@@ -35,18 +35,20 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
             return_value={'tenant_id': 101010})
 
         self.treq = patch(self, 'otter.rest.history.treq', new=mock_treq(
-            code=200, method='get', json_content={'hits': {
-                'hits': [{
-                    '_source': {
-                        'message': 'audit log event',
-                        'event_type': 'event-abc',
-                        '@timestamp': 1234567890,
-                        'policy_id': 'policy-xyz',
-                        'scaling_group_id': 'scaling-group-uvw',
-                        'server_id': 'server-rst',
-                    }
-                }]}}
-            ))
+            code=200, method='get', json_content={
+                'hits': {
+                    'hits': [{
+                        '_source': {
+                            'message': 'audit log event',
+                            'event_type': 'event-abc',
+                            '@timestamp': 1234567890,
+                            'policy_id': 'policy-xyz',
+                            'scaling_group_id': 'scaling-group-uvw',
+                            'server_id': 'server-rst',
+                        }
+                    }]
+                }
+            }))
 
     def test_history(self):
         """

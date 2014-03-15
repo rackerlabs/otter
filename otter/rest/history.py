@@ -128,7 +128,6 @@ class OtterHistory(object):
                 except:
                     pass
 
-
             for hit in body['hits']['hits']:
                 fields = hit['_source']
                 event = {'timestamp': fields['@timestamp']}
