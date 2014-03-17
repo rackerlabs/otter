@@ -5,18 +5,118 @@ Tests for :mod:`otter.scheduler`
 from twisted.trial.unittest import TestCase
 from twisted.internet import defer
 from twisted.internet.task import Clock
+from twisted.python.failure import Failure
 from twisted.internet.test.test_endpoints import MemoryProcessReactor
+from twisted.test import proto_helpers
 
 import mock
+import json
 from datetime import datetime, timedelta
+from testtools.matchers import IsInstance
 
 from otter.scheduler import (
-    SchedulerService, check_events_in_bucket, process_events, add_cron_events, execute_event)
-from otter.test.utils import iMock, patch, CheckFailure, mock_log, DeferredFunctionMixin
+    SchedulerService, check_events_in_bucket, process_events, add_cron_events, execute_event,
+    PartitionProtocol)
+from otter.test.utils import (
+    iMock, patch, CheckFailure, mock_log, DeferredFunctionMixin, matches)
+from otter.log.bound import BoundLog
 from otter.models.interface import (
     IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection)
 from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 from otter.controller import CannotExecutePolicyError
+
+
+class PartitionProtocolTests(TestCase):
+    """
+    Tests for `PartitionProtocol`
+    """
+
+    def setUp(self):
+        """
+        Setup sample `PartitionProtocol`
+        """
+        self.sch = mock.Mock(spec=SchedulerService)
+        self.tr = proto_helpers.StringTransport()
+        self.proto = PartitionProtocol(self.sch)
+        self.proto.makeConnection(self.tr)
+
+    def test_delimiter(self):
+        """
+        Delimiter is '\n'
+        """
+        self.assertEqual(self.proto.delimiter, '\n')
+
+    def test_line_recv(self):
+        """
+        lineReceived passes received buckets to scheduler
+        """
+        body = {'buckets': ['1', '2', '3']}
+        self.proto.lineReceived(json.dumps(body))
+        self.sch.set_buckets.assert_called_once_with(range(1, 4))
+
+    def test_line_recv_disconn(self):
+        """
+        lineReceived does nothing when disconnecting
+        """
+        body = {'buckets': ['1', '2', '3']}
+        self.tr.disconnecting = True
+        self.proto.lineReceived(json.dumps(body))
+        self.assertFalse(self.sch.set_buckets.called)
+
+    def test_line_recv_ignore(self):
+        """
+        lineReceived does nothing when ignore=True
+        """
+        body = {'buckets': ['1', '2', '3']}
+        self.proto.ignore = True
+        self.proto.lineReceived(json.dumps(body))
+        self.assertFalse(self.sch.set_buckets.called)
+
+    def test_conn_lost(self):
+        """
+        connectionLost calls scheduler.process_stopped()
+        """
+        f = Failure(ValueError(2))
+        self.proto.connectionLost(f)
+        self.sch.process_stopped.assert_called_once_with(f)
+
+    def test_conn_lost_disconn(self):
+        """
+        connectionLost does nothing when disconnecting
+        """
+        f = Failure(ValueError(2))
+        self.tr.disconnecting = True
+        self.proto.connectionLost(f)
+        self.assertFalse(self.sch.process_stopped.called)
+
+    def test_conn_lost_ignore(self):
+        """
+        connectionLost does nothing when getting ignored
+        """
+        f = Failure(ValueError(2))
+        self.proto.ignore = True
+        self.proto.connectionLost(f)
+        self.assertFalse(self.sch.process_stopped.called)
+
+    def test_disconnect(self):
+        """
+        disconnect() will call tr.loseConnection() and set disconnecting=False
+        """
+        # Cannot use self.tr since PartitionProtocol is explicitly setting tr.disconnecting=True
+        # on loseConnection() but we want to check if disconnecting is explicitly set
+        self.proto.transport = mock.Mock(spec=['disconnecting', 'loseConnection'])
+        self.proto.disconnect()
+        self.assertTrue(self.proto.transport.disconnecting)
+        self.proto.transport.loseConnection.assert_called_once_with()
+
+    def test_conn_made(self):
+        """
+        connectionMade() will set transport.disconnecting to True
+        """
+        # setting it to something to test if it is changed in connectionMade()
+        self.tr.disconnecting = 2
+        self.proto.connectionMade()
+        self.assertFalse(self.tr.disconnecting)
 
 
 class SchedulerTests(TestCase):
@@ -54,13 +154,14 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.zk_hosts = '127.0.0.1:2181'
         self.zk_partition_path = '/part_path'
         self.time_boundary = 15
-        self.buckets = range(1, 3)
+        self.buckets = range(1, 4)
 
         self.clock = Clock()
         self.reactor = MemoryProcessReactor()
-        self.scheduler_service = SchedulerService(
+        self.sservice = SchedulerService(
             100, 1, self.mock_store, self.zk_hosts, self.zk_partition_path,
-            self.time_boundary, self.buckets, self.reactor, clock=self.clock, threshold=600)
+            self.time_boundary, self.buckets, self.reactor, clock=self.clock,
+            threshold=60)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
 
         self.check_events_in_bucket = patch(self, 'otter.scheduler.check_events_in_bucket')
@@ -68,14 +169,20 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.returns = []
         self.setup_func(self.mock_store.get_oldest_event)
 
+
+class MostSchedulerServiceTests(SchedulerServiceTests):
+    """
+    Tests for most of the methods of `SchedulerService`
+    """
+
     def test_start_service(self):
         """
         startService() calls super's startService() and calls start_process()
         """
-        self.scheduler_service.start_process = mock.Mock(return_value=2)
-        d = self.scheduler_service.startService()
-        self.service.startService.assert_called_once_with(self.scheduler_service)
-        self.scheduler_service.start_process.assert_called_once_with()
+        self.sservice.start_process = mock.Mock(return_value=2)
+        d = self.sservice.startService()
+        self.assertTrue(self.sservice.running)
+        self.sservice.start_process.assert_called_once_with()
         self.assertEqual(d, 2)
 
     def test_start_process(self):
@@ -83,40 +190,175 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         start_process() spawns a new process with configured values. It sets the
         `PartitionProtocol` object in self.proc_protocol
         """
-        d = self.scheduler_service.start_process()
-        self.reactor.spawnProcess
-        self.assertEqual(self.reactor.executable, self.scheduler_service.python_exe)
+        d = self.sservice.start_process()
+        self.assertIsNone(self.successResultOf(d))
+        # Check if process was spawned
+        self.assertEqual(self.reactor.executable, self.sservice.python_exe)
         self.assertEqual(
             self.reactor.args,
-            [self.scheduler_service.python_exe, self.scheduler_service.partition_py_path,
+            [self.sservice.python_exe, self.sservice.partition_py_path,
              '127.0.0.1:2181', '/part_path', '1,2,3', '15', '1'])
         self.assertEqual(self.reactor.env, None)
+        # proc_protocol was set
+        self.assertIsInstance(self.sservice.proc_protocol, PartitionProtocol)
+        self.assertEqual(self.sservice.proc_protocol.scheduler, self.sservice)
+
+    def test_process_stopped_while_running(self):
+        """
+        `process_stopped` starts a new process if called when service is running
+        """
+        # Start process and check if protocol exists and running
+        self.sservice.startService()
+        protocol = self.sservice.proc_protocol
+        self.assertIsNot(protocol, None)
+        self.assertFalse(protocol.transport.disconnecting)
+
+        # Stop process and check if new proc_protocol is created
+        self.sservice.process_stopped(Failure(ValueError(2)))
+        self.log.err.assert_called_once_with(
+            CheckFailure(ValueError), 'Process unexpectedly stopped')
+        self.assertIsNot(self.sservice.proc_protocol, None)
+        self.assertNotEqual(self.sservice.proc_protocol, protocol)
+        self.assertFalse(self.sservice.proc_protocol.transport.disconnecting)
+
+    def test_process_stopped_while_not_running(self):
+        """
+        `process_stopped` does nothing if called when service is shutting down
+        """
+        self.sservice.startService()
+        self.assertIsNot(self.sservice.proc_protocol, None)
+        # So that it cannot be operated on
+        self.sservice.proc_protocol = mock.Mock(spec=[])
+
+        # Simulate service running and call `process_stopped`
+        self.sservice.running = False
+        self.sservice.process_stopped(Failure(ValueError(2)))
+
+        # protocol is not touched
+        self.assertIsNot(self.sservice.proc_protocol, None)
 
     def test_stop_service(self):
         """
-        stopService() calls super's stopService() and stops the allocation if it
-        is already acquired
+        stopService() calls super's stopService() and stops the process
         """
-        self.scheduler_service.startService()
-        self.kz_partition.acquired = True
-        d = self.scheduler_service.stopService()
-        self.timer_service.stopService.assert_called_once_with(self.scheduler_service)
-        self.kz_partition.finish.assert_called_once_with()
-        self.assertEqual(self.kz_partition.finish.return_value, d)
+        self.sservice.startService()
+        self.assertTrue(self.sservice.running)
+        self.sservice.stop_process = mock.Mock(return_value=2)
+        d = self.sservice.stopService()
+        self.assertFalse(self.sservice.running)
+        self.assertEqual(d, 2)
+
+    def test_stop_process(self):
+        """
+        `stop_process` will disconnect the protocol if it exists
+        """
+        # Does nothing (does not raise exception) if there is no protocol
+        self.sservice.stop_process()
+
+        # disconnects if there is protocol
+        self.sservice.startService()
+        prot = self.sservice.proc_protocol
+        prot.transport = mock.Mock(spec=['loseConnection', 'disconnecting'])
+
+        self.sservice.stop_process()
+        prot.transport.loseConnection.assert_called_once_with()
+        self.assertTrue(prot.transport.disconnecting)
+        self.assertIsNone(self.sservice.proc_protocol)
+
+    def test_reset(self):
+        """
+        `reset` starts process with new path and does nothing if existing protocol
+        is not there
+        """
+        self.sservice.reset('/new_path')
+        # starts new process with new path
+        self.assertEqual(
+            self.reactor.args,
+            [self.sservice.python_exe, self.sservice.partition_py_path,
+             '127.0.0.1:2181', '/new_path', '1,2,3', '15', '1'])
+
+    def test_reset_ignore(self):
+        """
+        `reset` ignores existing protocol and starts process with new one
+        """
+        self.sservice.startService()
+        prot = self.sservice.proc_protocol
+        self.sservice.reset('/new_path')
+
+        # protocol ignored
+        self.assertTrue(prot.ignore)
+        # starts new process with new path
+        self.assertEqual(
+            self.reactor.args,
+            [self.sservice.python_exe, self.sservice.partition_py_path,
+             '127.0.0.1:2181', '/new_path', '1,2,3', '15', '1'])
+        self.assertNotEqual(self.sservice.proc_protocol, prot)
+
+    def test_set_buckets(self):
+        """
+        `set_buckets` sets the buckets, last acquired time and calls check_events()
+        """
+        self.sservice.check_events = mock.Mock()
+        self.assertEqual(self.sservice.last_acquired_seconds, 0)
+        self.clock.advance(10)
+        self.sservice.set_buckets([2, 3])
+        self.assertEqual(self.sservice.last_acquired_seconds, 10)
+        self.assertEqual(self.sservice.buckets_acquired, [2, 3])
+        self.sservice.check_events.assert_called_once_with()
+
+    def test_check_events_not_acquired(self):
+        """
+        `check_events` logs message and does not check events in buckets when
+        buckets are not acquired
+        """
+        self.sservice.buckets_acquired = None
+        self.sservice.startService()
+        self.sservice.check_events()
+        self.log.msg.assert_called_with('No buckets')
+
+        # Ensure others are not called
+        self.assertFalse(self.check_events_in_bucket.called)
+
+    @mock.patch('otter.scheduler.datetime')
+    def test_check_events_acquired(self, mock_datetime):
+        """
+        `check_events` checks events in each bucket when they are partitoned.
+        """
+        self.sservice.startService()
+        self.sservice.buckets_acquired = [2, 3]
+        mock_datetime.utcnow.return_value = 'utcnow'
+
+        responses = [4, 5]
+        self.check_events_in_bucket.side_effect = lambda *_: defer.succeed(responses.pop(0))
+
+        d = self.sservice.check_events()
+
+        self.assertEqual(self.successResultOf(d), [4, 5])
+        self.log.msg.assert_called_once_with(
+            'Got buckets {buckets}', buckets=[2, 3], scheduler_run_id='transaction-id',
+            utcnow='utcnow')
+        self.check_events_in_bucket.assert_has_calls(
+            [mock.call(matches(IsInstance(BoundLog)), self.mock_store, 2, 'utcnow', 100),
+             mock.call(matches(IsInstance(BoundLog)), self.mock_store, 3, 'utcnow', 100)])
+
+
+class HealthCheckTests(SchedulerServiceTests):
+    """
+    Tests for `SchedulerService.health_check`
+    """
 
     def test_health_check_after_threshold(self):
         """
         `service.health_check` returns False when trigger time is above threshold
         """
-        self.kz_partition.acquired = True
-        self.scheduler_service.startService()
-        self.kz_partition.__iter__.return_value = [2, 3]
+        self.sservice.startService()
+        self.sservice.buckets_acquired = [2, 3]
         now = datetime.utcnow()
         returns = [{'trigger': now - timedelta(hours=1), 'version': 'v1'},
                    {'trigger': now - timedelta(seconds=2), 'version': 'v1'}]
         self.returns = returns[:]
 
-        d = self.scheduler_service.health_check()
+        d = self.sservice.health_check()
 
         self.assertEqual(self.successResultOf(d), (False, {'old_events': [returns[0]],
                                                            'buckets': [2, 3]}))
@@ -126,14 +368,13 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         """
         `service.health_check` returns True when trigger time is below threshold
         """
-        self.kz_partition.acquired = True
-        self.scheduler_service.startService()
-        self.kz_partition.__iter__.return_value = [2, 3]
+        self.sservice.buckets_acquired = [2, 3]
+        self.sservice.startService()
         now = datetime.utcnow()
         self.returns = [{'trigger': now + timedelta(hours=1), 'version': 'v1'},
                         {'trigger': now + timedelta(seconds=2), 'version': 'v1'}]
 
-        d = self.scheduler_service.health_check()
+        d = self.sservice.health_check()
 
         self.assertEqual(self.successResultOf(d), (True, {'old_events': [],
                                                           'buckets': [2, 3]}))
@@ -143,12 +384,11 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         """
         `service.health_check` returns True when there are no triggers
         """
-        self.kz_partition.acquired = True
-        self.scheduler_service.startService()
-        self.kz_partition.__iter__.return_value = [2, 3]
+        self.sservice.startService()
+        self.sservice.buckets_acquired = [2, 3]
         self.returns = [None, None]
 
-        d = self.scheduler_service.health_check()
+        d = self.sservice.health_check()
 
         self.assertEqual(self.successResultOf(d), (True, {'old_events': [],
                                                           'buckets': [2, 3]}))
@@ -158,134 +398,24 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         """
         `service.health_check` returns False when partition is not acquired
         """
-        self.kz_partition.acquired = False
-        self.scheduler_service.startService()
-        self.kz_partition.__iter__.return_value = [2, 3]
+        self.sservice.startService()
 
-        d = self.scheduler_service.health_check()
+        d = self.sservice.health_check()
 
         self.assertEqual(self.successResultOf(d), (False, {'reason': 'Not acquired'}))
         self.assertFalse(self.mock_store.get_oldest_event.called)
 
-    def test_stop_service_allocating(self):
+    def test_health_check_idle(self):
         """
-        stopService() does not stop the allocation (i.e. call finish) if it is not acquired
+        `service.health_check` returns False if bucket updates have not been
+        received in a while
         """
-        self.scheduler_service.startService()
-        d = self.scheduler_service.stopService()
-        self.assertFalse(self.kz_partition.finish.called)
-        self.assertIsNone(d)
-
-    def test_check_events_allocating(self):
-        """
-        `check_events` logs message and does not check events in buckets when
-        buckets are still allocating
-        """
-        self.kz_partition.allocating = True
-        self.scheduler_service.startService()
-        self.scheduler_service.check_events(100)
-        self.log.msg.assert_called_with('Partition allocating')
-
-        # Ensure others are not called
-        self.assertFalse(self.kz_partition.__iter__.called)
-        self.assertFalse(self.check_events_in_bucket.called)
-
-    def test_check_events_release(self):
-        """
-        `check_events` logs message and does not check events in buckets when
-        partitioning has changed. It calls release_set() to re-partition
-        """
-        self.kz_partition.release = True
-        self.scheduler_service.startService()
-        self.scheduler_service.check_events(100)
-        self.log.msg.assert_called_with('Partition changed. Repartitioning')
-        self.kz_partition.release_set.assert_called_once_with()
-
-        # Ensure others are not called
-        self.assertFalse(self.kz_partition.__iter__.called)
-        self.assertFalse(self.check_events_in_bucket.called)
-
-    def test_check_events_failed(self):
-        """
-        `check_events` logs message and does not check events in buckets when
-        partitioning has failed. It creates a new partition
-        """
-        self.kz_partition.failed = True
-        self.scheduler_service.startService()
-
-        # after starting change SetPartitioner return value to check if
-        # new value is set in self.scheduler_service.kz_partition
-        new_kz_partition = mock.MagicMock()
-        self.kz_client.SetPartitioner.return_value = new_kz_partition
-
-        self.scheduler_service.check_events(100)
-        self.log.msg.assert_called_with('Partition failed. Starting new')
-
-        # Called once when starting and now again when partition failed
-        self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
-                         [mock.call(self.zk_partition_path, set=set(self.buckets),
-                                    time_boundary=self.time_boundary)] * 2)
-        self.assertEqual(self.scheduler_service.kz_partition, new_kz_partition)
-
-        # Ensure others are not called
-        self.assertFalse(self.kz_partition.__iter__.called)
-        self.assertFalse(new_kz_partition.__iter__.called)
-        self.assertFalse(self.check_events_in_bucket.called)
-
-    def test_check_events_bad_state(self):
-        """
-        `self.kz_partition.state` is none of the exepected values. `check_events`
-        logs it as err and starts a new partition
-        """
-        self.kz_partition.state = 'bad'
-        self.scheduler_service.startService()
-
-        # after starting change SetPartitioner return value to check if
-        # new value is set in self.scheduler_service.kz_partition
-        new_kz_partition = mock.MagicMock()
-        self.kz_client.SetPartitioner.return_value = new_kz_partition
-
-        self.scheduler_service.check_events(100)
-
-        self.log.err.assert_called_with('Unknown state bad. This cannot happen. Starting new')
-        self.kz_partition.finish.assert_called_once_with()
-
-        # Called once when starting and now again when got bad state
-        self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
-                         [mock.call(self.zk_partition_path, set=set(self.buckets),
-                                    time_boundary=self.time_boundary)] * 2)
-        self.assertEqual(self.scheduler_service.kz_partition, new_kz_partition)
-
-        # Ensure others are not called
-        self.assertFalse(self.kz_partition.__iter__.called)
-        self.assertFalse(new_kz_partition.__iter__.called)
-        self.assertFalse(self.check_events_in_bucket.called)
-
-    @mock.patch('otter.scheduler.datetime')
-    def test_check_events_acquired(self, mock_datetime):
-        """
-        `check_events` checks events in each bucket when they are partitoned.
-        """
-        self.kz_partition.acquired = True
-        self.scheduler_service.startService()
-        self.kz_partition.__iter__.return_value = [2, 3]
-        self.scheduler_service.log = mock.Mock()
-        mock_datetime.utcnow.return_value = 'utcnow'
-
-        responses = [4, 5]
-        self.check_events_in_bucket.side_effect = lambda *_: defer.succeed(responses.pop(0))
-
-        d = self.scheduler_service.check_events(100)
-
-        self.assertEqual(self.successResultOf(d), [4, 5])
-        self.assertEqual(self.kz_partition.__iter__.call_count, 1)
-        self.scheduler_service.log.bind.assert_called_once_with(
-            scheduler_run_id='transaction-id', utcnow='utcnow')
-        log = self.scheduler_service.log.bind.return_value
-        log.msg.assert_called_once_with('Got buckets {buckets}', buckets=[2, 3])
-        self.assertEqual(self.check_events_in_bucket.mock_calls,
-                         [mock.call(log, self.mock_store, 2, 'utcnow', 100),
-                          mock.call(log, self.mock_store, 3, 'utcnow', 100)])
+        self.sservice.set_buckets([2, 3])
+        self.clock.advance(61)
+        d = self.sservice.health_check()
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, {'reason': 'No bucket updates for 61.0 seconds'}))
 
 
 class CheckEventsInBucketTests(SchedulerTests):
