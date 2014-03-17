@@ -139,7 +139,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         validate(resp, rest_schemas.list_webhooks_response)
         self.assertEqual(len(resp['webhooks']), 3)
         self.assertEqual(resp['webhooks_links'], [{
-            'href': '/v1.0/11111/groups/1/policies/2/webhooks/?marker=2&limit=3',
+            'href': '/v1.0/11111/groups/1/policies/2/webhooks/?limit=3&marker=2',
             'rel': 'next'
         }])
 
