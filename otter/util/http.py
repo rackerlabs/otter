@@ -4,6 +4,7 @@ HTTP utils, such as formulation of URLs
 
 from itertools import chain
 from urllib import quote, urlencode
+from urlparse import urlsplit, urlunsplit, parse_qs
 
 import treq
 
@@ -173,17 +174,33 @@ def _pagination_link(url, rel, limit, marker):
     :return: ``dict`` containing an href and the rel, the href being a link
         to the collection represented by the url, limit, and marker
     """
-    # these are tuples, not a dictionary, to ensure consistent ordering of the
-    # url for testing
-    query_params = []
+    query_params = {}
 
     if marker is not None:
-        query_params = [('marker', marker), ('limit', limit)]
+        query_params = {'marker': marker, 'limit': limit}
     elif limit != (config_value('limits.pagination') or 100):
-        query_params.append(('limit', limit))
+        query_params['limit'] = limit
+
+    url_parts = list(urlsplit(url))
+    if not (url_parts[0] and url_parts[1]):  # scheme and netloc
+        # 3 is query
+        url_parts[:3] = list(urlsplit(append_segments(get_url_root(),
+                                      url_parts[2].lstrip('/'))))[:3]
+        url = urlunsplit(url_parts)
 
     if query_params:
-        url = "{0}?{1}".format(url, urlencode(query_params))
+        query = parse_qs(url_parts[3])
+        query.update(query_params)
+
+        query_params = []
+        for k in sorted(query.keys()):  # sorting, for testability
+            if isinstance(query[k], list):
+                query_params.extend([(k, v) for v in query[k]])
+            else:
+                query_params.append((k, query[k]))
+
+        url_parts[3] = urlencode(query_params)
+        url = urlunsplit(url_parts)
 
     return {'href': url, 'rel': rel}
 
