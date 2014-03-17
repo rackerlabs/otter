@@ -259,7 +259,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         validate(resp, rest_schemas.list_groups_response)
         self.assertEqual(
             resp['groups_links'],
-            [{'href': self.endpoint + '?marker=one&limit=1', 'rel': 'next'}])
+            [{'href': self.endpoint + '?limit=1&marker=one', 'rel': 'next'}])
 
     def test_group_create_bad_input_400(self):
         """
