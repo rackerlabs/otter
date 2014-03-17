@@ -269,7 +269,7 @@ class CollectionLinksTests(TestCase):
         """
         self.coll = [{'id': '23'}, {'id': '567'}, {'id': '3444'}]
         set_config_data({'url_root': 'http://localhost'})
-        self.addCleanup(lambda: set_config_data({}))
+        self.addCleanup(set_config_data, {})
 
     def test_small_collection(self):
         """

@@ -97,14 +97,13 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         """
         super(AllGroupsEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
-        patch(self, 'otter.util.http.get_url_root', return_value="")
 
         # Patch supervisor
         self.supervisor = mock.Mock(spec=['validate_launch_config'])
         self.supervisor.validate_launch_config.return_value = defer.succeed(None)
         set_supervisor(self.supervisor)
 
-        set_config_data({'limits': {'pagination': 100}})
+        set_config_data({'limits': {'pagination': 100}, 'url_root': ''})
 
     def tearDown(self):
         """
