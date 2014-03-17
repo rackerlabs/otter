@@ -46,6 +46,8 @@ class PartitionProtocol(LineOnlyReceiver):
             self.scheduler.process_stopped(reason)
 
     def disconnect(self):
+        # Ideally, need not explicitly set this but doing this since ProcessTransport
+        # does not have disconnecting attr
         self.transport.disconnecting = True
         self.transport.loseConnection()
 
@@ -143,7 +145,7 @@ class SchedulerService(Service):
         """
         # TODO: Collect the old protocol and check if there are too many hanging around
         # instead of blindly ignoring them
-        # Only ignore the currently running process. let it run
+        # Only ignore the currently running process. Do not stop it, let it run
         if self.proc_protocol:
             self.proc_protocol.ignore = True
             self.proc_protocol = None
