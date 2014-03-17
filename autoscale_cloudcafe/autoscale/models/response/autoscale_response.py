@@ -21,6 +21,7 @@ class ScalingGroup(AutoMarshallingModel):
         super(ScalingGroup, self).__init__()
         for keys, values in kwargs.items():
             setattr(self, keys, values)
+            #print 'ScalingGroup', (keys, values)
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
@@ -53,11 +54,14 @@ class ScalingGroup(AutoMarshallingModel):
             scaling_group.launchConfiguration = Config._dict_to_obj(
                 scaling_group.launchConfiguration)
         if hasattr(scaling_group, 'scalingPolicies'):
+            print "Marshal ScalingGroup\n"
             temp = []
+            #print "scaling_group ", scaling_group.scalingPolicies
             for policy in scaling_group.scalingPolicies:
                 s = Policy._dict_to_obj(policy)
                 temp.append(s)
                 setattr(scaling_group, 'scalingPolicies', temp)
+                #print "ScalingPolicies", temp
         for each in scaling_group_dict:
             if each.startswith('{'):
                 newkey = re.split('}', each)[1]
@@ -224,11 +228,21 @@ class Policy(AutoMarshallingModel):
         """
         Helper method to turn dictionary into Policy instance
         """
+        print "Marshal Policy\n"
         policy = Policy(**policy_dict)
         if hasattr(policy, 'links'):
             policy.links = Links._dict_to_obj(policy.links)
         if hasattr(policy, 'args'):
             policy.args = PolicyArgs._dict_to_obj(policy.args)
+        if hasattr(policy, 'webhooks'):
+            print "Marshal Webhooks ----------------\n"
+            temp = []
+            for webhook in policy.webhooks:
+                w = Webhook._dict_to_obj(webhook)
+                temp.append(w)
+                setattr(policy, 'webhooks', temp)
+            print "--------------------------------------"
+                #print temp
         attr_list = ['id', 'name', 'change', 'changePercent',
                      'desiredCapacity', 'cooldown', 'type']
         for k in attr_list:

@@ -558,6 +558,26 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Webhooks)
 
+    def manifest_webhooks(self, group_id, webhooks="True", requestslib_kwargs=None, url=None):
+        """
+        :summary: List a manifest of the webhooks on each policy in the scaling group.
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+        :return: Response Object containing response code 200 and body with
+                 the list of the polices and webhooks on the scaling group
+        :rtype: Response Object
+
+        GET
+        '/<tenantId>/groups/<groupId>?webhooks=True'
+        """
+        params = {'webhooks': webhooks}
+        url = url or '%s/groups/%s' % (
+            self.url, group_id)
+        print "REQUEST URL:  ", url
+        return self.request('GET', url, params=params,
+                            requestslib_kwargs=requestslib_kwargs,
+                            response_entity_type=ScalingGroup)
+
     def update_webhook(self, group_id, policy_id, webhook_id, name,
                        metadata=None, requestslib_kwargs=None):
         """

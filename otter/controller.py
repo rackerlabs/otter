@@ -38,7 +38,7 @@ from otter.util.timestamp import from_timestamp
 
 
 # Amount of time spaced between starting delete jobs when scaling down
-DELETE_WAIT_INTERVAL = 60
+DELETE_WAIT_INTERVAL = 0
 
 
 class CannotExecutePolicyError(Exception):
