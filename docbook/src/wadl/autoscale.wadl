@@ -180,8 +180,7 @@
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         xml:lang="EN">
                         <para>One or more load balancers to which to
-                            add new servers.</para>
-                        <para>All servers are added to these load
+                            add new servers. All servers are added to these load
                             balancers with the IP addresses of their
                             ServiceNet network. All servers are
                             enabled and equally weighted. Any new
@@ -410,11 +409,11 @@
                         xml:lang="EN"><para>The time when this policy
                             runs. This property is mutually exclusive
                             with the <code>cron</code> parameter. You
-                            can either provide <code>cron</code> or
-                            "at" for a given policy, but not both. You
-                            must specify seconds when using "at". If
-                            seconds are not specified, a 400 error is
-                            returned.</para></wadl:doc>
+                            must specify seconds when using "at". For example, 
+                            <code>"at": "2013-12-05T03:12:00Z"</code>. 
+                            If seconds are not specified, a 400 error is
+                            returned. Note, the policy is triggered within a 
+                            10-second range of the time specified by <code>at</code>.</para></wadl:doc>
                 </param>
                 <param style="plain" name="changePercent"
                     required="false" type="number"
@@ -998,7 +997,8 @@
                         given policy, but not both. You must specify
                         seconds when using "at". If seconds are not
                         specified, a 400 error is
-                    returned.</para></wadl:doc>
+                        returned. Note, the policy is triggered within a 
+                        10-second range of the time specified by <code>at</code>. </para></wadl:doc>
             </param>
             <param style="plain" name="changePercent" required="false"
                 type="number" path="$.[*].changePercent">
