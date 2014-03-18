@@ -26,8 +26,10 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
         super(OtterHistoryTestCase, self).setUp()
         set_config_data({
             'elasticsearch': {'host': 'http://dummy'},
-            'limits': {'pagination': 20}})
-        self.addCleanup(lambda: set_config_data({}))
+            'limits': {'pagination': 20},
+            'url_root': 'http://localhost'})
+
+        self.addCleanup(set_config_data, {})
 
         self.log = patch(self, 'otter.rest.history.log', new=mock_log())
         self.make_auditlog_query = patch(
@@ -63,7 +65,7 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
                 'server_id': 'server-rst',
                 'message': 'audit log event',
             }],
-            'events_links': [{'href': '/v1.0/101010/history', 'rel': 'self'}]
+            'events_links': [{'href': 'http://localhost/v1.0/101010/history', 'rel': 'self'}]
         }
 
         result = self.successResultOf(
@@ -93,12 +95,13 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
                 'server_id': 'server-rst',
                 'message': 'audit log event',
             }],
-            'events_links': [{'href': '/v1.0/101010/history?marker=10&limit=1', 'rel': 'self'},
-                             {'href': '/v1.0/101010/history?marker=11&limit=1', 'rel': 'next'}]
+            'events_links': [
+                {'href': 'http://localhost/v1.0/101010/history?limit=1&marker=10', 'rel': 'self'},
+                {'href': 'http://localhost/v1.0/101010/history?limit=1&marker=11', 'rel': 'next'}]
         }
 
         result = self.successResultOf(
-            request(self.root, "GET", self.endpoint + "?marker=10&limit=1"))
+            request(self.root, "GET", self.endpoint + "?limit=1&marker=10"))
 
         self.assertEqual(200, result.response.code)
         self.assertEqual(expected, json.loads(result.content))
