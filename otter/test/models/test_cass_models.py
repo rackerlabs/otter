@@ -6,6 +6,7 @@ import json
 import mock
 from datetime import datetime
 import itertools
+from copy import deepcopy
 
 from twisted.trial.unittest import TestCase
 from jsonschema import ValidationError
@@ -18,7 +19,9 @@ from otter.models.cass import (
     CassAdmin,
     serialize_json_data,
     get_consistency_level,
-    verified_view)
+    verified_view,
+    _assemble_webhook_from_row,
+    assemble_webhooks_in_policies)
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
@@ -131,6 +134,108 @@ class GetConsistencyTests(TestCase):
         """
         level = get_consistency_level('fetch', 'event')
         self.assertEqual(level, ConsistencyLevel.QUORUM)
+
+    def test_group_create(self):
+        """
+        Gives QUORUM on group create
+        """
+        level = get_consistency_level('create', 'group')
+        self.assertEqual(level, ConsistencyLevel.QUORUM)
+
+    def test_update_state(self):
+        """
+        Gives QUORUM on updating state
+        """
+        level = get_consistency_level('update', 'state')
+        self.assertEqual(level, ConsistencyLevel.QUORUM)
+
+
+class AssembleWebhooksTests(TestCase):
+    """
+    Tests for `assemble_webhooks_in_policies`
+    """
+
+    def setUp(self):
+        """
+        sample policies, mock _assemble_webhook_from_row
+        """
+        self.policies = [{'id': str(i)} for i in range(10)]
+        self.awfr = patch(self, 'otter.models.cass._assemble_webhook_from_row')
+        self.awfr.side_effect = lambda w, **ka: w['policyId'] + w['webhookId']
+
+    def test_no_webhooks(self):
+        """
+        No webhooks in any policies
+        """
+        policies = assemble_webhooks_in_policies(self.policies, [])
+        for policy in policies:
+            self.assertEqual(policy['webhooks'], [])
+
+    def test_no_policies(self):
+        """
+        No policies will just return same empty list
+        """
+        self.assertEqual(assemble_webhooks_in_policies([], []), [])
+        self.assertEqual(
+            assemble_webhooks_in_policies([], [{'policyId': '1', 'webhookId': 'w'}]), [])
+
+    def test_all_webhooks(self):
+        """
+        All the policies have webhooks
+        """
+        webhooks = [{'policyId': str(i), 'webhookId': 'p{}{}'.format(i, j)}
+                    for i in range(len(self.policies)) for j in [0, 1]]
+        policies = assemble_webhooks_in_policies(self.policies, webhooks)
+        for i, policy in enumerate(policies):
+            self.assertEqual(
+                policy['webhooks'], ['{}p{}0'.format(i, i), '{}p{}1'.format(i, i)])
+
+    def test_some_webhooks(self):
+        """
+        Only some policies have webhooks
+        """
+        webhooks = [{'policyId': '0', 'webhookId': 'w01'},
+                    {'policyId': '0', 'webhookId': 'w02'},
+                    {'policyId': '1', 'webhookId': 'w11'},
+                    {'policyId': '3', 'webhookId': 'w31'},
+                    {'policyId': '3', 'webhookId': 'w32'},
+                    {'policyId': '9', 'webhookId': 'w91'}]
+        policies = assemble_webhooks_in_policies(self.policies, webhooks)
+        for i in set(range(10)) - set([0, 1, 3, 9]):
+            self.assertEqual(policies[i]['webhooks'], [])
+        self.assertEqual(policies[0]['webhooks'], ['0w01', '0w02'])
+        self.assertEqual(policies[1]['webhooks'], ['1w11'])
+        self.assertEqual(policies[3]['webhooks'], ['3w31', '3w32'])
+        self.assertEqual(policies[9]['webhooks'], ['9w91'])
+
+    def test_last_policies(self):
+        """
+        Last policies with no webhooks have empty list
+        """
+        webhooks = [{'policyId': '0', 'webhookId': 'w01'},
+                    {'policyId': '0', 'webhookId': 'w02'},
+                    {'policyId': '1', 'webhookId': 'w11'}]
+        policies = assemble_webhooks_in_policies(self.policies, webhooks)
+        for i in range(2, 10):
+            self.assertEqual(policies[i]['webhooks'], [])
+        self.assertEqual(policies[0]['webhooks'], ['0w01', '0w02'])
+        self.assertEqual(policies[1]['webhooks'], ['1w11'])
+
+    def test_extra_webhooks(self):
+        """
+        webhooks that don't belong to any policy is ignored
+        """
+        webhooks = [{'policyId': '0', 'webhookId': 'w01'},
+                    {'policyId': '15', 'webhookId': 'w151'},
+                    {'policyId': '3', 'webhookId': 'w31'},
+                    {'policyId': '35', 'webhookId': 'w351'},
+                    {'policyId': '9', 'webhookId': 'w91'}]
+        policies = assemble_webhooks_in_policies(self.policies, webhooks)
+        for i in set(range(10)) - set([0, 3, 9]):
+            self.assertEqual(policies[i]['webhooks'], [])
+        self.assertEqual(policies[0]['webhooks'], ['0w01'])
+        self.assertEqual(policies[3]['webhooks'], ['3w31'])
+        self.assertEqual(policies[9]['webhooks'], ['9w91'])
 
 
 class VerifiedViewTests(TestCase):
@@ -311,12 +416,13 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         cass_response = [
             {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}]
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23, 'desired': 10}]
         self.returns = [cass_response]
         d = self.group.view_state()
         r = self.successResultOf(d)
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
-                       '"groupTouched", "policyTouched", paused, created_at FROM scaling_group '
+                       '"groupTouched", "policyTouched", paused, desired, created_at '
+                       'FROM scaling_group '
                        'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -324,7 +430,39 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                                         ConsistencyLevel.TWO)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
                                        'a', {'A': 'R'},
-                                       {'P': 'R'}, '123', {'PT': 'R'}, False))
+                                       {'P': 'R'}, '123', {'PT': 'R'}, False,
+                                       desired=10))
+
+    def test_view_state_no_desired_capacity(self):
+        """
+        If there is no desired capacity, it defaults to 0
+        """
+        cass_response = [
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
+             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23, 'desired': None}]
+        self.returns = [cass_response]
+        r = self.successResultOf(self.group.view_state())
+        self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
+                                       'a', {'A': 'R'},
+                                       {'P': 'R'}, '123', {'PT': 'R'}, False,
+                                       desired=0))
+
+    def test_view_respsects_consistency_argument(self):
+        """
+        If a consistency argument is passed to ``view_state``, it is honored
+        over the default consistency
+        """
+        cass_response = [
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
+             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0, 'created_at': 23}]
+        self.returns = [cass_response]
+        d = self.group.view_state(consistency=ConsistencyLevel.ALL)
+        self.successResultOf(d)
+        self.connection.execute.assert_called_once_with(mock.ANY,
+                                                        mock.ANY,
+                                                        ConsistencyLevel.ALL)
 
     def test_view_state_no_such_group(self):
         """
@@ -344,12 +482,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         cass_response = [
             {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': None}]
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': None, 'created_at': None}]
         self.returns = [cass_response, None]
         d = self.group.view_state()
         self.failureResultOf(d, NoSuchScalingGroupError)
         viewCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
-                   '"groupTouched", "policyTouched", paused, created_at FROM scaling_group '
+                   '"groupTouched", "policyTouched", paused, desired, created_at FROM scaling_group '
                    'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         delCql = ('DELETE FROM scaling_group '
                   'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
@@ -366,14 +504,14 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         cass_response = _cassandrify_data([
             {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x01', 'created_at': 3}])
+             'policyTouched': '{"PT":"R"}', 'paused': '\x01', 'desired': 0, 'created_at': 3}])
 
         self.returns = [cass_response]
         d = self.group.view_state()
         r = self.successResultOf(d)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
                                        'a', {'A': 'R'}, {'P': 'R'},
-                                       '123', {'PT': 'R'}, True))
+                                       '123', {'PT': 'R'}, True, desired=0))
 
     @mock.patch('otter.models.cass.serialize_json_data',
                 side_effect=lambda *args: _S(args[0]))
@@ -382,23 +520,24 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         ``modify_state`` writes the state the modifier returns to the database
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None,
+                              {}, True, desired=5)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
         d = self.group.modify_state(modifier)
         self.assertEqual(self.successResultOf(d), None)
+        self.group.view_state.assert_called_once_with(ConsistencyLevel.TWO)
         expectedCql = (
             'INSERT INTO scaling_group("tenantId", "groupId", active, '
-            'pending, "groupTouched", "policyTouched", paused) VALUES('
+            'pending, "groupTouched", "policyTouched", paused, desired) VALUES('
             ':tenantId, :groupId, :active, :pending, :groupTouched, '
-            ':policyTouched, :paused)')
-
+            ':policyTouched, :paused, :desired)')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
                         "active": _S({}), "pending": _S({}),
                         "groupTouched": '0001-01-01T00:00:00Z',
                         "policyTouched": _S({}),
-                        "paused": True}
+                        "paused": True, "desired": 5}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
@@ -1076,6 +1215,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
+    def test_naive_list_all_webhooks(self):
+        """
+        Listing all webhooks from `_naive_list_all_webhooks` makes the right query
+        """
+        self.returns = [[{'webhookId': 'w1'}]]
+        d = self.group._naive_list_all_webhooks()
+
+        self.assertEqual(self.successResultOf(d), [{'webhookId': 'w1'}])
+        exp_cql = ('SELECT * FROM policy_webhooks WHERE "tenantId" = :tenantId '
+                   'AND "groupId" = :groupId ORDER BY "groupId", "policyId", "webhookId";')
+        self.connection.execute.assert_called_once_with(
+            exp_cql, {'tenantId': self.tenant_id, 'groupId': self.group_id},
+            ConsistencyLevel.TWO)
+
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
     def test_naive_list_webhooks_valid_policy(self, mock_get_policy):
@@ -1396,10 +1549,10 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
             'launch_config': serialize_json_data(self.launch_config, 1.0),
             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
         })
-        self.group._naive_list_policies = mock.MagicMock(
-            return_value=defer.succeed([]))
+        self.group._naive_list_policies = mock.Mock(return_value=defer.succeed([]))
 
         self.assertEqual(self.validate_view_manifest_return_value(), {
             'groupConfiguration': self.config,
@@ -1414,10 +1567,10 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                 {'PT': 'R'}, False)
         })
 
-        self.group._naive_list_policies.assert_called_once_with(limit=10)
+        self.group._naive_list_policies.assert_called_once_with()
 
         view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
-                    'pending, "groupTouched", "policyTouched", paused, created_at '
+                    'pending, "groupTouched", "policyTouched", paused, desired, created_at '
                     'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
         exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
@@ -1425,6 +1578,79 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                               exp_data, ConsistencyLevel.TWO,
                                               matches(IsInstance(NoSuchScalingGroupError)),
                                               self.mock_log)
+
+    @mock.patch('otter.models.cass.assemble_webhooks_in_policies')
+    @mock.patch('otter.models.cass.verified_view')
+    def test_view_manifest_with_webhooks(self, verified_view, mock_awip):
+        """
+        Viewing manifest with_webhooks=True returns webhooks inside policies by
+        calling `assemble_webhooks_in_policies`
+        """
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
+        })
+        mock_awip.return_value = 'assembled scaling policies'
+
+        # Getting policies
+        self.group._naive_list_policies = mock.Mock(
+            return_value=defer.succeed('raw policies'))
+
+        # Getting webhooks
+        self.group._naive_list_all_webhooks = mock.Mock(
+            return_value=defer.succeed('raw webhooks'))
+
+        # Getting the result and comparing
+        resp = self.successResultOf(self.group.view_manifest(with_webhooks=True))
+        self.assertEqual(resp['scalingPolicies'], 'assembled scaling policies')
+        mock_awip.assert_called_once_with('raw policies', 'raw webhooks')
+        self.group._naive_list_policies.assert_called_once_with()
+        self.group._naive_list_all_webhooks.assert_called_once_with()
+
+    @mock.patch('otter.models.cass.verified_view')
+    def test_view_manifest_with_webhooks_integration(self, verified_view):
+        """
+        Viewing manifest with_webhooks=True returns webhooks inside policies that
+        matches the `model_schemas.manifest`
+        """
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
+        })
+
+        # Getting policies
+        policies = [group_examples.policy()[i] for i in range(3)]
+        [policy.update({'id': str(i)}) for i, policy in enumerate(policies)]
+        self.group._naive_list_policies = mock.Mock(return_value=defer.succeed(policies))
+
+        # Getting webhooks
+        wh_part = {'data': '{"name": "a", "metadata": {"a": "b"}}',
+                   'capability': '{"version": "v1"}'}
+        webhooks = [{'policyId': '0', 'webhookId': '11'},
+                    {'policyId': '0', 'webhookId': '12'},
+                    {'policyId': '2', 'webhookId': '21'},
+                    {'policyId': '2', 'webhookId': '22'},
+                    {'policyId': '2', 'webhookId': '23'}]
+        [webhook.update(wh_part) for webhook in webhooks]
+        self.group._naive_list_all_webhooks = mock.Mock(return_value=defer.succeed(webhooks))
+
+        # Getting the result and comparing
+        resp = self.validate_view_manifest_return_value(with_webhooks=True)
+        exp_policies = deepcopy(policies)
+        exp_policies[0]['webhooks'] = [_assemble_webhook_from_row(webhooks[0], True),
+                                       _assemble_webhook_from_row(webhooks[1], True)]
+        exp_policies[1]['webhooks'] = []
+        exp_policies[2]['webhooks'] = [
+            _assemble_webhook_from_row(webhook, True) for webhook in webhooks[2:]]
+        self.assertEqual(resp['scalingPolicies'], exp_policies)
 
     @mock.patch('otter.models.cass.verified_view',
                 return_value=defer.fail(NoSuchScalingGroupError(2, 3)))
@@ -1455,7 +1681,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         r = self.group.view_manifest()
         self.failureResultOf(r, NoSuchScalingGroupError)
         view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
-                    'pending, "groupTouched", "policyTouched", paused, created_at '
+                    'pending, "groupTouched", "policyTouched", paused, desired, created_at '
                     'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
         exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
@@ -1975,6 +2201,31 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         self.connection.execute.assert_called_once_with(
             cql, data, ConsistencyLevel.ONE)
 
+    def test_get_oldest_event(self):
+        """
+        Tests for `get_oldest_event`
+        """
+        events = [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef',
+                   'trigger': 100, 'cron': 'c1', 'version': 'v1'}]
+        self.returns = [events]
+
+        d = self.collection.get_oldest_event(2)
+
+        self.assertEqual(self.successResultOf(d), events[0])
+        self.connection.execute.assert_called_once_with(
+            'SELECT * from scaling_schedule_v2 WHERE bucket=:bucket LIMIT 1;',
+            {'bucket': 2}, ConsistencyLevel.ONE)
+
+    def test_get_oldest_event_empty(self):
+        """
+        Tests for `get_oldest_event`
+        """
+        self.returns = [[]]
+
+        d = self.collection.get_oldest_event(2)
+
+        self.assertIsNone(self.successResultOf(d))
+
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
@@ -2035,13 +2286,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "active": '{}',
             "pending": '{}',
             "policyTouched": '{}',
-            "paused": False}
+            "paused": False,
+            "desired": 0}
         expectedCql = ('BEGIN BATCH '
                        'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
                        'launch_config, active, pending, "policyTouched", '
-                       'paused, created_at) '
+                       'paused, desired, created_at) '
                        'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-                       ':pending, :policyTouched, :paused, :created_at) '
+                       ':pending, :policyTouched, :paused, :desired, :created_at) '
                        'APPLY BATCH;')
         self.mock_key.return_value = '12345678'
 
@@ -2078,6 +2330,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'tenantId': '123',
             "active": '{}',
             "pending": '{}',
+            "desired": 0,
             "policyTouched": '{}',
             "paused": False,
             'policy0policyId': '12345678',
@@ -2086,9 +2339,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'BEGIN BATCH '
             'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
-            'launch_config, active, pending, "policyTouched", paused, created_at) '
+            'launch_config, active, pending, "policyTouched", paused, desired, created_at) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-            ':pending, :policyTouched, :paused, :created_at) '
+            ':pending, :policyTouched, :paused, :desired, :created_at) '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
             'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
             'APPLY BATCH;')
@@ -2129,6 +2382,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "pending": '{}',
             "policyTouched": '{}',
             "paused": False,
+            "desired": 0,
             'policy0policyId': '2',
             'policy0data': _S(policies[0]),
             'policy0version': 'timeuuid',
@@ -2138,9 +2392,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'BEGIN BATCH '
             'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
-            'launch_config, active, pending, "policyTouched", paused, created_at) '
+            'launch_config, active, pending, "policyTouched", paused, desired, created_at) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-            ':pending, :policyTouched, :paused, :created_at) '
+            ':pending, :policyTouched, :paused, :desired, :created_at) '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
             'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
@@ -2221,12 +2475,13 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'groupTouched': None,
             'policyTouched': '{}',
             'paused': '\x00',
+            'desired': 0,
             'created_at': 23
         } for i in range(2)]]
 
         expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
-                       '"groupTouched", "policyTouched", paused, created_at FROM '
+                       '"groupTouched", "policyTouched", paused, desired, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -2245,7 +2500,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
-                       '"groupTouched", "policyTouched", paused, created_at FROM '
+                       '"groupTouched", "policyTouched", paused, desired, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
@@ -2261,7 +2516,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.returns = [[]]
         expectedData = {'tenantId': '123', 'limit': 5}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
-                       '"groupTouched", "policyTouched", paused, created_at FROM '
+                       '"groupTouched", "policyTouched", paused, desired, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         self.collection.list_scaling_group_states(self.mock_log, '123', limit=5)
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -2275,7 +2530,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.returns = [[]]
         expectedData = {'tenantId': '123', 'limit': 100, 'marker': '345'}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
-                       '"groupTouched", "policyTouched", paused, created_at FROM '
+                       '"groupTouched", "policyTouched", paused, desired, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId AND '
                        '"groupId" > :marker LIMIT :limit;')
         self.collection.list_scaling_group_states(self.mock_log, '123',
@@ -2298,6 +2553,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'groupTouched': None,
             'policyTouched': '{}',
             'paused': '\x00',
+            'desired': 0,
             'created_at': 23
         }, {
             'tenantId': '23',
@@ -2308,13 +2564,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'groupTouched': None,
             'policyTouched': '{}',
             'paused': '\x00',
+            'desired': 0,
             'created_at': None
         }]
         self.returns = [group_dicts, None]
 
         expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
-                       '"groupTouched", "policyTouched", paused, created_at FROM '
+                       '"groupTouched", "policyTouched", paused, desired, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(self.connection.execute.call_args_list[0],
@@ -2338,22 +2595,50 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'groupTouched': None,
             'policyTouched': '{}',
             'paused': '\x00',
+            'desired': 0,
             'created_at': 23
         }, {
-            'tenantId': '23',
-            'groupId': 'group23',
+            'tenantId': '123',
+            'groupId': 'group124',
             'group_config': '{"name": "test123"}',
             'active': '{}',
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
             'paused': '\x00',
+            'desired': 0,
+            'created_at': None
+        }, {
+            'tenantId': '123',
+            'groupId': 'group125',
+            'group_config': '{"name": "test123"}',
+            'active': '{}',
+            'pending': '{}',
+            'groupTouched': None,
+            'policyTouched': '{}',
+            'paused': '\x00',
+            'desired': 0,
             'created_at': None
         }]
         self.returns = [group_dicts, None]
 
-        expectedCql = 'DELETE FROM scaling_group WHERE "groupId" IN (:column_value0);'
-        expectedData = {'column_value0': 'group23'}
+        expectedCql = ('BEGIN BATCH '
+                       'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId0 '
+                       'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId1 '
+                       'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId0 '
+                       'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId1 '
+                       'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId0 '
+                       'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId1 '
+                       'APPLY BATCH;')
+        expectedData = {'groupId0': 'group124',
+                        'groupId1': 'group125',
+                        'tenantId': '123'}
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(self.connection.execute.call_count, 2)
         self.assertEqual(self.connection.execute.call_args_list[1],
@@ -2461,10 +2746,11 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.collection.kz_client = None
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'healthy': Equals(False), 'zookeeper': Equals(False),
-             'zookeeper_state': Equals('Not connected yet')}
-        )))
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'zookeeper': Equals(False),
+                 'zookeeper_state': Equals('Not connected yet')}))))
 
     def test_health_check_zookeeper_not_connected(self):
         """
@@ -2472,10 +2758,11 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.collection.kz_client = mock.MagicMock(connected=False)
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'healthy': Equals(False), 'zookeeper': Equals(False),
-             'zookeeper_state': Equals('Not connected yet')}
-        )))
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'zookeeper': Equals(False),
+                 'zookeeper_state': Equals('Not connected yet')}))))
 
     def test_health_check_zookeeper_connected(self):
         """
@@ -2485,10 +2772,11 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'zookeeper': Equals(True),
-             'zookeeper_state': Equals('CONNECTED')}
-        )))
+        self.assertEqual(
+            self.successResultOf(d),
+            (True, matches(ContainsDict(
+                {'zookeeper': Equals(True),
+                 'zookeeper_state': Equals('CONNECTED')}))))
 
     def test_health_check_zookeeper_suspended(self):
         """
@@ -2497,10 +2785,11 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.SUSPENDED)
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'healthy': Equals(False), 'zookeeper': Equals(False),
-             'zookeeper_state': Equals('SUSPENDED')}
-        )))
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'zookeeper': Equals(False),
+                 'zookeeper_state': Equals('SUSPENDED')}))))
 
     def test_health_check_cassandra_fails(self):
         """
@@ -2508,12 +2797,12 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.connection.execute.return_value = defer.fail(Exception('boo'))
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'healthy': Equals(False),
-             'cassandra': Equals(False),
-             'cassandra_failure': Equals("Exception('boo',)"),
-             'cassandra_time': Equals(0)}
-        )))
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'cassandra': Equals(False),
+                 'cassandra_failure': Equals("Exception('boo',)"),
+                 'cassandra_time': Equals(0)}))))
 
     def test_health_check_cassandra_times_out(self):
         """
@@ -2524,13 +2813,13 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.assertNoResult(d)
 
         self.clock.advance(15)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'healthy': Equals(False),
-             'cassandra': Equals(False),
-             'cassandra_failure': Equals("TimedOutError('cassandra health check "
-                                         "timed out after 15 seconds.',)"),
-             'cassandra_time': Equals(15)}
-        )))
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'cassandra': Equals(False),
+                 'cassandra_failure': Equals("TimedOutError('cassandra health check "
+                                             "timed out after 15 seconds.',)"),
+                 'cassandra_time': Equals(15)}))))
         # to make sure the deferred doesn't get GCed without being called
         self.connection.execute.return_value.callback(None)
 
@@ -2539,19 +2828,18 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check fails if cassandra fails
         """
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'cassandra': Equals(True),
-             'cassandra_time': Equals(0)}
-        )))
+        self.assertEqual(
+            self.successResultOf(d),
+            (True, matches(ContainsDict(
+                {'cassandra': Equals(True),
+                 'cassandra_time': Equals(0)}))))
 
     def test_health_check_succeeds_if_both_succeed(self):
         """
         If both zookeeper and cassandra are healthy, the store is healthy
         """
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'healthy': Equals(True)}
-        )))
+        self.assertEqual(self.successResultOf(d), (True, mock.ANY))
 
 
 class CassAdminTestCase(TestCase):

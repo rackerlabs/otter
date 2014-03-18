@@ -125,7 +125,7 @@ class MockScalingGroup:
             self.policies = None
             self.webhooks = None
 
-    def view_manifest(self):
+    def view_manifest(self, with_webhooks=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
@@ -471,6 +471,12 @@ class MockScalingGroupCollection:
         """
         return defer.succeed(None)
 
+    def get_oldest_event(self, bucket):
+        """
+        see :meth:`otter.models.interface.IScalingScheduleCollection.get_oldest_event`
+        """
+        return defer.succeed(None)
+
     def webhook_info_by_hash(self, log, capability_hash):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`
@@ -497,7 +503,7 @@ class MockScalingGroupCollection:
 
         see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
         """
-        return defer.succeed({'healthy': True})
+        return defer.succeed((True, {}))
 
 
 @implementer(IAdmin)

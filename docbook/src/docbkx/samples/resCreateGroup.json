@@ -1,75 +1,79 @@
 {
-    "group": {
-        "groupConfiguration": {
-            "cooldown": 360, 
-            "maxEntities": 10, 
-            "metadata": {}, 
-            "minEntities": 0, 
-            "name": "testscalinggroup"
-        }, 
-        "id": "48692442-2dbe-4311-955e-bc29f02ae311", 
-        "launchConfiguration": {
-            "args": {
-                "loadBalancers": [
-                    {
-                        "loadBalancerId": 237935, 
-                        "port": 80
-                    }
-                ], 
-                "server": {
-                    "OS-DCF:diskConfig": "AUTO", 
-                    "flavorRef": "performance1-2", 
-                    "imageRef": "7cf5ffc3-7b20-46fd-98e4-fefa9908d7e8", 
-                    "name": "autoscale_server", 
-                    "networks": [
-                        {
-                            "uuid": "11111111-1111-1111-1111-111111111111"
-                        }, 
-                        {
-                            "uuid": "00000000-0000-0000-0000-000000000000"
-                        }
-                    ]
-                }
-            }, 
-            "type": "launch_server"
-        }, 
-        "links": [
-            {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/829409/groups/48692442-2dbe-4311-955e-bc29f02ae311/", 
-                "rel": "self"
+   "group":{
+      "groupConfiguration":{
+         "cooldown":360,
+         "maxEntities":10,
+         "metadata":{
+
+         },
+         "minEntities":0,
+         "name":"testscalinggroup"
+      },
+      "id":"48692442-2dbe-4311-955e-bc29f02ae311",
+      "launchConfiguration":{
+         "args":{
+            "loadBalancers":[
+               {
+                  "loadBalancerId":237935,
+                  "port":80
+               }
+            ],
+            "server":{
+               "OS-DCF:diskConfig":"AUTO",
+               "flavorRef":"performance1-2",
+               "imageRef":"7cf5ffc3-7b20-46fd-98e4-fefa9908d7e8",
+               "name":"autoscale_server",
+               "networks":[
+                  {
+                     "uuid":"11111111-1111-1111-1111-111111111111"
+                  },
+                  {
+                     "uuid":"00000000-0000-0000-0000-000000000000"
+                  }
+               ]
             }
-        ], 
-        "scalingPolicies": [
-            {
-                "args": {
-                    "cron": "23 * * * *"
-                }, 
-                "change": 1, 
-                "cooldown": 0, 
-                "id": "9fa63149-c93d-4116-8069-74d68f48fadc", 
-                "links": [
-                    {
-                        "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/829409/groups/48692442-2dbe-4311-955e-bc29f02ae311/policies/9fa63149-c93d-4116-8069-74d68f48fadc/", 
-                        "rel": "self"
-                    }
-                ], 
-                "name": "scale up by 1", 
-                "type": "schedule"
-            }
-        ], 
-        "scalingPolicies_links": [
-            {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/829409/groups/48692442-2dbe-4311-955e-bc29f02ae311/policies/", 
-                "rel": "policies"
-            }
-        ], 
-        "state": {
-            "active": [], 
-            "activeCapacity": 0, 
-            "desiredCapacity": 0, 
-            "name": "testscalinggroup", 
-            "paused": false, 
-            "pendingCapacity": 0
-        }
-    }
+         },
+         "type":"launch_server"
+      },
+      "links":[
+         {
+            "href":"https://dfw.autoscale.api.rackspacecloud.com/v1.0/829409/groups/48692442-2dbe-4311-955e-bc29f02ae311/",
+            "rel":"self"
+         }
+      ],
+      "scalingPolicies":[
+         {
+            "args":{
+               "cron":"23 * * * *"
+            },
+            "change":1,
+            "cooldown":0,
+            "id":"9fa63149-c93d-4116-8069-74d68f48fadc",
+            "links":[
+               {
+                  "href":"https://dfw.autoscale.api.rackspacecloud.com/v1.0/829409/groups/48692442-2dbe-4311-955e-bc29f02ae311/policies/9fa63149-c93d-4116-8069-74d68f48fadc/",
+                  "rel":"self"
+               }
+            ],
+            "name":"scale up by 1",
+            "type":"schedule"
+         }
+      ],
+      "scalingPolicies_links":[
+         {
+            "href":"https://dfw.autoscale.api.rackspacecloud.com/v1.0/829409/groups/48692442-2dbe-4311-955e-bc29f02ae311/policies/",
+            "rel":"policies"
+         }
+      ],
+      "state":{
+         "active":[
+
+         ],
+         "activeCapacity":0,
+         "desiredCapacity":0,
+         "name":"testscalinggroup",
+         "paused":false,
+         "pendingCapacity":0
+      }
+   }
 }

@@ -32,12 +32,18 @@ USE @@KEYSPACE@@;
 --
 -- policyTouched is a list of timestamps for the policy
 --  {"policyid": date}
+--
+-- declaring a variable as an int means that it is a 32-bit signed int.
+-- declaring it as a varint means that it is an arbitrary precision int, which
+-- is more general.  If there is no particular need for an int to be one thing
+-- or another, varint is preferred.
 
 CREATE COLUMNFAMILY scaling_group (
     "tenantId" ascii,
     "groupId" ascii,
     group_config ascii,
     launch_config ascii,
+    desired varint,
     active ascii,
     pending ascii,
     "groupTouched" ascii,

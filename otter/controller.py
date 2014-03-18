@@ -38,7 +38,7 @@ from otter.util.timestamp import from_timestamp
 
 
 # Amount of time spaced between starting delete jobs when scaling down
-DELETE_WAIT_INTERVAL = 20
+DELETE_WAIT_INTERVAL = 60
 
 
 class CannotExecutePolicyError(Exception):
@@ -284,12 +284,13 @@ def calculate_delta(log, state, config, policy):
     max_entities = config['maxEntities']
     if max_entities is None:
         max_entities = MAX_ENTITIES
-    constrained = max(min(desired, max_entities), config['minEntities'])
-    delta = constrained - current
+    state.desired = max(min(desired, max_entities), config['minEntities'])
+    delta = state.desired - current
 
-    log.msg("calculating delta",
+    log.msg(("calculating delta "
+             "{current_active} + {current_pending} -> {constrained_desired_capacity}"),
             unconstrained_desired_capacity=desired,
-            constrained_desired_capacity=constrained,
+            constrained_desired_capacity=state.desired,
             max_entities=max_entities, min_entities=config['minEntities'],
             server_delta=delta, current_active=len(state.active),
             current_pending=len(state.pending))

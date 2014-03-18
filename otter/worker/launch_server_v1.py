@@ -26,7 +26,8 @@ from otter.util import logging_treq as treq
 
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
-                             wrap_request_error, APIError, RequestError)
+                             wrap_request_error, raise_error_on_code,
+                             APIError, RequestError)
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
@@ -55,6 +56,17 @@ class UnexpectedServerStatus(Exception):
         self.expected_status = expected_status
 
 
+class ServerDeleted(Exception):
+    """
+    An exception to be raised when a server was deleted unexpectedly.
+    """
+    def __init__(self, server_id):
+        super(ServerDeleted, self).__init__(
+            'Server {server_id} has been deleted unexpectedly.'.format(
+                server_id=server_id))
+        self.server_id = server_id
+
+
 def server_details(server_endpoint, auth_token, server_id, log=None):
     """
     Fetch the details of a server as specified by id.
@@ -70,7 +82,8 @@ def server_details(server_endpoint, auth_token, server_id, log=None):
     path = append_segments(server_endpoint, 'servers', server_id)
     d = treq.get(path, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, path, 'server_details')
+    d.addErrback(raise_error_on_code, 404, ServerDeleted(server_id),
+                 path, 'server_details')
     return d.addCallback(treq.json_content)
 
 
@@ -78,7 +91,7 @@ def wait_for_active(log,
                     server_endpoint,
                     auth_token,
                     server_id,
-                    interval=5,
+                    interval=20,
                     timeout=3600,
                     clock=None):
     """
@@ -132,7 +145,7 @@ def wait_for_active(log,
 
     return retry_and_timeout(
         poll, timeout,
-        can_retry=transient_errors_except(UnexpectedServerStatus),
+        can_retry=transient_errors_except(UnexpectedServerStatus, ServerDeleted),
         next_interval=repeating_interval(interval),
         clock=clock,
         deferred_description=timeout_description)
@@ -451,13 +464,34 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
     lb_log.msg('Removing from load balancer')
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
 
+    def check_422_deleted(failure):
+        # A LB being deleted sometimes results in a 422.  This function
+        # unfortunately has to parse the body of the message to see if this is an
+        # acceptable 422 (if the LB has been deleted or the node has already been
+        # removed, then 'removing from load balancer' as a task should be
+        # successful - if the LB is in ERROR, then nothing more can be done to
+        # it except resetting it - may as well remove the server.)
+        failure.trap(APIError)
+        error = failure.value
+        if error.code == 422:
+            message = json.loads(error.body)['message']
+            if ('load balancer is deleted' not in message and
+                    'PENDING_DELETE' not in message):
+                return failure
+            lb_log.msg(message)
+        else:
+            return failure
+
     def remove():
         d = treq.delete(path, headers=headers(auth_token), log=lb_log)
+
+        # Success is 200/202.  An LB not being found is 404.  A node not being
+        # found is a 404.  But a deleted LB sometimes results in a 422.
         d.addCallback(log_on_response_code, lb_log, 'Node to delete does not exist', 404)
         d.addCallback(check_success, [200, 202, 404])
+        d.addCallback(treq.content)  # To avoid https://twistedmatrix.com/trac/ticket/6751
+        d.addErrback(check_422_deleted)
         d.addErrback(log_lb_unexpected_errors, path, lb_log, 'remove_node')
-        # To avoid the twisted hang bug - TESTING
-        d.addCallback(treq.content)
         return d
 
     d = remove()
@@ -520,15 +554,12 @@ def verified_delete(log,
                     server_endpoint,
                     auth_token,
                     server_id,
-                    interval=5,
+                    interval=10,
                     timeout=3660,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
-    deleted by trying again until getting the server results in a 404.
-
-    There is a possibility Nova sometimes fails to delete servers.  Log if this
-    happens, and if so, re-evaluate workarounds.
+    deleted by trying again until deleting the server results in a 404.
 
     Time out attempting to verify deletes after a period of time and log an
     error.
@@ -550,41 +581,33 @@ def verified_delete(log,
     serv_log.msg('Deleting server')
 
     path = append_segments(server_endpoint, 'servers', server_id)
-    d = treq.delete(path, headers=headers(auth_token), log=serv_log)
-
-    d.addCallback(log_on_response_code, serv_log, 'Server to delete does not exist', 404)
-    d.addCallback(check_success, [204, 404])
-    d.addErrback(wrap_request_error, path, 'server_delete')
 
     if clock is None:  # pragma: no cover
         from twisted.internet import reactor
         clock = reactor
 
-    def verify(_):
-        def check_status():
-            check_d = treq.head(
-                append_segments(server_endpoint, 'servers', server_id),
-                headers=headers(auth_token), log=serv_log)
-            check_d.addCallback(check_success, [404])
-            return check_d
+    # just delete over and over until a 404 is received
+    def delete():
+        del_d = treq.delete(path, headers=headers(auth_token), log=serv_log)
+        del_d.addCallback(check_success, [404])
+        del_d.addCallback(treq.content)
+        return del_d
 
-        start_time = clock.seconds()
+    start_time = clock.seconds()
 
-        timeout_description = (
-            "Waiting for Nova to actually delete server {0}".format(server_id))
+    timeout_description = (
+        "Waiting for Nova to actually delete server {0}".format(server_id))
 
-        verify_d = retry_and_timeout(check_status, timeout,
-                                     next_interval=repeating_interval(interval),
-                                     clock=clock,
-                                     deferred_description=timeout_description)
+    d = retry_and_timeout(delete, timeout,
+                          next_interval=repeating_interval(interval),
+                          clock=clock,
+                          deferred_description=timeout_description)
 
-        def on_success(_):
-            time_delete = clock.seconds() - start_time
-            serv_log.msg('Server deleted successfully: {time_delete} seconds.',
-                         time_delete=time_delete)
+    def on_success(_):
+        time_delete = clock.seconds() - start_time
+        serv_log.msg('Server deleted successfully: {time_delete} seconds.',
+                     time_delete=time_delete)
 
-        verify_d.addCallback(on_success)
-        verify_d.addErrback(serv_log.err)
-
-    d.addCallback(verify)
+    d.addCallback(on_success)
+    d.addErrback(serv_log.err)
     return d

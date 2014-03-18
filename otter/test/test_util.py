@@ -12,12 +12,12 @@ from twisted.web.http_headers import Headers
 
 from otter.util.http import (
     append_segments, APIError, check_success, RequestError, headers,
-    wrap_request_error)
+    raise_error_on_code, wrap_request_error)
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
 from otter.util.deferredutils import with_lock
 
-from otter.test.utils import patch, LockMixin, mock_log
+from otter.test.utils import patch, LockMixin, mock_log, DummyException
 
 
 class HTTPUtilityTests(TestCase):
@@ -186,6 +186,26 @@ class HTTPUtilityTests(TestCase):
         self.assertEqual(
             str(e),
             "RequestError[xkcd.com, {}, data=stuff]".format(str(failure)))
+
+    def test_raise_error_on_code_matches_code(self):
+        """
+        ``raise_error_on_code`` expects an APIError, and raises a particular
+        error given a specific code.  Otherwise, it just wraps it in a
+        :class:`RequestError`
+        """
+        failure = Failure(APIError(404, '', {}))
+        self.assertRaises(DummyException, raise_error_on_code,
+                          failure, 404, DummyException(), 'url')
+
+    def test_raise_error_on_code_does_not_match_code(self):
+        """
+        ``raise_error_on_code`` expects an APIError, and raises a particular
+        error given a specific code.  Otherwise, it just wraps it in a
+        :class:`RequestError`
+        """
+        failure = Failure(APIError(404, '', {}))
+        self.assertRaises(RequestError, raise_error_on_code,
+                          failure, 500, DummyException(), 'url')
 
     def test_wrap_request_error_raises_RequestError(self):
         """

@@ -7,10 +7,11 @@ from twisted.internet import defer
 from twisted.internet.task import Clock
 
 import mock
+from datetime import datetime, timedelta
 
 from otter.scheduler import (
     SchedulerService, check_events_in_bucket, process_events, add_cron_events, execute_event)
-from otter.test.utils import iMock, patch, CheckFailure, mock_log
+from otter.test.utils import iMock, patch, CheckFailure, mock_log, DeferredFunctionMixin
 from otter.models.interface import (
     IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection)
 from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
@@ -32,7 +33,7 @@ class SchedulerTests(TestCase):
             return_value='transaction-id')
 
 
-class SchedulerServiceTests(SchedulerTests):
+class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
     """
     Tests for `SchedulerService`
     """
@@ -51,7 +52,7 @@ class SchedulerServiceTests(SchedulerTests):
 
         self.kz_client = mock.Mock(spec=['SetPartitioner'])
         self.kz_partition = mock.MagicMock(allocating=False, release=False, failed=False,
-                                           allocated=False)
+                                           acquired=False)
         self.kz_client.SetPartitioner.return_value = self.kz_partition
         self.zk_partition_path = '/part_path'
         self.time_boundary = 15
@@ -60,11 +61,14 @@ class SchedulerServiceTests(SchedulerTests):
         self.clock = Clock()
         self.scheduler_service = SchedulerService(
             100, 1, self.mock_store, self.kz_client, self.zk_partition_path,
-            self.time_boundary, self.buckets, self.clock)
+            self.time_boundary, self.buckets, self.clock, threshold=600)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
         self.timer_service = patch(self, 'otter.scheduler.TimerService')
 
         self.check_events_in_bucket = patch(self, 'otter.scheduler.check_events_in_bucket')
+
+        self.returns = []
+        self.setup_func(self.mock_store.get_oldest_event)
 
     def test_start_service(self):
         """
@@ -79,18 +83,81 @@ class SchedulerServiceTests(SchedulerTests):
     def test_stop_service(self):
         """
         stopService() calls super's stopService() and stops the allocation if it
-        is already allocated
+        is already acquired
         """
         self.scheduler_service.startService()
-        self.kz_partition.allocated = True
+        self.kz_partition.acquired = True
         d = self.scheduler_service.stopService()
         self.timer_service.stopService.assert_called_once_with(self.scheduler_service)
         self.kz_partition.finish.assert_called_once_with()
         self.assertEqual(self.kz_partition.finish.return_value, d)
 
+    def test_health_check_after_threshold(self):
+        """
+        `service.health_check` returns False when trigger time is above threshold
+        """
+        self.kz_partition.acquired = True
+        self.scheduler_service.startService()
+        self.kz_partition.__iter__.return_value = [2, 3]
+        now = datetime.utcnow()
+        returns = [{'trigger': now - timedelta(hours=1), 'version': 'v1'},
+                   {'trigger': now - timedelta(seconds=2), 'version': 'v1'}]
+        self.returns = returns[:]
+
+        d = self.scheduler_service.health_check()
+
+        self.assertEqual(self.successResultOf(d), (False, {'old_events': [returns[0]],
+                                                           'buckets': [2, 3]}))
+        self.mock_store.get_oldest_event.assert_has_calls([mock.call(2), mock.call(3)])
+
+    def test_health_check_before_threshold(self):
+        """
+        `service.health_check` returns True when trigger time is below threshold
+        """
+        self.kz_partition.acquired = True
+        self.scheduler_service.startService()
+        self.kz_partition.__iter__.return_value = [2, 3]
+        now = datetime.utcnow()
+        self.returns = [{'trigger': now + timedelta(hours=1), 'version': 'v1'},
+                        {'trigger': now + timedelta(seconds=2), 'version': 'v1'}]
+
+        d = self.scheduler_service.health_check()
+
+        self.assertEqual(self.successResultOf(d), (True, {'old_events': [],
+                                                          'buckets': [2, 3]}))
+        self.mock_store.get_oldest_event.assert_has_calls([mock.call(2), mock.call(3)])
+
+    def test_health_check_None(self):
+        """
+        `service.health_check` returns True when there are no triggers
+        """
+        self.kz_partition.acquired = True
+        self.scheduler_service.startService()
+        self.kz_partition.__iter__.return_value = [2, 3]
+        self.returns = [None, None]
+
+        d = self.scheduler_service.health_check()
+
+        self.assertEqual(self.successResultOf(d), (True, {'old_events': [],
+                                                          'buckets': [2, 3]}))
+        self.mock_store.get_oldest_event.assert_has_calls([mock.call(2), mock.call(3)])
+
+    def test_health_check_not_acquired(self):
+        """
+        `service.health_check` returns False when partition is not acquired
+        """
+        self.kz_partition.acquired = False
+        self.scheduler_service.startService()
+        self.kz_partition.__iter__.return_value = [2, 3]
+
+        d = self.scheduler_service.health_check()
+
+        self.assertEqual(self.successResultOf(d), (False, {'reason': 'Not acquired'}))
+        self.assertFalse(self.mock_store.get_oldest_event.called)
+
     def test_stop_service_allocating(self):
         """
-        stopService() does not stop the allocation (i.e. call finish) if it is not allocated
+        stopService() does not stop the allocation (i.e. call finish) if it is not acquired
         """
         self.scheduler_service.startService()
         d = self.scheduler_service.stopService()
@@ -183,11 +250,11 @@ class SchedulerServiceTests(SchedulerTests):
         self.assertFalse(self.check_events_in_bucket.called)
 
     @mock.patch('otter.scheduler.datetime')
-    def test_check_events_allocated(self, mock_datetime):
+    def test_check_events_acquired(self, mock_datetime):
         """
         `check_events` checks events in each bucket when they are partitoned.
         """
-        self.kz_partition.allocated = True
+        self.kz_partition.acquired = True
         self.scheduler_service.startService()
         self.kz_partition.__iter__.return_value = [2, 3]
         self.scheduler_service.log = mock.Mock()

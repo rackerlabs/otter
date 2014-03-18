@@ -2,12 +2,14 @@
 A wrapper around treq to log all requests along with the status code and time
 it took.
 """
+from uuid import uuid4
 
 import treq
 
 from twisted.internet import reactor
 
 from otter.log import log as default_log
+from otter.util.deferredutils import timeout_deferred
 
 
 def _log_request(treq_call, url, **kwargs):
@@ -17,27 +19,33 @@ def _log_request(treq_call, url, **kwargs):
     :param callable f: a ``treq`` request method, such as ``treq.request``, or
         ``treq.get``, ``treq.post``, etc.
     """
-    time_func = kwargs.pop('time_function', reactor.seconds)
+    clock = kwargs.pop('clock', reactor)
     log = kwargs.pop('log', default_log)
     method = kwargs.get('method', treq_call.__name__)
 
-    start_time = time_func()
+    treq_transaction = str(uuid4())
+    log = log.bind(system='treq.request', url=url, method=method,
+                   treq_request_id=treq_transaction)
+    start_time = clock.seconds()
+
+    log.msg("Request to {method} {url} starting.")
     d = treq_call(url=url, **kwargs)
 
+    timeout_deferred(d, 45, clock)
+
     def log_request(response):
-        request_time = time_func() - start_time
+        request_time = clock.seconds() - start_time
         log.msg(
             ("Request to {method} {url} resulted in a {status_code} response "
              "after {request_time} seconds."),
-            url=url, status_code=response.code, headers=response.headers,
-            request_time=request_time, system="treq.request", method=method)
+            status_code=response.code, headers=response.headers,
+            request_time=request_time)
         return response
 
     def log_failure(failure):
-        request_time = time_func() - start_time
+        request_time = clock.seconds() - start_time
         log.msg("Request to {method} {url} failed after {request_time} seconds.",
-                url=url, reason=failure, request_time=request_time,
-                method=method, system="treq.request")
+                reason=failure, request_time=request_time)
         return failure
 
     return d.addCallbacks(log_request, log_failure)

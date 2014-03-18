@@ -1052,7 +1052,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Health check always returns healthy
         """
         d = self.collection.health_check()
-        self.assertEqual(self.successResultOf(d), {'healthy': True})
+        self.assertEqual(self.successResultOf(d), (True, {}))
 
 
 class MockAdminTestCase(TestCase):

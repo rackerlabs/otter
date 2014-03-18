@@ -7,6 +7,7 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
 from cafe.drivers.unittest.decorators import tags
 from cloudcafe.common.tools.datagen import rand_name
+import unittest
 
 
 class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
@@ -52,6 +53,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, self.gc_min_entities)
 
+    @unittest.skip("Skipping until CRON timing test issues are addressed")
     @tags(speed='slow')
     def test_system_cron_style_when_policy_cooldown_over_trigger_period(self):
         """
@@ -72,6 +74,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, self.sp_change * 2)
 
+    @unittest.skip("Skipping until CRON timing test issues are addressed")
     @tags(speed='slow')
     def test_system_cron_style_when_group_cooldown_over_trigger_period(self):
         """

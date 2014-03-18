@@ -1,52 +1,44 @@
-
-$ curl -i https://{region}.autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups \
-       -X POST\ 
-       -H  'Content-Type: application/json' \
-       -H  'Accept: application/json' \
-       -H  'X-Auth-Token: AUTH_TOKEN' 
-       --data-binary \   
-
-'{
-  "launchConfiguration": {
-    "args": {
-      "loadBalancers": [
-        {
-          "port": 80,
-          "loadBalancerId": 237935
-        }
-      ],
-      "server": {
-        "name": "autoscale_server",
-        "imageRef": "7cf5ffc3-7b20-46fd-98e4-fefa9908d7e8",
-        "flavorRef": "performance1-2",
-        "OS-DCF:diskConfig": "AUTO",
-        "networks": [
-          {
-            "uuid": "11111111-1111-1111-1111-111111111111"
-          },
-          {
-            "uuid": "00000000-0000-0000-0000-000000000000"
-          }
-        ]
+{
+   "launchConfiguration":{
+      "args":{
+         "loadBalancers":[
+            {
+               "port":80,
+               "loadBalancerId":237935
+            }
+         ],
+         "server":{
+            "name":"autoscale_server",
+            "imageRef":"7cf5ffc3-7b20-46fd-98e4-fefa9908d7e8",
+            "flavorRef":"performance1-2",
+            "OS-DCF:diskConfig":"AUTO",
+            "networks":[
+               {
+                  "uuid":"11111111-1111-1111-1111-111111111111"
+               },
+               {
+                  "uuid":"00000000-0000-0000-0000-000000000000"
+               }
+            ]
+         }
+      },
+      "type":"launch_server"
+   },
+   "groupConfiguration":{
+      "maxEntities":10,
+      "cooldown":360,
+      "name":"testscalinggroup",
+      "minEntities":0
+   },
+   "scalingPolicies":[
+      {
+         "cooldown":0,
+         "name":"scale up by 1",
+         "change":1,
+         "type":"schedule",
+         "args":{
+            "cron":"23 * * * *"
+         }
       }
-    },
-    "type": "launch_server"
-  },
-  "groupConfiguration": {
-    "maxEntities": 10,
-    "cooldown": 360,
-    "name": "testscalinggroup",
-    "minEntities": 0
-  },
-  "scalingPolicies": [
-    {
-      "cooldown": 0,
-      "name": "scale up by 1",
-      "change": 1,
-      "type": "schedule",
-      "args": {
-      "cron": "23 * * * *"
-      }
-    }
-  ]
-}'
+   ]
+}

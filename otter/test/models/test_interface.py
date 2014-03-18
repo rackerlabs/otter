@@ -26,10 +26,20 @@ class GroupStateTestCase(TestCase):
         """
         repr(GroupState) returns something human readable
         """
-        state = GroupState('tid', 'gid', 'name', {'1': {}}, {}, 'date', {}, True)
+        state = GroupState('tid', 'gid', 'name', {'1': {}}, {}, 'date', {},
+                           True, desired=5)
         self.assertEqual(
             repr(state),
-            "GroupState(tid, gid, name, {'1': {}}, {}, date, {}, True)")
+            "GroupState(tid, gid, name, 5, {'1': {}}, {}, date, {}, True)")
+
+    def test_default_desired_capacity_is_zero(self):
+        """
+        If no desired capacity is passed, the default value is zero.
+        """
+        self.assertEqual(
+            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date',
+                       {}, True).desired,
+            0)
 
     def test_two_states_are_equal_if_all_vars_are_equal(self):
         """

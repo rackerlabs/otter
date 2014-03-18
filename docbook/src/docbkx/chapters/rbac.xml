@@ -8,7 +8,6 @@
 <!ENTITY PROD "Auto Scale">               
 ]>
 <section 
-    security="writeronly"
     xml:id="RBAC"
     xmlns="http://docbook.org/ns/docbook"
     xmlns:xi="http://www.w3.org/2001/XInclude"
@@ -179,14 +178,7 @@ access is granted </td>
     <section xml:id="operationsRoles">
     <title>RBAC Permissions Cross-reference to &PROD; Operations</title>
        <para> API operations for &PROD; may or may not be available to all roles. 
-           To see which operations are permitted to invoke which calls, review 
-            <!-- This KC page does not exist yet; check with Renee Rendon and be sure to match the name she gives it. 
-                 Later, we expect to be able to mark each operations' capabilitites in the WADL and then report it along with the other 
-                 details about that operation. Check with David Cramer about when that can replace or augment this.
-            -->
-            <link
-                xlink:href="http://www.rackspace.com/knowledge_center/article/permissions-matrix-for-auto-scale"
-                >
-                the Knowledge Center article</link>. </para>
+           To see which operations are permitted to invoke which calls, review the 
+            <link xlink:href="http://www.rackspace.com/knowledge_center/article/permissions-matrix-for-auto-scale">Permissions Matrix for Auto Scale Knowledge Center article</link>. </para>
     </section>
 </section> 
