@@ -56,9 +56,9 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-devguide">
             <!-- enter the publication date of this document; in revhistory, explain what changed -->
             <pubdate/>
             <copyright>
-                <year>2013</year>
-                <holder>Rackspace US, Inc.</holder>
-            </copyright>
+            <year>2014</year>
+            <holder>Rackspace US, Inc.</holder>
+        </copyright>
             <legalnotice role="rs-api">
                 <annotation>
                     <remark>Copyright details are filled in by the template.</remark>
@@ -66,7 +66,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-devguide">
             </legalnotice>
             <revhistory>
                 <revision>
-                <date>2014-03-17</date>
+                <date>2014-03-18</date>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
