@@ -58,15 +58,14 @@
                         </param>
                         <method href="#showGroupManifest"/>
                         <method href="#deleteGroup"/>
-                        <resource id="group_state" path="state">
+                        <resource id="state" path="state">
                             <method href="#getGroupState"/>
                         </resource>
-                        <resource id="group_config" path="config">
+                        <resource id="config" path="config">
                             <method href="#getGroupConfig"/>
                             <method href="#putGroupConfig"/>
                         </resource>
-                        <resource id="launch_configuration"
-                            path="launch">
+                        <resource id="launch" path="launch">
                             <method href="#getLaunchConfig"/>
                             <method href="#putLaunchConfig"/>
                         </resource>
@@ -80,7 +79,7 @@
                         <resource id="policies" path="policies">
                             <method href="#getPolicies"/>
                             <method href="#createPolicies"/>
-                            <resource id="policy" path="{policyId}">
+                            <resource id="policyid" path="{policyId}">
                                 <param name="policyId"
                                    type="osapi:UUID" required="true"
                                    style="template">
@@ -99,7 +98,7 @@
                                    path="webhooks">
                                    <method href="#getWebhooks"/>
                                    <method href="#createWebhook"/>
-                                   <resource id="webhook"
+                                   <resource id="webhookid"
                                    path="{webhookId}">
                                    <param name="webhookId"
                                    type="osapi:UUID" required="true"
@@ -119,13 +118,19 @@
                     </resource>
                 </resource>
             </resource>
-            <resource id="anonymous_execute_webhook"
-                path="execute/{capability_version}/{capability_hash}/">
-                <param name="capability_version" required="true"
-                    style="template" type="xsd:string"/>
-                <param name="capability_hash" required="true"
-                    style="template" type="xsd:string"/>
-                <method href="#anonymousExecute"/>
+            <resource id="anonymous-execute" path="execute">
+                <resource id="capability_version"
+                    path="{capability_version}">
+                    <resource id="capability_hash"
+                        path="{capability_hash}">
+                        <param name="capability_version"
+                            required="true" style="template"
+                            type="xsd:string"/>
+                        <param name="capability_hash" required="true"
+                            style="template" type="xsd:string"/>
+                        <method href="#anonymousExecute"/>
+                    </resource>
+                </resource>
             </resource>
         </resource>
     </resources>
