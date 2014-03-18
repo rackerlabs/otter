@@ -9,6 +9,8 @@
   <name>Autoscale Docs</name>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <src.wadl>src/wadl</src.wadl>
+    <wadl.file>autoscale.wadl</wadl.file>
   </properties>
   <build>
     <plugins>
@@ -55,7 +57,7 @@
 	  <enableDisqus>internet</enableDisqus>
 	  <socialIcons>0</socialIcons>
 	  <!-- notify these people when comments are posted on docs-internal.rackspace.com -->
-	  <feedbackEmail>rose.coste@rackspace.com,constanze.kratel@rackspace.com,felix.sargent@rackspace.com</feedbackEmail>
+	  <feedbackEmail>maria.abrahms@rackspace.com,rose.coste@rackspace.com,constanze.kratel@rackspace.com,felix.sargent@rackspace.com</feedbackEmail>
 	  <branding>rackspace</branding>
 	  <enableGoogleAnalytics>1</enableGoogleAnalytics>
 	  <!-- <failOnValidationerror>no</failOnValidationerror> -->

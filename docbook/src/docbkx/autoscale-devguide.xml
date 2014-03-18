@@ -66,15 +66,26 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-devguide">
             </legalnotice>
             <revhistory>
                 <revision>
-                    <date>2013-11-19</date>
-                    <revdescription>
-                        <itemizedlist spacing="compact">
-                            <listitem>
-                                <para>Updating content for UA</para>
-                            </listitem>
-                        </itemizedlist>
-                    </revdescription>
-                </revision>
+                <date>2014-03-17</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Un-hid RBAC section, implemented fix
+                                for AUTO-824.</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
+            <revision>
+                <date>2013-11-19</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Updating content for UA</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
                 <revision>
                     <date>2013-08-21</date>
                     <revdescription>
@@ -1382,6 +1393,11 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </listitem>
                 </itemizedlist>
             </para>
+            <note>
+                <para>For details on API parameters, see <link
+                    linkend="API_Operations">Chapter 6, API
+                    Operations</link>. </para>
+            </note>
             <section xml:id="Group_Configuration">
                 <title>Scaling Group Configuration</title>
                 <para>The scaling group configuration specifies the basic elements of the Auto Scale configuration.
@@ -2011,6 +2027,11 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </listitem>
                 </itemizedlist>
             </para>
+            <note>
+                <para>For details on API parameters, see <link
+                    linkend="API_Operations">Chapter 6, API
+                    Operations</link>. </para>
+            </note>
             <section xml:id="Manage_Launch_Configuration">
                 <title>Manage the Configuration for your Scaling Group</title>
                 <para>You can use the Auto Scale API to view and update the launch configuration for your scaling
@@ -2539,7 +2560,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     If some element of the configuration is invalid, scaling can fail even if the scaling
                     policy is executed.</para>
             </section>
-            <xi:include href="./chapters/rbac.xml" />
+            <xi:include href="./chapters/rbac.xml"/>
         </chapter>
         <xi:include href="./chapters/apiref.xml" />
 </book>
