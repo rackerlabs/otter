@@ -15,8 +15,8 @@
       <title>Scaling groups</title>
       <wadl:resources xmlns:wadl="http://wadl.dev.java.net/2009/02">
          <wadl:resource href="../../wadl/autoscale.wadl#groups">
-            <wadl:method href="#createGroup"/>
             <wadl:method href="#listGroups"/>
+            <wadl:method href="#createGroup"/>
          </wadl:resource>
          <wadl:resource href="../../wadl/autoscale.wadl#groupId">
             <wadl:method href="#showGroupManifest"/>
@@ -56,9 +56,9 @@
             <wadl:method href="#createPolicies"/>
          </wadl:resource>
          <wadl:resource href="../../wadl/autoscale.wadl#policyid">
-            <wadl:method href="#deletePolicy"/>
             <wadl:method href="#getPolicy"/>
             <wadl:method href="#putPolicy"/>
+            <wadl:method href="#deletePolicy"/>
          </wadl:resource>
          <wadl:resource href="../../wadl/autoscale.wadl#execute">
             <wadl:method href="#executePolicy"/>
