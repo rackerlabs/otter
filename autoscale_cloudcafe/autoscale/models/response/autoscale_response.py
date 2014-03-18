@@ -369,7 +369,7 @@ class Audit(AutoMarshallingModel):
         for keys, values in kwargs.items():
             setattr(self, keys, values)
             # DEBUG
-            print "\n DEBUG:: Audit - init - keys --- ", keys  # expect only key is "events"
+            #print "\n DEBUG:: Audit - init - keys --- ", keys  # expect only key is "events"
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
@@ -406,7 +406,7 @@ class HistoryEvent(AutoMarshallingModel):
         for keys, values in kwargs.items():
             setattr(self, keys, values)   # This should provide "event_type", "message", and "timestamp"
             # DEBUG
-            print "\n DEBUG:: HistoryEvent - init - keys --- ", keys
+            #print "\n DEBUG:: HistoryEvent - init - keys --- ", keys
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
@@ -424,7 +424,7 @@ class HistoryEvent(AutoMarshallingModel):
         Converts the dictionary representing a single event into an object
         """
         event = HistoryEvent(**event_dict)
-        print "DEBUG: Expand HistoryEvent"
+        #print "DEBUG: Expand HistoryEvent"
         # If the event type is a request event, convert the value associated with the 'data' key
         # into a request object based on event_type
         if hasattr(event, 'data'):
