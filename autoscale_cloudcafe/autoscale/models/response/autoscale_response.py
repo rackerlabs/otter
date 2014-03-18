@@ -369,7 +369,7 @@ class Audit(AutoMarshallingModel):
         for keys, values in kwargs.items():
             setattr(self, keys, values)
             # DEBUG
-            print "\n DEBUG:: Audit - init - keys --- ", keys
+            print "\n DEBUG:: Audit - init - keys --- ", keys  # expect only key is "events"
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
@@ -387,11 +387,12 @@ class Audit(AutoMarshallingModel):
         Helper method to turn a dictionary into an Audit instance
         """
         history = Audit(**history_dict)
+        if hasattr(history, 'events_links'):
+            history.events_links = Links._dict_to_obj(history.events_links)
         if hasattr(history, 'events'):
-            history.events = []
             for event in history.events:
                 e = HistoryEvent._dict_to_obj       # Turn the dictionary into a HistoryEvent object
-                history.append(e)
+                history.events.append(e)
         return history
 
 
@@ -403,7 +404,7 @@ class HistoryEvent(AutoMarshallingModel):
     def __init__(self, **kwargs):
         super(HistoryEvent, self).__init__()
         for keys, values in kwargs.items():
-            setattr(self, keys, values)
+            setattr(self, keys, values)   # This should provide "event_type", "message", and "timestamp"
             # DEBUG
             print "\n DEBUG:: HistoryEvent - init - keys --- ", keys
 
@@ -423,10 +424,11 @@ class HistoryEvent(AutoMarshallingModel):
         Converts the dictionary representing a single event into an object
         """
         event = HistoryEvent(**event_dict)
+        print "DEBUG: Expand HistoryEvent"
         # If the event type is a request event, convert the value associated with the 'data' key
         # into a request object based on event_type
         if hasattr(event, 'data'):
-            # TODO: More elegant means than giant if block
+            # TODO: More elegant means than giant if block?
             try:
                 if event.event_type.startswith('request.group.create'):
                     event.data = ScalingGroup._dict_to_obj(event.data)
@@ -444,79 +446,3 @@ class HistoryEvent(AutoMarshallingModel):
         #if hasattr(event, 'fault'):
             #event.fault - Fault._dict_to_obj(event.fault)
         return event
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

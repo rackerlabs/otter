@@ -8,17 +8,39 @@ class AuditLogBasicsTest(AutoscaleFixture):
     """
     Verify the following basic audit log behaviors:
         1.) Using GET on /tenantid/history returns 200 and result OK
-            > what happens if you try PUT?
-        2.) Entry pagination
-        3.) Only events for the given tenant ID are shown (information security)
-        4.) Transaction ID is unique?
-        5.) log entries still present after group is deleted? (might be in different category)
+        TODO: 2.) Entry pagination
+        TODO: 3.) Only events for the given tenant ID are shown (information security)
+        TODO: 4.) Transaction ID is unique?
+            (Confirm if this is true? ex. multiple deletes as part of one transaction)
+        TODO 5.) log entries still present after group is deleted? (might be in different category)
+        TODO: Question: Are all log entries tied to a specific scaling group?
+              (i.e. are there tenant level events?)
 
     Prerequisites:
         1.) Tenant ID for an account with audit logging
 
 
     """
+    @classmethod
+    def setUpClass(cls):
+        """
+        Create scaling groups to populate the history log
+        """
+        super(AuditLogBasicsTest, cls).setUpClass()
+        first_group = cls.autoscale_behaviors.create_scaling_group_min()
+        cls.first_scaling_group = first_group.entity
+        second_group = cls.autoscale_behaviors.create_scaling_group_min()
+        cls.second_scaling_group = second_group.entity
+        third_group = cls.autoscale_behaviors.create_scaling_group_min()
+        cls.third_scaling_group = third_group.entity
+        # Delete the first scaling group for variety
+        cls.autoscale_client.delete_scaling_group(cls.first_scaling_group.id)
+        # cls.resources.add(cls.first_scaling_group.id,
+        #                   cls.autoscale_client.delete_scaling_group)
+        cls.resources.add(cls.second_scaling_group.id,
+                          cls.autoscale_client.delete_scaling_group)
+        cls.resources.add(cls.third_scaling_group.id,
+                          cls.autoscale_client.delete_scaling_group)
 
     def test_history_resource_response(self):
         """
@@ -34,53 +56,8 @@ class AuditLogBasicsTest(AutoscaleFixture):
                           '{1}'.format(history_response.status_code, self.tenant_id))
         # Extract the list of events
         latest_event = (history_response.entity).events[0]
-        expected_event = {'event_type': 'request.group.create.ok',
-                          'user_id': self.tenant_id,
-                          'scaling_group_id': self.scaling_group.id,
-                          'event_status': 'TBD',
-                          'parent_id': 'TBD',
-                          'as_user_id': 'TBD',
-                          'lc_name': self.autoscale_config.lc_name,
-                          'gc_name': self.gc_name}
-        # What set of data needs to be checked to conclude 'data' = request object?
-        #TODO - NOTE: Using a response object strips the "type: launch_server" field from the
-        #               launchConfiguration
-
-        # Confirm that the most recent entry indicates a group was created successfully
-        # Based on API functionality, assume that the first item in the list is the most recent
-        self.assertEquals(latest_event.event_type, expected_event['event_type'],
-                          msg='The event_type: {0} did not match the expected '
-                          'event_type: {1}'.format(latest_event.event_type,
-                                                   expected_event['event_type']))
-        # Confirm event details match expected
-        self.assertEqual(latest_event.data.launchConfiguration.server.name,
-                         expected_event['lc_name'],
-                         msg='Server name in the launch config history did not match the request')
-        self.assertEqual(latest_event.data.groupConfiguration.name,
-                         expected_event['gc_name'],
-                         msg='The name in the group config history did not match the request')
-
-
-#     Categories:
-#     Requests (simple, ok)
-#     Requests (simple, fail)
-#     Convergence
-#         (Various cases that trigger convergence)
-#         > Test that when it converges it is logged correctly,
-#            not that convergence happens when it should (test logging, not function)
-#     Server
-#         (number of server.active entries matches the number of servers)
-#         Confirm there is no way to spin up or down a server without it being logged
-#     Error Injection
-#         > simulate externally triggered errors
-
-
-
-# > Complex Use case
-
-
-# When would audit logs be considered broken:
-# > unable to get logs
-# > not all events logged
-# > log entries present after deletion
-# > no way to modify logs
+        # Confirm that the basic fiels are present for the most recent events
+        self.assertTrue(hasattr(latest_event, 'timestamp'))
+        self.assertTrue(hasattr(latest_event, 'message'))
+        self.assertTrue(hasattr(latest_event, 'event_type'))
+        self.assertTrue(hasattr(latest_event, 'scaling_group_id'))
