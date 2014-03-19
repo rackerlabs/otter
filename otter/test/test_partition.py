@@ -1,112 +1,144 @@
+import mock
+from StringIO import StringIO
 
-    def test_check_events_allocating(self):
+from twisted.trial.unittest import TestCase
+
+from kazoo.recipe.partitioner import SetPartitioner
+
+from otter.test.utils import patch
+
+from otter.partition import partition, process_partitioner
+
+
+class ProcessPartitionerTests(TestCase):
+    """
+    Tests for `process_partitioner`
+    """
+
+    def setUp(self):
         """
-        `check_events` logs message and does not check events in buckets when
-        buckets are still allocating
+        Sample SetPartitioner
         """
-        self.kz_partition.allocating = True
-        self.sservice.startService()
-        self.sservice.check_events(100)
-        self.log.msg.assert_called_with('Partition allocating')
+        self.part = mock.MagicMock(
+            spec=SetPartitioner, allocating=False, release=False, failed=False,
+            acquired=False)
+        self.new_part = mock.Mock()
+        sys = patch(self, 'otter.partition.sys', spec=['stdout'])
+        self.strio = StringIO()
+        self.stdout = sys.stdout = mock.Mock(wraps=self.strio)
 
-        # Ensure others are not called
-        self.assertFalse(self.kz_partition.__iter__.called)
-        self.assertFalse(self.check_events_in_bucket.called)
-
-    def test_check_events_release(self):
+    def test_allocating(self):
         """
-        `check_events` logs message and does not check events in buckets when
-        partitioning has changed. It calls release_set() to re-partition
+        Waits to acquire when allocating and does nothing else
         """
-        self.kz_partition.release = True
-        self.sservice.startService()
-        self.sservice.check_events(100)
-        self.log.msg.assert_called_with('Partition changed. Repartitioning')
-        self.kz_partition.release_set.assert_called_once_with()
+        self.part.allocating = True
+        p = process_partitioner(self.part, self.new_part)
+        self.assertEqual(p, self.part)
+        self.part.wait_for_acquire.assert_called_once_with()
+        self.assertFalse(self.new_part.called)
+        self.assertFalse(self.part.release_set.called)
+        self.assertFalse(self.part.__iter__.called)
+        self.assertEqual(self.strio.getvalue(), '')
 
-        # Ensure others are not called
-        self.assertFalse(self.kz_partition.__iter__.called)
-        self.assertFalse(self.check_events_in_bucket.called)
-
-    def test_check_events_failed(self):
+    def test_release(self):
         """
-        `check_events` logs message and does not check events in buckets when
-        partitioning has failed. It creates a new partition
+        calls release_set() when in release state and does nothing else
         """
-        self.kz_partition.failed = True
-        self.sservice.startService()
+        self.part.release = True
+        p = process_partitioner(self.part, self.new_part)
+        self.assertEqual(p, self.part)
+        self.part.release_set.assert_called_once_with()
+        self.assertFalse(self.new_part.called)
+        self.assertFalse(self.part.wait_for_acquire.called)
+        self.assertFalse(self.part.__iter__.called)
+        self.assertEqual(self.strio.getvalue(), '')
 
-        # after starting change SetPartitioner return value to check if
-        # new value is set in self.sservice.kz_partition
-        new_kz_partition = mock.MagicMock()
-        self.kz_client.SetPartitioner.return_value = new_kz_partition
-
-        self.sservice.check_events(100)
-        self.log.msg.assert_called_with('Partition failed. Starting new')
-
-        # Called once when starting and now again when partition failed
-        self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
-                         [mock.call(self.zk_partition_path, set=set(self.buckets),
-                                    time_boundary=self.time_boundary)] * 2)
-        self.assertEqual(self.sservice.kz_partition, new_kz_partition)
-
-        # Ensure others are not called
-        self.assertFalse(self.kz_partition.__iter__.called)
-        self.assertFalse(new_kz_partition.__iter__.called)
-        self.assertFalse(self.check_events_in_bucket.called)
-
-    def test_check_events_bad_state(self):
+    def test_failed(self):
         """
-        `self.kz_partition.state` is none of the exepected values. `check_events`
-        logs it as err and starts a new partition
+        creates new partitioner when failed and does nothing else
         """
-        self.kz_partition.state = 'bad'
-        self.sservice.startService()
+        self.part.failed = True
+        p = process_partitioner(self.part, self.new_part)
+        self.assertNotEqual(p, self.part)
+        self.assertEqual(p, self.new_part.return_value)
+        self.new_part.assert_called_once_with()
+        self.assertFalse(self.part.release_set.called)
+        self.assertFalse(self.part.wait_for_acquire.called)
+        self.assertFalse(self.part.__iter__.called)
+        self.assertEqual(self.strio.getvalue(), '')
 
-        # after starting change SetPartitioner return value to check if
-        # new value is set in self.sservice.kz_partition
-        new_kz_partition = mock.MagicMock()
-        self.kz_client.SetPartitioner.return_value = new_kz_partition
-
-        self.sservice.check_events(100)
-
-        self.log.err.assert_called_with('Unknown state bad. This cannot happen. Starting new')
-        self.kz_partition.finish.assert_called_once_with()
-
-        # Called once when starting and now again when got bad state
-        self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
-                         [mock.call(self.zk_partition_path, set=set(self.buckets),
-                                    time_boundary=self.time_boundary)] * 2)
-        self.assertEqual(self.sservice.kz_partition, new_kz_partition)
-
-        # Ensure others are not called
-        self.assertFalse(self.kz_partition.__iter__.called)
-        self.assertFalse(new_kz_partition.__iter__.called)
-        self.assertFalse(self.check_events_in_bucket.called)
-
-    @mock.patch('otter.scheduler.datetime')
-    def test_check_events_acquired(self, mock_datetime):
+    def test_acquired(self):
         """
-        `check_events` checks events in each bucket when they are partitoned.
+        writes buckets json to stdout when acquired and does nothing else
         """
-        self.kz_partition.acquired = True
-        self.sservice.startService()
-        self.kz_partition.__iter__.return_value = [2, 3]
-        self.sservice.log = mock.Mock()
-        mock_datetime.utcnow.return_value = 'utcnow'
+        self.part.acquired = True
+        self.part.__iter__.return_value = [1, 2]
+        p = process_partitioner(self.part, self.new_part)
+        self.assertEqual(self.strio.getvalue(), '{"buckets": [1, 2]}\n')
+        self.stdout.flush.assert_called_once_with()
+        self.assertEqual(p, self.part)
+        self.assertFalse(self.new_part.called)
+        self.assertFalse(self.part.release_set.called)
+        self.assertFalse(self.part.wait_for_acquire.called)
 
-        responses = [4, 5]
-        self.check_events_in_bucket.side_effect = lambda *_: defer.succeed(responses.pop(0))
 
-        d = self.sservice.check_events(100)
+class PartitionTests(TestCase):
+    """
+    Tests for `partition()`
+    """
 
-        self.assertEqual(self.successResultOf(d), [4, 5])
-        self.assertEqual(self.kz_partition.__iter__.call_count, 1)
-        self.sservice.log.bind.assert_called_once_with(
-            scheduler_run_id='transaction-id', utcnow='utcnow')
-        log = self.sservice.log.bind.return_value
-        log.msg.assert_called_once_with('Got buckets {buckets}', buckets=[2, 3])
-        self.assertEqual(self.check_events_in_bucket.mock_calls,
-                         [mock.call(log, self.mock_store, 2, 'utcnow', 100),
-                          mock.call(log, self.mock_store, 3, 'utcnow', 100)])
+    def setUp(self):
+        """
+        Sample client
+        """
+        self.client = mock.Mock(spec=['SetPartitioner'])
+        self.part = mock.MagicMock(
+            spec=SetPartitioner, allocating=False, release=False, failed=False,
+            acquired=False)
+        self.client.SetPartitioner.return_value = self.part
 
+        self.running = [True, False]
+        self.running_func = lambda: self.running.pop(0)
+
+        time = patch(self, 'otter.partition.time', spec=['sleep'])
+        self.sleep = time.sleep
+
+        self.proc_part = patch(self, 'otter.partition.process_partitioner',
+                               return_value=self.part)
+
+    def test_sleep_on_acquired(self):
+        """
+        Sleeps when acquired
+        """
+        self.part.acquired = True
+        partition(self.client, '/path', [1, 2], 10, 1, running=self.running_func)
+        self.client.SetPartitioner.assert_called_once_with('/path', [1, 2], time_boundary=10)
+        self.proc_part.assert_called_once_with(self.part, mock.ANY)
+        # second argument is function that creates new SetPartitioner
+        p = self.proc_part.call_args[0][1]()
+        self.assertEqual(p, self.part)
+        # Sleeps since acquired
+        self.sleep.assert_called_once_with(1)
+
+    def test_not_sleep_on_non_acquired(self):
+        """
+        Does not sleep when not acquired
+        """
+        partition(self.client, '/path', [1, 2], 10, 1, running=self.running_func)
+        self.client.SetPartitioner.assert_called_once_with('/path', [1, 2], time_boundary=10)
+        self.proc_part.assert_called_once_with(self.part, mock.ANY)
+        # second argument is function that creates new SetPartitioner
+        p = self.proc_part.call_args[0][1]()
+        self.assertEqual(p, self.part)
+        # Does not sleep
+        self.assertFalse(self.sleep.called)
+
+    def test_loop_continues(self):
+        """
+        Loop continues to run
+        """
+        self.running = [True, True, False]
+        partition(self.client, '/path', [1, 2], 10, 1, running=self.running_func)
+        self.client.SetPartitioner.assert_called_once_with('/path', [1, 2], time_boundary=10)
+        self.assertEqual(self.proc_part.call_count, 2)
+        self.assertFalse(self.sleep.called)

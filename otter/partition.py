@@ -6,32 +6,52 @@ this will keep printing the partiton to stdout at regural intervals. Expected to
 called by otter reactor process to partition scheduler buckets
 
 Usage:
-    python partition.py <hosts> <path> <set> <time boundary> <interval>
+    python partition.py <handler> <hosts> <path> <set> <time boundary> <interval>
 """
+from __future__ import print_function
 
 import time
 import sys
 import json
+from functools import partial
 
 from kazoo.client import KazooClient
+from kazoo.handlers.gevent import SequentialGeventHandler
+from kazoo.handlers.threading import SequentialThreadingHandler
 
 
-def partition(client, path, set, time_boundary, interval):
+def process_partitioner(partitioner, new_partitioner):
+    """
+    Process partitioner by checking its state
+
+    :param partitioner: `SetPartitioner` object
+    :new_partitioner: no-arg callable that creates a new partitioner
+    """
+    if partitioner.allocating:
+        partitioner.wait_for_acquire()
+    elif partitioner.release:
+        partitioner.release_set()
+    elif partitioner.failed:
+        partitioner = new_partitioner()
+        #partitioner = client.SetPartitioner(path, set, time_boundary=time_boundary)
+    elif partitioner.acquired:
+        print(json.dumps({'buckets': list(partitioner)}), file=sys.stdout)
+        sys.stdout.flush()
+        #time.sleep(interval)
+    return partitioner
+
+
+def partition(client, path, set, time_boundary, interval, running=lambda: True):
     """
     Partitions and outputs the partitoned set on stdout as json line on
     interval basis
     """
     partitioner = client.SetPartitioner(path, set, time_boundary=time_boundary)
-    while True:
-        if partitioner.allocating:
-            partitioner.wait_for_acquire()
-        elif partitioner.release:
-            partitioner.release_set()
-        elif partitioner.failed:
-            partitioner = client.SetPartitioner(path, set, time_boundary=time_boundary)
-        elif partitioner.acquired:
-            print(json.dumps({'buckets': list(partitioner)}))
-            sys.stdout.flush()
+    while running():
+        partitioner = process_partitioner(
+            partitioner, partial(client.SetPartitioner, path, set,
+                                 time_boundary=time_boundary))
+        if partitioner.acquired:
             time.sleep(interval)
 
 
@@ -39,9 +59,16 @@ def main(args):
     """
     Start partition process
     """
-    client = KazooClient(hosts=args[0])
+    handler, hosts = args[0:2]
+    if handler == 'gevent':
+        handler = SequentialGeventHandler()
+    elif handler == 'thread':
+        handler = SequentialThreadingHandler()
+    else:
+        raise ValueError('Unknown handler')
+    client = KazooClient(hosts=hosts, handler=handler)
     client.start()
-    path, _set, time_boundary, interval = args[1:]
+    path, _set, time_boundary, interval = args[2:]
     _set = set(_set.split(','))
     partition(client, path, _set, float(time_boundary), float(interval))
 

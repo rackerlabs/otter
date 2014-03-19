@@ -296,6 +296,6 @@ def setup_scheduler(parent, store, hosts):
     scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
                                          int(config_value('scheduler.interval')),
                                          store, hosts, partition_path, time_boundary,
-                                         buckets, reactor)
+                                         buckets, reactor, config_value('scheduler.kz_handler'))
     scheduler_service.setServiceParent(parent)
     return scheduler_service

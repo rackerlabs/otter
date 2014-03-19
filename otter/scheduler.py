@@ -59,8 +59,8 @@ class SchedulerService(Service):
     """
 
     def __init__(self, batchsize, interval, store, zk_hosts,
-                 zk_partition_path, time_boundary, buckets, reactor, clock=None,
-                 threshold=60):
+                 zk_partition_path, time_boundary, buckets, reactor,
+                 kz_handler, clock=None, threshold=60):
         """
         Initialize the scheduler service
 
@@ -71,6 +71,7 @@ class SchedulerService(Service):
         :param zk_partition_path: Partiton path used by kz_client to partition the buckets
         :param time_boundary: Time to wait for partition to become stable
         :param reactor: An instance of IReactorProcess provider that defaults to reactor if not provided
+        :param kz_handler: One of "thread" or "gevent" describing the handler used by subprocess
         :param clock: An instance of IReactorTime provider that defaults to reactor param
         """
         self.store = store
@@ -84,6 +85,7 @@ class SchedulerService(Service):
         self.buckets_acquired = None
         self.zk_hosts = zk_hosts
         self.zk_partition_path = zk_partition_path
+        self.kz_handler = kz_handler
         self.time_boundary = time_boundary
         self.proc_protocol = None
         self.threshold = threshold
@@ -107,8 +109,9 @@ class SchedulerService(Service):
         """
         pe = ProcessEndpoint(
             self.reactor, self.python_exe,
-            args=[self.python_exe, self.partition_py_path, self.zk_hosts, self.zk_partition_path,
-                  ','.join(map(str, self.buckets)), str(self.time_boundary), str(self.interval)],
+            args=[self.python_exe, self.partition_py_path, self.kz_handler, self.zk_hosts,
+                  self.zk_partition_path, ','.join(map(str, self.buckets)),
+                  str(self.time_boundary), str(self.interval)],
             env=None)
         d = pe.connect(ClientFactory.forProtocol(lambda: PartitionProtocol(self)))
         d.addCallback(partial(setattr, self, 'proc_protocol'))
