@@ -686,16 +686,8 @@
                 <param style="plain" name="at" required="false"
                     type="string" path="$.scalingPolicies.[*].args.at">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
-<<<<<<< HEAD
-                        >The time when this policy runs. This property
-                        is mutually exclusive with the "cron"
-                        parameter. You can either provide "cron" or
-                        "at" for a given policy, but not both. You
-                        must specify seconds when using "at". If
-                        seconds are not specified, a 400 error is
-                        returned.</wadl:doc>
-=======
-                        xml:lang="EN"><para>The time when this policy
+                        xml:lang="EN">
+                        <para>The time when this policy
                             runs. This property is mutually exclusive
                             with the <code>cron</code> parameter. You
                             must specify seconds when using "at". For example, 
@@ -703,7 +695,6 @@
                             If seconds are not specified, a 400 error is
                             returned. Note, the policy is triggered within a 
                             10-second range of the time specified by <code>at</code>.</para></wadl:doc>
->>>>>>> recommiting a change that never got merged when done 3 months ago--about the 10 second range for the "at" param
                 </param>
                 <param style="plain" name="changePercent"
                     required="false" type="number"
