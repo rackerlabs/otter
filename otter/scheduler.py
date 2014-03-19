@@ -34,6 +34,7 @@ class PartitionProtocol(LineOnlyReceiver):
 
     def connectionMade(self):
         # TODO: Temporary HACK! since ProcessTransport does not have disconnecting attr
+        # https://twistedmatrix.com/trac/ticket/6606
         self.transport.disconnecting = False
 
     def lineReceived(self, line):
