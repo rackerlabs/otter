@@ -1574,6 +1574,13 @@
                 no response body is returned.</para>
         </wadl:doc>
         <request>
+            <representation mediaType="application/json">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <xsdxt:code
+                        href="../docbkx/samples/reqPutPolicy.json"/>
+                </wadl:doc>
+          
             <param style="plain" name="name" required="true"
                 type="string" path="$.scalingPolicies.[*].name">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
@@ -1684,13 +1691,7 @@
                         0.</para>
                 </wadl:doc>
             </param>
-            <representation mediaType="application/json">
-                <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN">
-                    <xsdxt:code
-                        href="../docbkx/samples/reqPutPolicy.json"/>
-                </wadl:doc>
-            </representation>
+            </representation> 
         </request>
         <response status="204"/> &commonFaults; &getFaults;
         &postPutFaults; </method>
