@@ -2,6 +2,8 @@
 Module that provides retrying-at-a-particular-interval functionality.
 """
 
+import random
+
 from twisted.internet import defer
 
 
@@ -173,6 +175,16 @@ def repeating_interval(interval):
     :return: a function that accepts a :class:`Failure` and returns ``interval``
     """
     return lambda f: interval
+
+
+def random_interval(minimum, maximum):
+    """
+    Returns a ``can_retry`` function for :py:func:retry` that returns different
+    random interval between `minimum` and `maximum` each time it is called
+
+    :return: a function that accepts a :class:`Failure` and returns ``interval``
+    """
+    return lambda f: random.uniform(minimum, maximum)
 
 
 def retry(do_work, can_retry=None, next_interval=None, clock=None):
