@@ -388,8 +388,7 @@
                             <code>"at": "2013-12-05T03:12:00Z"</code>.
                         If seconds are not specified, a 400 error is
                         returned. Note, the policy is triggered within
-                        a 10-second range of the time specified by
-                            <code>at</code>.</para></wadl:doc>
+                        a 10-second range of the time specified.</para></wadl:doc>
             </param>
             <param style="plain" name="changePercent" required="false"
                 type="number"
@@ -694,7 +693,7 @@
                             <code>"at": "2013-12-05T03:12:00Z"</code>. 
                             If seconds are not specified, a 400 error is
                             returned. Note, the policy is triggered within a 
-                            10-second range of the time specified by <code>at</code>.</para></wadl:doc>
+                            10-second range of the time specified.</para></wadl:doc>
                 </param>
                 <param style="plain" name="changePercent"
                     required="false" type="number"
@@ -1458,7 +1457,8 @@
                         provide "cron" or "at" for a given policy, but
                         not both. You must specify seconds when using
                         "at". If seconds are not specified, a 400
-                        error is returned.</wadl:doc>
+                        error is returned. Note, the policy is triggered within
+                        a 10-second range of the time specified.</wadl:doc>
                 </param>
                 <param style="plain" name="changePercent"
                     required="false" type="number"
@@ -1616,7 +1616,8 @@
                         given policy, but not both. You must specify
                         seconds when using "at". If seconds are not
                         specified, a 400 error is
-                    returned.</para></wadl:doc>
+                        returned. Note, the policy is triggered within
+                        a 10-second range of the time specified.</para></wadl:doc>
             </param>
             <param style="plain" name="changePercent" required="false"
                 type="number"
