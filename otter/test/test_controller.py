@@ -1385,7 +1385,8 @@ class ExecuteLaunchConfigTestCase(TestCase):
 
         self.log.err.assert_called_with(f, 'Launching server failed',
                                         system="otter.job.launch",
-                                        image_id="Unable to pull image ref.",
+                                        image_ref="Unable to pull image ref.",
+                                        flavor_ref="Unable to pull flavor ref.",
                                         job_id='1')
 
     def test_modify_state_failure_logged(self):
@@ -1400,7 +1401,8 @@ class ExecuteLaunchConfigTestCase(TestCase):
 
         self.log.err.assert_called_once_with(
             CheckFailure(AssertionError), system="otter.job.launch",
-            image_id="Unable to pull image ref.", job_id='1')
+            image_ref="Unable to pull image ref.",
+            flavor_ref="Unable to pull flavor ref.", job_id='1')
 
 
 class DummyException(Exception):
@@ -1441,11 +1443,12 @@ class PrivateJobHelperTestCase(TestCase):
 
         self.del_job = patch(self, 'otter.controller._DeleteJob')
         self.mock_launch = {'type': 'launch_server',
-                            'args': {'server': {'imageRef': 'imageID'}}}
+                            'args': {'server': {'imageRef': 'imageID',
+                                                'flavorRef': '1'}}}
 
-    def test_start_binds_image_id_to_log(self):
+    def test_start_binds_image_and_flavor_refs_to_log(self):
         """
-        `start` binds the image ID, if provided, to the logs
+        `start` binds the image ID and flavor, if provided, to the logs
         """
         self.job.job_started = mock.MagicMock()
 
@@ -1453,20 +1456,37 @@ class PrivateJobHelperTestCase(TestCase):
 
         self.job.log.msg('')
         self.log.msg.assert_called_once_with('', system='otter.job.launch',
-                                             image_id="imageID")
+                                             image_ref="imageID", flavor_ref='1')
 
-    def test_start_binds_invalid_image_id_to_log(self):
+    def test_start_binds_invalid_image_ref_to_log(self):
         """
         `start` binds the image ID to a string that says that we were unable
-        to find the image id in the logs
+        to find the image id in the logs, if the image ref could not be found
         """
         self.job.job_started = mock.MagicMock()
 
-        self.job.start('launch')
+        del self.mock_launch['args']['server']['imageRef']
+        self.job.start(self.mock_launch)
 
         self.job.log.msg('')
         self.log.msg.assert_called_once_with('', system='otter.job.launch',
-                                             image_id="Unable to pull image ref.")
+                                             image_ref="Unable to pull image ref.",
+                                             flavor_ref='1')
+
+    def test_start_binds_invalid_flavor_ref_to_log(self):
+        """
+        `start` binds the flavor ID to a string that says that we were unable
+        to find the flavor id in the logs, if the flavor ref could not be found
+        """
+        self.job.job_started = mock.MagicMock()
+
+        del self.mock_launch['args']['server']['flavorRef']
+        self.job.start(self.mock_launch)
+
+        self.job.log.msg('')
+        self.log.msg.assert_called_once_with('', system='otter.job.launch',
+                                             image_ref="imageID",
+                                             flavor_ref="Unable to pull flavor ref.")
 
     def test_start_calls_supervisor(self):
         """
@@ -1557,7 +1577,7 @@ class PrivateJobHelperTestCase(TestCase):
         self.log.msg.assert_called_once_with(
             "Server is active.", event_type="server.active", server_id='yay',
             job_id=self.job_id, audit_log=True, system="otter.job.launch",
-            image_id="imageID")
+            image_ref="imageID", flavor_ref="1")
 
     def test_job_completion_success_job_deleted_pending(self):
         """
@@ -1598,7 +1618,8 @@ class PrivateJobHelperTestCase(TestCase):
             ("A pending server that is no longer needed is now active, "
              "and hence deletable.  Deleting said server."),
             event_type="server.deletable", server_id='yay', job_id=self.job_id,
-            audit_log=True, system="otter.job.launch", image_id="imageID")
+            audit_log=True, system="otter.job.launch", image_ref="imageID",
+            flavor_ref="1")
 
     def test_job_completion_failure_job_removed(self):
         """
@@ -1618,7 +1639,8 @@ class PrivateJobHelperTestCase(TestCase):
 
         self.log.err.assert_called_once_with(
             CheckFailure(DummyException), 'Launching server failed',
-            system="otter.job.launch", image_id="imageID", job_id=self.job_id)
+            system="otter.job.launch", image_ref="imageID", job_id=self.job_id,
+            flavor_ref="1")
 
     def test_job_completion_failure_job_deleted_pending(self):
         """
@@ -1639,7 +1661,8 @@ class PrivateJobHelperTestCase(TestCase):
 
         self.log.err.assert_called_with(
             CheckFailure(DummyException), 'Launching server failed',
-            system="otter.job.launch", image_id="imageID", job_id=self.job_id)
+            system="otter.job.launch", image_ref="imageID", job_id=self.job_id,
+            flavor_ref="1")
 
     def test_job_completion_success_NoSuchScalingGroupError(self):
         """
@@ -1676,7 +1699,8 @@ class PrivateJobHelperTestCase(TestCase):
              "({scaling_group_id}) is now active, and hence deletable. "
              "Deleting said server."),
             event_type="server.deletable", server_id='yay', job_id=self.job_id,
-            audit_log=True, system="otter.job.launch", image_id="imageID")
+            audit_log=True, system="otter.job.launch", image_ref="imageID",
+            flavor_ref="1")
 
     def test_job_completion_failure_NoSuchScalingGroupError(self):
         """
@@ -1704,5 +1728,5 @@ class PrivateJobHelperTestCase(TestCase):
 
         self.log.err.assert_called_once_with(CheckFailure(DummyException),
                                              system="otter.job.launch",
-                                             image_id="imageID",
+                                             image_ref="imageID", flavor_ref="1",
                                              job_id=self.job_id)

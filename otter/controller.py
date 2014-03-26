@@ -424,7 +424,12 @@ class _Job(object):
         except:
             image = 'Unable to pull image ref.'
 
-        self.log = self.log.bind(image_id=image)
+        try:
+            flavor = launch_config['args']['server']['flavorRef']
+        except:
+            flavor = 'Unable to pull flavor ref.'
+
+        self.log = self.log.bind(image_ref=image, flavor_ref=flavor)
 
         deferred = self.supervisor.execute_config(
             self.log, self.transaction_id, self.scaling_group, launch_config)
