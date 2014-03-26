@@ -1414,7 +1414,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                 <parameter>maxEntities</parameter>
                             </td>
                             <td>Specifies the maximum amount of
-                            identities that are allowed in this group.
+                            entities that are allowed in this group.
                             You cannot scale up above this value.
                             Decreasing this value can cause an
                             immediate reduction of the scaling group. </td>
@@ -1424,7 +1424,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                 <parameter>minEntities</parameter>
                             </td>
                             <td>Specifies the minimum amount of
-                            identities that are allowed in this group.
+                            entities that are allowed in this group.
                             You cannot scale down below this value.
                             Increasing this value can cause an
                             immediate addition to the scaling group. </td>
