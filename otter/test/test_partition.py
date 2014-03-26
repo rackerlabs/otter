@@ -1,3 +1,7 @@
+"""
+Tests for otter/partition.py
+"""
+
 import mock
 from StringIO import StringIO
 
@@ -7,7 +11,7 @@ from kazoo.recipe.partitioner import SetPartitioner
 
 from otter.test.utils import patch
 
-from otter.partition import partition, process_partitioner
+from otter.partition import partition, process_partitioner, main
 
 
 class ProcessPartitionerTests(TestCase):
@@ -142,3 +146,43 @@ class PartitionTests(TestCase):
         self.client.SetPartitioner.assert_called_once_with('/path', [1, 2], time_boundary=10)
         self.assertEqual(self.proc_part.call_count, 2)
         self.assertFalse(self.sleep.called)
+
+
+class MainTests(TestCase):
+    """
+    Tests for `main()`
+    """
+
+    def setUp(self):
+        """
+        Mock KazooClient and partition
+        """
+        self.client = patch(self, 'otter.partition.KazooClient')
+        self.shandler = patch(self, 'otter.partition.SequentialThreadingHandler')
+        self.ghandler = patch(self, 'otter.partition.SequentialGeventHandler')
+        self.part = patch(self, 'otter.partition.partition')
+        self.args = ['kz_hosts', '/path', '1,2,3', '2.3', '3.4']
+
+    def _test_client(self, handler):
+        """
+        Check KazooClient is created and partition is called correctly
+        """
+        handler.assert_called_once_with()
+        self.client.assert_called_once_with(hosts='kz_hosts', handler=handler.return_value)
+        self.client.return_value.start.assert_called_once_with()
+        self.part.assert_called_once_with(self.client.return_value,
+                                          '/path', set(['1', '2', '3']), 2.3, 3.4)
+
+    def test_thread_handler(self):
+        """
+        SequentialThreadingHandler is used when first arg is 'thread'
+        """
+        main(['thread'] + self.args)
+        self._test_client(self.shandler)
+
+    def test_gevent_handler(self):
+        """
+        SequentialGeventHandler is used when first arg is 'gevent'
+        """
+        main(['gevent'] + self.args)
+        self._test_client(self.ghandler)
