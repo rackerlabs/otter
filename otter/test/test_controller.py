@@ -5,7 +5,7 @@ from datetime import timedelta, datetime
 
 import mock
 
-from testtools.matchers import ContainsDict, Equals
+from testtools.matchers import ContainsDict, Equals, IsInstance
 
 from twisted.internet import defer
 from twisted.python.failure import Failure
@@ -1234,7 +1234,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
         patch(self, 'otter.controller.get_supervisor', return_value=self.supervisor)
         self.del_job = patch(self, 'otter.controller._DeleteJob')
 
-        self.log = mock.MagicMock()
+        self.log = mock_log()
 
         self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
         self.fake_state = mock.MagicMock(GroupState)
@@ -1247,7 +1247,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
         controller.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 5)
         self.assertEqual(self.supervisor.execute_config.mock_calls,
-                         [mock.call(self.log.bind.return_value, '1',
+                         [mock.call(matches(IsInstance(self.log.__class__)), '1',
                                     self.group, 'launch')] * 5)
 
     def test_positive_delta_execute_config_failures_propagated(self):
@@ -1351,7 +1351,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
 
         # first bind is system='otter.job.launch', second is job_id='1'
         self.del_job.assert_called_once_with(
-            self.log.bind.return_value.bind.return_value, '1', self.group,
+            matches(IsInstance(self.log.__class__)), '1', self.group,
             {'id': 's1'}, self.supervisor)
         self.del_job.return_value.start.assert_called_once_with()
 
@@ -1383,10 +1383,10 @@ class ExecuteLaunchConfigTestCase(TestCase):
         self.assertEqual(len(written), 1)
         self.assertEqual(written[0], s)
 
-        # first bind is system='otter.job.launch'
-        log = self.log.bind.return_value
-        log.bind.assert_called_once_with(job_id='1')
-        log.bind.return_value.err.assert_called_with(f, 'Launching server failed')
+        self.log.err.assert_called_with(f, 'Launching server failed',
+                                        system="otter.job.launch",
+                                        image_id="Unable to pull image ref.",
+                                        job_id='1')
 
     def test_modify_state_failure_logged(self):
         """
@@ -1398,11 +1398,9 @@ class ExecuteLaunchConfigTestCase(TestCase):
                                          'launch', self.group, 1)
         self.execute_config_deferreds[0].callback({'id': 's1'})
 
-        # first bind is system='otter.job.launch'
-        log = self.log.bind.return_value
-        log.bind.assert_called_once_with(job_id='1')
-        log.bind.return_value.err.assert_called_once_with(
-            CheckFailure(AssertionError))
+        self.log.err.assert_called_once_with(
+            CheckFailure(AssertionError), system="otter.job.launch",
+            image_id="Unable to pull image ref.", job_id='1')
 
 
 class DummyException(Exception):
@@ -1437,11 +1435,38 @@ class PrivateJobHelperTestCase(TestCase):
 
         self.group.modify_state.side_effect = fake_modify_state
 
+        self.log = mock_log()
         self.job = controller._Job(self.log, self.transaction_id, self.group,
                                    self.supervisor)
-        self.log.bind.assert_called_once_with(system='otter.job.launch')
-        self.log = self.log.bind.return_value
+
         self.del_job = patch(self, 'otter.controller._DeleteJob')
+        self.mock_launch = {'type': 'launch_server',
+                            'args': {'server': {'imageRef': 'imageID'}}}
+
+    def test_start_binds_image_id_to_log(self):
+        """
+        `start` binds the image ID, if provided, to the logs
+        """
+        self.job.job_started = mock.MagicMock()
+
+        self.job.start(self.mock_launch)
+
+        self.job.log.msg('')
+        self.log.msg.assert_called_once_with('', system='otter.job.launch',
+                                             image_id="imageID")
+
+    def test_start_binds_invalid_image_id_to_log(self):
+        """
+        `start` binds the image ID to a string that says that we were unable
+        to find the image id in the logs
+        """
+        self.job.job_started = mock.MagicMock()
+
+        self.job.start('launch')
+
+        self.job.log.msg('')
+        self.log.msg.assert_called_once_with('', system='otter.job.launch',
+                                             image_id="Unable to pull image ref.")
 
     def test_start_calls_supervisor(self):
         """
@@ -1452,7 +1477,8 @@ class PrivateJobHelperTestCase(TestCase):
 
         self.job.start('launch')
         self.supervisor.execute_config.assert_called_once_with(
-            self.log, self.transaction_id, self.group, 'launch')
+            matches(IsInstance(self.log.__class__)), self.transaction_id,
+            self.group, 'launch')
         self.job.job_started.assert_called_once_with(
             (self.job_id, self.completion_deferred))
 
@@ -1478,7 +1504,7 @@ class PrivateJobHelperTestCase(TestCase):
         """
         d = self.job.start('launch')
         self.assertEqual(self.successResultOf(d), self.job_id)
-        self.assertEqual(self.job.log, self.log.bind.return_value)
+        self.assertEqual(self.job.log, matches(IsInstance(self.log.__class__)))
 
     def test_modify_state_called_on_job_completion_success(self):
         """
@@ -1523,15 +1549,15 @@ class PrivateJobHelperTestCase(TestCase):
         """
         self.state = GroupState('tenant', 'group', 'name', {},
                                 {self.job_id: {}}, None, {}, False)
-        log = self.job.log = mock_log()
-        self.job.start('launch')
+        self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'yay'})
 
         self.successResultOf(self.completion_deferred)
 
-        log.msg.assert_called_once_with(
+        self.log.msg.assert_called_once_with(
             "Server is active.", event_type="server.active", server_id='yay',
-            job_id='job_id', audit_log=True)
+            job_id=self.job_id, audit_log=True, system="otter.job.launch",
+            image_id="imageID")
 
     def test_job_completion_success_job_deleted_pending(self):
         """
@@ -1550,11 +1576,11 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.active, {})
 
         self.del_job.assert_called_once_with(
-            self.log.bind.return_value, self.transaction_id,
+            matches(IsInstance(self.log.__class__)), self.transaction_id,
             self.group, {'id': 'active'}, self.supervisor)
         self.del_job.return_value.start.assert_called_once_with()
 
-        self.assertEqual(self.log.bind.return_value.err.call_count, 0)
+        self.assertEqual(self.log.err.call_count, 0)
 
     def test_job_completion_success_job_deleted_audit_logged(self):
         """
@@ -1563,17 +1589,16 @@ class PrivateJobHelperTestCase(TestCase):
         """
         self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
                                 {}, False)
-        log = self.job.log = mock_log()
-        self.job.start('launch')
+        self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'yay'})
 
         self.successResultOf(self.completion_deferred)
 
-        log.msg.assert_called_once_with(
+        self.log.msg.assert_called_once_with(
             ("A pending server that is no longer needed is now active, "
              "and hence deletable.  Deleting said server."),
-            event_type="server.deletable", server_id='yay', job_id='job_id',
-            audit_log=True)
+            event_type="server.deletable", server_id='yay', job_id=self.job_id,
+            audit_log=True, system="otter.job.launch", image_id="imageID")
 
     def test_job_completion_failure_job_removed(self):
         """
@@ -1582,7 +1607,7 @@ class PrivateJobHelperTestCase(TestCase):
         """
         self.state = GroupState('tenant', 'group', 'name', {}, {self.job_id: {}}, None,
                                 {}, False)
-        self.job.start('launch')
+        self.job.start(self.mock_launch)
         self.completion_deferred.errback(DummyException('e'))
 
         self.assertIs(self.successResultOf(self.completion_deferred),
@@ -1591,8 +1616,9 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.log.bind.return_value.err.assert_called_once_with(
-            CheckFailure(DummyException), 'Launching server failed')
+        self.log.err.assert_called_once_with(
+            CheckFailure(DummyException), 'Launching server failed',
+            system="otter.job.launch", image_id="imageID", job_id=self.job_id)
 
     def test_job_completion_failure_job_deleted_pending(self):
         """
@@ -1602,7 +1628,7 @@ class PrivateJobHelperTestCase(TestCase):
         """
         self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
                                 {}, False)
-        self.job.start('launch')
+        self.job.start(self.mock_launch)
         self.completion_deferred.errback(DummyException('e'))
 
         self.assertIs(self.successResultOf(self.completion_deferred),
@@ -1611,8 +1637,9 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.log.bind.return_value.err.assert_called_with(
-            CheckFailure(DummyException), 'Launching server failed')
+        self.log.err.assert_called_with(
+            CheckFailure(DummyException), 'Launching server failed',
+            system="otter.job.launch", image_id="imageID", job_id=self.job_id)
 
     def test_job_completion_success_NoSuchScalingGroupError(self):
         """
@@ -1627,7 +1654,7 @@ class PrivateJobHelperTestCase(TestCase):
         self.completion_deferred.callback({'id': 'active'})
 
         self.del_job.assert_called_once_with(
-            self.log.bind.return_value, self.transaction_id,
+            matches(IsInstance(self.log.__class__)), self.transaction_id,
             self.group, {'id': 'active'}, self.supervisor)
         self.del_job.return_value.start.assert_called_once_with()
 
@@ -1639,18 +1666,17 @@ class PrivateJobHelperTestCase(TestCase):
         self.group.modify_state.side_effect = (
             lambda *args: defer.fail(NoSuchScalingGroupError('tenant', 'group')))
 
-        log = self.job.log = mock_log()
-        self.job.start('launch')
+        self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'yay'})
 
         self.successResultOf(self.completion_deferred)
 
-        log.msg.assert_called_once_with(
+        self.log.msg.assert_called_once_with(
             ("A pending server belonging to a deleted scaling group "
              "({scaling_group_id}) is now active, and hence deletable. "
              "Deleting said server."),
-            event_type="server.deletable", server_id='yay', job_id='job_id',
-            audit_log=True)
+            event_type="server.deletable", server_id='yay', job_id=self.job_id,
+            audit_log=True, system="otter.job.launch", image_id="imageID")
 
     def test_job_completion_failure_NoSuchScalingGroupError(self):
         """
@@ -1663,7 +1689,7 @@ class PrivateJobHelperTestCase(TestCase):
 
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
-        self.assertEqual(self.log.bind.return_value.err.call_count, 0)
+        self.assertEqual(self.log.err.call_count, 0)
 
     def test_modify_state_failure_logged(self):
         """
@@ -1673,8 +1699,10 @@ class PrivateJobHelperTestCase(TestCase):
         self.group.modify_state.side_effect = (
             lambda *args: defer.fail(DummyException('e')))
 
-        self.job.start('launch')
+        self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'active'})
 
-        self.log.bind.return_value.err.assert_called_once_with(
-            CheckFailure(DummyException))
+        self.log.err.assert_called_once_with(CheckFailure(DummyException),
+                                             system="otter.job.launch",
+                                             image_id="imageID",
+                                             job_id=self.job_id)
