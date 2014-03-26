@@ -33,11 +33,9 @@ def process_partitioner(partitioner, new_partitioner):
         partitioner.release_set()
     elif partitioner.failed:
         partitioner = new_partitioner()
-        #partitioner = client.SetPartitioner(path, set, time_boundary=time_boundary)
     elif partitioner.acquired:
         print(json.dumps({'buckets': list(partitioner)}), file=sys.stdout)
         sys.stdout.flush()
-        #time.sleep(interval)
     return partitioner
 
 
