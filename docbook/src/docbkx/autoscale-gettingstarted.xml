@@ -57,9 +57,9 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
             <!-- enter the publication date of this document; in revhistory, explain what changed -->
             <pubdate/>
             <copyright>
-                <year>2013</year>
-                <holder>Rackspace US, Inc.</holder>
-            </copyright>
+            <year>2014</year>
+            <holder>Rackspace US, Inc.</holder>
+        </copyright>
             <legalnotice role="rs-api">
                 <annotation>
                     <remark>Copyright details are filled in by the template.
@@ -68,15 +68,30 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
             </legalnotice>
             <revhistory>
                 <revision>
-                    <date>2013-11-19</date>
-                    <revdescription>
-                        <itemizedlist spacing="compact">
-                            <listitem>
-                                <para>Updating content for UA</para>
-                            </listitem>
-                        </itemizedlist>
-                    </revdescription>
-                </revision>
+                <date>2014-03-26</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Final fix for AUTO-834, added IAD to
+                                service endpoints in the Getting
+                                Started Guide and added comment about
+                                verifying the service endpoints by
+                                issuing the call being the best way to
+                                know what they are.</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
+            <revision>
+                <date>2013-11-19</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Updating content for UA</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
                 <revision>
                     <date>2013-10-31</date>
                     <revdescription>
@@ -129,8 +144,9 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
                     </revdescription>
                 </revision>
             </revhistory>
-            <raxm:metadata>
-                <raxm:displayname>Getting Started Guide</raxm:displayname>
+            <!-- raxm:product appears in WAR for publication: cas-v1.0-autoscale-gettingstarted-internal.war -->
+            <raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <raxm:displayname>API Developer Guide</raxm:displayname>
                 <raxm:product version="v1.0">cas</raxm:product>
                 <raxm:priority>10</raxm:priority>
             </raxm:metadata>
@@ -192,7 +208,10 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
                 <para>&PRODNAME; is a regionalized service. The user of the service is therefore responsible
                     for appropriate replication, caching, and overall maintenance of &PRODNAME; data
                     across regional boundaries to other &PROD; servers.</para>
-                <para>The following table lists the service access endpoints for &PROD;.</para>
+                <para>The following table lists the service access
+                endpoints for &PROD; though we recommend checking the
+                endpoints returned in the authentication response for
+                the most up-to-date information.</para>
                 <?rax-fo keep-with-next?>
                     <para>
                         <table rules="all">
@@ -219,10 +238,23 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
                                     </td>
                                 </tr>
                                 <tr align="left">
-                                    <td colspan="2">Dallas/Ft. Worth (DFW)
-                                    </td>
+                                    <td colspan="2">Dallas/Ft. Worth (DFW)</td>
                                     <td colspan="5">
                                         <code>https://dfw.autoscale.api.rackspacecloud.com/v1.0/</code>
+                                        <parameter>1234</parameter>/
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td colspan="2">Dulles (IAD)</td>
+                                    <td colspan="5">
+                                        <code>https://iad.autoscale.api.rackspacecloud.com/v1.0/</code>
+                                        <parameter>1234</parameter>/
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td colspan="2">Hong Kong (HKG)</td>
+                                    <td colspan="5">
+                                        <code>https://hkg.autoscale.api.rackspacecloud.com/v1.0/</code>
                                         <parameter>1234</parameter>/
                                     </td>
                                 </tr>
@@ -230,22 +262,13 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
                                     <td colspan="2">London (LON)</td>
                                     <td colspan="5">
                                         <code>https://lon.autoscale.api.rackspacecloud.com/v1.0/</code>
-                                        <parameter>1234</parameter>/
-                                    </td>
+                                        <parameter>1234</parameter>/</td>
                                 </tr>
                                 <tr align="left">
                                     <td colspan="2">Sydney (SYD)</td>
                                     <td colspan="5">
                                         <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code>
-                                        <parameter>1234</parameter>/
-                                    </td>
-                                </tr>
-                                <tr align="left">
-                                    <td colspan="2">Hong Kong (HKG)</td>
-                                    <td colspan="5">
-                                        <code>https://hkg.autoscale.api.rackspacecloud.com/v1.0/</code>
-                                        <parameter>1234</parameter>/
-                                    </td>
+                                        <parameter>1234</parameter>/</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -609,10 +632,19 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
                         regardless of where your account was created.
                     </para>
                 </important>
-                <para>The following table shows a list of valid endpoints:
-                </para>
+                <para>The following table shows a list of valid
+                endpoints for &PROD; though we recommend checking the
+                endpoints returned in the authentication response for
+                the most up-to-date information. </para>
                 <table rules="all">
                     <caption>Regionalized Service Endpoints</caption>
+                    <col width="11%" />
+                    <col width="11%" />
+                    <col width="16%" />
+                    <col width="16%" />
+                    <col width="16%" />
+                    <col width="16%" />
+                    <col width="16%" />
                     <thead>
                         <tr align="center">
                             <td colspan="2">Region</td>
@@ -621,16 +653,30 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
                     </thead>
                     <tbody>
                         <tr align="left">
-                            <td colspan="2">US</td>
+                            <td colspan="2">Chicago (ORD)</td>
                             <td colspan="5">
                                 <code>https://ord.autoscale.api.rackspacecloud.com/v1.0/</code>
                                 <parameter>1234</parameter>/
                             </td>
                         </tr>
                         <tr align="left">
-                            <td colspan="2">UK</td>
+                            <td colspan="2">Dallas/Ft. Worth (DFW)</td>
                             <td colspan="5">
                                 <code>https://dfw.autoscale.api.rackspacecloud.com/v1.0/</code>
+                                <parameter>1234</parameter>/
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">Dulles (IAD)</td>
+                            <td colspan="5">
+                                <code>https://iad.autoscale.api.rackspacecloud.com/v1.0/</code>
+                                <parameter>1234</parameter>/
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">Hong Kong (HKG)</td>
+                            <td colspan="5">
+                                <code>https://hkg.autoscale.api.rackspacecloud.com/v1.0/</code>
                                 <parameter>1234</parameter>/
                             </td>
                         </tr>
@@ -638,25 +684,26 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
                             <td colspan="2">London (LON)</td>
                             <td colspan="5">
                                 <code>https://lon.autoscale.api.rackspacecloud.com/v1.0/</code>
-                                <parameter>1234</parameter>/
-                            </td>
+                                <parameter>1234</parameter>/</td>
                         </tr>
                         <tr align="left">
                             <td colspan="2">Sydney (SYD)</td>
                             <td colspan="5">
                                 <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code>
-                                <parameter>1234</parameter>/
-                            </td>
-                        </tr>
-                        <tr align="left">
-                            <td colspan="2">Hong Kong (HKG)</td>
-                            <td colspan="5">
-                                <code>https://hkg.autoscale.api.rackspacecloud.com/v1.0/</code>
-                                <parameter>1234</parameter>/
-                            </td>
+                                <parameter>1234</parameter>/</td>
                         </tr>
                     </tbody>
                 </table>
+                <para>Replace the Tenant ID,
+                    <parameter>1234</parameter>, with your actual Tenant ID.</para>
+                <para>You will find your tenant Id after the final '/' in the
+                    <code>publicURL</code>field returned by the authentication response. For example, in
+                    <olink
+                        targetdoc="autoscale-devguide" targetptr="auth-response-example-json">Example 2, “Authentication Response for US Endpoint: JSON”</olink>the
+                    <code>publicURL</code>field for
+                    <code>autoscale</code>
+                    ("https://ord.autoscale.api.rackspacecloud.com/v1.0/
+                    <emphasis role="bold">1100111</emphasis>") shows that the tenant Id is 1100111.</para>
                 <para>
                     <note>
                         <para>Auto Scale supports Role-based Access Control (RBAC) for more information, read
