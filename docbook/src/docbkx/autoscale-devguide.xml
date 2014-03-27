@@ -65,6 +65,22 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-devguide">
                 </annotation>
             </legalnotice>
             <revhistory>
+            <revision
+                xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <date>2014-03-26</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Final fix for AUTO-834, added IAD to
+                                service endpoints in the Getting
+                                Started Guide and added comment about
+                                verifying the service endpoints by
+                                issuing the call being the best way to
+                                know what they are.</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
                 <revision>
                 <date>2014-03-19</date>
                 <revdescription>
@@ -691,8 +707,10 @@ is external so it's handy for Getting Started to share -->
                 <para>&PRODNAME; is a regionalized service. The user of the service is therefore responsible
                     for appropriate replication, caching, and overall maintenance of &PRODNAME; data
                     across regional boundaries to other &PROD; servers.</para>
-                <para>The following table lists the service access endpoints for &PROD;.
-                </para>
+                <para>The following table lists the service access
+                endpoints for &PROD;  though we recommend checking the
+                endpoints returned in the authentication response for
+                the most up-to-date information. </para>
                 <?rax-fo keep-with-next?>
                     <para>
                         <table rules="all">
