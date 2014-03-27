@@ -1231,7 +1231,8 @@ class CassScalingGroupCollection:
         d = self._webhook_info_from_table(log, capability_hash)
 
         def not_found(f):
-            f.trap(UnrecognizedCapabilityError)
+            if not f.check(UnrecognizedCapabilityError):
+                log.err(f, 'Error getting webhook info from table')
             return self._webhook_info_by_index(log, capability_hash)
 
         d.addErrback(not_found)

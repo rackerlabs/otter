@@ -28,7 +28,7 @@ from otter.models.interface import (
     NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError,
     WebhooksOverLimitError, PoliciesOverLimitError)
 
-from otter.test.utils import LockMixin, DummyException, mock_log
+from otter.test.utils import LockMixin, DummyException, mock_log, CheckFailure
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin,
@@ -2683,6 +2683,23 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(self.successResultOf(d), 'g')
         self.collection._webhook_info_from_table.assert_called_once_with(self.mock_log, 'hash')
         self.collection._webhook_info_by_index.assert_called_once_with(self.mock_log, 'hash')
+
+    def test_webhook_hash_from_index_logs_unknown_err(self):
+        """
+        `webhook_info_by_hash` returns info from _webhook_info_by_index if
+        _webhook_info_from_table fails with unknown error
+        """
+        self.collection._webhook_info_from_table = mock.Mock(
+            return_value=defer.fail(ValueError(1)))
+        self.collection._webhook_info_by_index = mock.Mock(return_value=defer.succeed('g'))
+
+        d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
+
+        self.assertEqual(self.successResultOf(d), 'g')
+        self.collection._webhook_info_from_table.assert_called_once_with(self.mock_log, 'hash')
+        self.collection._webhook_info_by_index.assert_called_once_with(self.mock_log, 'hash')
+        self.mock_log.err.assert_called_once_with(
+            CheckFailure(ValueError), 'Error getting webhook info from table')
 
     def test_webhook_hash_index(self):
         """
