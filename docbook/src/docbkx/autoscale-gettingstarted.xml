@@ -48,7 +48,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
 xlink:href="http:// docs.autoscale.apiary.io/ ">
     <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
     <title>&PRODNAME; API Getting Started Guide</title>
-    <titleabbrev>&PRODABBV; API Getting Started Guide</titleabbrev>
+    <titleabbrev>&PRODABBV; Getting Started Guide</titleabbrev>
     <?rax title.font.size="35px" subtitle.font.size="20px" canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstarted/content"
     ?>
         <info>
@@ -146,7 +146,7 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
             </revhistory>
             <!-- raxm:product appears in WAR for publication: cas-v1.0-autoscale-gettingstarted-internal.war -->
             <raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
-                <raxm:displayname>API Developer Guide</raxm:displayname>
+                <raxm:displayname>Getting Started Guide</raxm:displayname>
                 <raxm:product version="v1.0">cas</raxm:product>
                 <raxm:priority>10</raxm:priority>
             </raxm:metadata>
