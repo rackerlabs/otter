@@ -252,19 +252,10 @@ def makeService(config):
 
     # Setup Kazoo client
     if config_value('zookeeper'):
-        health_checker.checks['scheduler'] = (
-            lambda: (False, {'reason': 'scheduler not ready yet'}))
         threads = config_value('zookeeper.threads') or 10
         kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'),
                                   threads=threads, txlog=log.bind(system='kazoo'))
         d = kz_client.start()
-
-        # Setup scheduler
-        scheduler = setup_scheduler(s, store, config_value('zookeeper.hosts'))
-        health_checker.checks['scheduler'] = getattr(
-            scheduler, 'health_check',
-            lambda: (False, 'scheduler health check not implemented'))
-        otter.scheduler_reset = scheduler.reset
 
         def on_client_ready(_):
             # Set the client after starting
@@ -279,6 +270,11 @@ def makeService(config):
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
 
+        # Setup scheduler
+        scheduler = setup_scheduler(s, store, config_value('zookeeper.hosts'))
+        health_checker.checks['scheduler'] = scheduler.health_check
+        otter.scheduler_reset = scheduler.reset
+
     return s
 
 
@@ -286,7 +282,6 @@ def setup_scheduler(parent, store, hosts):
     """
     Setup scheduler service
     """
-    # Setup scheduler service
     if not config_value('scheduler') or config_value('mock'):
         return
     buckets = range(1, int(config_value('scheduler.buckets')) + 1)

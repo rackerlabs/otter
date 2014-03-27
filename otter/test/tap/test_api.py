@@ -389,21 +389,6 @@ class APIMakeServiceTests(TestCase):
         self.assertEqual(self.health_checker.checks['store'],
                          self.store.health_check)
 
-    @mock.patch('otter.tap.api.setup_scheduler')
-    @mock.patch('otter.tap.api.TxKazooClient')
-    def test_health_checker_zookeeper(self, *args):
-        """
-        A health checker is constructed by default with the store and an
-        invalid scheduler service
-        """
-        config = test_config.copy()
-        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
-        self.assertIsNone(self.health_checker)
-        makeService(config)
-        self.assertIsNotNone(self.health_checker)
-        self.assertEqual(self.health_checker.checks['scheduler'](),
-                         (False, {'reason': 'scheduler not ready yet'}))
-
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_supervisor_service_set_by_default(self, supervisor):
         """
@@ -416,61 +401,69 @@ class APIMakeServiceTests(TestCase):
 
         self.assertEqual(get_supervisor(), supervisor_service)
 
-    @mock.patch('otter.tap.api.setup_scheduler')
-    @mock.patch('otter.tap.api.TxKazooClient')
-    def test_kazoo_client_success(self, mock_txkz, mock_setup_scheduler):
+    def _test_zookeeper(self, config, mock_txkz, mock_setup_scheduler):
         """
-        TxKazooClient is started and calls `setup_scheduler`. Its instance
-        is also set in store.kz_client after start has finished, and the
-        scheduler added to the health checker
+        Zookeeper config is used to create TxKazooClient and scheduler is setup
         """
-        config = test_config.copy()
-        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
-
+        # Setup kazoo mocking
         kz_client = mock.Mock(spec=['start', 'stop'])
         start_d = defer.Deferred()
         kz_client.start.return_value = start_d
         mock_txkz.return_value = kz_client
         self.store.kz_client = None
 
+        # make service
         parent = makeService(config)
 
+        # TxKazoo got started?
         self.log.bind.assert_called_with(system='kazoo')
         mock_txkz.assert_called_once_with(
             hosts='zk_hosts', threads=20, txlog=self.log.bind.return_value)
         kz_client.start.assert_called_once_with()
 
-        # setup_scheduler and store.kz_client is not called yet, and nothing
-        # added to the health checker
-        self.assertFalse(mock_setup_scheduler.called)
-        self.assertIsNone(self.store.kz_client)
-
-        # they are called after start completes
-        start_d.callback(None)
-        mock_setup_scheduler.assert_called_once_with(parent, self.store, kz_client)
-        self.assertEqual(self.store.kz_client, kz_client)
+        # scheduler was setup?
+        mock_setup_scheduler.assert_called_once_with(parent, self.store, 'zk_hosts')
         self.assertEqual(self.health_checker.checks['scheduler'],
                          mock_setup_scheduler.return_value.health_check)
 
+        return start_d
+
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
-    def test_kazoo_client_failed(self, mock_txkz, mock_setup_scheduler):
+    def test_kazoo_success(self, mock_txkz, mock_setup_scheduler):
         """
-        `setup_scheduler` is not called if TxKazooClient is not able to start
-        Error is logged
+        store.kz_client is set only after KazooClient is successfully started
         """
         config = test_config.copy()
         config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
-        kz_client = mock.Mock(spec=['start', 'stop'])
-        kz_client.start.return_value = defer.fail(ValueError('e'))
-        mock_txkz.return_value = kz_client
 
-        makeService(config)
+        d = self._test_zookeeper(config, mock_txkz, mock_setup_scheduler)
 
-        mock_txkz.assert_called_once_with(
-            hosts='zk_hosts', threads=20, txlog=mock.ANY)
-        kz_client.start.assert_called_once_with()
-        self.assertFalse(mock_setup_scheduler.called)
+        # store.kz_client is not set yet
+        self.assertIsNone(self.store.kz_client)
+
+        # it is after start completes
+        d.callback(None)
+        self.assertEqual(self.store.kz_client, mock_txkz.return_value)
+
+    @mock.patch('otter.tap.api.setup_scheduler')
+    @mock.patch('otter.tap.api.TxKazooClient')
+    def test_kazoo_failed(self, mock_txkz, mock_setup_scheduler):
+        """
+        store.kz_client is not set if TxKazooClient is not able to start
+        and error is logged
+        """
+        config = test_config.copy()
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
+
+        d = self._test_zookeeper(config, mock_txkz, mock_setup_scheduler)
+
+        # store.kz_client is not set yet
+        self.assertIsNone(self.store.kz_client)
+
+        # it is not set after error and error is logged
+        d.errback(ValueError('e'))
+        self.assertIsNone(self.store.kz_client)
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
                                              'Could not start TxKazooClient')
 
@@ -533,13 +526,14 @@ class SchedulerSetupTests(TestCase):
         """
         Mock args
         """
-        self.scheduler_service = patch(self, 'otter.tap.api.SchedulerService')
+        self.sservice = patch(self, 'otter.tap.api.SchedulerService')
         self.config = {
             'scheduler': {
                 'buckets': 10,
                 'partition': {'path': '/part_path', 'time_boundary': 15},
                 'batchsize': 100,
-                'interval': 10
+                'interval': 10,
+                'kz_handler': 'thread'
             }
         }
         set_config_data(self.config)
@@ -558,12 +552,14 @@ class SchedulerSetupTests(TestCase):
         `SchedulerService` is configured with config values and set as parent
         to passed `MultiService`
         """
-        setup_scheduler(self.parent, self.store, self.kz_client)
+        s = setup_scheduler(self.parent, self.store, self.kz_client)
         buckets = range(1, 11)
         self.store.set_scheduler_buckets.assert_called_once_with(buckets)
-        self.scheduler_service.assert_called_once_with(
-            100, 10, self.store, self.kz_client, '/part_path', 15, buckets)
-        self.scheduler_service.return_value.setServiceParent.assert_called_once_with(self.parent)
+        self.sservice.assert_called_once_with(
+            100, 10, self.store, self.kz_client, '/part_path', 15, buckets,
+            reactor, 'thread')
+        self.sservice.return_value.setServiceParent.assert_called_once_with(self.parent)
+        self.assertEqual(s, self.sservice.return_value)
 
     def test_mock_store_with_scheduler(self):
         """
@@ -575,4 +571,4 @@ class SchedulerSetupTests(TestCase):
         setup_scheduler(self.parent, self.store, self.kz_client)
 
         self.assertFalse(self.store.set_scheduler_buckets.called)
-        self.assertFalse(self.scheduler_service.called)
+        self.assertFalse(self.sservice.called)
