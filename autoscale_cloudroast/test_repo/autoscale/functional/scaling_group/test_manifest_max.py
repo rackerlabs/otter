@@ -2,7 +2,6 @@
 Test to create and verify the listing webhooks.
 """
 from test_repo.autoscale.fixtures import ScalingGroupFixture
-import time
 
 
 class GetMaxManifest(ScalingGroupFixture):
@@ -28,16 +27,11 @@ class GetMaxManifest(ScalingGroupFixture):
                 webhook_resp = self.autoscale_client.create_webhook(self.group.id, p_id, "hook_%s" % w)
                 hook_obj = webhook_resp.entity[0]
                 webhook_ids.append(hook_obj.id)
-            manifest_dict[p_id] = webhook_ids.sort()  # Sort webhooks to verify against rx'd manifest
+            manifest_dict[p_id] = sorted(webhook_ids)  # Sort webhooks to verify against rx'd manifest
         # Issues the manifest query, capture resluts, and compare
-        start_time = time.time()
         list_manifest_resp = \
             self.autoscale_client.view_manifest_config_for_scaling_group_with_webhooks(
                 self.group.id)
-        request_time = time.time() - start_time
-        expected_time = 5
-        self.assertTrue(request_time <= expected_time,
-                        "Request time %s was greater than %s sec." % (request_time, expected_time))
         list_manifest = list_manifest_resp.entity
         actual_ids = {}
         for policy in list_manifest.scalingPolicies:
@@ -46,4 +40,5 @@ class GetMaxManifest(ScalingGroupFixture):
             for hook in policy.webhooks:
                 rx_webhook_ids.append(hook.id)
             actual_ids[sp_id] = rx_webhook_ids  # Unsorted to verify that the order is correct
-        self.assertTrue(manifest_dict == actual_ids, "Recieved manifest did not match expected")
+        self.assertTrue(manifest_dict == actual_ids,
+                        "Recieved manifest did not match expected")
