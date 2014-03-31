@@ -348,10 +348,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.lock = self.mock_lock()
         self.kz_lock.Lock.return_value = self.lock
 
+        self.clock = Clock()
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
                                       self.connection, itertools.cycle(range(2, 10)),
-                                      self.kz_lock)
+                                      self.kz_lock, self.clock)
         self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
                                                    tenant_id=self.tenant_id,
                                                    scaling_group_id=self.group_id)
@@ -2131,7 +2132,8 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
 
         self.connection.execute.side_effect = _responses
 
-        self.collection = CassScalingGroupCollection(self.connection)
+        self.clock = Clock()
+        self.collection = CassScalingGroupCollection(self.connection, self.clock)
 
         self.uuid = patch(self, 'otter.models.cass.uuid')
         self.uuid.uuid1.return_value = 'timeuuid'
@@ -2250,8 +2252,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.side_effect = _responses
 
         self.mock_log = mock_log()
+        self.clock = Clock()
 
-        self.collection = CassScalingGroupCollection(self.connection)
+        self.collection = CassScalingGroupCollection(self.connection, self.clock)
         self.tenant_id = 'goo1234'
         self.config = _de_identify({
             'name': 'blah',
@@ -2735,7 +2738,8 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """ Setup the mocks """
         self.connection = mock.MagicMock(spec=['execute'])
         self.connection.execute.return_value = defer.succeed([])
-        self.collection = CassScalingGroupCollection(self.connection)
+        self.clock = Clock()
+        self.collection = CassScalingGroupCollection(self.connection, self.clock)
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
         self.clock = Clock()

@@ -190,7 +190,7 @@ def makeService(config):
             seed_endpoints,
             config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
 
-        store = CassScalingGroupCollection(cassandra_cluster)
+        store = CassScalingGroupCollection(cassandra_cluster, reactor)
         admin_store = CassAdmin(cassandra_cluster)
     else:
         store = MockScalingGroupCollection()
