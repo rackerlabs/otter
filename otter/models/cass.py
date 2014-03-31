@@ -20,7 +20,7 @@ from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
 from otter.util.config import config_value
-from otter.util.deferredutils import with_lock, timeout_deferred
+from otter.util.deferredutils import with_lock, timeout_deferred, delay
 from otter.scheduler import next_cron_occurrence
 
 from silverberg.client import ConsistencyLevel
@@ -609,7 +609,8 @@ class CassScalingGroup(object):
         def _modify_state():
             d = self.view_state(consistency)
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
-            return d.addCallback(_write_state)
+            d.addCallback(_write_state)
+            return d.addCallback(delay, reactor, 2)
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
