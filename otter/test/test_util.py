@@ -15,7 +15,7 @@ from otter.util.http import (
     raise_error_on_code, wrap_request_error)
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
-from otter.util.deferredutils import with_lock
+from otter.util.deferredutils import with_lock, delay
 
 from otter.test.utils import patch, LockMixin, mock_log, DummyException
 
@@ -420,3 +420,24 @@ class WithLockTests(TestCase):
         self.assertEqual(self.log.msg.call_count, 2)
 
         self.failureResultOf(d, ValueError)
+
+
+class DelayTests(TestCase):
+    """
+    Tests for `delay`
+    """
+
+    def setUp(self):
+        """
+        Sample clock
+        """
+        self.clock = Clock()
+
+    def test_delays(self):
+        """
+        Delays the result
+        """
+        d = delay(2, self.clock, 5)
+        self.assertNoResult(d)
+        self.clock.advance(5)
+        self.assertEqual(self.successResultOf(d), 2)
