@@ -2742,7 +2742,6 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.collection = CassScalingGroupCollection(self.connection, self.clock)
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
-        self.clock = Clock()
 
     def test_health_check_no_zookeeper(self):
         """

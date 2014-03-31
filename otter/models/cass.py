@@ -1278,6 +1278,7 @@ class CassScalingGroupCollection:
         connect to cassandra and zookeeper
         """
         if clock is None:
+            from twisted.internet import reactor
             clock = reactor
 
         if self.kz_client is None:
