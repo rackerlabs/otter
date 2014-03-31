@@ -219,3 +219,18 @@ def with_lock(reactor, lock, log, func, *args, **kwargs):
 
     d.addCallback(lock_acquired)
     return d
+
+
+def delay(result, reactor, seconds):
+    """
+    Delays the result by `seconds`.
+
+    :param result: Result to be returned after `seconds` have passed
+    :param reactor: IReactorTime provider
+    :param seconds: Number of seconds to delay
+
+    :return: `result` after `seconds` have passed
+    """
+    d = defer.Deferred()
+    reactor.callLater(seconds, d.callback, result)
+    return d
