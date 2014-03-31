@@ -425,6 +425,8 @@ class APIMakeServiceTests(TestCase):
         mock_setup_scheduler.assert_called_once_with(parent, self.store, 'zk_hosts')
         self.assertEqual(self.health_checker.checks['scheduler'],
                          mock_setup_scheduler.return_value.health_check)
+        self.assertEqual(self.Otter.return_value.scheduler_reset,
+                         mock_setup_scheduler.return_value.reset)
 
         return start_d
 

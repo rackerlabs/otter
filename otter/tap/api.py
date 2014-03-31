@@ -272,8 +272,9 @@ def makeService(config):
 
         # Setup scheduler
         scheduler = setup_scheduler(s, store, config_value('zookeeper.hosts'))
-        health_checker.checks['scheduler'] = scheduler.health_check
-        otter.scheduler_reset = scheduler.reset
+        if scheduler:
+            health_checker.checks['scheduler'] = scheduler.health_check
+            otter.scheduler_reset = scheduler.reset
 
     return s
 
