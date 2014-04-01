@@ -33,7 +33,7 @@ def process_partitioner(partitioner, new_partitioner):
         partitioner.release_set()
     elif partitioner.failed:
         partitioner = new_partitioner()
-    elif partitioner.acquired:
+    if partitioner.acquired:
         print(json.dumps({'buckets': list(partitioner)}), file=sys.stdout)
         sys.stdout.flush()
     return partitioner

@@ -26,7 +26,9 @@ class ProcessPartitionerTests(TestCase):
         self.part = mock.MagicMock(
             spec=SetPartitioner, allocating=False, release=False, failed=False,
             acquired=False)
-        self.new_part = mock.Mock()
+        self.new_part = mock.Mock(
+            return_value=mock.MagicMock(spec=SetPartitioner, allocating=False,
+                                        release=False, failed=False, acquired=False))
         sys = patch(self, 'otter.partition.sys', spec=['stdout'])
         self.strio = StringIO()
         self.stdout = sys.stdout = mock.Mock(wraps=self.strio)
