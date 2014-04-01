@@ -229,6 +229,8 @@ class Policy(AutoMarshallingModel):
             policy.links = Links._dict_to_obj(policy.links)
         if hasattr(policy, 'args'):
             policy.args = PolicyArgs._dict_to_obj(policy.args)
+        if hasattr(policy, 'webhooks'):
+            policy.webhooks = [Webhook._dict_to_obj(w) for w in policy.webhooks]
         attr_list = ['id', 'name', 'change', 'changePercent',
                      'desiredCapacity', 'cooldown', 'type']
         for k in attr_list:
