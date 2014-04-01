@@ -160,8 +160,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.reactor = MemoryProcessReactor()
         self.sservice = SchedulerService(
             100, 1, self.mock_store, self.zk_hosts, self.zk_partition_path,
-            self.time_boundary, self.buckets, self.reactor, clock=self.clock,
-            threshold=60)
+            self.time_boundary, self.buckets, self.reactor, 'thread',
+            clock=self.clock, threshold=60)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
 
         self.check_events_in_bucket = patch(self, 'otter.scheduler.check_events_in_bucket')
@@ -197,7 +197,7 @@ class MostSchedulerServiceTests(SchedulerServiceTests):
         self.assertEqual(
             self.reactor.args,
             [self.sservice.python_exe, self.sservice.partition_py_path,
-             '127.0.0.1:2181', '/part_path', '1,2,3', '15', '1'])
+             'thread', '127.0.0.1:2181', '/part_path', '1,2,3', '15', '1'])
         self.assertEqual(self.reactor.env, None)
         # proc_protocol was set
         self.assertIsInstance(self.sservice.proc_protocol, PartitionProtocol)
@@ -275,7 +275,7 @@ class MostSchedulerServiceTests(SchedulerServiceTests):
         self.assertEqual(
             self.reactor.args,
             [self.sservice.python_exe, self.sservice.partition_py_path,
-             '127.0.0.1:2181', '/new_path', '1,2,3', '15', '1'])
+             'thread', '127.0.0.1:2181', '/new_path', '1,2,3', '15', '1'])
 
     def test_reset_ignore(self):
         """
@@ -291,7 +291,7 @@ class MostSchedulerServiceTests(SchedulerServiceTests):
         self.assertEqual(
             self.reactor.args,
             [self.sservice.python_exe, self.sservice.partition_py_path,
-             '127.0.0.1:2181', '/new_path', '1,2,3', '15', '1'])
+             'thread', '127.0.0.1:2181', '/new_path', '1,2,3', '15', '1'])
         self.assertNotEqual(self.sservice.proc_protocol, prot)
 
     def test_set_buckets(self):
