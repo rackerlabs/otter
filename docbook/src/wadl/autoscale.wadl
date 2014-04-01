@@ -1412,7 +1412,6 @@
                         />
                     </xsdxt:sample>
                 </wadl:doc>
-<<<<<<< HEAD
 	      <param style="plain"
 		     name="array"
 		     required="true"
@@ -1478,13 +1477,6 @@
                     type="integer"
                     path="$.[*].change">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the change to make in the number of servers in the scaling group. This parameter must be an integer. If the value is a positive integer, the number of servers will increase. If the value is a negative integer, the number of servers will decrease.</wadl:doc>
-=======
-                <param style="plain" name="array" required="true"
-                    type="array" path="$.[*]">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                        >This parameter specifies an array of scaling
-                        policies.</wadl:doc>
->>>>>>> master
                 </param>
                 <param style="plain" name="name" required="true"
                     type="string" path="$.[*].name">
