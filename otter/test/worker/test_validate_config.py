@@ -185,7 +185,8 @@ class ValidateImageTests(TestCase):
                                         method='get'))
         patch(self, 'otter.util.http.treq', new=self.treq)
         self.headers = {'content-type': ['application/json'],
-                        'accept': ['application/json']}
+                        'accept': ['application/json'],
+                        'User-Agent': ['OtterScale/0.0']}
 
     def test_valid(self):
         """
@@ -194,7 +195,8 @@ class ValidateImageTests(TestCase):
         self.headers['x-auth-token'] = ['token']
         d = validate_image(self.log, 'token', 'endpoint', 'image_ref')
         self.successResultOf(d)
-        self.treq.get.assert_called_with('endpoint/images/image_ref', headers=self.headers)
+        self.treq.get.assert_called_with(
+            'endpoint/images/image_ref', headers=self.headers, log=self.log)
 
     def test_inactive_image(self):
         """
@@ -235,7 +237,8 @@ class ValidateFlavorTests(TestCase):
                           new=mock_treq(code=200, method='get'))
         patch(self, 'otter.util.http.treq', new=self.treq)
         self.headers = {'content-type': ['application/json'],
-                        'accept': ['application/json']}
+                        'accept': ['application/json'],
+                        'User-Agent': ['OtterScale/0.0']}
 
     def test_valid(self):
         """
@@ -244,7 +247,8 @@ class ValidateFlavorTests(TestCase):
         self.headers['x-auth-token'] = ['token']
         d = validate_flavor(self.log, 'token', 'endpoint', 'flavornum')
         self.successResultOf(d)
-        self.treq.get.assert_called_once_with('endpoint/flavors/flavornum', headers=self.headers)
+        self.treq.get.assert_called_once_with(
+            'endpoint/flavors/flavornum', headers=self.headers, log=self.log)
 
     def test_unknown_flavor(self):
         """
@@ -282,7 +286,8 @@ class ValidatePersonalityTests(TestCase):
              'contents': base64.b64encode('This is a test of base64 encoding')}
         ]
         self.headers = {'content-type': ['application/json'],
-                        'accept': ['application/json']}
+                        'accept': ['application/json'],
+                        'User-Agent': ['OtterScale/0.0']}
 
     def test_valid(self):
         """
@@ -291,7 +296,8 @@ class ValidatePersonalityTests(TestCase):
         self.headers['x-auth-token'] = ['token']
         d = validate_personality(self.log, 'token', 'endpoint', self.personality)
         self.successResultOf(d)
-        self.treq.get.assert_called_once_with('endpoint/limits', headers=self.headers)
+        self.treq.get.assert_called_once_with(
+            'endpoint/limits', headers=self.headers, log=self.log)
 
     def test_limit_failure_succeeds(self):
         """

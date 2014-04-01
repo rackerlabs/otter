@@ -20,13 +20,15 @@ from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
 from otter.util.config import config_value
-from otter.util.deferredutils import with_lock
+from otter.util.deferredutils import with_lock, timeout_deferred
 from otter.scheduler import next_cron_occurrence
 
 from silverberg.client import ConsistencyLevel
 
 import json
 from datetime import datetime
+
+from kazoo.protocol.states import KazooState
 
 
 LOCK_PATH = '/locks'
@@ -59,21 +61,20 @@ _cql_view_webhook = ('SELECT data, capability FROM {cf} WHERE "tenantId" = :tena
                      '"groupId" = :groupId AND "policyId" = :policyId AND '
                      '"webhookId" = :webhookId;')
 _cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, launch_config, active, '
-                     'pending, "policyTouched", paused, created_at) '
+                     'pending, "policyTouched", paused, desired, created_at) '
                      'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-                     ':pending, :policyTouched, :paused, :created_at)')
-_cql_delete_many = 'DELETE FROM {cf} WHERE {column} IN ({column_values});'
+                     ':pending, :policyTouched, :paused, :desired, :created_at)')
 _cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
-                      'pending, "groupTouched", "policyTouched", paused, created_at '
+                      'pending, "groupTouched", "policyTouched", paused, desired, created_at '
                       'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", data, version) '
     'VALUES (:tenantId, :groupId, :{name}policyId, :{name}data, :{name}version)')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
-                           '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, '
-                           ':pending, :groupTouched, :policyTouched, :paused)')
+                           '"policyTouched", paused, desired) VALUES(:tenantId, :groupId, :active, '
+                           ':pending, :groupTouched, :policyTouched, :paused, :desired)')
 _cql_view_group_state = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
-                         '"policyTouched", paused, created_at FROM {cf} WHERE '
+                         '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
                          '"tenantId" = :tenantId AND "groupId" = :groupId;')
 
 # --- Event related queries
@@ -93,6 +94,7 @@ _cql_fetch_batch_of_events = (
     'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')
 _cql_delete_bucket_event = ('DELETE FROM {cf} WHERE bucket = :bucket '
                             'AND trigger = :{name}trigger AND "policyId" = :{name}policyId;')
+_cql_oldest_event = 'SELECT * from {cf} WHERE bucket=:bucket LIMIT 1;'
 
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
@@ -103,20 +105,22 @@ _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", {column}) '
 _cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
                        'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
 _cql_delete_all_in_group = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
-                            '"groupId" = :groupId')
+                            '"groupId" = :groupId{name}')
 _cql_delete_all_in_policy = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId '
                              'AND "groupId" = :groupId AND "policyId" = :policyId')
 _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
                            '"groupId" = :groupId AND "policyId" = :policyId AND '
                            '"webhookId" = :webhookId')
 _cql_list_states = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
-                    '"policyTouched", paused, created_at FROM {cf} WHERE '
+                    '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
                     '"tenantId" = :tenantId;')
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE '
                     '"tenantId" = :tenantId AND "groupId" = :groupId;')
 _cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} '
                      'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
                      '"policyId" = :policyId;')
+_cql_list_all_in_group = ('SELECT * FROM {cf} WHERE "tenantId" = :tenantId '
+                          'AND "groupId" = :groupId {order_by};')
 
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
@@ -128,6 +132,10 @@ _cql_count_for_policy = ('SELECT COUNT(*) FROM {cf} WHERE '
 _cql_count_for_group = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId '
                         'AND "groupId" = :groupId;')
 _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
+
+# seems to be pretty quick no matter the consistency - unfortunately this only checks
+# connectability to cassandra, and not whether the otter keyspace is correct, etc.
+_cql_health_check = ('SELECT now() FROM system.local;')
 
 
 def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
@@ -196,7 +204,9 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
 # Store consistency levels
 _consistency_levels = {'event': {'fetch': ConsistencyLevel.QUORUM,
                                  'insert': ConsistencyLevel.ONE,
-                                 'delete': ConsistencyLevel.QUORUM}}
+                                 'delete': ConsistencyLevel.QUORUM},
+                       'group': {'create': ConsistencyLevel.QUORUM},
+                       'state': {'update': ConsistencyLevel.QUORUM}}
 
 
 def get_consistency_level(operation, resource):
@@ -370,6 +380,10 @@ def _jsonloads_data(raw_data):
 
 
 def _unmarshal_state(state_dict):
+    desired_capacity = state_dict['desired']
+    if desired_capacity is None:
+        desired_capacity = 0
+
     return GroupState(
         state_dict["tenantId"], state_dict["groupId"],
         _jsonloads_data(state_dict["group_config"])["name"],
@@ -377,8 +391,43 @@ def _unmarshal_state(state_dict):
         _jsonloads_data(state_dict["pending"]),
         state_dict["groupTouched"],
         _jsonloads_data(state_dict["policyTouched"]),
-        bool(ord(state_dict["paused"]))
+        bool(ord(state_dict["paused"])),
+        desired=desired_capacity
     )
+
+
+def assemble_webhooks_in_policies(policies, webhooks):
+    """
+    Assemble webhooks inside policies. 'webhooks' property will be added to
+    each policy `dict` in `policies`. It will be list of webhooks taken from `webhooks`
+
+    :param policies: list of policy `dict` sorted based on 'id' based on `group_schemas.policy`
+    :param webhooks: list of webhook `dict` sorted based on 'policyId' and 'webhookId'
+                     based on `model_schemas.webhook`
+
+    :return: policies with webhooks in them
+    """
+    # Assuming policies and webhooks are sorted based on policyId and
+    # (policyId, webhookId) respectively
+    iwebhooks = iter(webhooks)
+    ipolicies = iter(policies)
+    try:
+        webhook = iwebhooks.next()
+        policy = ipolicies.next()
+        while True:
+            policy.setdefault('webhooks', [])
+            if policy['id'] == webhook['policyId']:
+                policy['webhooks'].append(
+                    _assemble_webhook_from_row(webhook, include_id=True))
+                webhook = iwebhooks.next()
+            elif policy['id'] < webhook['policyId']:
+                policy = ipolicies.next()
+            else:
+                webhook = iwebhooks.next()
+    except StopIteration:
+        # Add empty webhooks for remaining policies
+        [p.update({'webhooks': []}) for p in ipolicies]
+    return policies
 
 
 def verified_view(connection, view_query, del_query, data, consistency, exception_if_empty, log):
@@ -447,33 +496,46 @@ class CassScalingGroup(object):
         self.webhooks_table = "policy_webhooks"
         self.event_table = "scaling_schedule_v2"
 
-    def view_manifest(self):
+    def view_manifest(self, with_webhooks=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
         def _get_policies(group):
-            """
-            Now that we know the group exists, get its policies
-            """
-            limit = config_value('limits.pagination') or 100
-            d = self._naive_list_policies(limit=limit)
-            d.addCallback(lambda policies: {
+            d = self._naive_list_policies()
+            return d.addCallback(lambda policies: (group, policies))
+
+        def _get_policies_and_webhooks(group):
+            d = defer.gatherResults(
+                [self._naive_list_policies(),
+                 self._naive_list_all_webhooks()], consumeErrors=True)
+            return d.addCallback(lambda results: (group, results))
+
+        def _assemble_webhooks((group, results)):
+            policies, webhooks = results
+            return group, assemble_webhooks_in_policies(policies, webhooks)
+
+        def _generate_manifest((group, policies)):
+            return {
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'scalingPolicies': policies,
                 'id': self.uuid,
                 'state': _unmarshal_state(group)
-            })
-            return d
+            }
 
         view_query = _cql_view_manifest.format(cf=self.group_table)
-        del_query = _cql_delete_all_in_group.format(cf=self.group_table)
+        del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           get_consistency_level('view', 'group'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
-        d.addCallback(_get_policies)
+        if with_webhooks:
+            d.addCallback(_get_policies_and_webhooks)
+            d.addCallback(_assemble_webhooks)
+        else:
+            d.addCallback(_get_policies)
+        d.addCallback(_generate_manifest)
         return d
 
     def view_config(self):
@@ -481,7 +543,7 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.view_config`
         """
         view_query = _cql_view.format(cf=self.group_table, column='group_config')
-        del_query = _cql_delete_all_in_group.format(cf=self.group_table)
+        del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
@@ -495,7 +557,7 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.view_launch_config`
         """
         view_query = _cql_view.format(cf=self.group_table, column='launch_config')
-        del_query = _cql_delete_all_in_group.format(cf=self.group_table)
+        del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
@@ -504,16 +566,19 @@ class CassScalingGroup(object):
 
         return d.addCallback(lambda group: _jsonloads_data(group['launch_config']))
 
-    def view_state(self):
+    def view_state(self, consistency=None):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
+        if consistency is None:
+            consistency = get_consistency_level('view', 'partial')
+
         view_query = _cql_view_group_state.format(cf=self.group_table)
-        del_query = _cql_delete_all_in_group.format(cf=self.group_table)
+        del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
-                          get_consistency_level('view', 'partial'),
+                          consistency,
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
 
         return d.addCallback(_unmarshal_state)
@@ -523,6 +588,7 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
         log = self.log.bind(system='CassScalingGroup.modify_state')
+        consistency = get_consistency_level('update', 'state')
 
         def _write_state(new_state):
             assert (new_state.tenant_id == self.tenant_id and
@@ -533,14 +599,15 @@ class CassScalingGroup(object):
                 'active': serialize_json_data(new_state.active, 1),
                 'pending': serialize_json_data(new_state.pending, 1),
                 'paused': new_state.paused,
+                'desired': new_state.desired,
                 'groupTouched': new_state.group_touched,
                 'policyTouched': serialize_json_data(new_state.policy_touched, 1)
             }
             return self.connection.execute(_cql_insert_group_state.format(cf=self.group_table),
-                                           params, get_consistency_level('update', 'state'))
+                                           params, consistency)
 
         def _modify_state():
-            d = self.view_state()
+            d = self.view_state(consistency)
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             return d.addCallback(_write_state)
 
@@ -740,6 +807,18 @@ class CassScalingGroup(object):
         d.addCallback(_do_delete)
         return d
 
+    def _naive_list_all_webhooks(self):
+        """
+        List all webhooks of a group. Does not check if group exists and
+        does not paginate
+        """
+        d = self.connection.execute(
+            _cql_list_all_in_group.format(cf=self.webhooks_table,
+                                          order_by='ORDER BY "groupId", "policyId", "webhookId"'),
+            {'tenantId': self.tenant_id, 'groupId': self.uuid},
+            get_consistency_level('list', 'webhook'))
+        return d
+
     def _naive_list_webhooks(self, policy_id, limit, marker):
         """
         Like :meth:`otter.models.cass.CassScalingGroup.list_webhooks`, but gets
@@ -894,7 +973,7 @@ class CassScalingGroup(object):
                 'groupId': self.uuid
             }
             queries = [
-                _cql_delete_all_in_group.format(cf=table) for table in
+                _cql_delete_all_in_group.format(cf=table, name='') for table in
                 (self.group_table, self.policies_table, self.webhooks_table)]
 
             b = Batch(queries, params,
@@ -918,23 +997,6 @@ class CassScalingGroup(object):
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         return with_lock(reactor, lock, log.bind(category='locking'), _delete_group)
-
-
-def _delete_many_query_and_params(cf, column, column_values):
-    """
-    Creates query and parameters that deletes many rows based on given column and values
-
-    :param cf: column family
-    :param column: column name based on which row will be deleted
-    :return: iterable column_values, column values that will match deleted row
-    """
-    column_values = list(column_values)
-    column_values_args = ','.join(
-        [':column_value{}'.format(i) for i in range(len(column_values))])
-    params = {'column_value{}'.format(i): column_value
-              for i, column_value in enumerate(column_values)}
-    query = _cql_delete_many.format(cf=cf, column=column, column_values=column_values_args)
-    return (query, params)
 
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
@@ -1027,7 +1089,8 @@ class CassScalingGroupCollection:
                 "pending": '{}',
                 "created_at": datetime.utcnow(),
                 "policyTouched": '{}',
-                "paused": False
+                "paused": False,
+                "desired": config.get('minEntities', 0)
             }
 
             scaling_group_state = GroupState(
@@ -1038,7 +1101,8 @@ class CassScalingGroupCollection:
                 {},
                 data['created_at'],
                 {},
-                data['paused']
+                data['paused'],
+                desired=data['desired']
             )
             outpolicies = _build_policies(policies, self.policies_table,
                                           self.event_table, queries, data, self.buckets)
@@ -1082,11 +1146,18 @@ class CassScalingGroupCollection:
             if not groups:
                 return None
             log.msg('Resurrected rows', rows=groups)
-            query, params = _delete_many_query_and_params(
-                self.group_table, '"groupId"',
-                (group['groupId'] for group in groups))
-            return self.connection.execute(query, params,
-                                           get_consistency_level('delete', 'group'))
+
+            queries = [
+                _cql_delete_all_in_group.format(cf=table, name=i)
+                for table in (self.group_table, self.policies_table, self.webhooks_table)
+                for i in range(len(groups))]
+
+            params = {'groupId{0}'.format(i): group['groupId']
+                      for i, group in enumerate(groups)}
+            params['tenantId'] = tenant_id
+
+            b = Batch(queries, params, get_consistency_level('delete', 'group'))
+            return b.execute(self.connection)
 
         log = log.bind(tenant_id=tenant_id)
         cql, params = _paginated_list(tenant_id, limit=limit, marker=marker)
@@ -1142,6 +1213,16 @@ class CassScalingGroupCollection:
         b = Batch(queries, data, get_consistency_level('insert', 'event'))
         return b.execute(self.connection)
 
+    def get_oldest_event(self, bucket):
+        """
+        see :meth:`otter.models.interface.IScalingScheduleCollection.get_oldest_event`
+        """
+        d = self.connection.execute(_cql_oldest_event.format(cf=self.event_table),
+                                    {'bucket': bucket},
+                                    get_consistency_level('check', 'event'))
+        d.addCallback(lambda r: r[0] if len(r) > 0 else None)
+        return d
+
     def webhook_info_by_hash(self, log, capability_hash):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`
@@ -1175,6 +1256,52 @@ class CassScalingGroupCollection:
         d.addCallback(lambda results: [r[0]['count'] for r in results])
         d.addCallback(lambda results: dict(zip(
             ('groups', 'policies', 'webhooks'), results)))
+        return d
+
+    def health_check(self, clock=None):
+        """
+        see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
+
+        In addition to ``healthy`` and ``time``, returns whether it can
+        connect to cassandra and zookeeper
+        """
+        if clock is None:
+            clock = reactor
+
+        if self.kz_client is None:
+            zk_health = {'zookeeper': False,
+                         'zookeeper_state': 'Not connected yet'}
+        elif not self.kz_client.connected:
+            zk_health = {'zookeeper': False,
+                         'zookeeper_state': 'Not connected yet'}
+        else:
+            state = self.kz_client.state
+            zk_health = {'zookeeper': state == KazooState.CONNECTED,
+                         'zookeeper_state': state}
+
+        start_time = clock.seconds()
+
+        d = self.connection.execute(
+            _cql_health_check.format(cf=self.group_table), {},
+            get_consistency_level('health', 'check'))
+
+        # stop health check after 15 seconds
+        timeout_deferred(d, 15, clock=clock,
+                         deferred_description='cassandra health check')
+
+        d.addCallback(lambda _: (zk_health['zookeeper'], dict(
+            cassandra=True,
+            cassandra_time=(clock.seconds() - start_time),
+            **zk_health
+        )))
+
+        d.addErrback(lambda f: (False, dict(
+            cassandra=False,
+            cassandra_failure=repr(f.value),
+            cassandra_time=clock.seconds() - start_time,
+            **zk_health
+        )))
+
         return d
 
 

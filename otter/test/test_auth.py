@@ -7,11 +7,15 @@ from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed, fail, Deferred
 from twisted.internet.task import Clock
 
+from testtools.matchers import IsInstance
+
 from zope.interface.verify import verifyObject
 
-from otter.test.utils import patch, SameJSON, iMock
+from otter.test.utils import patch, SameJSON, iMock, matches
 
 from otter.util.http import APIError, RequestError
+
+from otter.log import log as default_log
 
 from otter.auth import authenticate_user
 from otter.auth import extract_token
@@ -20,11 +24,13 @@ from otter.auth import endpoints_for_token
 from otter.auth import user_for_tenant
 from otter.auth import ImpersonatingAuthenticator
 from otter.auth import CachingAuthenticator
+from otter.auth import RetryingAuthenticator
 from otter.auth import IAuthenticator
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],
-                    'x-auth-token': ['auth-token']}
+                    'x-auth-token': ['auth-token'],
+                    'User-Agent': ['OtterScale/0.0']}
 
 
 class HelperTests(TestCase):
@@ -37,6 +43,7 @@ class HelperTests(TestCase):
         """
         self.treq = patch(self, 'otter.auth.treq')
         patch(self, 'otter.util.http.treq', new=self.treq)
+        self.log = mock.Mock()
 
     def test_extract_token(self):
         """
@@ -60,7 +67,8 @@ class HelperTests(TestCase):
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.post.return_value = succeed(response)
 
-        d = authenticate_user('http://identity/v2.0', 'user', 'pass')
+        d = authenticate_user('http://identity/v2.0', 'user', 'pass',
+                              log=self.log)
 
         self.assertEqual(self.successResultOf(d), response_body)
 
@@ -73,7 +81,9 @@ class HelperTests(TestCase):
                 }
             }}),
             headers={'accept': ['application/json'],
-                     'content-type': ['application/json']})
+                     'content-type': ['application/json'],
+                     'User-Agent': ['OtterScale/0.0']},
+            log=self.log)
 
     def test_authenticate_user_propagates_error(self):
         """
@@ -107,7 +117,8 @@ class HelperTests(TestCase):
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.post.return_value = succeed(response)
 
-        d = impersonate_user('http://identity/v2.0', 'auth-token', 'foo')
+        d = impersonate_user('http://identity/v2.0', 'auth-token', 'foo',
+                             log=self.log)
 
         self.assertEqual(self.successResultOf(d), response_body)
 
@@ -119,7 +130,8 @@ class HelperTests(TestCase):
                     'expire-in-seconds': 10800
                 }
             }),
-            headers=expected_headers)
+            headers=expected_headers,
+            log=self.log)
 
     def test_impersonate_user_expire_in_seconds(self):
         """
@@ -148,7 +160,8 @@ class HelperTests(TestCase):
                     'expire-in-seconds': 60
                 }
             }),
-            headers=expected_headers)
+            headers=expected_headers,
+            log=None)
 
     def test_impersonate_user_propogates_errors(self):
         """
@@ -180,13 +193,13 @@ class HelperTests(TestCase):
         self.treq.get.return_value = succeed(response)
 
         d = endpoints_for_token('http://identity/v2.0', 'auth-token',
-                                'user-token')
+                                'user-token', log=self.log)
 
         self.assertEqual(self.successResultOf(d), response_body)
 
         self.treq.get.assert_called_once_with(
             'http://identity/v2.0/tokens/user-token/endpoints',
-            headers=expected_headers)
+            headers=expected_headers, log=self.log)
 
     def test_endpoints_for_token_propogates_errors(self):
         """
@@ -218,14 +231,14 @@ class HelperTests(TestCase):
         self.treq.get.return_value = succeed(response)
 
         d = user_for_tenant('http://identity/v2.0', 'username', 'password',
-                            111111)
+                            111111, log=self.log)
 
         self.assertEqual(self.successResultOf(d), 'ausername')
 
         self.treq.get.assert_called_once_with(
             'http://identity/v1.1/mosso/111111',
             auth=('username', 'password'),
-            allow_redirects=False)
+            allow_redirects=False, log=self.log)
 
     def test_user_for_tenant_propagates_errors(self):
         """
@@ -261,12 +274,12 @@ class ImpersonatingAuthenticatorTests(TestCase):
         self.endpoints_for_token = patch(self,
                                          'otter.auth.endpoints_for_token')
 
-        self.authenticate_user.return_value = succeed(
+        self.authenticate_user.side_effect = lambda *a, **kw: succeed(
             {'access': {'token': {'id': 'auth-token'}}})
-        self.user_for_tenant.return_value = succeed('test_user')
-        self.impersonate_user.return_value = succeed(
+        self.user_for_tenant.side_effect = lambda *a, **kw: succeed('test_user')
+        self.impersonate_user.side_effect = lambda *a, **kw: succeed(
             {'access': {'token': {'id': 'impersonation_token'}}})
-        self.endpoints_for_token.return_value = succeed(
+        self.endpoints_for_token.side_effect = lambda *a, **kw: succeed(
             {'endpoints': [{'name': 'anEndpoint', 'type': 'anType'}]})
 
         self.url = 'http://identity/v2.0'
@@ -275,6 +288,7 @@ class ImpersonatingAuthenticatorTests(TestCase):
         self.password = 'service_password'
         self.ia = ImpersonatingAuthenticator(self.user, self.password,
                                              self.url, self.admin_url)
+        self.log = mock.Mock()
 
     def test_verifyObject(self):
         """
@@ -287,9 +301,16 @@ class ImpersonatingAuthenticatorTests(TestCase):
         authenticate_tenant authenticates as the service user.
         """
         self.successResultOf(self.ia.authenticate_tenant(111111))
-
         self.authenticate_user.assert_called_once_with(self.url, self.user,
-                                                       self.password)
+                                                       self.password,
+                                                       log=None)
+
+        self.authenticate_user.reset_mock()
+
+        self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
+        self.authenticate_user.assert_called_once_with(self.url, self.user,
+                                                       self.password,
+                                                       log=self.log)
 
     def test_authenticate_tenant_gets_user_for_specified_tenant(self):
         """
@@ -297,9 +318,17 @@ class ImpersonatingAuthenticatorTests(TestCase):
         endpoint.
         """
         self.successResultOf(self.ia.authenticate_tenant(111111))
+        self.user_for_tenant.assert_called_once_with(self.admin_url, self.user,
+                                                     self.password, 111111,
+                                                     log=None)
+
+        self.user_for_tenant.reset_mock()
+
+        self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
 
         self.user_for_tenant.assert_called_once_with(self.admin_url, self.user,
-                                                     self.password, 111111)
+                                                     self.password, 111111,
+                                                     log=self.log)
 
     def test_authenticate_tenant_impersonates_first_user(self):
         """
@@ -307,10 +336,16 @@ class ImpersonatingAuthenticatorTests(TestCase):
         users for the tenant using the admin endpoint.
         """
         self.successResultOf(self.ia.authenticate_tenant(111111))
-
         self.impersonate_user.assert_called_once_with(self.admin_url,
                                                       'auth-token',
-                                                      'test_user')
+                                                      'test_user', log=None)
+
+        self.impersonate_user.reset_mock()
+
+        self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
+        self.impersonate_user.assert_called_once_with(self.admin_url,
+                                                      'auth-token',
+                                                      'test_user', log=self.log)
 
     def test_authenticate_tenant_gets_endpoints_for_the_impersonation_token(self):
         """
@@ -318,9 +353,14 @@ class ImpersonatingAuthenticatorTests(TestCase):
         token.
         """
         self.successResultOf(self.ia.authenticate_tenant(111111))
-
         self.endpoints_for_token.assert_called_once_with(
-            self.admin_url, 'auth-token', 'impersonation_token')
+            self.admin_url, 'auth-token', 'impersonation_token', log=None)
+
+        self.endpoints_for_token.reset_mock()
+
+        self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
+        self.endpoints_for_token.assert_called_once_with(
+            self.admin_url, 'auth-token', 'impersonation_token', log=self.log)
 
     def test_authenticate_tenant_returns_impersonation_token_and_endpoint_list(self):
         """
@@ -340,7 +380,7 @@ class ImpersonatingAuthenticatorTests(TestCase):
         """
         authenticate_tenant propagates errors from authenticate_user.
         """
-        self.authenticate_user.return_value = fail(APIError(500, '500'))
+        self.authenticate_user.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
 
         failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
         self.assertTrue(failure.check(APIError))
@@ -349,7 +389,7 @@ class ImpersonatingAuthenticatorTests(TestCase):
         """
         authenticate_tenant propagates errors from user_for_tenant
         """
-        self.user_for_tenant.return_value = fail(APIError(500, '500'))
+        self.user_for_tenant.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
 
         failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
         self.assertTrue(failure.check(APIError))
@@ -358,7 +398,7 @@ class ImpersonatingAuthenticatorTests(TestCase):
         """
         authenticate_tenant propagates errors from impersonate_user
         """
-        self.impersonate_user.return_value = fail(APIError(500, '500'))
+        self.impersonate_user.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
 
         failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
         self.assertTrue(failure.check(APIError))
@@ -367,7 +407,7 @@ class ImpersonatingAuthenticatorTests(TestCase):
         """
         authenticate_tenant propagates errors from endpoints_for_token
         """
-        self.endpoints_for_token.return_value = fail(APIError(500, '500'))
+        self.endpoints_for_token.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
 
         failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
         self.assertTrue(failure.check(APIError))
@@ -383,7 +423,7 @@ class CachingAuthenticatorTests(TestCase):
         """
         self.authenticator = iMock(IAuthenticator)
 
-        def authenticate_tenant(tenant_id):
+        def authenticate_tenant(tenant_id, log=None):
             return succeed(('auth-token', 'catalog'))
 
         self.authenticator.authenticate_tenant.side_effect = authenticate_tenant
@@ -403,9 +443,10 @@ class CachingAuthenticatorTests(TestCase):
         authenticate_tenant with no items in the cache returns the result
         of the auth_function passed to the authenticator.
         """
-        result = self.successResultOf(self.ca.authenticate_tenant(1))
+        result = self.successResultOf(self.ca.authenticate_tenant(1, mock.Mock()))
         self.assertEqual(result, ('auth-token', 'catalog'))
-        self.auth_function.assert_called_once_with(1)
+        self.auth_function.assert_called_once_with(
+            1, log=matches(IsInstance(mock.Mock)))
 
     def test_returns_token_from_cache(self):
         """
@@ -418,7 +459,8 @@ class CachingAuthenticatorTests(TestCase):
         result = self.successResultOf(self.ca.authenticate_tenant(1))
         self.assertEqual(result, ('auth-token', 'catalog'))
 
-        self.auth_function.assert_called_once_with(1)
+        self.auth_function.assert_called_once_with(
+            1, log=matches(IsInstance(default_log.__class__)))
 
     def test_cache_expires(self):
         """
@@ -428,16 +470,19 @@ class CachingAuthenticatorTests(TestCase):
         result = self.successResultOf(self.ca.authenticate_tenant(1))
         self.assertEqual(result, ('auth-token', 'catalog'))
 
-        self.auth_function.assert_called_once_with(1)
+        self.auth_function.assert_called_once_with(
+            1, log=matches(IsInstance(default_log.__class__)))
 
         self.clock.advance(20)
 
-        self.auth_function.side_effect = lambda _: succeed(('auth-token2', 'catalog2'))
+        self.auth_function.side_effect = lambda _, log: succeed(('auth-token2', 'catalog2'))
 
         result = self.successResultOf(self.ca.authenticate_tenant(1))
         self.assertEqual(result, ('auth-token2', 'catalog2'))
 
-        self.auth_function.assert_has_calls([mock.call(1), mock.call(1)])
+        self.auth_function.assert_has_calls([
+            mock.call(1, log=matches(IsInstance(default_log.__class__))),
+            mock.call(1, log=matches(IsInstance(default_log.__class__)))])
 
     def test_serialize_auth_requests(self):
         """
@@ -446,14 +491,15 @@ class CachingAuthenticatorTests(TestCase):
         value is cached.
         """
         auth_d = Deferred()
-        self.auth_function.side_effect = lambda _: auth_d
+        self.auth_function.side_effect = lambda _, log: auth_d
 
         d1 = self.ca.authenticate_tenant(1)
         d2 = self.ca.authenticate_tenant(1)
 
         self.assertNotIdentical(d1, d2)
 
-        self.auth_function.assert_called_once_with(1)
+        self.auth_function.assert_called_once_with(
+            1, log=matches(IsInstance(default_log.__class__)))
 
         auth_d.callback(('auth-token2', 'catalog2'))
 
@@ -471,7 +517,8 @@ class CachingAuthenticatorTests(TestCase):
         r1 = self.successResultOf(self.ca.authenticate_tenant(1))
         self.assertEqual(r1, ('auth-token', 'catalog'))
 
-        self.auth_function.side_effect = lambda _: succeed(('auth-token2', 'catalog2'))
+        self.auth_function.side_effect = (
+            lambda _, log: succeed(('auth-token2', 'catalog2')))
 
         r2 = self.successResultOf(self.ca.authenticate_tenant(2))
 
@@ -482,7 +529,7 @@ class CachingAuthenticatorTests(TestCase):
         authenticate_tenant propagates auth failures to all waiters
         """
         auth_d = Deferred()
-        self.auth_function.side_effect = lambda _: auth_d
+        self.auth_function.side_effect = lambda _, log: auth_d
 
         d1 = self.ca.authenticate_tenant(1)
         d2 = self.ca.authenticate_tenant(1)
@@ -500,8 +547,62 @@ class CachingAuthenticatorTests(TestCase):
         """
         authenticate_tenant propagates auth failures to the caller.
         """
-        self.auth_function.side_effect = lambda _: fail(APIError(500, '500'))
+        self.auth_function.side_effect = lambda _, log: fail(APIError(500, '500'))
 
         d = self.ca.authenticate_tenant(1)
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(APIError))
+
+
+class RetryingAuthenticatorTests(TestCase):
+    """
+    Tests for `RetryingAuthenticator`
+    """
+
+    def setUp(self):
+        """
+        Create RetryingAuthenticator
+        """
+        self.clock = Clock()
+        self.mock_auth = iMock(IAuthenticator)
+        self.authenticator = RetryingAuthenticator(
+            self.clock, self.mock_auth, max_retries=3, retry_interval=4)
+
+    def test_delegates(self):
+        """
+        `RetryingAuthenticator` calls internal authenticator and returns its result
+        """
+        self.mock_auth.authenticate_tenant.return_value = succeed('result')
+        d = self.authenticator.authenticate_tenant(23)
+        self.assertEqual(self.successResultOf(d), 'result')
+        self.mock_auth.authenticate_tenant.assert_called_once_with(23, log=None)
+
+    def test_retries(self):
+        """
+        `RetryingAuthenticator` retries internal authenticator if it fails
+        """
+        self.mock_auth.authenticate_tenant.side_effect = lambda *a, **kw: fail(APIError(500, '2'))
+        d = self.authenticator.authenticate_tenant(23)
+        # mock_auth is called and there is no result
+        self.assertNoResult(d)
+        self.mock_auth.authenticate_tenant.assert_called_once_with(23, log=None)
+        # Advance clock and mock_auth is called again
+        self.clock.advance(4)
+        self.assertEqual(self.mock_auth.authenticate_tenant.call_count, 2)
+        self.assertNoResult(d)
+        # advance clock and mock_auth's success return is propogated
+        self.mock_auth.authenticate_tenant.side_effect = lambda *a, **kw: succeed('result')
+        self.clock.advance(4)
+        self.assertEqual(self.successResultOf(d), 'result')
+
+    def test_retries_times_out(self):
+        """
+        `RetryingAuthenticator` retries internal authenticator and times out if it
+        keeps failing for certain period of time
+        """
+        self.mock_auth.authenticate_tenant.side_effect = lambda *a, **kw: fail(APIError(500, '2'))
+        d = self.authenticator.authenticate_tenant(23)
+        self.assertNoResult(d)
+        self.clock.pump([4] * 4)
+        f = self.failureResultOf(d, APIError)
+        self.assertEqual(f.value.code, 500)

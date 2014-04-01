@@ -13,6 +13,7 @@ from twisted.trial.unittest import TestCase
 
 from otter import controller
 from otter.supervisor import ISupervisor
+from otter.util.deferredutils import DeferredPool
 
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
@@ -57,6 +58,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_positive_change_will_hit_max(self):
         """
@@ -74,6 +76,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_positive_change_but_at_max(self):
         """
@@ -91,6 +94,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_positive_change_but_at_default_max(self):
         """
@@ -108,6 +112,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_negative_change_within_min_max(self):
         """
@@ -125,6 +130,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_negative_change_will_hit_min(self):
         """
@@ -142,6 +148,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_negative_change_but_at_min(self):
         """
@@ -158,6 +165,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_percent_positive_change_within_min_max(self):
         """
@@ -174,6 +182,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 6)
 
     def test_percent_positive_change_will_hit_max(self):
         """
@@ -190,6 +199,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_percent_positive_change_but_at_max(self):
         """
@@ -206,6 +216,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_percent_positive_change_but_at_default_max(self):
         """
@@ -222,6 +233,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_percent_negative_change_within_min_max(self):
         """
@@ -238,6 +250,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_percent_negative_change_will_hit_min(self):
         """
@@ -254,6 +267,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_percent_negative_change_but_at_min(self):
         """
@@ -269,6 +283,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_percent_rounding(self):
         """
@@ -279,16 +294,17 @@ class CalculateDeltaTestCase(TestCase):
         fake_state = self.get_state({}, dict.fromkeys(range(5)))
 
         test_cases = [
-            (50, 3), (5, 1), (75, 4),
-            (-50, -3), (-5, -1), (-75, -4)]
+            (50, 8, 3), (5, 6, 1), (75, 9, 4),
+            (-50, 2, -3), (-5, 4, -1), (-75, 1, -4)]
 
-        for change_percent, expected_delta in test_cases:
+        for change_percent, expected_desired, expected_delta in test_cases:
             fake_policy = {'changePercent': change_percent}
             self.assertEqual(expected_delta,
                              controller.calculate_delta(self.mock_log,
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+            self.assertEqual(fake_state.desired, expected_desired)
 
     def test_desired_positive_change_within_min_max(self):
         """
@@ -305,6 +321,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 25)
 
     def test_desired_positive_change_will_hit_max(self):
         """
@@ -321,6 +338,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_desired_positive_change_but_at_max(self):
         """
@@ -337,6 +355,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_desired_positive_change_but_at_default_max(self):
         """
@@ -353,6 +372,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_desired_will_hit_min(self):
         """
@@ -369,6 +389,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_desired_at_min(self):
         """
@@ -384,6 +405,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_no_change_or_percent_or_desired_fails(self):
         """
@@ -412,6 +434,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_zero_change_below_min(self):
         """
@@ -427,6 +450,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_zero_change_above_max(self):
         """
@@ -442,6 +466,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 2)
 
     def test_logs_relevant_information(self):
         """
@@ -454,7 +479,10 @@ class CalculateDeltaTestCase(TestCase):
         controller.calculate_delta(self.mock_log, fake_state, fake_config,
                                    fake_policy)
         args, kwargs = self.mock_log.msg.call_args
-        self.assertEqual(args, ('calculating delta',))
+        self.assertEqual(fake_state.desired, 1)
+        self.assertEqual(
+            args, (('calculating delta {current_active} + {current_pending}'
+                    ' -> {constrained_desired_capacity}'),))
         self.assertEqual(kwargs, matches(ContainsDict({
             'server_delta': Equals(1),
             'constrained_desired_capacity': Equals(1)})))
@@ -809,6 +837,7 @@ class DeleteActiveServersTests(TestCase):
             self, 'otter.controller._DeleteJob', side_effect=self.jobs)
 
         self.supervisor = iMock(ISupervisor)
+        self.supervisor.deferred_pool = DeferredPool()
         patch(self, 'otter.controller.get_supervisor',
               return_value=self.supervisor)
 
@@ -828,11 +857,13 @@ class DeleteActiveServersTests(TestCase):
         self.assertTrue(
             all([_id not in self.fake_state.active for _id in self.evict_servers]))
 
-        # _DeketeJob was created for each server to delete
+        # _DeleteJob was created for each server to delete
         self.assertEqual(
             self.del_job.call_args_list,
             [mock.call(self.log, 'trans-id', 'group', data, self.supervisor)
-                for data in self.evict_servers.values()])
+                for i, data in enumerate(self.evict_servers.values())])
+
+        # They were started
         self.assertTrue(all([job.start.called for job in self.jobs]))
 
 
@@ -867,10 +898,12 @@ class DeleteJobTests(TestCase):
 
     def test_job_completed(self):
         """
-        `_job_completed` just logs success msg
+        `_job_completed` audit logs a successful deletion
         """
+        log = self.job.log = mock_log()
         self.job._job_completed('ignore')
-        self.log.msg.assert_called_with('Server deletion job completed')
+        log.msg.assert_called_with('Server deleted.', audit_log=True,
+                                   event_type='server.delete')
 
     def test_job_failed(self):
         """
@@ -1269,9 +1302,9 @@ class ExecuteLaunchConfigTestCase(TestCase):
         controller.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 3)
 
-        self.execute_config_deferreds[0].callback(None)              # job id 1
+        self.execute_config_deferreds[0].callback({'id': '1'})       # job id 1
         self.execute_config_deferreds[1].errback(Exception('meh'))   # job id 2
-        self.execute_config_deferreds[2].callback(None)              # job id 3
+        self.execute_config_deferreds[2].callback({'id': '3'})       # job id 3
 
         self.assertEqual(self.group.modify_state.call_count, 3)
 
@@ -1293,11 +1326,6 @@ class ExecuteLaunchConfigTestCase(TestCase):
         self.execute_config_deferreds[0].callback({'id': 's1'})
         self.assertEqual(s.pending, {})  # job removed
         self.assertIn('s1', s.active)    # active server added
-
-        # first bind is system='otter.job.launch'
-        self.log.bind.return_value.bind.assert_called_once_with(job_id='1')
-        self.log.bind().bind().bind.assert_called_once_with(server_id='s1')
-        self.assertEqual(self.log.bind().bind().bind().msg.call_count, 1)
 
     def test_pending_server_delete(self):
         """
@@ -1358,7 +1386,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
         # first bind is system='otter.job.launch'
         log = self.log.bind.return_value
         log.bind.assert_called_once_with(job_id='1')
-        log.bind.return_value.msg.assert_called_with('Job failed', reason=f)
+        log.bind.return_value.err.assert_called_with(f, 'Launching server failed')
 
     def test_modify_state_failure_logged(self):
         """
@@ -1458,7 +1486,7 @@ class PrivateJobHelperTestCase(TestCase):
         """
         self.job.start('launch')
         self.assertEqual(self.group.modify_state.call_count, 0)
-        self.completion_deferred.callback('blob')
+        self.completion_deferred.callback({'id': 'blob'})
         self.assertEqual(self.group.modify_state.call_count, 1)
 
     def test_modify_state_called_on_job_completion_failure(self):
@@ -1488,6 +1516,23 @@ class PrivateJobHelperTestCase(TestCase):
             self.state.active,
             {'active': matches(ContainsDict({'id': Equals('active')}))})
 
+    def test_job_completion_success_audit_logged(self):
+        """
+        If the job succeeded, and the job ID is still in pending, it is audit
+        logged as a "server.active" event.
+        """
+        self.state = GroupState('tenant', 'group', 'name', {},
+                                {self.job_id: {}}, None, {}, False)
+        log = self.job.log = mock_log()
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'yay'})
+
+        self.successResultOf(self.completion_deferred)
+
+        log.msg.assert_called_once_with(
+            "Server is active.", event_type="server.active", server_id='yay',
+            job_id='job_id', audit_log=True)
+
     def test_job_completion_success_job_deleted_pending(self):
         """
         If the job succeeded, but the job ID is no longer in pending, the
@@ -1511,6 +1556,25 @@ class PrivateJobHelperTestCase(TestCase):
 
         self.assertEqual(self.log.bind.return_value.err.call_count, 0)
 
+    def test_job_completion_success_job_deleted_audit_logged(self):
+        """
+        If the job succeeded, but the job ID is no longer in pending, it is
+        audit logged as a "server.deletable" event.
+        """
+        self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
+                                {}, False)
+        log = self.job.log = mock_log()
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'yay'})
+
+        self.successResultOf(self.completion_deferred)
+
+        log.msg.assert_called_once_with(
+            ("A pending server that is no longer needed is now active, "
+             "and hence deletable.  Deleting said server."),
+            event_type="server.deletable", server_id='yay', job_id='job_id',
+            audit_log=True)
+
     def test_job_completion_failure_job_removed(self):
         """
         If the job failed, the job ID is removed from the pending state.  The
@@ -1527,8 +1591,8 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.log.bind.return_value.msg.assert_called_once_with(
-            'Job failed', reason=CheckFailure(DummyException))
+        self.log.bind.return_value.err.assert_called_once_with(
+            CheckFailure(DummyException), 'Launching server failed')
 
     def test_job_completion_failure_job_deleted_pending(self):
         """
@@ -1547,8 +1611,8 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.log.bind.return_value.msg.assert_called_with(
-            'Job failed', reason=CheckFailure(DummyException))
+        self.log.bind.return_value.err.assert_called_with(
+            CheckFailure(DummyException), 'Launching server failed')
 
     def test_job_completion_success_NoSuchScalingGroupError(self):
         """
@@ -1566,6 +1630,27 @@ class PrivateJobHelperTestCase(TestCase):
             self.log.bind.return_value, self.transaction_id,
             self.group, {'id': 'active'}, self.supervisor)
         self.del_job.return_value.start.assert_called_once_with()
+
+    def test_job_completion_success_NoSuchScalingGroupError_audit_logged(self):
+        """
+        If the job succeeded, but the job ID is no longer in pending, it is
+        audit logged as a "server.deletable" event.
+        """
+        self.group.modify_state.side_effect = (
+            lambda *args: defer.fail(NoSuchScalingGroupError('tenant', 'group')))
+
+        log = self.job.log = mock_log()
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'yay'})
+
+        self.successResultOf(self.completion_deferred)
+
+        log.msg.assert_called_once_with(
+            ("A pending server belonging to a deleted scaling group "
+             "({scaling_group_id}) is now active, and hence deletable. "
+             "Deleting said server."),
+            event_type="server.deletable", server_id='yay', job_id='job_id',
+            audit_log=True)
 
     def test_job_completion_failure_NoSuchScalingGroupError(self):
         """

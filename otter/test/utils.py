@@ -173,6 +173,25 @@ class LockMixin(object):
         return lock
 
 
+class DeferredFunctionMixin(object):
+    """
+    A mixin for adding functions that return specific values
+    """
+
+    def setup_func(self, func):
+        """
+        Setup `func` to return value from self.returns
+        """
+
+        def mock_func(*args, **kwargs):
+            ret = self.returns.pop(0)
+            if isinstance(ret, Exception):
+                return defer.fail(ret)
+            return defer.succeed(ret)
+
+        func.side_effect = mock_func
+
+
 def mock_log(*args, **kwargs):
     """
     Returns a BoundLog whose msg and err methods are mocks.  Makes it easier
@@ -190,7 +209,7 @@ def mock_log(*args, **kwargs):
     return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
 
 
-def mock_treq(code=200, json_content={}, method='get', content=''):
+def mock_treq(code=200, json_content={}, method='get', content='', treq_mock=None):
     """
     Return mocked treq instance configured based on arguments given
 
@@ -199,7 +218,8 @@ def mock_treq(code=200, json_content={}, method='get', content=''):
     :param method: HTTP method
     :param content: Str to be returned from treq.content
     """
-    treq_mock = mock.MagicMock(spec=treq)
+    if treq_mock is None:
+        treq_mock = mock.MagicMock(spec=treq)
     response = mock.MagicMock(code=code)
     treq_mock.configure_mock(**{method + '.return_value': defer.succeed(response)})
     treq_mock.json_content.return_value = defer.succeed(json_content)

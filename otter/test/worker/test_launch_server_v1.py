@@ -7,6 +7,7 @@ import json
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
+from twisted.python.failure import Failure
 
 from otter.worker.launch_server_v1 import (
     private_ip_addresses,
@@ -22,11 +23,14 @@ from otter.worker.launch_server_v1 import (
     remove_from_load_balancer,
     public_endpoint_url,
     UnexpectedServerStatus,
-    verified_delete
+    ServerDeleted,
+    verified_delete,
+    LB_MAX_RETRIES, LB_RETRY_INTERVAL_RANGE
 )
 
 
-from otter.test.utils import DummyException, mock_log, patch, CheckFailure
+from otter.test.utils import mock_log, patch, CheckFailure, mock_treq, matches
+from testtools.matchers import IsInstance, StartsWith
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error, TimedOutError
@@ -107,7 +111,8 @@ class UtilityTests(TestCase):
 expected_headers = {
     'content-type': ['application/json'],
     'accept': ['application/json'],
-    'x-auth-token': ['my-auth-token']
+    'x-auth-token': ['my-auth-token'],
+    'User-Agent': ['OtterScale/0.0']
 }
 
 
@@ -122,10 +127,26 @@ class LoadBalancersTests(TestCase):
         """
         set up test dependencies for load balancers.
         """
-        self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
+        self.json_content = {'nodes': [{'id': 1}]}
+        self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
+                          new=mock_treq(code=200, json_content=self.json_content,
+                                        method='post'))
         patch(self, 'otter.util.http.treq', new=self.treq)
+        self.log = mock_log()
+        self.log.msg.return_value = None
 
         self.undo = iMock(IUndoStack)
+
+        self.max_retries = 12
+        set_config_data({'worker': {'lb_max_retries': self.max_retries,
+                                    'lb_retry_interval_range': [5, 7]}})
+        self.addCleanup(set_config_data, {})
+
+        # patch random_interval
+        self.retry_interval = 6
+        self.rand_interval = patch(self, 'otter.worker.launch_server_v1.random_interval')
+        self.rand_interval.return_value = self.interval_func = mock.Mock(
+            return_value=self.retry_interval)
 
     def test_add_to_load_balancer(self):
         """
@@ -133,26 +154,20 @@ class LoadBalancersTests(TestCase):
         the specified load balancer endpoint witht he specified auth token,
         load balancer id, port, and ip address.
         """
-        response = mock.Mock()
-        response.code = 200
-        self.treq.post.return_value = succeed(response)
-
-        content = {'nodes': [{'id': 1}]}
-        self.treq.json_content.return_value = succeed(content)
-
-        d = add_to_load_balancer('http://url/', 'my-auth-token',
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
                                  {'loadBalancerId': 12345,
                                   'port': 80},
                                  '192.168.1.1',
                                  self.undo)
 
         result = self.successResultOf(d)
-        self.assertEqual(result, content)
+        self.assertEqual(result, self.json_content)
 
         self.treq.post.assert_called_once_with(
             'http://url/loadbalancers/12345/nodes',
             headers=expected_headers,
-            data=mock.ANY
+            data=mock.ANY,
+            log=matches(IsInstance(self.log.__class__))
         )
 
         data = self.treq.post.mock_calls[0][2]['data']
@@ -163,53 +178,140 @@ class LoadBalancersTests(TestCase):
                                      'condition': 'ENABLED',
                                      'type': 'PRIMARY'}]})
 
-        self.treq.json_content.assert_called_once_with(response)
+        self.treq.json_content.assert_called_once_with(mock.ANY)
 
-    def test_add_to_load_balancer_propagates_api_failure(self):
+    def test_add_lb_retries(self):
         """
-        add_to_load_balancer will propagate API failures.
+        add_to_load_balancer will retry again until it succeeds
         """
-        response = mock.Mock()
-        response.code = 500
+        self.codes = [422] * 10 + [200]
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        clock = Clock()
 
-        self.treq.post.return_value = succeed(response)
-
-        self.treq.content.return_value = succeed(error_body)
-
-        d = add_to_load_balancer('http://url/', 'my-auth-token',
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
                                  {'loadBalancerId': 12345,
                                   'port': 80},
                                  '192.168.1.1',
-                                 self.undo)
+                                 self.undo, clock=clock)
+        clock.pump([self.retry_interval] * 11)
+        result = self.successResultOf(d)
+        self.assertEqual(result, self.json_content)
+        self.assertEqual(self.treq.post.mock_calls,
+                         [mock.call('http://url/loadbalancers/12345/nodes',
+                                    headers=expected_headers, data=mock.ANY,
+                                    log=matches(IsInstance(self.log.__class__)))] * 11)
+        self.rand_interval.assert_called_once_with(5, 7)
 
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(RequestError))
-        real_failure = failure.value.reason
+    def test_add_lb_defaults_retries_configs(self):
+        """
+        add_to_load_balancer will use defaults LB_RETRY_INTERVAL_RANGE, LB_MAX_RETRIES
+        when not configured
+        """
+        set_config_data({})
+        self.treq.post.side_effect = lambda *a, **kw: succeed(mock.Mock(code=422))
+        clock = Clock()
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo, clock=clock)
+        clock.pump([self.retry_interval] * LB_MAX_RETRIES)
+        self.failureResultOf(d, RequestError)
+        self.assertEqual(self.treq.post.mock_calls,
+                         [mock.call('http://url/loadbalancers/12345/nodes',
+                                    headers=expected_headers, data=mock.ANY,
+                                    log=matches(IsInstance(self.log.__class__)))]
+                         * (LB_MAX_RETRIES + 1))
+        self.rand_interval.assert_called_once_with(*LB_RETRY_INTERVAL_RANGE)
 
-        self.assertTrue(real_failure.check(APIError))
-        self.assertEqual(real_failure.value.code, 500)
+    def failed_add_to_lb(self, code=500):
+        """
+        Helper function to ensure add_to_load_balancer fails by returning failure
+        again and again until it times out
+        """
+        self.treq.post.side_effect = lambda *a, **kw: succeed(mock.Mock(code=code))
+        clock = Clock()
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo, clock=clock)
+        clock.pump([self.retry_interval] * self.max_retries)
+        return d
+
+    def test_addl_b_retries_times_out(self):
+        """
+        add_to_load_balancer will retry again and again for worker.lb_max_retries times.
+        It will fail after that. This also checks that API failure is propogated
+        """
+        d = self.failed_add_to_lb(422)
+
+        f = self.failureResultOf(d, RequestError)
+        self.assertEqual(f.value.reason.value.code, 422)
+        self.assertEqual(
+            self.treq.post.mock_calls,
+            [mock.call('http://url/loadbalancers/12345/nodes',
+                       headers=expected_headers, data=mock.ANY,
+                       log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
+
+    def test_add_lb_retries_logs(self):
+        """
+        add_to_load_balancer will log all failures while it is trying
+        """
+        self.codes = [500, 503, 422, 422, 401, 200]
+        bad_codes_len = len(self.codes) - 1
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        clock = Clock()
+
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo, clock=clock)
+        clock.pump([self.retry_interval] * 6)
+        self.successResultOf(d)
+        self.log.msg.assert_has_calls(
+            [mock.call('Got LB error while {m}: {e}', loadbalancer_id=12345,
+                       m='add_node', e=matches(IsInstance(RequestError)))] * bad_codes_len)
+
+    def test_add_lb_retries_logs_unexpected_errors(self):
+        """
+        add_to_load_balancer will log unexpeted failures while it is trying
+        """
+        self.codes = [500, 503, 422, 422, 401, 200]
+        bad_codes = [500, 503, 401]
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        clock = Clock()
+
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo, clock=clock)
+        clock.pump([self.retry_interval] * 6)
+        self.successResultOf(d)
+        self.log.msg.assert_has_calls(
+            [mock.call('Unexpected status {status} while {msg}: {error}',
+                       status=code, msg='add_node',
+                       error=matches(IsInstance(RequestError)), loadbalancer_id=12345)
+             for code in bad_codes])
+
+    test_add_lb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
 
     def test_add_to_load_balancer_pushes_remove_onto_undo_stack(self):
         """
         add_to_load_balancer pushes an inverse remove_from_load_balancer
         operation onto the undo stack.
         """
-        response = mock.Mock()
-        response.code = 200
-
-        self.treq.post.return_value = succeed(response)
-        self.treq.json_content.return_value = succeed({'nodes': [{'id': 1}]})
-
-        d = add_to_load_balancer('http://url/', 'my-auth-token',
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
                                  {'loadBalancerId': 12345,
                                   'port': 80},
                                  '192.168.1.1',
                                  self.undo)
 
         self.successResultOf(d)
-
         self.undo.push.assert_called_once_with(
-            remove_from_load_balancer,
+            remove_from_load_balancer, matches(IsInstance(self.log.__class__)),
             'http://url/', 'my-auth-token',
             12345,
             1)
@@ -219,21 +321,9 @@ class LoadBalancersTests(TestCase):
         add_to_load_balancer doesn't push an operation onto the undo stack
         if it fails.
         """
-        response = mock.Mock()
-        response.code = 500
-
-        self.treq.post.return_value = succeed(response)
-        self.treq.content.return_value = succeed("{'nodes': [{'id': 1}]}")
-
-        d = add_to_load_balancer('http://url/', 'my-auth-token',
-                                 {'loadBalancerId': 12345,
-                                  'port': 80},
-                                 '192.168.1.1',
-                                 self.undo)
-
+        d = self.failed_add_to_lb()
         self.failureResultOf(d, RequestError)
-
-        self.assertEqual(self.undo.push.call_count, 0)
+        self.assertFalse(self.undo.push.called)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
     def test_add_to_load_balancers(self, add_to_load_balancer):
@@ -246,12 +336,12 @@ class LoadBalancersTests(TestCase):
         add_to_load_balancer_deferreds = [d1, d2]
 
         def _add_to_load_balancer(
-                endpoint, auth_token, lb_config, ip_address, undo):
+                log, endpoint, auth_token, lb_config, ip_address, undo):
             return add_to_load_balancer_deferreds.pop(0)
 
         add_to_load_balancer.side_effect = _add_to_load_balancer
 
-        d = add_to_load_balancers('http://url/', 'my-auth-token',
+        d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
                                   [{'loadBalancerId': 12345,
                                     'port': 80},
                                    {'loadBalancerId': 54321,
@@ -281,12 +371,12 @@ class LoadBalancersTests(TestCase):
 
         add_to_load_balancer_deferreds = [d1, d2]
 
-        def _add_to_load_balancer(*args):
+        def _add_to_load_balancer(*args, **kwargs):
             return add_to_load_balancer_deferreds.pop(0)
 
         add_to_load_balancer.side_effect = _add_to_load_balancer
 
-        d = add_to_load_balancers('http://url/', 'my-auth-token',
+        d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
                                   [{'loadBalancerId': 12345,
                                     'port': 80},
                                    {'loadBalancerId': 54321,
@@ -297,6 +387,7 @@ class LoadBalancersTests(TestCase):
         self.assertNoResult(d)
 
         add_to_load_balancer.assert_called_once_with(
+            self.log,
             'http://url/',
             'my-auth-token',
             {'loadBalancerId': 12345, 'port': 80},
@@ -307,6 +398,7 @@ class LoadBalancersTests(TestCase):
         d1.callback(None)
 
         add_to_load_balancer.assert_called_with(
+            self.log,
             'http://url/',
             'my-auth-token',
             {'loadBalancerId': 54321, 'port': 81},
@@ -324,7 +416,7 @@ class LoadBalancersTests(TestCase):
         when no load balancers are configured.
         """
 
-        d = add_to_load_balancers('http://url/', 'my-auth-token',
+        d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
                                   [],
                                   '192.168.1.1',
                                   self.undo)
@@ -336,37 +428,220 @@ class LoadBalancersTests(TestCase):
         remove_from_load_balancer makes a DELETE request against the
         URL represting the load balancer node.
         """
-        response = mock.Mock()
-        response.code = 200
+        self.treq.delete.return_value = succeed(mock.Mock(code=200))
+        self.treq.content.return_value = succeed('')
 
-        self.treq.delete.return_value = succeed(response)
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
-        d = remove_from_load_balancer('http://url/', 'my-auth-token', 12345, 1)
         self.assertEqual(self.successResultOf(d), None)
-
         self.treq.delete.assert_called_once_with(
             'http://url/loadbalancers/12345/nodes/1',
-            headers=expected_headers)
+            headers=expected_headers, log=matches(IsInstance(self.log.__class__)))
 
-    def test_remove_from_load_balancer_propagates_api_failure(self):
+    def test_remove_from_load_balancer_on_404(self):
         """
-        remove_from_load_balancer will propagate API failures.
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node and ignores if it is already deleted
+        i.e. it returns 404. It also logs it
         """
-        response = mock.Mock()
-        response.code = 500
+        self.treq.delete.return_value = succeed(mock.Mock(code=404))
+        self.treq.content.return_value = succeed(json.dumps({'message': 'LB does not exist'}))
 
-        self.treq.delete.return_value = succeed(response)
-        self.treq.content.return_value = succeed(error_body)
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
-        d = remove_from_load_balancer('http://url/', 'my-auth-token',
-                                      '12345', '1')
-        failure = self.failureResultOf(d)
+        self.assertEqual(self.successResultOf(d), None)
+        self.log.msg.assert_any_call(
+            'Node to delete does not exist', loadbalancer_id=12345, node_id=1)
 
-        self.assertTrue(failure.check(RequestError))
-        real_failure = failure.value.reason
+    def test_remove_from_load_balancer_on_422_LB_deleted(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node and ignores if the load balancer
+        has been deleted and is considered immutable (a 422 response with a
+        particular message). It also logs it
+        """
+        message = "The load balancer is deleted and considered immutable."
+        body = {"message": message, "code": 422}
+        mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
 
-        self.assertTrue(real_failure.check(APIError))
-        self.assertEqual(real_failure.value.code, 500)
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
+        self.assertEqual(self.successResultOf(d), None)
+        self.log.msg.assert_any_call(message, loadbalancer_id=12345, node_id=1)
+
+    def test_remove_from_load_balancer_on_422_Pending_delete(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node and ignores if the load balancer
+        is in PENDING_DELETE and is considered immutable (a 422 response with a
+        particular message). It also logs it
+        """
+        message = ("Load Balancer '12345' has a status of 'PENDING_DELETE' and "
+                   "is considered immutable.")
+        body = {"message": message, "code": 422}
+        mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
+
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
+        self.assertEqual(self.successResultOf(d), None)
+        self.log.msg.assert_any_call(message, loadbalancer_id=12345, node_id=1)
+
+    def test_remove_from_load_balancer_fails_on_422_LB_other(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node and will fail if the 422 response
+        is not a result of the LB being deleted.
+        """
+        body = {
+            "message": ("Load Balancer '1' has a status of 'ERROR' and is "
+                        "considered immutable."),
+            "code": 422
+        }
+        mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
+
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
+        self.failureResultOf(d, RequestError)
+        self.log.msg.assert_any_call(
+            'Got LB error while {m}: {e}', m='remove_node', e=mock.ANY,
+            loadbalancer_id=12345, node_id=1)
+
+    test_remove_from_load_balancer_fails_on_422_LB_other.skip = 'Until we bail out early on ERROR'
+
+    def test_removelb_retries(self):
+        """
+        remove_from_load_balancer will retry again until it succeeds and retry interval
+        will be random number based on lb_retry_interval_range config value
+        """
+        self.codes = [422] * 7 + [500] * 3 + [200]
+        self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        self.treq.content.side_effect = lambda *a, **ka: succeed(
+            json.dumps({'message': 'PENDING_UPDATE'}))
+        clock = Clock()
+
+        d = remove_from_load_balancer(
+            self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
+
+        clock.pump([self.retry_interval] * 11)
+        self.assertIsNone(self.successResultOf(d))
+        # delete calls made?
+        self.assertEqual(self.treq.delete.mock_calls,
+                         [mock.call('http://url/loadbalancers/12345/nodes/1',
+                                    headers=expected_headers,
+                                    log=matches(IsInstance(self.log.__class__)))] * 11)
+        # Expected logs?
+        self.assertEqual(self.log.msg.mock_calls[0],
+                         mock.call('Removing from load balancer',
+                                   loadbalancer_id=12345, node_id=1))
+        self.assertEqual(
+            self.log.msg.mock_calls[1:-1],
+            [mock.call('Got LB error while {m}: {e}', m='remove_node',
+                       e=matches(IsInstance(RequestError)),
+                       loadbalancer_id=12345, node_id=1)] * 10)
+        self.assertEqual(self.log.msg.mock_calls[-1],
+                         mock.call('Removed from load balancer',
+                                   loadbalancer_id=12345, node_id=1))
+        # Random interval from config
+        self.rand_interval.assert_called_once_with(5, 7)
+        self.interval_func.assert_has_calls([mock.call(CheckFailure(RequestError))] * 10)
+
+    def test_removelb_limits_retries(self):
+        """
+        remove_from_load_balancer will retry again and again for LB_MAX_RETRIES times.
+        It will fail after that
+        """
+        self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=422))
+        self.treq.content.side_effect = lambda *a, **ka: succeed(
+            json.dumps({'message': 'PENDING_UPDATE'}))
+        clock = Clock()
+
+        d = remove_from_load_balancer(
+            self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
+
+        clock.pump([self.retry_interval] * self.max_retries)
+        # failed?
+        failure = self.failureResultOf(d, RequestError)
+        self.assertEqual(failure.value.reason.value.code, 422)
+        # delete calls made?
+        self.assertEqual(
+            self.treq.delete.mock_calls,
+            [mock.call('http://url/loadbalancers/12345/nodes/1',
+                       headers=expected_headers,
+                       log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
+        # Expected logs?
+        self.assertEqual(self.log.msg.mock_calls[0],
+                         mock.call('Removing from load balancer',
+                                   loadbalancer_id=12345, node_id=1))
+        self.assertEqual(
+            self.log.msg.mock_calls[1:],
+            [mock.call('Got LB error while {m}: {e}', m='remove_node',
+                       e=matches(IsInstance(RequestError)),
+                       loadbalancer_id=12345, node_id=1)] * (self.max_retries + 1))
+        # Interval func call max times?
+        self.rand_interval.assert_called_once_with(5, 7)
+        self.interval_func.assert_has_calls(
+            [mock.call(CheckFailure(RequestError))] * self.max_retries)
+
+    def test_removelb_retries_uses_defaults(self):
+        """
+        remove_from_load_balancer will retry based on default config if lb_max_retries
+        or lb_retry_interval_range is not found
+        """
+        set_config_data({})
+        self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=422))
+        self.treq.content.side_effect = lambda *a, **ka: succeed(
+            json.dumps({'message': 'PENDING_UPDATE'}))
+        clock = Clock()
+
+        d = remove_from_load_balancer(
+            self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
+
+        clock.pump([self.retry_interval] * LB_MAX_RETRIES)
+        # failed?
+        failure = self.failureResultOf(d, RequestError)
+        self.assertEqual(failure.value.reason.value.code, 422)
+        # delete calls made?
+        self.assertEqual(
+            self.treq.delete.mock_calls,
+            [mock.call('http://url/loadbalancers/12345/nodes/1',
+                       headers=expected_headers,
+                       log=matches(IsInstance(self.log.__class__)))] * (LB_MAX_RETRIES + 1))
+        # Expected logs?
+        self.assertEqual(self.log.msg.mock_calls[0],
+                         mock.call('Removing from load balancer',
+                                   loadbalancer_id=12345, node_id=1))
+        self.assertEqual(
+            self.log.msg.mock_calls[1:],
+            [mock.call('Got LB error while {m}: {e}', m='remove_node',
+                       e=matches(IsInstance(RequestError)),
+                       loadbalancer_id=12345, node_id=1)] * (LB_MAX_RETRIES + 1))
+        # Interval func call max times?
+        self.rand_interval.assert_called_once_with(*LB_RETRY_INTERVAL_RANGE)
+        self.interval_func.assert_has_calls(
+            [mock.call(CheckFailure(RequestError))] * LB_MAX_RETRIES)
+
+    def test_removelb_retries_logs_unexpected_errors(self):
+        """
+        add_to_load_balancer will log unexpeted failures while it is trying
+        """
+        self.codes = [500, 503, 422, 422, 401, 200]
+        bad_codes = [500, 503, 401]
+        self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        clock = Clock()
+
+        d = remove_from_load_balancer(
+            self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
+
+        clock.pump([self.retry_interval] * 6)
+        self.successResultOf(d)
+        self.log.msg.assert_has_calls(
+            [mock.call('Unexpected status {status} while {msg}: {error}',
+                       status=code, msg='remove_node',
+                       error=matches(IsInstance(RequestError)), loadbalancer_id=12345,
+                       node_id=1)
+             for code in bad_codes])
+
+    test_removelb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
 
 
 class BobbyServerTests(TestCase):
@@ -495,6 +770,17 @@ class ServerTests(TestCase):
 
         self.assertEqual(results, self.treq.json_content.return_value)
 
+    def test_server_details_on_404(self):
+        """
+        server_details will raise a :class:`ServerDeleted` error when it
+        it gets a 404 back in the response
+        """
+        mock_treq(code=404, content='not found', method='get',
+                  treq_mock=self.treq)
+
+        d = server_details('http://url/', 'my-auth-token', 'serverId')
+        self.failureResultOf(d, ServerDeleted)
+
     def test_server_details_propagates_api_failure(self):
         """
         server_details will propagate API failures.
@@ -573,10 +859,10 @@ class ServerTests(TestCase):
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            clock=clock)
+                            interval=5, clock=clock)
 
         server_details.assert_called_with('http://url/', 'my-auth-token',
-                                          'serverId')
+                                          'serverId', log=mock.ANY)
         self.assertEqual(server_details.call_count, 1)
 
         server_status[0] = 'ACTIVE'
@@ -584,7 +870,7 @@ class ServerTests(TestCase):
         clock.advance(5)
 
         server_details.assert_called_with('http://url/', 'my-auth-token',
-                                          'serverId')
+                                          'serverId', log=mock.ANY)
         self.assertEqual(server_details.call_count, 2)
 
         result = self.successResultOf(d)
@@ -608,7 +894,7 @@ class ServerTests(TestCase):
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            clock=clock)
+                            interval=5, clock=clock)
 
         clock.advance(5)
 
@@ -618,6 +904,45 @@ class ServerTests(TestCase):
         self.assertEqual(failure.value.server_id, 'serverId')
         self.assertEqual(failure.value.status, 'ERROR')
         self.assertEqual(failure.value.expected_status, 'ACTIVE')
+
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_continues_looping_on_500(self, server_details):
+        """
+        wait_for_active will keep looping if ``server_details`` raises other
+        exceptions, for instance RequestErrors.
+        """
+        clock = Clock()
+
+        server_details.return_value = fail(
+            RequestError(Failure(APIError(500, '', {})), 'url'))
+
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            interval=5, clock=clock)
+
+        self.assertNoResult(d)
+        server_details.return_value = succeed({'server': {'status': 'ACTIVE'}})
+
+        clock.advance(5)
+
+        result = self.successResultOf(d)
+        self.assertEqual(result['server']['status'], 'ACTIVE')
+
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_stops_looping_on_server_deletion(self, server_details):
+        """
+        wait_for_active will errback it's Deferred if ``server_details`` raises
+        a ``ServerDeletion`` error
+        """
+        clock = Clock()
+
+        server_details.return_value = fail(ServerDeleted('1234'))
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            interval=5, clock=clock)
+
+        failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(ServerDeleted))
 
     @mock.patch('otter.worker.launch_server_v1.server_details')
     def test_wait_for_active_stops_looping_on_error(self, server_details):
@@ -634,7 +959,7 @@ class ServerTests(TestCase):
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            clock=clock)
+                            interval=5, clock=clock)
 
         # This gets called once immediately then every 5 seconds.
         self.assertEqual(server_details.call_count, 1)
@@ -666,7 +991,7 @@ class ServerTests(TestCase):
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            clock=clock)
+                            interval=5, clock=clock)
 
         # This gets called once immediately then every 5 seconds.
         self.assertEqual(server_details.call_count, 1)
@@ -755,7 +1080,8 @@ class ServerTests(TestCase):
             (54321, ('10.0.0.1', 81))
         ])
 
-        d = launch_server(self.log,
+        log = mock.Mock()
+        d = launch_server(log,
                           'DFW',
                           self.scaling_group,
                           fake_service_catalog,
@@ -772,15 +1098,19 @@ class ServerTests(TestCase):
 
         create_server.assert_called_once_with('http://dfw.openstack/',
                                               'my-auth-token',
-                                              expected_server_config)
+                                              expected_server_config,
+                                              log=mock.ANY)
 
         wait_for_active.assert_called_once_with(mock.ANY,
                                                 'http://dfw.openstack/',
                                                 'my-auth-token',
                                                 '1')
 
+        log.bind.assert_called_once_with(server_name='as000000')
+        log = log.bind.return_value
+        log.bind.assert_called_once_with(server_id='1')
         add_to_load_balancers.assert_called_once_with(
-            'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
+            log.bind.return_value, 'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
             '10.0.0.1', self.undo)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
@@ -1105,15 +1435,20 @@ class DeleteServerTests(TestCase):
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
         patch(self, 'otter.util.http.treq', new=self.treq)
 
-    @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
-    def test_delete_server_deletes_load_balancer_node(
-            self, remove_from_load_balancer):
+        self.treq.delete.return_value = succeed(mock.Mock(code=404))
+        self.treq.content.side_effect = lambda *a, **kw: succeed("")
+
+        self.remove_from_load_balancer = patch(
+            self, 'otter.worker.launch_server_v1.remove_from_load_balancer')
+        self.remove_from_load_balancer.return_value = succeed(None)
+
+        self.clock = Clock()
+
+    def test_delete_server_deletes_load_balancer_node(self):
         """
         delete_server removes the nodes specified in instance details from
         the associated load balancers.
         """
-        remove_from_load_balancer.return_value = succeed(None)
-
         d = delete_server(self.log,
                           'DFW',
                           fake_service_catalog,
@@ -1121,36 +1456,42 @@ class DeleteServerTests(TestCase):
                           instance_details)
         self.successResultOf(d)
 
-        remove_from_load_balancer.has_calls([
-            mock.call('http://dfw.lbaas/', 'my-auth-token', 12345, 1),
-            mock.call('http://dfw.lbaas/', 'my-auth-token', 54321, 2)
+        self.remove_from_load_balancer.assert_has_calls([
+            mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token', 12345, 1),
+            mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token', 54321, 2)
         ], any_order=True)
 
-        self.assertEqual(remove_from_load_balancer.call_count, 2)
+        self.assertEqual(self.remove_from_load_balancer.call_count, 2)
 
-    @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
-    def test_delete_server(self, remove_from_load_balancer):
+    def test_delete_server(self):
         """
         delete_server performs a DELETE request against the instance URL based
         on the information in instance_details.
         """
-        remove_from_load_balancer.return_value = succeed(None)
-
         d = delete_server(self.log, 'DFW', fake_service_catalog,
                           'my-auth-token', instance_details)
         self.successResultOf(d)
 
         self.treq.delete.assert_called_once_with(
-            'http://dfw.openstack/servers/a', headers=expected_headers)
+            'http://dfw.openstack/servers/a',
+            headers=expected_headers, log=mock.ANY)
 
-    @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
-    def test_delete_server_propagates_loadbalancer_failures(
-            self, remove_from_load_balancer):
+    def test_delete_server_succeeds_on_unknown_server(self):
+        """
+        delete_server succeeds and logs if delete calls return 404.
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=404))
+
+        d = delete_server(self.log, 'DFW', fake_service_catalog,
+                          'my-auth-token', instance_details)
+        self.successResultOf(d)
+
+    def test_delete_server_propagates_loadbalancer_failures(self):
         """
         delete_server propagates any errors from removing server from load
         balancers
         """
-        remove_from_load_balancer.return_value = fail(
+        self.remove_from_load_balancer.return_value = fail(
             APIError(500, '')).addErrback(wrap_request_error, 'url')
 
         d = delete_server(self.log, 'DFW', fake_service_catalog,
@@ -1159,138 +1500,63 @@ class DeleteServerTests(TestCase):
 
         self.assertEqual(failure.value.reason.value.code, 500)
 
-    @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
-    def test_delete_server_propagates_delete_server_api_failures(
-            self, remove_from_load_balancer):
+    @mock.patch('otter.worker.launch_server_v1.verified_delete')
+    def test_delete_server_propagates_verified_delete_failures(self, deleter):
         """
         delete_server fails with an APIError if deleting the server fails.
         """
-
-        remove_from_load_balancer.return_value = succeed(None)
-
-        response = mock.Mock()
-        response.code = 500
-
-        self.treq.delete.return_value = succeed(response)
-        self.treq.content.return_value = succeed(error_body)
+        deleter.return_value = fail(TimedOutError(3660, 'meh'))
 
         d = delete_server(self.log, 'DFW', fake_service_catalog,
                           'my-auth-token', instance_details)
-        failure = self.failureResultOf(d)
+        self.failureResultOf(d, TimedOutError)
 
-        self.assertEqual(failure.value.reason.value.code, 500)
-
-    def test_verified_delete_returns_after_delete_but_verifies_deletion(self):
+    def test_verified_delete_retries_until_success(self):
         """
-        verified_delete returns as soon as the deletion succeeded, but also
-        attempts to verify deleting the server.  It also logs the deletion.
+        If the first delete didn't work, wait a bit and try again until the
+        server has been deleted, since a server can sit in DELETE state for a
+        bit.  Deferred only callbacks when the deletion is done.
+
+        It also logs deletion success.
         """
-        clock = Clock()
-        self.treq.delete.return_value = succeed(
-            mock.Mock(spec=['code'], code=204))
-
-        self.treq.head.return_value = Deferred()
-
+        self.treq.delete.return_value = succeed(mock.Mock(code=204))
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', clock=clock)
-        self.assertIsNone(self.successResultOf(d))
+                            'serverId', interval=5, clock=self.clock)
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertNoResult(d)
 
-        self.treq.delete.assert_called_once_with('http://url/servers/serverId',
-                                                 headers=expected_headers)
-        self.treq.head.assert_called_once_with('http://url/servers/serverId',
-                                               headers=expected_headers)
-
-        self.log.msg.assert_called_with(mock.ANY, instance_id='serverId')
-
-    def test_verified_delete_propagates_delete_server_api_failures(self):
-        """
-        verified_delete propagates deletions from server deletion
-        """
-        clock = Clock()
-        self.treq.delete.return_value = succeed(
-            mock.Mock(spec=['code', 'headers'], code=500, headers=None))
-        self.treq.content.return_value = succeed(error_body)
-        self.treq.head.return_value = Deferred()
-
-        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', clock=clock)
-        failure = self.failureResultOf(d, RequestError)
-        self.assertTrue(failure.value.reason.check(APIError))
-        self.assertEqual(failure.value.reason.value.code, 500)
-
-    def test_verified_delete_does_not_propagate_verification_failure(self):
-        """
-        verified_delete propagates deletions from server deletion
-        """
-        clock = Clock()
-        self.treq.delete.return_value = succeed(
-            mock.Mock(spec=['code'], code=204))
-        self.treq.head.return_value = fail(DummyException('failure'))
-        self.treq.content.side_effect = lambda *args: succeed("")
-
-        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', clock=clock)
-        self.assertIsNone(self.successResultOf(d))
-
-    def test_verified_delete_retries_verification_until_success(self):
-        """
-        If the first verification didn't work, wait a bit and see if it's been
-        deleted, since a server can sit in DELETE state for a bit.
-
-        It also logs deletion success, and deletion failure
-        """
-        clock = Clock()
-        self.treq.delete.return_value = succeed(
-            mock.Mock(spec=['code'], code=204))
-        self.treq.content.side_effect = lambda *args: succeed("")
-        self.treq.head.return_value = Deferred()
-
-        verified_delete(self.log, 'http://url/', 'my-auth-token',
-                        'serverId', interval=5, clock=clock)
-
-        self.assertEqual(self.log.msg.call_count, 1)
-        self.treq.head.return_value.callback(mock.Mock(spec=['code'], code=204))
-
-        self.treq.head.assert_called_once_with('http://url/servers/serverId',
-                                               headers=expected_headers)
-
-        self.treq.head.return_value = succeed(
-            mock.Mock(spec=['code'], code=404))
-
-        clock.advance(5)
-        self.treq.head.assert_has_calls([
-            mock.call('http://url/servers/serverId', headers=expected_headers),
-            mock.call('http://url/servers/serverId', headers=expected_headers)
-        ])
-        self.assertEqual(self.log.msg.call_count, 2)
+        self.treq.delete.return_value = succeed(mock.Mock(code=404))
+        self.clock.pump([5])
+        self.assertEqual(self.treq.delete.call_count, 2)
+        self.successResultOf(d)
 
         # the loop has stopped
-        clock.advance(5)
-        self.assertEqual(self.treq.head.call_count, 2)
+        self.clock.pump([5])
+        self.assertEqual(self.treq.delete.call_count, 2)
+
+        # success logged
+        self.log.msg.assert_called_with(
+            matches(StartsWith("Server deleted successfully")),
+            server_id='serverId', time_delete=5)
 
     def test_verified_delete_retries_verification_until_timeout(self):
         """
-        If the verification fails until the timeout, log a failure and do not
-        keep trying to verify.
+        If the deleting fails until the timeout, log a failure and do not
+        keep trying to delete.
         """
-        clock = Clock()
-        self.treq.delete.return_value = succeed(
-            mock.Mock(spec=['code'], code=204))
-        self.treq.content.side_effect = lambda *args: succeed("")
-        self.treq.head.side_effect = lambda *args, **kwargs: succeed(
-            mock.Mock(spec=['code'], code=204))
+        self.treq.delete.side_effect = lambda *a, **kw: succeed(mock.Mock(code=500))
+        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
+                            'serverId', interval=5, timeout=20, clock=self.clock)
+        self.assertNoResult(d)
 
-        verified_delete(self.log, 'http://url/', 'my-auth-token',
-                        'serverId', interval=5, timeout=11, clock=clock)
-
-        clock.advance(11)
-        self.treq.head.assert_has_calls([
-            mock.call('http://url/servers/serverId', headers=expected_headers),
-            mock.call('http://url/servers/serverId', headers=expected_headers)
-        ])
+        self.clock.pump([5] * 4)
+        self.assertEqual(
+            self.treq.delete.mock_calls,
+            [mock.call('http://url/servers/serverId', headers=expected_headers,
+                       log=mock.ANY)] * 4)
         self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
-                                             instance_id='serverId')
+                                             server_id='serverId')
 
         # the loop has stopped
-        clock.advance(5)
-        self.assertEqual(self.treq.head.call_count, 2)
+        self.clock.pump([5])
+        self.assertEqual(self.treq.delete.call_count, 4)

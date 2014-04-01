@@ -3,13 +3,16 @@
 """
 Tests for :mod:`otter.rest.application`
 """
+import json
 import mock
 
+from twisted.internet.defer import succeed
 from twisted.trial.unittest import TestCase
 
+from otter.rest.application import Otter
 from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import with_transaction_id, log_arguments
-from otter.test.rest.request import RequestTestMixin
+from otter.test.rest.request import RequestTestMixin, RestAPITestMixin
 from otter.test.utils import patch
 from otter.util.http import (get_autoscale_links, transaction_id, get_collection_links,
                              get_groups_links, get_policies_links, get_webhooks_links)
@@ -445,3 +448,30 @@ class DelegatedLogArgumentsTestCase(RequestTestMixin, TestCase):
 
         kwargs = {'extra_arg1': 'some_data'}
         self.mock_log.bind().bind.assert_called_with(**kwargs)
+
+
+class HealthCheckTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests that the health check endpoint returns a json dumped health check
+    """
+    endpoint = "/health"
+    invalid_methods = ("DELETE", "PUT", "POST")
+
+    def test_health_check_endpoint_health_check_function(self):
+        """
+        Returns a healthy = True result
+        """
+        resp = self.assert_status_code(200)
+        self.assertEqual(resp, json.dumps({"healthy": True}))
+
+    def test_health_check_endpoint_calls_store_health_check(self):
+        """
+        And returns the stringified json blob
+        """
+        def health_check():
+            return succeed({'blargh': 'boo'})
+
+        self.root = Otter(self.mock_store, health_check).app.resource()
+
+        resp = self.assert_status_code(200)
+        self.assertEqual(resp, json.dumps({'blargh': 'boo'}))

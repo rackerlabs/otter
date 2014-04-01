@@ -7,7 +7,6 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 from cloudcafe.common.tools.datagen import rand_name
 
 
-@unittest.skip('currently fails')
 class LaunchConfigNegtaiveTest(AutoscaleFixture):
 
     """
@@ -20,8 +19,10 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         """
         super(LaunchConfigNegtaiveTest, self).setUp()
         self.lc_name = rand_name('negative_launch_config')
-        self.invalid_flavor_ids = ['', 'INVALID-FLAVOR-ID', '8888', '-4', None]
-        self.invalid_image_ids = ['', 'INVALID-IMAGE-ID', '1111', self.lc_image_ref + 'Z', None]
+        self.invalid_flavor_ids = ['INVALID-FLAVOR-ID', '8888', '-4', None, '',
+                                   '  ']
+        self.invalid_image_ids = ['INVALID-IMAGE-ID', '1111',
+                                  self.lc_image_ref + 'Z', None, '', '  ']
 
     def test_update_scaling_group_launch_config_to_invalid_imageid(self):
         """

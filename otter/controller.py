@@ -279,12 +279,13 @@ def calculate_delta(log, state, config, policy):
     max_entities = config['maxEntities']
     if max_entities is None:
         max_entities = MAX_ENTITIES
-    constrained = max(min(desired, max_entities), config['minEntities'])
-    delta = constrained - current
+    state.desired = max(min(desired, max_entities), config['minEntities'])
+    delta = state.desired - current
 
-    log.msg("calculating delta",
+    log.msg(("calculating delta "
+             "{current_active} + {current_pending} -> {constrained_desired_capacity}"),
             unconstrained_desired_capacity=desired,
-            constrained_desired_capacity=constrained,
+            constrained_desired_capacity=state.desired,
             max_entities=max_entities, min_entities=config['minEntities'],
             server_delta=delta, current_active=len(state.active),
             current_pending=len(state.pending))
@@ -332,8 +333,9 @@ def delete_active_servers(log, transaction_id, scaling_group,
 
     # then start deleting those servers
     supervisor = get_supervisor()
-    return [_DeleteJob(log, transaction_id, scaling_group, server_info, supervisor).start()
-            for server_info in servers_to_evict]
+    for i, server_info in enumerate(servers_to_evict):
+        job = _DeleteJob(log, transaction_id, scaling_group, server_info, supervisor)
+        job.start()
 
 
 def exec_scale_down(log, transaction_id, state, scaling_group, delta):
@@ -386,7 +388,7 @@ class _DeleteJob(object):
         self.log.msg('Started server deletion job')
 
     def _job_completed(self, _):
-        self.log.msg('Server deletion job completed')
+        audit(self.log).msg('Server deleted.', event_type="server.delete")
 
     def _job_failed(self, failure):
         # REVIEW: Logging this as err since failing to delete a server will cost
@@ -426,7 +428,7 @@ class _Job(object):
         """
         Job has failed. Remove the job, if it exists, and log the error.
         """
-        self.log.msg('Job failed', reason=f)
+        self.log.err(f, 'Launching server failed')
 
         def handle_failure(group, state):
             # if it is not in pending, then the job was probably deleted before
@@ -450,27 +452,37 @@ class _Job(object):
         Job succeeded. If the job exists, move the server from pending to active
         and log.  If not, then the job has been canceled, so delete the server.
         """
+        server_id = result['id']
+        log = self.log.bind(server_id=server_id)
+
         def handle_success(group, state):
             if self.job_id not in state.pending:
                 # server was slated to be deleted when it completed building.
                 # So, deleting it now
-                self.log.msg('Job removed. Deleting server')
+                audit(log).msg(
+                    "A pending server that is no longer needed is now active, "
+                    "and hence deletable.  Deleting said server.",
+                    event_type="server.deletable")
+
                 job = _DeleteJob(self.log, self.transaction_id,
                                  self.scaling_group, result, self.supervisor)
                 job.start()
             else:
                 state.remove_job(self.job_id)
                 state.add_active(result['id'], result)
-                self.log.bind(server_id=result['id']).msg(
-                    "Job completed, resulting in an active server.")
+                audit(log).msg("Server is active.", event_type="server.active")
             return state
 
         d = self.scaling_group.modify_state(handle_success)
 
         def delete_if_group_deleted(f):
             f.trap(NoSuchScalingGroupError)
-            self.log.msg('Relevant scaling group has been removed. '
-                         'Deleting server.')
+            audit(log).msg(
+                "A pending server belonging to a deleted scaling group "
+                "({scaling_group_id}) is now active, and hence deletable. "
+                "Deleting said server.",
+                event_type="server.deletable")
+
             job = _DeleteJob(self.log, self.transaction_id,
                              self.scaling_group, result, self.supervisor)
             job.start()

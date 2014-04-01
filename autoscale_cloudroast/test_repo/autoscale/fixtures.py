@@ -39,8 +39,10 @@ class AutoscaleFixture(BaseTestFixture):
         load_balancer_service = access_data.get_service(
             cls.autoscale_config.load_balancer_endpoint_name)
         server_url = server_service.get_endpoint(
+            cls.autoscale_config.server_region_override or
             cls.autoscale_config.region).public_url
         lbaas_url = load_balancer_service.get_endpoint(
+            cls.autoscale_config.lbaas_region_override or
             cls.autoscale_config.region).public_url
 
         cls.tenant_id = cls.autoscale_config.tenant_id
@@ -93,10 +95,6 @@ class AutoscaleFixture(BaseTestFixture):
         cls.lc_load_balancers = cls.autoscale_config.lc_load_balancers
         cls.sp_list = cls.autoscale_config.sp_list
         cls.wb_name = rand_name(cls.autoscale_config.wb_name)
-        cls.load_balancer_1 = int(cls.autoscale_config.load_balancer_1)
-        cls.load_balancer_2 = int(cls.autoscale_config.load_balancer_2)
-        cls.load_balancer_3 = int(cls.autoscale_config.load_balancer_3)
-        cls.lb_other_region = int(cls.autoscale_config.lb_other_region)
         cls.interval_time = int(cls.autoscale_config.interval_time)
         cls.timeout = int(cls.autoscale_config.timeout)
         cls.scheduler_interval = OtterConstants.SCHEDULER_INTERVAL
@@ -328,6 +326,24 @@ class AutoscaleFixture(BaseTestFixture):
                 "observe the active server list achieving the expected servers count: {2}.".format(
                     timeout, group_id, expected_servers))
 
+    def wait_for_expected_group_state(self, group_id, expected_servers, wait_time=120):
+        """
+        :summary: verify the group state reached the expected servers count.
+        :param group_id: Group id
+        :param expected_servers: Number of servers expected
+        """
+        end_time = time.time() + wait_time
+        while time.time() < end_time:
+            group_state = self.autoscale_client.list_status_entities_sgroups(group_id).entity
+            if group_state.desiredCapacity == expected_servers:
+                return
+            time.sleep(self.interval_time)
+        else:
+            self.fail(
+                "wait_for_exepected_group_state ran for 120 seconds for group {0} and did not "
+                "observe the active server list achieving the expected servers count: {1}.".format(
+                    group_id, expected_servers))
+
     def check_for_expected_number_of_building_servers(
         self, group_id, expected_servers,
             desired_capacity=None, server_name=None):
@@ -369,14 +385,15 @@ class AutoscaleFixture(BaseTestFixture):
     def assert_servers_deleted_successfully(self, server_name, count=0):
         """
         Given a partial server name, polls for 15 mins to assert that the tenant id
-        has only specified count of servers containing that name.
+        has only specified count of servers containing that name, and returns the list
+        of servers.
         """
         endtime = time.time() + 900
         while time.time() < endtime:
             server_list = self.get_servers_containing_given_name_on_tenant(
                 server_name=server_name)
             if len(server_list) == count:
-                break
+                return server_list
             time.sleep(self.interval_time)
         else:
             self.fail('Servers on the tenant with name {0} were not deleted even'
@@ -418,8 +435,8 @@ class AutoscaleFixture(BaseTestFixture):
         list_policies = self.autoscale_client.list_policies(group_id).entity
         policies_num = len(list_policies.policies)
         while (hasattr(list_policies.policies_links, 'next')):
-            list_policies = self.autoscale_client.list_scaling_policies(
-                url=list_policies.policies_links.next).entity
+            list_policies = self.autoscale_client.list_policies(
+                url=list_policies.policies_links.next, group_id=group_id).entity
             policies_num += len(list_policies.policies)
         return policies_num
 
@@ -428,13 +445,28 @@ class AutoscaleFixture(BaseTestFixture):
         Returns the total number of webhooks on a given policy.
         Note: This will work only after the test webhook pagination branch is merged
         """
-        list_webhooks = self.autoscale_client.list_webhooks().entity
+        list_webhooks = self.autoscale_client.list_webhooks(group_id, policy_id).entity
         webhooks_num = len(list_webhooks.webhooks)
         while (hasattr(list_webhooks.webhooks_links, 'next')):
             list_webhooks = self.autoscale_client.list_webhooks(
                 url=list_webhooks.webhooks_links.next).entity
             webhooks_num += len(list_webhooks.webhooks)
         return webhooks_num
+
+    def successfully_delete_given_loadbalancer(self, lb_id):
+        """
+        Given the load balancer Id, tries to delete the load balancer for 15 minutes,
+        until a 204 is received
+        """
+        endtime = time.time() + 900
+        while time.time() < endtime:
+            del_lb = self.lbaas_client.delete_load_balancer(lb_id)
+            if del_lb.status_code == 202:
+                break
+            time.sleep(self.interval_time)
+        else:
+            self.fail('Deleting load balancer failed, as load balncer remained in building'
+                      ' after waiting 15 mins'.format(lb_id))
 
     @classmethod
     def tearDownClass(cls):

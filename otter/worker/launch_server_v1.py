@@ -22,15 +22,22 @@ from copy import deepcopy
 
 from twisted.internet.defer import gatherResults, maybeDeferred
 
-import treq
+from otter.util import logging_treq as treq
 
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
-                             wrap_request_error)
+                             wrap_request_error, raise_error_on_code,
+                             APIError, RequestError)
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout
-from otter.util.retry import (repeating_interval, transient_errors_except,
-                              TransientRetryError)
+from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
+                              TransientRetryError, random_interval)
+
+# Number of times to retry when adding/removing nodes from LB
+LB_MAX_RETRIES = 10
+
+# Range from which random retry interval is got
+LB_RETRY_INTERVAL_RANGE = [10, 15]
 
 
 class UnexpectedServerStatus(Exception):
@@ -49,7 +56,18 @@ class UnexpectedServerStatus(Exception):
         self.expected_status = expected_status
 
 
-def server_details(server_endpoint, auth_token, server_id):
+class ServerDeleted(Exception):
+    """
+    An exception to be raised when a server was deleted unexpectedly.
+    """
+    def __init__(self, server_id):
+        super(ServerDeleted, self).__init__(
+            'Server {server_id} has been deleted unexpectedly.'.format(
+                server_id=server_id))
+        self.server_id = server_id
+
+
+def server_details(server_endpoint, auth_token, server_id, log=None):
     """
     Fetch the details of a server as specified by id.
 
@@ -62,9 +80,10 @@ def server_details(server_endpoint, auth_token, server_id):
     :return: A dict of the server details.
     """
     path = append_segments(server_endpoint, 'servers', server_id)
-    d = treq.get(path, headers=headers(auth_token))
+    d = treq.get(path, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, path, 'server_details')
+    d.addErrback(raise_error_on_code, 404, ServerDeleted(server_id),
+                 path, 'server_details')
     return d.addCallback(treq.json_content)
 
 
@@ -72,7 +91,7 @@ def wait_for_active(log,
                     server_endpoint,
                     auth_token,
                     server_id,
-                    interval=5,
+                    interval=20,
                     timeout=3600,
                     clock=None):
     """
@@ -117,7 +136,7 @@ def wait_for_active(log,
             else:
                 raise TransientRetryError()  # just poll again
 
-        sd = server_details(server_endpoint, auth_token, server_id)
+        sd = server_details(server_endpoint, auth_token, server_id, log=log)
         sd.addCallback(check_status)
         return sd
 
@@ -126,13 +145,13 @@ def wait_for_active(log,
 
     return retry_and_timeout(
         poll, timeout,
-        can_retry=transient_errors_except(UnexpectedServerStatus),
+        can_retry=transient_errors_except(UnexpectedServerStatus, ServerDeleted),
         next_interval=repeating_interval(interval),
         clock=clock,
         deferred_description=timeout_description)
 
 
-def create_server(server_endpoint, auth_token, server_config):
+def create_server(server_endpoint, auth_token, server_config, log=None):
     """
     Create a new server.
 
@@ -144,18 +163,45 @@ def create_server(server_endpoint, auth_token, server_config):
     """
     path = append_segments(server_endpoint, 'servers')
     d = treq.post(path, headers=headers(auth_token),
-                  data=json.dumps({'server': server_config}))
+                  data=json.dumps({'server': server_config}), log=log)
     d.addCallback(check_success, [202])
     d.addErrback(wrap_request_error, path, 'server_create')
     return d.addCallback(treq.json_content)
 
 
-def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
+def log_on_response_code(response, log, msg, code):
+    """
+    Log `msg` if response.code is same as code
+    """
+    if response.code == code:
+        log.msg(msg)
+    return response
+
+
+def log_lb_unexpected_errors(f, path, log, msg):
+    """
+    Log load-balancer unexpected errors
+    """
+    if not f.check(APIError):
+        log.err(f, 'Unknown error while ' + msg)
+        return f
+    error = RequestError(f, path, msg)
+    log.msg('Got LB error while {m}: {e}', m=msg, e=error)
+    # TODO: Will do it after LB delete works fine
+    # 422 is PENDING_UPDATE
+    #if f.value.code != 422:
+    #    log.msg('Unexpected status {status} while {msg}: {error}',
+    #            msg=msg, status=f.value.code, error=error)
+    raise error
+
+
+def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
     """
     Add an IP addressed to a load balancer based on the lb_config.
 
     TODO: Handle load balancer node metadata.
 
+    :param log: A bound logger
     :param str endpoint: Load balancer endpoint URI.
     :param str auth_token: Keystone Auth Token.
     :param str lb_config: An lb_config dictionary.
@@ -169,17 +215,30 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
+    lb_log = log.bind(loadbalancer_id=lb_id)
 
-    d = treq.post(path, headers=headers(auth_token),
-                  data=json.dumps({"nodes": [{"address": ip_address,
-                                              "port": port,
-                                              "condition": "ENABLED",
-                                              "type": "PRIMARY"}]}))
-    d.addCallback(check_success, [200, 202])
-    d.addErrback(wrap_request_error, path, 'add')
+    def add():
+        d = treq.post(path, headers=headers(auth_token),
+                      data=json.dumps({"nodes": [{"address": ip_address,
+                                                  "port": port,
+                                                  "condition": "ENABLED",
+                                                  "type": "PRIMARY"}]}),
+                      log=lb_log)
+        d.addCallback(check_success, [200, 202])
+        d.addErrback(log_lb_unexpected_errors, path, lb_log, 'add_node')
+        return d
+
+    d = retry(
+        add,
+        can_retry=retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES),
+        next_interval=random_interval(
+            *(config_value('worker.lb_retry_interval_range') or LB_RETRY_INTERVAL_RANGE)),
+        clock=clock)
 
     def when_done(result):
+        lb_log.msg('Added to load balancer')
         undo.push(remove_from_load_balancer,
+                  lb_log,
                   endpoint,
                   auth_token,
                   lb_id,
@@ -189,11 +248,12 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
     return d.addCallback(treq.json_content).addCallback(when_done)
 
 
-def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address, undo):
+def add_to_load_balancers(log, endpoint, auth_token, lb_configs, ip_address, undo):
     """
     Add the specified IP to mulitple load balancer based on the configs in
     lb_configs.
 
+    :param log: A bound logger
     :param str endpoint: Load balancer endpoint URI.
     :param str auth_token: Keystone Auth Token.
     :param list lb_configs: List of lb_config dictionaries.
@@ -211,7 +271,7 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address, undo):
         try:
             lb_config = lb_iter.next()
 
-            d = add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo)
+            d = add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo)
             d.addCallback(lambda response, lb_id: (lb_id, response), lb_config['loadBalancerId'])
             d.addCallback(results.append)
             d.addCallback(add_next)
@@ -330,17 +390,9 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
 
-    log.msg("Looking for load balancer endpoint",
-            service_name=cloudLoadBalancers,
-            region=lb_region)
-
     lb_endpoint = public_endpoint_url(service_catalog,
                                       cloudLoadBalancers,
                                       lb_region)
-
-    log.msg("Looking for cloud servers endpoint",
-            service_name=cloudServersOpenStack,
-            region=region)
 
     server_endpoint = public_endpoint_url(service_catalog,
                                           cloudServersOpenStack,
@@ -351,8 +403,9 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     server_config = launch_config['server']
 
     log = log.bind(server_name=server_config['name'])
+    ilog = [None]
 
-    d = create_server(server_endpoint, auth_token, server_config)
+    d = create_server(server_endpoint, auth_token, server_config, log=log)
 
     def wait_for_server(server):
         server_id = server['server']['id']
@@ -360,9 +413,9 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
         undo.push(
             verified_delete, log, server_endpoint, auth_token, server_id)
 
-        ilog = log.bind(instance_id=server_id)
+        ilog[0] = log.bind(server_id=server_id)
         return wait_for_active(
-            ilog,
+            ilog[0],
             server_endpoint,
             auth_token,
             server_id)
@@ -372,7 +425,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     def add_lb(server):
         ip_address = private_ip_addresses(server)[0]
         lbd = add_to_load_balancers(
-            lb_endpoint, auth_token, lb_config, ip_address, undo)
+            ilog[0], lb_endpoint, auth_token, lb_config, ip_address, undo)
         lbd.addCallback(lambda lb_response: (server, lb_response))
         return lbd
 
@@ -393,7 +446,8 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     return d
 
 
-def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
+def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
+                              node_id, clock=None):
     """
     Remove a node from a load balancer.
 
@@ -403,13 +457,50 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     :param str node_id: The ID for a node in that cloudloadbalancer.
 
     :returns: A Deferred that fires with None if the operation completed successfully,
-        or errbacks with an APIError.
+        or errbacks with an RequestError.
     """
+    lb_log = log.bind(loadbalancer_id=loadbalancer_id, node_id=node_id)
+    # TODO: Will remove this once LB ERROR state is fixed and it is working fine
+    lb_log.msg('Removing from load balancer')
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
-    d = treq.delete(path, headers=headers(auth_token))
-    d.addCallback(check_success, [200, 202])
-    d.addErrback(wrap_request_error, path, 'remove')
-    d.addCallback(lambda _: None)
+
+    def check_422_deleted(failure):
+        # A LB being deleted sometimes results in a 422.  This function
+        # unfortunately has to parse the body of the message to see if this is an
+        # acceptable 422 (if the LB has been deleted or the node has already been
+        # removed, then 'removing from load balancer' as a task should be
+        # successful - if the LB is in ERROR, then nothing more can be done to
+        # it except resetting it - may as well remove the server.)
+        failure.trap(APIError)
+        error = failure.value
+        if error.code == 422:
+            message = json.loads(error.body)['message']
+            if ('load balancer is deleted' not in message and
+                    'PENDING_DELETE' not in message):
+                return failure
+            lb_log.msg(message)
+        else:
+            return failure
+
+    def remove():
+        d = treq.delete(path, headers=headers(auth_token), log=lb_log)
+
+        # Success is 200/202.  An LB not being found is 404.  A node not being
+        # found is a 404.  But a deleted LB sometimes results in a 422.
+        d.addCallback(log_on_response_code, lb_log, 'Node to delete does not exist', 404)
+        d.addCallback(check_success, [200, 202, 404])
+        d.addCallback(treq.content)  # To avoid https://twistedmatrix.com/trac/ticket/6751
+        d.addErrback(check_422_deleted)
+        d.addErrback(log_lb_unexpected_errors, path, lb_log, 'remove_node')
+        return d
+
+    d = retry(
+        remove,
+        can_retry=retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES),
+        next_interval=random_interval(
+            *(config_value('worker.lb_retry_interval_range') or LB_RETRY_INTERVAL_RANGE)),
+        clock=clock)
+    d.addCallback(lambda _: lb_log.msg('Removed from load balancer'))
     return d
 
 
@@ -439,17 +530,9 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
 
-    log.msg("Looking for load balancer endpoint: %(service_name)s",
-            service_name=cloudLoadBalancers,
-            region=lb_region)
-
     lb_endpoint = public_endpoint_url(service_catalog,
                                       cloudLoadBalancers,
                                       lb_region)
-
-    log.msg("Looking for cloud servers endpoint: %(service_name)s",
-            service_name=cloudServersOpenStack,
-            region=region)
 
     server_endpoint = public_endpoint_url(service_catalog,
                                           cloudServersOpenStack,
@@ -462,7 +545,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
           for (loadbalancer_id, node_details) in loadbalancer_details])
 
     d = gatherResults(
-        [remove_from_load_balancer(lb_endpoint, auth_token, loadbalancer_id, node_id)
+        [remove_from_load_balancer(log, lb_endpoint, auth_token, loadbalancer_id, node_id)
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
@@ -476,15 +559,12 @@ def verified_delete(log,
                     server_endpoint,
                     auth_token,
                     server_id,
-                    interval=5,
+                    interval=10,
                     timeout=3660,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
-    deleted by trying again until getting the server results in a 404.
-
-    There is a possibility Nova sometimes fails to delete servers.  Log if this
-    happens, and if so, re-evaluate workarounds.
+    deleted by trying again until deleting the server results in a 404.
 
     Time out attempting to verify deletes after a period of time and log an
     error.
@@ -502,43 +582,37 @@ def verified_delete(log,
 
     :return: Deferred that fires when the expected status has been seen.
     """
-    del_log = log.bind(instance_id=server_id)
-    del_log.msg('Deleting server')
+    serv_log = log.bind(server_id=server_id)
+    serv_log.msg('Deleting server')
 
     path = append_segments(server_endpoint, 'servers', server_id)
-    d = treq.delete(path, headers=headers(auth_token))
-    d.addCallback(check_success, [204])
-    d.addErrback(wrap_request_error, path, 'server_delete')
 
     if clock is None:  # pragma: no cover
         from twisted.internet import reactor
         clock = reactor
 
-    def verify(_):
-        def check_status():
-            check_d = treq.head(
-                append_segments(server_endpoint, 'servers', server_id),
-                headers=headers(auth_token))
-            check_d.addCallback(check_success, [404])
-            return check_d
+    # just delete over and over until a 404 is received
+    def delete():
+        del_d = treq.delete(path, headers=headers(auth_token), log=serv_log)
+        del_d.addCallback(check_success, [404])
+        del_d.addCallback(treq.content)
+        return del_d
 
-        start_time = clock.seconds()
+    start_time = clock.seconds()
 
-        timeout_description = (
-            "Waiting for Nova to actually delete server {0}".format(server_id))
+    timeout_description = (
+        "Waiting for Nova to actually delete server {0}".format(server_id))
 
-        verify_d = retry_and_timeout(check_status, timeout,
-                                     next_interval=repeating_interval(interval),
-                                     clock=clock,
-                                     deferred_description=timeout_description)
+    d = retry_and_timeout(delete, timeout,
+                          next_interval=repeating_interval(interval),
+                          clock=clock,
+                          deferred_description=timeout_description)
 
-        def on_success(_):
-            time_delete = clock.seconds() - start_time
-            del_log.msg('Server deleted successfully: {time_delete} seconds.',
-                        time_delete=time_delete)
+    def on_success(_):
+        time_delete = clock.seconds() - start_time
+        serv_log.msg('Server deleted successfully: {time_delete} seconds.',
+                     time_delete=time_delete)
 
-        verify_d.addCallback(on_success)
-        verify_d.addErrback(del_log.err)
-
-    d.addCallback(verify)
+    d.addCallback(on_success)
+    d.addErrback(serv_log.err)
     return d
