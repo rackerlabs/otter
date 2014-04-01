@@ -29,7 +29,8 @@
     },
     "worker": {
         "lb_max_retries": 10,
-        "lb_retry_interval": 10
+        "lb_retry_interval_range": [10, 15]
+        "lb_delete_timeout": 600
     },
     "limits": {
         "pagination": 100,
@@ -38,5 +39,10 @@
           "maxPoliciesPerGroup": 100,
           "maxWebhooksPerPolicy": 25
         }
+    },
+    "root": {
+      "code": 301,
+      "headers": ["http://autoscale.api.rackspacecloud.com"],
+      "body": "Moved to http://autoscale.api.rackspacecloud.com"
     }
 }

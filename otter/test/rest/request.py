@@ -83,7 +83,7 @@ def request(root_resource, method, endpoint, headers=None, body=None):
     def _twisted_compat(name, value):
         if not isinstance(name, str) or not isinstance(value, str):
             raise TypeError("Can only pass-through bytes on Python 2")
-        mock_request.responseHeaders.setRawHeaders(name, [value])
+        mock_request.responseHeaders.addRawHeader(name, value)
 
     mock_request.setHeader.side_effect = _twisted_compat
 
@@ -237,20 +237,38 @@ class RequestTestMixin(object):
 
         :return: the response body as a string
         """
-        if root is None:
-            if not hasattr(self, 'root'):
-                root = Otter(iMock(IScalingGroupCollection)).app.resource()
-            else:
-                root = self.root
-
-        response_wrapper = self.successResultOf(
-            request(root, method, endpoint or self.endpoint, body=body))
+        response_wrapper = self.request(endpoint, method, body, root)
 
         self.assert_response(response_wrapper, expected_status)
         if location is not None:
             self.assertEqual(self.get_location_header(response_wrapper),
                              location)
         return response_wrapper.content
+
+    def request(self, endpoint=None, method="GET", body="", root=None):
+        """
+        Make a pretend request to otter
+
+        :param endpoint: what the URI in the request should be
+        :type endpoint: ``string``
+
+        :param method: what method the request should use: "GET", "DELETE",
+            "POST", or "PUT"
+        :type method: ``string``
+
+        :param body: what the request body should contain
+        :type body: ``string``
+
+        :return: :class:`ResponseWrapper`
+        """
+        if root is None:
+            if not hasattr(self, 'root'):
+                root = Otter(iMock(IScalingGroupCollection)).app.resource()
+            else:
+                root = self.root
+
+        return self.successResultOf(
+            request(root, method, endpoint or self.endpoint, body=body))
 
 
 class RestAPITestMixin(RequestTestMixin):

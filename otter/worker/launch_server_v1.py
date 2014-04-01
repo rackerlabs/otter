@@ -31,13 +31,13 @@ from otter.util.http import (append_segments, headers, check_success,
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
-                              TransientRetryError)
+                              TransientRetryError, random_interval)
 
 # Number of times to retry when adding/removing nodes from LB
 LB_MAX_RETRIES = 10
 
-# Interval between subsequent retries
-LB_RETRY_INTERVAL = 10
+# Range from which random retry interval is got
+LB_RETRY_INTERVAL_RANGE = [10, 15]
 
 
 class UnexpectedServerStatus(Exception):
@@ -231,8 +231,8 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
     d = retry(
         add,
         can_retry=retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES),
-        next_interval=repeating_interval(
-            config_value('worker.lb_retry_interval') or LB_RETRY_INTERVAL),
+        next_interval=random_interval(
+            *(config_value('worker.lb_retry_interval_range') or LB_RETRY_INTERVAL_RANGE)),
         clock=clock)
 
     def when_done(result):
@@ -494,7 +494,12 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
         d.addErrback(log_lb_unexpected_errors, path, lb_log, 'remove_node')
         return d
 
-    d = remove()
+    d = retry(
+        remove,
+        can_retry=retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES),
+        next_interval=random_interval(
+            *(config_value('worker.lb_retry_interval_range') or LB_RETRY_INTERVAL_RANGE)),
+        clock=clock)
     d.addCallback(lambda _: lb_log.msg('Removed from load balancer'))
     return d
 
