@@ -42,7 +42,7 @@ class PartitionProtocolTests(TestCase):
 
     def test_delimiter(self):
         """
-        Delimiter is '\n'
+        Delimiter is r"""\n""""
         """
         self.assertEqual(self.proto.delimiter, '\n')
 
