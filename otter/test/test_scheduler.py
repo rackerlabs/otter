@@ -100,7 +100,7 @@ class PartitionProtocolTests(TestCase):
 
     def test_disconnect(self):
         """
-        disconnect() will call tr.loseConnection() and set disconnecting=False
+        disconnect() will call tr.loseConnection() and set disconnecting=True
         """
         # Cannot use self.tr since PartitionProtocol is explicitly setting tr.disconnecting=True
         # on loseConnection() but we want to check if disconnecting is explicitly set
@@ -111,7 +111,7 @@ class PartitionProtocolTests(TestCase):
 
     def test_conn_made(self):
         """
-        connectionMade() will set transport.disconnecting to True
+        connectionMade() will set transport.disconnecting to False
         """
         # setting it to something to test if it is changed in connectionMade()
         self.tr.disconnecting = 2
