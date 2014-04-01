@@ -35,10 +35,10 @@ class ListWebhookManifest(ScalingGroupPolicyFixture):
         """
         Verify the manifest call for response code 200, headers and data
         """
-        params = ["true", "tRuE"]
+        params = ["true", "tRuE", True]
         for param in params:
             list_manifest_resp = \
-                self.autoscale_client.view_manifest_config_for_scaling_group_with_webhooks(
+                self.autoscale_client.view_manifest_config_for_scaling_group(
                     self.group.id,
                     webhooks=param)
             list_manifest = list_manifest_resp.entity
@@ -46,9 +46,6 @@ class ListWebhookManifest(ScalingGroupPolicyFixture):
                               msg='List scaling group manifest returns response {0} for group'
                               ' {1}'.format(list_manifest_resp.status_code, self.group.id))
             self.validate_headers(list_manifest_resp.headers)
-            policy_ids = []
-            for policy in list_manifest.scalingPolicies:
-                policy_ids.append(policy.id)
             self.assertEqual(list_manifest.id, self.group.id,
                              msg='Group id did not match for group '
                              '{0}'.format(self.group.id))
@@ -71,7 +68,7 @@ class ListWebhookManifest(ScalingGroupPolicyFixture):
         params = [None, "False", 15, "Tr@%"]
         for param in params:
             list_manifest_resp = \
-                self.autoscale_client.view_manifest_config_for_scaling_group_with_webhooks(
+                self.autoscale_client.view_manifest_config_for_scaling_group(
                     self.group.id,
                     webhooks=param)
             list_manifest = list_manifest_resp.entity

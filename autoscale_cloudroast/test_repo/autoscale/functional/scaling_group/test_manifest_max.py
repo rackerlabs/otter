@@ -31,8 +31,8 @@ class GetMaxManifest(ScalingGroupFixture):
             manifest_dict[p_id] = sorted(webhook_ids)  # Sort webhooks to verify against rx'd manifest
         # Issues the manifest query, capture resluts, and compare
         list_manifest_resp = \
-            self.autoscale_client.view_manifest_config_for_scaling_group_with_webhooks(
-                self.group.id)
+            self.autoscale_client.view_manifest_config_for_scaling_group(
+                self.group.id, webhooks="True")
         list_manifest = list_manifest_resp.entity
         actual_ids = {}
         for policy in list_manifest.scalingPolicies:
