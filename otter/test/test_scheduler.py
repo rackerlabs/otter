@@ -230,7 +230,7 @@ class MostSchedulerServiceTests(SchedulerServiceTests):
         # So that it cannot be operated on
         self.sservice.proc_protocol = mock.Mock(spec=[])
 
-        # Simulate service running and call `process_stopped`
+        # Simulate service stopping and call `process_stopped`
         self.sservice.running = False
         self.sservice.process_stopped(Failure(ValueError(2)))
 
