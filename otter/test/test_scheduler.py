@@ -42,7 +42,7 @@ class PartitionProtocolTests(TestCase):
 
     def test_delimiter(self):
         """
-        Delimiter is r"""\n""""
+        Delimiter is newline
         """
         self.assertEqual(self.proto.delimiter, '\n')
 
@@ -158,9 +158,10 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         self.clock = Clock()
         self.reactor = MemoryProcessReactor()
+        patch(self, 'otter.scheduler.procutils', which=mock.Mock(return_value='pyexe'))
         self.sservice = SchedulerService(
             100, 1, self.mock_store, self.zk_hosts, self.zk_partition_path,
-            self.time_boundary, self.buckets, self.reactor, 'thread',
+            self.time_boundary, self.buckets, self.reactor, 'thread', 'part_script',
             clock=self.clock, threshold=60)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
 
@@ -193,11 +194,11 @@ class MostSchedulerServiceTests(SchedulerServiceTests):
         d = self.sservice.start_process()
         self.assertIsNone(self.successResultOf(d))
         # Check if process was spawned
-        self.assertEqual(self.reactor.executable, self.sservice.python_exe)
+        self.assertEqual(self.reactor.executable, 'pyexe')
         self.assertEqual(
             self.reactor.args,
-            [self.sservice.python_exe, self.sservice.partition_py_path,
-             'thread', '127.0.0.1:2181', '/part_path', '1,2,3', '15', '1'])
+            ['pyexe', 'part_script', 'thread', '127.0.0.1:2181',
+             '/part_path', '1,2,3', '15', '1'])
         self.assertEqual(self.reactor.env, None)
         # proc_protocol was set
         self.assertIsInstance(self.sservice.proc_protocol, PartitionProtocol)
@@ -274,8 +275,7 @@ class MostSchedulerServiceTests(SchedulerServiceTests):
         # starts new process with new path
         self.assertEqual(
             self.reactor.args,
-            [self.sservice.python_exe, self.sservice.partition_py_path,
-             'thread', '127.0.0.1:2181', '/new_path', '1,2,3', '15', '1'])
+            ['pyexe', 'part_script', 'thread', '127.0.0.1:2181', '/new_path', '1,2,3', '15', '1'])
 
     def test_reset_ignore(self):
         """
@@ -290,8 +290,7 @@ class MostSchedulerServiceTests(SchedulerServiceTests):
         # starts new process with new path
         self.assertEqual(
             self.reactor.args,
-            [self.sservice.python_exe, self.sservice.partition_py_path,
-             'thread', '127.0.0.1:2181', '/new_path', '1,2,3', '15', '1'])
+            ['pyexe', 'part_script', 'thread', '127.0.0.1:2181', '/new_path', '1,2,3', '15', '1'])
         self.assertNotEqual(self.sservice.proc_protocol, prot)
 
     def test_set_buckets(self):

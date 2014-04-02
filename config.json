@@ -25,7 +25,8 @@
         "kz_handler": "thread",
         "partition": {
             "path": "/scheduler_partition",
-            "time_boundary": 15
+            "time_boundary": 15,
+            "script_path": "otter/partition.py"
         }
     },
     "worker": {

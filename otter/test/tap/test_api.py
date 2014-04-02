@@ -532,7 +532,8 @@ class SchedulerSetupTests(TestCase):
         self.config = {
             'scheduler': {
                 'buckets': 10,
-                'partition': {'path': '/part_path', 'time_boundary': 15},
+                'partition': {'path': '/part_path', 'time_boundary': 15,
+                              'script_path': 'sp'},
                 'batchsize': 100,
                 'interval': 10,
                 'kz_handler': 'thread'
@@ -559,7 +560,7 @@ class SchedulerSetupTests(TestCase):
         self.store.set_scheduler_buckets.assert_called_once_with(buckets)
         self.sservice.assert_called_once_with(
             100, 10, self.store, self.kz_client, '/part_path', 15, buckets,
-            reactor, 'thread')
+            reactor, 'thread', 'sp')
         self.sservice.return_value.setServiceParent.assert_called_once_with(self.parent)
         self.assertEqual(s, self.sservice.return_value)
 

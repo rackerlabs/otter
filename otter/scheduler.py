@@ -15,6 +15,7 @@ from twisted.application.service import Service
 from twisted.internet.protocol import ClientFactory
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.internet.endpoints import ProcessEndpoint
+from twisted.python import procutils
 
 from otter.util.hashkey import generate_transaction_id
 from otter.controller import maybe_execute_scaling_policy, CannotExecutePolicyError
@@ -60,7 +61,7 @@ class SchedulerService(Service):
 
     def __init__(self, batchsize, interval, store, zk_hosts,
                  zk_partition_path, time_boundary, buckets, reactor,
-                 kz_handler, clock=None, threshold=60):
+                 kz_handler, part_script_path, clock=None, threshold=60):
         """
         Initialize the scheduler service
 
@@ -89,10 +90,10 @@ class SchedulerService(Service):
         self.time_boundary = time_boundary
         self.proc_protocol = None
         self.threshold = threshold
+        self.partition_py_path = part_script_path
 
-        # TODO: These 2 should probably come from env/config
-        self.python_exe = 'python'
-        self.partition_py_path = 'otter/partition.py'
+        # TODO: This should probably come from env/config
+        self.python_exe = procutils.which('python')
 
         self.log = otter_log.bind(system='otter.scheduler')
 
