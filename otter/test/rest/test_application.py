@@ -475,3 +475,29 @@ class HealthCheckTestCase(RestAPITestMixin, TestCase):
 
         resp = self.assert_status_code(200)
         self.assertEqual(resp, json.dumps({'blargh': 'boo'}))
+
+
+class SchedulerResetTests(RestAPITestMixin, TestCase):
+    """
+    Tests that the scheduler reset endpoint resets the scheduler with new path
+    """
+    endpoint = "/scheduler_reset"
+    invalid_methods = ("DELETE", "PUT", "GET")
+
+    def setUp(self):
+        """
+        Sample scheduler
+        """
+        super(SchedulerResetTests, self).setUp()
+        self.reset = mock.Mock()
+        self.root = Otter(self.mock_store, scheduler_reset=self.reset).app.resource()
+
+    def test_delegates(self):
+        """
+        Calls scheduler.reset with new path
+        """
+        #resp = self.assert_status_code(200, method='POST', body='path=/new_path')
+        resp = self.assert_status_code(200, method='POST',
+                                       endpoint=self.endpoint + '?path=/new_path')
+        self.assertEqual(resp, '')
+        self.reset.assert_called_once_with('/new_path')
