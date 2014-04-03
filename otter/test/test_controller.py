@@ -615,8 +615,8 @@ class ObeyConfigChangeTestCase(TestCase):
 
     def test_uses_provided_launch_config_on_scale_up_if_provided(self):
         """
-        When a scale-up needs to happen, if the launch config provided, it is
-        used and view launch config is not called
+        When a scale-up needs to happen, if the launch config is provided, it is
+        used and ``view_launch_config`` is not called
         """
         self.calculate_delta.return_value = 5
         d = controller.obey_config_change(self.log, 'transaction-id',
