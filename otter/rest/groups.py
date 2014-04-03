@@ -325,9 +325,11 @@ class OtterGroups(object):
         def _do_obey_config_change(result):
             group_id = result['id']
             config = result['groupConfiguration']
+            launch = result['launchConfiguration']
             group = self.store.get_scaling_group(self.log, self.tenant_id, group_id)
-            d = group.modify_state(partial(controller.obey_config_change, self.log,
-                                           transaction_id(request), config))
+            d = group.modify_state(partial(
+                controller.obey_config_change, self.log,
+                transaction_id(request), config, launch_config=launch))
             return d.addCallback(lambda _: result)
 
         deferred.addCallback(_do_obey_config_change)

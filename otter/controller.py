@@ -95,7 +95,8 @@ def _do_convergence_audit_log(_, log, delta, state):
     return state
 
 
-def obey_config_change(log, transaction_id, config, scaling_group, state):
+def obey_config_change(log, transaction_id, config, scaling_group, state,
+                       launch_config=None):
     """
     Given the config change, do servers need to be started or deleted
 
@@ -104,6 +105,7 @@ def obey_config_change(log, transaction_id, config, scaling_group, state):
     :param log: A twiggy bound log for logging
     :param str transaction_id: the transaction id
     :param dict config: the scaling group config
+    :param dict launch_config: the scaling group launch config
     :param scaling_group: an IScalingGroup provider
     :param state: a :class:`otter.models.interface.GroupState` representing the
         state
@@ -120,10 +122,15 @@ def obey_config_change(log, transaction_id, config, scaling_group, state):
     if delta == 0:
         return defer.succeed(state)
     elif delta > 0:
-        deferred = scaling_group.view_launch_config()
-        deferred.addCallback(partial(execute_launch_config, bound_log,
-                                     transaction_id, state,
-                                     scaling_group=scaling_group, delta=delta))
+        if launch_config is not None:
+            deferred = execute_launch_config(bound_log, transaction_id, state,
+                                             launch_config, scaling_group,
+                                             delta)
+        else:
+            deferred = scaling_group.view_launch_config()
+            deferred.addCallback(partial(
+                execute_launch_config, bound_log, transaction_id, state,
+                scaling_group=scaling_group, delta=delta))
     else:
         # delta < 0 (scale down)
         deferred = exec_scale_down(bound_log, transaction_id, state,
