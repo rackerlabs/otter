@@ -8,19 +8,9 @@ class AuditLogBasicsTest(AutoscaleFixture):
     """
     Verify the following basic audit log behaviors:
         1.) Using GET on /tenantid/history returns 200 and result OK
-        TODO: 2.) Entry pagination
-        TODO: 3.) Only events for the given tenant ID are shown (information security)
-        TODO: 4.) Transaction ID is unique?
-            (Confirm if this is true? ex. multiple deletes as part of one transaction)
-        TODO 5.) log entries still present after group is deleted? (might be in different category)
-        TODO: Question: Are all log entries tied to a specific scaling group?
-              (i.e. are there tenant level events?)
-
-    Prerequisites:
-        1.) Tenant ID for an account with audit logging
-
-
+        2.) Each entry has the following fields: timestamp, message, event_type, scaling_group_id
     """
+
     @classmethod
     def setUpClass(cls):
         """
@@ -35,8 +25,6 @@ class AuditLogBasicsTest(AutoscaleFixture):
         cls.third_scaling_group = third_group.entity
         # Delete the first scaling group for variety
         cls.autoscale_client.delete_scaling_group(cls.first_scaling_group.id)
-        # cls.resources.add(cls.first_scaling_group.id,
-        #                   cls.autoscale_client.delete_scaling_group)
         cls.resources.add(cls.second_scaling_group.id,
                           cls.autoscale_client.delete_scaling_group)
         cls.resources.add(cls.third_scaling_group.id,
