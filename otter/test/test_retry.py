@@ -8,8 +8,8 @@ from twisted.internet.defer import CancelledError, Deferred, succeed
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
 
-from otter.util.retry import (retry, repeating_interval, transient_errors_except,
-                              retry_times, compose_retries)
+from otter.util.retry import (retry, repeating_interval, random_interval,
+                              transient_errors_except, retry_times, compose_retries)
 from otter.test.utils import CheckFailure, DummyException
 
 
@@ -343,3 +343,17 @@ class NextIntervalHelperTests(TestCase):
         next_interval = repeating_interval(3)
         for exception in (DummyException(), NotImplementedError()):
             self.assertEqual(next_interval(Failure(exception)), 3)
+
+    def test_random_interval(self):
+        """
+        ``random_interval`` returns the different random interval each time it
+        is called
+        """
+        next_interval = random_interval(5, 10)
+        intervals = set()
+        for exception in [DummyException(), NotImplementedError(), ValueError(),
+                          FloatingPointError(), IOError()]:
+            interval = next_interval(exception)
+            self.assertTrue(5 <= interval <= 10)
+            self.assertNotIn(interval, intervals)
+            intervals.add(interval)

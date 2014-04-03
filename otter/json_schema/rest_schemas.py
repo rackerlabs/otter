@@ -162,12 +162,41 @@ list_groups_response = _openstackify_schema("groups", _list_of_states,
                                             paginated=True, include_id=True)
 
 
+# ----- schemas for viewing webhooks
+_view_webhook = deepcopy(webhook)
+_view_webhook['properties']['metadata']['required'] = True
+
+view_webhook_response = _openstackify_schema("webhook", _view_webhook,
+                                             include_id=True)
+_list_of_webhooks = {
+    "type": "array",
+    "items": view_webhook_response["properties"]["webhook"],
+    "uniqueItems": True
+}
+
+list_webhooks_response = _openstackify_schema(
+    "webhooks", _list_of_webhooks, paginated=True)
+
+create_webhooks_request = {
+    "type": "array",
+    "description": "Schema of the JSON used to create webhooks",
+    "items": webhook,
+    "minItems": 1,
+    "maxItems": _max_batch_creates
+}
+
+create_webhooks_response = _openstackify_schema("webhooks", _list_of_webhooks)
+
+
 # ----- schemas for viewing policies
 view_policy = deepcopy(policy)
 view_policy["properties"].update(_link_objects["properties"])
 for type_blob in view_policy["type"]:
     type_blob["properties"].update(_link_objects["properties"])
-
+    for prop in ['webhooks', 'webhooks_links']:
+        prop_value = deepcopy(list_webhooks_response['properties'][prop])
+        prop_value['required'] = False
+        type_blob['properties'][prop] = prop_value
 
 _view_policies_list = {
     "type": "array",
@@ -233,29 +262,3 @@ create_and_manifest_response = _openstackify_schema("group", {
 # ----- schemas for viewing configs
 view_config = _openstackify_schema("groupConfiguration", config)
 view_launch_config = _openstackify_schema("launchConfiguration", launch_config)
-
-
-# ----- schemas for viewing webhooks
-_view_webhook = deepcopy(webhook)
-_view_webhook['properties']['metadata']['required'] = True
-
-view_webhook_response = _openstackify_schema("webhook", _view_webhook,
-                                             include_id=True)
-_list_of_webhooks = {
-    "type": "array",
-    "items": view_webhook_response["properties"]["webhook"],
-    "uniqueItems": True
-}
-
-list_webhooks_response = _openstackify_schema(
-    "webhooks", _list_of_webhooks, paginated=True)
-
-create_webhooks_request = {
-    "type": "array",
-    "description": "Schema of the JSON used to create webhooks",
-    "items": webhook,
-    "minItems": 1,
-    "maxItems": _max_batch_creates
-}
-
-create_webhooks_response = _openstackify_schema("webhooks", _list_of_webhooks)

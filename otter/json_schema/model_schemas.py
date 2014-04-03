@@ -25,34 +25,6 @@ _id = {
 }
 
 
-policy = deepcopy(group_schemas.policy)
-policy['properties']['id'] = _id
-for _policy_type in policy['type']:
-    _policy_type['properties']['id'] = {}
-
-policy_list = {
-    "type": "array",
-    "items": policy,
-    "uniqueItems": True,
-    "required": True
-}
-
-
-# create group and view manifest returns a dictionary with keys being the ids
-manifest = {
-    "type": "object",
-    "description": "Schema returned by the interface for viewing a manifest",
-    "properties": {
-        "id": _id,
-        "state": {},
-        "groupConfiguration": group_schemas.config,
-        "launchConfiguration": group_schemas.launch_config,
-        "scalingPolicies": policy_list
-    },
-    "additionalProperties": False
-}
-
-
 webhook = deepcopy(group_schemas.webhook)
 webhook['properties']['id'] = _id
 webhook['properties']['metadata']['required'] = True
@@ -82,4 +54,34 @@ webhook_list = {
     "items": webhook,
     "uniqueItems": True,
     "required": True
+}
+
+
+policy = deepcopy(group_schemas.policy)
+policy['properties']['id'] = _id
+for _policy_type in policy['type']:
+    _policy_type['properties']['id'] = {}
+    _policy_type['properties']['webhooks'] = webhook_list
+    _policy_type['properties']['webhooks']['required'] = False
+
+policy_list = {
+    "type": "array",
+    "items": policy,
+    "uniqueItems": True,
+    "required": True
+}
+
+
+# create group and view manifest returns a dictionary with keys being the ids
+manifest = {
+    "type": "object",
+    "description": "Schema returned by the interface for viewing a manifest",
+    "properties": {
+        "id": _id,
+        "state": {},
+        "groupConfiguration": group_schemas.config,
+        "launchConfiguration": group_schemas.launch_config,
+        "scalingPolicies": policy_list
+    },
+    "additionalProperties": False
 }

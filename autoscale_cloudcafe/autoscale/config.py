@@ -256,6 +256,20 @@ class AutoscaleConfig(ConfigSectionInterface):
         return self.get('load_balancer_endpoint_name')
 
     @property
+    def lbaas_region_override(self):
+        """
+        load balancer region in the service catalog
+        """
+        return self.get('lbaas_region_override', None)
+
+    @property
+    def server_region_override(self):
+        """
+        server region in the service catalog
+        """
+        return self.get('server_region_override', None)
+
+    @property
     def non_autoscale_username(self):
         """
         Test username without autoscale endpoint in its service catalog

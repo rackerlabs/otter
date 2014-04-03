@@ -19,10 +19,11 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    InvalidQueryArgument)
 from otter.rest.errors import exception_codes
 from otter.rest.policies import OtterPolicies, linkify_policy_list
+from otter.rest.webhooks import _format_webhook
 from otter.rest.errors import InvalidMinEntities
 from otter.rest.otterapp import OtterApp
 from otter.util.http import (get_autoscale_links, transaction_id, get_groups_links,
-                             get_policies_links)
+                             get_policies_links, get_webhooks_links)
 from otter.rest.bobby import get_bobby
 
 
@@ -440,16 +441,31 @@ class OtterGroup(object):
                 }
             }
         """
+        def with_webhooks(_request):
+            return ('webhooks' in _request.args and
+                    _request.args['webhooks'][0].lower() == 'true')
+
+        def add_webhooks_links(policies, gid):
+            for policy in policies:
+                webhook_list = [_format_webhook(webhook_model, self.tenant_id,
+                                                gid, policy['id'])
+                                for webhook_model in policy['webhooks']]
+                policy['webhooks'] = webhook_list
+                policy['webhooks_links'] = get_webhooks_links(
+                    webhook_list, self.tenant_id, gid, policy['id'], rel='webhooks')
+
         def openstack_formatting(data, uuid):
             data["links"] = get_autoscale_links(self.tenant_id, uuid)
             data["state"] = format_state_dict(data["state"])
             linkify_policy_list(data["scalingPolicies"], self.tenant_id, uuid)
             data['scalingPolicies_links'] = get_policies_links(
                 data['scalingPolicies'], self.tenant_id, uuid, rel='policies')
+            if with_webhooks(request):
+                add_webhooks_links(data["scalingPolicies"], uuid)
             return {"group": data}
 
         group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
-        deferred = group.view_manifest()
+        deferred = group.view_manifest(with_webhooks(request))
         deferred.addCallback(openstack_formatting, group.uuid)
         deferred.addCallback(json.dumps)
         return deferred

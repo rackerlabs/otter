@@ -119,6 +119,8 @@ _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE '
 _cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} '
                      'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
                      '"policyId" = :policyId;')
+_cql_list_all_in_group = ('SELECT * FROM {cf} WHERE "tenantId" = :tenantId '
+                          'AND "groupId" = :groupId {order_by};')
 
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
@@ -394,6 +396,40 @@ def _unmarshal_state(state_dict):
     )
 
 
+def assemble_webhooks_in_policies(policies, webhooks):
+    """
+    Assemble webhooks inside policies. 'webhooks' property will be added to
+    each policy `dict` in `policies`. It will be list of webhooks taken from `webhooks`
+
+    :param policies: list of policy `dict` sorted based on 'id' based on `group_schemas.policy`
+    :param webhooks: list of webhook `dict` sorted based on 'policyId' and 'webhookId'
+                     based on `model_schemas.webhook`
+
+    :return: policies with webhooks in them
+    """
+    # Assuming policies and webhooks are sorted based on policyId and
+    # (policyId, webhookId) respectively
+    iwebhooks = iter(webhooks)
+    ipolicies = iter(policies)
+    try:
+        webhook = iwebhooks.next()
+        policy = ipolicies.next()
+        while True:
+            policy.setdefault('webhooks', [])
+            if policy['id'] == webhook['policyId']:
+                policy['webhooks'].append(
+                    _assemble_webhook_from_row(webhook, include_id=True))
+                webhook = iwebhooks.next()
+            elif policy['id'] < webhook['policyId']:
+                policy = ipolicies.next()
+            else:
+                webhook = iwebhooks.next()
+    except StopIteration:
+        # Add empty webhooks for remaining policies
+        [p.update({'webhooks': []}) for p in ipolicies]
+    return policies
+
+
 def verified_view(connection, view_query, del_query, data, consistency, exception_if_empty, log):
     """
     Ensures the view query does not get resurrected row, i.e. one that does not have "created_at" in it.
@@ -460,24 +496,32 @@ class CassScalingGroup(object):
         self.webhooks_table = "policy_webhooks"
         self.event_table = "scaling_schedule_v2"
 
-    def view_manifest(self):
+    def view_manifest(self, with_webhooks=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
         def _get_policies(group):
-            """
-            Now that we know the group exists, get its policies
-            """
-            limit = config_value('limits.pagination') or 100
-            d = self._naive_list_policies(limit=limit)
-            d.addCallback(lambda policies: {
+            d = self._naive_list_policies()
+            return d.addCallback(lambda policies: (group, policies))
+
+        def _get_policies_and_webhooks(group):
+            d = defer.gatherResults(
+                [self._naive_list_policies(),
+                 self._naive_list_all_webhooks()], consumeErrors=True)
+            return d.addCallback(lambda results: (group, results))
+
+        def _assemble_webhooks((group, results)):
+            policies, webhooks = results
+            return group, assemble_webhooks_in_policies(policies, webhooks)
+
+        def _generate_manifest((group, policies)):
+            return {
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'scalingPolicies': policies,
                 'id': self.uuid,
                 'state': _unmarshal_state(group)
-            })
-            return d
+            }
 
         view_query = _cql_view_manifest.format(cf=self.group_table)
         del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
@@ -486,7 +530,12 @@ class CassScalingGroup(object):
                            "groupId": self.uuid},
                           get_consistency_level('view', 'group'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
-        d.addCallback(_get_policies)
+        if with_webhooks:
+            d.addCallback(_get_policies_and_webhooks)
+            d.addCallback(_assemble_webhooks)
+        else:
+            d.addCallback(_get_policies)
+        d.addCallback(_generate_manifest)
         return d
 
     def view_config(self):
@@ -758,6 +807,18 @@ class CassScalingGroup(object):
         d.addCallback(_do_delete)
         return d
 
+    def _naive_list_all_webhooks(self):
+        """
+        List all webhooks of a group. Does not check if group exists and
+        does not paginate
+        """
+        d = self.connection.execute(
+            _cql_list_all_in_group.format(cf=self.webhooks_table,
+                                          order_by='ORDER BY "groupId", "policyId", "webhookId"'),
+            {'tenantId': self.tenant_id, 'groupId': self.uuid},
+            get_consistency_level('list', 'webhook'))
+        return d
+
     def _naive_list_webhooks(self, policy_id, limit, marker):
         """
         Like :meth:`otter.models.cass.CassScalingGroup.list_webhooks`, but gets
@@ -984,6 +1045,7 @@ class CassScalingGroupCollection:
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
         self.webhooks_table = "policy_webhooks"
+        self.webhook_keys_table = "webhook_keys"
         self.state_table = "group_state"
         self.event_table = "scaling_schedule_v2"
         self.buckets = None
@@ -1165,6 +1227,37 @@ class CassScalingGroupCollection:
     def webhook_info_by_hash(self, log, capability_hash):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`
+        """
+        d = self._webhook_info_from_table(log, capability_hash)
+
+        def not_found(f):
+            if not f.check(UnrecognizedCapabilityError):
+                log.err(f, 'Error getting webhook info from table')
+            return self._webhook_info_by_index(log, capability_hash)
+
+        d.addErrback(not_found)
+        return d
+
+    def _webhook_info_from_table(self, log, capability_hash):
+        """
+        Get webhook info based on hash by using the new webhook_keys table
+        """
+        d = self.connection.execute(
+            _cql_find_webhook_token.format(cf=self.webhook_keys_table),
+            {"webhookKey": capability_hash}, get_consistency_level('list', 'policy'))
+
+        def extract_info(rows):
+            if len(rows) == 0:
+                raise UnrecognizedCapabilityError(capability_hash, 1)
+            r = rows[0]
+            return (r['tenantId'], r['groupId'], r['policyId'])
+
+        d.addCallback(extract_info)
+        return d
+
+    def _webhook_info_by_index(self, log, capability_hash):
+        """
+        Get webhook info based on hash by using the INDEX
         """
         def _do_webhook_lookup(webhook_rec):
             res = webhook_rec

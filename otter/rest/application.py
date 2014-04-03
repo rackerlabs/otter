@@ -11,6 +11,8 @@ from otter.rest.webhooks import OtterExecute
 from otter.rest.limits import OtterLimits
 from otter.rest.history import OtterHistory
 
+from otter.util.config import config_value
+
 Request.defaultContentType = 'application/json'
 
 
@@ -25,13 +27,27 @@ class Otter(object):
         self.health_check_function = health_check_function
         self.scheduler_reset = scheduler_reset
 
-    @app.route('/')
+    @app.route('/', methods=['GET'])
     def base(self, request):
         """
         base root route.
 
-        :returns: Empty string
+        :returns: Whatever is configured to be returned by the root
         """
+        code = config_value('root.code')
+        if code is not None:
+            request.setResponseCode(code)
+
+        headers = config_value('root.headers')
+        if headers is not None:
+            for header in headers:
+                for value in headers[header]:
+                    request.setHeader(str(header), str(value))
+
+        body = config_value('root.body')
+        if body is not None:
+            return body
+
         return ''
 
     @app.route('/v1.0/<string:tenant_id>/groups/', branch=True)

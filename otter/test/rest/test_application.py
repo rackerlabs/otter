@@ -14,6 +14,7 @@ from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import with_transaction_id, log_arguments
 from otter.test.rest.request import RequestTestMixin, RestAPITestMixin
 from otter.test.utils import patch
+from otter.util.config import set_config_data
 from otter.util.http import (get_autoscale_links, transaction_id, get_collection_links,
                              get_groups_links, get_policies_links, get_webhooks_links)
 
@@ -475,6 +476,85 @@ class HealthCheckTestCase(RestAPITestMixin, TestCase):
 
         resp = self.assert_status_code(200)
         self.assertEqual(resp, json.dumps({'blargh': 'boo'}))
+
+
+class RootRouteTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests that the root returns with whatever code, headers, and body are
+    configured.
+    """
+    endpoint = "/"
+    invalid_methods = ("DELETE", "PUT", "POST")
+
+    def tearDown(self):
+        """
+        Reset config data
+        """
+        set_config_data({})
+
+    def get_non_standard_headers(self, response_wrapper):
+        """
+        Returns the dictionary of headers without x-response-id or content-type
+        """
+        # want to make a copy of the headers
+        return {k.lower(): list(v) for k, v in
+                response_wrapper.response.headers.getAllRawHeaders()
+                if k not in ('X-Response-Id', 'Content-Type')}
+
+    def test_default_empty_200(self):
+        """
+        Returns a 200 without any content, without any specific headers
+        by default.
+        """
+        response_wrapper = self.request()
+        self.assertEqual(response_wrapper.response.code, 200)
+        self.assertEqual(self.get_non_standard_headers(response_wrapper), {})
+        self.assertEqual(response_wrapper.content, '')
+
+    def test_sets_status_code(self):
+        """
+        Returns the configured status code
+        """
+        set_config_data({'root': {'code': 204}})
+        response_wrapper = self.request()
+        self.assertEqual(response_wrapper.response.code, 204)
+        self.assertEqual(self.get_non_standard_headers(response_wrapper), {})
+        self.assertEqual(response_wrapper.content, '')
+
+    def test_sets_headers(self):
+        """
+        Returns the configured response headers
+        """
+        headers = {'someheader1': ['value1', 'value2'],
+                   'someheader2': ['value1']}
+        set_config_data({'root': {'headers': headers}})
+        response_wrapper = self.request()
+        self.assertEqual(response_wrapper.response.code, 200)
+        self.assertEqual(self.get_non_standard_headers(response_wrapper),
+                         headers)
+        self.assertEqual(response_wrapper.content, '')
+
+    def test_sets_unicode_headers(self):
+        """
+        Returns the configured response headers, even if they were provided in
+        unicode
+        """
+        set_config_data({'root': {'headers': {u'someheader': [u'value']}}})
+        response_wrapper = self.request()
+        self.assertEqual(response_wrapper.response.code, 200)
+        self.assertEqual(self.get_non_standard_headers(response_wrapper),
+                         {'someheader': ['value']})
+        self.assertEqual(response_wrapper.content, '')
+
+    def test_sets_contents(self):
+        """
+        Returns the configured response body
+        """
+        set_config_data({'root': {'body': 'happyhappyhappy'}})
+        response_wrapper = self.request()
+        self.assertEqual(response_wrapper.response.code, 200)
+        self.assertEqual(self.get_non_standard_headers(response_wrapper), {})
+        self.assertEqual(response_wrapper.content, 'happyhappyhappy')
 
 
 class SchedulerResetTests(RestAPITestMixin, TestCase):

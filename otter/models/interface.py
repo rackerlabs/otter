@@ -245,10 +245,13 @@ class IScalingGroup(Interface):
     uuid = Attribute("UUID of the scaling group - immutable.")
     tenant_id = Attribute("Rackspace Tenant ID of the owner of this group.")
 
-    def view_manifest():
+    def view_manifest(with_webhooks=False):
         """
         The manifest contains everything required to configure this scaling:
         the config, the launch config, and all the scaling policies.
+
+        :param with_webhooks: Should webhooks information be included?
+        :type config: ``Bool``
 
         :return: a dictionary corresponding to the JSON schema at
             :data:``otter.json_schema.model_schemas.view_manifest``
