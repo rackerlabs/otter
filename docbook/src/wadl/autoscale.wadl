@@ -55,8 +55,9 @@
                                 xmlns="http://docbook.org/ns/docbook"
                                 xml:lang="EN"><para>A scaling
                                    group.</para></wadl:doc>
-                        </param>
+                        </param>       
                         <method href="#showGroupManifest"/>
+                        <method href="#showGroupManifestWebhook"/>
                         <method href="#deleteGroup"/>
                         <resource id="state" path="state">
                             <method href="#getGroupState"/>
@@ -114,7 +115,7 @@
                                    </resource>
                                 </resource>
                             </resource>
-                        </resource>
+                        </resource>                     
                     </resource>
                 </resource>
             </resource>
@@ -806,6 +807,40 @@
             <para>The details appear in the response body in JSON
                 format.</para>
         </wadl:doc>
+        <response status="200">
+            <representation mediaType="application/json">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <!-- <xsdxt:code
+                        href="../docbkx/samples/resGetGroupManifest-json-http.txt"/>-->
+                    <xsdxt:code
+                        href="../docbkx/samples/resGetGroupManifest.json"
+                    />
+                </wadl:doc>
+            </representation>
+        </response> &commonFaults; &getFaults; </method>
+    <method id="showGroupManifestWebhook" name="GET"
+        rax:roles="observer autoscale:observer">
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Show scaling group details">
+            <para role="shortdesc">Shows configuration details for a
+                specified scaling group.</para>
+            <para>Details include the launch configuration and the
+                scaling policies for the specified scaling group
+                configuration.</para>
+            <para>The details appear in the response body in JSON
+                format.</para>
+        </wadl:doc>
+        <request>
+            <param xmlns="http://wadl.dev.java.net/2009/02"
+                name="webhook" style="query" required="false"
+                type="xsd:boolean">
+                <wadl:doc xml:lang="EN"
+                    xmlns="http://docbook.org/ns/docbook">
+                    <para>Set <code>?webhook=true</code>
+                    to filter the results.</para></wadl:doc>
+        </param>
+        </request>
         <response status="200">
             <representation mediaType="application/json">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
