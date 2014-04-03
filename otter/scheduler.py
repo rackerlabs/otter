@@ -29,25 +29,40 @@ class PartitionProtocol(LineOnlyReceiver):
     Handle getting buckets from partition process
     """
     def __init__(self, scheduler):
+        """
+        Initialize the protocol
+        """
         self.delimiter = '\n'
         self.scheduler = scheduler
         self.ignore = False
 
     def connectionMade(self):
+        """
+        Set self.transport.disconnecting attr due to https://twistedmatrix.com/trac/ticket/6606
+        """
         # TODO: Temporary HACK! since ProcessTransport does not have disconnecting attr
         # https://twistedmatrix.com/trac/ticket/6606
         self.transport.disconnecting = False
 
     def lineReceived(self, line):
+        """
+        Get buckets from received line and give it to scheduler
+        """
         if not self.transport.disconnecting and not self.ignore:
             body = json.loads(line)
             self.scheduler.set_buckets(map(int, body['buckets']))
 
     def connectionLost(self, reason):
+        """
+        Inform the scheduler about process being stopped
+        """
         if not self.transport.disconnecting and not self.ignore:
             self.scheduler.process_stopped(reason)
 
     def disconnect(self):
+        """
+        Disconnect from the process
+        """
         # Ideally, need not explicitly set this but doing this since ProcessTransport
         # does not have disconnecting attr
         self.transport.disconnecting = True
