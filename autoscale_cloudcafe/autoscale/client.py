@@ -667,7 +667,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         GET
         '/<string:tenantId>/history'
         """
-        url = url or '%s/history' % (self.url)
+        url = url or '{0}/history'.format(self.url)
         return self.request('GET', url,
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Audit)
