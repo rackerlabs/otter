@@ -1412,11 +1412,71 @@
                         />
                     </xsdxt:sample>
                 </wadl:doc>
-                <param style="plain" name="array" required="true"
-                    type="array" path="$.[*]">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                        >This parameter specifies an array of scaling
-                        policies.</wadl:doc>
+	      <param style="plain"
+		     name="array"
+		     required="true"
+		     type="array"
+		     path="$.[*]">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies an array of scaling policies.</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="name"
+		     required="true"
+		     type="string"
+		     path="$.[*].name">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the name of the scaling policy. The name must be unique for each scaling policy in the scaling group.</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="args"
+		     required="false"
+		     type="object"
+		     path="$.[*].args">
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies additional configuration information for policies of type "schedule." This parameter is not not required for policies of type "webhook." This parameter must be set to either "at" or "cron". Both "at" and "cron" are mutually exclusive. </wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="cron"
+		     required="false"
+		     type="string"
+		     path="$.[*].args.cron">
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the recurring time when the policy will be executed as a cron entry. For example, if this is parameter is set to "1 0 * * *", the policy will be executed at one minute past midnight (00:01) every day of the month, and every day of the week. For more information about cron, read: http://en.wikipedia.org/wiki/Cron</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="at"
+		     required="false"
+		     type="string"
+		     path="$.[*].args.at">
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time, in seconds at which this policy will be executed. 
+	              For example, <code>"at": "2013-12-05T03:12:00Z"</code>. The policy will be triggered within a 10 second range of the time specified by "at", 
+	              so if you set the "at" seconds to 10:20:32, it will be triggered anytime between 10:20:32 to 10:20:42.
+	              This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both.</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="changePercent"
+		     required="false"
+		     type="number"
+		     path="$.[*].changePercent">
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the percent change to make in the number of servers in the scaling group. If this number is positive, the number of servers will increase by the given percentage. If this parameter is set to a negative number, the number of servers will decrease by the given percentage. The absolute change in the number of servers will be rounded to the nearest integer. This means that if -X% of the current number of servers translates to -0.5 or -0.25 or -0.75 servers, the actual number of servers that will be shut down is 1. If X% of the current number of servers translates to 1.2 or 1.5 or 1.7 servers, the actual number of servers that will be launched is 2</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="cooldown"
+		     required="true"
+		     type="number"
+		     path="$.[*].cooldown">
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the cooldown period, in seconds, before this particular scaling policy can be executed again. The cooldown period does not affect the global scaling group cooldown. The minimum value for this parameter is 0 seconds, the maximum value is 86400 seconds (24 hrs). </wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="type"
+		     required="true"
+		     type="enum"
+		     path="$.[*].type">
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the type of policy that will be executed for the current release, this value can be either "webhook" for webhook-based policies or "schedule" for schedule-based policies.</wadl:doc>
+	      </param>
+                <param style="plain"
+                    name="change"
+                    required="false"
+                    type="integer"
+                    path="$.[*].change">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the change to make in the number of servers in the scaling group. This parameter must be an integer. If the value is a positive integer, the number of servers will increase. If the value is a negative integer, the number of servers will decrease.</wadl:doc>
                 </param>
                 <param style="plain" name="name" required="true"
                     type="string" path="$.[*].name">

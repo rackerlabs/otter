@@ -147,10 +147,14 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             response_entity_type=Groups)
 
     def view_manifest_config_for_scaling_group(self, group_id,
-                                               requestslib_kwargs=None):
+                                               requestslib_kwargs=None,
+                                               webhooks=None):
         """
         :summary: List full details of scaling configuration, including launch
                   configs and scaling policies
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+        :param webhooks: The value of the optional "webhooks" query parameter
         :return: Response Object containing response code 200 and body with
                  details of autoscaling group such as launch config, group
                  config and scaling policies
@@ -159,12 +163,12 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         GET
         {tenant_id}/groups/{group_id}
         """
-
+        params = {'webhooks': webhooks}
         self.group_id = group_id
         url_new = str(group_id)
         url_scheme = urlparse(url_new).scheme
         url = url_new if url_scheme else '%s/groups/%s' % (self.url, group_id)
-        return self.request('GET', url,
+        return self.request('GET', url, params=params,
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=ScalingGroup)
 
