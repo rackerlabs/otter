@@ -180,6 +180,8 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         the complete config (including non-required, group, and state
         """
         self.mock_group.update_config.return_value = defer.succeed(None)
+        self.mock_group.view_launch_config.return_value = defer.succeed('launch')
+
         self.assert_status_code(204, method='PUT', body=json.dumps({
             'name': 'blah',
             'cooldown': 35,
@@ -199,7 +201,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         self.mock_group.modify_state.assert_called_once_with(mock.ANY)
         mock_controller.obey_config_change.assert_called_once_with(
             mock.ANY, "transaction-id", expected_config, self.mock_group,
-            self.mock_state)
+            self.mock_state, 'launch')
 
     def test_update_group_config_propagates_modify_state_errors(self):
         """
