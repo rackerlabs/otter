@@ -22,7 +22,6 @@ Storage model for state information:
 """
 from datetime import datetime
 from decimal import Decimal, ROUND_UP
-from functools import partial
 import iso8601
 import json
 
