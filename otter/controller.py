@@ -122,15 +122,10 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
     if delta == 0:
         return defer.succeed(state)
     elif delta > 0:
-        if launch_config is not None:
-            deferred = execute_launch_config(bound_log, transaction_id, state,
-                                             launch_config, scaling_group,
-                                             delta)
-        else:
-            deferred = scaling_group.view_launch_config()
-            deferred.addCallback(partial(
-                execute_launch_config, bound_log, transaction_id, state,
-                scaling_group=scaling_group, delta=delta))
+        assert launch_config is not None
+        deferred = execute_launch_config(bound_log, transaction_id, state,
+                                         launch_config, scaling_group,
+                                         delta)
     else:
         # delta < 0 (scale down)
         deferred = exec_scale_down(bound_log, transaction_id, state,

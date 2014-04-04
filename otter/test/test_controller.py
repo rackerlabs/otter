@@ -611,49 +611,22 @@ class ObeyConfigChangeTestCase(TestCase):
         }
 
         self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
-        self.group.view_launch_config.return_value = defer.succeed("launch")
 
-    def test_uses_provided_launch_config_on_scale_up_if_provided(self):
-        """
-        When a scale-up needs to happen, if the launch config is provided, it is
-        used and ``view_launch_config`` is not called
-        """
-        self.calculate_delta.return_value = 5
-        d = controller.obey_config_change(self.log, 'transaction-id',
-                                          'config', self.group, self.state,
-                                          launch_config='launch')
-
-        self.assertIs(self.successResultOf(d), self.state)
-        self.assertFalse(self.group.view_launch_config.called)
-
-    def test_launch_config_not_used_on_scale_down(self):
-        """
-        On scale down, even if the launch config is not provided, launch
-        config is not fetched
-        """
-        self.calculate_delta.return_value = -5
-        d = controller.obey_config_change(self.log, 'transaction-id',
-                                          'config', self.group, self.state)
-        self.assertIs(self.successResultOf(d), self.state)
-        self.assertFalse(self.group.view_launch_config.called)
-
-    def test_gets_launch_config_if_not_provided(self):
+    def test_fail_if_launch_config_not_provided_on_scaleup(self):
         """
         When a scale-up needs to happen, if the launch config is not provided,
-        gets the launch config.
+        an error is raised.
         """
         self.calculate_delta.return_value = 5
-        d = controller.obey_config_change(self.log, 'transaction-id',
-                                          'config', self.group, self.state)
-        self.assertIs(self.successResultOf(d), self.state)
-        self.execute_launch_config.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state,
-            'launch', scaling_group=self.group, delta=5)
+        self.assertRaises(AssertionError, controller.obey_config_change,
+                          self.log, 'transaction-id', 'config', self.group,
+                          self.state)
 
     def test_parameters_bound_to_log(self):
         """
         Relevant values are bound to the log.
         """
+        self.calculate_delta.return_value = 0
         controller.obey_config_change(self.log, 'transaction-id',
                                       'config', self.group, self.state)
         self.log.bind.assert_called_once_with(scaling_group_id=self.group.uuid)
@@ -676,11 +649,12 @@ class ObeyConfigChangeTestCase(TestCase):
         """
         self.calculate_delta.return_value = 5
         d = controller.obey_config_change(self.log, 'transaction-id',
-                                          'config', self.group, self.state)
+                                          'config', self.group, self.state,
+                                          'launch')
         self.assertIs(self.successResultOf(d), self.state)
         self.execute_launch_config.assert_called_once_with(
             self.log.bind.return_value, 'transaction-id', self.state, 'launch',
-            scaling_group=self.group, delta=5)
+            self.group, 5)
 
     def test_nonzero_delta_execute_errors_propagated(self):
         """
@@ -690,12 +664,13 @@ class ObeyConfigChangeTestCase(TestCase):
         self.calculate_delta.return_value = 5
         self.execute_launch_config.return_value = defer.fail(Exception('meh'))
         d = controller.obey_config_change(self.log, 'transaction-id',
-                                          'config', self.group, self.state)
+                                          'config', self.group, self.state,
+                                          'launch')
         f = self.failureResultOf(d)
         self.assertTrue(f.check(Exception))
         self.execute_launch_config.assert_called_once_with(
             self.log.bind.return_value, 'transaction-id', self.state, 'launch',
-            scaling_group=self.group, delta=5)
+            self.group, 5)
 
     def test_negative_delta_state_is_returned_if_execute_successful(self):
         """
@@ -731,7 +706,8 @@ class ObeyConfigChangeTestCase(TestCase):
         log = mock_log()
         self.calculate_delta.return_value = 5
         d = controller.obey_config_change(log, 'transaction-id',
-                                          'config', self.group, self.state)
+                                          'config', self.group, self.state,
+                                          'launch')
         self.assertIs(self.successResultOf(d), self.state)
         log.msg.assert_called_once_with(
             'Starting {convergence_delta} new servers to satisfy desired capacity',
