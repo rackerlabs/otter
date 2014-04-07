@@ -61,24 +61,6 @@ class APIOptionsTests(TestCase):
         config.parseOptions(['-p', 'tcp:9999'])
         self.assertEqual(config['port'], 'tcp:9999')
 
-    def test_store_options(self):
-        """
-        The mock long flag option should end up in the 'mock' key
-        """
-        config = Options()
-        self.assertFalse(config['mock'])
-        config.parseOptions(['--mock'])
-        self.assertTrue(config['mock'])
-
-    def test_short_store_options(self):
-        """
-        The m short option should end up in the 'mock' key
-        """
-        config = Options()
-        self.assertFalse(config['mock'])
-        config.parseOptions(['-m'])
-        self.assertTrue(config['mock'])
-
 
 class HealthCheckerTests(TestCase):
     """
@@ -361,23 +343,6 @@ class APIMakeServiceTests(TestCase):
         makeService(test_config)
         self.Otter.assert_called_once_with(self.store,
                                            self.health_checker.health_check)
-
-    def test_mock_store(self):
-        """
-        makeService does not configure the CassScalingGroupCollection as an
-        api store
-        """
-        mock_config = test_config.copy()
-        mock_config['mock'] = True
-
-        makeService(mock_config)
-
-        for mocked in (self.RoundRobinCassandraCluster,
-                       self.CassScalingGroupCollection,
-                       self.clientFromString):
-            mock_calls = getattr(mocked, 'mock_calls')
-            self.assertEqual(len(mock_calls), 0,
-                             "{0} called with {1}".format(mocked, mock_calls))
 
     def test_health_checker_no_zookeeper(self):
         """
