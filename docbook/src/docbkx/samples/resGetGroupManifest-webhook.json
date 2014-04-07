@@ -51,7 +51,7 @@
                 "rel": "self"
               },
               {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/{capability_hash1}/",
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/392be67bacfd1adf54e4f9fbc2b40873b9c7c3128315647f46d94c4b5c56b4d6/",
                 "rel": "capability"
               }
             ]
