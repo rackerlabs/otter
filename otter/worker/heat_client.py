@@ -4,7 +4,6 @@ Asynchronous client for Heat, using treq.
 
 from __future__ import print_function
 
-
 import json
 
 from otter.util.http import (append_segments, headers, check_success,
@@ -13,6 +12,9 @@ from otter.util.http import (append_segments, headers, check_success,
 
 
 class HeatClient(object):
+    """
+    An Asynchronous Heat client.
+    """
     def __init__(self, auth_token, log, treq):
         self.treq = treq
         self.auth_token = auth_token
