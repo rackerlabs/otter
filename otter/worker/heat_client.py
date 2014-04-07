@@ -7,8 +7,10 @@ from __future__ import print_function
 import json
 
 from otter.util.http import (append_segments, headers, check_success,
-                             wrap_request_error, raise_error_on_code,
-                             APIError, RequestError)
+                             APIError)
+
+
+__all__ = ['HeatClient']
 
 
 class HeatClient(object):
@@ -45,7 +47,8 @@ class HeatClient(object):
             'template': template,
         }
         log = self.log.bind(event='update-stack')
-        result = self.treq.put(stack_url,
+        result = self.treq.put(
+            stack_url,
             data=json.dumps(payload),
             headers=headers(self.auth_token),
             log=log)
@@ -63,8 +66,13 @@ class HeatClient(object):
 
 
 def main(reactor, *args):
-    import os, yaml
+    """
+    Try to get a stack, then update it. If no stack exists, it will be created.
+    """
+    import os
+    import yaml
     from otter.log import log
+
     template = yaml.safe_load(open(args[1]))
     tenant = os.environ['OS_TENANT_ID']
     client = HeatClient(os.environ['OS_AUTH_TOKEN'], log)
@@ -72,19 +80,22 @@ def main(reactor, *args):
     heat_root = 'https://dfw.orchestration.api.rackspacecloud.com/v1/' + tenant
     stack_url = heat_root + '/stacks/my-stack-name'
     result = client.get_stack(stack_url)
+
     def got_stack(result):
         print("here's a stack:", result)
         result = client.update_stack(stack_url, None, None,
                                      {}, 60, template=template)
         return result
+
     def no_stack(failure):
         failure.trap(APIError)
         if failure.value.code != 404:
             return failure
         result = client.create_stack(
-             heat_root,
+            heat_root,
             'my-stack-name', None, None, {}, 60, False, template=template)
         return result
+
     result.addCallback(got_stack).addErrback(no_stack)
     return result.addCallback(lambda r: print("FINAL RESULT", r))
 
@@ -92,7 +103,7 @@ def main(reactor, *args):
 if __name__ == '__main__':
     import sys
     from twisted.internet.task import react
-    from twisted.python.log import startLogging, addObserver
+    from twisted.python.log import addObserver
     from otter.log.setup import observer_factory
     addObserver(observer_factory())
     react(main, sys.argv)

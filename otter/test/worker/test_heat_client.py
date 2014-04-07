@@ -1,3 +1,5 @@
+"""Tests for the asynchronous Heat client."""
+
 import json
 import mock
 
@@ -9,6 +11,7 @@ from otter.test.utils import mock_treq, mock_log, patch
 
 
 class HeatClientTests(TestCase):
+    """Tests for HeatClient."""
 
     def _assert_bound(self, orig_log, log, **kwargs):
         # Invoke a log message on the mocked log object so that we can check
@@ -40,9 +43,9 @@ class HeatClientTests(TestCase):
                      'accept': ['application/json'],
                      'User-Agent': ['OtterScale/0.0']},
             data=json.dumps({'stack_name': 'my-stack-name',
-                  'parameters': {'p1': 'v1'},
-                  'timeout_mins': 60,
-                  'template': 'my template'}),
+                             'parameters': {'p1': 'v1'},
+                             'timeout_mins': 60,
+                             'template': 'my template'}),
             log=mock.ANY)
 
         self.assertEqual(self.successResultOf(result), {'hello': 'world'})
@@ -83,9 +86,9 @@ class HeatClientTests(TestCase):
                      'accept': ['application/json'],
                      'User-Agent': ['OtterScale/0.0']},
             data=json.dumps({
-                  'parameters': {'p1': 'v1'},
-                  'timeout_mins': 60,
-                  'template': 'my template'}),
+                'parameters': {'p1': 'v1'},
+                'timeout_mins': 60,
+                'template': 'my template'}),
             log=mock.ANY)
 
         self.assertEqual(self.successResultOf(result), {'hello': 'world'})
