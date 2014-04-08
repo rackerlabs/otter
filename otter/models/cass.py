@@ -1057,6 +1057,7 @@ class CassScalingGroupCollection:
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
         self.webhooks_table = "policy_webhooks"
+        self.webhook_keys_table = "webhook_keys"
         self.state_table = "group_state"
         self.event_table = "scaling_schedule_v2"
         self.buckets = None
@@ -1238,6 +1239,37 @@ class CassScalingGroupCollection:
     def webhook_info_by_hash(self, log, capability_hash):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`
+        """
+        d = self._webhook_info_from_table(log, capability_hash)
+
+        def not_found(f):
+            if not f.check(UnrecognizedCapabilityError):
+                log.err(f, 'Error getting webhook info from table')
+            return self._webhook_info_by_index(log, capability_hash)
+
+        d.addErrback(not_found)
+        return d
+
+    def _webhook_info_from_table(self, log, capability_hash):
+        """
+        Get webhook info based on hash by using the new webhook_keys table
+        """
+        d = self.connection.execute(
+            _cql_find_webhook_token.format(cf=self.webhook_keys_table),
+            {"webhookKey": capability_hash}, get_consistency_level('list', 'policy'))
+
+        def extract_info(rows):
+            if len(rows) == 0:
+                raise UnrecognizedCapabilityError(capability_hash, 1)
+            r = rows[0]
+            return (r['tenantId'], r['groupId'], r['policyId'])
+
+        d.addCallback(extract_info)
+        return d
+
+    def _webhook_info_by_index(self, log, capability_hash):
+        """
+        Get webhook info based on hash by using the INDEX
         """
         def _do_webhook_lookup(webhook_rec):
             res = webhook_rec

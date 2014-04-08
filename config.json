@@ -39,5 +39,10 @@
           "maxPoliciesPerGroup": 100,
           "maxWebhooksPerPolicy": 25
         }
+    },
+    "root": {
+      "code": 301,
+      "headers": ["http://autoscale.api.rackspacecloud.com"],
+      "body": "Moved to http://autoscale.api.rackspacecloud.com"
     }
 }
