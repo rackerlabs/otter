@@ -20,6 +20,7 @@
          </wadl:resource>
          <wadl:resource href="../../wadl/autoscale.wadl#groupId">
             <wadl:method href="#showGroupManifest"/>
+            <wadl:method href="#showGroupManifestWebhook"/>
             <wadl:method href="#deleteGroup"/>
          </wadl:resource>
          <wadl:resource href="../../wadl/autoscale.wadl#state">
