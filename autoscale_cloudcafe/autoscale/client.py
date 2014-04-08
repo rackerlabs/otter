@@ -657,7 +657,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         return self.request('POST', url,
                             requestslib_kwargs=requestslib_kwargs)
 
-    def get_history(self, url=None, requestslib_kwargs=None):
+    def get_history(self, requestslib_kwargs=None):
         """
         :summary: Request the history audit log
         :return: Response object containing response code 200 (on success) and a body
@@ -667,7 +667,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         GET
         '/<string:tenantId>/history'
         """
-        url = url or '{0}/history'.format(self.url)
+        url = '{0}/history'.format(self.url)
         return self.request('GET', url,
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Audit)
