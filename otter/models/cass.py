@@ -1302,17 +1302,13 @@ class CassScalingGroupCollection:
             ('groups', 'policies', 'webhooks'), results)))
         return d
 
-    def health_check(self, clock=None):
+    def health_check(self):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
 
         In addition to ``healthy`` and ``time``, returns whether it can
         connect to cassandra and zookeeper
         """
-        if clock is None:
-            from twisted.internet import reactor
-            clock = reactor
-
         if self.kz_client is None:
             zk_health = {'zookeeper': False,
                          'zookeeper_state': 'Not connected yet'}
@@ -1324,26 +1320,26 @@ class CassScalingGroupCollection:
             zk_health = {'zookeeper': state == KazooState.CONNECTED,
                          'zookeeper_state': state}
 
-        start_time = clock.seconds()
+        start_time = self.reactor.seconds()
 
         d = self.connection.execute(
             _cql_health_check.format(cf=self.group_table), {},
             get_consistency_level('health', 'check'))
 
         # stop health check after 15 seconds
-        timeout_deferred(d, 15, clock=clock,
+        timeout_deferred(d, 15, clock=self.reactor,
                          deferred_description='cassandra health check')
 
         d.addCallback(lambda _: (zk_health['zookeeper'], dict(
             cassandra=True,
-            cassandra_time=(clock.seconds() - start_time),
+            cassandra_time=(self.reactor.seconds() - start_time),
             **zk_health
         )))
 
         d.addErrback(lambda f: (False, dict(
             cassandra=False,
             cassandra_failure=repr(f.value),
-            cassandra_time=clock.seconds() - start_time,
+            cassandra_time=self.reactor.seconds() - start_time,
             **zk_health
         )))
 

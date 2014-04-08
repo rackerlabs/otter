@@ -2804,7 +2804,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check fails if there is no zookeeper client
         """
         self.collection.kz_client = None
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (False, matches(ContainsDict(
@@ -2816,7 +2816,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check fails if there is no zookeeper client
         """
         self.collection.kz_client = mock.MagicMock(connected=False)
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (False, matches(ContainsDict(
@@ -2830,7 +2830,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (True, matches(ContainsDict(
@@ -2843,7 +2843,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.SUSPENDED)
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (False, matches(ContainsDict(
@@ -2855,7 +2855,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check fails if cassandra fails
         """
         self.connection.execute.return_value = defer.fail(Exception('boo'))
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (False, matches(ContainsDict(
@@ -2868,7 +2868,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check for cassandra fails if cassandra check times out
         """
         self.connection.execute.return_value = defer.Deferred()
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertNoResult(d)
 
         self.clock.advance(15)
@@ -2886,7 +2886,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         Health check fails if cassandra fails
         """
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (True, matches(ContainsDict(
@@ -2897,7 +2897,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         If both zookeeper and cassandra are healthy, the store is healthy
         """
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(self.successResultOf(d), (True, mock.ANY))
 
 
