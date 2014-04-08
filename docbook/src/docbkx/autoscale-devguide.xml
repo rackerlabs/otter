@@ -65,13 +65,25 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-devguide">
                 </annotation>
             </legalnotice>
             <revhistory>
-            <revision
-                xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <revision>
+                <date>2014-04-07</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Added new "webhook=true" parameter
+                                to scaling group API. Clarified policy
+                                cooldown description. Removed all
+                                internal bug numbers.</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
+                <revision>
                 <date>2014-03-26</date>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Final fix for AUTO-834, added IAD to
+                            <para>Added IAD to
                                 service endpoints in the Getting
                                 Started Guide and added comment about
                                 verifying the service endpoints by
@@ -86,8 +98,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-devguide">
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Un-hid RBAC section, implemented fix
-                                for AUTO-824.</para>
+                            <para>Un-hid RBAC section.</para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
@@ -2194,12 +2205,17 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <section xml:id="Get_Configuration_for_Scaling_Group">
                     <title>Get the Current Configuration for your Scaling Group
                     </title>
-                    <para>To obtain the configuration for a scaling group, which includes the minimum number
-                        of entities, the maximum number of entities, global cooldown, and other metadata,
-                        submit a
+                    <para>To obtain the configuration for a scaling
+                    group, which includes the minimum number of
+                    entities, the maximum number of entities, global
+                    cooldown, and other metadata, submit a
                         <command>GET</command>request with the
-                        <parameter>tenantId</parameter>and
-                        <parameter>groupId</parameter>parameters specified in the request URL.</para>
+                        <parameter>tenantId</parameter> and
+                        <parameter>groupId</parameter> parameters
+                    specified in the request URL. Add the
+                        <parameter>?webhook=true</parameter> parameter
+                    to also get details about any webhooks associated
+                    with the scaling group's policies.</para>
                     <example>
                         <title>Get Configuration for your Scaling Group Request</title>
                         <programlisting>GET /{tenantId}/groups/{groupId}/config</programlisting>

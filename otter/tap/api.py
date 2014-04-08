@@ -24,7 +24,6 @@ from otter.rest.application import Otter
 from otter.rest.bobby import set_bobby
 from otter.util.config import set_config_data, config_value
 from otter.models.cass import CassAdmin, CassScalingGroupCollection
-from otter.models.mock import MockAdmin, MockScalingGroupCollection
 from otter.scheduler import SchedulerService
 
 from otter.supervisor import SupervisorService, set_supervisor
@@ -55,10 +54,6 @@ class Options(usage.Options):
          "strports description of the port for API connections."],
         ["config", "c", "config.json",
          "path to JSON configuration file."]
-    ]
-
-    optFlags = [
-        ["mock", "m", "whether to use a mock back end instead of cassandra"]
     ]
 
     def postOptions(self):
@@ -181,20 +176,16 @@ def makeService(config):
 
     s = MultiService()
 
-    if not config_value('mock'):
-        seed_endpoints = [
-            clientFromString(reactor, str(host))
-            for host in config_value('cassandra.seed_hosts')]
+    seed_endpoints = [
+        clientFromString(reactor, str(host))
+        for host in config_value('cassandra.seed_hosts')]
 
-        cassandra_cluster = LoggingCQLClient(RoundRobinCassandraCluster(
-            seed_endpoints,
-            config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
+    cassandra_cluster = LoggingCQLClient(RoundRobinCassandraCluster(
+        seed_endpoints,
+        config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
 
-        store = CassScalingGroupCollection(cassandra_cluster)
-        admin_store = CassAdmin(cassandra_cluster)
-    else:
-        store = MockScalingGroupCollection()
-        admin_store = MockAdmin()
+    store = CassScalingGroupCollection(cassandra_cluster)
+    admin_store = CassAdmin(cassandra_cluster)
 
     bobby_url = config_value('bobby_url')
     if bobby_url is not None:
