@@ -95,13 +95,17 @@ class OtterConfig(object):
         if data['minEntities'] > data['maxEntities']:
             raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
 
-        def _do_obey_config_change(_, group):
-            return group.modify_state(
-                partial(controller.obey_config_change, self.log, transaction_id(request),
-                        data))
+        def _get_launch_and_obey_config_change(scaling_group, state):
+            d = scaling_group.view_launch_config()
+            d.addCallback(partial(
+                controller.obey_config_change, self.log, transaction_id(request),
+                data, scaling_group, state))
+            return d
 
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
-        deferred = rec.update_config(data).addCallback(_do_obey_config_change, rec)
+        deferred = rec.update_config(data)
+        deferred.addCallback(
+            lambda _: rec.modify_state(_get_launch_and_obey_config_change))
         return deferred
 
 
