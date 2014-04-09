@@ -19,8 +19,8 @@ class ScalingGroup(AutoMarshallingModel):
 
     def __init__(self, **kwargs):
         super(ScalingGroup, self).__init__()
-        for keys, values in kwargs.items():
-            setattr(self, keys, values)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
@@ -81,8 +81,8 @@ class Group(AutoMarshallingModel):
 
     def __init__(self, **kwargs):
         super(Group, self).__init__()
-        for keys, values in kwargs.items():
-            setattr(self, keys, values)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
@@ -125,8 +125,8 @@ class Groups(AutoMarshallingModel):
 
     def __init__(self, **kwargs):
         super(Groups, self).__init__()
-        for keys, values in kwargs.items():
-            setattr(self, keys, values)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
@@ -158,8 +158,8 @@ class Config(AutoMarshallingModel):
 
     def __init__(self, **kwargs):
         super(Config, self).__init__()
-        for keys, values in kwargs.items():
-            setattr(self, keys, values)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
@@ -199,8 +199,8 @@ class Policy(AutoMarshallingModel):
 
     def __init__(self, **kwargs):
         super(Policy, self).__init__()
-        for keys, values in kwargs.items():
-            setattr(self, keys, values)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
@@ -250,8 +250,8 @@ class Policies(AutoMarshallingModel):
 
     def __init__(self, **kwargs):
         super(Policies, self).__init__()
-        for keys, values in kwargs.items():
-            setattr(self, keys, values)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
@@ -288,8 +288,8 @@ class Webhook(AutoMarshallingModel):
 
     def __init__(self, **kwargs):
         super(Webhook, self).__init__()
-        for keys, values in kwargs.items():
-            setattr(self, keys, values)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
@@ -335,8 +335,8 @@ class Webhooks(AutoMarshallingModel):
     """
     def __init__(self, **kwargs):
         super(Webhooks, self).__init__()
-        for keys, values in kwargs.items():
-            setattr(self, keys, values)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
@@ -358,3 +358,68 @@ class Webhooks(AutoMarshallingModel):
         if hasattr(webhooks, 'webhooks'):
             webhooks.webhooks = [Webhook._dict_to_obj(w) for w in webhooks.webhooks]
         return webhooks
+
+
+class Audit(AutoMarshallingModel):
+    """
+    A marshalling object for audit log returned by the history resource
+    The log consists of a timestamp ordered list of events (HistoryEvent objects)
+    """
+
+    def __init__(self, **kwargs):
+        super(Audit, self).__init__()
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        """
+        Returns an instance of an Audit Log based on the json serialized string passed in
+        """
+        ret = None
+        json_dict = json.loads(serialized_str)
+        ret = cls._dict_to_obj(json_dict)
+        return ret
+
+    @classmethod
+    def _dict_to_obj(cls, history_dict):
+        """
+        Helper method to turn a dictionary into an Audit instance
+        """
+        history = Audit(**history_dict)
+        if hasattr(history, 'events_links'):
+            history.events_links = Links._dict_to_obj(history.events_links)
+        if hasattr(history, 'events'):
+            history.events = [HistoryEvent._dict_to_obj(e) for e in history.events]
+        return history
+
+
+class HistoryEvent(AutoMarshallingModel):
+    """
+    A marshalling object for the events in the audit log produced by the history API call
+    """
+
+    def __init__(self, **kwargs):
+        super(HistoryEvent, self).__init__()
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        """
+        Returns an instance of event based on the json serialized string passed in
+        """
+        ret = None
+        json_dict = json.loads(serialized_str)
+        ret = cls._dict_to_obj(json_dict)
+        return ret
+
+    @classmethod
+    def _dict_to_obj(cls, event_dict):
+        """
+        Converts the dictionary representing a single event into an object
+        """
+        event = HistoryEvent(**event_dict)
+        # TODO: If the event type is a request event, convert the value associated with the 'data' key
+        # into a request object based on event_type
+        return event
