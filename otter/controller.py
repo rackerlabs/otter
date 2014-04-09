@@ -121,7 +121,6 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
     if delta == 0:
         return defer.succeed(state)
     elif delta > 0:
-        assert launch_config is not None
         deferred = execute_launch_config(bound_log, transaction_id, state,
                                          launch_config, scaling_group,
                                          delta)
