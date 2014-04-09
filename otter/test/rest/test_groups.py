@@ -769,9 +769,11 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
             204, endpoint="{0}?force=true".format(self.endpoint),
             method="DELETE")
 
-        self.mock_group.update_config.assert_called_once_with(
-            {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'})
-        self.assertEqual(1, self.mock_controller.obey_config_change.call_count)
+        expected_config = {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'}
+        self.mock_group.update_config.assert_called_once_with(expected_config)
+        self.mock_controller.obey_config_change.assert_called_once_with(
+            mock.ANY, "transaction-id", expected_config, self.mock_group,
+            self.mock_state, launch_config=None)
         self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_force_case_insensitive(self):
@@ -789,9 +791,11 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
             204, endpoint="{0}?force=true".format(self.endpoint),
             method="DELETE")
 
-        self.mock_group.update_config.assert_called_once_with(
-            {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'})
-        self.assertEqual(1, self.mock_controller.obey_config_change.call_count)
+        expected_config = {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'}
+        self.mock_group.update_config.assert_called_once_with(expected_config)
+        self.mock_controller.obey_config_change.assert_called_once_with(
+            mock.ANY, "transaction-id", expected_config, self.mock_group,
+            self.mock_state, launch_config=None)
         self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_force_garbage_arg(self):

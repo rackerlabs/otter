@@ -511,7 +511,8 @@ class OtterGroup(object):
                 _config = config[0]
                 d = group.modify_state(
                     partial(controller.obey_config_change, self.log,
-                            transaction_id(request), _config))
+                            transaction_id(request), _config,
+                            launch_config=None))
                 return d
             d.addCallback(modify_state)
 
