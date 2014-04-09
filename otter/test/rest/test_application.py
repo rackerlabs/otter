@@ -576,7 +576,6 @@ class SchedulerResetTests(RestAPITestMixin, TestCase):
         """
         Calls scheduler.reset with new path
         """
-        #resp = self.assert_status_code(200, method='POST', body='path=/new_path')
         resp = self.assert_status_code(200, method='POST',
                                        endpoint=self.endpoint + '?path=/new_path')
         self.assertEqual(resp, '')
