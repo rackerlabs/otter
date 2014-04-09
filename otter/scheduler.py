@@ -130,6 +130,15 @@ class SchedulerService(TimerService):
             [check_events_in_bucket(
                 log, self.store, bucket, utcnow, batchsize) for bucket in buckets])
 
+    def reset(self, path):
+        """
+        Reset the scheduler with new path
+        """
+        self.zk_partition_path = path
+        self.kz_partition = self.kz_client.SetPartitioner(
+            self.zk_partition_path, set=set(self.buckets),
+            time_boundary=self.time_boundary)
+
 
 def check_events_in_bucket(log, store, bucket, now, batchsize):
     """
