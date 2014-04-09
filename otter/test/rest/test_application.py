@@ -581,3 +581,13 @@ class SchedulerResetTests(RestAPITestMixin, TestCase):
                                        endpoint=self.endpoint + '?path=/new_path')
         self.assertEqual(resp, '')
         self.reset.assert_called_once_with('/new_path')
+
+    def test_exception(self):
+        """
+        Returns 400 with exception message when ValueError is raised
+        """
+        self.reset.side_effect = ValueError('meh')
+        resp = self.assert_status_code(400, method='POST',
+                                       endpoint=self.endpoint + '?path=/new_path')
+        self.assertEqual(resp, 'meh')
+        self.reset.assert_called_once_with('/new_path')

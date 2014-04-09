@@ -68,10 +68,14 @@ class SchedulerService(TimerService):
         """
         Reset the scheduler with new path
         """
-        self.zk_partition_path = path
-        self.kz_partition = self.kz_client.SetPartitioner(
-            self.zk_partition_path, set=set(self.buckets),
-            time_boundary=self.time_boundary)
+        if self.zk_partition_path != path:
+            self.zk_partition_path = path
+            self.kz_partition = self.kz_client.SetPartitioner(
+                self.zk_partition_path, set=set(self.buckets),
+                time_boundary=self.time_boundary)
+        else:
+            raise ValueError('same path')
+
 
     def health_check(self):
         """

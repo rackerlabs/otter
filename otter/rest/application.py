@@ -96,6 +96,11 @@ class Otter(object):
         Reset the scheduler with new path
         """
         new_path = request.args.get('path')[0]
-        self.scheduler_reset(new_path)
         request.setHeader('X-Response-Id', 'scheduler_reset')
-        return ''
+        try:
+            self.scheduler_reset(new_path)
+        except ValueError as e:
+            request.setResponseCode(400)
+            return e.message
+        else:
+            return ''

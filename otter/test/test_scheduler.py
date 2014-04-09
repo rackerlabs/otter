@@ -175,6 +175,13 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.assertEqual(self.scheduler_service.kz_partition,
                          self.kz_client.SetPartitioner.return_value)
 
+    def test_reset_same_path(self):
+        """
+        reset() raises error on same path
+        """
+        self.assertRaises(ValueError, self.scheduler_service.reset, '/part_path')
+        self.assertFalse(self.kz_client.SetPartitioner.called)
+
     def test_check_events_allocating(self):
         """
         `check_events` logs message and does not check events in buckets when
