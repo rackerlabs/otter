@@ -76,7 +76,7 @@
       </wadl:resources>
    </section>
    <section xml:id="autoscale-webhooks">
-      <title>Web hooks</title>
+      <title>Webhooks</title>
       <wadl:resources xmlns:wadl="http://wadl.dev.java.net/2009/02">
          <wadl:resource href="../../wadl/autoscale.wadl#webhooks">
             <wadl:method href="#getWebhooks"/>

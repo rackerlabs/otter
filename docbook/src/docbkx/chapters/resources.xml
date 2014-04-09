@@ -12,7 +12,7 @@
     xmlns:xi="http://www.w3.org/2001/XInclude"
     xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0"
     xml:id="Resources-000">
-    <title>Additional Resources</title>
+    <title>Additional resources</title>
     <para> &PRODNAME; is an open-source project. You can see and
         contribute to source code in the GitHub repository at <link
             xlink:href="https://github.com/rackerlabs/otter"
