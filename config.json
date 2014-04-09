@@ -22,9 +22,11 @@
         "interval": 10,
         "batchsize": 100,
         "buckets": 10,
+        "kz_handler": "thread",
         "partition": {
             "path": "/scheduler_partition",
-            "time_boundary": 15
+            "time_boundary": 15,
+            "script_path": "otter/partition.py"
         }
     },
     "worker": {
