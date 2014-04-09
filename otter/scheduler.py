@@ -76,7 +76,6 @@ class SchedulerService(TimerService):
         else:
             raise ValueError('same path')
 
-
     def health_check(self):
         """
         Checks if scheduler service is healthy by comparing oldest event w.r.t current
