@@ -44,6 +44,15 @@ class RequestError(Exception):
         return "RequestError[{0}, {1!s}, data={2!s}]".format(
             self.url, self.reason, self.data)
 
+    def log_args(self):
+        args = {}
+        if self.reason.check(APIError):
+            args.update({'code': self.reason.value.code,
+                         'body': self.reason.value.body,
+                         'headers': self.reason.value.headers})
+        return dict(url=self.url, data=self.data, **args)
+
+
 
 def raise_error_on_code(failure, code, error, url, data=None):
     """
