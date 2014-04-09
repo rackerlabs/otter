@@ -121,7 +121,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         set_supervisor(supervisor)
 
         def _mock_obey_config_change(log, trans, config, group, state,
-                                     launch_config=None):
+                                     launch_config):
             return defer.succeed(GroupState(
                 state.tenant_id, state.group_id, *self.active_pending_etc))
 

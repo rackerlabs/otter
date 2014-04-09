@@ -95,7 +95,7 @@ def _do_convergence_audit_log(_, log, delta, state):
 
 
 def obey_config_change(log, transaction_id, config, scaling_group, state,
-                       launch_config=None):
+                       launch_config):
     """
     Given the config change, do servers need to be started or deleted
 
