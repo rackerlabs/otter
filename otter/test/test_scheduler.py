@@ -288,7 +288,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.scheduler_service.log.bind.assert_called_once_with(
             scheduler_run_id='transaction-id', utcnow='utcnow')
         log = self.scheduler_service.log.bind.return_value
-        log.msg.assert_called_once_with('Got buckets {buckets}', buckets=[2, 3])
+        log.msg.assert_called_once_with('Got buckets {buckets}',
+                                        buckets=[2, 3], path='/part_path')
         self.assertEqual(self.check_events_in_bucket.mock_calls,
                          [mock.call(log, self.mock_store, 2, 'utcnow', 100),
                           mock.call(log, self.mock_store, 3, 'utcnow', 100)])

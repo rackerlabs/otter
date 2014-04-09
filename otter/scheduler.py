@@ -136,7 +136,7 @@ class SchedulerService(TimerService):
         log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=utcnow)
         # TODO: This log might feel like spam since it'll occur on every tick. But
         # it'll be useful to debug partitioning problems (at least in initial deployment)
-        log.msg('Got buckets {buckets}', buckets=buckets)
+        log.msg('Got buckets {buckets}', buckets=buckets, path=self.zk_partition_path)
 
         return defer.gatherResults(
             [check_events_in_bucket(
