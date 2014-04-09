@@ -164,6 +164,17 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.assertFalse(self.kz_partition.finish.called)
         self.assertIsNone(d)
 
+    def test_reset(self):
+        """
+        reset() starts new partition based on new path
+        """
+        self.scheduler_service.reset('/new_path')
+        self.assertEqual(self.scheduler_service.zk_partition_path, '/new_path')
+        self.kz_client.SetPartitioner.assert_called_once_with(
+            '/new_path', set=set(self.buckets), time_boundary=self.time_boundary)
+        self.assertEqual(self.scheduler_service.kz_partition,
+                         self.kz_client.SetPartitioner.return_value)
+
     def test_check_events_allocating(self):
         """
         `check_events` logs message and does not check events in buckets when
