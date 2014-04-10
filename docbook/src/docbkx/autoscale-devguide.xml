@@ -2378,7 +2378,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         </listitem>
                         <listitem>
                             <para>
-                                <link linkend="Obtain_List_of_Scaling_Policies">List of scaling policies</link>
+                                <link linkend="Obtain_List_of_Scaling_Policies">List scaling policies</link>
                             </para>
                         </listitem>
                         <listitem>
