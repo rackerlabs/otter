@@ -2204,12 +2204,17 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <section xml:id="Get_Configuration_for_Scaling_Group">
                     <title>Get the current configuration for your scaling group
                     </title>
-                    <para>To obtain the configuration for a scaling group, which includes the minimum number
-                        of entities, the maximum number of entities, global cooldown, and other metadata,
-                        submit a
+                    <para>To obtain the configuration for a scaling
+                    group, which includes the minimum number of
+                    entities, the maximum number of entities, global
+                    cooldown, and other metadata, submit a
                         <command>GET</command>request with the
-                        <parameter>tenantId</parameter>and
-                        <parameter>groupId</parameter>parameters specified in the request URL.</para>
+                        <parameter>tenantId</parameter> and
+                        <parameter>groupId</parameter> parameters
+                    specified in the request URL. Add the
+                        <parameter>?webhook=true</parameter> parameter
+                    to also get details about any webhooks associated
+                    with the scaling group's policies.</para>
                     <example>
                         <title>Request</title>
                         <programlisting>GET /{tenantId}/groups/{groupId}/config</programlisting>

@@ -326,7 +326,7 @@ class AutoscaleFixture(BaseTestFixture):
                 "observe the active server list achieving the expected servers count: {2}.".format(
                     timeout, group_id, expected_servers))
 
-    def wait_for_expected_group_state(self, group_id, expected_servers, wait_time=120):
+    def wait_for_expected_group_state(self, group_id, expected_servers, wait_time=180):
         """
         :summary: verify the group state reached the expected servers count.
         :param group_id: Group id
@@ -340,7 +340,7 @@ class AutoscaleFixture(BaseTestFixture):
             time.sleep(self.interval_time)
         else:
             self.fail(
-                "wait_for_exepected_group_state ran for 120 seconds for group {0} and did not "
+                "wait_for_exepected_group_state ran for 180 seconds for group {0} and did not "
                 "observe the active server list achieving the expected servers count: {1}.".format(
                     group_id, expected_servers))
 

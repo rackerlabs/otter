@@ -21,9 +21,6 @@ test: unit integration
 run:
 	twistd -n --logger=otter.log.observer_factory_debug otter-api
 
-mockrun:
-	twistd -n --logger=otter.log.observer_factory_debug otter-api --mock
-
 env:
 	./scripts/bootstrap-virtualenv.sh
 
@@ -55,6 +52,7 @@ coverage:
 cleandocs:
 	rm -rf _builddoc
 	rm -rf htmldoc
+	rm -rf docbook/target
 
 docs: cleandocs
 	cp -r ${DOCDIR} _builddoc

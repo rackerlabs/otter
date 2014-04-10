@@ -822,6 +822,38 @@ class ServerTests(TestCase):
 
         self.assertEqual(result, self.treq.json_content.return_value)
 
+    def test_create_server_limits(self):
+        """
+        create_server when called many times will post only 2 requests at a time
+        """
+        deferreds = [Deferred() for i in range(3)]
+        post_ds = deferreds[:]
+        self.treq.post.side_effect = lambda *a, **kw: deferreds.pop(0)
+
+        server_config = {
+            'name': 'someServer',
+            'imageRef': '1',
+            'flavorRef': '3'
+        }
+
+        ret_ds = [create_server('http://url/', 'my-auth-token', server_config)
+                  for i in range(3)]
+
+        # no result in any of them and only first 2 treq.post is called
+        [self.assertNoResult(d) for d in ret_ds]
+        self.assertTrue(self.treq.post.call_count, 2)
+
+        # fire one deferred and notice that 3rd treq.post is called
+        post_ds[0].callback(mock.Mock(code=202))
+        self.assertTrue(self.treq.post.call_count, 3)
+        self.successResultOf(ret_ds[0])
+
+        # fire others
+        post_ds[1].callback(mock.Mock(code=202))
+        post_ds[2].callback(mock.Mock(code=202))
+        self.successResultOf(ret_ds[1])
+        self.successResultOf(ret_ds[2])
+
     def test_create_server_propagates_api_failure(self):
         """
         create_server will propagate API failures.

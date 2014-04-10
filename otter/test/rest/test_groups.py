@@ -449,9 +449,11 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
     def test_group_create_calls_obey_config_changes(self):
         """
         If the group creation succeeds, ``obey_config_change`` is called with
-        the updated log, transaction id, config, group, and state
+        the updated log, transaction id, config, group, state, and launch
+        config
         """
         config = config_examples()[0]
+        launch = launch_examples()[0]
 
         expected_config = config.copy()
         expected_config.setdefault('maxEntities', 25)
@@ -459,7 +461,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
 
         manifest = {
             'groupConfiguration': expected_config,
-            'launchConfiguration': launch_examples()[0],
+            'launchConfiguration': launch
         }
         self.mock_store.create_scaling_group.return_value = defer.succeed(manifest)
         self._test_successful_create(manifest)
@@ -467,7 +469,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_group.modify_state.assert_called_once_with(mock.ANY)
         self.mock_controller.obey_config_change.assert_called_once_with(
             mock.ANY, "transaction-id", expected_config, self.mock_group,
-            self.mock_state)
+            self.mock_state, launch_config=launch)
 
     def test_create_group_propagates_modify_state_errors(self):
         """
@@ -767,9 +769,11 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
             204, endpoint="{0}?force=true".format(self.endpoint),
             method="DELETE")
 
-        self.mock_group.update_config.assert_called_once_with(
-            {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'})
-        self.assertEqual(1, self.mock_controller.obey_config_change.call_count)
+        expected_config = {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'}
+        self.mock_group.update_config.assert_called_once_with(expected_config)
+        self.mock_controller.obey_config_change.assert_called_once_with(
+            mock.ANY, "transaction-id", expected_config, self.mock_group,
+            self.mock_state, launch_config=None)
         self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_force_case_insensitive(self):
@@ -787,9 +791,11 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
             204, endpoint="{0}?force=true".format(self.endpoint),
             method="DELETE")
 
-        self.mock_group.update_config.assert_called_once_with(
-            {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'})
-        self.assertEqual(1, self.mock_controller.obey_config_change.call_count)
+        expected_config = {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'}
+        self.mock_group.update_config.assert_called_once_with(expected_config)
+        self.mock_controller.obey_config_change.assert_called_once_with(
+            mock.ANY, "transaction-id", expected_config, self.mock_group,
+            self.mock_state, launch_config=None)
         self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_force_garbage_arg(self):

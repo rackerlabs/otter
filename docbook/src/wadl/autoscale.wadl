@@ -56,7 +56,12 @@
                                 xml:lang="EN"><para>A scaling
                                    group.</para></wadl:doc>
                         </param>
+                        
                         <method href="#showGroupManifest"/>
+                        <resource id="webhook" path="webhook">
+                            <method href="#showGroupManifestWebhook"/>
+                        </resource>
+                        
                         <method href="#deleteGroup"/>
                         <resource id="state" path="state">
                             <method href="#getGroupState"/>
@@ -647,7 +652,6 @@
                 <param style="plain" name="args" required="false"
                     type="object" path="$.scalingPolicies.[*].args">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
-
                         >Configuration information for policies of
                         type <code>schedule</code>. Must be
                         either <code>at</code> or
@@ -802,13 +806,51 @@
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
                     <!-- <xsdxt:code
-                        href="../docbkx/samples/resGetGroupManifest-json-http.txt"/>-->
+                href="../docbkx/samples/resGetGroupManifest-json-http.txt"/>-->
                     <xsdxt:code
                         href="../docbkx/samples/resGetGroupManifest.json"
                     />
                 </wadl:doc>
             </representation>
         </response> &commonFaults; &getFaults; </method>
+       <method id="showGroupManifestWebhook" name="GET"
+                rax:roles="observer autoscale:observer">
+           <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+               title="Show scaling group details including webhooks">
+               <para role="shortdesc">Shows configuration details for a
+                   specified scaling group and its associated webhooks.</para>
+               <para>Details include the launch configuration, the
+                   scaling policies, and the policies' webhooks, for the specified scaling group
+                   configuration.</para>
+               <para>The details appear in the response body in JSON
+                   format.</para>
+               <para>
+                   <note>
+                       <para>The <code>?webhook=true</code> parameter is required for this method.</para>
+                   </note>
+               </para>
+           </wadl:doc>
+           <request>
+               <param name="webhook" style="query" required="true" default="true"
+                   type="xsd:boolean">
+                   <wadl:doc xml:lang="EN"
+                       xmlns="http://docbook.org/ns/docbook">
+                       <para>Set <code>?webhook=true</code>
+                           to display webhook configuration details in the results.</para></wadl:doc>
+               </param>
+           </request>
+           <response status="200">
+               <representation mediaType="application/json">
+                   <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                       xml:lang="EN">
+                       <!-- <xsdxt:code
+                        href="../docbkx/samples/resGetGroupManifest-json-http.txt"/>-->
+                       <xsdxt:code
+                           href="../docbkx/samples/resGetGroupManifest-webhook.json"
+                       />
+                   </wadl:doc>
+               </representation>
+           </response> &commonFaults; &getFaults; </method>    
     <method id="deleteGroup" name="DELETE">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Delete scaling group">
