@@ -2585,7 +2585,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </example>
                 </section>
                 <section xml:id="Get_List_of_Scaling_Webhooks">
-                    <title>List of all webhooks and their IDs</title>
+                    <title>List webhooks and their IDs</title>
                     <para>To obtain a list of all scaling webhooks and their corresponding ids, submit a
                         <command>GET</command>request with the
                         <parameter>tenantId</parameter>,
