@@ -2650,7 +2650,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <command>GET</command>request is successful, the data will be returned in JSON format
                         as shown in the following example:</para>
                     <example>
-                        <title>Example of successful response to get information about a webhook request</title>
+                        <title>Response to successful get information about a webhook request</title>
                         <programlisting
                         language="json">
                             <xi:include href="./samples/resGetWebhook.json" parse="text" />
