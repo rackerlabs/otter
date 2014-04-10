@@ -295,9 +295,9 @@
             <param style="plain" name="maxEntities" required="false"
                 type="object" path="$.groupConfiguration.maxEntities">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN"><para>The maximum amount of
-                        identities that are allowed in the scaling
-                        group. This number defaults to null. If this
+                    xml:lang="EN"><para>The maximum number of
+                        entities that are allowed in the scaling
+                        group. If unconfigured, defaults to 1000. If this
                         value is provided it must be set to an integer
                         between 0 and 1000.</para>
                 </wadl:doc>
@@ -591,9 +591,9 @@
                     required="false" type="object"
                     path="$.groupConfiguration.maxEntities">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                        >The maximum amount of entities that are
-                        allowed in the scaling group, defaults to
-                        null. If this parameter is provided it must be
+                        >The maximum number of entities that are
+                        allowed in the scaling group. If unconfigured, defaults to 1000. 
+                        If this parameter is provided it must be
                         set to an integer between 0 and 1000. </wadl:doc>
                 </param>
                 <param style="plain" name="name" required="true"
@@ -965,9 +965,9 @@
             <param style="plain" name="maxEntities" required="true"
                 type="object" path="$.maxEntities">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN"><para>The maximum amount of
+                    xml:lang="EN"><para>The maximum number of
                         entities that are allowed in the scaling
-                        group, defaults to null. If this
+                        group. If left unconfigured, defaults to 1000. If this
                         value is provided it must be set to an integer
                         between 0 and 1000.</para>
                 </wadl:doc>
@@ -1013,9 +1013,9 @@
                 <param style="plain" name="maxEntities"
                     required="true" type="object" path="$.maxEntities">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                        >The maximum amount of entities that are
-                        allowed in the scaling group, defaults to
-                        null. If this value is provided it must be set
+                        >The maximum number of entities that are
+                        allowed in the scaling group. If left unconfigured, defaults to 1000.
+                        If this value is provided it must be set
                         to an integer between 0 and 1000. </wadl:doc>
                 </param>
                 <param style="plain" name="cooldown" required="true"
