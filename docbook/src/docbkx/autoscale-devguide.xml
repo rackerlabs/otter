@@ -1457,7 +1457,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>maxEntities</parameter>
                             </td>
-                            <td>Specifies the maximum amount of
+                            <td>Specifies the maximum number of
                             entities that are allowed in this group.
                             You cannot scale up above this value.
                             Decreasing this value can cause an
@@ -1467,7 +1467,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>minEntities</parameter>
                             </td>
-                            <td>Specifies the minimum amount of
+                            <td>Specifies the minimum number of
                             entities that are allowed in this group.
                             You cannot scale down below this value.
                             Increasing this value can cause an
@@ -2082,14 +2082,14 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <section xml:id="Min_and_Max_Policies">
                     <title>Using the min and max values with policies
                     </title>
-                    <para>When setting up your scaling groups, you configure the minimum and maximum amount
+                    <para>When setting up your scaling groups, you configure the minimum and maximum number
                         of resources that are allowed. These values are specified in the
                         <parameter>minEntities</parameter>and
                         <parameter>maxEntities</parameter>parameters under group configuration, and are invoked whenever
                         you update your group configuration.</para>
                     <para>
                         <important>
-                            <para>If the amount of resources that is specified in a policy differs from the
+                            <para>If the number of resources that is specified in a policy differs from the
                                 amount that is specified under group configuration, the preconfigured
                                 values take precedence.
                             </para>
