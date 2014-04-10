@@ -451,13 +451,13 @@
                 path="$.scalingPolicies.[*].desiredCapacity">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The desired server capacity of
-                        the scaling the group. For example, how many
+                        the scaling the group; that is, how many
                         servers should be in the scaling group. This
-                        value must be an absolute number. For example,
-                        if this parameter is set to 10 and the
-                        executing policy with this brings the number
-                        of servers to 10. The minimum allowed value is
-                        0.</para>
+                        value must be an absolute number, greater than or equal to zero. 
+                        For example, if this parameter is set to ten, executing the policy brings the number
+                        of servers to ten. The minimum allowed value is
+                        zero. Note that the configured group maxEntities and minEntities takes precedence
+                        over this setting.</para>
                 </wadl:doc>
             </param>
             <representation mediaType="application/json">
@@ -1599,14 +1599,14 @@
                     required="false" type="integer"
                     path="$.[*].desiredCapacity">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                        >The desired server capacity of the scaling
-                        the group, such as how many servers there
-                        should be in the scaling group. This value
-                        must be an absolute number, positive or
-                        negative. For example, if this parameter is
-                        set to 10, executing this policy brings the
-                        number of servers to 10. The minimum allowed
-                        value of this parameter is 0. </wadl:doc>
+                        >The desired server capacity of
+                        the scaling the group; that is, how many
+                        servers should be in the scaling group. This
+                        value must be an absolute number, greater than or equal to zero. 
+                        For example, if this parameter is set to ten, executing the policy brings the number
+                        of servers to ten. The minimum allowed value is
+                        zero. Note that the configured group maxEntities and minEntities takes precedence
+                        over this setting.</wadl:doc>
                 </param>
 
             </representation>
@@ -1766,13 +1766,13 @@
                 path="$.scalingPolicies.[*].desiredCapacity">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The desired server capacity of
-                        the scaling the group, such as how many
+                        the scaling the group; that is, how many
                         servers should be in the scaling group. This
-                        value must be an absolute number. For example,
-                        if this parameter is set to 10, running this
-                        policy brings the number of servers to 10. The
-                        minimum allowed value of this parameter is
-                        0.</para>
+                        value must be an absolute number, greater than or equal to zero. 
+                        For example, if this parameter is set to ten, executing the policy brings the number
+                        of servers to ten. The minimum allowed value is
+                        zero. Note that the configured group maxEntities and minEntities takes precedence
+                        over this setting.</para>
                 </wadl:doc>
             </param>
             </representation> 
