@@ -101,9 +101,10 @@ class NegativeGroupFixture(AutoscaleFixture):
         self.server_client.delete_server(server_list[0])
         self.wait_for_expected_group_state(group.id, server_count - 1)
         updated_state = self.autoscale_client.list_status_entities_sgroups(group.id).entity
-        self.assertEqual(updated_state.pendingCapacity, server_count - 1,
-                         msg='{0} servers are building. Expected '
-                         '{1}'.format(updated_state.pendingCapacity, server_count - 1))
+        self.assertEqual(updated_state.pendingCapacity + updated_state.activeCapacity, server_count - 1,
+                         msg='{0} servers are building or active. Expected '
+                         '{1}'.format(updated_state.pendingCapacity + updated_state.activeCapacity,
+                                      server_count - 1))
 
     def test_system_create_delete_scaling_group_server_building_indefinitely(self):
         """
