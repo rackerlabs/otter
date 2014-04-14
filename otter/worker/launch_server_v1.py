@@ -26,8 +26,8 @@ from otter.util import logging_treq as treq
 
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
-                             wrap_request_error, raise_error_on_code,
-                             APIError, RequestError)
+                             wrap_upstream_error, raise_error_on_code,
+                             APIError)
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
@@ -82,8 +82,8 @@ def server_details(server_endpoint, auth_token, server_id, log=None):
     path = append_segments(server_endpoint, 'servers', server_id)
     d = treq.get(path, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(raise_error_on_code, 404, ServerDeleted(server_id),
-                 path, 'server_details')
+    d.addErrback(raise_error_on_code, 404, ServerDeleted(server_id), 'nova',
+                 'server_details', path)
     return d.addCallback(treq.json_content)
 
 
@@ -143,12 +143,19 @@ def wait_for_active(log,
     timeout_description = ("Waiting for server <{0}> to change from BUILD "
                            "state to ACTIVE state").format(server_id)
 
-    return retry_and_timeout(
+    d = retry_and_timeout(
         poll, timeout,
         can_retry=transient_errors_except(UnexpectedServerStatus, ServerDeleted),
         next_interval=repeating_interval(interval),
         clock=clock,
         deferred_description=timeout_description)
+
+    def wrap_nova_errors(f):
+        f.trap(UnexpectedServerStatus, ServerDeleted, TimedOutError)
+        raise UpstreamError(f, 'nova', 'server_create')
+
+    d.addErrback(wrap_nova_errors)
+    return d
 
 
 def create_server(server_endpoint, auth_token, server_config, log=None):
@@ -165,7 +172,7 @@ def create_server(server_endpoint, auth_token, server_config, log=None):
     d = treq.post(path, headers=headers(auth_token),
                   data=json.dumps({'server': server_config}), log=log)
     d.addCallback(check_success, [202])
-    d.addErrback(wrap_request_error, path, 'server_create')
+    d.addErrback(wrap_upstream_error, 'nova', 'server_create', path)
     return d.addCallback(treq.json_content)
 
 
@@ -184,8 +191,7 @@ def log_lb_unexpected_errors(f, path, log, msg):
     """
     if not f.check(APIError):
         log.err(f, 'Unknown error while ' + msg)
-        return f
-    error = RequestError(f, path, msg)
+    error = UpstreamError(f, 'clb', msg, path)
     log.msg('Got LB error while {m}: {e}', m=msg, e=error)
     # TODO: Will do it after LB delete works fine
     # 422 is PENDING_UPDATE

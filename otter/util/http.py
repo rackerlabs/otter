@@ -4,10 +4,68 @@ HTTP utils, such as formulation of URLs
 
 from itertools import chain
 from urllib import quote, urlencode
+import json
 
 import treq
 
 from otter.util.config import config_value
+
+
+# REVIEW: I started with specific subclasses for each system (nova, clb and identity)
+# but they had too much in common. So decided to put stuff in this class itself
+class UpstreamError(Exception):
+    """
+    An upstream system error that wraps more detailed error
+    """
+    def __init__(self, error, system, operation, url=None):
+        self.error = error
+        self.system = system
+        self.operation = operation
+        self.url = url
+        self.apierr_message = None
+        msg = self.system + ' error: '
+        if error.check(APIError):
+            self._parse_message(error.value.body)
+            msg += '{} - {}'.format(error.value.code, self.apierr_message)
+        else:
+            msg += str(error)
+        super(UpstreamError, self).__init__(msg)
+
+    def _parse_message(self, body):
+        try:
+            body = json.loads(body)
+            self.apierr_message = body[body.keys()[0]]['message']
+        except:
+            self.apierr_message = 'Could not parse API error body'
+
+    def details(self):
+        """
+        Return `dict` of all the details within this object
+        """
+        d = self.__dict__.copy()
+        del d['error']
+        if self.error.check(APIError):
+            e = self.error.value
+            d.update({'code': e.code, 'body': e.body, 'headers': e.headers})
+        return d
+
+
+def wrap_upstream_error(f, system, operation, url=None):
+    """
+    Wrap error in UpstreamError
+    """
+    raise UpstreamError(f, system, operation, url)
+
+
+def raise_error_on_code(failure, code, error, system, operation, url):
+    """
+    Raise `error` if given `code` in APIError.code inside failure matches.
+    Otherwise `RequestError` is raised with `url` and `data`
+    """
+    failure.trap(APIError)
+    if failure.value.code == code:
+        raise error
+    raise UpstreamError(failure, system, operation, url)
 
 
 class RequestError(Exception):
@@ -43,26 +101,6 @@ class RequestError(Exception):
         """
         return "RequestError[{0}, {1!s}, data={2!s}]".format(
             self.url, self.reason, self.data)
-
-    def log_args(self):
-        args = {}
-        if self.reason.check(APIError):
-            args.update({'code': self.reason.value.code,
-                         'body': self.reason.value.body,
-                         'headers': self.reason.value.headers})
-        return dict(url=self.url, data=self.data, **args)
-
-
-
-def raise_error_on_code(failure, code, error, url, data=None):
-    """
-    Raise `error` if given `code` in APIError.code inside failure matches.
-    Otherwise `RequestError` is raised with `url` and `data`
-    """
-    failure.trap(APIError)
-    if failure.value.code == code:
-        raise error
-    raise RequestError(failure, url, data)
 
 
 def wrap_request_error(failure, target, data=None):

@@ -3,6 +3,7 @@ Tests for ``otter.util``
 """
 from datetime import datetime
 import mock
+import json
 
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed, fail, Deferred
@@ -12,7 +13,7 @@ from twisted.web.http_headers import Headers
 
 from otter.util.http import (
     append_segments, APIError, check_success, RequestError, headers,
-    raise_error_on_code, wrap_request_error)
+    raise_error_on_code, wrap_request_error, UpstreamError)
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
 from otter.util.deferredutils import with_lock, delay
@@ -215,6 +216,23 @@ class HTTPUtilityTests(TestCase):
         failure = Failure(Exception())
         self.assertRaises(RequestError, wrap_request_error,
                           failure, 'url')
+
+
+class UpstreamErrorTests(TestCase):
+    """
+    Tests for `UpstreamError`
+    """
+
+    def test_apierror(self):
+        body = json.dumps({"computeFault": {"message": "b"}})
+        apie = APIError(404, body, {})
+        err = UpstreamError(Failure(apie), 'nova', 'add', 'xkcd.com')
+        self.assertEqual(err.apierr_message, 'b')
+        self.assertEqual(err.message, 'nova error: 404 - b')
+        self.assertEqual(str(err), 'nova error: 404 - b')
+        self.assertEqual(err.details(), {
+            'system': 'nova', 'operation': 'add', 'url': 'xkcd.com',
+            'apierr_message': 'b', 'code': 404, 'body': body, 'headers': {}})
 
 
 class CapabilityTests(TestCase):

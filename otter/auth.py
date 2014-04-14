@@ -49,7 +49,7 @@ from otter.util.retry import retry, retry_times, repeating_interval
 
 from otter.log import log as default_log
 from otter.util.http import (
-    headers, check_success, append_segments, wrap_request_error)
+    headers, check_success, append_segments, wrap_upstream_error)
 
 
 class IAuthenticator(Interface):
@@ -249,7 +249,7 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token,
     d = treq.get(append_segments(auth_endpoint, 'tokens', user_token, 'endpoints'),
                  headers=headers(identity_admin_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, auth_endpoint, data='token_endpoints')
+    d.addErrback(wrap_upstream_error, 'identity', 'token_endpoints', auth_endpoint)
     d.addCallback(treq.json_content)
     return d
 
@@ -271,7 +271,7 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
         allow_redirects=False,
         log=log)
     d.addCallback(check_success, [301])
-    d.addErrback(wrap_request_error, auth_endpoint, data='mosso')
+    d.addErrback(wrap_upstream_error, 'identity', 'mosso', auth_endpoint)
     d.addCallback(treq.json_content)
     d.addCallback(lambda user: user['user']['id'])
     return d
@@ -301,8 +301,7 @@ def authenticate_user(auth_endpoint, username, password, log=None):
         headers=headers(),
         log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, auth_endpoint,
-                 data=('authenticating', username))
+    d.addErrback(wrap_upstream_error, 'identity', ('authenticating', username), auth_endpoint)
     d.addCallback(treq.json_content)
     return d
 
@@ -331,7 +330,7 @@ def impersonate_user(auth_endpoint, identity_admin_token, username,
         headers=headers(identity_admin_token),
         log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, auth_endpoint, data='impersonation')
+    d.addErrback(wrap_upstream_error, 'identity', 'impersonation', auth_endpoint)
     d.addCallback(treq.json_content)
     return d
 

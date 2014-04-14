@@ -393,7 +393,8 @@ class _DeleteJob(object):
     def _job_failed(self, failure):
         # REVIEW: Logging this as err since failing to delete a server will cost
         # money to customers and affect us. We should know and try to delete it manually asap
-        self.log.err(failure, 'Server deletion job failed')
+        details = f.details() if f.check(UpstreamError) else 'unknown'
+        self.log.err(failure, 'Server deletion job failed', error=details)
 
 
 class _Job(object):
@@ -428,8 +429,8 @@ class _Job(object):
         """
         Job has failed. Remove the job, if it exists, and log the error.
         """
-        log_args = f.log_args() if f.check(RequestError) or {}
-        self.log.err(f, 'Launching server failed', **log_args)
+        details = f.details() if f.check(UpstreamError) else 'unknown'
+        self.log.err(f, 'Launching server failed', error=details)
 
         def handle_failure(group, state):
             # if it is not in pending, then the job was probably deleted before
