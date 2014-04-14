@@ -164,6 +164,24 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.assertFalse(self.kz_partition.finish.called)
         self.assertIsNone(d)
 
+    def test_reset(self):
+        """
+        reset() starts new partition based on new path
+        """
+        self.scheduler_service.reset('/new_path')
+        self.assertEqual(self.scheduler_service.zk_partition_path, '/new_path')
+        self.kz_client.SetPartitioner.assert_called_once_with(
+            '/new_path', set=set(self.buckets), time_boundary=self.time_boundary)
+        self.assertEqual(self.scheduler_service.kz_partition,
+                         self.kz_client.SetPartitioner.return_value)
+
+    def test_reset_same_path(self):
+        """
+        reset() raises error on same path
+        """
+        self.assertRaises(ValueError, self.scheduler_service.reset, '/part_path')
+        self.assertFalse(self.kz_client.SetPartitioner.called)
+
     def test_check_events_allocating(self):
         """
         `check_events` logs message and does not check events in buckets when
@@ -270,7 +288,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.scheduler_service.log.bind.assert_called_once_with(
             scheduler_run_id='transaction-id', utcnow='utcnow')
         log = self.scheduler_service.log.bind.return_value
-        log.msg.assert_called_once_with('Got buckets {buckets}', buckets=[2, 3])
+        log.msg.assert_called_once_with('Got buckets {buckets}',
+                                        buckets=[2, 3], path='/part_path')
         self.assertEqual(self.check_events_in_bucket.mock_calls,
                          [mock.call(log, self.mock_store, 2, 'utcnow', 100),
                           mock.call(log, self.mock_store, 3, 'utcnow', 100)])

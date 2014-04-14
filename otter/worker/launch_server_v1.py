@@ -20,7 +20,7 @@ import json
 import itertools
 from copy import deepcopy
 
-from twisted.internet.defer import gatherResults, maybeDeferred
+from twisted.internet.defer import gatherResults, maybeDeferred, DeferredSemaphore
 
 from otter.util import logging_treq as treq
 
@@ -158,6 +158,11 @@ def wait_for_active(log,
     return d
 
 
+# limit on 2 servers to be created simultaneously
+MAX_CREATE_SERVER = 2
+create_server_sem = DeferredSemaphore(MAX_CREATE_SERVER)
+
+
 def create_server(server_endpoint, auth_token, server_config, log=None):
     """
     Create a new server.
@@ -169,8 +174,8 @@ def create_server(server_endpoint, auth_token, server_config, log=None):
     :return: Deferred that fires with the CreateServer response as a dict.
     """
     path = append_segments(server_endpoint, 'servers')
-    d = treq.post(path, headers=headers(auth_token),
-                  data=json.dumps({'server': server_config}), log=log)
+    d = create_server_sem.run(treq.post, path, headers=headers(auth_token),
+                              data=json.dumps({'server': server_config}), log=log)
     d.addCallback(check_success, [202])
     d.addErrback(wrap_upstream_error, 'nova', 'server_create', path)
     return d.addCallback(treq.json_content)

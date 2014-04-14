@@ -22,7 +22,6 @@ Storage model for state information:
 """
 from datetime import datetime
 from decimal import Decimal, ROUND_UP
-from functools import partial
 import iso8601
 import json
 
@@ -95,7 +94,8 @@ def _do_convergence_audit_log(_, log, delta, state):
     return state
 
 
-def obey_config_change(log, transaction_id, config, scaling_group, state):
+def obey_config_change(log, transaction_id, config, scaling_group, state,
+                       launch_config):
     """
     Given the config change, do servers need to be started or deleted
 
@@ -104,6 +104,7 @@ def obey_config_change(log, transaction_id, config, scaling_group, state):
     :param log: A twiggy bound log for logging
     :param str transaction_id: the transaction id
     :param dict config: the scaling group config
+    :param dict launch_config: the scaling group launch config
     :param scaling_group: an IScalingGroup provider
     :param state: a :class:`otter.models.interface.GroupState` representing the
         state
@@ -120,10 +121,9 @@ def obey_config_change(log, transaction_id, config, scaling_group, state):
     if delta == 0:
         return defer.succeed(state)
     elif delta > 0:
-        deferred = scaling_group.view_launch_config()
-        deferred.addCallback(partial(execute_launch_config, bound_log,
-                                     transaction_id, state,
-                                     scaling_group=scaling_group, delta=delta))
+        deferred = execute_launch_config(bound_log, transaction_id, state,
+                                         launch_config, scaling_group,
+                                         delta)
     else:
         # delta < 0 (scale down)
         deferred = exec_scale_down(bound_log, transaction_id, state,
@@ -420,6 +420,18 @@ class _Job(object):
         """
         Kick off a job by calling the supervisor with a launch config.
         """
+        try:
+            image = launch_config['args']['server']['imageRef']
+        except:
+            image = 'Unable to pull image ref.'
+
+        try:
+            flavor = launch_config['args']['server']['flavorRef']
+        except:
+            flavor = 'Unable to pull flavor ref.'
+
+        self.log = self.log.bind(image_ref=image, flavor_ref=flavor)
+
         deferred = self.supervisor.execute_config(
             self.log, self.transaction_id, self.scaling_group, launch_config)
         deferred.addCallback(self.job_started)
