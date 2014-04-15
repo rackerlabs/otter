@@ -527,6 +527,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
         d = self.group.modify_state(modifier)
+
+        self.assertNoResult(d)
+        self.clock.advance(2)
         self.assertEqual(self.successResultOf(d), None)
         self.group.view_state.assert_called_once_with(ConsistencyLevel.TWO)
         expectedCql = (
