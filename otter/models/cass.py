@@ -620,7 +620,7 @@ class CassScalingGroup(object):
             d = self.view_state(consistency)
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             d.addCallback(_write_state)
-            return d.addCallback(delay, reactor, 2)
+            return d.addCallback(delay, self.reactor, 2)
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
