@@ -28,7 +28,7 @@ from otter.models.interface import (
     NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError,
     WebhooksOverLimitError, PoliciesOverLimitError)
 
-from otter.test.utils import LockMixin, DummyException, mock_log
+from otter.test.utils import LockMixin, DummyException, mock_log, CheckFailure
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin,
@@ -348,10 +348,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.lock = self.mock_lock()
         self.kz_lock.Lock.return_value = self.lock
 
+        self.clock = Clock()
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
                                       self.connection, itertools.cycle(range(2, 10)),
-                                      self.kz_lock)
+                                      self.kz_lock, self.clock)
         self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
                                                    tenant_id=self.tenant_id,
                                                    scaling_group_id=self.group_id)
@@ -2131,7 +2132,8 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
 
         self.connection.execute.side_effect = _responses
 
-        self.collection = CassScalingGroupCollection(self.connection)
+        self.clock = Clock()
+        self.collection = CassScalingGroupCollection(self.connection, self.clock)
 
         self.uuid = patch(self, 'otter.models.cass.uuid')
         self.uuid.uuid1.return_value = 'timeuuid'
@@ -2250,8 +2252,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.side_effect = _responses
 
         self.mock_log = mock_log()
+        self.clock = Clock()
 
-        self.collection = CassScalingGroupCollection(self.connection)
+        self.collection = CassScalingGroupCollection(self.connection, self.clock)
         self.tenant_id = 'goo1234'
         self.config = _de_identify({
             'name': 'blah',
@@ -2656,9 +2659,54 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(g.uuid, '12345678')
         self.assertEqual(g.tenant_id, '123')
 
-    def test_webhook_hash(self):
+    def test_webhook_hash_from_table(self):
         """
-        Test that you can get webhook info by hash.
+        `webhook_info_by_hash` returns info from _webhook_info_from_table if avail
+        """
+        self.collection._webhook_info_from_table = mock.Mock(return_value=defer.succeed('g'))
+        self.collection._webhook_info_by_index = mock.Mock()
+
+        d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
+
+        self.assertEqual(self.successResultOf(d), 'g')
+        self.collection._webhook_info_from_table.assert_called_once_with(self.mock_log, 'hash')
+        self.assertFalse(self.collection._webhook_info_by_index.called)
+
+    def test_webhook_hash_from_index(self):
+        """
+        `webhook_info_by_hash` returns info from _webhook_info_by_index if
+        _webhook_info_from_table returns nothing
+        """
+        self.collection._webhook_info_from_table = mock.Mock(
+            return_value=defer.fail(UnrecognizedCapabilityError('hash', 1)))
+        self.collection._webhook_info_by_index = mock.Mock(return_value=defer.succeed('g'))
+
+        d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
+
+        self.assertEqual(self.successResultOf(d), 'g')
+        self.collection._webhook_info_from_table.assert_called_once_with(self.mock_log, 'hash')
+        self.collection._webhook_info_by_index.assert_called_once_with(self.mock_log, 'hash')
+
+    def test_webhook_hash_from_index_logs_unknown_err(self):
+        """
+        `webhook_info_by_hash` returns info from _webhook_info_by_index if
+        _webhook_info_from_table fails with unknown error
+        """
+        self.collection._webhook_info_from_table = mock.Mock(
+            return_value=defer.fail(ValueError(1)))
+        self.collection._webhook_info_by_index = mock.Mock(return_value=defer.succeed('g'))
+
+        d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
+
+        self.assertEqual(self.successResultOf(d), 'g')
+        self.collection._webhook_info_from_table.assert_called_once_with(self.mock_log, 'hash')
+        self.collection._webhook_info_by_index.assert_called_once_with(self.mock_log, 'hash')
+        self.mock_log.err.assert_called_once_with(
+            CheckFailure(ValueError), 'Error getting webhook info from table')
+
+    def test_webhook_hash_index(self):
+        """
+        `_webhook_info_by_index` uses webhooks_by_token INDEX
         """
         self.returns = [_cassandrify_data([
             {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1'}]),
@@ -2667,33 +2715,44 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'webhookKey': 'x'}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId" FROM policy_webhooks WHERE '
                        '"webhookKey" = :webhookKey;')
-        d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
+        d = self.collection._webhook_info_by_index(self.mock_log, 'x')
         r = self.successResultOf(d)
         self.assertEqual(r, ('123', 'group1', 'pol1'))
-        self.connection.execute.assert_called_any(expectedCql,
-                                                  expectedData,
-                                                  ConsistencyLevel.TWO)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
 
-        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
-        expectedData = {"tenantId": "123", "groupId": "group1", "policyId": "pol1"}
-        self.connection.execute.assert_called_any(expectedCql,
-                                                  expectedData,
-                                                  ConsistencyLevel.TWO)
+    def test_webhook_hash_table(self):
+        """
+        `_webhook_info_from_table` uses webhook_keys table
+        """
+        self.returns = [_cassandrify_data([
+            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1'}]),
+            _cassandrify_data([{'data': '{}'}])
+        ]
+        expectedData = {'webhookKey': 'x'}
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId" FROM webhook_keys WHERE '
+                       '"webhookKey" = :webhookKey;')
+        d = self.collection._webhook_info_from_table(self.mock_log, 'x')
+        r = self.successResultOf(d)
+        self.assertEqual(r, ('123', 'group1', 'pol1'))
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
 
     def test_webhook_bad(self):
         """
         Test that a bad webhook will fail predictably
         """
-        self.returns = [[]]
+        self.returns = [[], []]
         expectedData = {'webhookKey': 'x'}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId" FROM policy_webhooks WHERE '
-                       '"webhookKey" = :webhookKey;')
+        expectedCql = [('SELECT "tenantId", "groupId", "policyId" FROM webhook_keys WHERE '
+                        '"webhookKey" = :webhookKey;'),
+                       ('SELECT "tenantId", "groupId", "policyId" FROM policy_webhooks WHERE '
+                        '"webhookKey" = :webhookKey;')]
         d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
         self.failureResultOf(d, UnrecognizedCapabilityError)
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
+        self.connection.execute.assert_has_calls(
+            [mock.call(expectedCql[0], expectedData, ConsistencyLevel.TWO),
+             mock.call(expectedCql[1], expectedData, ConsistencyLevel.TWO)])
 
     def test_get_counts(self):
         """
@@ -2735,17 +2794,17 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """ Setup the mocks """
         self.connection = mock.MagicMock(spec=['execute'])
         self.connection.execute.return_value = defer.succeed([])
-        self.collection = CassScalingGroupCollection(self.connection)
+        self.clock = Clock()
+        self.collection = CassScalingGroupCollection(self.connection, self.clock)
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
-        self.clock = Clock()
 
     def test_health_check_no_zookeeper(self):
         """
         Health check fails if there is no zookeeper client
         """
         self.collection.kz_client = None
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (False, matches(ContainsDict(
@@ -2757,7 +2816,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check fails if there is no zookeeper client
         """
         self.collection.kz_client = mock.MagicMock(connected=False)
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (False, matches(ContainsDict(
@@ -2771,7 +2830,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (True, matches(ContainsDict(
@@ -2784,7 +2843,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.SUSPENDED)
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (False, matches(ContainsDict(
@@ -2796,7 +2855,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check fails if cassandra fails
         """
         self.connection.execute.return_value = defer.fail(Exception('boo'))
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (False, matches(ContainsDict(
@@ -2809,7 +2868,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check for cassandra fails if cassandra check times out
         """
         self.connection.execute.return_value = defer.Deferred()
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertNoResult(d)
 
         self.clock.advance(15)
@@ -2827,7 +2886,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         Health check fails if cassandra fails
         """
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (True, matches(ContainsDict(
@@ -2838,7 +2897,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         If both zookeeper and cassandra are healthy, the store is healthy
         """
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(self.successResultOf(d), (True, mock.ANY))
 
 

@@ -7,7 +7,7 @@ import mock
 
 from testtools.matchers import Contains
 
-from twisted.internet import reactor, defer
+from twisted.internet import defer
 
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
@@ -60,24 +60,6 @@ class APIOptionsTests(TestCase):
         config = Options()
         config.parseOptions(['-p', 'tcp:9999'])
         self.assertEqual(config['port'], 'tcp:9999')
-
-    def test_store_options(self):
-        """
-        The mock long flag option should end up in the 'mock' key
-        """
-        config = Options()
-        self.assertFalse(config['mock'])
-        config.parseOptions(['--mock'])
-        self.assertTrue(config['mock'])
-
-    def test_short_store_options(self):
-        """
-        The m short option should end up in the 'mock' key
-        """
-        config = Options()
-        self.assertFalse(config['mock'])
-        config.parseOptions(['-m'])
-        self.assertTrue(config['mock'])
 
 
 class HealthCheckerTests(TestCase):
@@ -243,6 +225,8 @@ class APIMakeServiceTests(TestCase):
         self.Otter = Otter_patcher.start()
         self.addCleanup(Otter_patcher.stop)
 
+        self.reactor = patch(self, 'otter.tap.api.reactor')
+
         self.CassScalingGroupCollection = patch(self, 'otter.tap.api.CassScalingGroupCollection')
         self.store = self.CassScalingGroupCollection.return_value
 
@@ -310,7 +294,7 @@ class APIMakeServiceTests(TestCase):
         cassandra seed_hosts.
         """
         makeService(test_config)
-        self.clientFromString.assert_called_once_with(reactor, 'tcp:127.0.0.1:9160')
+        self.clientFromString.assert_called_once_with(self.reactor, 'tcp:127.0.0.1:9160')
 
     def test_unicode_cassandra_seed_hosts_endpoints(self):
         """
@@ -320,7 +304,7 @@ class APIMakeServiceTests(TestCase):
         """
         unicode_config = json.loads(json.dumps(test_config, encoding="utf-8"))
         makeService(unicode_config)
-        self.clientFromString.assert_called_once_with(reactor, 'tcp:127.0.0.1:9160')
+        self.clientFromString.assert_called_once_with(self.reactor, 'tcp:127.0.0.1:9160')
         self.assertTrue(isinstance(self.clientFromString.call_args[0][1], str))
 
     def test_cassandra_cluster_with_endpoints_and_keyspace(self):
@@ -342,7 +326,8 @@ class APIMakeServiceTests(TestCase):
         self.log.bind.assert_called_once_with(system='otter.silverberg')
         self.LoggingCQLClient.assert_called_once_with(self.RoundRobinCassandraCluster.return_value,
                                                       self.log.bind.return_value)
-        self.CassScalingGroupCollection.assert_called_once_with(self.LoggingCQLClient.return_value)
+        self.CassScalingGroupCollection.assert_called_once_with(
+            self.LoggingCQLClient.return_value, self.reactor)
 
     def test_cassandra_cluster_disconnects_on_stop(self):
         """
@@ -361,23 +346,6 @@ class APIMakeServiceTests(TestCase):
         makeService(test_config)
         self.Otter.assert_called_once_with(self.store,
                                            self.health_checker.health_check)
-
-    def test_mock_store(self):
-        """
-        makeService does not configure the CassScalingGroupCollection as an
-        api store
-        """
-        mock_config = test_config.copy()
-        mock_config['mock'] = True
-
-        makeService(mock_config)
-
-        for mocked in (self.RoundRobinCassandraCluster,
-                       self.CassScalingGroupCollection,
-                       self.clientFromString):
-            mock_calls = getattr(mocked, 'mock_calls')
-            self.assertEqual(len(mock_calls), 0,
-                             "{0} called with {1}".format(mocked, mock_calls))
 
     def test_health_checker_no_zookeeper(self):
         """

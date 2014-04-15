@@ -8,7 +8,7 @@ import functools
 
 from zope.interface import implementer
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from jsonschema import ValidationError
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
@@ -466,6 +466,15 @@ class CassScalingGroup(object):
     :ivar connection: silverberg client used to connect to cassandra
     :type connection: :class:`silverberg.client.CQLClient`
 
+    :ivar buckets: Scheduler buckets
+    :type buckets: iterator of buckets that does not end
+
+    :ivar kz_client: Kazoo client used for locking
+    :type kz_client: :class:`txkazoo.TxKazooClient`
+
+    :ivar reactor: Reactor used for time manipulations
+    :type reactor: :class:`twisted.internet.reactor.IReactorTime` provider
+
     IMPORTANT REMINDER: In CQL, update will create a new row if one doesn't
     exist.  Therefore, before doing an update, a read must be performed first
     else an entry is created where none should have been.
@@ -477,7 +486,7 @@ class CassScalingGroup(object):
     Also, because deletes are done as tombstones rather than actually deleting,
     deletes are also updates and hence a read must be performed before deletes.
     """
-    def __init__(self, log, tenant_id, uuid, connection, buckets, kz_client):
+    def __init__(self, log, tenant_id, uuid, connection, buckets, kz_client, reactor):
         """
         Creates a CassScalingGroup object.
         """
@@ -489,6 +498,7 @@ class CassScalingGroup(object):
         self.connection = connection
         self.buckets = buckets
         self.kz_client = kz_client
+        self.reactor = reactor
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
@@ -614,8 +624,7 @@ class CassScalingGroup(object):
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
-        # TODO: Better way to get reactor instead of importing?
-        return with_lock(reactor, lock, log.bind(category='locking'), _modify_state)
+        return with_lock(self.reactor, lock, log.bind(category='locking'), _modify_state)
 
     def update_config(self, data):
         """
@@ -997,13 +1006,15 @@ class CassScalingGroup(object):
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
-        return with_lock(reactor, lock, log.bind(category='locking'), _delete_group)
+        return with_lock(self.reactor, lock, log.bind(category='locking'), _delete_group)
 
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
 class CassScalingGroupCollection:
     """
     .. autointerface:: otter.models.interface.IScalingGroupCollection
+
+    :param reactor: IReactorTime provider
 
     The Cassandra schema structure::
 
@@ -1033,7 +1044,7 @@ class CassScalingGroupCollection:
     Also, because deletes are done as tombstones rather than actually deleting,
     deletes are also updates and hence a read must be performed before deletes.
     """
-    def __init__(self, connection):
+    def __init__(self, connection, reactor):
         """
         Init
 
@@ -1042,10 +1053,12 @@ class CassScalingGroupCollection:
         :param cflist: Column family list
         """
         self.connection = connection
+        self.reactor = reactor
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
         self.webhooks_table = "policy_webhooks"
+        self.webhook_keys_table = "webhook_keys"
         self.state_table = "group_state"
         self.event_table = "scaling_schedule_v2"
         self.buckets = None
@@ -1173,7 +1186,7 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.get_scaling_group`
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
-                                self.connection, self.buckets, self.kz_client)
+                                self.connection, self.buckets, self.kz_client, self.reactor)
 
     def fetch_and_delete(self, bucket, now, size=100):
         """
@@ -1228,6 +1241,37 @@ class CassScalingGroupCollection:
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`
         """
+        d = self._webhook_info_from_table(log, capability_hash)
+
+        def not_found(f):
+            if not f.check(UnrecognizedCapabilityError):
+                log.err(f, 'Error getting webhook info from table')
+            return self._webhook_info_by_index(log, capability_hash)
+
+        d.addErrback(not_found)
+        return d
+
+    def _webhook_info_from_table(self, log, capability_hash):
+        """
+        Get webhook info based on hash by using the new webhook_keys table
+        """
+        d = self.connection.execute(
+            _cql_find_webhook_token.format(cf=self.webhook_keys_table),
+            {"webhookKey": capability_hash}, get_consistency_level('list', 'policy'))
+
+        def extract_info(rows):
+            if len(rows) == 0:
+                raise UnrecognizedCapabilityError(capability_hash, 1)
+            r = rows[0]
+            return (r['tenantId'], r['groupId'], r['policyId'])
+
+        d.addCallback(extract_info)
+        return d
+
+    def _webhook_info_by_index(self, log, capability_hash):
+        """
+        Get webhook info based on hash by using the INDEX
+        """
         def _do_webhook_lookup(webhook_rec):
             res = webhook_rec
             if len(res) == 0:
@@ -1259,16 +1303,13 @@ class CassScalingGroupCollection:
             ('groups', 'policies', 'webhooks'), results)))
         return d
 
-    def health_check(self, clock=None):
+    def health_check(self):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
 
         In addition to ``healthy`` and ``time``, returns whether it can
         connect to cassandra and zookeeper
         """
-        if clock is None:
-            clock = reactor
-
         if self.kz_client is None:
             zk_health = {'zookeeper': False,
                          'zookeeper_state': 'Not connected yet'}
@@ -1280,26 +1321,26 @@ class CassScalingGroupCollection:
             zk_health = {'zookeeper': state == KazooState.CONNECTED,
                          'zookeeper_state': state}
 
-        start_time = clock.seconds()
+        start_time = self.reactor.seconds()
 
         d = self.connection.execute(
             _cql_health_check.format(cf=self.group_table), {},
             get_consistency_level('health', 'check'))
 
         # stop health check after 15 seconds
-        timeout_deferred(d, 15, clock=clock,
+        timeout_deferred(d, 15, clock=self.reactor,
                          deferred_description='cassandra health check')
 
         d.addCallback(lambda _: (zk_health['zookeeper'], dict(
             cassandra=True,
-            cassandra_time=(clock.seconds() - start_time),
+            cassandra_time=(self.reactor.seconds() - start_time),
             **zk_health
         )))
 
         d.addErrback(lambda f: (False, dict(
             cassandra=False,
             cassandra_failure=repr(f.value),
-            cassandra_time=clock.seconds() - start_time,
+            cassandra_time=self.reactor.seconds() - start_time,
             **zk_health
         )))
 
