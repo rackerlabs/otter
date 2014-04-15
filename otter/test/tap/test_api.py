@@ -7,7 +7,7 @@ import mock
 
 from testtools.matchers import Contains
 
-from twisted.internet import reactor, defer
+from twisted.internet import defer
 
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
@@ -225,6 +225,8 @@ class APIMakeServiceTests(TestCase):
         self.Otter = Otter_patcher.start()
         self.addCleanup(Otter_patcher.stop)
 
+        self.reactor = patch(self, 'otter.tap.api.reactor')
+
         self.CassScalingGroupCollection = patch(self, 'otter.tap.api.CassScalingGroupCollection')
         self.store = self.CassScalingGroupCollection.return_value
 
@@ -292,7 +294,7 @@ class APIMakeServiceTests(TestCase):
         cassandra seed_hosts.
         """
         makeService(test_config)
-        self.clientFromString.assert_called_once_with(reactor, 'tcp:127.0.0.1:9160')
+        self.clientFromString.assert_called_once_with(self.reactor, 'tcp:127.0.0.1:9160')
 
     def test_unicode_cassandra_seed_hosts_endpoints(self):
         """
@@ -302,7 +304,7 @@ class APIMakeServiceTests(TestCase):
         """
         unicode_config = json.loads(json.dumps(test_config, encoding="utf-8"))
         makeService(unicode_config)
-        self.clientFromString.assert_called_once_with(reactor, 'tcp:127.0.0.1:9160')
+        self.clientFromString.assert_called_once_with(self.reactor, 'tcp:127.0.0.1:9160')
         self.assertTrue(isinstance(self.clientFromString.call_args[0][1], str))
 
     def test_cassandra_cluster_with_endpoints_and_keyspace(self):
@@ -324,7 +326,8 @@ class APIMakeServiceTests(TestCase):
         self.log.bind.assert_called_once_with(system='otter.silverberg')
         self.LoggingCQLClient.assert_called_once_with(self.RoundRobinCassandraCluster.return_value,
                                                       self.log.bind.return_value)
-        self.CassScalingGroupCollection.assert_called_once_with(self.LoggingCQLClient.return_value)
+        self.CassScalingGroupCollection.assert_called_once_with(
+            self.LoggingCQLClient.return_value, self.reactor)
 
     def test_cassandra_cluster_disconnects_on_stop(self):
         """
