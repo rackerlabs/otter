@@ -21,7 +21,8 @@ from otter.models.cass import (
     get_consistency_level,
     verified_view,
     _assemble_webhook_from_row,
-    assemble_webhooks_in_policies)
+    assemble_webhooks_in_policies,
+    WeakLocks)
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
@@ -300,6 +301,36 @@ class VerifiedViewTests(TestCase):
         self.failureResultOf(r, ValueError)
         self.connection.execute.assert_called_once_with('vq', {'d': 2}, 6)
         self.assertFalse(self.log.msg.called)
+
+
+class WeakLocksTests(TestCase):
+    """
+    Tests for `WeakLocks`
+    """
+
+    def setUp(self):
+        """
+        Sample `WeakLocks` object
+        """
+        self.locks = WeakLocks()
+
+    def test_returns_deferlock(self):
+        """
+        `get_lock` returns a `DeferredLock`
+        """
+        self.assertIsInstance(self.locks.get_lock('a'), defer.DeferredLock)
+
+    def test_same_lock(self):
+        """
+        `get_lock` on same uuid returns same `DeferredLock`
+        """
+        self.assertIs(self.locks.get_lock('a'), self.locks.get_lock('a'))
+
+    def test_diff_lock(self):
+        """
+        `get_lock` on different uuid returns different `DeferredLock`
+        """
+        self.assertIsNot(self.locks.get_lock('a'), self.locks.get_lock('b'))
 
 
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):

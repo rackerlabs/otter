@@ -5,6 +5,7 @@ import time
 import itertools
 import uuid
 import functools
+import weakref
 
 from zope.interface import implementer
 
@@ -449,6 +450,29 @@ def verified_view(connection, view_query, del_query, data, consistency, exceptio
 
     d = connection.execute(view_query, data, consistency)
     return d.addCallback(_check_resurrection)
+
+
+class WeakLocks(object):
+    """
+    A cache of DeferredLocks mapped based on uuid that gets garbage collected
+    after the lock has been utilized
+    """
+
+    def __init__(self):
+        self._locks = weakref.WeakValueDictionary()
+
+    def get_lock(self, uuid):
+        """
+        Get lock based on uuid
+
+        :param str uuid: Lock's corresponding UUID
+        :return `DeferredLock`
+        """
+        lock = self._locks.get(uuid)
+        if not lock:
+            lock = defer.DeferredLock()
+            self._locks[uuid] = lock
+        return lock
 
 
 @implementer(IScalingGroup)
