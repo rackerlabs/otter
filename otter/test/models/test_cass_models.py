@@ -380,10 +380,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.kz_lock.Lock.return_value = self.lock
 
         self.clock = Clock()
+        locks = WeakLocks()
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
                                       self.connection, itertools.cycle(range(2, 10)),
-                                      self.kz_lock, self.clock)
+                                      self.kz_lock, self.clock, locks)
+        self.assertIs(self.group.local_locks, locks)
         self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
                                                    tenant_id=self.tenant_id,
                                                    scaling_group_id=self.group_id)
@@ -578,6 +580,44 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
+
+    def test_modify_state_local_lock_before_kz_lock(self):
+        """
+        ``modify_state`` first acquires local lock then acquires kz lock
+        """
+        def modifier(group, state):
+            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None,
+                              {}, True, desired=5)
+
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+        # setup local lock
+        llock = defer.DeferredLock()
+        self.group.local_locks = mock.Mock(get_lock=mock.Mock(return_value=llock))
+
+        # setup local and kz lock acquire and release returns
+        local_acquire_d = defer.Deferred()
+        llock.acquire = mock.Mock(return_value=local_acquire_d)
+        llock.release = mock.Mock(return_value=defer.succeed(None))
+        release_d = defer.Deferred()
+        self.lock.release.side_effect = lambda: release_d
+
+        d = self.group.modify_state(modifier)
+
+        self.assertNoResult(d)
+        # local lock was tried, but kz lock was not
+        llock.acquire.assert_called_once_with()
+        self.assertFalse(self.lock._acquire.called)
+        # After local lock acquired, kz lock is acquired
+        local_acquire_d.callback(None)
+        self.lock._acquire.assert_called_once_with(timeout=120)
+        # first kz lock is released
+        self.lock.release.assert_called_once_with()
+        self.assertFalse(llock.release.called)
+        # then local lock is relased
+        release_d.callback(None)
+        llock.release.assert_called_once_with()
+
+        self.assertEqual(self.successResultOf(d), None)
 
     @mock.patch('otter.models.cass.serialize_json_data',
                 side_effect=lambda *args: _S(args[0]))
@@ -2306,6 +2346,15 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         # 'serializing' something just wraps it with a _S
         self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
                                  side_effect=lambda *args: _S(args[0]))
+
+    @mock.patch('otter.models.cass.WeakLocks', return_value=2)
+    def test_locks(self, mock_wl):
+        """
+        `CassScalingGroupCollection` keeps new WeakLocks object
+        """
+        collection = CassScalingGroupCollection(self.connection, self.clock)
+        mock_wl.assert_called_once_with()
+        self.assertEqual(collection.local_locks, 2)
 
     def test_create(self):
         """
