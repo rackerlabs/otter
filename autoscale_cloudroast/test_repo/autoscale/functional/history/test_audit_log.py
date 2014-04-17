@@ -2,6 +2,7 @@
 Test the non-scenario specific audit log functions.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
+import unittest
 
 
 class AuditLogBasicsTest(AutoscaleFixture):
@@ -30,6 +31,7 @@ class AuditLogBasicsTest(AutoscaleFixture):
         cls.resources.add(cls.third_scaling_group.id,
                           cls.autoscale_client.delete_scaling_group)
 
+    @unittest.skip("Skipping until audit log population is merged")
     def test_history_resource_response(self):
         """
         Verify that querying the history API returns the expected response.
