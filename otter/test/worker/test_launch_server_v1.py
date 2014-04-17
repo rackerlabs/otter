@@ -1327,6 +1327,165 @@ class ServerTests(TestCase):
 
         self.assertEqual(self.undo.push.call_count, 0)
 
+    @mock.patch('otter.worker.launch_server_v1.verified_delete')
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_retries_on_error(self, mock_wfa, mock_cs, mock_addlb, mock_vd):
+        """
+        If server goes into ERROR state, launch_server deletes it and creates a new
+        one instead
+        """
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': [
+                             {'loadBalancerId': 12345, 'port': 80},
+                             {'loadBalancerId': 54321, 'port': 81}
+                         ]}
+
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'private': [
+                    {'version': 4, 'addr': '10.0.0.1'}]}}}
+
+        mock_cs.side_effect = lambda *a, **kw: succeed(server_details)
+
+        wfa_returns = [fail(UnexpectedServerStatus('1', 'ERROR', 'ACTIVE')),
+                       fail(UnexpectedServerStatus('1', 'ERROR', 'ACTIVE')),
+                       succeed(server_details)]
+        mock_wfa.side_effect = lambda *a: wfa_returns.pop(0)
+        mock_vd.side_effect = lambda *a: Deferred()
+
+        clock = Clock()
+        d = launch_server(self.log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo, clock=clock)
+
+        # No result, create_server and wait_for_active called once, server deletion
+        # was started and it wasn't added to clb
+        self.assertNoResult(d)
+        self.assertEqual(mock_cs.call_count, 1)
+        self.assertEqual(mock_wfa.call_count, 1)
+        mock_vd.assert_called_once_with(
+            matches(IsInstance(self.log.__class__)), 'http://dfw.openstack/',
+            'my-auth-token', '1')
+        self.log.msg.assert_called_once_with(
+            '{server_id} errored, deleting and creating new server instead',
+            server_name='as000000', server_id='1')
+
+        self.assertFalse(mock_addlb.called)
+
+        # After 15 seconds, server was created again, notice that verified_delete
+        # incompletion doesn't hinder new server creation
+        clock.advance(15)
+        self.assertNoResult(d)
+        self.assertEqual(mock_cs.call_count, 2)
+        self.assertEqual(mock_wfa.call_count, 2)
+        self.assertEqual(mock_vd.mock_calls,
+            [mock.call(matches(IsInstance(self.log.__class__)), 'http://dfw.openstack/',
+                       'my-auth-token', '1')] * 2)
+        self.assertEqual(self.log.msg.mock_calls,
+            [mock.call('{server_id} errored, deleting and creating new server instead',
+                       server_name='as000000', server_id='1')] * 2)
+        self.assertFalse(mock_addlb.called)
+
+        # next time server creation succeeds
+        clock.advance(15)
+        self.successResultOf(d)
+        self.assertEqual(mock_cs.call_count, 3)
+        self.assertEqual(mock_wfa.call_count, 3)
+        self.assertEqual(mock_vd.call_count, 2)
+        self.assertEqual(self.log.msg.call_count, 2)
+        self.assertEqual(mock_addlb.call_count, 1)
+
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_no_retry_on_non_error(self, mock_wfa, mock_cs, mock_addlb):
+        """
+        launch_server does not retry to create server if server goes into any state
+        other than ERROR
+        """
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': [
+                             {'loadBalancerId': 12345, 'port': 80},
+                             {'loadBalancerId': 54321, 'port': 81}
+                         ]}
+
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'private': [
+                    {'version': 4, 'addr': '10.0.0.1'}]}}}
+
+        mock_cs.side_effect = lambda *a, **kw: succeed(server_details)
+
+        wfa_returns = [fail(UnexpectedServerStatus('1', 'SOME', 'ACTIVE')),
+                       succeed(server_details)]
+        mock_wfa.side_effect = lambda *a: wfa_returns.pop(0)
+
+        clock = Clock()
+        d = launch_server(self.log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo, clock=clock)
+
+        self.failureResultOf(d, UnexpectedServerStatus)
+        self.assertEqual(mock_cs.call_count, 1)
+        self.assertEqual(mock_wfa.call_count, 1)
+        self.assertFalse(mock_addlb.called)
+
+    @mock.patch('otter.worker.launch_server_v1.verified_delete')
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_max_retries(self, mock_wfa, mock_cs, mock_addlb, mock_vd):
+        """
+        server is created again max 3 times if it goes into ERROR state
+        """
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': [
+                             {'loadBalancerId': 12345, 'port': 80},
+                             {'loadBalancerId': 54321, 'port': 81}
+                         ]}
+
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'private': [
+                    {'version': 4, 'addr': '10.0.0.1'}]}}}
+
+        mock_cs.side_effect = lambda *a, **kw: succeed(server_details)
+
+        wfa_returns = [fail(UnexpectedServerStatus('1', 'ERROR', 'ACTIVE')),
+                       fail(UnexpectedServerStatus('1', 'ERROR', 'ACTIVE')),
+                       fail(UnexpectedServerStatus('1', 'ERROR', 'ACTIVE')),
+                       fail(UnexpectedServerStatus('1', 'ERROR', 'ACTIVE'))]
+        mock_wfa.side_effect = lambda *a: wfa_returns.pop(0)
+
+        clock = Clock()
+        d = launch_server(self.log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo, clock=clock)
+
+        clock.pump([15] * 3)
+        self.failureResultOf(d, UnexpectedServerStatus)
+        self.assertEqual(mock_cs.call_count, 4)
+        self.assertEqual(mock_wfa.call_count, 4)
+        self.assertEqual(mock_vd.call_count, 3)
+        self.assertFalse(mock_addlb.called)
+
 
 class ConfigPreparationTests(TestCase):
     """
