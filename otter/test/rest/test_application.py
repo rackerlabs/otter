@@ -328,7 +328,7 @@ class CollectionLinksTests(TestCase):
 
     def test_ignore_url_limit_query_params(self):
         """
-        If the marker parameter is provided, it will override the marker params
+        If the limit parameter is provided, it will override the marker params
         in the url
         """
         links = get_collection_links(self.coll, 'url?limit=100&marker=1', 'self',
@@ -378,6 +378,14 @@ class CollectionLinksTests(TestCase):
                                      next_marker=next_marker_by_offset)
         self.assertEqual(links, [{'href': 'http://localhost/url?limit=1&marker=1', 'rel': 'self'},
                                  {'href': 'http://localhost/url?limit=1&marker=2', 'rel': 'next'}])
+
+    def test_use_provided_absolute_url_if_provided(self):
+        """
+        If an absolute url is passed, use that instead of trying to get the url
+        root.
+        """
+        links = get_collection_links(self.coll, 'http://otherroot/url', 'self', limit=20)
+        self.assertEqual(links, [{'href': 'http://otherroot/url?limit=20', 'rel': 'self'}])
 
 
 class GetSpecificCollectionsLinks(TestCase):
