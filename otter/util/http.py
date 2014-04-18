@@ -161,6 +161,41 @@ def get_url_root():
     return config_value('url_root')
 
 
+def unparse_qs(querydict):
+    """
+    Query parameters in urls can repeat keys, such as ``name=willis&name=rob``.
+
+    L{urllib.parse_qs} returns in request arguments in dictionary form with every
+    key mapped to a list, such as ``{"name": ["willis", "rob"]}``
+
+    L{urllib.urlencode} however encodes that as
+    ``'name=%5B%27willis%27%2C+%27rob%27%5D'`` which is basically
+    ``name=['willis', 'rob']``::
+
+        >>> urlencode(parse_qs("name=willis&name=rob"))
+        'name=%5B%27willis%27%2C+%27rob%27%5D'
+
+    This helper function first converts such a dictionary to a list of tuples,
+    such as ``[('name', 'willis'), ('name', 'rob')]`` so that ``urlencode`` will
+    produce ``name=willis&name=rob`` again.
+
+    Then it returns the urlencoded string.
+
+    :param dictionary: A C{dict} of C{lists}
+    :return: A url-encoded string of query parameters, sorted in alphabetical
+        order to make testing easier
+    """
+    query_params = []
+
+    for k in sorted(querydict.keys()):
+        if isinstance(querydict[k], list):
+            query_params.extend([(k, v) for v in sorted(querydict[k])])
+        else:
+            query_params.append((k, querydict[k]))
+
+    return urlencode(query_params)
+
+
 def _pagination_link(url, rel, limit, marker):
     """
     Generates a link dictionary where the href link has (possibly) limit
@@ -191,15 +226,7 @@ def _pagination_link(url, rel, limit, marker):
     if query_params:
         query = parse_qs(url_parts[3])
         query.update(query_params)
-
-        query_params = []
-        for k in sorted(query.keys()):  # sorting, for testability
-            if isinstance(query[k], list):
-                query_params.extend([(k, v) for v in query[k]])
-            else:
-                query_params.append((k, query[k]))
-
-        url_parts[3] = urlencode(query_params)
+        url_parts[3] = unparse_qs(query)
         url = urlunsplit(url_parts)
 
     return {'href': url, 'rel': rel}
