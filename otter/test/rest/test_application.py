@@ -14,7 +14,6 @@ from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import with_transaction_id, log_arguments
 from otter.test.rest.request import RequestTestMixin, RestAPITestMixin
 from otter.test.utils import patch
-from otter.util.config import set_config_data
 from otter.util.http import (get_autoscale_links, transaction_id, get_collection_links,
                              get_groups_links, get_policies_links, get_webhooks_links,
                              next_marker_by_offset)

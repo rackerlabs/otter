@@ -216,19 +216,28 @@ def _pagination_link(url, rel, limit, marker):
     elif limit != (config_value('limits.pagination') or 100):
         query_params['limit'] = limit
 
-    url_parts = list(urlsplit(url))
-    if not (url_parts[0] and url_parts[1]):  # scheme and netloc
-        # 3 is query
-        url_parts[:3] = list(urlsplit(append_segments(get_url_root(),
-                                      url_parts[2].lstrip('/'))))[:3]
-        url = urlunsplit(url_parts)
+    # split_url is a tuple that can't be modified, so listify it
+    # (scheme, netloc, path, query, fragment)
+    split_url = urlsplit(url)
+    mutable_url_parts = list(split_url)
 
+    # update mutable_url_parts with a scheme and netloc if either are missing
+    # so that the final URI will always be an absolute URI
+    if not (split_url.scheme and split_url.netloc):
+        # generate a new absolute URI so that when split, its scheme, netloc,
+        # and path parts can be cannabalized
+        donor = urlsplit(
+            append_segments(get_url_root(), split_url.path.lstrip('/')))
+
+        mutable_url_parts[:3] = [donor.scheme, donor.netloc, donor.path]
+
+    # update the query parameters with new query parameters if necessary
     if query_params:
-        query = parse_qs(url_parts[3])
+        query = parse_qs(split_url.query)
         query.update(query_params)
-        url_parts[3] = unparse_qs(query)
-        url = urlunsplit(url_parts)
+        mutable_url_parts[3] = unparse_qs(query)
 
+    url = urlunsplit(mutable_url_parts)
     return {'href': url, 'rel': rel}
 
 
