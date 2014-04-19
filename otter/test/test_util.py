@@ -3,7 +3,6 @@ Tests for ``otter.util``
 """
 from datetime import datetime
 import mock
-from urlparse import parse_qs
 
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed, fail, Deferred
@@ -13,7 +12,7 @@ from twisted.web.http_headers import Headers
 
 from otter.util.http import (
     append_segments, APIError, check_success, RequestError, headers,
-    raise_error_on_code, wrap_request_error, unparse_qs)
+    raise_error_on_code, wrap_request_error)
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
 from otter.util.deferredutils import with_lock, delay
