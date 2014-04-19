@@ -217,30 +217,6 @@ class HTTPUtilityTests(TestCase):
         self.assertRaises(RequestError, wrap_request_error,
                           failure, 'url')
 
-    def test_unparse_qs_returns_multiple_values_for_keys(self):
-        """
-        urlencode(parse_qs("name=willis&name=rob")) returns
-        'name=%5B%27willis%27%2C+%27rob%27%5D'
-
-        unparse_qs is the inverse of parse_qs
-        """
-        sample = "name=rob&name=willis"
-        self.assertEqual(unparse_qs(parse_qs(sample)), sample)
-
-    def test_unparse_qs_sorts_keys_in_alphabetical_order(self):
-        """
-        unparse_qs returns all keys sorted in alphabetical order
-        """
-        self.assertEqual(unparse_qs({'a': 1, 'z': 2, 'b': 3}), "a=1&b=3&z=2")
-
-    def test_unparse_qs_sorts_values_in_alphabetical_order(self):
-        """
-        unparse_qs returns all values for the same key sorted in alphabetical
-        order
-        """
-        self.assertEqual(unparse_qs({'name': ['z', 'b', 'y', 'x']}),
-                         "name=b&name=x&name=y&name=z")
-
 
 class CapabilityTests(TestCase):
     """
