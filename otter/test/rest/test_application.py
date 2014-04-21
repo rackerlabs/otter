@@ -555,3 +555,38 @@ class RootRouteTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(response_wrapper.response.code, 200)
         self.assertEqual(self.get_non_standard_headers(response_wrapper), {})
         self.assertEqual(response_wrapper.content, 'happyhappyhappy')
+
+
+class SchedulerResetTests(RestAPITestMixin, TestCase):
+    """
+    Tests that the scheduler reset endpoint resets the scheduler with new path
+    """
+    endpoint = "/scheduler_reset"
+    invalid_methods = ("DELETE", "PUT", "GET")
+
+    def setUp(self):
+        """
+        Sample scheduler
+        """
+        super(SchedulerResetTests, self).setUp()
+        self.reset = mock.Mock()
+        self.root = Otter(self.mock_store, scheduler_reset=self.reset).app.resource()
+
+    def test_delegates(self):
+        """
+        Calls scheduler.reset with new path
+        """
+        resp = self.assert_status_code(200, method='POST',
+                                       endpoint=self.endpoint + '?path=/new_path')
+        self.assertEqual(resp, '')
+        self.reset.assert_called_once_with('/new_path')
+
+    def test_exception(self):
+        """
+        Returns 400 with exception message when ValueError is raised
+        """
+        self.reset.side_effect = ValueError('meh')
+        resp = self.assert_status_code(400, method='POST',
+                                       endpoint=self.endpoint + '?path=/new_path')
+        self.assertEqual(resp, 'meh')
+        self.reset.assert_called_once_with('/new_path')

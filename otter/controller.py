@@ -289,3 +289,4 @@ def calculate_delta(log, state, config, policy):
             server_delta=delta, current_active=len(state.active),
             current_pending=len(state.pending))
     return delta
+

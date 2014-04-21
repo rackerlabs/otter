@@ -5,7 +5,7 @@ from datetime import timedelta, datetime
 
 import mock
 
-from testtools.matchers import ContainsDict, Equals
+from testtools.matchers import ContainsDict, Equals, IsInstance
 
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase

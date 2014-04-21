@@ -354,21 +354,6 @@ class APIMakeServiceTests(TestCase):
         self.assertEqual(self.health_checker.checks['store'],
                          self.store.health_check)
 
-    @mock.patch('otter.tap.api.setup_scheduler')
-    @mock.patch('otter.tap.api.TxKazooClient')
-    def test_health_checker_zookeeper(self, *args):
-        """
-        A health checker is constructed by default with the store and an
-        invalid scheduler service
-        """
-        config = test_config.copy()
-        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
-        self.assertIsNone(self.health_checker)
-        makeService(config)
-        self.assertIsNotNone(self.health_checker)
-        self.assertEqual(self.health_checker.checks['scheduler'](),
-                         (False, {'reason': 'scheduler not ready yet'}))
-
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_supervisor_service_set_by_default(self, supervisor):
         """
@@ -414,8 +399,9 @@ class APIMakeServiceTests(TestCase):
         start_d.callback(None)
         mock_setup_scheduler.assert_called_once_with(parent, self.store, kz_client)
         self.assertEqual(self.store.kz_client, kz_client)
-        self.assertEqual(self.health_checker.checks['scheduler'],
-                         mock_setup_scheduler.return_value.health_check)
+        sch = mock_setup_scheduler.return_value
+        self.assertEqual(self.health_checker.checks['scheduler'], sch.health_check)
+        self.assertEqual(self.Otter.return_value.scheduler_reset, sch.reset)
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')

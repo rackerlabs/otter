@@ -243,8 +243,6 @@ def makeService(config):
 
     # Setup Kazoo client
     if config_value('zookeeper'):
-        health_checker.checks['scheduler'] = (
-            lambda: (False, {'reason': 'scheduler not ready yet'}))
         threads = config_value('zookeeper.threads') or 10
         kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'),
                                   threads=threads, txlog=log.bind(system='kazoo'))
@@ -253,9 +251,8 @@ def makeService(config):
         def on_client_ready(_):
             # Setup scheduler service after starting
             scheduler = setup_scheduler(s, store, kz_client)
-            health_checker.checks['scheduler'] = getattr(
-                scheduler, 'health_check',
-                lambda: (False, 'scheduler health check not implemented'))
+            health_checker.checks['scheduler'] = scheduler.health_check
+            otter.scheduler_reset = scheduler.reset
             # Set the client after starting
             # NOTE: There is small amount of time when the start is not finished
             # and the kz_client is not set in which case policy execution and group

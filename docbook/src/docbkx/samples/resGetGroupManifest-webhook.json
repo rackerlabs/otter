@@ -1,0 +1,75 @@
+{
+  "group": {
+    "groupConfiguration": {
+      "cooldown": 60,
+      "maxEntities": 0,
+      "metadata": {},
+      "minEntities": 0,
+      "name": "smallest possible launch config group"
+    },
+    "state": {
+      "active": [],
+      "activeCapacity": 0,
+      "desiredCapacity": 0,
+      "paused": false,
+      "pendingCapacity": 0
+    },
+    "id": "605e13f6-1452-4588-b5da-ac6bb468c5bf",
+    "launchConfiguration": {
+      "args": {
+        "server": {}
+      },
+      "type": "launch_server"
+    },
+    "links": [
+      {
+        "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/",
+        "rel": "self"
+      }
+    ],
+    "scalingPolicies": [
+      {
+        "changePercent": -5.5,
+        "cooldown": 1800,
+        "id": "eb0fe1bf-3428-4f34-afd9-a5ac36f60511",
+        "links": [
+          {
+            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/",
+                "rel": "self"
+            }
+        ],
+        "name": "scale down by 5.5 percent",
+        "type": "webhook",
+        "webhooks": [
+          {
+            "id":"05f7d9d9-b9d0-40ac-8d3b-610197775c7f",
+            "name": "automatically generated",
+            "metadata": {},
+            "links": [
+              {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/05f7d9d9-b9d0-40ac-8d3b-610197775c7f/",
+                "rel": "self"
+              },
+              {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/392be67bacfd1adf54e4f9fbc2b40873b9c7c3128315647f46d94c4b5c56b4d6/",
+                "rel": "capability"
+              }
+            ]
+          }
+        ],
+        "webhooks_links": [
+          {
+            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/",
+            "rel": "webhooks"
+          }
+        ]
+      }
+    ],
+    "scalingPolicies_links": [
+      {
+        "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/", 
+        "rel": "policies"
+      }
+    ]
+  }
+}

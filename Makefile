@@ -52,6 +52,7 @@ coverage:
 cleandocs:
 	rm -rf _builddoc
 	rm -rf htmldoc
+	rm -rf docbook/target
 
 docs: cleandocs
 	cp -r ${DOCDIR} _builddoc
