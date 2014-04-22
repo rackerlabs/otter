@@ -1385,10 +1385,12 @@ class ServerTests(TestCase):
         self.assertNoResult(d)
         self.assertEqual(mock_cs.call_count, 2)
         self.assertEqual(mock_wfa.call_count, 2)
-        self.assertEqual(mock_vd.mock_calls,
+        self.assertEqual(
+            mock_vd.mock_calls,
             [mock.call(matches(IsInstance(self.log.__class__)), 'http://dfw.openstack/',
                        'my-auth-token', '1')] * 2)
-        self.assertEqual(self.log.msg.mock_calls,
+        self.assertEqual(
+            self.log.msg.mock_calls,
             [mock.call('{server_id} errored, deleting and creating new server instead',
                        server_name='as000000', server_id='1')] * 2)
         self.assertFalse(mock_addlb.called)
