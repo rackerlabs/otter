@@ -2738,6 +2738,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(g, CassScalingGroup))
         self.assertEqual(g.uuid, '12345678')
         self.assertEqual(g.tenant_id, '123')
+        self.assertIs(g.local_locks, self.collection.local_locks)
 
     def test_webhook_hash_from_table(self):
         """
