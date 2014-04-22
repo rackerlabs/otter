@@ -119,15 +119,17 @@ def wait_for_active(log,
     def poll():
         def check_status(server):
             status = server['server']['status']
+            time_building = clock.seconds() - start_time
 
             if status == 'ACTIVE':
-                time_building = clock.seconds() - start_time
                 log.msg(("Server changed from 'BUILD' to 'ACTIVE' within "
                          "{time_building} seconds"),
                         time_building=time_building)
                 return server
 
             elif status != 'BUILD':
+                log.msg("Server changed to '{status}' in {time_building} seconds",
+                        time_building=time_building, status=status)
                 raise UnexpectedServerStatus(
                     server_id,
                     status,

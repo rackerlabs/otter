@@ -893,6 +893,9 @@ class ServerTests(TestCase):
                             'http://url/', 'my-auth-token', 'serverId',
                             interval=5, clock=clock)
 
+        self.log.msg.assert_called_once_with(
+            "Checking instance status every {interval} seconds", interval=5)
+
         server_details.assert_called_with('http://url/', 'my-auth-token',
                                           'serverId', log=mock.ANY)
         self.assertEqual(server_details.call_count, 1)
@@ -904,6 +907,10 @@ class ServerTests(TestCase):
         server_details.assert_called_with('http://url/', 'my-auth-token',
                                           'serverId', log=mock.ANY)
         self.assertEqual(server_details.call_count, 2)
+
+        self.log.msg.assert_called_with(
+            "Server changed from 'BUILD' to 'ACTIVE' within {time_building} seconds",
+            time_building=5.0)
 
         result = self.successResultOf(d)
 
@@ -932,6 +939,10 @@ class ServerTests(TestCase):
 
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(UnexpectedServerStatus))
+
+        self.log.msg.assert_called_with(
+            "Server changed to '{status}' in {time_building} seconds",
+            time_building=5.0, status='ERROR')
 
         self.assertEqual(failure.value.server_id, 'serverId')
         self.assertEqual(failure.value.status, 'ERROR')
