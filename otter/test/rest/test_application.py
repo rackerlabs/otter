@@ -14,9 +14,10 @@ from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import with_transaction_id, log_arguments
 from otter.test.rest.request import RequestTestMixin, RestAPITestMixin
 from otter.test.utils import patch
-from otter.util.config import set_config_data
 from otter.util.http import (get_autoscale_links, transaction_id, get_collection_links,
-                             get_groups_links, get_policies_links, get_webhooks_links)
+                             get_groups_links, get_policies_links, get_webhooks_links,
+                             next_marker_by_offset)
+from otter.util.config import set_config_data
 
 
 class LinkGenerationTestCase(TestCase):
@@ -267,48 +268,123 @@ class CollectionLinksTests(TestCase):
         Setup sample collection
         """
         self.coll = [{'id': '23'}, {'id': '567'}, {'id': '3444'}]
+        set_config_data({'url_root': 'http://localhost'})
+        self.addCleanup(set_config_data, {})
 
     def test_small_collection(self):
         """
-        Collection len < limit gives self link only. No next link
+        Collection len < limit gives self link only. No next link.
         """
         links = get_collection_links(self.coll, 'url', 'self', limit=20)
-        self.assertEqual(links, [{'href': 'url', 'rel': 'self'}])
+        self.assertEqual(links, [{'href': 'http://localhost/url?limit=20', 'rel': 'self'}])
 
     def test_limit_collection(self):
         """
-        Collection len == limit gives next link also
+        Collection len == limit gives next link also - defaults to calculating
+        the next marker by id.
         """
         links = get_collection_links(self.coll, 'url', 'self', limit=3)
-        # FIXME: Cannot predict the sequence of marker and limit in URL
-        self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
-                                 {'href': 'url?marker=3444&limit=3', 'rel': 'next'}])
+        self.assertEqual(links, [{'href': 'http://localhost/url?limit=3', 'rel': 'self'},
+                                 {'href': 'http://localhost/url?limit=3&marker=3444', 'rel': 'next'}])
 
     def test_big_collection(self):
         """
-        Collection len > limit gives next link with marker based on limit
+        Collection len > limit gives next link with marker based on limit -
+        defaults to calculating the next marker by id.
         """
         links = get_collection_links(self.coll, 'url', 'self', limit=2)
-        # FIXME: Cannot predict the sequence of marker and limit in URL
-        self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
-                                 {'href': 'url?marker=567&limit=2', 'rel': 'next'}])
+        self.assertEqual(links, [{'href': 'http://localhost/url?limit=2', 'rel': 'self'},
+                                 {'href': 'http://localhost/url?limit=2&marker=567', 'rel': 'next'}])
 
-    @mock.patch('otter.util.http.config_value', return_value=3)
-    def test_no_limit(self, config_value):
+    def test_no_limit(self):
         """
-        Defaults to config limit if not given
+        Defaults to config limit if not given, leaving it off the self URL, and
+        calculates the next marker by id by default
         """
+        set_config_data({'limits': {'pagination': 3}, 'url_root': 'http://localhost'})
         links = get_collection_links(self.coll, 'url', 'self')
-        self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
-                                 {'href': 'url?marker=3444&limit=3', 'rel': 'next'}])
-        config_value.assert_called_once_with('limits.pagination')
+        self.assertEqual(links, [{'href': 'http://localhost/url', 'rel': 'self'},
+                                 {'href': 'http://localhost/url?limit=3&marker=3444', 'rel': 'next'}])
 
     def test_rel_None(self):
         """
-        Does not include self link if rel is None
+        Does not include self link if rel is None, even if there is a next
+        link, and calculates the next marker by id by default
         """
-        links = get_collection_links(self.coll, 'url', None, limit=30)
-        self.assertEqual(links, [])
+        links = get_collection_links(self.coll, 'url', None, limit=3)
+        self.assertEqual(links,
+                         [{'href': 'http://localhost/url?limit=3&marker=3444', 'rel': 'next'}])
+
+    def test_ignore_url_marker_query_params(self):
+        """
+        If the marker parameter is provided, it will override the marker params
+        in the url
+        """
+        links = get_collection_links(self.coll, 'url?marker=0', 'self',
+                                     marker='1')
+        self.assertEqual(
+            links, [{'href': 'http://localhost/url?limit=100&marker=1', 'rel': 'self'}])
+
+    def test_ignore_url_limit_query_params(self):
+        """
+        If the limit parameter is provided, it will override the marker params
+        in the url
+        """
+        links = get_collection_links(self.coll, 'url?limit=100&marker=1', 'self',
+                                     limit=20)
+        self.assertEqual(
+            links, [{'href': 'http://localhost/url?limit=20&marker=1', 'rel': 'self'}])
+
+    def test_passes_additional_query_params(self):
+        """
+        If there are more query params besides marker and limit,
+        ``get_collection_links`` will not destroy them
+        """
+        links = get_collection_links(self.coll, 'url?hat=black&scarf=hipster', 'self',
+                                     limit=1)
+        self.assertEqual(
+            links,
+            [{'href': 'http://localhost/url?hat=black&limit=1&scarf=hipster', 'rel': 'self'},
+             {'href': 'http://localhost/url?hat=black&limit=1&marker=23&scarf=hipster',
+              'rel': 'next'}])
+
+    def test_current_marker_in_self_link(self):
+        """
+        If a current marker is provided it is included in the self link
+        """
+        links = get_collection_links(self.coll, 'url', 'self', marker='1',
+                                     limit=20)
+        self.assertEqual(links,
+                         [{'href': 'http://localhost/url?limit=20&marker=1', 'rel': 'self'}])
+
+    def test_marker_by_offset_no_current_marker(self):
+        """
+        When passed ``next_marker_by_offset``, next_marker is the next item offset
+        by the limit
+        """
+        links = get_collection_links(self.coll, 'url', 'self', limit=1,
+                                     next_marker=next_marker_by_offset)
+        self.assertEqual(links, [{'href': 'http://localhost/url?limit=1', 'rel': 'self'},
+                                 {'href': 'http://localhost/url?limit=1&marker=1', 'rel': 'next'}])
+
+    def test_marker_by_offset_from_current_marker(self):
+        """
+        When passed ``next_marker_by_offset``, next_marker is the next item offset
+        by the limit, but takes into account the current marker too
+        """
+        links = get_collection_links(self.coll, 'url', 'self', limit=1,
+                                     marker=1,
+                                     next_marker=next_marker_by_offset)
+        self.assertEqual(links, [{'href': 'http://localhost/url?limit=1&marker=1', 'rel': 'self'},
+                                 {'href': 'http://localhost/url?limit=1&marker=2', 'rel': 'next'}])
+
+    def test_use_provided_absolute_url_if_provided(self):
+        """
+        If an absolute url is passed, use that instead of trying to get the url
+        root.
+        """
+        links = get_collection_links(self.coll, 'http://otherroot/url', 'self', limit=20)
+        self.assertEqual(links, [{'href': 'http://otherroot/url?limit=20', 'rel': 'self'}])
 
 
 class GetSpecificCollectionsLinks(TestCase):

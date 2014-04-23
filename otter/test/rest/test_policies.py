@@ -115,7 +115,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         validate(resp, rest_schemas.list_policies_response)
         expected_links = [
-            {'href': '/v1.0/11111/groups/1/policies/?marker=100&limit=100',
+            {'href': '/v1.0/11111/groups/1/policies/?limit=100&marker=100',
              'rel': 'next'}
         ]
         self.assertEqual(resp['policies_links'], expected_links)
