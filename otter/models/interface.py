@@ -245,10 +245,13 @@ class IScalingGroup(Interface):
     uuid = Attribute("UUID of the scaling group - immutable.")
     tenant_id = Attribute("Rackspace Tenant ID of the owner of this group.")
 
-    def view_manifest():
+    def view_manifest(with_webhooks=False):
         """
         The manifest contains everything required to configure this scaling:
         the config, the launch config, and all the scaling policies.
+
+        :param with_webhooks: Should webhooks information be included?
+        :type config: ``Bool``
 
         :return: a dictionary corresponding to the JSON schema at
             :data:``otter.json_schema.model_schemas.view_manifest``
@@ -703,13 +706,12 @@ class IScalingGroupCollection(Interface):
             count of tenants policies, webhooks and groups as ``dict``
         """
 
-    def health_check(clock=None):
+    def health_check():
         """
         Returns a JSON dictionary specifying whether the store is healthy.  The
         dictionary must have the parameters ``'healthy': boolean``, but can
         contain other information as well
 
-        :param clock: an option clock with which to use for testing.
         :return: ``tuple`` of (``bool``, ``dict``), where the boolean is
             whether the services is healthy and the dictionar contains
             extra health information.

@@ -8,12 +8,11 @@
 <!ENTITY PROD "Auto Scale">               
 ]>
 <section 
-    security="writeronly"
     xml:id="RBAC"
     xmlns="http://docbook.org/ns/docbook"
     xmlns:xi="http://www.w3.org/2001/XInclude"
     xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0">
-<title>Role Based Access Control (RBAC)</title>
+<title>Role based access control (RBAC)</title>
 <para>Role Based Access Control (RBAC) restricts access to the
         capabilities of Rackspace Cloud services, including the Cloud
         &PRODNAME; API, to authorized users only. RBAC enables
@@ -27,7 +26,7 @@
         multiproduct (global) or product-specific (for example, &PROD; only) 
         to account users. </para>
 <section xml:id="assigningRoles">
-<title>Assigning Roles to Account Users</title>
+<title>Assigning roles to account users</title>
 <para>The account owner (<code>identity:user-admin</code>) can
             create account users on the account and then assign roles
             to those users. The roles grant the account users
@@ -65,7 +64,7 @@ following tasks:</para>
 </note>
 </section>
 <section xml:id="rolesAvailable">
-<title>Roles Available for &PROD; </title>
+<title>Roles available for &PROD; </title>
     <para> Two roles (observer and admin) can be used to access the
             &PROD; API specifically. The following table describes
             these roles and their permissions. </para>
@@ -126,8 +125,8 @@ access is granted </td>
 </table>
 </section>
     <section xml:id="roleConflicts">
-        <title>Resolving Conflicts Between RBAC Multiproduct vs.
-            Custom (Product-specific) Roles</title>
+        <title>Resolving conflicts between RBAC multiproduct vs.
+            custom (product-specific) roles</title>
         <para>
             The account owner can set roles for both multiproduct and &PROD; scope, and it is
             important to understand how any potential conflicts among these roles are resolved. When
@@ -177,16 +176,10 @@ access is granted </td>
         </informaltable>
     </section>
     <section xml:id="operationsRoles">
-    <title>RBAC Permissions Cross-reference to &PROD; Operations</title>
+    <title>RBAC permissions cross-reference to &PROD;
+            operations</title>
        <para> API operations for &PROD; may or may not be available to all roles. 
-           To see which operations are permitted to invoke which calls, review 
-            <!-- This KC page does not exist yet; check with Renee Rendon and be sure to match the name she gives it. 
-                 Later, we expect to be able to mark each operations' capabilitites in the WADL and then report it along with the other 
-                 details about that operation. Check with David Cramer about when that can replace or augment this.
-            -->
-            <link
-                xlink:href="http://www.rackspace.com/knowledge_center/article/permissions-matrix-for-auto-scale"
-                >
-                the Knowledge Center article</link>. </para>
+           To see which operations are permitted to invoke which calls, review the 
+            <link xlink:href="http://www.rackspace.com/knowledge_center/article/permissions-matrix-for-auto-scale">Permissions Matrix for Auto Scale Knowledge Center article</link>. </para>
     </section>
 </section> 

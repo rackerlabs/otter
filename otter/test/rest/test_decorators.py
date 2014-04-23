@@ -181,7 +181,7 @@ class FaultTestCase(TestCase):
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
         self.mockLog.msg.assert_called_once_with(
-            "Request failed: {message}", code=404, uri='/', details='',
+            "Request failed: fail", code=404, uri='/', details='',
             message='fail', type='BlahError', request_status="failed")
 
         faultDoc = json.loads(r)
@@ -213,7 +213,7 @@ class FaultTestCase(TestCase):
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
         self.mockLog.msg.assert_called_once_with(
-            "Request failed: {message}", code=404, uri='/',
+            "Request failed: fail", code=404, uri='/',
             details='this is a detail', message='fail', type='DetailsError',
             request_status="failed")
 
@@ -289,7 +289,7 @@ class FaultTestCase(TestCase):
         self.mockRequest.setResponseCode.assert_called_once_with(400)
 
         self.mockLog.msg.assert_called_once_with(
-            "Request failed: {message}", code=400, uri='/', details='',
+            "Request failed: fail", code=400, uri='/', details='',
             message='fail', type='BlahError', request_status="failed")
 
         faultDoc = json.loads(r)

@@ -6,6 +6,7 @@ import json
 import mock
 from datetime import datetime
 import itertools
+from copy import deepcopy
 
 from twisted.trial.unittest import TestCase
 from jsonschema import ValidationError
@@ -18,14 +19,16 @@ from otter.models.cass import (
     CassAdmin,
     serialize_json_data,
     get_consistency_level,
-    verified_view)
+    verified_view,
+    _assemble_webhook_from_row,
+    assemble_webhooks_in_policies)
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError,
     WebhooksOverLimitError, PoliciesOverLimitError)
 
-from otter.test.utils import LockMixin, DummyException, mock_log
+from otter.test.utils import LockMixin, DummyException, mock_log, CheckFailure
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin,
@@ -147,6 +150,94 @@ class GetConsistencyTests(TestCase):
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
 
+class AssembleWebhooksTests(TestCase):
+    """
+    Tests for `assemble_webhooks_in_policies`
+    """
+
+    def setUp(self):
+        """
+        sample policies, mock _assemble_webhook_from_row
+        """
+        self.policies = [{'id': str(i)} for i in range(10)]
+        self.awfr = patch(self, 'otter.models.cass._assemble_webhook_from_row')
+        self.awfr.side_effect = lambda w, **ka: w['policyId'] + w['webhookId']
+
+    def test_no_webhooks(self):
+        """
+        No webhooks in any policies
+        """
+        policies = assemble_webhooks_in_policies(self.policies, [])
+        for policy in policies:
+            self.assertEqual(policy['webhooks'], [])
+
+    def test_no_policies(self):
+        """
+        No policies will just return same empty list
+        """
+        self.assertEqual(assemble_webhooks_in_policies([], []), [])
+        self.assertEqual(
+            assemble_webhooks_in_policies([], [{'policyId': '1', 'webhookId': 'w'}]), [])
+
+    def test_all_webhooks(self):
+        """
+        All the policies have webhooks
+        """
+        webhooks = [{'policyId': str(i), 'webhookId': 'p{}{}'.format(i, j)}
+                    for i in range(len(self.policies)) for j in [0, 1]]
+        policies = assemble_webhooks_in_policies(self.policies, webhooks)
+        for i, policy in enumerate(policies):
+            self.assertEqual(
+                policy['webhooks'], ['{}p{}0'.format(i, i), '{}p{}1'.format(i, i)])
+
+    def test_some_webhooks(self):
+        """
+        Only some policies have webhooks
+        """
+        webhooks = [{'policyId': '0', 'webhookId': 'w01'},
+                    {'policyId': '0', 'webhookId': 'w02'},
+                    {'policyId': '1', 'webhookId': 'w11'},
+                    {'policyId': '3', 'webhookId': 'w31'},
+                    {'policyId': '3', 'webhookId': 'w32'},
+                    {'policyId': '9', 'webhookId': 'w91'}]
+        policies = assemble_webhooks_in_policies(self.policies, webhooks)
+        for i in set(range(10)) - set([0, 1, 3, 9]):
+            self.assertEqual(policies[i]['webhooks'], [])
+        self.assertEqual(policies[0]['webhooks'], ['0w01', '0w02'])
+        self.assertEqual(policies[1]['webhooks'], ['1w11'])
+        self.assertEqual(policies[3]['webhooks'], ['3w31', '3w32'])
+        self.assertEqual(policies[9]['webhooks'], ['9w91'])
+
+    def test_last_policies(self):
+        """
+        Last policies with no webhooks have empty list
+        """
+        webhooks = [{'policyId': '0', 'webhookId': 'w01'},
+                    {'policyId': '0', 'webhookId': 'w02'},
+                    {'policyId': '1', 'webhookId': 'w11'}]
+        policies = assemble_webhooks_in_policies(self.policies, webhooks)
+        for i in range(2, 10):
+            self.assertEqual(policies[i]['webhooks'], [])
+        self.assertEqual(policies[0]['webhooks'], ['0w01', '0w02'])
+        self.assertEqual(policies[1]['webhooks'], ['1w11'])
+
+    def test_extra_webhooks(self):
+        """
+        webhooks that don't belong to any policy is ignored
+        """
+        webhooks = [{'policyId': '0', 'webhookId': 'w01'},
+                    {'policyId': '15', 'webhookId': 'w151'},
+                    {'policyId': '3', 'webhookId': 'w31'},
+                    {'policyId': '35', 'webhookId': 'w351'},
+                    {'policyId': '9', 'webhookId': 'w91'}]
+        policies = assemble_webhooks_in_policies(self.policies, webhooks)
+        for i in set(range(10)) - set([0, 3, 9]):
+            self.assertEqual(policies[i]['webhooks'], [])
+        self.assertEqual(policies[0]['webhooks'], ['0w01'])
+        self.assertEqual(policies[3]['webhooks'], ['3w31'])
+        self.assertEqual(policies[9]['webhooks'], ['9w91'])
+
+
 class VerifiedViewTests(TestCase):
     """
     Tests for `verified_view`
@@ -257,10 +348,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.lock = self.mock_lock()
         self.kz_lock.Lock.return_value = self.lock
 
+        self.clock = Clock()
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
                                       self.connection, itertools.cycle(range(2, 10)),
-                                      self.kz_lock)
+                                      self.kz_lock, self.clock)
         self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
                                                    tenant_id=self.tenant_id,
                                                    scaling_group_id=self.group_id)
@@ -1124,6 +1216,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
+    def test_naive_list_all_webhooks(self):
+        """
+        Listing all webhooks from `_naive_list_all_webhooks` makes the right query
+        """
+        self.returns = [[{'webhookId': 'w1'}]]
+        d = self.group._naive_list_all_webhooks()
+
+        self.assertEqual(self.successResultOf(d), [{'webhookId': 'w1'}])
+        exp_cql = ('SELECT * FROM policy_webhooks WHERE "tenantId" = :tenantId '
+                   'AND "groupId" = :groupId ORDER BY "groupId", "policyId", "webhookId";')
+        self.connection.execute.assert_called_once_with(
+            exp_cql, {'tenantId': self.tenant_id, 'groupId': self.group_id},
+            ConsistencyLevel.TWO)
+
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
     def test_naive_list_webhooks_valid_policy(self, mock_get_policy):
@@ -1447,8 +1553,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
             'created_at': 23
         })
-        self.group._naive_list_policies = mock.MagicMock(
-            return_value=defer.succeed([]))
+        self.group._naive_list_policies = mock.Mock(return_value=defer.succeed([]))
 
         self.assertEqual(self.validate_view_manifest_return_value(), {
             'groupConfiguration': self.config,
@@ -1463,7 +1568,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                 {'PT': 'R'}, False)
         })
 
-        self.group._naive_list_policies.assert_called_once_with(limit=10)
+        self.group._naive_list_policies.assert_called_once_with()
 
         view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                     'pending, "groupTouched", "policyTouched", paused, desired, created_at '
@@ -1474,6 +1579,79 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                               exp_data, ConsistencyLevel.TWO,
                                               matches(IsInstance(NoSuchScalingGroupError)),
                                               self.mock_log)
+
+    @mock.patch('otter.models.cass.assemble_webhooks_in_policies')
+    @mock.patch('otter.models.cass.verified_view')
+    def test_view_manifest_with_webhooks(self, verified_view, mock_awip):
+        """
+        Viewing manifest with_webhooks=True returns webhooks inside policies by
+        calling `assemble_webhooks_in_policies`
+        """
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
+        })
+        mock_awip.return_value = 'assembled scaling policies'
+
+        # Getting policies
+        self.group._naive_list_policies = mock.Mock(
+            return_value=defer.succeed('raw policies'))
+
+        # Getting webhooks
+        self.group._naive_list_all_webhooks = mock.Mock(
+            return_value=defer.succeed('raw webhooks'))
+
+        # Getting the result and comparing
+        resp = self.successResultOf(self.group.view_manifest(with_webhooks=True))
+        self.assertEqual(resp['scalingPolicies'], 'assembled scaling policies')
+        mock_awip.assert_called_once_with('raw policies', 'raw webhooks')
+        self.group._naive_list_policies.assert_called_once_with()
+        self.group._naive_list_all_webhooks.assert_called_once_with()
+
+    @mock.patch('otter.models.cass.verified_view')
+    def test_view_manifest_with_webhooks_integration(self, verified_view):
+        """
+        Viewing manifest with_webhooks=True returns webhooks inside policies that
+        matches the `model_schemas.manifest`
+        """
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
+        })
+
+        # Getting policies
+        policies = [group_examples.policy()[i] for i in range(3)]
+        [policy.update({'id': str(i)}) for i, policy in enumerate(policies)]
+        self.group._naive_list_policies = mock.Mock(return_value=defer.succeed(policies))
+
+        # Getting webhooks
+        wh_part = {'data': '{"name": "a", "metadata": {"a": "b"}}',
+                   'capability': '{"version": "v1"}'}
+        webhooks = [{'policyId': '0', 'webhookId': '11'},
+                    {'policyId': '0', 'webhookId': '12'},
+                    {'policyId': '2', 'webhookId': '21'},
+                    {'policyId': '2', 'webhookId': '22'},
+                    {'policyId': '2', 'webhookId': '23'}]
+        [webhook.update(wh_part) for webhook in webhooks]
+        self.group._naive_list_all_webhooks = mock.Mock(return_value=defer.succeed(webhooks))
+
+        # Getting the result and comparing
+        resp = self.validate_view_manifest_return_value(with_webhooks=True)
+        exp_policies = deepcopy(policies)
+        exp_policies[0]['webhooks'] = [_assemble_webhook_from_row(webhooks[0], True),
+                                       _assemble_webhook_from_row(webhooks[1], True)]
+        exp_policies[1]['webhooks'] = []
+        exp_policies[2]['webhooks'] = [
+            _assemble_webhook_from_row(webhook, True) for webhook in webhooks[2:]]
+        self.assertEqual(resp['scalingPolicies'], exp_policies)
 
     @mock.patch('otter.models.cass.verified_view',
                 return_value=defer.fail(NoSuchScalingGroupError(2, 3)))
@@ -1954,7 +2132,8 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
 
         self.connection.execute.side_effect = _responses
 
-        self.collection = CassScalingGroupCollection(self.connection)
+        self.clock = Clock()
+        self.collection = CassScalingGroupCollection(self.connection, self.clock)
 
         self.uuid = patch(self, 'otter.models.cass.uuid')
         self.uuid.uuid1.return_value = 'timeuuid'
@@ -2073,8 +2252,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.side_effect = _responses
 
         self.mock_log = mock_log()
+        self.clock = Clock()
 
-        self.collection = CassScalingGroupCollection(self.connection)
+        self.collection = CassScalingGroupCollection(self.connection, self.clock)
         self.tenant_id = 'goo1234'
         self.config = _de_identify({
             'name': 'blah',
@@ -2479,9 +2659,54 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(g.uuid, '12345678')
         self.assertEqual(g.tenant_id, '123')
 
-    def test_webhook_hash(self):
+    def test_webhook_hash_from_table(self):
         """
-        Test that you can get webhook info by hash.
+        `webhook_info_by_hash` returns info from _webhook_info_from_table if avail
+        """
+        self.collection._webhook_info_from_table = mock.Mock(return_value=defer.succeed('g'))
+        self.collection._webhook_info_by_index = mock.Mock()
+
+        d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
+
+        self.assertEqual(self.successResultOf(d), 'g')
+        self.collection._webhook_info_from_table.assert_called_once_with(self.mock_log, 'hash')
+        self.assertFalse(self.collection._webhook_info_by_index.called)
+
+    def test_webhook_hash_from_index(self):
+        """
+        `webhook_info_by_hash` returns info from _webhook_info_by_index if
+        _webhook_info_from_table returns nothing
+        """
+        self.collection._webhook_info_from_table = mock.Mock(
+            return_value=defer.fail(UnrecognizedCapabilityError('hash', 1)))
+        self.collection._webhook_info_by_index = mock.Mock(return_value=defer.succeed('g'))
+
+        d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
+
+        self.assertEqual(self.successResultOf(d), 'g')
+        self.collection._webhook_info_from_table.assert_called_once_with(self.mock_log, 'hash')
+        self.collection._webhook_info_by_index.assert_called_once_with(self.mock_log, 'hash')
+
+    def test_webhook_hash_from_index_logs_unknown_err(self):
+        """
+        `webhook_info_by_hash` returns info from _webhook_info_by_index if
+        _webhook_info_from_table fails with unknown error
+        """
+        self.collection._webhook_info_from_table = mock.Mock(
+            return_value=defer.fail(ValueError(1)))
+        self.collection._webhook_info_by_index = mock.Mock(return_value=defer.succeed('g'))
+
+        d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
+
+        self.assertEqual(self.successResultOf(d), 'g')
+        self.collection._webhook_info_from_table.assert_called_once_with(self.mock_log, 'hash')
+        self.collection._webhook_info_by_index.assert_called_once_with(self.mock_log, 'hash')
+        self.mock_log.err.assert_called_once_with(
+            CheckFailure(ValueError), 'Error getting webhook info from table')
+
+    def test_webhook_hash_index(self):
+        """
+        `_webhook_info_by_index` uses webhooks_by_token INDEX
         """
         self.returns = [_cassandrify_data([
             {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1'}]),
@@ -2490,33 +2715,44 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'webhookKey': 'x'}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId" FROM policy_webhooks WHERE '
                        '"webhookKey" = :webhookKey;')
-        d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
+        d = self.collection._webhook_info_by_index(self.mock_log, 'x')
         r = self.successResultOf(d)
         self.assertEqual(r, ('123', 'group1', 'pol1'))
-        self.connection.execute.assert_called_any(expectedCql,
-                                                  expectedData,
-                                                  ConsistencyLevel.TWO)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
 
-        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
-        expectedData = {"tenantId": "123", "groupId": "group1", "policyId": "pol1"}
-        self.connection.execute.assert_called_any(expectedCql,
-                                                  expectedData,
-                                                  ConsistencyLevel.TWO)
+    def test_webhook_hash_table(self):
+        """
+        `_webhook_info_from_table` uses webhook_keys table
+        """
+        self.returns = [_cassandrify_data([
+            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1'}]),
+            _cassandrify_data([{'data': '{}'}])
+        ]
+        expectedData = {'webhookKey': 'x'}
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId" FROM webhook_keys WHERE '
+                       '"webhookKey" = :webhookKey;')
+        d = self.collection._webhook_info_from_table(self.mock_log, 'x')
+        r = self.successResultOf(d)
+        self.assertEqual(r, ('123', 'group1', 'pol1'))
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
 
     def test_webhook_bad(self):
         """
         Test that a bad webhook will fail predictably
         """
-        self.returns = [[]]
+        self.returns = [[], []]
         expectedData = {'webhookKey': 'x'}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId" FROM policy_webhooks WHERE '
-                       '"webhookKey" = :webhookKey;')
+        expectedCql = [('SELECT "tenantId", "groupId", "policyId" FROM webhook_keys WHERE '
+                        '"webhookKey" = :webhookKey;'),
+                       ('SELECT "tenantId", "groupId", "policyId" FROM policy_webhooks WHERE '
+                        '"webhookKey" = :webhookKey;')]
         d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
         self.failureResultOf(d, UnrecognizedCapabilityError)
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
+        self.connection.execute.assert_has_calls(
+            [mock.call(expectedCql[0], expectedData, ConsistencyLevel.TWO),
+             mock.call(expectedCql[1], expectedData, ConsistencyLevel.TWO)])
 
     def test_get_counts(self):
         """
@@ -2558,17 +2794,17 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """ Setup the mocks """
         self.connection = mock.MagicMock(spec=['execute'])
         self.connection.execute.return_value = defer.succeed([])
-        self.collection = CassScalingGroupCollection(self.connection)
+        self.clock = Clock()
+        self.collection = CassScalingGroupCollection(self.connection, self.clock)
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
-        self.clock = Clock()
 
     def test_health_check_no_zookeeper(self):
         """
         Health check fails if there is no zookeeper client
         """
         self.collection.kz_client = None
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (False, matches(ContainsDict(
@@ -2580,7 +2816,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check fails if there is no zookeeper client
         """
         self.collection.kz_client = mock.MagicMock(connected=False)
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (False, matches(ContainsDict(
@@ -2594,7 +2830,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (True, matches(ContainsDict(
@@ -2607,7 +2843,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.SUSPENDED)
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (False, matches(ContainsDict(
@@ -2619,7 +2855,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check fails if cassandra fails
         """
         self.connection.execute.return_value = defer.fail(Exception('boo'))
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (False, matches(ContainsDict(
@@ -2632,7 +2868,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check for cassandra fails if cassandra check times out
         """
         self.connection.execute.return_value = defer.Deferred()
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertNoResult(d)
 
         self.clock.advance(15)
@@ -2650,7 +2886,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         Health check fails if cassandra fails
         """
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
             (True, matches(ContainsDict(
@@ -2661,7 +2897,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         If both zookeeper and cassandra are healthy, the store is healthy
         """
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(self.successResultOf(d), (True, mock.ANY))
 
 

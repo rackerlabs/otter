@@ -1,0 +1,8 @@
+HTTP/1.1 201 Created
+Content-Type: application/json
+Date: Wed, 11 Sep 2013 00:23:05 GMT
+Location: https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/
+Server: Jetty(8.0.y.z-SNAPSHOT)
+Transfer-Encoding: chunked
+Via: 1.1 Repose (Repose/2.8.2)
+x-response-id: 4a72feaa-8085-45d8-aeb5-8c3a1cb38894

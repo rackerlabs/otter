@@ -15,7 +15,7 @@ import mock
 import os
 
 from twisted.trial.unittest import TestCase
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from otter.json_schema.group_examples import (
     config, launch_server_config)
@@ -85,7 +85,7 @@ except Exception as e:
     skip = "Cassandra unavailable: {0}".format(e)
 else:
     keyspace = keymaster.get_keyspace()
-    store = CassScalingGroupCollection(keyspace.client)
+    store = CassScalingGroupCollection(keyspace.client, reactor)
 
 
 class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
@@ -120,7 +120,8 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         supervisor.validate_launch_config.return_value = defer.succeed(None)
         set_supervisor(supervisor)
 
-        def _mock_obey_config_change(log, trans, config, group, state):
+        def _mock_obey_config_change(log, trans, config, group, state,
+                                     launch_config):
             return defer.succeed(GroupState(
                 state.tenant_id, state.group_id, *self.active_pending_etc))
 

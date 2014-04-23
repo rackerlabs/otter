@@ -29,7 +29,8 @@ from otter.auth import IAuthenticator
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],
-                    'x-auth-token': ['auth-token']}
+                    'x-auth-token': ['auth-token'],
+                    'User-Agent': ['OtterScale/0.0']}
 
 
 class HelperTests(TestCase):
@@ -80,7 +81,8 @@ class HelperTests(TestCase):
                 }
             }}),
             headers={'accept': ['application/json'],
-                     'content-type': ['application/json']},
+                     'content-type': ['application/json'],
+                     'User-Agent': ['OtterScale/0.0']},
             log=self.log)
 
     def test_authenticate_user_propagates_error(self):

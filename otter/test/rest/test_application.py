@@ -327,8 +327,7 @@ class CollectionLinksTests(TestCase):
 
     def test_ignore_url_limit_query_params(self):
         """
-        If the marker parameter is provided, it will override the marker params
-        in the url
+        If the limit parameter is provided, it will override the marker params
         """
         links = get_collection_links(self.coll, 'url?limit=100&marker=1', 'self',
                                      limit=20)
@@ -377,6 +376,14 @@ class CollectionLinksTests(TestCase):
                                      next_marker=next_marker_by_offset)
         self.assertEqual(links, [{'href': 'http://localhost/url?limit=1&marker=1', 'rel': 'self'},
                                  {'href': 'http://localhost/url?limit=1&marker=2', 'rel': 'next'}])
+
+    def test_use_provided_absolute_url_if_provided(self):
+        """
+        If an absolute url is passed, use that instead of trying to get the url
+        root.
+        """
+        links = get_collection_links(self.coll, 'http://otherroot/url', 'self', limit=20)
+        self.assertEqual(links, [{'href': 'http://otherroot/url?limit=20', 'rel': 'self'}])
 
 
 class GetSpecificCollectionsLinks(TestCase):
@@ -544,3 +551,117 @@ class HealthCheckTestCase(RestAPITestMixin, TestCase):
 
         resp = self.assert_status_code(200)
         self.assertEqual(resp, json.dumps({'blargh': 'boo'}))
+
+
+class RootRouteTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests that the root returns with whatever code, headers, and body are
+    configured.
+    """
+    endpoint = "/"
+    invalid_methods = ("DELETE", "PUT", "POST")
+
+    def tearDown(self):
+        """
+        Reset config data
+        """
+        set_config_data({})
+
+    def get_non_standard_headers(self, response_wrapper):
+        """
+        Returns the dictionary of headers without x-response-id or content-type
+        """
+        # want to make a copy of the headers
+        return {k.lower(): list(v) for k, v in
+                response_wrapper.response.headers.getAllRawHeaders()
+                if k not in ('X-Response-Id', 'Content-Type')}
+
+    def test_default_empty_200(self):
+        """
+        Returns a 200 without any content, without any specific headers
+        by default.
+        """
+        response_wrapper = self.request()
+        self.assertEqual(response_wrapper.response.code, 200)
+        self.assertEqual(self.get_non_standard_headers(response_wrapper), {})
+        self.assertEqual(response_wrapper.content, '')
+
+    def test_sets_status_code(self):
+        """
+        Returns the configured status code
+        """
+        set_config_data({'root': {'code': 204}})
+        response_wrapper = self.request()
+        self.assertEqual(response_wrapper.response.code, 204)
+        self.assertEqual(self.get_non_standard_headers(response_wrapper), {})
+        self.assertEqual(response_wrapper.content, '')
+
+    def test_sets_headers(self):
+        """
+        Returns the configured response headers
+        """
+        headers = {'someheader1': ['value1', 'value2'],
+                   'someheader2': ['value1']}
+        set_config_data({'root': {'headers': headers}})
+        response_wrapper = self.request()
+        self.assertEqual(response_wrapper.response.code, 200)
+        self.assertEqual(self.get_non_standard_headers(response_wrapper),
+                         headers)
+        self.assertEqual(response_wrapper.content, '')
+
+    def test_sets_unicode_headers(self):
+        """
+        Returns the configured response headers, even if they were provided in
+        unicode
+        """
+        set_config_data({'root': {'headers': {u'someheader': [u'value']}}})
+        response_wrapper = self.request()
+        self.assertEqual(response_wrapper.response.code, 200)
+        self.assertEqual(self.get_non_standard_headers(response_wrapper),
+                         {'someheader': ['value']})
+        self.assertEqual(response_wrapper.content, '')
+
+    def test_sets_contents(self):
+        """
+        Returns the configured response body
+        """
+        set_config_data({'root': {'body': 'happyhappyhappy'}})
+        response_wrapper = self.request()
+        self.assertEqual(response_wrapper.response.code, 200)
+        self.assertEqual(self.get_non_standard_headers(response_wrapper), {})
+        self.assertEqual(response_wrapper.content, 'happyhappyhappy')
+
+
+class SchedulerResetTests(RestAPITestMixin, TestCase):
+    """
+    Tests that the scheduler reset endpoint resets the scheduler with new path
+    """
+    endpoint = "/scheduler_reset"
+    invalid_methods = ("DELETE", "PUT", "GET")
+
+    def setUp(self):
+        """
+        Sample scheduler
+        """
+        super(SchedulerResetTests, self).setUp()
+        self.reset = mock.Mock()
+        self.root = Otter(self.mock_store, scheduler_reset=self.reset).app.resource()
+
+    def test_delegates(self):
+        """
+        Calls scheduler.reset with new path
+        """
+        resp = self.assert_status_code(200, method='POST',
+                                       endpoint=self.endpoint + '?path=/new_path')
+        self.assertEqual(resp, '')
+        self.reset.assert_called_once_with('/new_path')
+
+    def test_exception(self):
+        """
+        Returns 400 with exception message when ValueError is raised
+        """
+        self.reset.side_effect = ValueError('meh')
+        resp = self.assert_status_code(400, method='POST',
+                                       endpoint=self.endpoint + '?path=/new_path')
+        self.assertEqual(resp, 'meh')
+        self.reset.assert_called_once_with('/new_path')

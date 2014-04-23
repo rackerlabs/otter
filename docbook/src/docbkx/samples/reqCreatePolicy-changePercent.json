@@ -1,8 +1,8 @@
 [
- {
-    "name": "scale down by 5.5 percent",
-    "changePercent": -5.5,
-    "cooldown": 1800,
-    "type": "webhook"
-  }
+   {
+      "name":"scale down by 5.5 percent",
+      "changePercent":-5.5,
+      "cooldown":1800,
+      "type":"webhook"
+   }
 ]

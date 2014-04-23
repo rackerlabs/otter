@@ -56,25 +56,62 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-devguide">
             <!-- enter the publication date of this document; in revhistory, explain what changed -->
             <pubdate/>
             <copyright>
-                <year>2013</year>
-                <holder>Rackspace US, Inc.</holder>
-            </copyright>
+            <year>2014</year>
+            <holder>Rackspace US, Inc.</holder>
+        </copyright>
             <legalnotice role="rs-api">
                 <annotation>
                     <remark>Copyright details are filled in by the template.</remark>
                 </annotation>
             </legalnotice>
             <revhistory>
-                <revision>
-                    <date>2013-11-19</date>
+                <revision
+                    xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                    <date>2014-04-08</date>
                     <revdescription>
                         <itemizedlist spacing="compact">
                             <listitem>
-                                <para>Updating content for UA</para>
+                                <para>Removed duplicate parameter descriptions. Improved "at" parameter description. Removed internal bug numbers. Modified titles per new convention.</para>
                             </listitem>
                         </itemizedlist>
                     </revdescription>
                 </revision>
+                <revision
+                xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <date>2014-03-26</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Added IAD to
+                                service endpoints in the Getting
+                                Started Guide and added comment about
+                                verifying the service endpoints by
+                                issuing the call being the best way to
+                                know what they are.</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
+                <revision>
+                <date>2014-03-19</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Un-hid RBAC section.</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
+            <revision>
+                <date>2013-11-19</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Updating content for UA</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
                 <revision>
                     <date>2013-08-21</date>
                     <revdescription>
@@ -145,32 +182,32 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-devguide">
                 <itemizedlist>
                     <listitem>
                         <para>
-                            <link linkend="Intended_Audience-d1e166">Intended Audience
+                            <link linkend="Intended_Audience-d1e166">Intended audience
                             </link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Doc_Change_History">Document Change History
+                            <link linkend="Doc_Change_History">Document change history
                             </link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Resources-000">Additional Resources
+                            <link linkend="Resources-000">Additional resources
                             </link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Pricing_SLA-d1e1362">Pricing and Service Level</link>
+                            <link linkend="Pricing_SLA-d1e1362">Pricing and service level</link>
                         </para>
                     </listitem>
                 </itemizedlist>
             </para>
             <para></para>
             <section xml:id="Intended_Audience-d1e166">
-                <title>Intended Audience</title>
+                <title>Intended audience</title>
                 <para>This document is intended for software developers who are interested in developing applications
                     that use the Rackspace &PROD; API. To use this API, you need the following skills:
                 </para>
@@ -187,7 +224,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-devguide">
                 </itemizedlist>
             </section>
             <section xml:id="Doc_Change_History">
-                <title>Document Change History</title>
+                <title>Document change history</title>
                 <para>
                     This version of the document replaces and obsoletes all previous versions. The most recent changes are
                     described in the following table:
@@ -199,7 +236,7 @@ is external so it's handy for Getting Started to share -->
             <xi:include href="chapters/resources.xml" />
             <!-- -->
             <section xml:id="Pricing_SLA-d1e1362">
-                <title>Pricing and Service Level</title>
+                <title>Pricing and service level</title>
                 <para>&PRODNAME; relies on other services that are part of the Rackspace Cloud; your use of
                     those services through the API will be billed as per the pricing schedule published
                     for each service:
@@ -224,7 +261,7 @@ is external so it's handy for Getting Started to share -->
             </section>
         </chapter>
         <chapter xml:id="Auto_Scale_Core_Concepts">
-            <title>Auto Scale Core Concepts</title>
+            <title>Auto Scale core concepts</title>
             <para>To use the &PROD; API effectively, you should understand several key concepts:
             </para>
             <section xml:id="Glossary">
@@ -236,7 +273,7 @@ is external so it's handy for Getting Started to share -->
             </section>
 
             <section xml:id="Scaling_groups" xmlns:raxm="http://docs.rackspace.com/api/metadata">
-                <title>Scaling Groups</title>
+                <title>Scaling groups</title>
                 <para>The scaling group is at the heart of an Auto Scale deployment. The scaling group specifies
                     the basic elements of the Auto Scale configuration. It manages how many servers can
                     participate in the scaling group. It also specifies information related to load balancers
@@ -284,7 +321,7 @@ is external so it's handy for Getting Started to share -->
                 </para>
             </section>
             <section xml:id="Authenticated_Webhooks_and_Anonymous_Webhooks" xmlns:raxm="http://docs.rackspace.com/api/metadata">
-                <title>Webhooks and Capability URLs</title>
+                <title>Webhooks and capability URLs</title>
                 <para>Auto Scale uses webhooks to initiate scaling events. A webhook is an industry-standard
                     protocol for sending events between systems; for Auto Scale, they are used to execute
                     policies. A webhook consists of an HTTP callback that is triggered by some user-defined
@@ -295,7 +332,7 @@ is external so it's handy for Getting Started to share -->
                     body. You can send webhooks with a simple call in the library that you are using.
                     You can also send them manually via cURL:</para>
                 <example>
-                    <title>POST Request to Execute a Webhook</title>
+                    <title>POST request to execute a webhook</title>
                     <programlisting>curl -v https://example.com/webhook -X POST -d "payload=payload"</programlisting>
                 </example>
                 <para>Auto Scale only supports anonymous webhooks. In regular webhooks, the {webhook_version}/{webhook_hash}
@@ -318,7 +355,7 @@ is external so it's handy for Getting Started to share -->
                 <para>To execute a capability URL, locate the URL in your webhook, and then submit a
                     <command>POST</command>request against it, as shown in the following example:</para>
                 <example>
-                    <title>POST Request to Execute a Capability URL</title>
+                    <title>POST request to execute a capability URL</title>
                     <programlisting language="json">
                         <xi:include href="./samples/reqExecuteCapabilityURL.json" parse="text" />
                     </programlisting>
@@ -334,7 +371,7 @@ is external so it's handy for Getting Started to share -->
                 </para>
             </section>
             <section xml:id="Scaling_policies" xmlns:raxm="http://docs.rackspace.com/api/metadata">
-                <title>Scaling Policies</title>
+                <title>Scaling policies</title>
                 <para>Auto Scale uses policies to define the scaling activity that will take place, as well
                     as when and how that scaling activity will take place. Scaling policies specify how
                     to modify the scaling group and its behavior. You can specify multiple policies to
@@ -383,7 +420,7 @@ is external so it's handy for Getting Started to share -->
 
         </chapter>
         <chapter xml:id="Gen_API_Info-de01">
-            <title>General API Information</title>
+            <title>General API information</title>
             <para>
                 <itemizedlist>
                     <listitem>
@@ -393,19 +430,19 @@ is external so it's handy for Getting Started to share -->
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="serviceEndpoints">Service Access Endpoints
+                            <link linkend="serviceEndpoints">Service access endpoints
                             </link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="contractVersion">Contract Versions
+                            <link linkend="contractVersion">Contract versions
                             </link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Request_Response_Types-d1e903">Request and Response Types</link>
+                            <link linkend="Request_Response_Types-d1e903">Request and response types</link>
                         </para>
                     </listitem>
                     <listitem>
@@ -415,7 +452,7 @@ is external so it's handy for Getting Started to share -->
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="datetimeformat">Date and Time Format
+                            <link linkend="datetimeformat">Date and time format
                             </link>
                         </para>
                     </listitem>
@@ -426,13 +463,13 @@ is external so it's handy for Getting Started to share -->
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="server-flavors">Server Flavors
+                            <link linkend="server-flavors">Server flavors
                             </link>
                         </para>
                     </listitem>
                     <listitem linkend="audit-log">
                         <para>
-                            <link linkend="audit-log">Audit Logs</link>
+                            <link linkend="audit-log">Audit logs</link>
                         </para>
                     </listitem>
                     <listitem linkend="faults-dle101">
@@ -453,14 +490,14 @@ is external so it's handy for Getting Started to share -->
             <section xml:id="Authentication-d1e647">
                 <title>Authentication</title>
                 <para>
-                    <link linkend="Retrieving_Auth_Token">Retrieving the Authentication Token</link>
+                    <link linkend="Retrieving_Auth_Token">Retrieving the authentication token</link>
                 </para>
                 <para>Every REST request for &PROD; requires the inclusion of a specific authentication token,
                     supplied by the
                     <code>X-Auth-Token</code>HTTP header. Customers obtain this token by first using the Rackspace
                     Cloud Identity service and supplying a valid user name and API access key.</para>
                 <section xml:id="Retrieving_Auth_Token">
-                    <title>Retrieving the Authentication Token</title>
+                    <title>Retrieving the authentication token</title>
                     <para>The authenticate operation provides users with an authentication token and a list
                         of regional cloud endpoints. The sample requests and responses in this section
                         illustrate a general case. In your authentication request, use your own credentials
@@ -493,7 +530,7 @@ is external so it's handy for Getting Started to share -->
                         <errorcode>503</errorcode>)</simpara>
 
                     <example>
-                        <title>Authentication Request for US Endpoint: JSON</title>
+                        <title>Authentication request for US endpoint: JSON</title>
                         <programlistingco>
                             <areaspec>
                                 <area xml:id="credentials.json.user" units="linecolumn" coords="14 22" />
@@ -521,7 +558,7 @@ is external so it's handy for Getting Started to share -->
 
 
                     <example xml:id="auth-response-example-json">
-                        <title>Authentication Response for US Endpoint: JSON</title>
+                        <title>Authentication response for US endpoint: JSON</title>
 
                         <programlistingco>
                             <areaspec>
@@ -676,12 +713,14 @@ is external so it's handy for Getting Started to share -->
                 </section>
             </section>
             <section xml:id="serviceEndpoints">
-                <title>Service Access Endpoints</title>
+                <title>Service access endpoints</title>
                 <para>&PRODNAME; is a regionalized service. The user of the service is therefore responsible
                     for appropriate replication, caching, and overall maintenance of &PRODNAME; data
                     across regional boundaries to other &PROD; servers.</para>
-                <para>The following table lists the service access endpoints for &PROD;.
-                </para>
+                <para>The following table lists the service access
+                endpoints for &PROD;  though we recommend checking the
+                endpoints returned in the authentication response for
+                the most up-to-date information. </para>
                 <?rax-fo keep-with-next?>
                     <para>
                         <table rules="all">
@@ -755,14 +794,14 @@ is external so it's handy for Getting Started to share -->
                             <emphasis role="bold">1100111</emphasis>") shows that the tenant Id is 1100111.</para>
             </section>
             <section xml:id="contractVersion">
-                <title>Contract Versions</title>
+                <title>Contract versions</title>
                 <para>The &PROD; version defines the contract and build information for the API.</para>
                 <para>The contract version denotes the data model and behavior that the API supports. The requested
                     contract version is included in all request URLs. Different contract versions of
                     the API might be available at any given time and are not guaranteed to be compatible
                     with one another.</para>
                 <example>
-                    <title>Sample Request URL for Contract Version 1.0</title>
+                    <title>Sample request URL for contract version 1.0</title>
                     <programlisting>https://ord.autoscale.api.rackspacecloud.com/
                         <emphasis role="strong">v1.0</emphasis>/1234</programlisting>
                 </example>
@@ -771,7 +810,7 @@ is external so it's handy for Getting Started to share -->
                 </note>
             </section>
             <section xml:id="Request_Response_Types-d1e903">
-                <title>Request and Response Types</title>
+                <title>Request and response types</title>
                 <para>The &PRODNAME; API supports JSON data serialization formats. You specify the request
                     format by using the
                     <code>Content-Type</code>header. The request format is
@@ -821,7 +860,7 @@ is external so it's handy for Getting Started to share -->
 rate limits are managed by Repose rate limiting filter,
 config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbooks/repose/attributes/default.rb
 -->
-                        <title>Rate Limits</title>
+                        <title>Rate limits</title>
                         <para>Rate limits are specified in terms of both a human-readable wildcard URI and
                             a machine-processable regular expression. The regular expression boundary
                             matcher '^' takes effect after the root URI path.</para>
@@ -875,7 +914,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             again.</para>
                     </section>
                     <section xml:id="Absolute_Limits-d1e1397">
-                        <title>Absolute Limits</title>
+                        <title>Absolute limits</title>
                         <table rules="all">
                             <caption>Absolute Limits</caption>
                             <thead>
@@ -907,7 +946,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </section>
                 </section>
                 <section xml:id="datetimeformat">
-                    <title>Date and Time Format</title>
+                    <title>Date and time format</title>
                     <para>The &PROD; service uses a specific date format for the display and consumption of
                         date and time values. While the standard allows specification of time zones,
                         &PROD; does not use time zones. All times are expressed as UTC time zone.
@@ -1042,7 +1081,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                     </td>
                                     <td>Specifies the number of items that can be returned on one page. If
                                         the client requests a
-                                        <emphasis role="italic">limit</emphasis>beyond the 100 items supported byAuto Scale,
+                                        <emphasis role="italic">limit</emphasis>beyond the 100 items supported by Auto Scale,
                                         an overLimit (413) response code will be returned.</td>
                                 </tr>
                                 <tr>
@@ -1103,13 +1142,13 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         </tbody>
                     </table>
                     <section xml:id="Paginating_Group_Lists">
-                        <title>Paginating Group Lists</title>
+                        <title>Paginating group lists</title>
                         <para>When submitting a request for a group manifest, you receive a list of all the
                             available scaling groups and associated policies. However, if there are too
                             many, the response body will only list 100, and provide a next link in the
                             <parameter>rel</parameter>parameter as shown in the following example:</para>
                         <example>
-                            <title>Paginating Group Lists Example</title>
+                            <title>Paginating group lists example</title>
                             <programlisting language="json">{ "groups": [ ... ], "group_links": [ { "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/?limit=100&amp;marker=f82bb000-f451-40c8-9dc3-6919097d2f7e"
                                 "rel": "next" } ] }
 
@@ -1129,14 +1168,14 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         </para>
                     </section>
                     <section xml:id="Paginating_Policy_Lists">
-                        <title>Paginating Policy Lists</title>
+                        <title>Paginating policy lists</title>
                         <para>When you submit a request to obtain all the policies associated with a scaling
                             group, a list of policies will be returned. However, if there are too many
                             policies, the response body will only list 100, and provide a next link in
                             the
                             <parameter>rel</parameter>parameter as shown in the following example:</para>
                         <example>
-                            <title>Paginating Policy Lists Example</title>
+                            <title>Paginating policy lists example</title>
                             <programlisting language="json">{ "policies": [ ... ], "policies_links": [ { "href": "http://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/b5210aa2-5c8f-4c17-9fb4-71a351e519cd/policies/?limit=100&amp;marker=f82bb000-f451-40c8-9dc3-6919097d2f7e",
                                 "rel": "next" } ] }
                             </programlisting>
@@ -1148,13 +1187,13 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         </para>
                     </section>
                     <section xml:id="Paginating_Webhook_lists">
-                        <title>Paginating Webhook Lists</title>
+                        <title>Paginating webhook lists</title>
                         <para>When you submit a request to obtain all the webhooks associated with a policy,
                             a list of webhooks will be returned. However, if there are too many webhooks,
                             the response body will only list 100, and provide a next link in the
                             <parameter>rel</parameter>parameter as shown in the following example:</para>
                         <example>
-                            <title>Paginating Webhook Lists Example</title>
+                            <title>Paginating webhook lists example</title>
                             <programlisting language="json">{ "webhooks": [ ... ], "webhooks_links": [ { "href": "http://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/b5210aa2-5c8f-4c17-9fb4-71a351e519cd/policies/5783f588-eba6-4ca2-a9c5-ce04f2c32992/webhooks/?limit=100&amp;marker=f82bb000-f451-40c8-9dc3-6919097d2f7e",
                                 "rel": "next" } ] }
                             </programlisting>
@@ -1167,7 +1206,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </section>
                 </section>
                 <section xml:id="server-flavors">
-                    <title>Server Flavors</title>
+                    <title>Server flavors</title>
                     <para>When configuring a Cloud Server image through the Control Panel or the API, users
                         can chose a specific server flavor. A flavor is an available hardware configuration
                         for a server. Each flavor has a unique combination of disk space and memory capacity.
@@ -1314,7 +1353,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </para>
                 </section>
                 <section xml:id="audit-log">
-                    <title>Audit Logs</title>
+                    <title>Audit logs</title>
                     <para>Because of the deferred nature of Auto Scale, most errors occur outside of the user's
                         session. Errors are logged to a user's cloud feed as an audit log. The audit
                         log contains all the events that have occurred within a user's scaling group.
@@ -1347,7 +1386,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <para>An example of an error message follows.</para>
                     <!-- improve this example to show something that an Auto scale user would really see -->
                     <example>
-                        <title>Error Message: Bad Request</title>
+                        <title>Error message: bad request</title>
                         <programlisting>HTTP/1.1 400 Bad Request Content-Type: application/json { "title": "Unsupported
                             limit", "description": "The given limit cannot be negative, and cannot be
                             greater than 50.", "code": 1092, "link": { "rel": "help", "href": "http://docs.example.com/messages#limit",
@@ -1360,39 +1399,44 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 </section>
         </chapter>
         <chapter xml:id="Autoscale_Components">
-            <title>Key Configurations</title>
+            <title>Key configurations</title>
             <para>In this chapter you will learn about the following key elements of an Auto Scale deployment:</para>
             <para>
                 <itemizedlist>
                     <listitem>
                         <para>
-                            <link linkend="Group_Configuration">Scaling Group Configuration</link>
+                            <link linkend="Group_Configuration">Scaling groups</link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Launch_Configuration">Launch Configuration
+                            <link linkend="Launch_Configuration">Launch configurations
                             </link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Scaling_Policies">Scaling Group Policies</link>
+                            <link linkend="Scaling_Policies">Scaling group policies</link>
                         </para>
                     </listitem>
                 </itemizedlist>
             </para>
+            <note>
+                <para>For details on API parameters, see <link
+                    linkend="API_Operations">Chapter 6, API
+                    Operations</link>. </para>
+            </note>
             <section xml:id="Group_Configuration">
-                <title>Scaling Group Configuration</title>
+                <title>Scaling groups</title>
                 <para>The scaling group configuration specifies the basic elements of the Auto Scale configuration.
                     It manages how many servers can participate in the scaling group. It also specifies
                     information related to load balancers.
                 </para>
                 <para>The following table specifies the parameters for the
-                    <parameter>GroupConfiguration</parameter>
+                    <parameter>group</parameter> configuration
                     parameter:</para>
                 <table rules="all">
-                    <caption>GroupConfiguration Parameters</caption>
+                    <caption>Group Configuration Parameters</caption>
                     <col width="20%" />
                     <col width="60%" />
                     <thead>
@@ -1406,37 +1450,59 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>name</parameter>
                             </td>
-                            <td>Specifies the name of the scaling group
-                            </td>
+                            <td>Specifies the name of the scaling
+                            group.</td>
                         </tr>
                         <tr>
                             <td>
                                 <parameter>maxEntities</parameter>
                             </td>
-                            <td>Specifies the maximum amount of identities that are allowed in this group</td>
+                            <td>Specifies the maximum number of
+                            entities that are allowed in this group.
+                            You cannot scale up above this value.
+                            Decreasing this value can cause an
+                            immediate reduction of the scaling group. </td>
                         </tr>
                         <tr>
                             <td>
                                 <parameter>minEntities</parameter>
                             </td>
-                            <td>Specifies the minimum amount of identities that are allowed in this group</td>
+                            <td>Specifies the minimum number of
+                            entities that are allowed in this group.
+                            You cannot scale down below this value.
+                            Increasing this value can cause an
+                            immediate addition to the scaling group. </td>
                         </tr>
                         <tr>
                             <td>
                                 <parameter>cooldown</parameter>
                             </td>
                             <td>
-                                <para>Describes, in seconds, how long the group must wait after a scaling policy
-                                    is triggered before another request for scaling is accepted</para>
+                                <para>Describes, in seconds, how long
+                                the group must wait after a scaling
+                                policy is triggered before another
+                                request for scaling is accepted.
+                                Applies mainly to event-based
+                                policies.</para>
                             </td>
                         </tr>
+                    <tr>
+                        <td>
+                            <parameter>metadata</parameter>
+                        </td>
+                        <td>Optional. The maximum size of the metadata
+                            key and value is 255 bytes each. For more
+                            information, see the <link
+                                xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html"
+                                >Server</link></td>
+                    </tr>
                     </tbody>
                 </table>
                 <para>The number of resources entities that are specified in
                     <parameter>minEntities</parameter>and
                     <parameter>maxEntities</parameter>overrides the amount of resources that can be specified in
                     a policy. See also
-                    <link linkend="Min_and_Max_Policies">Using the Min and Max Values with Policies
+                    <link linkend="Min_and_Max_Policies">Using the min and max values with policies
                     </link>.</para>
                 <para>You can specify custom metadata for your group configuration using the optional
                     <parameter>metadata</parameter>parameter.</para>
@@ -1451,14 +1517,14 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <para>The following example shows a possible scaling group configuration:
                 </para>
                 <example>
-                    <title>Scaling Group Configuration Example</title>
+                    <title>Scaling group configuration example</title>
                     <programlisting language="json">
                         <xi:include href="./samples/GroupConfiguration.json" parse="text" />
                     </programlisting>
                 </example>
             </section>
             <section xml:id="Launch_Configuration">
-                <title>Launch Configuration</title>
+                <title>Launch configurations</title>
                 <para>The launch configuration manages the process of creating new servers. It specifies what
                     type of server image will be started on launch, what flavor the new server is, and
                     which load balancer the new server connects to.</para>
@@ -1487,9 +1553,12 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                 <td>
                                     <parameter>args</parameter>
                                 </td>
-                                <td>Specifies the item to be configured. Must be "server" and, in most cases,
-                                    "loadbalancer." Most launch configurations have both a server and
-                                    a loadbalancer configured.</td>
+                                <td>Specifies the item to be
+                                configured. Must be "server" and also,
+                                in most cases, "loadbalancer." Most
+                                launch configurations have both a
+                                server and a loadbalancer
+                                configured.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1548,46 +1617,64 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                 <td>
                                     <parameter>name</parameter>
                                 </td>
-                                <td>Specifies the name of the server. The name of the server will be automatically
-                                    generated using the following formula: [serverName]-AS[uniqueHash],
-                                    and will look like the following: autoscale_server-AS12fabe. The
-                                    name of the server may be truncated to fit within the limit of 255
-                                    characters.
-                                </td>
+                                <td>Specifies a prefix to the name for
+                                created servers. The name of new
+                                servers will be automatically
+                                generated using the following formula:
+                                [serverName]-AS[uniqueHash], and will
+                                look similar to the following:
+                                [serverName]-AS12fabe. The name of new
+                                servers may be truncated to fit within
+                                the limit of 255 characters. </td>
                             </tr>
                             <tr>
                                 <td>
                                     <parameter>flavorRef</parameter>
                                 </td>
-                                <td>Specifies the flavor Id for the server. A flavor is a resource configuration
-                                    for a server. For more information on available flavors, see
-                                    <olink targetdoc="autoscale-devguide" targetptr="server-flavors">“Server Flavors”
-                                    </olink>.</td>
+                                <td>Specifies the flavor Id for the
+                                server. A flavor is a resource
+                                configuration for a server. For more
+                                information on available flavors, see
+                                   <olink
+                                   targetdoc="autoscale-devguide"
+                                   targetptr="server-flavors">“Server
+                                   Flavors” </olink>.  Example:
+                                performance1-4.</td>
                             </tr>
                             <tr>
                                 <td>
                                     <parameter>imageRef</parameter>
                                 </td>
-                                <td>Specifies the Id of the Cloud Server image to start.</td>
+                                <td>Specifies the Id of the Cloud
+                                Server image to start.  Example:
+                                0d589460-f177-4b0f-81c1-8ab8903ac7d8.</td>
                             </tr>
                             <tr>
                                 <td>
                                     <parameter>OS-DCF:diskConfig</parameter>
                                 </td>
-                                <td>Specifies the disk configuration value. Valid values are "AUTO" or "manual."
-                                    For more information, see the
-                                    <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/ch_extensions.html#diskconfig_attribute">Disk Configuration Extension
-                                    </link>documentation for Rackspace Cloud Servers.</td>
+                                <td>Specifies the disk configuration
+                                value, specifically, how the disk on
+                                new servers is partitioned. . Valid
+                                values are "AUTO" or "MANUAL." For
+                                more information, see the <link
+                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/ch_extensions.html#diskconfig_attribute"
+                                   >Disk Configuration Extension
+                                </link>documentation for Rackspace
+                                Cloud Servers.</td>
                             </tr>
                             <tr>
                                 <td>
                                     <parameter>metadata</parameter>
                                 </td>
-                                <td>This parameter is optional. The maximum size of the metadata key and
-                                    value is 255 bytes each. For more information, see the
-                                    <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html">Server Metadata</link>
-                                    documentation for Rackspace Cloud Servers.
-                                </td>
+                                <td>Optional. The maximum size of the
+                                metadata key and value is 255 bytes
+                                each. For more information, see the
+                                   <link
+                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html"
+                                   >Server Metadata</link>
+                                documentation for Rackspace Cloud
+                                Servers. </td>
                             </tr>
                             <tr>
                                 <td>
@@ -1632,15 +1719,17 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>loadBalancerId</parameter>
                             </td>
-                            <td>Specifies the id of the load balancer that is automatically generated when
-                                the load balancer is created</td>
+                            <td>Specifies the ID of the load balancer
+                            that is automatically generated when the
+                            load balancer is created.</td>
                         </tr>
                         <tr>
                             <td>
                                 <parameter>port</parameter>
                             </td>
-                            <td>Specifies the port for the load balancer
-                            </td>
+                            <td> The port on which new servers will
+                            receive traffic from the load balancer,
+                            often port 80. </td>
                         </tr>
                     </tbody>
                 </table>
@@ -1653,7 +1742,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     server and a load balancer:
                 </para>
                 <example>
-                    <title>Launch Configuraiton Example</title>
+                    <title>Launch configuration example</title>
                     <programlisting language="json">
                         <xi:include href="./samples/LaunchConfiguration.json" parse="text" />
                     </programlisting>
@@ -1690,7 +1779,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 </tip>
             </section>
             <section xml:id="Scaling_Policies">
-                <title>Scaling Group Policies
+                <title>Scaling group policies
                     <?sbr?>
                 </title>
                 <para>Scaling group policies specify how to modify the scaling group and its behavior. You
@@ -1720,14 +1809,31 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>changePercent</parameter>
                             </td>
-                            <td>Specifies the change value, in incremental stages or per cent</td>
+                            <td>Specifies the change value, in
+                            incremental stages or per cent.  Use to
+                            change the percentage of servers relative
+                            to the current number of servers. If a
+                            positive number is used, servers are
+                            added; if a negative number is used,
+                            servers are removed. The absolute change
+                            in the number of servers is always rounded
+                            up. For example, if -X% of the current
+                            number of servers translates to -0.5 or
+                            -0.25 or -0.75 servers, the actual number
+                            of servers that will be shut down is 1. </td>
                         </tr>
                         <tr>
                             <td>
                                 <parameter>cooldown</parameter>
                             </td>
-                            <td>Specifies the policy cooldown time, in seconds
-                            </td>
+                            <td>Specifies the policy cooldown time, in
+                            seconds.  Prohibits the execution of this
+                            specific policy until the configured
+                            cooldown time period has passed. Helps
+                            prevent an event triggering a policy and
+                            can help to ensure that servers can be
+                            added quickly (long cooldown) and removed
+                            gradually (short cooldown). </td>
                         </tr>
                         <tr>
                             <td>
@@ -1743,34 +1849,34 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <itemizedlist>
                     <listitem>
                         <para>
-                            <link linkend="Webhook_triggered_policy">Webhook-Based Policies</link>
+                            <link linkend="Webhook_triggered_policy">Webhook-based policies</link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Schedule_based_Policy">Schedule-Based Policies</link>
+                            <link linkend="Schedule_based_Policy">Schedule-based policies</link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Scale_by_percentage">Scaling by Percentage</link>
+                            <link linkend="Scale_by_percentage">Scaling by percentage</link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Min_and_Max_Policies">Using the Min and Max Values with Policies
+                            <link linkend="Min_and_Max_Policies">Using the min and max values with policies
                             </link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Deleting_resources">Deleting Resources
+                            <link linkend="Deleting_resources">Deleting resources
                             </link>
                         </para>
                     </listitem>
                 </itemizedlist>
                 <section xml:id="Webhook_triggered_policy">
-                    <title>Webhook-Based Policies</title>
+                    <title>Webhook-based policies</title>
                     <para>You can define a scaling policy that is invoked by a webhook when a predefined event
                         occurs.</para>
                     <para>
@@ -1801,23 +1907,46 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                     <td>
                                         <parameter>change</parameter>
                                     </td>
-                                    <td>Specifies the number of entities to add or remove, for example "1"
-                                        implies that 1 server needs to be added.
-                                    </td>
+                                    <td>Specifies the number of
+                                   entities to add or remove, for
+                                   example "1" implies that 1 server
+                                   needs to be added. Use to change
+                                   the number of servers to a specific
+                                   number. If a positive number is
+                                   used, servers are added; if a
+                                   negative number is used, servers
+                                   are removed. </td>
                                 </tr>
                                 <tr>
                                     <td>
                                         <parameter>changePercent</parameter>
                                     </td>
-                                    <td>Specifies the change value in per cent
-                                    </td>
+                                    <td>Specifies the change value in
+                                   per cent. Use to change the
+                                   percentage of servers relative to
+                                   the current number of servers. If a
+                                   positive number is used, servers
+                                   are added; if a negative number is
+                                   used, servers are removed. The
+                                   absolute change in the number of
+                                   servers is always rounded up. For
+                                   example, if -X% of the current
+                                   number of servers translates to
+                                   -0.5 or -0.25 or -0.75 servers, the
+                                   actual number of servers that
+                                   will be shut down is 1. </td>
                                 </tr>
                                 <tr>
                                     <td>
                                         <parameter>desiredCapacity</parameter>
                                     </td>
-                                    <td>Specifies the final capacity that is desired by the scale up event.
-                                        Note that this value is always rounded up.</td>
+                                    <td>Specifies the final capacity
+                                   that is desired by the scale up
+                                   event. Note that this value is
+                                   always rounded up. Use to specify a
+                                   number of servers for the policy to
+                                   implement—by either adding or
+                                   removing servers as needed. </td>
                                 </tr>
                             </tbody>
                         </table>The webhook object takes no
@@ -1834,7 +1963,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </para>
                 </section>
                 <section xml:id="Schedule_based_Policy">
-                    <title>Schedule-Based Policies</title>
+                    <title>Schedule-based policies</title>
                     <para>You can define a scaling policy that is invoked by a preset schedule.</para>
                     <para>
                         <note>
@@ -1864,21 +1993,46 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                     <td>
                                         <parameter>change</parameter>
                                     </td>
-                                    <td>Specifies the number of entities to add or remove, for example "1"
-                                        implies that 1 server needs to be added.
-                                    </td>
+                                    <td>Specifies the number of
+                                   entities to add or remove, for
+                                   example "1" implies that 1 server
+                                   needs to be added. Use to change
+                                   the number of servers to a specific
+                                   number. If a positive number is
+                                   used, servers are added; if a
+                                   negative number is used, servers
+                                   are removed.</td>
                                 </tr>
                                 <tr>
                                     <td>
                                         <parameter>changePercent</parameter>
                                     </td>
-                                    <td>Specifies the change value, in incremental stages or per cent</td>
+                                    <td>Specifies the change value, in
+                                   incremental stages or per cent. Use
+                                   to change the percentage of servers
+                                   relative to the current number of
+                                   servers. If a positive number is
+                                   used, servers are added; if a
+                                   negative number is used, servers
+                                   are removed. The absolute change in
+                                   the number of servers is always
+                                   rounded up. For example, if -X% of
+                                   the current number of servers
+                                   translates to -0.5 or -0.25 or
+                                   -0.75 servers, the actual number of
+                                   servers that will be shut down is
+                                   1. </td>
                                 </tr>
                                 <tr>
                                     <td>
                                         <parameter>desiredCapacity</parameter>
                                     </td>
-                                    <td>Specifies final capacity that is desired by the scale up event</td>
+                                    <td>Specifies final capacity that
+                                   is desired by the scale up event.
+                                   Use to specify a number of servers
+                                   for the policy to implement—by
+                                   either adding or removing servers
+                                   as needed. </td>
                                 </tr>
                                 <tr>
                                     <td>
@@ -1894,7 +2048,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         policy is invoked in CRON format, as shown in the following example, which configures
                         the policy to be invoked at 6 AM every day:
                         <example>
-                            <title>Schedule-Based Policy Using Cron</title>
+                            <title>Schedule-based policy using cron</title>
                             <programlisting language="json">
                                 <xi:include href="./samples/Cronstylescheduler.json" parse="text" />
                             </programlisting>
@@ -1904,7 +2058,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         "at" argument and specify the time using the format that is shown in the following
                         example:
                         <example>
-                            <title>Schedule-Based Policy Specifying Direct Time</title>
+                            <title>Schedule-based policy specifying direct time</title>
                             <programlisting language="json">
                                 <xi:include href="./samples/Atstylescheduler.json" parse="text" />
                             </programlisting>
@@ -1912,7 +2066,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </para>
                 </section>
                 <section xml:id="Scale_by_percentage">
-                    <title>Scaling by Percentage</title>
+                    <title>Scaling by percentage</title>
                     <para>You can define a policy that scales your server resources up and down by a predefined
                         percentage. For example, you can define a policy to increase your resources by
                         20% if a certain predefined event occurs.</para>
@@ -1926,17 +2080,17 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </informalfigure>
                 </section>
                 <section xml:id="Min_and_Max_Policies">
-                    <title>Using the Min and Max Values with Policies
+                    <title>Using the min and max values with policies
                     </title>
-                    <para>When setting up your scaling groups, you configure the minimum and maximum amount
+                    <para>When setting up your scaling groups, you configure the minimum and maximum number
                         of resources that are allowed. These values are specified in the
                         <parameter>minEntities</parameter>and
-                        <parameter>maxEntities</parameter>parameters under GroupConfiguration, and are invoked whenever
+                        <parameter>maxEntities</parameter>parameters under group configuration, and are invoked whenever
                         you update your group configuration.</para>
                     <para>
                         <important>
-                            <para>If the amount of resources that is specified in a policy differs from the
-                                amount that is specified under GroupConfiguration, the preconfigured
+                            <para>If the number of resources that is specified in a policy differs from the
+                                amount that is specified under group configuration, the preconfigured
                                 values take precedence.
                             </para>
                         </important>
@@ -1951,7 +2105,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </informalfigure>
                 </section>
                 <section xml:id="Deleting_resources">
-                    <title>Deleting Resources
+                    <title>Deleting resources
                         <?sbr?>
                     </title>
                     <para>You can set a policy to specify when you want some of your resources deleted, and
@@ -1989,84 +2143,94 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <itemizedlist>
                     <listitem>
                         <para>
-                            <link linkend="Manage_Launch_Configuration">Manage the Launch Configuration for your Scaling Group
+                            <link linkend="Manage_Launch_Configuration">Create and manage scaling groups
                             </link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Create_Scaling_Policies">Create Scaling Policies
+                            <link linkend="Create_Scaling_Policies">Create and manage scaling policies
                             </link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Create_and_Manage_Webhooks">Create and Manage Webhooks</link>
+                            <link linkend="Create_and_Manage_Webhooks">Create and manage webhooks</link>
                         </para>
                     </listitem>
                     <listitem>
                         <para>
-                            <link linkend="Execute_Scaling_Policy">Execute a Scaling Policy</link>
+                            <link linkend="Execute_Scaling_Policy">Execute a scaling policy</link>
                         </para>
                     </listitem>
                 </itemizedlist>
             </para>
+            <note>
+                <para>For details on API parameters, see <link
+                    linkend="API_Operations">Chapter 6, API
+                    Operations</link>. </para>
+            </note>
             <section xml:id="Manage_Launch_Configuration">
-                <title>Manage the Configuration for your Scaling Group</title>
+                <title>Create and manage scaling groups</title>
                 <para>You can use the Auto Scale API to view and update the launch configuration for your scaling
                     group:</para>
                 <para>
                     <itemizedlist>
                         <listitem>
                             <para>
-                                <link linkend="Get_Configuration_for_Scaling_Group">Get the Current Configuration for your Scaling Group
+                                <link linkend="Get_Configuration_for_Scaling_Group">Get the current configuration for your scaling group
                                 </link>
                             </para>
                         </listitem>
                         <listitem>
                             <para>
-                                <link linkend="Edit_Configuration_for_Scaling_Group">Edit the Current Configuraiton for your Scaling Group
+                                <link linkend="Edit_Configuration_for_Scaling_Group">Edit the current configuration for your scaling group
                                 </link>
                             </para>
                         </listitem>
                         <listitem>
                             <para>
-                                <link linkend="Get_Launch_Configuration_for_Scaling_Group">Get the Launch Configuration for your Scaling Group
+                                <link linkend="Get_Launch_Configuration_for_Scaling_Group">Get the launch configuration for your scaling group
                                 </link>
                             </para>
                         </listitem>
                         <listitem>
                             <para>
-                                <link linkend="Edit_Launch_Config">Edit the Launch Configuration for your Scaling Group</link>
+                                <link linkend="Edit_Launch_Config">Edit the launch configuration for your scaling group</link>
                             </para>
                         </listitem>
                     </itemizedlist>
                 </para>
                 <section xml:id="Get_Configuration_for_Scaling_Group">
-                    <title>Get the Current Configuration for your Scaling Group
+                    <title>Get the current configuration for your scaling group
                     </title>
-                    <para>To obtain the configuration for a scaling group, which includes the minimum number
-                        of entities, the maximum number of entities, global cooldown, and other metadata,
-                        submit a
+                    <para>To obtain the configuration for a scaling
+                    group, which includes the minimum number of
+                    entities, the maximum number of entities, global
+                    cooldown, and other metadata, submit a
                         <command>GET</command>request with the
-                        <parameter>tenantId</parameter>and
-                        <parameter>groupId</parameter>parameters specified in the request URL.</para>
+                        <parameter>tenantId</parameter> and
+                        <parameter>groupId</parameter> parameters
+                    specified in the request URL. Add the
+                        <parameter>?webhook=true</parameter> parameter
+                    to also get details about any webhooks associated
+                    with the scaling group's policies.</para>
                     <example>
-                        <title>Get Configuration for your Scaling Group Request</title>
+                        <title>Request</title>
                         <programlisting>GET /{tenantId}/groups/{groupId}/config</programlisting>
                     </example>
                     <para>If the
                         <command>GET</command>request is successful, the data is returned in the body of the response
                         in JSON format as shown in the following example:</para>
                     <example>
-                        <title>Response to Successful Get Configuration Request</title>
+                        <title>Response to successful GET configuration request</title>
                         <programlisting language="json">
                             <xi:include href="./samples/resGetLaunchConfig.json" parse="text" />
                         </programlisting>
                     </example>
                 </section>
                 <section xml:id="Edit_Configuration_for_Scaling_Group">
-                    <title>Edit the Current Configuration for your Scaling Group
+                    <title>Edit the current configuration for your scaling group
                     </title>
                     <para>To edit the configuration for a scaling group, which includes the minimum number
                         of entities, the maximum number of entities, global cooldown, and other metadata,
@@ -2075,7 +2239,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>tenantId</parameter>and
                         <parameter>groupId</parameter>parameters specified in the request URL.</para>
                     <example>
-                        <title>Edit the Configuration for a Scaling Group Request</title>
+                        <title>Request</title>
                         <programlisting>PUT /{tenantId}/groups/{groupId}/config</programlisting>
                         <programlisting language="json">
                             <xi:include href="./samples/reqPutGroupConfig.json" parse="text" />
@@ -2086,7 +2250,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         body will be returned</para>
                 </section>
                 <section xml:id="Get_Launch_Configuration_for_Scaling_Group">
-                    <title>Get the Launch Configuration for your Scaling Group
+                    <title>Get the launch configuration for your scaling group
                     </title>
                     <para>To obtain the launch configuration for a scaling group, which includes the details
                         of how to create a server, from what image, which load balancers to join it to,
@@ -2095,14 +2259,14 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>tenantId</parameter>and
                         <parameter>groupId</parameter>parameters specified in the request URL.</para>
                     <example>
-                        <title>Get the Launch Configuration for a Scaling Group Request</title>
+                        <title>Request</title>
                         <programlisting>GET /{tenantId}/groups/{groupId}/launch</programlisting>
                     </example>
                     <para>If the
-                        <command>GET</command>request is successfull, the data will be returned in the body of
+                        <command>GET</command>request is successful, the data will be returned in the body of
                         the response in JSON format as shown in the following example:</para>
                     <example>
-                        <title>Response to a Successful Get the Launch Configuration for a Scaling Group</title>
+                        <title>Response to a successful get launch configuration for a scaling group</title>
                         <programlisting
                         language="json">
                             <xi:include href="./samples/resGetLaunchConfig.json" parse="text" />
@@ -2110,7 +2274,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </example>
                 </section>
                 <section xml:id="Edit_Launch_Config">
-                    <title>Edit the Launch Configuration for your Scaling Group
+                    <title>Edit the launch configuration for your scaling group
                     </title>
                     <para>To edit the launch configuration for a scaling group, including how to create a server,
                         from what image, which load balancers to join it to, and what networks to add
@@ -2122,7 +2286,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         specify the details about the server type, server image, load balancers, network,
                         and any other information you want to edit, as shown in the following example.</para>
                     <example>
-                        <title>Edit the Launch Configuration for a Scaling Group Example
+                        <title>Request
                         </title>
                         <programlisting>PUT /{tenantId}/groups/{groupId}/launch</programlisting>
                         <programlisting language="json">
@@ -2135,7 +2299,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </para>
                 </section>
                 <section xml:id="Pause_Execution_of_Scaling_Policies">
-                    <title>Pause Execution of All Scaling Policies</title>
+                    <title>Pause execution of all scaling policies</title>
                     <para>
                         <note>
                             <para>The Pause feature has not been implemented in the Auto Scale API yet but
@@ -2148,7 +2312,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>tenantId</parameter>and
                         <parameter>groupId</parameter>parameters specified in the request URL.</para>
                     <example>
-                        <title>Pause Execution of all Policies for a Scaling Group
+                        <title>Request
                         </title>
                         <programlisting>POST /{tenantId}/groups/{groupId}/pause</programlisting>
                     </example>
@@ -2158,7 +2322,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </para>
                 </section>
                 <section xml:id="Resume_Execution_of_Scaling_Policies">
-                    <title>Resume Execution of all Policies for a Scaling Group
+                    <title>Resume execution of all policies for a scaling group
                     </title>
                     <para>
                         <note>
@@ -2172,7 +2336,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>tenantId</parameter>and
                         <parameter>groupId</parameter>parameters specified in the request URL.</para>
                     <example>
-                        <title>Resume Execution of All Scaling Policies</title>
+                        <title>Request</title>
                         <programlisting>POST /{tenantId}/groups/{groupId}/resume</programlisting>
                     </example>
                     <para>If the
@@ -2182,7 +2346,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 </section>
             </section>
             <section xml:id="Create_Scaling_Policies">
-                <title>Create Scaling Policies</title>
+                <title>Create and manage scaling policies</title>
                 <para>You can use the Auto Scale API to create and manage the scaling policies for your scaling
                     group. Create a scaling policy by submitting a
                     <command>POST</command>request that contains the
@@ -2209,33 +2373,33 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <itemizedlist>
                         <listitem>
                             <para>
-                                <link linkend="Create_a_Scaling_Policy">Create a Scaling Policy</link>
+                                <link linkend="Create_a_Scaling_Policy">Create a scaling policy</link>
                             </para>
                         </listitem>
                         <listitem>
                             <para>
-                                <link linkend="Obtain_List_of_Scaling_Policies">Obtain a List of Scalijng Policies</link>
+                                <link linkend="Obtain_List_of_Scaling_Policies">List scaling policies</link>
                             </para>
                         </listitem>
                         <listitem>
                             <para>
-                                <link linkend="Getting_Individual_Scaling_Policy">Get an Indiviual Scaling Policy</link>
+                                <link linkend="Getting_Individual_Scaling_Policy">Get an individual scaling policy</link>
                             </para>
                         </listitem>
                         <listitem>
                             <para>
-                                <link linkend="Updating_Scaling_Policy">Update a Scaling Policy</link>
+                                <link linkend="Updating_Scaling_Policy">Update a scaling policy</link>
                             </para>
                         </listitem>
                         <listitem>
                             <para>
-                                <link linkend="Deleting_Scaling_Policy">Delete a Scaling Policy</link>
+                                <link linkend="Deleting_Scaling_Policy">Delete a scaling policy</link>
                             </para>
                         </listitem>
                     </itemizedlist>
                 </para>
                 <section xml:id="Create_a_Scaling_Policy">
-                    <title>Create a Scaling Policy</title>
+                    <title>Create a scaling policy</title>
                     <para>To create a scaling policy, submit a
                         <command>POST</command>request with the
                         <parameter>tenantId</parameter>and
@@ -2244,7 +2408,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         phase of 150 seconds and a scaling policy that scales the group down by 5.5 percent
                         with a cooldown phase of 6 seconds.</para>
                     <example>
-                        <title>Create a Scaling Policy</title>
+                        <title>Request</title>
                         <programlisting>
                             POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/
                         </programlisting>
@@ -2256,7 +2420,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <command>POST</command>request is successful, an array of scaling policies is provided
                         in the request body in JSON format, as shown in the following example.</para>
                     <example>
-                        <title>Response to Successful Create a Scaling Policy Request</title>
+                        <title>Response to successful create a scaling policy request</title>
                         <programlisting
                         language="json">
                             <xi:include href="./samples/resCreatePolicies.json" parse="text" />
@@ -2264,13 +2428,13 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </example>
                 </section>
                 <section xml:id="Obtain_List_of_Scaling_Policies">
-                    <title>Obtain a List of Scaling Policies</title>
+                    <title>List scaling policies</title>
                     <para>To obtain a list of scaling policies for a scaling group, submit a
                         <command>GET</command>request with the
                         <parameter>tenantId</parameter>and
                         <parameter>groupId</parameter>parameters specified in the request URL.</para>
                     <example>
-                        <title>Obtain a List of Scaling Policies Request</title>
+                        <title>Request</title>
                         <programlisting>
                             GET /{tenantId}/groups/{groupId}/policies
                         </programlisting>
@@ -2279,7 +2443,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <command>GET</command>request is successful, the response data will be returned in JSON
                         format as shown in the following example:</para>
                     <example>
-                        <title>Response to Successful Obtain a List of Scaling Policies Request</title>
+                        <title>Response to successful list scaling policies request</title>
                         <programlisting
                         language="json">
                             <xi:include href="./samples/resGetPolicies.json" parse="text" />
@@ -2287,7 +2451,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </example>
                 </section>
                 <section xml:id="Getting_Individual_Scaling_Policy">
-                    <title>Get an Individual Scaling Policy</title>
+                    <title>Get an individual scaling policy</title>
                     <para>To obtain information about an individual scaling policy, including policy id, name,
                         type, adjustment, and cooldown, submit a
                         <command>GET</command>request with the
@@ -2295,7 +2459,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>groupId</parameter>and
                         <parameter>policyId</parameter>parameters specified in the request URL.</para>
                     <example>
-                        <title>Get an Individual Scaling Policy Request</title>
+                        <title>Request</title>
                         <programlisting>
                             GET /{tenantId}/groups/{groupId}/policies/{policyId}
                         </programlisting>
@@ -2304,7 +2468,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <command>GET</command>request is successful, the data will be returned in the response
                         body in JSON format as shown in the following example:</para>
                     <example>
-                        <title>Response to a Successful Get an Individual Scaling Policy Request</title>
+                        <title>Response to a successful get an individual scaling policy request</title>
                         <programlisting
                         language="json">
                             <xi:include href="./samples/resGetPolicy.json" parse="text" />
@@ -2312,7 +2476,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </example>
                 </section>
                 <section xml:id="Updating_Scaling_Policy">
-                    <title>Update a Scaling Policy</title>
+                    <title>Update a scaling policy</title>
                     <para>To update a scaling policy, submit a
                         <command>PUT</command>request, with the
                         <parameter>tenantId</parameter>,
@@ -2322,7 +2486,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         a method for triggering the policy, for example a webhook. In the following example,
                         the configuration is scaled up by one server with a cooldown phase of 1800 seconds.</para>
                     <example>
-                        <title>Update a Scaling Policy Request</title>
+                        <title>Request</title>
                         <programlisting>
                             PUT /{tenantId}/groups/{groupId}/policies/{policyId}
                         </programlisting>
@@ -2335,14 +2499,14 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         body will be returned.</para>
                 </section>
                 <section xml:id="Deleting_Scaling_Policy">
-                    <title>Delete a Scaling Policy</title>
+                    <title>Delete a scaling policy</title>
                     <para>To delete a scaling policy, submit a
                         <command>DELETE</command>request with the
                         <parameter>tenantId</parameter>,
                         <parameter>groupId</parameter>and
                         <parameter>policyId</parameter>parameters specified in the request URL.</para>
                     <example>
-                        <title>Delete a Scaling Policy Request</title>
+                        <title>Request</title>
                         <programlisting>
                             DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
                         </programlisting>
@@ -2353,7 +2517,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 </section>
             </section>
             <section xml:id="Create_and_Manage_Webhooks">
-                <title>Create and Manage Webhooks</title>
+                <title>Create and manage webhooks</title>
                 <para>After creating your policy, you need to specify a webhook to tie your scaling policy
                     to events. Webhooks are URLs that can activate the policy without authentication.
                     When a webhook is set, a pre-configured event, such as an alarm set through Cloud
@@ -2362,36 +2526,36 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <itemizedlist>
                         <listitem>
                             <para>
-                                <link linkend="Create_scaling_webhook">Create a Webhook
+                                <link linkend="Create_scaling_webhook">Create a webhook
                                 </link>
                             </para>
                         </listitem>
                         <listitem>
                             <para>
-                                <link linkend="Get_List_of_Scaling_Webhooks">Get a List of all Webhooks and their Ids</link>
+                                <link linkend="Get_List_of_Scaling_Webhooks">List all webhooks and their IDs</link>
                             </para>
                         </listitem>
                         <listitem>
                             <para>
-                                <link linkend="Update_Scaling_Webhook">Update a Webhook
+                                <link linkend="Update_Scaling_Webhook">Update a webhook
                                 </link>
                             </para>
                         </listitem>
                         <listitem>
                             <para>
-                                <link linkend="Get_Info_About_Webhook">Get Information about a Specific Webhook</link>
+                                <link linkend="Get_Info_About_Webhook">Get information about a specific webhook</link>
                             </para>
                         </listitem>
                         <listitem>
                             <para>
-                                <link linkend="Delete_Scaling_Webhook">Delete a Webhook
+                                <link linkend="Delete_Scaling_Webhook">Delete a webhook
                                 </link>
                             </para>
                         </listitem>
                     </itemizedlist>
                 </para>
                 <section xml:id="Create_scaling_webhook">
-                    <title>Create a Webhook</title>
+                    <title>Create a webhook</title>
                     <para>To create a webhook, submit a
                         <command>POST</command>
                         request with the
@@ -2402,7 +2566,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         example shows how to create a webhook for a scaling policy.
                     </para>
                     <example>
-                        <title>Create a Webhook Request</title>
+                        <title>Request</title>
                         <programlisting>
                             POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/{policyID}/webhooks
                         </programlisting>
@@ -2414,21 +2578,21 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <command>POST</command>request is successful, the data will be returned in JSON format
                         as shown in the following example:</para>
                     <example>
-                        <title>Response to a Successful Create a Webhook Request</title>
+                        <title>Response to a successful create a webhook request</title>
                         <programlisting language="json">
                             <xi:include href="./samples/resCreateWebhook.json" parse="text" />
                         </programlisting>
                     </example>
                 </section>
                 <section xml:id="Get_List_of_Scaling_Webhooks">
-                    <title>Get a List of all Webhooks and their Ids</title>
+                    <title>List webhooks and their IDs</title>
                     <para>To obtain a list of all scaling webhooks and their corresponding ids, submit a
                         <command>GET</command>request with the
                         <parameter>tenantId</parameter>,
                         <parameter>groupId</parameter>and
                         <parameter>policyId</parameter>parameters specified in the request URL.</para>
                     <example>
-                        <title>Get a List of Scaling Webhooks and their Ids Request</title>
+                        <title>Request</title>
                         <programlisting>
                             GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                         </programlisting>
@@ -2437,7 +2601,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <command>GET</command>request is successful, the data will be returned in the response
                         body in JSON format as shown in the following example:</para>
                     <example>
-                        <title>Response to a Successful Get a List of Scaling Webhooks Request</title>
+                        <title>Response to a successful list all webhooks request</title>
                         <programlisting
                         language="json">
                             <xi:include href="./samples/resGetWebhooks.json" parse="text" />
@@ -2445,7 +2609,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </example>
                 </section>
                 <section xml:id="Update_Scaling_Webhook">
-                    <title>Update a Webhook</title>
+                    <title>Update a webhook</title>
                     <para>To modify a scaling webhook, submit a
                         <command>PUT</command>request with the
                         <parameter>tenantId</parameter>,
@@ -2455,7 +2619,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         body, specify a name and metadata for the webhook as shown in the following example.
                     </para>
                     <example>
-                        <title>Update a Webhook Request</title>
+                        <title>Request</title>
                         <programlisting>
                             PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                         </programlisting>
@@ -2469,7 +2633,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </para>
                 </section>
                 <section xml:id="Get_Info_About_Webhook">
-                    <title>Get Information about a Specific Webhook</title>
+                    <title>Get information about a specific webhook</title>
                     <para>To obtain details about a specific webhook, submit a
                         <command>GET</command>request with the
                         <parameter>tenantId</parameter>,
@@ -2477,7 +2641,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>policyId</parameter>and
                         <parameter>webhookId</parameter>parameters specified in the request URL.</para>
                     <example>
-                        <title>Get Information about a Webhook Request</title>
+                        <title>Request</title>
                         <programlisting>
                             GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                         </programlisting>
@@ -2486,7 +2650,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <command>GET</command>request is successful, the data will be returned in JSON format
                         as shown in the following example:</para>
                     <example>
-                        <title>Example of Successful Response to Get Info about a Webhook Request</title>
+                        <title>Response to successful get information about a webhook request</title>
                         <programlisting
                         language="json">
                             <xi:include href="./samples/resGetWebhook.json" parse="text" />
@@ -2494,7 +2658,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </example>
                 </section>
                 <section xml:id="Delete_Scaling_Webhook">
-                    <title>Delete a Webhook</title>
+                    <title>Delete a webhook</title>
                     <para>To delete a webhook, submit a
                         <command>DELETE</command>
                         request with the
@@ -2503,7 +2667,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>policyID</parameter>, and the
                         <parameter>webhookID</parameter>parameters specified in the request URL.</para>
                     <example>
-                        <title>Delete a Webhook Request</title>
+                        <title>Request</title>
                         <programlisting>
                             DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                         </programlisting>
@@ -2513,7 +2677,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 </section>
             </section>
             <section xml:id="Execute_Scaling_Policy">
-                <title>Execute a Scaling Policy</title>
+                <title>Execute a scaling policy</title>
                 <para>After you define a scaling policy, you can activate that policy by issuing a
                     <command>POST</command>request against its URL.</para>
                 <para>To activate a scaling policy, submit a
@@ -2523,7 +2687,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <parameter>groupId</parameter>and
                     <parameter>policyId</parameter>parameters specified in the request URL.</para>
                 <example>
-                    <title>Activate a Scaling Policy Request</title>
+                    <title>Request</title>
                     <programlisting>
                         POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute
                     </programlisting>
@@ -2539,7 +2703,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     If some element of the configuration is invalid, scaling can fail even if the scaling
                     policy is executed.</para>
             </section>
-            <xi:include href="./chapters/rbac.xml" />
+            <xi:include href="./chapters/rbac.xml"/>
         </chapter>
         <xi:include href="./chapters/apiref.xml" />
 </book>

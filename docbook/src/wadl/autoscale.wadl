@@ -14,6 +14,7 @@
 <application xmlns="http://wadl.dev.java.net/2009/02"
     xmlns:identity="http://docs.openstack.org/identity/api/v2.0"
     xmlns:db="http://docbook.org/ns/docbook"
+    xmlns:csapi="http://docs.openstack.org/compute/api/v2"
     xmlns:raxapi="http://docs.rackspace.com/volume/api/v1"
     xmlns:wadl="http://wadl.dev.java.net/2009/02"
     xmlns:osapi="http://docs.openstack.org/compute/api/v1.1"
@@ -24,788 +25,1416 @@
     <!-- ======================================================================================= -->
     <!-- Resources -->
     <!-- ======================================================================================= -->
-    <resources base="https://{region}.autoscale.api.rackspacecloud.com/" xml:id="autoscale-v1">
-        <resource id="version" path="v1.0/" rax:roles="admin autoscale:admin autoscale:service-admin">
-
+    <resources
+        base="https://{region}.autoscale.api.rackspacecloud.com/"
+        xml:id="autoscale-v1">
+        <resource id="version" path="v1.0/"
+            rax:roles="admin autoscale:admin autoscale:service-admin">
             <!-- GROUPS resource -->
-            <resource id="tenantid" path="/{tenantId}">
-                <param name="tenantId" type="xsd:string" required="true" style="template">
-                    <doc>A subscriber to the autoscaling service</doc>
+            <resource id="tenantid" path="{tenantId}">
+                <param name="tenantId" type="xsd:string"
+                    required="true" style="template">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        xml:lang="EN"><para>A subscriber to the auto
+                            scaling service.</para></wadl:doc>
                 </param>
-                <resource id="groups" path="/groups">
-                    <param name="X-Auth-Token" style="header" type="xsd:string" required="true">
-                        <doc>A valid authentication token</doc>
+                <resource id="groups" path="groups">
+                    <param name="X-Auth-Token" style="header"
+                        type="xsd:string" required="true">
+                        <wadl:doc
+                            xmlns="http://docbook.org/ns/docbook"
+                            xml:lang="EN"><para>A valid authentication
+                                token.</para></wadl:doc>
                     </param>
-
-                    <method href="#getGroups"/>
                     <method href="#createGroup"/>
-
-                    <resource id="group" path="/{groupId}">
-
-                        <param name="groupId" type="osapi:UUID" required="true" style="template">
-                            <doc>A scaling group</doc>
+                    <method href="#listGroups"/>
+                    <resource id="groupId" path="{groupId}">
+                        <param name="groupId" type="osapi:UUID"
+                            required="true" style="template">
+                            <wadl:doc
+                                xmlns="http://docbook.org/ns/docbook"
+                                xml:lang="EN"><para>A scaling
+                                   group.</para></wadl:doc>
                         </param>
-                        <method href="#getGroupManifest"/>
+                        
+                        <method href="#showGroupManifest"/>
+                        <resource id="webhook" path="webhook">
+                            <method href="#showGroupManifestWebhook"/>
+                        </resource>
+                        
                         <method href="#deleteGroup"/>
-
-                        <resource id="group_state" path="/state">
+                        <resource id="state" path="state">
                             <method href="#getGroupState"/>
                         </resource>
-
-                        <resource id="group_config" path="/config">
+                        <resource id="config" path="config">
                             <method href="#getGroupConfig"/>
                             <method href="#putGroupConfig"/>
                         </resource>
-                        <resource id="launch_configuration" path="/launch">
+                        <resource id="launch" path="launch">
                             <method href="#getLaunchConfig"/>
                             <method href="#putLaunchConfig"/>
                         </resource>
-
-                        <resource id="pause" path="/pause">
+                        <resource id="pause" path="pause">
                             <method href="#pauseGroup"/>
                         </resource>
-                        <resource id="resume" path="/resume">
+                        <resource id="resume" path="resume">
                             <method href="#resumeGroup"/>
                         </resource>
-
                         <!-- POLICIES resource -->
-                        <resource id="policies" path="/policies">
+                        <resource id="policies" path="policies">
                             <method href="#getPolicies"/>
                             <method href="#createPolicies"/>
-
-                            <resource id="policy" path="/{policyId}">
-                                <param name="policyId" type="osapi:UUID" required="true" style="template">
-                                    <doc>A scaling policy</doc>
+                            <resource id="policyid" path="{policyId}">
+                                <param name="policyId"
+                                   type="osapi:UUID" required="true"
+                                   style="template">
+                                   <wadl:doc
+                                   xmlns="http://docbook.org/ns/docbook"
+                                   xml:lang="EN"><para>A scaling
+                                   policy.</para></wadl:doc>
                                 </param>
+                                <method href="#deletePolicy"/>
                                 <method href="#getPolicy"/>
                                 <method href="#putPolicy"/>
-                                <method href="#deletePolicy"/>
-
-                                <resource id="execute" path="/execute">
-                                    <method href="#executePolicy"/>
+                                <resource id="execute" path="execute">
+                                   <method href="#executePolicy"/>
                                 </resource>
-
-                                <resource id="webhooks" path="/webhooks">
-                                    <method href="#getWebhooks"/>
-                                    <method href="#createWebhook"/>
-
-                                    <resource id="webhook" path="/{webhookId}">
-                                        <param name="webhookId" type="osapi:UUID" required="true" style="template">
-                                            <doc>A webhook</doc>
-                                        </param>
-                                        <method href="#getWebhook"/>
-                                        <method href="#putWebhook"/>
-                                        <method href="#deleteWebhook"/>
-                                    </resource>
+                                <resource id="webhooks"
+                                   path="webhooks">
+                                   <method href="#getWebhooks"/>
+                                   <method href="#createWebhook"/>
+                                   <resource id="webhookid"
+                                   path="{webhookId}">
+                                   <param name="webhookId"
+                                   type="osapi:UUID" required="true"
+                                   style="template">
+                                   <wadl:doc
+                                   xmlns="http://docbook.org/ns/docbook"
+                                   xml:lang="EN"><para>A
+                                   webhook.</para></wadl:doc>
+                                   </param>
+                                   <method href="#getWebhook"/>
+                                   <method href="#putWebhook"/>
+                                   <method href="#deleteWebhook"/>
+                                   </resource>
                                 </resource>
                             </resource>
                         </resource>
                     </resource>
                 </resource>
             </resource>
-            <resource id="anonymous_execute_webhook" path="/execute/{capability_version}/{capability_hash}/">
-                <param name="capability_version" required="true" style="template" type="xsd:string"/>
-                <param name="capability_hash" required="true" style="template" type="xsd:string"/>
-                <method href="#anonymousExecute"/>
+            <resource id="anonymous-execute" path="execute">
+                <resource id="capability_version"
+                    path="{capability_version}">
+                    <resource id="capability_hash"
+                        path="{capability_hash}">
+                        <param name="capability_version"
+                            required="true" style="template"
+                            type="xsd:string"/>
+                        <param name="capability_hash" required="true"
+                            style="template" type="xsd:string"/>
+                        <method href="#anonymousExecute"/>
+                    </resource>
+                </resource>
             </resource>
         </resource>
     </resources>
     <!-- ======================================================================================= -->
     <!-- Methods -->
     <!-- ======================================================================================= -->
-      <method id="createGroup" name="POST">
-          <wadl:doc title="Create Group" xmlns="http://docbook.org/ns/docbook">
-            <para role="shortdesc">
-                This method creates a scaling group.
-            </para>
-            <para>
-                This method creates a scaling group or a collection of servers and load balancers that are managed by a scaling policy.
-                To describe the group you wish to create, specify the scaling group configuration, launch configuration, and optional scaling
-                policies in the request body in JSON format. For a successful request, the response body describes
-                the created group in JSON format. The response includes an ID and links for the group.
-            </para>
+    <method id="createGroup" name="POST">
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Create scaling group">
+            <para role="shortdesc">Creates a scaling group.</para>
+            <para>Creates a scaling group or a collection of servers
+                and load balancers that are managed by a scaling
+                policy. To describe the group, specify the scaling
+                group configuration, launch configuration, and
+                optional scaling policies in the request body in JSON
+                format.</para>
+            <para>If the request succeeds, the response body describes
+                the created group in JSON format. The response
+                includes an ID and links for the group.</para>
         </wadl:doc>
         <request>
+            <param style="plain" name="launchConfiguration"
+                required="true" type="object"
+                path="$.launchConfiguration">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <para>A launch configuration.</para>
+                    <para>A launch configuration defines what to do
+                        when a new server is created, including
+                        information about the server image, the flavor
+                        of the server image, and the load balancer to
+                        which to connect. You must set the
+                        <code>type</code> parameter to <code>launch_server</code>.
+                    </para></wadl:doc>
+            </param>
+            <param style="plain" name="loadBalancers" required="false"
+                type="array"
+                path="$.launchConfiguration.args.loadBalancers">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <para>One or more load balancers to which to add
+                        new servers. All servers are added to these
+                        load balancers with the IP addresses of their
+                        ServiceNet network. All servers are enabled
+                        and equally weighted. Any new servers that are
+                        not connected to the ServiceNet network are
+                        not added to any load
+                    balancers.</para></wadl:doc>
+            </param>
+            <param style="plain" name="port" required="true"
+                type="integer"
+                path="$.launchConfiguration.args.loadBalancers.[*].port">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The port number of the service
+                        (on the new servers) to use for this
+                        particular load balancer. In most cases, this
+                        port number is 80.</para></wadl:doc>
+            </param>
+            <param style="plain" name="loadBalancerId" required="true"
+                type="integer"
+                path="$.launchConfiguration.args.loadBalancers.[*].loadBalancerId">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The ID of the load balancer to
+                        which to add new servers.</para></wadl:doc>
+            </param>
+            <param style="plain" name="server" required="true"
+                type="object" path="$.launchConfiguration.args.server">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The attributes that Auto Scale
+                        uses to create a new server. For more
+                        information, see <link
+                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html"
+                            >Create Server</link>. The attributes that
+                        you specify for the server entity apply to all
+                        new servers in the scaling group, including
+                        the server name.</para></wadl:doc>
+            </param>
+            <param style="plain" name="flavorRef" required="true"
+                type="string"
+                path="$.launchConfiguration.args.server.flavorRef">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The flavor of the server
+                        image. Specifies the flavor ID for the
+                        server.</para><para>A flavor is a resource
+                        configuration for a server. For more
+                        information, see Server Flavors<olink
+                            targetdoc="autoscale-devguide"
+                            targetptr="server-flavors">“Server
+                            Flavors”</olink>
+                    section.</para></wadl:doc>
+            </param>
+            <param style="plain" name="imageRef" required="true"
+                type="string"
+                path="$.launchConfiguration.args.server.imageRef">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The ID of the cloud server
+                        image, after which new server images are
+                        created.</para></wadl:doc>
+            </param>
+            <param style="plain" name="personality" required="false"
+                type="array"
+                path="$.launchConfiguration.args.server.personality">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The file path and/or the
+                        content that you want to inject into a server
+                        image. For more information, see the <link
+                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html"
+                            >Server Personality</link> documentation
+                        for Rackspace Cloud Servers.</para></wadl:doc>
+            </param>
+            <param style="plain" name="path" required="true"
+                type="string"
+                path="$.launchConfiguration.args.server.personality.[*].path">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The path to the file that
+                        contains data that is injected into the file
+                        system of the new cloud server
+                    image.</para></wadl:doc>
+            </param>
+            <param style="plain" name="contents" required="true"
+                type="string"
+                path="$.launchConfiguration.args.server.personality.[*].contents">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The content items that is
+                        injected into the file system of the new cloud
+                        server image.</para>
+                </wadl:doc>
+            </param>
+            <param style="plain" name="args" required="true"
+                type="object" path="$.launchConfiguration.args">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The item to be configured.
+                        Must be "server" or "load balancer." Most
+                        launch configurations have both a server and a
+                        load balancer configured.</para></wadl:doc>
+            </param>
+            <param style="plain" name="type" required="true"
+                type="string" path="$.launchConfiguration.type">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The type of the launch
+                        configuration. For this release, this
+                        parameter must be set to
+                            <code>launch_server</code>.</para></wadl:doc>
+            </param>
+            <param style="plain" name="groupConfiguration"
+                required="true" type="object"
+                path="$.groupConfiguration">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The configuration options for
+                        the scaling group. The scaling group
+                        configuration specifies the basic elements of
+                        the Auto Scale configuration. It manages how
+                        many servers can participate in the scaling
+                        group. It specifies information related to
+                        load balancers.</para></wadl:doc>
+            </param>
+            <param style="plain" name="maxEntities" required="false"
+                type="object" path="$.groupConfiguration.maxEntities">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The maximum number of
+                        entities that are allowed in the scaling
+                        group. If unconfigured, defaults to 1000. If this
+                        value is provided it must be set to an integer
+                        between 0 and 1000.</para>
+                </wadl:doc>
+            </param>
+            <param style="plain" name="name" required="true"
+                type="string" path="$.groupConfiguration.name">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The name of the scaling group.
+                        This name does not need to be
+                    unique.</para></wadl:doc>
+            </param>
+            <param style="plain" name="cooldown" required="true"
+                type="integer" path="$.groupConfiguration.cooldown">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The cool-down period before
+                        more entities are added, in seconds. This
+                        number must be an integer between 0 and 86400
+                        (24 hrs).</para>
+                </wadl:doc>
+            </param>
+            <param style="plain" name="minEntities" required="true"
+                type="integer" path="$.groupConfiguration.minEntities">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The minimum number of entities
+                        in the scaling group. This number must be an
+                        integer between 0 and 1000.</para></wadl:doc>
+            </param>
+            <param style="plain" name="metadata" required="false"
+                type="object" path="$.groupConfiguration.metadata">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>Optional. Custom metadata for
+                        your group configuration. You can use the
+                        metadata parameter for customer automation,
+                        but it does not change any functionality in
+                        Auto Scale. There currently is no limitation
+                        on depth.</para></wadl:doc>
+            </param>
+            <param style="plain" name="scalingPolicies"
+                required="true" type="array" path="$.scalingPolicies">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook">This
+                    parameter group specifies configuration
+                    information for your scaling policies. Scaling
+                    policies specify how to modify the scaling group
+                    and its behavior. You can specify multiple
+                    policies to manage a scaling group. </wadl:doc>
+            </param>
+            <param style="plain" name="array" required="true"
+                type="array" path="$.scalingPolicies.[*]">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>An array of scaling
+                        policies.</para></wadl:doc>
+            </param>
+            <param style="plain" name="name" required="true"
+                type="string" path="$.scalingPolicies.[*].name">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>A name for the scaling policy.
+                        This name must be unique for each scaling
+                        policy.</para></wadl:doc>
+            </param>
+            <param style="plain" name="args" required="false"
+                type="object" path="$.scalingPolicies.[*].args">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>Additional configuration
+                        information for policies of type "schedule."
+                        This parameter is not required for policies of
+                        type "webhook." This parameter must be set to
+                        either "at" or <code>cron</code>. Both "at"
+                        and <code>cron</code> are mutually
+                        exclusive.</para>
+                </wadl:doc>
+            </param>
+            <param style="plain" name="cron" required="false"
+                type="string" path="$.scalingPolicies.[*].args.cron">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The recurring time when the
+                        policy runs as a cron entry. For example, if
+                        you set this parameter to <code>1 0 * *
+                            *</code>, the policy runs at one minute
+                        past midnight (00:01) every day of the month,
+                        and every day of the week. For more
+                        information about cron, see <link
+                            xlink:href="http://en.wikipedia.org/wiki/Cron"
+                            >http://en.wikipedia.org/wiki/Cron</link>.</para></wadl:doc>
+            </param>
+            <param style="plain" name="at" required="false"
+                type="string" path="$.scalingPolicies.[*].args.at">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The time when this policy
+                        runs. This property is mutually exclusive with
+                        the <code>cron</code> parameter. You must
+                        specify seconds when using "at". For example,
+                            <code>"at": "2013-12-05T03:12:00Z"</code>.
+                        If seconds are not specified, a 400 error is
+                        returned. Note, the policy is triggered within
+                        a 10-second range of the time specified.</para></wadl:doc>
+            </param>
+            <param style="plain" name="changePercent" required="false"
+                type="number"
+                path="$.scalingPolicies.[*].changePercent">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The percent change to make in
+                        the number of servers in the scaling group. If
+                        this number is positive, the number of servers
+                        increases by the given percentage. If this
+                        parameter is set to a negative number, the
+                        number of servers decreases by the given
+                        percentage. The absolute change in the number
+                        of servers is rounded to the nearest integer.
+                        This means that if -X% of the current number
+                        of servers translates to -0.5 or -0.25 or
+                        -0.75 servers, the actual number of servers
+                        that are shut down is 1. If X% of the current
+                        number of servers translates to 1.2 or 1.5 or
+                        1.7 servers, the actual number of servers that
+                        are launched is 2.</para></wadl:doc>
+            </param>
+            <param style="plain" name="cooldown" required="true"
+                type="number" path="$.scalingPolicies.[*].cooldown">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The cool-down period, in
+                        seconds, before this particular scaling policy
+                        can run again. The cool-down period does not
+                        affect the global scaling group cool-down. The
+                        minimum value for this parameter is 0 seconds,
+                        the maximum value is 86400 seconds (24
+                        hrs).</para>
+                </wadl:doc>
+            </param>
+            <param style="plain" name="type" required="true"
+                type="enum" path="$.scalingPolicies.[*].type">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The type of policy that runs
+                        for the current release, this value can be
+                        either <code>webhook</code> for webhook-based
+                        policies or <code>schedule</code> for
+                        schedule-based policies.</para></wadl:doc>
+            </param>
+            <param style="plain" name="change" required="false"
+                type="integer" path="$.scalingPolicies.[*].change">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The change to make in the
+                        number of servers in the scaling group. This
+                        parameter must be an integer. If the value is
+                        a positive integer, the number of servers
+                        increases. If the value is a negative integer,
+                        the number of servers
+                    decreases.</para></wadl:doc>
+            </param>
+            <param style="plain" name="desiredCapacity"
+                required="false" type="integer"
+                path="$.scalingPolicies.[*].desiredCapacity">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The desired server capacity of
+                        the scaling the group; that is, how many
+                        servers should be in the scaling group. This
+                        value must be an absolute number, greater than or equal to zero. 
+                        For example, if this parameter is set to ten, executing the policy brings the number
+                        of servers to ten. The minimum allowed value is
+                        zero. Note that the configured group maxEntities and minEntities takes precedence
+                        over this setting.</para>
+                </wadl:doc>
+            </param>
             <representation mediaType="application/json">
                 <wadl:doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/reqCreateGroup.json"/>
+                    <xsdxt:code
+                        href="../docbkx/samples/reqCreateGroup.json"/>
                 </wadl:doc>
-	      <param style="plain"
-		     name="launchConfiguration"
-		     required="true"
-		     type="object"
-		     path="$.launchConfiguration">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This entity specifies all the details for the launch configuration. The launch configuration describes what to do when a new server is created. It includes information about the server image, the flavor of the server image, as well as which load balancer to connect to. The "type" parameter for a launch configuration must be set to "launch_server."</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="loadBalancers"
-		     required="false"
-		     type="array"
-		     path="$.launchConfiguration.args.loadBalancers">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter provides details about one or more load balancers to add new servers to. All servers will be added to these load balancers with the IP addresses of their ServiceNet network. All servers will be enabled and equally weighted. Any new servers that are not connected to the ServiceNet network will not be added to any load balancers.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="port"
-		     required="true"
-		     type="integer"
-		     path="$.launchConfiguration.args.loadBalancers.[*].port">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the port number of the service (on the new servers) to use for this particular load balancer. In most cases, this port number is 80.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="loadBalancerId"
-		     required="true"
-		     type="integer"
-		     path="$.launchConfiguration.args.loadBalancers.[*].loadBalancerId">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the ID of the load balancer to which new servers will be added.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="server"
-		     required="true"
-		     type="object"
-		     path="$.launchConfiguration.args.server">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter group specifies all the attributes Auto Scale will use to create a new server. For more information, see: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html.The attributes that are specified for the server entity will apply to all new servers in the scaling group, including the server name.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="flavorRef"
-		     required="true"
-		     type="string"
-		     path="$.launchConfiguration.args.server.flavorRef">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the flavor of the server image. Specifies the flavor Id for the
-	              server. A flavor is a resource
-	              configuration for a server. For more
-	              information on available flavors, see
-	              the Server Flavors<olink
-	                  targetdoc="autoscale-devguide"
-	                  targetptr="server-flavors">“Server
-	                  Flavors”</olink> section.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="imageRef"
-		     required="true"
-		     type="string"
-		     path="$.launchConfiguration.args.server.imageRef">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the ID of the cloud server image, after which new server images will be created. </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="personality"
-		     required="false"
-		     type="array"
-		     path="$.launchConfiguration.args.server.personality">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the file path and/or the
-	              content that you want to inject into a
-	              server image. For more information,
-	              see the <link
-	                  xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html"
-	                  >Server Personality</link>
-	              documentation for Rackspace Cloud
-	              Servers </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="path"
-		     required="true"
-		     type="string"
-		     path="$.launchConfiguration.args.server.personality.[*].path">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the path to the file that contains data that will be injected into the file system of the new cloud server image/ </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="contents"
-		     required="true"
-		     type="string"
-		     path="$.launchConfiguration.args.server.personality.[*].contents">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the content items that will be injected into the file system of the new cloud server image. </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="args"
-		     required="true"
-		     type="object"
-		     path="$.launchConfiguration.args">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the item to be configured. Must be "server" or "loadbalancer." Most launch configurations have both a server and a loadbalancer configured.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="type"
-		     required="true"
-		     type="string"
-		     path="$.launchConfiguration.type">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the type of the launch configuration. For this release, this parameter must be set to "launch_server."</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="groupConfiguration"
-		     required="true"
-		     type="object"
-		     path="$.groupConfiguration">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter group specifies the configuration options for the scaling group. The scaling group configuration specifies the basic elements of the Auto Scale configuration. It manages how many servers can participate in the scaling group. It specifies information related to load balancers.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="maxEntities"
-		     required="false"
-		     type="object"
-		     path="$.groupConfiguration.maxEntities">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the maximum amount of identities that are allowed in the scaling group. This number defaults to null. If this value is provided it must be set to an integer between 0 and 1000. </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="name"
-		     required="true"
-		     type="string"
-		     path="$.groupConfiguration.name">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the name of the scaling group. This name does not need to be unique.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="cooldown"
-		     required="true"
-		     type="integer"
-		     path="$.groupConfiguration.cooldown">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the cooldown period before more entities are added, in seconds. This number must be an integer between 0 and 86400 (24 hrs). </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="minEntities"
-		     required="true"
-		     type="integer"
-		     path="$.groupConfiguration.minEntities">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the minimum number of entities in the scaling group. This number must be an integer between 0 and 1000. </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="metadata"
-		     required="false"
-		     type="object"
-		     path="$.groupConfiguration.metadata">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This optional parameter specifies custom metadata for your group configuration. You can use the metadata parameter for customer automation, but it does not change any functionality in Auto Scale. There currently is no limitation on depth.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="scalingPolicies"
-		     required="true"
-		     type="array"
-		     path="$.scalingPolicies">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter group specifies configuration information for your scaling policies. Scaling policies specify how to modify the scaling group and its behavior. You can specify multiple policies to manage a scaling group. </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="array"
-		     required="true"
-		     type="array"
-		     path="$.scalingPolicies.[*]">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies an array of scaling policies.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="name"
-		     required="true"
-		     type="string"
-		     path="$.scalingPolicies.[*].name">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies a name for the scaling policy. This name dmust be unique for each scaling policy.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="args"
-		     required="false"
-		     type="object"
-		     path="$.scalingPolicies.[*].args">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies additional configuration information for policies of type "schedule." This parameter is not not required for policies of type "webhook." This parameter must be set to either "at" or "cron". Both "at" and "cron" are mutually exclusive. </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="cron"
-		     required="false"
-		     type="string"
-		     path="$.scalingPolicies.[*].args.cron">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the recurring time when the policy will be executed as a cron entry. For example, if this is parameter is set to "1 0 * * *", the policy will be executed at one minute past midnight (00:01) every day of the month, and every day of the week. For more information about cron, read: http://en.wikipedia.org/wiki/Cron</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="at"
-		     required="false"
-		     type="string"
-		     path="$.scalingPolicies.[*].args.at">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both. You must specify seconds when using "at". If seconds are not specified, a 400 error is returned.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="changePercent"
-		     required="false"
-		     type="number"
-		     path="$.scalingPolicies.[*].changePercent">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the percent change to make in the number of servers in the scaling group. If this number is positive, the number of servers will increase by the given percentage.  If this parameter is set to a negative number, the number of servers will decrease by the given percentage. The absolute change in the number of servers will be rounded to the nearest integer. This means that if -X% of the current number of servers translates to -0.5 or -0.25 or -0.75 servers, the actual number of servers that will be shut down is 1. If X% of the current number of servers translates to 1.2 or 1.5 or 1.7 servers, the actual number of servers that will be launched is 2</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="cooldown"
-		     required="true"
-		     type="number"
-		     path="$.scalingPolicies.[*].cooldown">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the cooldown period, in seconds, before this particular scaling policy can be executed again. The cooldown period does not affect the global scaling group cooldown. The minimum value for this parameter is 0 seconds, the maximum value is 86400 seconds (24 hrs). </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="type"
-		     required="true"
-		     type="enum"
-		     path="$.scalingPolicies.[*].type">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the type of policy that will be executed for the current release, this value can be either "webhook" for webhook-based policies or "schedule" for schedule-based policies.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="change"
-		     required="false"
-		     type="integer"
-		     path="$.scalingPolicies.[*].change">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the change to make in the number of servers in the scaling group. This parameter must be an integer. If the value is a positive integer, the number of servers will increase. If the value is a negative integer, the number of servers will decrease.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="desiredCapacity"
-		     required="false"
-		     type="integer"
-		     path="$.scalingPolicies.[*].desiredCapacity">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the desired server capacity of the scaling the group, i.e. how many servers there should be in the scaling group. This value must be an absolute number. For example, if this parameter is set to 10 and the executing policy with this will bring the number of servers to 10. The minimum allowed value is 0. </wadl:doc>
-	      </param>
+                <param style="plain" name="launchConfiguration"
+                    required="true" type="object"
+                    path="$.launchConfiguration">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >What to do when a new server is created. Its
+                        configuration includes information about the
+                        server image, the flavor of the server image,
+                        and which load balancer to connect to. The
+                        <code>type</code> parameter for <code>launchConfiguration</code> must be
+                        set to <code>launch_server</code>.</wadl:doc>
+                </param>
+                <param style="plain" name="loadBalancers"
+                    required="false" type="array"
+                    path="$.launchConfiguration.args.loadBalancers">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >Details about one or more load balancers to
+                        add new servers to. All servers are added to
+                        these load balancers with the IP addresses of
+                        their ServiceNet network. All servers are
+                        enabled and equally weighted. Any new servers
+                        that are not connected to the ServiceNet
+                        network are not added to any load
+                        balancers.</wadl:doc>
+                </param>
+                <param style="plain" name="port" required="true"
+                    type="integer"
+                    path="$.launchConfiguration.args.loadBalancers.[*].port">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The port number of the service (on the new
+                        servers) to use for this particular load
+                        balancer. In most cases, this port number is
+                        80.</wadl:doc>
+                </param>
+                <param style="plain" name="loadBalancerId"
+                    required="true" type="integer"
+                    path="$.launchConfiguration.args.loadBalancers.[*].loadBalancerId">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The ID of the load balancer to which new
+                        servers are added.</wadl:doc>
+                </param>
+                <param style="plain" name="server" required="true"
+                    type="object"
+                    path="$.launchConfiguration.args.server">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The attributes that Auto Scale uses to create
+                        a server. For more information, see: <link xlink:href="/servers/api/v2/cs-devguide/content/CreateServers.html">Create
+                        Servers</link> in the cloud servers
+                        developer's guide. The attributes that are
+                        specified for the <code>server</code> parameter are applied
+                        to all new servers in the scaling group. The
+                        specified server name is used as the base name
+                        for all created servers.</wadl:doc>
+                </param>
+                <param style="plain" name="flavorRef" required="true"
+                    type="string"
+                    path="$.launchConfiguration.args.server.flavorRef">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The flavor ID for the server. A flavor is a
+                        resource configuration for a server. For more
+                        information on available flavors, see the
+                        <olink targetdoc="autoscale-devguide" targetptr="server-flavors">“Server
+                            Flavors”</olink>
+                        section.</wadl:doc>
+                </param>
+                <param style="plain" name="imageRef" required="true"
+                    type="string"
+                    path="$.launchConfiguration.args.server.imageRef">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The ID of the cloud server image, after which
+                        new server images are created. </wadl:doc>
+                </param>
+                <param style="plain" name="personality"
+                    required="false" type="array"
+                    path="$.launchConfiguration.args.server.personality">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The file path and/or the content that you
+                        want to inject into a server image. For more
+                        information, see the <link
+                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html"
+                            >Server Personality</link> documentation
+                        for Rackspace Cloud Servers </wadl:doc>
+                </param>
+                <param style="plain" name="path" required="true"
+                    type="string"
+                    path="$.launchConfiguration.args.server.personality.[*].path">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The path to the file that contains data that
+                        is injected into the file system of the new
+                        cloud server image.</wadl:doc>
+                </param>
+                <param style="plain" name="contents" required="true"
+                    type="string"
+                    path="$.launchConfiguration.args.server.personality.[*].contents">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The content items that are injected into the
+                        file system of the new cloud server image.
+                    </wadl:doc>
+                </param>
+                <param style="plain" name="args" required="true"
+                    type="object" path="$.launchConfiguration.args">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The item to be configured. Must be
+                        <code>server</code> or
+                        <code>loadbalancer</code>. Most launch
+                        configurations have both a server and a
+                        loadbalancer.</wadl:doc>
+                </param>
+                <param style="plain" name="type" required="true"
+                    type="string" path="$.launchConfiguration.type">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The type of the launch configuration.
+                        Currently, this parameter must be set to
+                        <code>launch_server</code>.</wadl:doc>
+                </param>
+                <param style="plain" name="groupConfiguration"
+                    required="true" type="object"
+                    path="$.groupConfiguration">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The configuration options for the scaling
+                        group that manages how many servers and load
+                        balancers are in the scaling group. </wadl:doc>
+                </param>
+                <param style="plain" name="maxEntities"
+                    required="false" type="object"
+                    path="$.groupConfiguration.maxEntities">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The maximum number of entities that are
+                        allowed in the scaling group. If unconfigured, defaults to 1000. 
+                        If this parameter is provided it must be
+                        set to an integer between 0 and 1000. </wadl:doc>
+                </param>
+                <param style="plain" name="name" required="true"
+                    type="string" path="$.groupConfiguration.name">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The name of the scaling group, does not need
+                        to be unique.</wadl:doc>
+                </param>
+                <param style="plain" name="cooldown" required="true"
+                    type="integer"
+                    path="$.groupConfiguration.cooldown">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The period of time, in seconds, that must
+                        pass before any scaling can occur after the
+                        previous scaling. Must be an integer between 0
+                        and 86400 (24 hrs). </wadl:doc>
+                </param>
+                <param style="plain" name="minEntities"
+                    required="true" type="integer"
+                    path="$.groupConfiguration.minEntities">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The minimum number of entities in the scaling
+                        group. This number must be an integer between
+                        0 and 1000. </wadl:doc>
+                </param>
+                <param style="plain" name="metadata" required="false"
+                    type="object" path="$.groupConfiguration.metadata">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >This optional parameter specifies custom
+                        metadata for your group configuration. You can
+                        use the metadata parameter for customer
+                        automation, but it does not change any
+                        functionality in Auto Scale. There currently
+                        is no limitation on depth.</wadl:doc>
+                </param>
+                <param style="plain" name="scalingPolicies"
+                    required="true" type="array"
+                    path="$.scalingPolicies">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >Configuration information for your scaling
+                        policies specifying how to modify the scaling
+                        group and when. You can specify multiple
+                        policies to manage a scaling group. </wadl:doc>
+                </param>
+                <param style="plain" name="array" required="true"
+                    type="array" path="$.scalingPolicies.[*]">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook">An
+                        array of scaling policies.</wadl:doc>
+                </param>
+                <param style="plain" name="name" required="true"
+                    type="string" path="$.scalingPolicies.[*].name">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook">A
+                        name for the scaling policy. Must be unique
+                        for each scaling policy.</wadl:doc>
+                </param>
+                <param style="plain" name="args" required="false"
+                    type="object" path="$.scalingPolicies.[*].args">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >Configuration information for policies of
+                        type <code>schedule</code>. Must be
+                        either <code>at</code> or
+                        <code>cron</code>, which are mutually
+                        exclusive. Not required for policies of type
+                        <code>webhook</code>. </wadl:doc>
+                </param>
+                <param style="plain" name="cron" required="false"
+                    type="string"
+                    path="$.scalingPolicies.[*].args.cron">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The time when the policy is executed, as a
+                        cron entry. For example, if this is parameter
+                        is set to <code>1 0 * * *</code>, the
+                        policy runs at one minute past midnight
+                        (00:01) every day of the month, and every day
+                        of the week. For more information about cron,
+                        read:
+                        http://en.wikipedia.org/wiki/Cron</wadl:doc>
+                </param>
+                <param style="plain" name="at" required="false"
+                    type="string" path="$.scalingPolicies.[*].args.at">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        xml:lang="EN">The time when this policy will
+                        be executed. The time must be formatted
+                        according to this service's custom <link xlink:href="
+                        /cas/api/v1.0/autoscale-devguide/content/datetimeformat.html">Date
+                        and Time format</link>, with seconds,
+                        otherwise a 400 error may be returned. The
+                        policy will be triggered within a 10-second
+                        range of the time specified, so if you set the
+                        <code>at</code> time to
+                        <code>2013-05-19T08:07:08Z</code>, it
+                        will be triggered anytime between 08:07:08 to
+                        08:07:18. This property is mutually exclusive
+                        with the <code>cron</code>
+                        parameter.</wadl:doc>
+                </param>
+                <param style="plain" name="changePercent"
+                    required="false" type="number"
+                    path="$.scalingPolicies.[*].changePercent">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The percent change to make in the number of
+                        servers in the scaling group. If this number
+                        is positive, the number of servers
+                        increases by the given percentage. If this
+                        parameter is set to a negative number, the
+                        number of servers decreases by the given
+                        percentage. The absolute change in the number
+                        of servers is rounded to the nearest
+                        integer. This means that if -X% of the current
+                        number of servers translates to -0.5 or -0.25
+                        or -0.75 servers, the actual number of servers
+                        that are shut down is 1. If X% of the
+                        current number of servers translates to 1.2 or
+                        1.5 or 1.7 servers, the actual number of
+                        servers that are launched is 2</wadl:doc>
+                </param>
+                <param style="plain" name="cooldown" required="true"
+                    type="number"
+                    path="$.scalingPolicies.[*].cooldown">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The cooldown period, in seconds, before this
+                        particular scaling policy can be executed
+                        again. The cooldown period does not affect the
+                        global scaling group cooldown. The minimum
+                        value for this parameter is 0 seconds, the
+                        maximum value is 86400 seconds (24 hrs).
+                    </wadl:doc>
+                </param>
+                <param style="plain" name="type" required="true"
+                    type="enum" path="$.scalingPolicies.[*].type">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The type of policy that runs for
+                        the current release. This value can be either
+                        "webhook" for webhook-based policies or
+                        "schedule" for schedule-based
+                        policies.</wadl:doc>
+                </param>
+                <param style="plain" name="change" required="false"
+                    type="integer" path="$.scalingPolicies.[*].change">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The change to make in the number of servers
+                        in the scaling group. This parameter must be
+                        an integer. If the value is a positive
+                        integer, the number of servers increases.
+                        If the value is a negative integer, the number
+                        of servers decreases.</wadl:doc>
+                </param>
+                <param style="plain" name="desiredCapacity"
+                    required="false" type="integer"
+                    path="$.scalingPolicies.[*].desiredCapacity">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The desired server capacity of the scaling
+                        the group, i.e. how many servers there should
+                        be in the scaling group. This value must be an
+                        absolute number. For example, if this
+                        parameter is set to 10 and the executing
+                        policy with this will bring the number of
+                        servers to 10. The minimum allowed value is 0.
+                    </wadl:doc>
+                </param>
             </representation>
         </request>
         <response status="201">
-            <param name="location" style="header"
-                   required="true" type="xsd:anyURI">
-            <doc>This method creates an autoscaling endpoint</doc>
+            <param name="location" style="header" required="true"
+                type="xsd:anyURI">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>Creates an auto scaling
+                        endpoint.</para></wadl:doc>
             </param>
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/resCreateGroup.json"/>
-                </doc>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <xsdxt:code
+                        href="../docbkx/samples/resCreateGroup.json"/>
+                </wadl:doc>
             </representation>
-        </response>
-          &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
-    <method id="getGroups" name="GET" rax:roles="observer autoscale:observer">
-        <wadl:doc title="List Scaling Groups" xml:lang="EN"
+        </response> &commonFaults; &getFaults; &postPutFaults; </method>
+    <method id="listGroups" name="GET"
+        rax:roles="observer autoscale:observer">
+        <wadl:doc title="List scaling groups" xml:lang="EN"
             xmlns="http://docbook.org/ns/docbook">
-            <para role="shortdesc">
-                This method lists the scaling groups that are available for the specified tenant.
-            </para>
-            <para>
-                This method returns a list of scaling groups that have been created for the tenant specified by
-                <code>tenantID</code>.</para>
+            <para role="shortdesc">Lists the scaling groups that are
+                available for a specified tenant.</para>
         </wadl:doc>
         <response status="200">
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/resGetGroups.json"/>
-                </doc>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <!--<xsdxt:code
+                        href="../docbkx/samples/resGetGroups-json-http.txt"/>-->
+                    <xsdxt:code
+                        href="../docbkx/samples/resGetGroups.json"/>
+                </wadl:doc>
             </representation>
-        </response>
-        &commonFaults; &getFaults;
-    </method>
-
-    <method id="getGroupManifest" name="GET" rax:roles="observer autoscale:observer">
-        <wadl:doc title="List All Group Details" xmlns="http://docbook.org/ns/docbook">
-            <para role="shortdesc">
-                This method returns details about the configuration for a specified scaling group.
-            </para>
-            <para>
-                This method returns details including the launch configuration and the scaling policies for the specified scaling group configuration. These
-                details are returned in the response body in JSON format.
-            </para>
+        </response> &commonFaults; &getFaults; </method>
+    <method id="showGroupManifest" name="GET"
+        rax:roles="observer autoscale:observer">
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Show scaling group details">
+            <para role="shortdesc">Shows configuration details for a
+                specified scaling group.</para>
+            <para>Details include the launch configuration and the
+                scaling policies for the specified scaling group
+                configuration.</para>
+            <para>The details appear in the response body in JSON
+                format.</para>
         </wadl:doc>
         <response status="200">
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/resGetGroupManifest.json"/>
-                </doc>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <!-- <xsdxt:code
+                href="../docbkx/samples/resGetGroupManifest-json-http.txt"/>-->
+                    <xsdxt:code
+                        href="../docbkx/samples/resGetGroupManifest.json"
+                    />
+                </wadl:doc>
             </representation>
-        </response>
-        &commonFaults; &getFaults;
-    </method>
-
+        </response> &commonFaults; &getFaults; </method>
+       <method id="showGroupManifestWebhook" name="GET"
+                rax:roles="observer autoscale:observer">
+           <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+               title="Show scaling group details including webhooks">
+               <para role="shortdesc">Shows configuration details for a
+                   specified scaling group and its associated webhooks.</para>
+               <para>Details include the launch configuration, the
+                   scaling policies, and the policies' webhooks, for the specified scaling group
+                   configuration.</para>
+               <para>The details appear in the response body in JSON
+                   format.</para>
+               <para>
+                   <note>
+                       <para>The <code>?webhook=true</code> parameter is required for this method.</para>
+                   </note>
+               </para>
+           </wadl:doc>
+           <request>
+               <param name="webhook" style="query" required="true" default="true"
+                   type="xsd:boolean">
+                   <wadl:doc xml:lang="EN"
+                       xmlns="http://docbook.org/ns/docbook">
+                       <para>Set <code>?webhook=true</code>
+                           to display webhook configuration details in the results.</para></wadl:doc>
+               </param>
+           </request>
+           <response status="200">
+               <representation mediaType="application/json">
+                   <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                       xml:lang="EN">
+                       <!-- <xsdxt:code
+                        href="../docbkx/samples/resGetGroupManifest-json-http.txt"/>-->
+                       <xsdxt:code
+                           href="../docbkx/samples/resGetGroupManifest-webhook.json"
+                       />
+                   </wadl:doc>
+               </representation>
+           </response> &commonFaults; &getFaults; </method>    
     <method id="deleteGroup" name="DELETE">
-        <doc title="Delete Group">
-            <db:para role="shortdesc">
-                This method deletes a scaling group.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                This method deletes the specified scaling group if the group is empty.
-                An empty group contains no entities. If deletion is successful, no response body is returned. If
-                the group contains pending or active entities, deletion fails and a 409 error message is returned. If there are pending or active servers in the scaling group,  pass force=true to force
-                delete the group. Passing force=true will immediately delete all active servers in the group. Pending servers will be deleted once they finish building and become active.
-            </p>
-        </doc>
-        <response status="204"/>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
-    <method id="getGroupState" name="GET" rax:roles="observer autoscale:observer">
-        <doc title="Get Group State">
-            <db:para role="shortdesc">
-               This method returns the state of a scaling group. The GroupState object consists of the following properties:
-                <ul xmlns="http://www.w3.org/1999/xhtml">
-                    <li>paused - specifies whether execution of
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Delete scaling group">
+            <para role="shortdesc">Deletes a specified scaling
+                group.</para>
+            <para>The scaling group must be empty. An empty group
+                contains no entities. If deletion is successful, no
+                response body is returned. If the group contains
+                pending or active entities, deletion fails and a 409
+                error message is returned. If there are pending or
+                active servers in the scaling group, pass
+                    <code>force=true</code> to force delete the group.
+                Passing <code>force=true</code> immediately deletes
+                all active servers in the group. Pending servers are
+                deleted when they build and become active.</para>
+        </wadl:doc>
+        <response status="204"/> &commonFaults; &getFaults;
+        &postPutFaults; </method>
+    <method id="getGroupState" name="GET"
+        rax:roles="observer autoscale:observer">
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Get scaling group state">
+            <para role="shortdesc">Gets the current state of a scaling
+                group.</para>
+            <para>The GroupState object consists of the following
+                properties:</para>
+            <itemizedlist>
+                <listitem><para>paused. Specifies whether execution of
                         scaling policies for the group is currently
                         suspended. If this value is set to true, the
                         group will not scale up or down. All policy
                         execution calls will be ignored while this
-                        value is set to true.</li>
-                    <li>pendingCapacity - integer, specifies the
-                        number of servers that are in a "building"
-                        state.</li>
-                    <li>name - specifies the name of the group</li>
-                    <li>Active - Specifies an array of active servers
-                        in the group. This array includes the
-                        serverID, as well as other data</li>
-                    <li>activeCapacity - integer, specifies the number
-                        of active servers in the group</li>
-                    <li>desiredCapacity - integer, specifies the sum
-                        of all servers that are in "Active" and
-                        "Pending" state</li>
-                    <!-- <li>a request to create a policy based on change percentage in response to an alarm</li> -->
-                    <li>A request to create multiple policies,
-                        followed by the matching response</li>
-                </ul>
-
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                This method retrieves the current state of the specified scaling group.
-                It describes the state of the group in terms of its
-                current set of active entities, the number of pending entities, and
-                the desired number of entities. The description is returned in the response body
-                in JSON format.
-            </p>
-        </doc>
+                        value is set to true..</para></listitem>
+                <listitem><para>pendingCapacity. Integer. Specifies
+                        the number of servers that are in a "building"
+                        state..</para></listitem>
+                <listitem><para>name. Specifies the name of the
+                        group.</para></listitem>
+                <listitem><para>Active. Specifies an array of active
+                        servers in the group. This array includes the
+                        serverID, as well as other
+                    data.</para></listitem>
+                <listitem><para>activeCapacity. Integer. Specifies the
+                        number of active servers in the
+                    group.</para></listitem>
+                <listitem><para>desiredCapacity. Integer. Specifies
+                        the sum of all servers that are in
+                            <code>Active</code> and
+                            <code>Pending</code>
+                    state.</para></listitem>
+                <listitem><para>A request to create multiple policies,
+                        followed by the matching
+                    response.</para></listitem>
+            </itemizedlist>
+            <para>Gets the current state of the specified scaling
+                group. It describes the state of the group in terms of
+                its current set of active entities, the number of
+                pending entities, and the desired number of entities.
+                The description is returned in the response body in
+                JSON format.</para>
+        </wadl:doc>
         <response status="200">
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/resGetGroupState.json"/>
-                </doc>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <!--<xsdxt:code
+                        href="../docbkx/samples/resGetGroupState-json-http.txt"/>-->
+                    <xsdxt:code
+                        href="../docbkx/samples/resGetGroupState.json"
+                    />
+                </wadl:doc>
             </representation>
-        </response>
-        &commonFaults; &getFaults;
-    </method>
+        </response> &commonFaults; &getFaults; </method>
 
-    <method id="getGroupConfig" name="GET" rax:roles="observer autoscale:observer">
-        <doc title="Get Group Configuration">
-            <db:para role="shortdesc">
-               This method lists the configuration for a scaling group.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                This method lists the configuration for a specified scaling group.
-                The configuration describes the
-                minimum number of entities in the group,
-                the maximum number of entities in the group,
-                the global
-                cooldown time for the group, and other metadata. The configuration is returned in the response body in JSON format.
-            </p>
-        </doc>
+    <method id="getGroupConfig" name="GET"
+        rax:roles="observer autoscale:observer">
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Show scaling group configuration">
+            <para role="shortdesc">Shows the configuration for a
+                scaling group.</para>
+            <para>Shows the configuration for a specified scaling
+                group, including the maximum and minimum number
+                of entities, the global cooldown time, and other metadata. The configuration is
+                returned in the response body in JSON format.</para>
+        </wadl:doc>
         <response status="200">
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/resGetGroupConfig.json"/>
-                </doc>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <!--  <xsdxt:code
+                        href="../docbkx/samples/resGetGroupConfig-json-http.txt"/>-->
+                    <xsdxt:code
+                        href="../docbkx/samples/resGetGroupConfig.json"
+                    />
+                </wadl:doc>
             </representation>
-        </response>
-        &commonFaults; &getFaults;
-    </method>
-
+        </response> &commonFaults; &getFaults; </method>
     <method id="putGroupConfig" name="PUT">
-        <doc title="Replace Group Configuration">
-            <db:para role="shortdesc">
-                This method updates the configuration for the scaling group.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-            This method changes the configuration of an existing scaling group.
-            To change the configuration,
-            specify the new configuration in the request body in JSON format.
-            Configuration elements include
-            the
-            minimum number of entities, the maximum number of entities, the global
-            cooldown time, and other metadata. If the update is successful, no response body is
-            returned.
-            </p>
-        </doc>
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Update scaling group configuration">
+            <para role="shortdesc">Updates the configuration for the
+                scaling group.</para>
+            <para>Updates the configuration of an existing scaling
+                group. To change the configuration, specify the new
+                configuration in the request body in JSON format.
+                Configuration elements include the minimum number of
+                entities, the maximum number of entities, the global
+                cooldown time, and other metadata. If the update is
+                successful, no response body is returned.</para>
+        </wadl:doc>
         <request>
+            <param style="plain" name="maxEntities" required="true"
+                type="object" path="$.maxEntities">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The maximum number of
+                        entities that are allowed in the scaling
+                        group. If left unconfigured, defaults to 1000. If this
+                        value is provided it must be set to an integer
+                        between 0 and 1000.</para>
+                </wadl:doc>
+            </param>
+            <param style="plain" name="cooldown" required="true"
+                type="integer" path="$.cooldown">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The cooldown period, in seconds, before
+                        any additional changes can happen. This
+                        number must be an integer between 0 and 86400
+                        (24 hrs).</para>
+                </wadl:doc>
+            </param>
+            <param style="plain" name="name" required="true"
+                type="string" path="$.name">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The name of the scaling group.
+                        This name does not have to be unique.</para></wadl:doc>
+            </param>
+            <param style="plain" name="minEntities" required="true"
+                type="integer" path="$.minEntities">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The minimum number of entities
+                        in the scaling group. This number must be an
+                        integer between 0 and 1000.</para></wadl:doc>
+            </param>
+            <param style="plain" name="metadata" required="true"
+                type="object" path="$.metadata">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>Optional. Custom metadata for
+                        your group configuration. You can use this parameter for custom automation,
+                        but it does not change any functionality in
+                        Auto Scale. There currently is no limitation
+                        on depth.</para></wadl:doc>
+            </param>
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/reqPutGroupConfig.json"/>
-                </doc>
-	      <param style="plain"
-		     name="maxEntities"
-		     required="true"
-		     type="object"
-		     path="$.maxEntities">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the maximum amount of identities that are allowed in the scaling group. This number defaults to null. If this value is provided it must be set to an integer between 0 and 1000. </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="cooldown"
-		     required="true"
-		     type="integer"
-		     path="$.cooldown">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the cooldown period before more entities are added, in seconds. This number must be an integer between 0 and 86400 (24 hrs). </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="name"
-		     required="true"
-		     type="string"
-		     path="$.name">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifes the name of the scaling group. This name cannot be unique).</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="minEntities"
-		     required="true"
-		     type="integer"
-		     path="$.minEntities">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the minimum number of entities in the scaling group. This number must be an integer between 0 and 1000. </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="metadata"
-		     required="true"
-		     type="object"
-		     path="$.metadata">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This optional parameter specifies custom metadata for your group configuration. You can use the metadata parameter for customer automation, but it does not change any functionality in Auto Scale. There currently is no limitation on depth.</wadl:doc>
-	      </param>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <xsdxt:code
+                        href="../docbkx/samples/reqPutGroupConfig.json"
+                    />
+                </wadl:doc>
+                <param style="plain" name="maxEntities"
+                    required="true" type="object" path="$.maxEntities">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The maximum number of entities that are
+                        allowed in the scaling group. If left unconfigured, defaults to 1000.
+                        If this value is provided it must be set
+                        to an integer between 0 and 1000. </wadl:doc>
+                </param>
+                <param style="plain" name="cooldown" required="true"
+                    type="integer" path="$.cooldown">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The cooldown period, in seconds, before more
+                        changes can happen. This number must be an
+                        integer between 0 and 86400 (24 hrs). </wadl:doc>
+                </param>
+                <param style="plain" name="name" required="true"
+                    type="string" path="$.name">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The name of the scaling group. This name does
+                        not have to be unique.</wadl:doc>
+                </param>
+                <param style="plain" name="minEntities"
+                    required="true" type="integer"
+                    path="$.minEntities">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The minimum number of entities in the scaling
+                        group. This number must be an integer between
+                        0 and 1000. </wadl:doc>
+                </param>
+                <param style="plain" name="metadata" required="true"
+                    type="object" path="$.metadata">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >This optional parameter specifies custom
+                        metadata for your group configuration. You can
+                        use the metadata parameter for custom
+                        automation, but it does not change any
+                        functionality in Auto Scale. There currently
+                        is no limitation on depth.</wadl:doc>
+                </param>
             </representation>
         </request>
-        <response status="204"/>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
+        <response status="204"/> &commonFaults; &getFaults;
+        &postPutFaults; </method>
 
-    <method id="getLaunchConfig" name="GET" rax:roles="observer autoscale:observer">
-        <doc title="Get Launch Configuration">
-            <db:para role="shortdesc">
-                This method lists details about the launch configuration for a scaling group.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                This method lists the launch configuration for the specified scaling group.
-                The launch configuration describes the details of how to create a server,
-                from what image to create a server,
-                which load
-                balancers to join the server to, which networks to add the server to, and other
-                metadata. The launch configuration is returned in the response body in JSON
-                format.
-            </p>
-        </doc>
+    <method id="getLaunchConfig" name="GET"
+        rax:roles="observer autoscale:observer">
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Show launch configuration">
+            <para role="shortdesc">Shows launch configuration details
+                for a specified scaling group.</para>
+            <para>The details include from
+                which image to create a server, which load balancers
+                to join the server to, which networks to add the
+                server to, and other metadata.</para>
+            <para>The details appear in the response body in JSON
+                format.</para>
+        </wadl:doc>
         <response status="200">
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/resGetLaunchConfig.json"/>
-                </doc>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <xsdxt:code
+                        href="../docbkx/samples/resGetLaunchConfig.json"
+                    />
+                </wadl:doc>
             </representation>
-        </response>
-        &commonFaults; &getFaults;
-    </method>
-
+        </response> &commonFaults; &getFaults; </method>
     <method id="putLaunchConfig" name="PUT">
-        <doc title="Replace Launch Configuration">
-            <db:para role="shortdesc">
-                This method updates the launch group configuration.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                This method changes an existing launch configuration for the specified scaling group.
-                To change the launch configuration,
-                specify the new configuration in the request body in JSON format.
-                Configuration elements include
-                how to create a server,
-                from what image to create a server,
-                which load
-                balancers to join the server to, which networks to add the server to, and other
-                metadata. If the update is successful, no response body is returned.
-            </p>
-        </doc>
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Update launch configuration">
+            <para role="shortdesc">Updates an existing launch
+                configuration for the specified scaling group.</para>
+            <para>To change the launch configuration, specify the new
+                configuration in the request body in JSON format.
+                Configuration elements include from which image to create a server, which load
+                balancers to join the server to, which networks to add
+                the server to, and other metadata. If the update is
+                successful, no response body is returned.</para>
+        </wadl:doc>
         <request>
+            <param style="plain" name="args" required="false"
+                type="object" path="$.args">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The item to be configured.
+                        Must be <code>server</code> or <code>loadbalancer</code>. Most
+                        launch configurations have both a server and a
+                        loadbalancer configured.</para></wadl:doc>
+            </param>
+            <param style="plain" name="loadBalancers" required="false"
+                type="array" path="$.args.loadBalancers">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>One or more load balancers to
+                        which to add servers.</para>
+                    <para>All servers are added to these load
+                        balancers with the IP addresses of their
+                        ServiceNet network. All servers are enabled
+                        and equally weighted. Any new servers that are
+                        not connected to the ServiceNet network are
+                        not added to any load
+                    balancers.</para></wadl:doc>
+            </param>
+            <param style="plain" name="port" required="true"
+                type="integer" path="$.args.loadBalancers.[*].port">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The port number of the service
+                        (on the new servers) to use for this
+                        particular load balancer. In most cases, this
+                        port number is 80.</para></wadl:doc>
+            </param>
+            <param style="plain" name="loadBalancerId" required="true"
+                type="integer"
+                path="$.args.loadBalancers.[*].loadBalancerId">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The ID of the load balancer to
+                        which new servers will be
+                    added.</para></wadl:doc>
+            </param>
+            <param style="plain" name="server" required="true"
+                type="object" path="$.args.server">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The attributes that Auto Scale
+                        uses to create a new server. For more
+                        information, see <link
+                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html"
+                            >Create Server</link>. The attributes that
+                        are specified for the server entity will apply
+                        to all new servers in the scaling group,
+                        including the server name.</para></wadl:doc>
+            </param>
+            <param style="plain" name="flavorRef" required="true"
+                type="string" path="$.args.server.flavorRef">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The flavor of the server
+                        image. Specifies the flavor Id for the server.
+                        A flavor is a resource configuration for a
+                        server. For more information on available
+                        flavors, see the <olink targetdoc="autoscale-devguide" targetptr="server-flavors">“Server
+                            Flavors”</olink>
+                    section.</para></wadl:doc>
+            </param>
+            <param style="plain" name="imageRef" required="true"
+                type="string" path="$.args.server.imageRef">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The ID of the cloud server
+                        image from which new server images will be
+                        created.</para></wadl:doc>
+            </param>
+            <param style="plain" name="personality" required="false"
+                type="array" path="$.args.server.personality">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The file path and/or the
+                        content that you want to inject into a server
+                        image. For more information, see the <link
+                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html"
+                            >Server Personality</link> documentation
+                        for Rackspace Cloud Servers.</para></wadl:doc>
+            </param>
+            <param style="plain" name="path" required="true"
+                type="string"
+                path="$.args.server.personality.[*].path">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The path to the file that
+                        contains data that will be injected into the
+                        file system of the new cloud server
+                        image.</para></wadl:doc>
+            </param>
+            <param style="plain" name="contents" required="true"
+                type="string"
+                path="$.args.server.personality.[*].contents">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The content items that will be
+                        injected into the file system of the new cloud
+                        server image.</para>
+                </wadl:doc>
+            </param>
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/reqPutLaunchConfig.json"/>
-                </doc>
-	      <param style="plain"
-		     name="args"
-		     required="false"
-		     type="object"
-		     path="$.args">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the item to be configured. Must be "server" or "loadbalancer." Most launch configurations have both a server and a loadbalancer configured.</wadl:doc>	          
-	      </param>
-	      <param style="plain"
-		     name="loadBalancers"
-		     required="false"
-		     type="array"
-		     path="$.args.loadBalancers">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter provides details about one or more load balancers to add new servers to. All servers will be added to these load balancers with the IP addresses of their ServiceNet network. All servers will be enabled and equally weighted. Any new servers that are not connected to the ServiceNet network will not be added to any load balancers.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="port"
-		     required="true"
-		     type="integer"
-		     path="$.args.loadBalancers.[*].port">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the port number of the service (on the new servers) to use for this particular load balancer. In most cases, this port number is 80.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="loadBalancerId"
-		     required="true"
-		     type="integer"
-		     path="$.args.loadBalancers.[*].loadBalancerId">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifes the ID of the load balancer to which new servers will be added.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="server"
-		     required="true"
-		     type="object"
-		     path="$.args.server">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter group specifies all the attributes Auto Scale will use to create a new server. For more information, see: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html.The attributes that are specified for the server entity will apply to all new servers in the scaling group, including the server name.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="flavorRef"
-		     required="true"
-		     type="string"
-		     path="$.args.server.flavorRef">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the flavor of the server image. Specifies the flavor Id for the
-	              server. A flavor is a resource
-	              configuration for a server. For more
-	              information on available flavors, see
-	              the Server Flavors<olink
-	                  targetdoc="autoscale-devguide"
-	                  targetptr="server-flavors">“Server
-	                  Flavors”</olink> section.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="imageRef"
-		     required="true"
-		     type="string"
-		     path="$.args.server.imageRef">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the ID of the cloud server image, after which new server images will be created. </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="personality"
-		     required="false"
-		     type="array"
-		     path="$.args.server.personality">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the file path and/or the
-	              content that you want to inject into a
-	              server image. For more information,
-	              see the <link
-	                  xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html"
-	                  >Server Personality</link>
-	              documentation for Rackspace Cloud
-	              Servers </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="path"
-		     required="true"
-		     type="string"
-		     path="$.args.server.personality.[*].path">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the path to the file that contains data that will be injected into the file system of the new cloud server image/ </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="contents"
-		     required="true"
-		     type="string"
-		     path="$.args.server.personality.[*].contents">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the content items that will be injected into the file system of the new cloud server image. </wadl:doc>
-	      </param>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <xsdxt:code
+                        href="../docbkx/samples/reqPutLaunchConfig.json"
+                    />
+                </wadl:doc>
+                <param style="plain" name="args" required="false"
+                    type="object" path="$.args">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The item to be configured. Must be
+                        <code>server</code> or
+                        <code>loadbalancer</code>. Most launch
+                        configurations have both a server and a
+                        loadbalancer configured.</wadl:doc>
+                </param>
+                <param style="plain" name="loadBalancers"
+                    required="false" type="array"
+                    path="$.args.loadBalancers">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >Details about one or more load balancers to
+                        add new servers to. All servers will be added
+                        to these load balancers with the IP addresses
+                        of their ServiceNet network. All servers will
+                        be enabled and equally weighted. Any new
+                        servers that are not connected to the
+                        ServiceNet network will not be added to any
+                        load balancers.</wadl:doc>
+                </param>
+                <param style="plain" name="port" required="true"
+                    type="integer"
+                    path="$.args.loadBalancers.[*].port">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The port number of the service (on the new
+                        servers) to use for this particular load
+                        balancer. In most cases, this port number is
+                        80.</wadl:doc>
+                </param>
+                <param style="plain" name="loadBalancerId"
+                    required="true" type="integer"
+                    path="$.args.loadBalancers.[*].loadBalancerId">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The ID of the load balancer to which new
+                        servers will be added.</wadl:doc>
+                </param>
+                <param style="plain" name="server" required="true"
+                    type="object" path="$.args.server">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The attributes Auto Scale will use to create
+                        a new server. For more information, see:
+                        <link xlink:href=" /servers/api/v2/cs-
+                        devguide/content/CreateServers.html">"Create
+                        Servers"</link> in the cloud servers
+                        developer's guide. The attributes that are
+                        specified for the server entity will apply to
+                        all new servers in the scaling group. The
+                        configured server name is the base for created
+                        servers.</wadl:doc>
+                </param>
+                <param style="plain" name="flavorRef" required="true"
+                    type="string" path="$.args.server.flavorRef">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The flavor of the server image. Specifies the
+                        flavor Id for the server. A flavor is a
+                        resource configuration for a server. For more
+                        information on available flavors, see the
+                        <olink targetdoc="autoscale-devguide" targetptr="server-flavors">“Server
+                            Flavors”</olink>
+                        section.</wadl:doc>
+                </param>
+                <param style="plain" name="imageRef" required="true"
+                    type="string" path="$.args.server.imageRef">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The ID of the cloud server image, from which
+                        new server images will be created. </wadl:doc>
+                </param>
+                <param style="plain" name="personality"
+                    required="false" type="array"
+                    path="$.args.server.personality">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The file path and/or the content that you
+                        want to inject into a server image. For more
+                        information, see the <link
+                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html"
+                            >Server Personality</link> documentation
+                        for Rackspace Cloud Servers </wadl:doc>
+                </param>
+                <param style="plain" name="path" required="true"
+                    type="string"
+                    path="$.args.server.personality.[*].path">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The path to the file that contains data that
+                        will be injected into the file system of the
+                        new cloud server image. </wadl:doc>
+                </param>
+                <param style="plain" name="contents" required="true"
+                    type="string"
+                    path="$.args.server.personality.[*].contents">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The content items that will be injected into
+                        the file system of the new cloud server image.
+                    </wadl:doc>
+                </param>
             </representation>
         </request>
-        <response status="204"/>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
+        <response status="204"/> &commonFaults; &getFaults;
+        &postPutFaults; </method>
     <method id="pauseGroup" name="POST">
-        <doc title="Pause Group Policy Execution">
-            <db:para role="shortdesc">
-                This method pauses the execution of a scaling policy.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                This method pauses the execution of all scaling policies for the specified scaling group.
-IMPORTANT: This method has not been implemented in the Auto Scale API yet and will be implemented in a future release.
-            </p>
-        </doc>
-        <request>
-            <representation mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
-        <response status="204"/>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Pause group policy execution">
+            <para role="shortdesc">Pauses the execution of all scaling
+                policies for a specified scaling group.</para>
+            <para>IMPORTANT: This method has not been implemented in
+                the Auto Scale API yet and will be implemented in a
+                future release.</para>
+        </wadl:doc>
+        <response status="204"/> &commonFaults; &getFaults;
+        &postPutFaults; </method>
     <method id="resumeGroup" name="POST">
-        <doc title="Resume Group Policy Execution">
-            <db:para role="shortdesc">
-                This method resumes the execution of a scaling policy.
-IMPORTANT: This method has not been implemented in the Auto Scale API yet and will be implemented in a future release.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                This method resumes the execution of all scaling policies for the specified scaling group.
-            </p>
-        </doc>
-        <request>
-            <representation mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
-        <response status="204"/>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
-    <method name="GET" id="getPolicies" rax:roles="observer autoscale:observer">
-        <doc title="Get Policies List">
-            <db:para role="shortdesc">
-                This method lists all scaling policies in the scaling group.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-            This method returns a list of the scaling policies that are available to the specified scaling group.
-            Each policy is described in terms of an ID,
-            name, type, adjustment, cooldown time, and links. These
-            descriptions are returned in the response body in JSON format.
-            </p>
-        </doc>
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Resume group policy execution">
+            <para role="shortdesc">Resumes the execution of all
+                scaling policies for a specified scaling group.</para>
+            <para>IMPORTANT: This method has not been implemented in
+                the Auto Scale API yet and will be implemented in a
+                future release.</para>
+        </wadl:doc>
+        <response status="204"/> &commonFaults; &getFaults;
+        &postPutFaults; </method>
+    <method name="GET" id="getPolicies"
+        rax:roles="observer autoscale:observer">
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="List policies">
+            <para role="shortdesc">Lists scaling policies that are
+                available to a specified scaling group.</para>
+            <para>Each policy is described in terms of an ID, name,
+                type, adjustment, cooldown time, and links. These
+                descriptions are returned in the response body in JSON
+                format.</para>
+        </wadl:doc>
         <response status="200">
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/resGetPolicies.json"/>
-                </doc>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <xsdxt:code
+                        href="../docbkx/samples/resGetPolicies.json"/>
+                </wadl:doc>
             </representation>
-        </response>
-        &commonFaults; &getFaults;
-    </method>
-
+        </response> &commonFaults; &getFaults; </method>
     <method name="POST" id="createPolicies">
-        <doc title="Create Policy">
-            <db:para role="shortdesc">
-                This method creates a scaling policy.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-            This method creates one or multiple scaling policies for the specified scaling group.
-            To create a policy, specify it in the request body in JSON format.
-            Each description must include a name, type, adjustment, and cooldown time.
-            </p>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-            Use the JSON response to obtain information about the newly-created policy or policies:
-            <ul>
-                <li>The response header points to the List Policies endpoint.</li>
-                <li>The response body provides an array of scaling policies.</li>
-            </ul>
-            </p>
-        </doc>
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Create policy">
+            <para role="shortdesc">Creates one or more scaling
+                policies for a specified scaling group.</para>
+            <para>To create a policy, specify it in the request body
+                in JSON format. Each description must include a name,
+                type, adjustment, and cooldown time.</para>
+            <para>Use the JSON response to obtain information about
+                the newly-created policy or policies:</para>
+            <itemizedlist>
+                <listitem><para>The response header points to the List
+                        Policies endpoint.</para></listitem>
+                <listitem><para>The response body provides an array of
+                        scaling policies.</para></listitem>
+            </itemizedlist>
+            <para>The examples that are provided below show several
+                methods for creating a scaling policy:</para><itemizedlist>
+                <listitem><para>A request to create a policy based on
+                        desired capacity.</para></listitem>
+                <listitem><para>A request to create a policy based on
+                        incremental change.</para></listitem>
+                <listitem><para>A request to create a policy based on
+                        change percentage.</para></listitem>
+                <listitem><para>A request to create a policy based on
+                        change percentage scheduled daily, at a
+                        specific time of day.</para></listitem>
+                <listitem><para>A request to create a policy based on
+                        change percentage scheduled once, for a
+                        specific date and time.</para></listitem>
+                <listitem><para>A request to create multiple policies,
+                        followed by the matching
+                    response.</para></listitem>
+            </itemizedlist>
+        </wadl:doc>
         <request>
             <representation mediaType="application/json">
-                <wadl:doc xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
-		  <p>
-		    The examples that are provided below show several methods for creating a scaling policy:
-		    <ul>
-                      <li>A request to create a policy based on desired capacity</li>
-                      <li>A request to create a policy based on incremental change</li>
-                      <li>A request to create a policy based on change percentage</li>
-                      <li>A request to create a policy based on change percentage scheduled daily, at a specific time of day</li>
-                      <li>A request to create a policy based on change percentage scheduled once, for a specific date and time</li>
-                      <!-- <li>a request to create a policy based on change percentage in response to an alarm</li> -->
-                      <li>A request to create multiple policies, followed by the matching response</li>
-		    </ul>
-		  </p>
-                    <xsdxt:sample title="Create Policy (Desired Capacity) Request: JSON" >
-		      <p>The following example shows how to create a
-		      webhook-based policy that specifies that the
-		      desired capacity be five servers and sets the
-		      cool-down phase to 1800 seconds.</p>
-                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-desiredCapacity.json"/>
+                <wadl:doc xml:lang="EN"
+                    xmlns="http://www.w3.org/1999/xhtml">
+                    <p> The examples that are provided below show
+                        several methods for creating a scaling policy: <ul>
+                            <li>A request to create a policy based on
+                                desired capacity</li>
+                            <li>A request to create a policy based on
+                                incremental change</li>
+                            <li>A request to create a policy based on
+                                change percentage</li>
+                            <li>A request to create a policy based on
+                                change percentage scheduled daily, at
+                                a specific time of day</li>
+                            <li>A request to create a policy based on
+                                change percentage scheduled once, for
+                                a specific date and time</li>
+                            <!-- <li>a request to create a policy based on change percentage in response to an alarm</li> -->
+                            <li>A request to create multiple policies,
+                                followed by the matching response</li>
+                        </ul>
+                    </p>
+                    <xsdxt:sample
+                        title="Create Policy (Desired Capacity) Request: JSON">
+                        <p>The following example shows how to create a
+                            webhook-based policy specifying that
+                            the desired capacity be five servers and
+                            setting the cooldown period to 1800
+                            seconds.</p>
+                        <xsdxt:code
+                            href="../docbkx/samples/reqCreatePolicy-desiredCapacity.json"
+                        />
                     </xsdxt:sample>
-                    <xsdxt:sample title="Create Policy (Incremental Change) Request: JSON" >
-                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-change.json"/>
+                    <xsdxt:sample
+                        title="Create Policy (Incremental Change) Request: JSON">
+                        <xsdxt:code
+                            href="../docbkx/samples/reqCreatePolicy-change.json"
+                        />
                     </xsdxt:sample>
-                    <xsdxt:sample title="Create Policy (Percentage Change) Request: JSON" >
-                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercent.json"/>
+                    <xsdxt:sample
+                        title="Create Policy (Percentage Change) Request: JSON">
+                        <xsdxt:code
+                            href="../docbkx/samples/reqCreatePolicy-changePercent.json"
+                        />
                     </xsdxt:sample>
-                    <xsdxt:sample title="Create Policy (Percentage Change at Time) Request: JSON" >
-                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercentTime.json"/>
+                    <xsdxt:sample
+                        title="Create Policy (Percentage Change at Time) Request: JSON">
+                        <xsdxt:code
+                            href="../docbkx/samples/reqCreatePolicy-changePercentTime.json"
+                        />
                     </xsdxt:sample>
-                    <xsdxt:sample title="Create Policy (Percentage Change on Date) Request: JSON" >
-                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercentDate.json"/>
+                    <xsdxt:sample
+                        title="Create Policy (Percentage Change on Date) Request: JSON">
+                        <xsdxt:code
+                            href="../docbkx/samples/reqCreatePolicy-changePercentDate.json"
+                        />
                     </xsdxt:sample>
                     <!-- <xsdxt:sample title="Create Policy (Percentage Change on Alarm) Request: JSON" > -->
                     <!--     <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercentAlarm.json"/> -->
                     <!-- </xsdxt:sample> -->
-                    <xsdxt:sample title="Create Policies Request: JSON" >
-                        <xsdxt:code href="../docbkx/samples/reqCreatePolicies.json"/>
+                    <xsdxt:sample
+                        title="Create Policies Request: JSON">
+                        <xsdxt:code
+                            href="../docbkx/samples/reqCreatePolicies.json"
+                        />
                     </xsdxt:sample>
                 </wadl:doc>
 	      <param style="plain"
@@ -813,376 +1442,526 @@ IMPORTANT: This method has not been implemented in the Auto Scale API yet and wi
 		     required="true"
 		     type="array"
 		     path="$.[*]">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies an array of scaling policies.</wadl:doc>
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">An array of scaling
+                        policies.</wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="name"
 		     required="true"
 		     type="string"
 		     path="$.[*].name">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the name of the scaling policy. The name must be unique for each scaling policy in the scaling group.</wadl:doc>
+		<wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="args"
 		     required="false"
 		     type="object"
 		     path="$.[*].args">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies additional configuration information for policies of type "schedule." This parameter is not not required for policies of type "webhook." This parameter must be set to either "at" or "cron". Both "at" and "cron" are mutually exclusive. </wadl:doc>
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="cron"
 		     required="false"
 		     type="string"
 		     path="$.[*].args.cron">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the recurring time when the policy will be executed as a cron entry. For example, if this is parameter is set to "1 0 * * *", the policy will be executed at one minute past midnight (00:01) every day of the month, and every day of the week. For more information about cron, read: http://en.wikipedia.org/wiki/Cron</wadl:doc>
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="at"
 		     required="false"
 		     type="string"
 		     path="$.[*].args.at">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both. You must specify seconds when using "at". If seconds are not specified, a 400 error is returned.</wadl:doc>
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="changePercent"
 		     required="false"
 		     type="number"
 		     path="$.[*].changePercent">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the percent change to make in the number of servers in the scaling group. If this number is positive, the number of servers will increase by the given percentage. If this parameter is set to a negative number, the number of servers will decrease by the given percentage. The absolute change in the number of servers will be rounded to the nearest integer. This means that if -X% of the current number of servers translates to -0.5 or -0.25 or -0.75 servers, the actual number of servers that will be shut down is 1. If X% of the current number of servers translates to 1.2 or 1.5 or 1.7 servers, the actual number of servers that will be launched is 2</wadl:doc>
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="cooldown"
 		     required="true"
 		     type="number"
 		     path="$.[*].cooldown">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the cooldown period, in seconds, before this particular scaling policy can be executed again. The cooldown period does not affect the global scaling group cooldown. The minimum value for this parameter is 0 seconds, the maximum value is 86400 seconds (24 hrs). </wadl:doc>
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="type"
 		     required="true"
 		     type="enum"
 		     path="$.[*].type">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the type of policy that will be executed for the current release, this value can be either "webhook" for webhook-based policies or "schedule" for schedule-based policies.</wadl:doc>
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
 	      </param>
                 <param style="plain"
                     name="change"
                     required="false"
                     type="integer"
                     path="$.[*].change">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the change to make in the number of servers in the scaling group. This parameter must be an integer. If the value is a positive integer, the number of servers will increase. If the value is a negative integer, the number of servers will decrease.</wadl:doc>
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
                 </param>
-                <param style="plain"
-                    name="desiredCapacity"
-                    required="false"
-                    type="integer"
+                <param style="plain" name="name" required="true"
+                    type="string" path="$.[*].name">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
+                </param>
+                <param style="plain" name="args" required="false"
+                    type="object" path="$.[*].args">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >Additional configuration information for
+                        policies of type <code>schedule</code>.
+                        This parameter is not required for policies of
+                        type <code>webhook</code>. This
+                        parameter must be set to either
+                        <code>at</code> or
+                        <code>cron</code>, which are mutually
+                        exclusive. </wadl:doc>
+                </param>
+                <param style="plain" name="cron" required="false"
+                    type="string" path="$.[*].args.cron">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The time when the policy will be executed, as
+                        a cron entry. For example, if this is
+                        parameter is set to <code>1 0 * *
+                        *</code>, the policy will be executed at
+                        one minute past midnight (00:01) every day of
+                        the month, and every day of the week. For more
+                        information about cron, read:
+                        http://en.wikipedia.org/wiki/Cron</wadl:doc>
+                </param>
+                <param style="plain" name="at" required="false"
+                    type="string" path="$.[*].args.at">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The time when this policy will be executed.
+                        The time must be formatted according to this
+                        service's custom <link xlink:href="
+                        /cas/api/v1.0/autoscale-devguide/content/datetimeformat.html">Date
+                        and Time format</link>, with seconds,
+                        otherwise a 400 error may be returned. The
+                        policy will be triggered within a 10-second
+                        range of the time specified, so if you set the
+                        <code>at</code> time to
+                        <code>2013-05-19T08:07:08Z</code>, it
+                        will be triggered anytime between 08:07:08 to
+                        08:07:18. This property is mutually exclusive
+                        with the <code>cron</code>
+                        parameter.</wadl:doc>
+                </param>
+                <param style="plain" name="changePercent"
+                    required="false" type="number"
+                    path="$.[*].changePercent">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The percent change to make in the number of
+                        servers in the scaling group. If this number
+                        is positive, the number of servers will
+                        increase by the given percentage. If this
+                        parameter is set to a negative number, the
+                        number of servers decreases by the given
+                        percentage. The absolute change in the number
+                        of servers will be rounded to the nearest
+                        integer. This means that if -X% of the current
+                        number of servers translates to -0.5 or -0.25
+                        or -0.75 servers, the actual number of servers
+                        that will be shut down is 1. If X% of the
+                        current number of servers translates to 1.2 or
+                        1.5 or 1.7 servers, the actual number of
+                        servers that will be launched is 2</wadl:doc>
+                </param>
+                <param style="plain" name="cooldown" required="true"
+                    type="number" path="$.[*].cooldown">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The cooldown period, in seconds, before this
+                        particular scaling policy can be executed
+                        again. The policy cooldown period does not
+                        affect the global scaling group cooldown. The
+                        minimum value for this parameter is 0 seconds,
+                        the maximum value is 86400 seconds (24 hrs). </wadl:doc>
+                </param>
+                <param style="plain" name="type" required="true"
+                    type="enum" path="$.[*].type">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The type of policy that will be executed for
+                        the current release, this value can be either
+                        <code>webhook</code>  or
+                        <code>schedule</code>.</wadl:doc>
+                </param>
+                <param style="plain" name="change" required="false"
+                    type="integer" path="$.[*].change">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The change to make in the number of servers
+                        in the scaling group. This parameter must be
+                        an integer. If the value is a positive
+                        integer, the number of servers increases.
+                        If the value is a negative integer, the number
+                        of servers decreases.</wadl:doc>
+                </param>
+                <param style="plain" name="desiredCapacity"
+                    required="false" type="integer"
                     path="$.[*].desiredCapacity">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the desired server capacity of the scaling the group, i.e. how many servers there should be in the scaling group. This value must be an absolute number. For example, if this parameter is set to 10, executing this policy will bring the number of servers to 10. The minimum allowed value of this parameter is 0. </wadl:doc>
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The desired server capacity of
+                        the scaling the group; that is, how many
+                        servers should be in the scaling group. This
+                        value must be an absolute number, greater than or equal to zero. 
+                        For example, if this parameter is set to ten, executing the policy brings the number
+                        of servers to ten. The minimum allowed value is
+                        zero. Note that the configured group maxEntities and minEntities takes precedence
+                        over this setting.</wadl:doc>
                 </param>
 
             </representation>
         </request>
         <response status="201">
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:sample title="Create Policies Response: JSON" >
-                        <xsdxt:code href="../docbkx/samples/resCreatePolicies.json"/>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <xsdxt:sample
+                        title="Create Policies Response: HTTP and JSON">
+                        <!-- <xsdxt:code
+                            href="../docbkx/samples/resCreatePolicies-json-http.txt"/>-->
+                        <xsdxt:code
+                            href="../docbkx/samples/resCreatePolicies.json"
+                        />
                     </xsdxt:sample>
-                </doc>
+                </wadl:doc>
             </representation>
-        </response>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
-    <method name="GET" id="getPolicy" rax:roles="observer autoscale:observer">
-        <doc title="Get Policy Details">
-            <db:para role="shortdesc">
-                This method returns details for a specified scaling policy.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-            This method returns a description for the specified scaling policy.
-            The description includes an ID, name, type,
-            adjustment, cooldown time, and links. The description is returned in the
-            response body in JSON format.
-            </p>
-        </doc>
+        </response> &commonFaults; &getFaults; &postPutFaults; </method>
+    <method name="GET" id="getPolicy"
+        rax:roles="observer autoscale:observer">
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Show policy details">
+            <para role="shortdesc">Shows scaling policy
+                details.</para>
+            <para>Details include an ID, name, type, adjustment,
+                cool-down time, and links.</para>
+            <para>The details appear in the response body in JSON
+                format.</para>
+        </wadl:doc>
         <response status="200">
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/resGetPolicy.json"/>
-                </doc>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <!-- <xsdxt:code
+                        href="../docbkx/samples/resGetPolicy-json-http.txt"/>-->
+                    <xsdxt:code
+                        href="../docbkx/samples/resGetPolicy.json"/>
+                </wadl:doc>
             </representation>
-        </response>
-        &commonFaults; &getFaults;
-    </method>
-
+        </response> &commonFaults; &getFaults; </method>
     <method id="putPolicy" name="PUT">
-        <doc title="Replace Policy">
-            <db:para role="shortdesc">
-                This method updates a scaling policy.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-            This method modifies an existing scaling policy for the specified tenant.
-            To update the policy, specify the policy's name,
-            type, adjustment, and cooldown time in the request body in JSON format. If the change is successful, no response body
-            is returned.
-            </p>
-        </doc>
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Replace policy">
+            <para role="shortdesc">Updates an existing scaling policy
+                for the specified tenant.</para>
+            <para>To update the policy, specify the name, type,
+                adjustment, and cooldown time for the policy in the
+                request body in JSON format. If the change succeeds,
+                no response body is returned.</para>
+        </wadl:doc>
         <request>
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/reqPutPolicy.json"/>
-                </doc>
-                <param style="plain"
-                    name="name"
-                    required="true"
-                    type="string"
-                    path="$.scalingPolicies.[*].name">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies a name for the scaling policy. This name must be unique for each scaling policy.</wadl:doc>
-                </param>
-                <param style="plain"
-                    name="args"
-                    required="false"
-                    type="object"
-                    path="$.scalingPolicies.[*].args">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies additional configuration information for policies of type "schedule." This parameter is not not required for policies of type "webhook." This parameter must be set to either "at" or "cron". Both "at" and "cron" are mutually exclusive. </wadl:doc>
-                </param>
-                <param style="plain"
-                    name="cron"
-                    required="false"
-                    type="string"
-                    path="$.scalingPolicies.[*].args.cron">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the recurring time when the policy will be executed as a cron entry. For example, if this is parameter is set to "1 0 * * *", the policy will be executed at one minute past midnight (00:01) every day of the month, and every day of the week. For more information about cron, read: http://en.wikipedia.org/wiki/Cron</wadl:doc>
-                </param>
-                <param style="plain"
-                    name="at"
-                    required="false"
-                    type="string"
-                    path="$.scalingPolicies.[*].args.at">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both. You must specify seconds when using "at". If seconds are not specified, a 400 error is returned.</wadl:doc>
-                </param>
-                <param style="plain"
-                    name="changePercent"
-                    required="false"
-                    type="number"
-                    path="$.scalingPolicies.[*].changePercent">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the percent change to make in the number of servers in the scaling group. If this number is positive, the number of servers will increase by the given percentage. If this parameter is set to a negative number, the number of servers will decrease by the given percentage. The absolute change in the number of servers will be rounded to the nearest integer. This means that if -X% of the current number of servers translates to -0.5 or -0.25 or -0.75 servers, the actual number of servers that will be shut down is 1. If X% of the current number of servers translates to 1.2 or 1.5 or 1.7 servers, the actual number of servers that will be launched is 2</wadl:doc>
-                </param>
-                <param style="plain"
-                    name="cooldown"
-                    required="true"
-                    type="number"
-                    path="$.scalingPolicies.[*].cooldown">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the cooldown period, in seconds, before this particular scaling policy can be executed again. The cooldown period does not affect the global scaling group cooldown. The minimum value for this parameter is 0 seconds, the maximum value is 86400 seconds (24 hrs). </wadl:doc>
-                </param>
-                <param style="plain"
-                    name="type"
-                    required="true"
-                    type="enum"
-                    path="$.scalingPolicies.[*].type">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the type of policy that will be executed for the current release, this value can be either "webhook" for webhook-based policies or "schedule" for schedule-based policies.</wadl:doc>
-                </param>
-                <param style="plain"
-                    name="change"
-                    required="false"
-                    type="integer"
-                    path="$.scalingPolicies.[*].change">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the change to make in the number of servers in the scaling group. This parameter must be an integer. If the value is a positive integer, the number of servers will increase. If the value is a negative integer, the number of servers will decrease.</wadl:doc>
-                </param>
-                <param style="plain"
-                    name="desiredCapacity"
-                    required="false"
-                    type="integer"
-                    path="$.scalingPolicies.[*].desiredCapacity">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the desired server capacity of the scaling the group, i.e. how many servers there should be in the scaling group. This value must be an absolute number. For example, if this parameter is set to 10, executing this policy will bring the number of servers to 10. The minimum allowed value of this parameter is 0. </wadl:doc>
-                </param>
-            </representation>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <xsdxt:code
+                        href="../docbkx/samples/reqPutPolicy.json"/>
+                </wadl:doc>
+          
+            <param style="plain" name="name" required="true"
+                type="string" path="$.scalingPolicies.[*].name">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>A name for the scaling policy.
+                        This name must be unique for each scaling
+                        policy.</para></wadl:doc>
+            </param>
+            <param style="plain" name="args" required="false"
+                type="object" path="$.scalingPolicies.[*].args">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>Additional configuration
+                        information for policies of type "schedule."
+                        This parameter is not required for policies of
+                        type <code>webhook</code>. This parameter must be set to
+                        either <code>at</code> or <code>cron</code>, which are mutually exclusive</para>
+                </wadl:doc>
+            </param>
+            <param style="plain" name="cron" required="false"
+                type="string" path="$.scalingPolicies.[*].args.cron">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The time when the
+                        policy runs, as a cron entry. For example, if
+                        you set this parameter to <code>1 0 * *
+                            *</code>, the policy runs at one minute
+                        past midnight (00:01) every day of the month,
+                        and every day of the week. For more
+                        information about cron, see <link xlink:href="http://en.wikipedia.org/wiki/Cron">http://en.wikipedia.org/wiki/Cron</link>.</para></wadl:doc>
+            </param>
+            <param style="plain" name="at" required="false"
+                type="string" path="$.scalingPolicies.[*].args.at">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        xml:lang="EN">The time when this policy will
+                        be executed. The time must be formatted
+                        according to this service's custom <link
+                        xlink:href="
+                        /cas/api/v1.0/autoscale-devguide/content/datetimeformat.html">Date
+                        and Time format</link>, with seconds,
+                        otherwise a 400 error may be returned. The
+                        policy will be triggered within a 10-second
+                        range of the time specified, so if you set the
+                        <code>at</code> time to
+                        <code>2013-05-19T08:07:08Z</code>, it
+                        will be triggered anytime between 08:07:08 to
+                        08:07:18. This property is mutually exclusive
+                        with the <code>cron</code>
+                        parameter.</wadl:doc>
+            </param>
+            <param style="plain" name="changePercent" required="false"
+                type="number"
+                path="$.scalingPolicies.[*].changePercent">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The percent change to make in
+                        the number of servers in the scaling group. If
+                        this number is positive, the number of servers
+                        increases by the given percentage. If this
+                        parameter is set to a negative number, the
+                        number of servers decreases by the given
+                        percentage. The absolute change in the number
+                        of servers is rounded to the nearest integer.
+                        This means that if -X% of the current number
+                        of servers translates to -0.5 or -0.25 or
+                        -0.75 servers, the actual number of servers
+                        that are shut down is 1. If X% of the current
+                        number of servers translates to 1.2 or 1.5 or
+                        1.7 servers, the actual number of servers that
+                        are launched is 2.</para></wadl:doc>
+            </param>
+            <param style="plain" name="cooldown" required="true"
+                type="number" path="$.scalingPolicies.[*].cooldown">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The cooldown period, in
+                        seconds, before this particular scaling policy
+                        can run again. The policy cooldown period does not
+                        affect the global scaling group cooldown. The
+                        minimum value for this parameter is 0 seconds.
+                        The maximum value is 86400 seconds (24
+                        hrs).</para></wadl:doc>
+            </param>
+            <param style="plain" name="type" required="true"
+                type="enum" path="$.scalingPolicies.[*].type">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The type of policy that runs. Currently, this value can be
+                        either <code>webhook</code> or <code>schedule</code>.</para></wadl:doc>
+            </param>
+            <param style="plain" name="change" required="false"
+                type="integer" path="$.scalingPolicies.[*].change">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The change to make in the
+                        number of servers in the scaling group. This
+                        parameter must be an integer. If the value is
+                        a positive integer, the number of servers
+                        increases. If the value is a negative integer,
+                        the number of servers
+                    decreases.</para></wadl:doc>
+            </param>
+            <param style="plain" name="desiredCapacity"
+                required="false" type="integer"
+                path="$.scalingPolicies.[*].desiredCapacity">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The desired server capacity of
+                        the scaling the group; that is, how many
+                        servers should be in the scaling group. This
+                        value must be an absolute number, greater than or equal to zero. 
+                        For example, if this parameter is set to ten, executing the policy brings the number
+                        of servers to ten. The minimum allowed value is
+                        zero. Note that the configured group maxEntities and minEntities takes precedence
+                        over this setting.</para>
+                </wadl:doc>
+            </param>
+            </representation> 
         </request>
-        <response status="204"/>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
+        <response status="204"/> &commonFaults; &getFaults;
+        &postPutFaults; </method>
     <method id="deletePolicy" name="DELETE">
-        <doc title="Delete Policy">
-            <db:para role="shortdesc">
-                This method deletes a scaling policy.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                This method deletes the specified scaling policy from the specified tenant.
-                If deletion is successful, no response body is returned.
-            </p>
-        </doc>
-        <response status="204"/>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Delete policy">
+            <para role="shortdesc">Deletes a specified scaling policy
+                from the specified tenant.</para>
+            <para>If deletion is successful, no response body is
+                returned.</para>
+        </wadl:doc>
+        <response status="204"/> &commonFaults; &getFaults;
+        &postPutFaults; </method>
     <method id="executePolicy" name="POST">
-        <doc title="Execute Policy">
-            <db:para role="shortdesc">
-                This method executes a scaling policy.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                This method executes the specified scaling policy. If execution is successful, a response body is
-            returned.
-            </p>
-        </doc>
-        <request>
-            <representation mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
-        <response status="202"/>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Execute policy">
+            <para role="shortdesc">Runs a specified scaling
+                policy.</para>
+            <para>If the operation succeeds, a response body is
+                returned.</para>
+        </wadl:doc>
+        <response status="202"/> &commonFaults; &getFaults;
+        &postPutFaults; </method>
     <method name="GET" id="getWebhooks">
-        <doc title="Get a list of webhooks for the policy">
-            <db:para role="shortdesc">
-                This method obtains a list of webhooks for the scaling policy.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                This method obtains a list of webhooks and their IDs for the specified scaling policy. This data is returned in
-                the response body in JSON format.
-            </p>
-        </doc>
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="List webhooks for the policy">
+            <para role="shortdesc">Lists web hooks and their IDs for a
+                specified scaling policy.</para>
+            <para>This data is returned in the response body in JSON
+                format.</para>
+        </wadl:doc>
         <response status="200">
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/resGetWebhooks.json"/>
-                </doc>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <!--<xsdxt:code
+                        href="../docbkx/samples/resGetWebhooks-json-http.txt"/>-->
+                    <xsdxt:code
+                        href="../docbkx/samples/resGetWebhooks.json"/>
+                </wadl:doc>
             </representation>
-        </response>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
+        </response> &commonFaults; &getFaults; &postPutFaults; </method>
     <method id="createWebhook" name="POST">
-        <doc title="Create a webhook">
-            <db:para role="shortdesc">
-                This method creates a webhook.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-            This method creates one or more webhooks for the specified scaling policy. Webhooks must
-            have a name. If successful, the response body will contain
-            the IDs and links to the newly created webhooks. This data is provided
-            in the request body in JSON format.
-            </p>
-        </doc>
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Create webhook">
+            <para role="shortdesc">Creates one or more webhooks for
+                the specified scaling policy.</para>
+            <para>Webhooks must have a name. If the operation
+                succeeds, the response body contains the IDs and links
+                to the newly created web hooks. This data is provided
+                in the request body in JSON format.</para></wadl:doc>
         <request>
+            <param style="plain" name="name" required="true"
+                type="string" path="$.[*].name">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>A name for the webhook for
+                        logging purposes.</para></wadl:doc>
+            </param>
+            <param style="plain" name="metadata" required="false"
+                type="object" path="$.[*].metadata">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>User-provided key-value
+                        metadata. Both keys and values should be
+                        strings with a maximum length of 256
+                        characters.</para></wadl:doc>
+            </param>
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/reqCreateWebhook.json"/>
-                </doc>
-	      <param style="plain"
-		     name="name"
-		     required="true"
-		     type="string"
-		     path="$.[*].name">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies a name for the webhook for logging purposes</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="metadata"
-		     required="false"
-		     type="object"
-		     path="$.[*].metadata">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies user-provided key-value metadata. Both keys and values should be strings not exceeding 256 characters in length.</wadl:doc>
-	      </param>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <!-- <xsdxt:code
+                        href="../docbkx/samples/reqCreateWebhook-json-http.txt"/>-->
+                    <xsdxt:code
+                        href="../docbkx/samples/reqCreateWebhook.json"
+                    />
+                </wadl:doc>
+                <param style="plain" name="name" required="true"
+                    type="string" path="$.[*].name">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >This parameter specifies a name for the
+                        webhook for logging purposes</wadl:doc>
+                </param>
+                <param style="plain" name="metadata" required="false"
+                    type="object" path="$.[*].metadata">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >This parameter specifies user-provided
+                        key-value metadata. Both keys and values
+                        should be strings not exceeding 256 characters
+                        in length.</wadl:doc>
+                </param>
             </representation>
         </request>
         <response status="201">
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/resCreateWebhook.json"/>
-                </doc>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <!--<xsdxt:code
+                        href="../docbkx/samples/resCreateWebhook-json-http.txt"/>-->
+                    <xsdxt:code
+                        href="../docbkx/samples/resCreateWebhook.json"
+                    />
+                </wadl:doc>
             </representation>
-        </response>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
+        </response> &commonFaults; &getFaults; &postPutFaults; </method>
     <method id="getWebhook" name="GET">
-        <doc title="View Webhook">
-            <db:para role="shortdesc">
-                This method returns the description for a webhook.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-            This method returns a description of a webhook for the specified tenant and the specified scaling policy.
-            The description is returned in the response body in JSON format.
-            </p>
-        </doc>
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Show webhook details">
+            <para role="shortdesc">Shows webhook details for a
+                specified scaling policy.</para>
+            <para>The details appear in the response body in JSON
+                format.</para>
+        </wadl:doc>
         <response status="200">
             <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/resGetWebhook.json"/>
-                </doc>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <!-- <xsdxt:code
+                        href="../docbkx/samples/resGetWebhook-json-http.txt"/>-->
+                    <xsdxt:code
+                        href="../docbkx/samples/resGetWebhook.json"/>
+                </wadl:doc>
             </representation>
-        </response>
-        &commonFaults; &getFaults;
-    </method>
-
+        </response> &commonFaults; &getFaults; </method>
     <method id="putWebhook" name="PUT">
-        <doc title="Update Webhook">
-            <db:para role="shortdesc">
-                This method updates a webhook.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-            This method changes the specified webhook for a specified enant and scaling policy.
-            If the specified webhook is not recognized, the change is ignored.
-            If you submit a URL, the URL is ignored but that does not invalidate the request.
-            If the change is successful, no
-            response body is returned.
-            </p>
-        </doc>
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Update webhook">
+            <para role="shortdesc">Updates a webhook for a specified
+                tenant and scaling policy.</para><para>If the
+                specified webhook is not recognized, the change is
+                ignored. If you submit a URL, the URL is ignored but
+                that does not invalidate the request. If the change is
+                successful, no response body is returned.</para>
+        </wadl:doc>
         <request>
+            <param style="plain" name="name" type="string"
+                required="true" path="$.[*].name">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>A name for the webhook for
+                        logging purposes.</para></wadl:doc>
+            </param>
+            <param style="plain" name="metadata" required="false"
+                type="object" path="$.[*].metadata">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>User-provided key-value
+                        metadata. Both keys and values should be
+                        strings not exceeding 256 characters in
+                        length.</para></wadl:doc>
+            </param>
             <representation mediaType="application/json">
-              <doc xml:lang="en">
-                <xsdxt:code href="../docbkx/samples/reqPutWebhook.json"/>
-              </doc>
-	      <param style="plain"
-		     name="name"
-		     type="string"
-		     required="true"
-		     path="$.[*].name">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies a name for the webhook for logging purposes</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="metadata"
-		     required="false"
-		     type="object"
-		     path="$.[*].metadata">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies user-provided key-value metadata. Both keys and values should be strings not exceeding 256 characters in length.</wadl:doc>
-	      </param>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                    <xsdxt:code
+                        href="../docbkx/samples/reqPutWebhook.json"/>
+                </wadl:doc>
+                <param style="plain" name="name" type="string"
+                    required="true" path="$.[*].name">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >This parameter specifies a name for the
+                        webhook for logging purposes</wadl:doc>
+                </param>
+                <param style="plain" name="metadata" required="false"
+                    type="object" path="$.[*].metadata">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >This parameter specifies user-provided
+                        key-value metadata. Both keys and values
+                        should be strings not exceeding 256 characters
+                        in length.</wadl:doc>
+                </param>
             </representation>
         </request>
-        <response status="204"/>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
+        <response status="204"/> &commonFaults; &getFaults;
+        &postPutFaults; </method>
     <method id="deleteWebhook" name="DELETE">
-        <doc title="Delete Webhook">
-            <db:para role="shortdesc">
-                This method deletes a webhook.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                This method deletes the webhook for a specified scaling policy. If deletion is successful, no response body
-                is returned.
-            </p>
-        </doc>
-        <response status="204"/>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Delete webhook">
+            <para role="shortdesc">Deletes a webhook for a specified
+                scaling policy.</para>
+            <para>If deletion succeeds, no response body is
+                returned.</para>
+        </wadl:doc>
+        <response status="204"/> &commonFaults; &getFaults;
+        &postPutFaults; </method>
     <method id="anonymousExecute" name="POST">
-        <doc title="Execute Anonymous Webhook">
-            <db:para role="shortdesc">
-                This method executes an anonymous webhook.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">This method executes an anonymous webhook.</p>
-        </doc>
-        <request>
-            <representation mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
-        <response status="202"/>
-        &commonFaults; &getFaults; &postPutFaults;
-    </method>
-
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Execute anonymous webhook">
+            <para role="shortdesc">Runs an anonymous webhook.</para>
+        </wadl:doc>
+        <response status="202"/> &commonFaults; &getFaults;
+        &postPutFaults; </method>
 </application>
