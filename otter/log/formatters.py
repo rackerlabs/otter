@@ -256,8 +256,8 @@ def ObserverWrapper(observer, hostname, seconds=None):
         log_params = {
             "@version": 1,
             "host": hostname,
-            "short_message": short_message,
-            "message": full_message,
+            "message": short_message,
+            "full_message": full_message,
             "@timestamp": datetime.fromtimestamp(eventDict.get("time", seconds())).isoformat(),
             "level": eventDict.get("level", level),
             "otter_facility": eventDict.get("system", ""),
