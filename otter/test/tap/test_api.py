@@ -404,7 +404,7 @@ class APIMakeServiceTests(TestCase):
         self.assertEqual(self.store.kz_client, kz_client)
         sch = mock_setup_scheduler.return_value
         self.assertEqual(self.health_checker.checks['scheduler'], sch.health_check)
-        self.assertEqual(self.Otter.return_value.scheduler_reset, sch.reset)
+        self.assertEqual(self.Otter.return_value.scheduler, sch)
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
