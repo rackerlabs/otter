@@ -1303,8 +1303,7 @@ class CassScalingGroupCollection:
         return d
 
     def health_check(self):
-        """
-        see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
+        """ see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
 
         In addition to ``healthy`` and ``time``, returns whether it can
         connect to cassandra and zookeeper
@@ -1322,13 +1321,20 @@ class CassScalingGroupCollection:
 
         start_time = self.reactor.seconds()
 
-        d = self.connection.execute(
+        cd = self.connection.execute(
             _cql_health_check.format(cf=self.group_table), {},
             get_consistency_level('health', 'check'))
 
+        lock_path = LOCK_PATH + '/test_{}'.format(uuid.uuid1())
+        lock = self.kz_client.Lock(lock_path)
+        lock.acquire = functools.partial(lock.acquire, timeout=5)
+        ld = with_lock(self.reactor, lock, self.log, lambda: None)
+
+        d = defer.gatherResults([cd, ld], consumeErrors=True)
+
         # stop health check after 15 seconds
         timeout_deferred(d, 15, clock=self.reactor,
-                         deferred_description='cassandra health check')
+                         deferred_description='cassandra/kazoo health check')
 
         d.addCallback(lambda _: (zk_health['zookeeper'], dict(
             cassandra=True,
