@@ -637,7 +637,7 @@ class SchedulerResetTests(RestAPITestMixin, TestCase):
     """
     Tests that the scheduler reset endpoint resets the scheduler with new path
     """
-    endpoint = "/scheduler_reset"
+    endpoint = "/scheduler/reset"
     invalid_methods = ("DELETE", "PUT", "GET")
 
     def setUp(self):
@@ -645,8 +645,9 @@ class SchedulerResetTests(RestAPITestMixin, TestCase):
         Sample scheduler
         """
         super(SchedulerResetTests, self).setUp()
-        self.reset = mock.Mock()
-        self.root = Otter(self.mock_store, scheduler_reset=self.reset).app.resource()
+        otter = Otter(self.mock_store)
+        self.sch = otter.scheduler = mock.Mock(spec=['reset'])
+        self.root = otter.app.resource()
 
     def test_delegates(self):
         """
@@ -655,14 +656,51 @@ class SchedulerResetTests(RestAPITestMixin, TestCase):
         resp = self.assert_status_code(200, method='POST',
                                        endpoint=self.endpoint + '?path=/new_path')
         self.assertEqual(resp, '')
-        self.reset.assert_called_once_with('/new_path')
+        self.sch.reset.assert_called_once_with('/new_path')
 
     def test_exception(self):
         """
         Returns 400 with exception message when ValueError is raised
         """
-        self.reset.side_effect = ValueError('meh')
+        self.sch.reset.side_effect = ValueError('meh')
         resp = self.assert_status_code(400, method='POST',
                                        endpoint=self.endpoint + '?path=/new_path')
         self.assertEqual(resp, 'meh')
-        self.reset.assert_called_once_with('/new_path')
+        self.sch.reset.assert_called_once_with('/new_path')
+
+
+class SchedulerStopTests(RestAPITestMixin, TestCase):
+    """
+    Tests that the scheduler stop endpoint stops the scheduler
+    """
+    endpoint = "/scheduler/stop"
+    invalid_methods = ("DELETE", "PUT", "GET")
+
+    def setUp(self):
+        """
+        Sample scheduler
+        """
+        super(SchedulerStopTests, self).setUp()
+        otter = Otter(self.mock_store)
+        self.sch = otter.scheduler = mock.Mock(spec=['stopService'])
+        self.root = otter.app.resource()
+
+    def test_delegates(self):
+        """
+        Calls scheduler.stopService
+        """
+        self.sch.stopService.return_value = succeed(None)
+        resp = self.assert_status_code(200, method='POST',
+                                       endpoint=self.endpoint)
+        self.assertEqual(resp, '')
+        self.sch.stopService.assert_called_once_with()
+
+    def test_stop_no_return(self):
+        """
+        When stopService() returns None
+        """
+        self.sch.stopService.return_value = None
+        resp = self.assert_status_code(200, method='POST',
+                                       endpoint=self.endpoint)
+        self.assertEqual(resp, '')
+        self.sch.stopService.assert_called_once_with()
