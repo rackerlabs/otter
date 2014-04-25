@@ -230,38 +230,36 @@ def ObserverWrapper(observer, hostname, seconds=None):
         seconds = time.time
 
     def Observer(eventDict):
-        short_message = None
-        full_message = None
+        message = None
+
+        log_params = {
+            "@version": 1,
+            "host": hostname,
+            "@timestamp": datetime.fromtimestamp(
+                eventDict.get("time", seconds())).isoformat(),
+            "otter_facility": eventDict.get("system", ""),
+        }
 
         if eventDict.get("isError", False):
             level = 3
 
             if 'failure' in eventDict:
-                short_message = repr(eventDict['failure'].value)
-                full_message = eventDict['failure'].getTraceback()
+                message = repr(eventDict['failure'].value)
+                log_params['traceback'] = eventDict['failure'].getTraceback()
 
             if 'why' in eventDict and eventDict['why']:
-                short_message = '{0}: {1}'.format(eventDict['why'],
-                                                  short_message)
+                message = '{0}: {1}'.format(eventDict['why'], message)
 
         else:
             level = 6
 
-        if not short_message:
-            short_message = eventDict["message"][0] if eventDict["message"] else ""
+        if not message:
+            message = eventDict["message"][0] if eventDict["message"] else ""
 
-        if not full_message:
-            full_message = " ".join([str(m) for m in eventDict["message"]])
-
-        log_params = {
-            "@version": 1,
-            "host": hostname,
-            "message": short_message,
-            "full_message": full_message,
-            "@timestamp": datetime.fromtimestamp(eventDict.get("time", seconds())).isoformat(),
+        log_params.update({
+            "message": message,
             "level": eventDict.get("level", level),
-            "otter_facility": eventDict.get("system", ""),
-        }
+        })
 
         if "file" in eventDict:
             log_params["file"] = eventDict["file"]
