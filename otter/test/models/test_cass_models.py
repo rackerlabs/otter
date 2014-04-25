@@ -35,7 +35,7 @@ from otter.test.models.test_interface import (
     IScalingScheduleCollectionProviderMixin)
 
 from otter.test.utils import patch, matches
-from testtools.matchers import IsInstance, ContainsDict, Equals
+from testtools.matchers import IsInstance
 from otter.util.timestamp import from_timestamp
 from otter.util.config import set_config_data
 
