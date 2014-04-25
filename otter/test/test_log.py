@@ -331,7 +331,7 @@ class ObserverWrapperTests(TestCase):
             'host': 'localhost',
             '@version': 1,
             'message': 'Hello',
-            'otter_facility': '',
+            'otter_facility': 'otter',
             '@timestamp': datetime.fromtimestamp(0).isoformat(),
             'level': 6,
         })

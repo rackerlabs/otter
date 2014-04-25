@@ -237,7 +237,7 @@ def ObserverWrapper(observer, hostname, seconds=None):
             "host": hostname,
             "@timestamp": datetime.fromtimestamp(
                 eventDict.get("time", seconds())).isoformat(),
-            "otter_facility": eventDict.get("system", ""),
+            "otter_facility": eventDict.get("system", "otter"),
         }
 
         if eventDict.get("isError", False):
