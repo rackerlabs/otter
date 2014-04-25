@@ -1305,10 +1305,11 @@ class CassScalingGroupCollection:
 
     def kazoo_health_check(self):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
+        Checks zookeer connection status and acquires a temporary lock to see if that
+        recipe is working fine
 
-        Checks connection status and acquires a temporary lock to see if that recipe
-        is working fine
+        return is same as described in
+        :meth:`otter.models.interface.IScalingGroupCollection.health_check`
         """
         if self.kz_client is None:
             return False, {'reason': 'No client yet'}
@@ -1334,7 +1335,7 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
 
         In addition to ``healthy`` and ``time``, returns whether it can
-        connect to cassandra and zookeeper
+        connect to cassandra
         """
         start_time = self.reactor.seconds()
 
