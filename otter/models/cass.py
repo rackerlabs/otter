@@ -20,8 +20,9 @@ from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
 from otter.util.config import config_value
-from otter.util.deferredutils import with_lock, timeout_deferred
+from otter.util.deferredutils import with_lock
 from otter.scheduler import next_cron_occurrence
+from otter.log import log as otter_log
 
 from silverberg.client import ConsistencyLevel
 
@@ -1302,53 +1303,47 @@ class CassScalingGroupCollection:
             ('groups', 'policies', 'webhooks'), results)))
         return d
 
+    def kazoo_health_check(self):
+        """
+        see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
+
+        Checks connection status and acquires a temporary lock to see if that recipe
+        is working fine
+        """
+        if self.kz_client is None:
+            return False, {'reason': 'No client yet'}
+        elif not self.kz_client.connected:
+            return False, {'reason': 'Not connected yet'}
+        elif self.kz_client.state != KazooState.CONNECTED:
+            return False, {'zookeeper_state': self.kz_client.state}
+
+        # check if sample lock can be acquired
+        lock_path = LOCK_PATH + '/test_{}'.format(uuid.uuid1())
+        lock = self.kz_client.Lock(lock_path)
+        lock.acquire = functools.partial(lock.acquire, timeout=5)
+        start_time = self.reactor.seconds()
+        d = with_lock(self.reactor, lock,
+                      otter_log.bind(system='health_check'), lambda: None)
+
+        d.addCallback(lambda _: self.kz_client.delete(lock_path, recursive=True))
+        d.addCallback(lambda _: (True, {'total_time': self.reactor.seconds() - start_time}))
+        return d
+
     def health_check(self):
-        """ see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
+        """
+        see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
 
         In addition to ``healthy`` and ``time``, returns whether it can
         connect to cassandra and zookeeper
         """
-        if self.kz_client is None:
-            zk_health = {'zookeeper': False,
-                         'zookeeper_state': 'Not connected yet'}
-        elif not self.kz_client.connected:
-            zk_health = {'zookeeper': False,
-                         'zookeeper_state': 'Not connected yet'}
-        else:
-            state = self.kz_client.state
-            zk_health = {'zookeeper': state == KazooState.CONNECTED,
-                         'zookeeper_state': state}
-
         start_time = self.reactor.seconds()
 
-        cd = self.connection.execute(
+        d = self.connection.execute(
             _cql_health_check.format(cf=self.group_table), {},
             get_consistency_level('health', 'check'))
 
-        lock_path = LOCK_PATH + '/test_{}'.format(uuid.uuid1())
-        lock = self.kz_client.Lock(lock_path)
-        lock.acquire = functools.partial(lock.acquire, timeout=5)
-        ld = with_lock(self.reactor, lock, self.log, lambda: None)
-
-        d = defer.gatherResults([cd, ld], consumeErrors=True)
-
-        # stop health check after 15 seconds
-        timeout_deferred(d, 15, clock=self.reactor,
-                         deferred_description='cassandra/kazoo health check')
-
-        d.addCallback(lambda _: (zk_health['zookeeper'], dict(
-            cassandra=True,
-            cassandra_time=(self.reactor.seconds() - start_time),
-            **zk_health
-        )))
-
-        d.addErrback(lambda f: (False, dict(
-            cassandra=False,
-            cassandra_failure=repr(f.value),
-            cassandra_time=self.reactor.seconds() - start_time,
-            **zk_health
-        )))
-
+        d.addCallback(
+            lambda _: (True, {'cassandra_time': (self.reactor.seconds() - start_time)}))
         return d
 
 
