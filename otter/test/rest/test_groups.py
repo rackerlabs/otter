@@ -511,7 +511,8 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
 
         super(AllGroupsBobbyEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
-        patch(self, 'otter.util.http.get_url_root', return_value="")
+        set_config_data({'url_root': ''})
+        self.addCleanup(set_config_data, {})
 
         # Patch supervisor
         supervisor = mock.Mock(spec=['validate_launch_config'])
