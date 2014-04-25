@@ -2785,9 +2785,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
 
 class CassScalingGroupsCollectionHealthCheckTestCase(
-        IScalingGroupCollectionProviderMixin, TestCase):
+        IScalingGroupCollectionProviderMixin, LockMixin, TestCase):
     """
-    Tests for :class:`CassScalingGroupCollection`
+    Tests for `health_check` and `kazoo_health_check` in
+    :class:`CassScalingGroupCollection`
     """
 
     def setUp(self):
@@ -2798,57 +2799,66 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.collection = CassScalingGroupCollection(self.connection, self.clock)
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
+        self.lock = self.mock_lock()
+        self.collection.kz_client.Lock.return_value = self.lock
 
-    def test_health_check_no_zookeeper(self):
+    def test_kazoo_no_zookeeper(self):
         """
-        Health check fails if there is no zookeeper client
+        Kazoo health check fails if there is no zookeeper client
         """
         self.collection.kz_client = None
-        d = self.collection.health_check()
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'zookeeper': Equals(False),
-                 'zookeeper_state': Equals('Not connected yet')}))))
+        d = self.collection.kazoo_health_check()
+        self.assertEqual(d, (False, {'reason': 'No client yet'}))
 
-    def test_health_check_zookeeper_not_connected(self):
+    def test_kazoo_zookeeper_not_connected(self):
         """
-        Health check fails if there is no zookeeper client
+        Kazoo health check fails if there is no zookeeper client
         """
-        self.collection.kz_client = mock.MagicMock(connected=False)
-        d = self.collection.health_check()
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'zookeeper': Equals(False),
-                 'zookeeper_state': Equals('Not connected yet')}))))
+        self.collection.kz_client.connected = False
+        d = self.collection.kazoo_health_check()
+        self.assertEqual(d, (False, {'reason': 'Not connected yet'}))
 
-    def test_health_check_zookeeper_connected(self):
+    def test_kazoo_zookeeper_suspended(self):
         """
-        Health check for zookeeper succeeds if the zookeeper client state is
-        CONNECTED
+        Kazoo Health check fails if the zookeeper client state is not CONNECTED
         """
-        self.collection.kz_client = mock.MagicMock(connected=True,
-                                                   state=KazooState.CONNECTED)
-        d = self.collection.health_check()
-        self.assertEqual(
-            self.successResultOf(d),
-            (True, matches(ContainsDict(
-                {'zookeeper': Equals(True),
-                 'zookeeper_state': Equals('CONNECTED')}))))
+        self.collection.kz_client.state = KazooState.SUSPENDED
+        d = self.collection.kazoo_health_check()
+        self.assertEqual(d, (False, {'zookeeper_state': KazooState.SUSPENDED}))
 
-    def test_health_check_zookeeper_suspended(self):
+    @mock.patch('otter.models.cass.uuid')
+    def test_zookeeper_lock_acquired(self, mock_uuid):
         """
-        Health check fails if the zookeeper client state is not CONNECTED
+        Acquires sample lock and succeeds if it is able to acquire. Deletes the lock
+        path before returning
         """
-        self.collection.kz_client = mock.MagicMock(connected=True,
-                                                   state=KazooState.SUSPENDED)
-        d = self.collection.health_check()
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'zookeeper': Equals(False),
-                 'zookeeper_state': Equals('SUSPENDED')}))))
+        self.collection.kz_client.delete.return_value = defer.succeed(None)
+        mock_uuid.uuid1.return_value = 'uuid1'
+
+        d = self.collection.kazoo_health_check()
+
+        self.assertEqual(self.successResultOf(d), (True, {'total_time': 0}))
+        self.collection.kz_client.Lock.assert_called_once_with('/locks/test_uuid1')
+        self.lock._acquire.assert_called_once_with(timeout=5)
+        self.lock.release.assert_called_once_with()
+        self.collection.kz_client.delete.assert_called_once_with(
+            '/locks/test_uuid1', recursive=True)
+
+    @mock.patch('otter.models.cass.uuid')
+    def test_zookeeper_lock_failed(self, mock_uuid):
+        """
+        Acquires sample lock and fails if it is not able to acquire.
+        """
+        self.lock._acquire.side_effect = lambda timeout: defer.fail(ValueError('e'))
+        mock_uuid.uuid1.return_value = 'uuid1'
+
+        d = self.collection.kazoo_health_check()
+
+        self.failureResultOf(d, ValueError)
+        self.collection.kz_client.Lock.assert_called_once_with('/locks/test_uuid1')
+        self.lock._acquire.assert_called_once_with(timeout=5)
+        self.assertFalse(self.lock.release.called)
+        self.assertFalse(self.collection.kz_client.delete.called)
 
     def test_health_check_cassandra_fails(self):
         """
@@ -2856,31 +2866,8 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.connection.execute.return_value = defer.fail(Exception('boo'))
         d = self.collection.health_check()
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'cassandra': Equals(False),
-                 'cassandra_failure': Equals("Exception('boo',)"),
-                 'cassandra_time': Equals(0)}))))
-
-    def test_health_check_cassandra_times_out(self):
-        """
-        Health check for cassandra fails if cassandra check times out
-        """
-        self.connection.execute.return_value = defer.Deferred()
-        d = self.collection.health_check()
-        self.assertNoResult(d)
-
-        self.clock.advance(15)
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'cassandra': Equals(False),
-                 'cassandra_failure': Equals("TimedOutError('cassandra health check "
-                                             "timed out after 15 seconds.',)"),
-                 'cassandra_time': Equals(15)}))))
-        # to make sure the deferred doesn't get GCed without being called
-        self.connection.execute.return_value.callback(None)
+        f = self.failureResultOf(d, Exception)
+        self.assertEqual(f.value.args, ('boo',))
 
     def test_health_check_cassandra_succeeds(self):
         """
@@ -2889,16 +2876,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
-            (True, matches(ContainsDict(
-                {'cassandra': Equals(True),
-                 'cassandra_time': Equals(0)}))))
-
-    def test_health_check_succeeds_if_both_succeed(self):
-        """
-        If both zookeeper and cassandra are healthy, the store is healthy
-        """
-        d = self.collection.health_check()
-        self.assertEqual(self.successResultOf(d), (True, mock.ANY))
+            (True, {'cassandra_time': 0}))
 
 
 class CassAdminTestCase(TestCase):
