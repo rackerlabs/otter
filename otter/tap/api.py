@@ -23,6 +23,7 @@ from otter.rest.admin import OtterAdmin
 from otter.rest.application import Otter
 from otter.rest.bobby import set_bobby
 from otter.util.config import set_config_data, config_value
+from otter.util.deferredutils import timeout_deferred
 from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.scheduler import SchedulerService
 
@@ -132,7 +133,8 @@ class HealthChecker(object):
     :param checks: a dictionary containing the name of things to health check
         mapped to their health check callabls
     """
-    def __init__(self, checks=None):
+    def __init__(self, clock, checks=None):
+        self.clock = clock
         self.checks = checks
         if checks is None:
             self.checks = {}
@@ -151,6 +153,7 @@ class HealthChecker(object):
         for k, v in self.checks.iteritems():
             keys.append(k)
             d = maybeDeferred(v)
+            timeout_deferred(d, 15, self.clock, '{} health check'.format(k))
             d.addErrback(
                 lambda f: (False, {'reason': f.getTraceback()}))
             checks.append(d)
@@ -211,8 +214,9 @@ def makeService(config):
             retry_interval=config_value('identity.retry_interval')),
         cache_ttl)
 
-    health_checker = HealthChecker({
-        'store': getattr(store, 'health_check', None)
+    health_checker = HealthChecker(reactor, {
+        'store': getattr(store, 'health_check', None),
+        'kazoo': store.kazoo_health_check
     })
 
     supervisor = SupervisorService(authenticator.authenticate_tenant, coiterate)
