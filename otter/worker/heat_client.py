@@ -20,7 +20,7 @@ class HeatClient(object):
     def __init__(self, auth_token, log, treq):
         self.treq = treq
         self.auth_token = auth_token
-        self.log = log.bind(heatclient=True)
+        self.log = log.bind(system='heatclient')
 
     def create_stack(self, heat_url, stack_name, parameters, timeout,
                      template):

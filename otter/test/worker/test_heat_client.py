@@ -50,7 +50,7 @@ class HeatClientTests(TestCase):
 
         self.assertEqual(self.successResultOf(result), {'hello': 'world'})
         self._assert_bound(log, treq.post.mock_calls[-1][2]['log'],
-                           heatclient=True, event='create-stack',
+                           system='heatclient', event='create-stack',
                            stack_name='my-stack-name')
 
     def test_create_stack_error(self):
@@ -93,7 +93,7 @@ class HeatClientTests(TestCase):
 
         self.assertEqual(self.successResultOf(result), {'hello': 'world'})
         self._assert_bound(log, treq.put.mock_calls[-1][2]['log'],
-                           heatclient=True, event='update-stack')
+                           system='heatclient', event='update-stack')
 
     def test_update_stack_error(self):
         """Non-202 codes from updating a stack are considered an APIError."""
