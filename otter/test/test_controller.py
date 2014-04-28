@@ -640,7 +640,8 @@ class ObeyConfigChangeTestCase(TestCase):
                                           'launch')
         self.assertIs(self.successResultOf(d), self.state)
         self.execute_launch_config.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state, 'launch',
+            self.log.bind.return_value.bind.return_value,
+            'transaction-id', self.state, 'launch',
             self.group, 5)
 
     def test_nonzero_delta_execute_errors_propagated(self):
@@ -656,7 +657,8 @@ class ObeyConfigChangeTestCase(TestCase):
         f = self.failureResultOf(d)
         self.assertTrue(f.check(Exception))
         self.execute_launch_config.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state, 'launch',
+            self.log.bind.return_value.bind.return_value,
+            'transaction-id', self.state, 'launch',
             self.group, 5)
 
     def test_negative_delta_state_is_returned_if_execute_successful(self):
@@ -669,7 +671,8 @@ class ObeyConfigChangeTestCase(TestCase):
                                           'config', self.group, self.state, 'launch')
         self.assertIs(self.successResultOf(d), self.state)
         self.exec_scale_down.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state,
+            self.log.bind.return_value.bind.return_value,
+            'transaction-id', self.state,
             self.group, 5)
 
     def test_negative_delta_execute_errors_propagated(self):
@@ -683,7 +686,8 @@ class ObeyConfigChangeTestCase(TestCase):
         f = self.failureResultOf(d)
         self.assertTrue(f.check(Exception))
         self.exec_scale_down.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state,
+            self.log.bind.return_value.bind.return_value,
+            'transaction-id', self.state,
             self.group, 5)
 
     def test_audit_log_events_logged_on_positive_delta(self):
@@ -696,7 +700,7 @@ class ObeyConfigChangeTestCase(TestCase):
                                           'config', self.group, self.state,
                                           'launch')
         self.assertIs(self.successResultOf(d), self.state)
-        log.msg.assert_called_once_with(
+        log.msg.assert_called_with(
             'Starting {convergence_delta} new servers to satisfy desired capacity',
             scaling_group_id=self.group.uuid, event_type="convergence.scale_up",
             convergence_delta=5, desired_capacity=5, pending_capacity=2,
@@ -712,7 +716,7 @@ class ObeyConfigChangeTestCase(TestCase):
         d = controller.obey_config_change(log, 'transaction-id',
                                           'config', self.group, self.state, 'launch')
         self.assertIs(self.successResultOf(d), self.state)
-        log.msg.assert_called_once_with(
+        log.msg.assert_called_with(
             'Deleting 5 servers to satisfy desired capacity',
             scaling_group_id=self.group.uuid, event_type="convergence.scale_down",
             convergence_delta=-5, desired_capacity=5, pending_capacity=2,

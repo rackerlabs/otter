@@ -111,24 +111,57 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
     :return: a ``Deferred`` that fires with the updated (or not)
         :class:`otter.models.interface.GroupState` if successful
     """
-    bound_log = log.bind(scaling_group_id=scaling_group.uuid)
+    log = log.bind(scaling_group_id=scaling_group.uuid)
 
-    # XXX:  this is a hack to create an internal zero-change policy so
+    # XXX: {'change': 0} is a hack to create an internal zero-change policy so
     # calculate delta will work
-    delta = calculate_delta(bound_log, state, config, {'change': 0})
+    d = converge(log, transaction_id, config, scaling_group, state,
+                 launch_config, {'change': 0})
+    if d is None:
+        return defer.succeed(state)
+    return d
+
+
+def converge(log, transaction_id, config, scaling_group, state, launch_config,
+             policy):
+    """
+    Apply a policy's change to a scaling group, and attempt to make the
+    resulting state a reality. This does no cooldown checking.
+
+    This is done by dispatching to the appropriate orchestration backend for
+    the scaling group; currently only direct nova interaction is supported.
+
+    :param log: A twiggy bound log for logging
+    :param str transaction_id: the transaction id
+    :param dict config: the scaling group config
+    :param otter.models.interface.IScalingGroup scaling_group: the scaling
+        group object
+    :param otter.models.interface.GroupState state: the group state
+    :param dict launch_config: the scaling group launch config
+    :param dict policy: the policy configuration dictionary
+
+    :return: a ``Deferred`` that fires with the updated
+        :class:`otter.models.interface.GroupState` if successful. If no changes
+        are to be made to the group, None will synchronously be returned.
+    """
+    delta = calculate_delta(log, state, config, policy)
+    execute_log = log.bind(server_delta=delta)
 
     if delta == 0:
-        return defer.succeed(state)
+        execute_log.msg("no change in servers")
+        return None
     elif delta > 0:
-        deferred = execute_launch_config(bound_log, transaction_id, state,
+        execute_log.msg("executing launch configs")
+        deferred = execute_launch_config(execute_log, transaction_id, state,
                                          launch_config, scaling_group,
                                          delta)
     else:
         # delta < 0 (scale down)
-        deferred = exec_scale_down(bound_log, transaction_id, state,
+        execute_log.msg("scaling down")
+        deferred = exec_scale_down(execute_log, transaction_id, state,
                                    scaling_group, -delta)
 
-    deferred.addCallback(_do_convergence_audit_log, bound_log, delta, state)
+    deferred.addCallback(_do_convergence_audit_log, log, delta, state)
     return deferred
 
 
@@ -186,26 +219,13 @@ def maybe_execute_scaling_policy(
             return state  # propagate the fully updated state back
 
         if check_cooldowns(bound_log, state, config, policy, policy_id):
-            delta = calculate_delta(bound_log, state, config, policy)
-            execute_bound_log = bound_log.bind(server_delta=delta)
-            if delta == 0:
-                execute_bound_log.msg("cooldowns checked, no change in servers")
+            d = converge(bound_log, transaction_id, config, scaling_group,
+                         state, launch, policy)
+            if d is None:
                 error_msg = "No change in servers"
                 raise CannotExecutePolicyError(scaling_group.tenant_id,
                                                scaling_group.uuid, policy_id,
                                                error_msg)
-            elif delta > 0:
-                execute_bound_log.msg("cooldowns checked, executing launch configs")
-                d = execute_launch_config(execute_bound_log, transaction_id, state,
-                                          launch, scaling_group, delta)
-            else:
-                # delta < 0 (scale down event)
-                execute_bound_log.msg("cooldowns checked, Scaling down")
-                d = exec_scale_down(execute_bound_log, transaction_id, state,
-                                    scaling_group, -delta)
-
-            d.addCallback(_do_convergence_audit_log, bound_log,
-                          delta, state)
             return d.addCallback(mark_executed)
 
         raise CannotExecutePolicyError(scaling_group.tenant_id,
