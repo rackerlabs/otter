@@ -214,15 +214,16 @@ def makeService(config):
             retry_interval=config_value('identity.retry_interval')),
         cache_ttl)
 
-    health_checker = HealthChecker(reactor, {
-        'store': getattr(store, 'health_check', None),
-        'kazoo': store.kazoo_health_check
-    })
-
     supervisor = SupervisorService(authenticator.authenticate_tenant, coiterate)
     supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
+
+    health_checker = HealthChecker(reactor, {
+        'store': getattr(store, 'health_check', None),
+        'kazoo': store.kazoo_health_check,
+        'supervisor': supervisor.health_check
+    })
 
     # Setup cassandra cluster to disconnect when otter shuts down
     if 'cassandra_cluster' in locals():
