@@ -3,7 +3,6 @@ rest endpoints that return the audit log
 
 /v1.0/tenant_id/history
 """
-import copy
 import json
 
 from otter.log import log
@@ -96,14 +95,13 @@ class OtterHistory(object):
                     pass
 
             for hit in body['hits']['hits']:
-                events.append(hit['_source'])
-                # fields = hit['_source']
-                # event = {'timestamp': fields['@timestamp']}
-                # for name in AUDIT_LOG_FIELDS.keys():
-                #     field = fields.get(name)
-                #     if field is not None:
-                #         event[name] = field
-                # events.append(event)
+                fields = hit['_source']
+                event = {'timestamp': fields['@timestamp']}
+                for name in AUDIT_LOG_FIELDS.keys():
+                    field = fields.get(name)
+                    if field is not None:
+                        event[name] = field
+                events.append(event)
             links = get_collection_links(
                 events, request.uri, 'self', limit=paginate.get('limit'),
                 marker=paginate.get('marker'), next_marker=next_marker_by_offset)

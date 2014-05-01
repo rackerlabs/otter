@@ -11,6 +11,48 @@ from otter.test.rest.request import RestAPITestMixin, request
 from otter.util.config import set_config_data
 from otter.test.utils import mock_log, patch, mock_treq, matches
 
+from otter.rest.history import make_auditlog_query
+
+
+class MakeAuditLogQueryTestCase(TestCase):
+    """
+    Tests for ``make_auditlog_query``
+    """
+    def test_filters_by_tenant_id(self):
+        """
+        The filtered query includes the tenant id
+        """
+        results = make_auditlog_query("MY_TENANT_ID   ", "region", 0, 1)
+        self.assertIn('"tenant_id": "MY_TENANT_ID"', json.dumps(results))
+
+    def test_filters_by_region(self):
+        """
+        The filtered query includes the normalized region
+        """
+        results = make_auditlog_query("MY_TENANT_ID", "dFW", 0, 1)
+        self.assertIn('"tags": "dfw"', json.dumps(results))
+
+    def test_limits_size_of_results(self):
+        """
+        The filtered query sets 'size' as the limit passed to it
+        """
+        results = make_auditlog_query("MY_TENANT_ID", "dFW", 0, 100)
+        self.assertEqual(results['size'], 100)
+
+    def test_sets_offset_to_marker(self):
+        """
+        The filtered query sets 'from' as the marker offset passed to it
+        """
+        results = make_auditlog_query("MY_TENANT_ID", "dFW", 5, 100)
+        self.assertEqual(results['from'], 5)
+
+    def test_queries_in_reverse_chronological_order(self):
+        """
+        The filtered query sorts by reverse chronological order
+        """
+        results = make_auditlog_query("MY_TENANT_ID", "dFW", 5, 100)
+        self.assertEqual(results['sort'], [{"@timestamp": {"order": "desc"}}])
+
 
 class OtterHistoryTestCase(RestAPITestMixin, TestCase):
     """
@@ -47,6 +89,7 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
                             'policy_id': 'policy-xyz',
                             'scaling_group_id': 'scaling-group-uvw',
                             'server_id': 'server-rst',
+                            'throwaway_key': 'ignore me!!!!'
                         }
                     }]
                 }
