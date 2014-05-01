@@ -52,6 +52,16 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
                 }
             }))
 
+    def test_history_not_implemented_if_not_configured(self):
+        """
+        A 501 not implemented error is returned if there is no configured host
+        """
+        set_config_data({
+            'limits': {'pagination': 20},
+            'url_root': 'http://localhost'})
+        self.assert_status_code(501)
+
+
     def test_history(self):
         """
         the history api endpoint returns the items from the audit log

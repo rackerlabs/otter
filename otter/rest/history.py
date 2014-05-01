@@ -114,6 +114,10 @@ class OtterHistory(object):
         returns a list of logged autoscale events
         """
         host = config_value('elasticsearch.host')
+        if not host:
+            raise NotImplementedError(
+                "Access to audit log history is not yet implemented")
+
         data = make_auditlog_query(self.tenant_id, config_value('region'), **paginate)
         d = treq.get(append_segments(host, '_search'), data=json.dumps(data), log=self.log)
         d.addCallback(check_success, [200])
