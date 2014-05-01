@@ -11,7 +11,7 @@ from otter.test.rest.request import RestAPITestMixin, request
 from otter.util.config import set_config_data
 from otter.test.utils import mock_log, patch, mock_treq, matches
 
-from otter.rest.history import make_auditlog_query
+from otter.rest.history import make_auditlog_query, next_marker_by_timestamp
 
 
 class MakeAuditLogQueryTestCase(TestCase):
@@ -36,15 +36,39 @@ class MakeAuditLogQueryTestCase(TestCase):
         """
         The filtered query sets 'size' as the limit passed to it
         """
-        results = make_auditlog_query("MY_TENANT_ID", "dFW", 0, 100)
+        results = make_auditlog_query("MY_TENANT_ID", "dFW", limit=100)
         self.assertEqual(results['size'], 100)
 
-    def test_sets_offset_to_marker(self):
+    def test_sets_range_query_to_last_30_days_if_no_marker(self):
         """
-        The filtered query sets 'from' as the marker offset passed to it
+        If no marker is provided, the default range is 30 days ago until now
         """
-        results = make_auditlog_query("MY_TENANT_ID", "dFW", 5, 100)
-        self.assertEqual(results['from'], 5)
+        expected = {
+            "range": {
+                "@timestamp": {
+                    "from": "now-30d",
+                    "to": "now"
+                }
+            }
+        }
+        results = make_auditlog_query("MY_TENANT_ID", "dFW", limit=500)
+        self.assertIn(json.dumps(expected), json.dumps(results))
+
+    def test_sets_range_query_to_be_until_marker(self):
+        """
+        If marker is is provided, date range is 30 days ago until the marker
+        """
+        expected = {
+            "range": {
+                "@timestamp": {
+                    "from": "now-30d",
+                    "to": "new_date"
+                }
+            }
+        }
+        results = make_auditlog_query("MY_TENANT_ID", "dFW",
+                                      limit=500, marker="new_date")
+        self.assertIn(json.dumps(expected), json.dumps(results))
 
     def test_queries_in_reverse_chronological_order(self):
         """
@@ -52,6 +76,20 @@ class MakeAuditLogQueryTestCase(TestCase):
         """
         results = make_auditlog_query("MY_TENANT_ID", "dFW", 5, 100)
         self.assertEqual(results['sort'], [{"@timestamp": {"order": "desc"}}])
+
+
+class NextMarkerByTimestampTestCase(TestCase):
+    """
+    ``next_marker_by_timestamp`` tests
+    """
+    def test_marker_by_timestamp_returns_last_timestamp(self):
+        """
+        ``next_marker_by_timestamp`` always returns the last item in the
+        collection's timestamp
+        """
+        next_marker = next_marker_by_timestamp(
+            [{'timestamp': 1, 'timestamp': 2}], 'ignore me', 'ignore me')
+        self.assertEqual(next_marker, 2)
 
 
 class OtterHistoryTestCase(RestAPITestMixin, TestCase):
@@ -104,7 +142,6 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
             'url_root': 'http://localhost'})
         self.assert_status_code(501)
 
-
     def test_history(self):
         """
         the history api endpoint returns the items from the audit log
@@ -137,7 +174,8 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
     def test_history_with_pagination(self):
         """
         The history api endpoint returns the items from the audit log, and
-        paginates them if there are more than the limit
+        paginates them if there are more than the limit with the marker being
+        the last timestamp
         """
         expected = {
             'events': [{
@@ -149,8 +187,10 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
                 'message': 'audit log event',
             }],
             'events_links': [
-                {'href': 'http://localhost/v1.0/101010/history?limit=1&marker=10', 'rel': 'self'},
-                {'href': 'http://localhost/v1.0/101010/history?limit=1&marker=11', 'rel': 'next'}]
+                {'href': 'http://localhost/v1.0/101010/history?limit=1&marker=10',
+                 'rel': 'self'},
+                {'href': 'http://localhost/v1.0/101010/history?limit=1&marker=1234567890',
+                 'rel': 'next'}]
         }
 
         result = self.successResultOf(

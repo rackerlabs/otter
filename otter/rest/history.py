@@ -12,15 +12,12 @@ from otter.rest.decorators import fails_with, paginatable, succeeds_with, with_t
 from otter.rest.errors import exception_codes
 from otter.util import logging_treq as treq
 from otter.util.config import config_value
-from otter.util.http import (
-    append_segments, check_success, get_collection_links, next_marker_by_offset)
+from otter.util.http import append_segments, check_success, get_collection_links
 
 
-def make_auditlog_query(tenant_id, region, marker=0, limit=0):
+def make_auditlog_query(tenant_id, region, limit, marker=None):
     """Make an elastic search query to fetch audit logs."""
-
     return {
-        "from": marker,
         "size": limit,
         "query": {
             "filtered": {
@@ -31,7 +28,7 @@ def make_auditlog_query(tenant_id, region, marker=0, limit=0):
                                 "range": {
                                     "@timestamp": {
                                         "from": "now-30d",
-                                        "to": "now"
+                                        "to": marker or "now"
                                     }
                                 }
                             },
@@ -51,6 +48,21 @@ def make_auditlog_query(tenant_id, region, marker=0, limit=0):
         },
         "sort": [{"@timestamp": {'order': 'desc'}}]
     }
+
+
+def next_marker_by_timestamp(collection, limit, marker):
+    """
+    Returns the next marker that is just last item in the collection's timestamp
+
+    :param collection: an iterable containing the collection to be paginated
+    :param limit: the limit on the collection
+    :marker: the current marker used to obtain this collection
+
+    :return: the next marker that would be used to fetch the next collection,
+        based on the last item's timestamp.  This assumes the collection is
+        sorted by timestamp.
+    """
+    return collection[-1]['timestamp']
 
 
 class OtterHistory(object):
@@ -81,18 +93,13 @@ class OtterHistory(object):
                 "Access to audit log history is not yet implemented")
 
         data = make_auditlog_query(self.tenant_id, config_value('region'), **paginate)
+
         d = treq.get(append_segments(host, '_search'), data=json.dumps(data), log=self.log)
         d.addCallback(check_success, [200])
         d.addCallback(treq.json_content)
 
         def build_response(body):
             events = []
-
-            if 'marker' in paginate:
-                try:
-                    paginate['marker'] = int(paginate['marker'])
-                except:
-                    pass
 
             for hit in body['hits']['hits']:
                 fields = hit['_source']
@@ -103,8 +110,10 @@ class OtterHistory(object):
                         event[name] = field
                 events.append(event)
             links = get_collection_links(
-                events, request.uri, 'self', limit=paginate.get('limit'),
-                marker=paginate.get('marker'), next_marker=next_marker_by_offset)
+                events, request.uri, 'self',
+                limit=paginate.get('limit'),
+                marker=paginate.get('marker'),
+                next_marker=next_marker_by_timestamp)
             return json.dumps({'events': events, 'events_links': links})
         d.addCallback(build_response)
 
