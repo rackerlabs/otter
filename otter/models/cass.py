@@ -5,6 +5,7 @@ import time
 import itertools
 import uuid
 import functools
+import weakref
 
 from zope.interface import implementer
 
@@ -452,6 +453,29 @@ def verified_view(connection, view_query, del_query, data, consistency, exceptio
     return d.addCallback(_check_resurrection)
 
 
+class WeakLocks(object):
+    """
+    A cache of DeferredLocks mapped based on uuid that gets garbage collected
+    after the lock has been utilized
+    """
+
+    def __init__(self):
+        self._locks = weakref.WeakValueDictionary()
+
+    def get_lock(self, uuid):
+        """
+        Get lock based on uuid
+
+        :param str uuid: Lock's corresponding UUID
+        :return `DeferredLock`
+        """
+        lock = self._locks.get(uuid)
+        if not lock:
+            lock = defer.DeferredLock()
+            self._locks[uuid] = lock
+        return lock
+
+
 @implementer(IScalingGroup)
 class CassScalingGroup(object):
     """
@@ -476,6 +500,9 @@ class CassScalingGroup(object):
     :ivar reactor: Reactor used for time manipulations
     :type reactor: :class:`twisted.internet.reactor.IReactorTime` provider
 
+    :ivar local_locks: Local locks used when modifying state
+    :type local_locks: :class:`WeakLocks`
+
     IMPORTANT REMINDER: In CQL, update will create a new row if one doesn't
     exist.  Therefore, before doing an update, a read must be performed first
     else an entry is created where none should have been.
@@ -487,7 +514,8 @@ class CassScalingGroup(object):
     Also, because deletes are done as tombstones rather than actually deleting,
     deletes are also updates and hence a read must be performed before deletes.
     """
-    def __init__(self, log, tenant_id, uuid, connection, buckets, kz_client, reactor):
+    def __init__(self, log, tenant_id, uuid, connection, buckets, kz_client, reactor,
+                 local_locks):
         """
         Creates a CassScalingGroup object.
         """
@@ -500,6 +528,8 @@ class CassScalingGroup(object):
         self.buckets = buckets
         self.kz_client = kz_client
         self.reactor = reactor
+        self.local_locks = local_locks
+
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
@@ -624,7 +654,9 @@ class CassScalingGroup(object):
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
-        return with_lock(self.reactor, lock, log.bind(category='locking'), _modify_state)
+        local_lock = self.local_locks.get_lock(self.uuid)
+        return local_lock.run(with_lock, self.reactor, lock,
+                              log.bind(category='locking'), _modify_state)
 
     def update_config(self, data):
         """
@@ -1054,6 +1086,7 @@ class CassScalingGroupCollection:
         """
         self.connection = connection
         self.reactor = reactor
+        self.local_locks = WeakLocks()
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
@@ -1186,7 +1219,8 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.get_scaling_group`
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
-                                self.connection, self.buckets, self.kz_client, self.reactor)
+                                self.connection, self.buckets, self.kz_client, self.reactor,
+                                self.local_locks)
 
     def fetch_and_delete(self, bucket, now, size=100):
         """
