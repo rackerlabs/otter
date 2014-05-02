@@ -373,10 +373,12 @@ class APIMakeServiceTests(TestCase):
         self.Otter.assert_called_once_with(self.store,
                                            self.health_checker.health_check)
 
-    def test_health_checker_no_zookeeper(self):
+    @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
+    def test_health_checker_no_zookeeper(self, supervisor):
         """
         A health checker is constructed by default with the store and kazoo health check
         """
+        self.addCleanup(lambda: set_supervisor(None))
         self.assertIsNone(self.health_checker)
         makeService(test_config)
         self.assertIsNotNone(self.health_checker)
@@ -384,6 +386,8 @@ class APIMakeServiceTests(TestCase):
                          self.store.health_check)
         self.assertEqual(self.health_checker.checks['kazoo'],
                          self.store.kazoo_health_check)
+        self.assertEqual(self.health_checker.checks['supervisor'],
+                         get_supervisor().health_check)
 
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_supervisor_service_set_by_default(self, supervisor):

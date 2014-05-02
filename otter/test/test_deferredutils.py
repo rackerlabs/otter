@@ -264,3 +264,14 @@ class DeferredPoolTests(TestCase):
         self.pool.add(holdup)
         holdup.errback(DummyException('hey'))
         self.failureResultOf(holdup, DummyException)
+
+    def test_len(self):
+        """
+        len(pool) returns number of deferreds waiting in the pool
+        """
+        self.assertEqual(len(self.pool), 0)
+        d = Deferred()
+        self.pool.add(d)
+        self.assertEqual(len(self.pool), 1)
+        d.callback(None)
+        self.assertEqual(len(self.pool), 0)

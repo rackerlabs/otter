@@ -64,6 +64,35 @@ class SupervisorTests(TestCase):
         verifyObject(ISupervisor, self.supervisor)
 
 
+class HealthCheckTests(SupervisorTests):
+    """
+    Tests for supervisor health check
+    """
+
+    def test_empty(self):
+        """
+        When no jobs running
+        """
+        self.assertEqual(self.supervisor.health_check(),
+                         (True, {'jobs': 0}))
+
+    def test_filled(self):
+        """
+        When jobs are running, returns number of jobs running
+        """
+        d1, d2 = Deferred(), Deferred()
+        self.supervisor.deferred_pool.add(d1)
+        self.supervisor.deferred_pool.add(d2)
+        self.assertEqual(self.supervisor.health_check(),
+                         (True, {'jobs': 2}))
+        d1.callback(None)
+        self.assertEqual(self.supervisor.health_check(),
+                         (True, {'jobs': 1}))
+        d2.callback(None)
+        self.assertEqual(self.supervisor.health_check(),
+                         (True, {'jobs': 0}))
+
+
 class LaunchConfigTests(SupervisorTests):
     """
     Test supervisor worker execution.
