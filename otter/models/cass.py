@@ -21,7 +21,7 @@ from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
 from otter.util.config import config_value
-from otter.util.deferredutils import with_lock, timeout_deferred, delay
+from otter.util.deferredutils import with_lock, delay
 from otter.scheduler import next_cron_occurrence
 from otter.log import log as otter_log
 
