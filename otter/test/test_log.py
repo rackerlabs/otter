@@ -330,21 +330,20 @@ class ObserverWrapperTests(TestCase):
         self.observer.assert_called_once_with({
             'host': 'localhost',
             '@version': 1,
-            'short_message': 'Hello',
             'message': 'Hello',
-            'otter_facility': '',
+            'otter_facility': 'otter',
             '@timestamp': datetime.fromtimestamp(0).isoformat(),
             'level': 6,
         })
 
-    def test_failure_include_traceback_in_full_message(self):
+    def test_failure_include_traceback_in_event_dict(self):
         """
-        The observer puts the traceback in the full_message key.
+        The observer puts the traceback in the ``traceback`` key.
         """
         self.wrapper({'failure': Failure(ValueError()), 'isError': True})
 
         self.observer.assert_called_once_with(
-            matches(ContainsDict({'message': Contains('Traceback')})))
+            matches(ContainsDict({'traceback': Contains('Traceback')})))
 
     def test_failure_repr_in_short_message(self):
         """
@@ -352,8 +351,7 @@ class ObserverWrapperTests(TestCase):
         """
         self.wrapper({'failure': Failure(ValueError()), 'isError': True})
         self.observer.assert_called_once_with(
-            matches(ContainsDict({'short_message': Equals(repr(ValueError()))}))
-        )
+            matches(ContainsDict({'message': Equals(repr(ValueError()))})))
 
     def test_isError_with_message_instead_of_failure(self):
         """
@@ -362,8 +360,7 @@ class ObserverWrapperTests(TestCase):
         self.wrapper({'message': ('uh oh',), 'isError': True})
 
         self.observer.assert_called_once_with(
-            matches(ContainsDict({'short_message': Equals('uh oh'),
-                                  'message': Equals('uh oh')})))
+            matches(ContainsDict({'message': Equals('uh oh')})))
 
     def test_isError_sets_level_3(self):
         """
@@ -386,7 +383,7 @@ class ObserverWrapperTests(TestCase):
         self.observer.assert_called_once_with(
             matches(
                 ContainsDict(
-                    {'short_message': Contains('Everything is terrible.')})))
+                    {'message': Contains('Everything is terrible.')})))
 
     def test_includes_structured_data(self):
         """
@@ -423,7 +420,7 @@ class ObserverWrapperTests(TestCase):
         """
         self.wrapper({'message': 'meh', 'audit_log': True, 'time': 1234.0})
         self.observer.has_calls([
-            mock.call(matches(ContainsDict({'_message': Equals('meh'),
+            mock.call(matches(ContainsDict({'message': Equals('meh'),
                                             'audit_log': Equals(True),
                                             '@timestamp': Equals(1234),
                                             'host': Equals('hostname')}))),
@@ -446,7 +443,7 @@ class AuditLogFormatterTests(TestCase):
                                 'hostname'),
             {
                 '@version': 1,
-                '_message': 'Hello',
+                'message': 'Hello',
                 '@timestamp': 0,
                 'host': 'hostname',
                 'is_error': False
@@ -462,7 +459,7 @@ class AuditLogFormatterTests(TestCase):
                                 'hostname'),
             {
                 '@version': 1,
-                '_message': 'Failed: meh.',
+                'message': 'Failed: meh.',
                 '@timestamp': 0,
                 'is_error': True,
                 'host': 'hostname',
@@ -471,7 +468,7 @@ class AuditLogFormatterTests(TestCase):
 
     def test_error_formats_why_message(self):
         """
-        The why message is formatted into the _message if it's an error.
+        The why message is formatted into the message if it's an error.
         """
         self.assertEquals(
             audit_log_formatter({'message': ('meh',), 'isError': 'yes',
@@ -479,7 +476,7 @@ class AuditLogFormatterTests(TestCase):
                                 'hostname'),
             {
                 '@version': 1,
-                '_message': 'Failed: meh. is the sky blue',
+                'message': 'Failed: meh. is the sky blue',
                 '@timestamp': 0,
                 'is_error': True,
                 'host': 'hostname',
@@ -496,7 +493,7 @@ class AuditLogFormatterTests(TestCase):
                                 'hostname'),
             {
                 '@version': 1,
-                '_message': 'Failed: meh.',
+                'message': 'Failed: meh.',
                 '@timestamp': 0,
                 'is_error': True,
                 'host': 'hostname',
@@ -514,7 +511,7 @@ class AuditLogFormatterTests(TestCase):
                                 'hostname'),
             {
                 '@version': 1,
-                '_message': 'Failed: meh.',
+                'message': 'Failed: meh.',
                 '@timestamp': 0,
                 'is_error': True,
                 'host': 'hostname',
@@ -537,7 +534,7 @@ class AuditLogFormatterTests(TestCase):
                                  'failure': Failure(exc)}, 0, 'hostname'),
             {
                 '@version': 1,
-                '_message': 'Failed: meh.',
+                'message': 'Failed: meh.',
                 '@timestamp': 0,
                 'is_error': True,
                 'host': 'hostname',
@@ -564,7 +561,7 @@ class AuditLogFormatterTests(TestCase):
                                  'failure': Failure(exc)}, 0, 'hostname'),
             {
                 '@version': 1,
-                '_message': 'Failed: meh.',
+                'message': 'Failed: meh.',
                 '@timestamp': 0,
                 'is_error': True,
                 'scaling_group_id': '5',

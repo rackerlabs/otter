@@ -25,6 +25,7 @@ class Otter(object):
     def __init__(self, store, health_check_function=None):
         self.store = store
         self.health_check_function = health_check_function
+        self.scheduler = None
 
     @app.route('/', methods=['GET'])
     def base(self, request):
@@ -88,3 +89,26 @@ class Otter(object):
             return self.health_check_function().addCallback(json.dumps)
 
         return json.dumps({'healthy': True})
+
+    @app.route('/scheduler/reset', methods=['POST'])
+    def scheduler_reset(self, request):
+        """
+        Reset the scheduler with new path
+        """
+        new_path = request.args.get('path')[0]
+        request.setHeader('X-Response-Id', 'scheduler_reset')
+        try:
+            self.scheduler.reset(new_path)
+        except ValueError as e:
+            request.setResponseCode(400)
+            return e.message
+        else:
+            return ''
+
+    @app.route('/scheduler/stop', methods=['POST'])
+    def scheduler_stop(self, request):
+        """
+        Stop the scheduler
+        """
+        request.setHeader('X-Response-Id', 'scheduler_stop')
+        return self.scheduler.stopService()

@@ -8,6 +8,7 @@ import mock
 from testtools.matchers import Contains
 
 from twisted.internet import defer
+from twisted.internet.task import Clock
 
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
@@ -66,11 +67,17 @@ class HealthCheckerTests(TestCase):
     """
     Tests for the HealthChecker object
     """
+    def setUp(self):
+        """
+        Sample clock
+        """
+        self.clock = Clock()
+
     def test_no_checks(self):
         """
         If there are no checks, HealthChecker returns healthy
         """
-        checker = HealthChecker()
+        checker = HealthChecker(self.clock)
         d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {'healthy': True})
 
@@ -78,7 +85,7 @@ class HealthCheckerTests(TestCase):
         """
         If an invalid check is added, its health is unhealthy
         """
-        checker = HealthChecker({'invalid': None})
+        checker = HealthChecker(self.clock, {'invalid': None})
         d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {
             'healthy': False,
@@ -92,7 +99,7 @@ class HealthCheckerTests(TestCase):
         """
         If a check raises an exception, its health is unhealthy
         """
-        checker = HealthChecker({'fail': mock.Mock(side_effect=Exception)})
+        checker = HealthChecker(self.clock, {'fail': mock.Mock(side_effect=Exception)})
         d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {
             'healthy': False,
@@ -106,7 +113,7 @@ class HealthCheckerTests(TestCase):
         """
         Synchronous health checks are supported
         """
-        checker = HealthChecker({'sync': mock.Mock(return_value=(True, {}))})
+        checker = HealthChecker(self.clock, {'sync': mock.Mock(return_value=(True, {}))})
         d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {
             'healthy': True,
@@ -121,6 +128,7 @@ class HealthCheckerTests(TestCase):
         Asynchronous health checks are supported
         """
         checker = HealthChecker(
+            self.clock,
             {'sync': mock.Mock(return_value=defer.succeed((True, {})))})
         d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {
@@ -135,7 +143,7 @@ class HealthCheckerTests(TestCase):
         """
         All health checks must pass in order for the main check to be healthy
         """
-        checker = HealthChecker({
+        checker = HealthChecker(self.clock, {
             'healthy_thing': mock.Mock(return_value=(True, {})),
             'unhealthy_thing': mock.Mock(return_value=(False, {}))
         })
@@ -156,7 +164,7 @@ class HealthCheckerTests(TestCase):
         """
         When all health checks pass the overall check is healthy
         """
-        checker = HealthChecker(dict([
+        checker = HealthChecker(self.clock, dict([
             ("check{0}".format(i), mock.Mock(return_value=(True, {})))
             for i in range(3)
         ]))
@@ -176,6 +184,24 @@ class HealthCheckerTests(TestCase):
                 'details': {}
             }
         })
+
+    def test_check_is_timed_out(self):
+        """
+        Each health check is timed out after 15 seconds
+        """
+        checker = HealthChecker(
+            self.clock, {'a': mock.Mock(return_value=defer.Deferred()),
+                         'b': mock.Mock(return_value=defer.succeed((True, {})))})
+        d = checker.health_check()
+        self.assertNoResult(d)
+        self.clock.advance(16)
+        r = self.successResultOf(d)
+        self.assertEqual(r, {
+            'healthy': False,
+            'a': {'healthy': False, 'details': {'reason': mock.ANY}},
+            'b': {'healthy': True, 'details': {}}
+        })
+        self.assertIn('a health check timed out', r['a']['details']['reason'])
 
 
 class CallAfterSupervisorTests(TestCase):
@@ -349,28 +375,15 @@ class APIMakeServiceTests(TestCase):
 
     def test_health_checker_no_zookeeper(self):
         """
-        A health checker is constructed by default with the store
+        A health checker is constructed by default with the store and kazoo health check
         """
         self.assertIsNone(self.health_checker)
         makeService(test_config)
         self.assertIsNotNone(self.health_checker)
         self.assertEqual(self.health_checker.checks['store'],
                          self.store.health_check)
-
-    @mock.patch('otter.tap.api.setup_scheduler')
-    @mock.patch('otter.tap.api.TxKazooClient')
-    def test_health_checker_zookeeper(self, *args):
-        """
-        A health checker is constructed by default with the store and an
-        invalid scheduler service
-        """
-        config = test_config.copy()
-        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
-        self.assertIsNone(self.health_checker)
-        makeService(config)
-        self.assertIsNotNone(self.health_checker)
-        self.assertEqual(self.health_checker.checks['scheduler'](),
-                         (False, {'reason': 'scheduler not ready yet'}))
+        self.assertEqual(self.health_checker.checks['kazoo'],
+                         self.store.kazoo_health_check)
 
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_supervisor_service_set_by_default(self, supervisor):
@@ -417,8 +430,9 @@ class APIMakeServiceTests(TestCase):
         start_d.callback(None)
         mock_setup_scheduler.assert_called_once_with(parent, self.store, kz_client)
         self.assertEqual(self.store.kz_client, kz_client)
-        self.assertEqual(self.health_checker.checks['scheduler'],
-                         mock_setup_scheduler.return_value.health_check)
+        sch = mock_setup_scheduler.return_value
+        self.assertEqual(self.health_checker.checks['scheduler'], sch.health_check)
+        self.assertEqual(self.Otter.return_value.scheduler, sch)
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')

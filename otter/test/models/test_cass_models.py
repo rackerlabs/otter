@@ -21,7 +21,8 @@ from otter.models.cass import (
     get_consistency_level,
     verified_view,
     _assemble_webhook_from_row,
-    assemble_webhooks_in_policies)
+    assemble_webhooks_in_policies,
+    WeakLocks)
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
@@ -35,7 +36,7 @@ from otter.test.models.test_interface import (
     IScalingScheduleCollectionProviderMixin)
 
 from otter.test.utils import patch, matches
-from testtools.matchers import IsInstance, ContainsDict, Equals
+from testtools.matchers import IsInstance
 from otter.util.timestamp import from_timestamp
 from otter.util.config import set_config_data
 
@@ -302,6 +303,36 @@ class VerifiedViewTests(TestCase):
         self.assertFalse(self.log.msg.called)
 
 
+class WeakLocksTests(TestCase):
+    """
+    Tests for `WeakLocks`
+    """
+
+    def setUp(self):
+        """
+        Sample `WeakLocks` object
+        """
+        self.locks = WeakLocks()
+
+    def test_returns_deferlock(self):
+        """
+        `get_lock` returns a `DeferredLock`
+        """
+        self.assertIsInstance(self.locks.get_lock('a'), defer.DeferredLock)
+
+    def test_same_lock(self):
+        """
+        `get_lock` on same uuid returns same `DeferredLock`
+        """
+        self.assertIs(self.locks.get_lock('a'), self.locks.get_lock('a'))
+
+    def test_diff_lock(self):
+        """
+        `get_lock` on different uuid returns different `DeferredLock`
+        """
+        self.assertIsNot(self.locks.get_lock('a'), self.locks.get_lock('b'))
+
+
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     """
     Tests for :class:`MockScalingGroup`
@@ -349,10 +380,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.kz_lock.Lock.return_value = self.lock
 
         self.clock = Clock()
+        locks = WeakLocks()
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
                                       self.connection, itertools.cycle(range(2, 10)),
-                                      self.kz_lock, self.clock)
+                                      self.kz_lock, self.clock, locks)
+        self.assertIs(self.group.local_locks, locks)
         self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
                                                    tenant_id=self.tenant_id,
                                                    scaling_group_id=self.group_id)
@@ -550,6 +583,44 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
+
+    def test_modify_state_local_lock_before_kz_lock(self):
+        """
+        ``modify_state`` first acquires local lock then acquires kz lock
+        """
+        def modifier(group, state):
+            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None,
+                              {}, True, desired=5)
+
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+        # setup local lock
+        llock = defer.DeferredLock()
+        self.group.local_locks = mock.Mock(get_lock=mock.Mock(return_value=llock))
+
+        # setup local and kz lock acquire and release returns
+        local_acquire_d = defer.Deferred()
+        llock.acquire = mock.Mock(return_value=local_acquire_d)
+        llock.release = mock.Mock(return_value=defer.succeed(None))
+        release_d = defer.Deferred()
+        self.lock.release.side_effect = lambda: release_d
+
+        d = self.group.modify_state(modifier)
+
+        self.assertNoResult(d)
+        # local lock was tried, but kz lock was not
+        llock.acquire.assert_called_once_with()
+        self.assertFalse(self.lock._acquire.called)
+        # After local lock acquired, kz lock is acquired
+        local_acquire_d.callback(None)
+        self.lock._acquire.assert_called_once_with(timeout=120)
+        # first kz lock is released
+        self.lock.release.assert_called_once_with()
+        self.assertFalse(llock.release.called)
+        # then local lock is relased
+        release_d.callback(None)
+        llock.release.assert_called_once_with()
+
+        self.assertEqual(self.successResultOf(d), None)
 
     @mock.patch('otter.models.cass.serialize_json_data',
                 side_effect=lambda *args: _S(args[0]))
@@ -2279,6 +2350,15 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
                                  side_effect=lambda *args: _S(args[0]))
 
+    @mock.patch('otter.models.cass.WeakLocks', return_value=2)
+    def test_locks(self, mock_wl):
+        """
+        `CassScalingGroupCollection` keeps new WeakLocks object
+        """
+        collection = CassScalingGroupCollection(self.connection, self.clock)
+        mock_wl.assert_called_once_with()
+        self.assertEqual(collection.local_locks, 2)
+
     def test_create(self):
         """
         Test that you can create a group, and if successful the group ID is
@@ -2661,6 +2741,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(g, CassScalingGroup))
         self.assertEqual(g.uuid, '12345678')
         self.assertEqual(g.tenant_id, '123')
+        self.assertIs(g.local_locks, self.collection.local_locks)
 
     def test_webhook_hash_from_table(self):
         """
@@ -2788,9 +2869,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
 
 class CassScalingGroupsCollectionHealthCheckTestCase(
-        IScalingGroupCollectionProviderMixin, TestCase):
+        IScalingGroupCollectionProviderMixin, LockMixin, TestCase):
     """
-    Tests for :class:`CassScalingGroupCollection`
+    Tests for `health_check` and `kazoo_health_check` in
+    :class:`CassScalingGroupCollection`
     """
 
     def setUp(self):
@@ -2801,57 +2883,66 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.collection = CassScalingGroupCollection(self.connection, self.clock)
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
+        self.lock = self.mock_lock()
+        self.collection.kz_client.Lock.return_value = self.lock
 
-    def test_health_check_no_zookeeper(self):
+    def test_kazoo_no_zookeeper(self):
         """
-        Health check fails if there is no zookeeper client
+        Kazoo health check fails if there is no zookeeper client
         """
         self.collection.kz_client = None
-        d = self.collection.health_check()
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'zookeeper': Equals(False),
-                 'zookeeper_state': Equals('Not connected yet')}))))
+        d = self.collection.kazoo_health_check()
+        self.assertEqual(d, (False, {'reason': 'No client yet'}))
 
-    def test_health_check_zookeeper_not_connected(self):
+    def test_kazoo_zookeeper_not_connected(self):
         """
-        Health check fails if there is no zookeeper client
+        Kazoo health check fails if there is no zookeeper client
         """
-        self.collection.kz_client = mock.MagicMock(connected=False)
-        d = self.collection.health_check()
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'zookeeper': Equals(False),
-                 'zookeeper_state': Equals('Not connected yet')}))))
+        self.collection.kz_client.connected = False
+        d = self.collection.kazoo_health_check()
+        self.assertEqual(d, (False, {'reason': 'Not connected yet'}))
 
-    def test_health_check_zookeeper_connected(self):
+    def test_kazoo_zookeeper_suspended(self):
         """
-        Health check for zookeeper succeeds if the zookeeper client state is
-        CONNECTED
+        Kazoo Health check fails if the zookeeper client state is not CONNECTED
         """
-        self.collection.kz_client = mock.MagicMock(connected=True,
-                                                   state=KazooState.CONNECTED)
-        d = self.collection.health_check()
-        self.assertEqual(
-            self.successResultOf(d),
-            (True, matches(ContainsDict(
-                {'zookeeper': Equals(True),
-                 'zookeeper_state': Equals('CONNECTED')}))))
+        self.collection.kz_client.state = KazooState.SUSPENDED
+        d = self.collection.kazoo_health_check()
+        self.assertEqual(d, (False, {'zookeeper_state': KazooState.SUSPENDED}))
 
-    def test_health_check_zookeeper_suspended(self):
+    @mock.patch('otter.models.cass.uuid')
+    def test_zookeeper_lock_acquired(self, mock_uuid):
         """
-        Health check fails if the zookeeper client state is not CONNECTED
+        Acquires sample lock and succeeds if it is able to acquire. Deletes the lock
+        path before returning
         """
-        self.collection.kz_client = mock.MagicMock(connected=True,
-                                                   state=KazooState.SUSPENDED)
-        d = self.collection.health_check()
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'zookeeper': Equals(False),
-                 'zookeeper_state': Equals('SUSPENDED')}))))
+        self.collection.kz_client.delete.return_value = defer.succeed(None)
+        mock_uuid.uuid1.return_value = 'uuid1'
+
+        d = self.collection.kazoo_health_check()
+
+        self.assertEqual(self.successResultOf(d), (True, {'total_time': 0}))
+        self.collection.kz_client.Lock.assert_called_once_with('/locks/test_uuid1')
+        self.lock._acquire.assert_called_once_with(timeout=5)
+        self.lock.release.assert_called_once_with()
+        self.collection.kz_client.delete.assert_called_once_with(
+            '/locks/test_uuid1', recursive=True)
+
+    @mock.patch('otter.models.cass.uuid')
+    def test_zookeeper_lock_failed(self, mock_uuid):
+        """
+        Acquires sample lock and fails if it is not able to acquire.
+        """
+        self.lock._acquire.side_effect = lambda timeout: defer.fail(ValueError('e'))
+        mock_uuid.uuid1.return_value = 'uuid1'
+
+        d = self.collection.kazoo_health_check()
+
+        self.failureResultOf(d, ValueError)
+        self.collection.kz_client.Lock.assert_called_once_with('/locks/test_uuid1')
+        self.lock._acquire.assert_called_once_with(timeout=5)
+        self.assertFalse(self.lock.release.called)
+        self.assertFalse(self.collection.kz_client.delete.called)
 
     def test_health_check_cassandra_fails(self):
         """
@@ -2859,31 +2950,8 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.connection.execute.return_value = defer.fail(Exception('boo'))
         d = self.collection.health_check()
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'cassandra': Equals(False),
-                 'cassandra_failure': Equals("Exception('boo',)"),
-                 'cassandra_time': Equals(0)}))))
-
-    def test_health_check_cassandra_times_out(self):
-        """
-        Health check for cassandra fails if cassandra check times out
-        """
-        self.connection.execute.return_value = defer.Deferred()
-        d = self.collection.health_check()
-        self.assertNoResult(d)
-
-        self.clock.advance(15)
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'cassandra': Equals(False),
-                 'cassandra_failure': Equals("TimedOutError('cassandra health check "
-                                             "timed out after 15 seconds.',)"),
-                 'cassandra_time': Equals(15)}))))
-        # to make sure the deferred doesn't get GCed without being called
-        self.connection.execute.return_value.callback(None)
+        f = self.failureResultOf(d, Exception)
+        self.assertEqual(f.value.args, ('boo',))
 
     def test_health_check_cassandra_succeeds(self):
         """
@@ -2892,16 +2960,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
-            (True, matches(ContainsDict(
-                {'cassandra': Equals(True),
-                 'cassandra_time': Equals(0)}))))
-
-    def test_health_check_succeeds_if_both_succeed(self):
-        """
-        If both zookeeper and cassandra are healthy, the store is healthy
-        """
-        d = self.collection.health_check()
-        self.assertEqual(self.successResultOf(d), (True, mock.ANY))
+            (True, {'cassandra_time': 0}))
 
 
 class CassAdminTestCase(TestCase):
