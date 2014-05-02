@@ -193,6 +193,13 @@ class SupervisorService(object, Service):
         super(SupervisorService, self).stopService()
         return self.deferred_pool.notify_when_empty()
 
+    def health_check(self):
+        """
+        Check if supervisor is healthy. In this case, just return number of jobs
+        currently running.
+        """
+        return True, {'jobs': len(self.deferred_pool)}
+
 
 _supervisor = None
 
