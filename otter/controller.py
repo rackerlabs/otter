@@ -131,7 +131,7 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
     This is done by dispatching to the appropriate orchestration backend for
     the scaling group; currently only direct nova interaction is supported.
 
-    :param log: A twiggy bound log for logging
+    :param log: A bound log for logging
     :param str transaction_id: the transaction id
     :param dict config: the scaling group config
     :param otter.models.interface.IScalingGroup scaling_group: the scaling
