@@ -74,7 +74,8 @@ _cql_insert_policy = (
     'VALUES (:tenantId, :groupId, :{name}policyId, :{name}data, :{name}version)')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
                            '"policyTouched", paused, desired) VALUES(:tenantId, :groupId, :active, '
-                           ':pending, :groupTouched, :policyTouched, :paused, :desired)')
+                           ':pending, :groupTouched, :policyTouched, :paused, :desired) '
+                           'USING TIMESTAMP {ts}')
 _cql_view_group_state = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
                          '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
                          '"tenantId" = :tenantId AND "groupId" = :groupId;')
@@ -476,6 +477,13 @@ class WeakLocks(object):
         return lock
 
 
+def get_client_ts():
+    """
+    Return EPOCH as int
+    """
+    return int(time.time() * 1000)
+
+
 @implementer(IScalingGroup)
 class CassScalingGroup(object):
     """
@@ -529,6 +537,11 @@ class CassScalingGroup(object):
         self.kz_client = kz_client
         self.reactor = reactor
         self.local_locks = local_locks
+
+        # Function used to return monotically increasing integer used while
+        # inserting state. This integer is expected to resolve conflict in
+        # CASS when CASS finds rows with different integers
+        self.using_ts = get_client_ts
 
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
@@ -644,8 +657,9 @@ class CassScalingGroup(object):
                 'groupTouched': new_state.group_touched,
                 'policyTouched': serialize_json_data(new_state.policy_touched, 1)
             }
-            return self.connection.execute(_cql_insert_group_state.format(cf=self.group_table),
-                                           params, consistency)
+            return self.connection.execute(
+                _cql_insert_group_state.format(cf=self.group_table, ts=self.using_ts()),
+                params, consistency)
 
         def _modify_state():
             d = self.view_state(consistency)
