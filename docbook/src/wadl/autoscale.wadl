@@ -6,7 +6,11 @@
 <!-- -->
 <!-- xmllint -noent autoscale.wadl -->
 <!--*******************************************************-->
-<!-- need xmlns:identity to use &commonFaults; &getFaults; &postPutFaults; in METHODS -->
+<!-- need xmlns:identity to use &commonFaults; &getFaults; &postPutFaults; &listGroupFaults; &createGroupFaults; 
+    &showGroupDetailsFaults; &deleteGroupFaults; &getGroupStateFaults; &getGroupConfigurationFaults; &updateGroupConfigurationFaults; 
+    &getLaunchConfigurationFaults; &updateLaunchConfigurationFaults; &listPoliciesFaults; &createPolicyFaults; &showPolicyDetailsFaults; 
+    &updatePolicyFaults; &deletePolicyFaults; &executePolicyFaults; &executeWebhookFaults; &listWebhookFaults; &createWebhookFaults; 
+    &createWebhookFaults; &showWebhookDetailsFaults; &updateWebhookFaults; &deleteWebhookFaults; in METHODS -->
 <!DOCTYPE application [
 <!ENTITY % common SYSTEM "../common/common.ent">
 %common;
@@ -756,7 +760,7 @@
                 </param>
             </representation>
         </request>
-        <response status="201">
+        <response status="201"><doc title="Created">The scaling group has been created.</doc>
             <param name="location" style="header" required="true"
                 type="xsd:anyURI">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
@@ -770,7 +774,7 @@
                         href="../docbkx/samples/resCreateGroup.json"/>
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &postPutFaults; </method>
+        </response> &commonFaults; &postPutFaults; &createGroupFaults; </method>
     <method id="listGroups" name="GET"
         rax:roles="observer autoscale:observer">
         <wadl:doc title="List scaling groups" xml:lang="EN"
@@ -778,7 +782,8 @@
             <para role="shortdesc">Lists the scaling groups that are
                 available for a specified tenant.</para>
         </wadl:doc>
-        <response status="200">
+        <response status="200"><doc title="OK">The request succeeded and the response 
+            contains the list of scaling groups.</doc>
             <representation mediaType="application/json">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
@@ -788,7 +793,7 @@
                         href="../docbkx/samples/resGetGroups.json"/>
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; </method>
+        </response> &commonFaults; &getFaults; &listGroupFaults; </method>
     <method id="showGroupManifest" name="GET"
         rax:roles="observer autoscale:observer">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
@@ -801,7 +806,8 @@
             <para>The details appear in the response body in JSON
                 format.</para>
         </wadl:doc>
-        <response status="200">
+        <response status="200"><doc title="OK">The request succeeded and the response 
+            contains details about the specified scaling group.</doc>
             <representation mediaType="application/json">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
@@ -812,7 +818,7 @@
                     />
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; </method>
+        </response> &commonFaults; &getFaults; &showGroupDetailsFaults; </method>
        <method id="showGroupManifestWebhook" name="GET"
                 rax:roles="observer autoscale:observer">
            <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
@@ -839,7 +845,8 @@
                            to display webhook configuration details in the results.</para></wadl:doc>
                </param>
            </request>
-           <response status="200">
+           <response status="200"><doc title="OK">The request succeeded and the response 
+               contains details about the specified scaling group, including associated webhooks.</doc>
                <representation mediaType="application/json">
                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
                        xml:lang="EN">
@@ -850,7 +857,7 @@
                        />
                    </wadl:doc>
                </representation>
-           </response> &commonFaults; &getFaults; </method>    
+           </response> &commonFaults; &getFaults; &showGroupDetailsFaults; </method>    
     <method id="deleteGroup" name="DELETE">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Delete scaling group">
@@ -867,8 +874,8 @@
                 all active servers in the group. Pending servers are
                 deleted when they build and become active.</para>
         </wadl:doc>
-        <response status="204"/> &commonFaults; &getFaults;
-        &postPutFaults; </method>
+        <response status="204"><doc title="Success But No Content">The delete scaling group request succeeded.</doc>
+        </response> &commonFaults; &deleteGroupFaults; </method>
     <method id="getGroupState" name="GET"
         rax:roles="observer autoscale:observer">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
@@ -912,7 +919,8 @@
                 The description is returned in the response body in
                 JSON format.</para>
         </wadl:doc>
-        <response status="200">
+        <response status="200"><doc title="OK">The request succeeded and the response 
+            describes the state of the specified scaling group.</doc>
             <representation mediaType="application/json">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
@@ -923,7 +931,7 @@
                     />
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; </method>
+        </response> &commonFaults; &getFaults; &getGroupStateFaults; </method>
 
     <method id="getGroupConfig" name="GET"
         rax:roles="observer autoscale:observer">
@@ -936,7 +944,8 @@
                 of entities, the global cooldown time, and other metadata. The configuration is
                 returned in the response body in JSON format.</para>
         </wadl:doc>
-        <response status="200">
+        <response status="200"><doc title="OK">The request succeeded and the response 
+            contains configuration details for the specified scaling group.</doc>
             <representation mediaType="application/json">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
@@ -947,7 +956,7 @@
                     />
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; </method>
+        </response> &commonFaults; &getFaults; &getGroupConfigurationFaults; </method>
     <method id="putGroupConfig" name="PUT">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Update scaling group configuration">
@@ -1051,8 +1060,8 @@
                 </param>
             </representation>
         </request>
-        <response status="204"/> &commonFaults; &getFaults;
-        &postPutFaults; </method>
+        <response status="204"><doc title="Success But No Content">The update group configuration request succeeded.</doc>
+        </response> &commonFaults; &postPutFaults; &updateGroupConfigurationFaults; </method>
 
     <method id="getLaunchConfig" name="GET"
         rax:roles="observer autoscale:observer">
@@ -1067,7 +1076,8 @@
             <para>The details appear in the response body in JSON
                 format.</para>
         </wadl:doc>
-        <response status="200">
+        <response status="200"><doc title="OK">The request succeeded and the response 
+            contains launch configuration details for the specified scaling group.</doc>
             <representation mediaType="application/json">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
@@ -1076,7 +1086,7 @@
                     />
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; </method>
+        </response> &commonFaults; &getFaults; &getLaunchConfigurationFaults; </method>
     <method id="putLaunchConfig" name="PUT">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Update launch configuration">
@@ -1199,7 +1209,7 @@
                         <code>server</code> or
                         <code>loadbalancer</code>. Most launch
                         configurations have both a server and a
-                        loadbalancer configured.</wadl:doc>
+                        load balancer configured.</wadl:doc>
                 </param>
                 <param style="plain" name="loadBalancers"
                     required="false" type="array"
@@ -1290,14 +1300,16 @@
                 </param>
             </representation>
         </request>
-        <response status="204"/> &commonFaults; &getFaults;
-        &postPutFaults; </method>
+        <response status="204"><doc title="Success But No Content">The update launch configuration request succeeded.</doc>
+        </response> &commonFaults; &postPutFaults; &updateLaunchConfigurationFaults; </method>
+    
+    
     <method id="pauseGroup" name="POST">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Pause group policy execution">
-            <para role="shortdesc">Pauses the execution of all scaling
+            <para role="shortdesc"  security="writerOnly">Pauses the execution of all scaling
                 policies for a specified scaling group.</para>
-            <para>IMPORTANT: This method has not been implemented in
+            <para  security="writerOnly">IMPORTANT: This method has not been implemented in
                 the Auto Scale API yet and will be implemented in a
                 future release.</para>
         </wadl:doc>
@@ -1306,14 +1318,16 @@
     <method id="resumeGroup" name="POST">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Resume group policy execution">
-            <para role="shortdesc">Resumes the execution of all
+            <para role="shortdesc"  security="writerOnly">Resumes the execution of all
                 scaling policies for a specified scaling group.</para>
-            <para>IMPORTANT: This method has not been implemented in
+            <para  security="writerOnly">IMPORTANT: This method has not been implemented in
                 the Auto Scale API yet and will be implemented in a
                 future release.</para>
         </wadl:doc>
         <response status="204"/> &commonFaults; &getFaults;
         &postPutFaults; </method>
+    
+    
     <method name="GET" id="getPolicies"
         rax:roles="observer autoscale:observer">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
@@ -1325,7 +1339,8 @@
                 descriptions are returned in the response body in JSON
                 format.</para>
         </wadl:doc>
-        <response status="200">
+        <response status="200"><doc title="OK">The request succeeded and the response 
+            contains a list of scaling policies for the specified scaling group.</doc>
             <representation mediaType="application/json">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
@@ -1333,7 +1348,7 @@
                         href="../docbkx/samples/resGetPolicies.json"/>
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; </method>
+        </response> &commonFaults; &getFaults; &listPoliciesFaults; </method>
     <method name="POST" id="createPolicies">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Create policy">
@@ -1611,7 +1626,7 @@
 
             </representation>
         </request>
-        <response status="201">
+        <response status="201"><doc title="Created">The scaling policy has been created.</doc>
             <representation mediaType="application/json">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
@@ -1625,7 +1640,7 @@
                     </xsdxt:sample>
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &postPutFaults; </method>
+        </response> &commonFaults; &postPutFaults; &createPolicyFaults; </method>
     <method name="GET" id="getPolicy"
         rax:roles="observer autoscale:observer">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
@@ -1637,7 +1652,8 @@
             <para>The details appear in the response body in JSON
                 format.</para>
         </wadl:doc>
-        <response status="200">
+        <response status="200"><doc title="OK">The request succeeded and the response 
+            contains details about the specified scaling policy.</doc>
             <representation mediaType="application/json">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
@@ -1647,10 +1663,10 @@
                         href="../docbkx/samples/resGetPolicy.json"/>
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; </method>
+        </response> &commonFaults; &getFaults; &showPolicyDetailsFaults; </method>
     <method id="putPolicy" name="PUT">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
-            title="Replace policy">
+            title="Update policy">
             <para role="shortdesc">Updates an existing scaling policy
                 for the specified tenant.</para>
             <para>To update the policy, specify the name, type,
@@ -1777,8 +1793,8 @@
             </param>
             </representation> 
         </request>
-        <response status="204"/> &commonFaults; &getFaults;
-        &postPutFaults; </method>
+        <response status="204"><doc title="Success But No Content">The update scaling policy request succeeded.</doc>
+        </response> &commonFaults; &postPutFaults; &updatePolicyFaults; </method>
     <method id="deletePolicy" name="DELETE">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Delete policy">
@@ -1787,8 +1803,8 @@
             <para>If deletion is successful, no response body is
                 returned.</para>
         </wadl:doc>
-        <response status="204"/> &commonFaults; &getFaults;
-        &postPutFaults; </method>
+        <response status="204"><doc title="Success But No Content">The delete scaling policy request succeeded.</doc>
+        </response> &commonFaults; &deletePolicyFaults; </method>
     <method id="executePolicy" name="POST">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Execute policy">
@@ -1797,8 +1813,10 @@
             <para>If the operation succeeds, a response body is
                 returned.</para>
         </wadl:doc>
-        <response status="202"/> &commonFaults; &getFaults;
-        &postPutFaults; </method>
+        <response status="202"><doc title="Accepted">The execute policy request was accepted. 
+            The actual execution may be delayed, but will be attempted if no errors are returned. 
+            Use the "GET scaling group state" method to see if the policy was executed. </doc>
+        </response> &commonFaults; &postPutFaults; &executePolicyFaults; </method>
     <method name="GET" id="getWebhooks">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="List webhooks for the policy">
@@ -1807,7 +1825,8 @@
             <para>This data is returned in the response body in JSON
                 format.</para>
         </wadl:doc>
-        <response status="200">
+        <response status="200"><doc title="OK">The request succeeded and the response 
+            contains a list of webhooks for the specified scaling policy.</doc>
             <representation mediaType="application/json">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
@@ -1817,7 +1836,7 @@
                         href="../docbkx/samples/resGetWebhooks.json"/>
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &postPutFaults; </method>
+        </response> &commonFaults; &getFaults; &listWebhookFaults; </method>
     <method id="createWebhook" name="POST">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Create webhook">
@@ -1867,7 +1886,7 @@
                 </param>
             </representation>
         </request>
-        <response status="201">
+        <response status="201"><doc title="Created">The webhook has been created.</doc>
             <representation mediaType="application/json">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
@@ -1878,7 +1897,7 @@
                     />
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &postPutFaults; </method>
+        </response> &commonFaults; &postPutFaults; &createWebhookFaults; </method>
     <method id="getWebhook" name="GET">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Show webhook details">
@@ -1887,7 +1906,8 @@
             <para>The details appear in the response body in JSON
                 format.</para>
         </wadl:doc>
-        <response status="200">
+        <response status="200"><doc title="OK">The request succeeded and the response 
+            contains details about the specified webhook.</doc>
             <representation mediaType="application/json">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
@@ -1897,7 +1917,7 @@
                         href="../docbkx/samples/resGetWebhook.json"/>
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; </method>
+        </response> &commonFaults; &getFaults; &showWebhookDetailsFaults; </method>
     <method id="putWebhook" name="PUT">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Update webhook">
@@ -1945,8 +1965,8 @@
                 </param>
             </representation>
         </request>
-        <response status="204"/> &commonFaults; &getFaults;
-        &postPutFaults; </method>
+        <response status="204"><doc title="Success But No Content">The update webhook request succeeded.</doc>
+        </response> &commonFaults; &postPutFaults; &updateWebhookFaults; </method>
     <method id="deleteWebhook" name="DELETE">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Delete webhook">
@@ -1955,13 +1975,12 @@
             <para>If deletion succeeds, no response body is
                 returned.</para>
         </wadl:doc>
-        <response status="204"/> &commonFaults; &getFaults;
-        &postPutFaults; </method>
+        <response status="204"><doc title="Success But No Content">The delete webhook request succeeded.</doc>
+        </response> &commonFaults; &deleteWebhookFaults; </method>
     <method id="anonymousExecute" name="POST">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Execute anonymous webhook">
             <para role="shortdesc">Runs an anonymous webhook.</para>
         </wadl:doc>
-        <response status="202"/> &commonFaults; &getFaults;
-        &postPutFaults; </method>
+        <response status="202"><doc title="Accepted">The execute webhook request was accepted.</doc></response> </method>
 </application>

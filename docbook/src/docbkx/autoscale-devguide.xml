@@ -67,6 +67,17 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-devguide">
             <revhistory>
                 <revision
                     xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                    <date>2014-04-15</date>
+                    <revdescription>
+                        <itemizedlist spacing="compact">
+                            <listitem>
+                                <para>Improved response code descriptions.</para>
+                            </listitem>
+                        </itemizedlist>
+                    </revdescription>
+                </revision>
+                <revision
+                    xmlns:raxm="http://docs.rackspace.com/api/metadata">
                     <date>2014-04-08</date>
                     <revdescription>
                         <itemizedlist spacing="compact">
@@ -76,8 +87,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-devguide">
                         </itemizedlist>
                     </revdescription>
                 </revision>
-                <revision
-                xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
                 <date>2014-03-26</date>
                 <revdescription>
                     <itemizedlist spacing="compact">

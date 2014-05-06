@@ -1,64 +1,585 @@
 
+     
      <!--
-         A collection of common faults, these are pretty much expected
-         in every request.
+         A collection of common faults possible with every endpoint.
      -->
      <!ENTITY commonFaults
            '
-          <response xmlns="http://wadl.dev.java.net/2009/02">
-              <doc title="Identity fault"></doc>
-              <representation mediaType="application/xml" element="identity:identityFault"/>
-              <representation mediaType="application/json"/>
-          </response>
-          <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
-              <doc title="Error">A general error occured.</doc>
-              <representation mediaType="application/xml" element="identity:badRequest"/>
-              <representation mediaType="application/json"/>
-          </response>
           <response status="401" xmlns="http://wadl.dev.java.net/2009/02">
-              <doc title="Bad Request">The format of the specified request is invalid.</doc>
+              <doc title="Unauthorized">The request requires user authentication.</doc>
               <representation mediaType="application/xml" element="identity:unauthorized"/>
               <representation mediaType="application/json"/>
           </response>
           <response status="403" xmlns="http://wadl.dev.java.net/2009/02">
-              <doc title="Forbidden"></doc>
+              <doc title="Forbidden">The server understood the request but is refusing to fulfill it; reasons should be given in the response.</doc>
               <representation mediaType="application/xml" element="identity:forbidden"/>
               <representation mediaType="application/json"/>
-          </response>
+          </response>          
           <response status="405" xmlns="http://wadl.dev.java.net/2009/02">
-               <doc title="Bad Method">The method is unavailable</doc>
+               <doc title="Invalid Method">The method used is unavailable for the endpoint.</doc>
               <representation mediaType="application/xml" element="identity:badMethod"/>
               <representation mediaType="application/json"/>
           </response>
           <response status="413" xmlns="http://wadl.dev.java.net/2009/02">
-              <doc title="Over Limit">The number of items returned is above the allowed limit.</doc>
+              <doc title="Rate Limit Error">The user has surpassed their rate limit.</doc>
               <representation mediaType="application/xml" element="identity:overLimit"/>
               <representation mediaType="application/json"/>
           </response>
+          <response status="500" xmlns="http://wadl.dev.java.net/2009/02">
+              <doc title="Internal Error">An error internal to the application has occurred, please file a bug report.</doc>
+              <representation mediaType="application/xml" element="identity:internal"/>
+              <representation mediaType="application/json"/>
+          </response>
           <response status="503" xmlns="http://wadl.dev.java.net/2009/02">
-              <doc title="Service Unavailable">The requested service is unavailable.</doc>
+              <doc title="Service Unavailable">The requested service is unavailable, please file a bug report.</doc>
               <representation mediaType="application/xml" element="identity:serviceUnavailable"/>
               <representation mediaType="application/json"/>
           </response>
            '>
+           
+           
       <!--
           Faults on GET
       -->
      <!ENTITY getFaults
            '
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid Query">The query argument is malformed.</doc>
+            <representation mediaType="application/xml" element="identity:badQuery"/>
+            <representation mediaType="application/json"/>
+        </response>
         <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
-            <doc title="File not found">Resource not found.</doc>
+            <doc title="File Not Found">Resource not found.</doc>
             <representation mediaType="application/xml" element="identity:itemNotFound"/>
             <representation mediaType="application/json"/>
         </response>
            '>
+           
       <!--
           Faults on POST/PUT
       -->
      <!ENTITY postPutFaults
            '
+          <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+              <doc title="Bad Request: Invalid Json">A syntax or parameter error. Request body was invalid Json.</doc>
+              <representation mediaType="application/xml" element="identity:badRequestInvalidJson"/>
+              <representation mediaType="application/json"/>
+          </response>
+          <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+              <doc title="Bad Request: Validation">A syntax or parameter error. Request body had valid Json 
+              but with unexpected properties or values. We will try to list the most common mistakes for each particular request. </doc>
+              <representation mediaType="application/xml" element="identity:badRequestValidation"/>
+              <representation mediaType="application/json"/>
+          </response>
         <response status="415" xmlns="http://wadl.dev.java.net/2009/02">
+            <doc title="Unsupported Media Type">The request is refused because the entity of the request is in a format not supported by the requested resource for the requested method.</doc>
             <representation mediaType="application/xml" element="identity:badMediaType"/>
             <representation mediaType="application/json"/>
         </response>
            '>
+          
+      <!-- 
+          Faults on List Scaling Groups
+      -->
+     <!ENTITY listGroupFaults
+           '
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid Query">The "limit" query argument is not a valid integer.</doc>
+            <representation mediaType="application/xml" element="identity:badQuery"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+
+      <!--
+          Faults on Create Scaling Groups
+      -->
+     <!ENTITY createGroupFaults
+           '
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid minEntities">The "minEntities" value is greater than the "maxEntities" value.</doc>
+            <representation mediaType="application/xml" element="identity:badMinEntities"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid launchConfiguration imageRef">The "imageRef" value is invalid or not active.</doc>
+            <representation mediaType="application/xml" element="identity:badLaunchConfigImageRef"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid launchConfiguration flavorRef">The "flavorRef" value is invalid.</doc>
+            <representation mediaType="application/xml" element="identity:badLaunchConfigFlavorRef"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid launchConfiguration personality encoding">The base64 encoding for the "path" argument in the "personality" parameter is invalid.</doc>
+            <representation mediaType="application/xml" element="identity:badLaunchConfigPersonalityEncoding"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid launchConfiguration personality files">The number of files in the "personality" parameter exceeds maximum limit.</doc>
+            <representation mediaType="application/xml" element="identity:badLaunchConfigPersonalityFiles"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid launchConfiguration personality files content">The content of the files in the "personality" parameter exceeds the maximum size limit allowed.</doc>
+            <representation mediaType="application/xml" element="identity:badLaunchConfigPersonalityFilesContent"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid launchConfiguration load balancer">The load balancer ID provided is invalid.</doc>
+            <representation mediaType="application/xml" element="identity:badLaunchConfigLb"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="422" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Scaling Group Over Limits">The user has reached their quota for scaling groups, currently 100.</doc>
+            <representation mediaType="application/xml" element="identity:overGroupLimit"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+           
+      <!--
+           Faults on Show Scaling Groups Details
+      -->
+     <!ENTITY showGroupDetailsFaults
+           '
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid Query Argument">The "limit" query argument value is not a valid integer.</doc>
+            <representation mediaType="application/xml" element="identity:badLimitArg"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+           
+      <!--
+            Faults on Delete Scaling Groups
+      -->
+     <!ENTITY deleteGroupFaults
+           '
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid Query Argument">The "force" query argument value is invalid. It must be "true".</doc>
+            <representation mediaType="application/xml" element="identity:badForceArg"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="403" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Forbidden: Scaling Group Not Empty">The scaling group cannot be deleted because it has servers in it. Use the "force=true" query argument to force delete the group.</doc>
+            <representation mediaType="application/xml" element="identity:groupNotEmpty"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+           
+      <!--
+            Faults on Get Scaling Group State
+      -->
+     <!ENTITY getGroupStateFaults
+           '
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+           
+      <!--
+            Faults on Show Scaling Group Configuration
+      -->
+     <!ENTITY getGroupConfigurationFaults
+           '
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+           
+      <!--
+            Faults on Update Scaling Group Configuration
+      -->
+     <!ENTITY updateGroupConfigurationFaults
+           '
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid minEntities">The minEntities value is greater than the maxEntities value.</doc>
+            <representation mediaType="application/xml" element="identity:invalidMinEntities"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+           
+      <!--
+             Faults on Show Launch Configuration
+      -->
+     <!ENTITY getLaunchConfigurationFaults
+           '
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+           
+      <!--
+               Faults on Update Launch Configuration
+      -->
+     <!ENTITY updateLaunchConfigurationFaults
+           '
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid launchConfiguration imageRef">The "imageRef" value is invalid or not active.</doc>
+            <representation mediaType="application/xml" element="identity:badLaunchConfigImageRef"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid launchConfiguration flavorRef">The "flavorRef" value is invalid.</doc>
+            <representation mediaType="application/xml" element="identity:badLaunchConfigFlavorRef"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid launchConfiguration personality encoding">The base64 encoding for the "path" argument in the "personality" parameter is invalid.</doc>
+            <representation mediaType="application/xml" element="identity:badLaunchConfigPersonalityEncoding"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid launchConfiguration personality files">The number of files in the "personality" parameter exceeds maximum limit.</doc>
+            <representation mediaType="application/xml" element="identity:badLaunchConfigPersonalityFiles"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid launchConfiguration personality files content">The content of the files in the "personality" parameter exceeds the maximum size limit allowed.</doc>
+            <representation mediaType="application/xml" element="identity:badLaunchConfigPersonalityFilesContent"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid launchConfiguration load balancer">The load balancer ID provided is invalid.</doc>
+            <representation mediaType="application/xml" element="identity:badLaunchConfigLb"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+           
+      <!--
+                Faults on List Policies
+      -->
+     <!ENTITY listPoliciesFaults
+           '
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid Query Argument">The "limit" query argument value is not a valid integer.</doc>
+            <representation mediaType="application/xml" element="identity:badLimitArg"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+           
+      <!--
+                Faults on Create Policies
+      -->
+     <!ENTITY createPolicyFaults
+           '
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid at Value">The "at" value does not correspond to "YYYY-MM-DDTHH:MM:SS.SSSS" format.</doc>
+            <representation mediaType="application/xml" element="identity:badAtValue"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid cron Expression">The "cron" value is invalid. It either contains a seconds component or is invalid cron expression.</doc>
+            <representation mediaType="application/xml" element="identity:badCronValue"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Missing args Parameter">The "args" parameter is not supplied and this is a "schedule" type policy.</doc>
+            <representation mediaType="application/xml" element="identity:missingArgsForSchedulePolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Missing Time Parameter">Neither "at" or "cron" values for the "args" parameter are supplied and this is a "schedule" type policy.</doc>
+            <representation mediaType="application/xml" element="identity:missingTimeForSchedulePolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Double Time Parameters">Both "at" and "cron" values for the "args" parameter are supplied. Only one such value is allowed.</doc>
+            <representation mediaType="application/xml" element="identity:doubleTimeArgsForSchedulePolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Missing Change Parameter">Neither "change" or "changePercent" or "desiredCapacity" values are supplied.</doc>
+            <representation mediaType="application/xml" element="identity:missingChangeParam"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Multiple Change Parameters">More than one of "change" or "changePercent" or "desiredCapacity" values are supplied. Only one such value is allowed.</doc>
+            <representation mediaType="application/xml" element="multipleChangeParams"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="422" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Policies Over Limit">The user has reached their quota for scaling policies, currently 100.</doc>
+            <representation mediaType="application/xml" element="identity:overPolicyLimit"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+                      
+      <!--
+                   Faults on Show Policy Details
+      -->
+     <!ENTITY showPolicyDetailsFaults
+           '
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Policy Not Found">The requested scaling policy was not found in the specified scaling group.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchPolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+           
+      <!--
+                      Faults on Update Policy
+      -->
+     <!ENTITY updatePolicyFaults
+           '
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid at Value">The "at" value does not correspond to "YYYY-MM-DDTHH:MM:SS.SSSS" format.</doc>
+            <representation mediaType="application/xml" element="identity:badAtValue"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid cron Expression">The "cron" value is invalid. It either contains a seconds component or is invalid cron expression.</doc>
+            <representation mediaType="application/xml" element="identity:badCronValue"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Missing args Parameter">The "args" parameter is not supplied and this is a "schedule" type policy.</doc>
+            <representation mediaType="application/xml" element="identity:missingArgsForSchedulePolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Missing Time Parameter">Neither "at" or "cron" values for the "args" parameter are supplied and this is a "schedule" type policy.</doc>
+            <representation mediaType="application/xml" element="identity:missingTimeForSchedulePolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Double Time Parameters">Both "at" and "cron" values for the "args" parameter are supplied. Only one such value is allowed.</doc>
+            <representation mediaType="application/xml" element="identity:doubleTimeArgsForSchedulePolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Missing Change Parameter">Neither "change" or "changePercent" or "desiredCapacity" values are supplied.</doc>
+            <representation mediaType="application/xml" element="identity:missingChangeParam"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Multiple Change Parameters">More than one of "change" or "changePercent" or "desiredCapacity" values are supplied. Only one such value is allowed.</doc>
+            <representation mediaType="application/xml" element="multipleChangeParams"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Policy Not Found">The requested scaling policy was not found in the specified scaling group.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchPolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+
+      <!--
+            Faults on Delete Policy
+      -->
+     <!ENTITY deletePolicyFaults
+           '
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Policy Not Found">The requested scaling policy was not found in the specified scaling group.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchPolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+            
+      <!--
+            Faults on Execute Policy
+      -->
+     <!ENTITY executePolicyFaults
+           '
+        <response status="403" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Forbidden: Null Change">The policy was not executed because applying the changes would not result in the addition or deletion of any servers.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchPolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="403" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Forbidden: Disallowed">The policy was not executed because a scaling policy or scaling group cooldown was still in effect.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Policy Not Found">The requested scaling policy was not found in the specified scalilng group.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchPolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+           
+                  
+      <!--
+                      Faults on List Webhooks
+      -->
+     <!ENTITY listWebhookFaults
+           '
+        <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Bad Request: Invalid Query Argument">Only "pagination" query arguments are valid in this request.</doc>
+            <representation mediaType="application/xml" element="identity:badQueryArg"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Policy Not Found">The requested scaling policy was not found in the specified scaling group.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchPolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>        
+           
+      <!--
+                      Faults on Create Webhook
+      -->
+     <!ENTITY createWebhookFaults
+           '           
+          <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+              <doc title="Bad Request: Invalid Json">A syntax or parameter error. The create webhook request body had invalid Json.</doc>
+              <representation mediaType="application/xml" element="identity:badRequestInvalidJson"/>
+              <representation mediaType="application/json"/>
+          </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Policy Not Found">The requested scaling policy was not found in the specified scaling group.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchPolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="422" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Webhooks Over Limit">The user has reached their quota for webhooks, currently 25.</doc>
+            <representation mediaType="application/xml" element="identity:overWebhookLimit"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+           
+      <!--
+                      Faults on Show Webhook Details
+      -->
+     <!ENTITY showWebhookDetailsFaults
+           '
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Webhook Not Found">The specified webhook was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchWebhook"/>
+            <representation mediaType="application/json"/>
+        </response> 
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Policy Not Found">The requested scaling policy was not found in the specified scaling group.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchPolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>                
+           '>   
+           
+      <!--
+                      Faults on Update Webhook
+      -->
+     <!ENTITY updateWebhookFaults
+           '            
+          <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
+              <doc title="Bad Request: Invalid Json">A syntax or parameter error. The update webhook request body was invalid Json.</doc>
+              <representation mediaType="application/xml" element="identity:badRequestInvalidJson"/>
+              <representation mediaType="application/json"/>
+          </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Policy Not Found">The requested scaling policy was not found in the specified scaling group.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchPolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>           
+                   
+      <!--
+                      Faults on Delete Webhook
+      -->
+     <!ENTITY deleteWebhookFaults
+           '           
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Webhook Not Found">The specified webhook was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchWebhook"/>
+            <representation mediaType="application/json"/>
+        </response> 
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Policy Not Found">The requested scaling policy was not found in the specified scaling group.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchPolicy"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Group Not Found">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response> 
+           '>           
+           
+      <!--
+                      Responses on Execute Anonymous Webhook
+      -->
+     <!ENTITY executeWebhookResponses
+           '
+        <response status="202" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="Accepted">The execute webhook request was accepted. </doc>
+            <representation mediaType="application/xml" element="identity:executeWebhookAccepted"/>
+            <representation mediaType="application/json"/>
+        </response> 
+           '>    
+           
+           
+           
