@@ -5,7 +5,7 @@ import json
 
 from twisted.trial.unittest import TestCase
 
-from testtools.matchers import IsInstance, ContainsDict
+from testtools.matchers import IsInstance
 
 from otter.test.rest.request import RestAPITestMixin, request
 from otter.util.config import set_config_data

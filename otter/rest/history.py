@@ -55,11 +55,16 @@ def next_marker_by_timestamp(collection, limit, marker):
     Returns the next marker, which is the timestamp of the last item in the
     collection.
 
+    To be used in :func:`otter.util.http.get_collection_links` as the
+    ``next_marker`` callable.
+
     :param collection: the collection to be paginated
     :type collection: iterable
 
     :param limit: the limit on the collection
-    :param marker: the current marker used to obtain this collection
+    :param marker: the current marker used to obtain this collection - not used
+        in this implementation, but accepted as per the contract in
+        :func:`otter.util.http.get_collection_links`
 
     :return: the next marker that would be used to fetch the next collection,
         based on the last item's timestamp.  This assumes the collection is
