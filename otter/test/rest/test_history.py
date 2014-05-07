@@ -5,7 +5,7 @@ import json
 
 from twisted.trial.unittest import TestCase
 
-from testtools.matchers import IsInstance
+from testtools.matchers import IsInstance, ContainsDict
 
 from otter.test.rest.request import RestAPITestMixin, request
 from otter.util.config import set_config_data
@@ -18,32 +18,47 @@ class MakeAuditLogQueryTestCase(TestCase):
     """
     Tests for ``make_auditlog_query``
     """
+    def assert_in_query(self, must_part, full_query):
+        """
+        Validates the form of the 'query' part of the query, and that
+        `must_part` is in the correct part of the full query.
+        """
+        self.assertEqual(full_query['query'],
+            {'filtered': {'filter': {'bool': {
+                'must': matches(IsInstance(list))
+            }}}}
+        )
+        self.assertIn(must_part,
+                      full_query["query"]["filtered"]["filter"]["bool"]["must"])
+
+
     def test_filters_by_tenant_id(self):
         """
         The filtered query includes the tenant id
         """
-        results = make_auditlog_query("MY_TENANT_ID   ", "region", 0, 1)
-        self.assertIn('"tenant_id": "MY_TENANT_ID"', json.dumps(results))
+        results = make_auditlog_query("MY_TENANT_ID   ", "region", 1)
+        self.assert_in_query({'term': {'tenant_id': "MY_TENANT_ID"}}, results)
 
     def test_filters_by_region(self):
         """
         The filtered query includes the normalized region
         """
-        results = make_auditlog_query("MY_TENANT_ID", "dFW", 0, 1)
-        self.assertIn('"tags": "dfw"', json.dumps(results))
+        results = make_auditlog_query("MY_TENANT_ID", "dFW", 1)
+        self.assert_in_query({"term": {"tags": "dfw"}}, results)
 
     def test_limits_size_of_results(self):
         """
         The filtered query sets 'size' as the limit passed to it
         """
         results = make_auditlog_query("MY_TENANT_ID", "dFW", limit=100)
-        self.assertEqual(results['size'], 100)
+        self.assertEquals(results['size'], 100)
 
     def test_sets_range_query_to_last_30_days_if_no_marker(self):
         """
         If no marker is provided, the default range is 30 days ago until now
         """
-        expected = {
+        results = make_auditlog_query("MY_TENANT_ID", "dFW", 1)
+        range_query = {
             "range": {
                 "@timestamp": {
                     "from": "now-30d",
@@ -51,14 +66,15 @@ class MakeAuditLogQueryTestCase(TestCase):
                 }
             }
         }
-        results = make_auditlog_query("MY_TENANT_ID", "dFW", limit=500)
-        self.assertIn(json.dumps(expected), json.dumps(results))
+        self.assert_in_query(range_query, results)
 
     def test_sets_range_query_to_be_until_marker(self):
         """
         If marker is is provided, date range is 30 days ago until the marker
         """
-        expected = {
+        results = make_auditlog_query("MY_TENANT_ID", "dFW", 1,
+                                      marker="new_date")
+        range_query = {
             "range": {
                 "@timestamp": {
                     "from": "now-30d",
@@ -66,16 +82,14 @@ class MakeAuditLogQueryTestCase(TestCase):
                 }
             }
         }
-        results = make_auditlog_query("MY_TENANT_ID", "dFW",
-                                      limit=500, marker="new_date")
-        self.assertIn(json.dumps(expected), json.dumps(results))
+        self.assert_in_query(range_query, results)
 
     def test_queries_in_reverse_chronological_order(self):
         """
         The filtered query sorts by reverse chronological order
         """
-        results = make_auditlog_query("MY_TENANT_ID", "dFW", 5, 100)
-        self.assertEqual(results['sort'], [{"@timestamp": {"order": "desc"}}])
+        results = make_auditlog_query("MY_TENANT_ID", "dFW", 1)
+        self.assertEquals(results["sort"], [{"@timestamp": {'order': 'desc'}}])
 
 
 class NextMarkerByTimestampTestCase(TestCase):
