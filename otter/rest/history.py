@@ -52,11 +52,14 @@ def make_auditlog_query(tenant_id, region, limit, marker=None):
 
 def next_marker_by_timestamp(collection, limit, marker):
     """
-    Returns the next marker that is just last item in the collection's timestamp
+    Returns the next marker, which is the timestamp of the last item in the
+    collection.
 
-    :param collection: an iterable containing the collection to be paginated
+    :param collection: the collection to be paginated
+    :type collection: iterable
+
     :param limit: the limit on the collection
-    :marker: the current marker used to obtain this collection
+    :param marker: the current marker used to obtain this collection
 
     :return: the next marker that would be used to fetch the next collection,
         based on the last item's timestamp.  This assumes the collection is

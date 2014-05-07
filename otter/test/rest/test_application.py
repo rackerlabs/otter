@@ -328,6 +328,7 @@ class CollectionLinksTests(TestCase):
     def test_ignore_url_limit_query_params(self):
         """
         If the limit parameter is provided, it will override the marker params
+        in the url
         """
         links = get_collection_links(self.coll, 'url?limit=100&marker=1', 'self',
                                      limit=20)
