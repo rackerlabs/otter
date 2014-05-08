@@ -4,6 +4,7 @@ Tests for `otter.rest.history`
 import json
 
 from twisted.trial.unittest import SynchronousTestCase
+from twisted.internet.defer import succeed
 
 from testtools.matchers import IsInstance
 
@@ -194,11 +195,11 @@ class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
 
         self.make_auditlog_query.assert_called_once_with('101010', None, limit=20)
 
-    def test_history_with_pagination(self):
+    def test_history_with_one_page_pagination(self):
         """
         The history api endpoint returns the items from the audit log, and
-        paginates them if there are more than the limit with the marker being
-        the last timestamp
+        paginates them if there are ``limit`` items in the collection, with the
+        marker being the last timestamp
         """
         expected = {
             'events': [{
@@ -210,14 +211,14 @@ class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
                 'message': 'audit log event',
             }],
             'events_links': [
-                {'href': 'http://localhost/v1.0/101010/history?limit=1&marker=10',
+                {'href': 'http://localhost/v1.0/101010/history?limit=1',
                  'rel': 'self'},
                 {'href': 'http://localhost/v1.0/101010/history?limit=1&marker=1234567890',
                  'rel': 'next'}]
         }
 
         result = self.successResultOf(
-            request(self.root, "GET", self.endpoint + "?limit=1&marker=10"))
+            request(self.root, "GET", self.endpoint + "?limit=1"))
 
         self.assertEqual(200, result.response.code)
         self.assertEqual(expected, json.loads(result.content))
@@ -227,4 +228,68 @@ class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
             log=matches(IsInstance(self.log.__class__)))
         self.assertTrue(self.treq.json_content.called)
 
-        self.make_auditlog_query.assert_called_once_with('101010', None, marker='10', limit=1)
+        self.make_auditlog_query.assert_called_once_with('101010', None, limit=1)
+
+    def test_history_with_one_multi_page_pagination(self):
+        """
+        The history api endpoint returns the items from the audit log, and
+        paginates them if there are more than ``limit`` items in the collection,
+        with the marker being the timestamp of the ``limit-1``th item.
+        """
+        self.treq.json_content.return_value = succeed({
+            'hits': {
+                'hits': [
+                    {
+                        '_source': {
+                            'message': 'audit log event',
+                            'event_type': 'event-abc',
+                            '@timestamp': 1234567890,
+                            'policy_id': 'policy-xyz',
+                            'scaling_group_id': 'scaling-group-uvw',
+                            'server_id': 'server-rst',
+                            'throwaway_key': 'ignore me!!!!'
+                        }
+                    },
+                    {
+                        '_source': {
+                            'message': 'audit log event 2',
+                            'event_type': 'event-def',
+                            '@timestamp': 1234567891,
+                            'policy_id': 'policy-xyz',
+                            'scaling_group_id': 'scaling-group-uvw',
+                            'server_id': 'server-rst',
+                            'throwaway_key': 'ignore me!!!!'
+                        }
+                    }
+                ]
+            }
+        })
+
+        expected = {
+            'events': [{
+                'event_type': 'event-abc',
+                'timestamp': 1234567890,
+                'policy_id': 'policy-xyz',
+                'scaling_group_id': 'scaling-group-uvw',
+                'server_id': 'server-rst',
+                'message': 'audit log event',
+            }],
+            'events_links': [
+                {'href': 'http://localhost/v1.0/101010/history?limit=1',
+                 'rel': 'self'},
+                {'href': 'http://localhost/v1.0/101010/history?limit=1&marker=1234567890',
+                 'rel': 'next'}]
+        }
+
+        result = self.successResultOf(
+            request(self.root, "GET", self.endpoint + "?limit=1"))
+
+        self.assertEqual(200, result.response.code)
+        self.assertEqual(expected, json.loads(result.content))
+
+        self.treq.get.assert_called_once_with(
+            'http://dummy/_search', data='{"tenant_id": 101010}',
+            log=matches(IsInstance(self.log.__class__)))
+        self.assertTrue(self.treq.json_content.called)
+
+        self.make_auditlog_query.assert_called_once_with('101010', None, limit=1)
