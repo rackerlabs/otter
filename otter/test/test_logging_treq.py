@@ -7,14 +7,14 @@ import treq
 from twisted.internet.defer import Deferred
 from twisted.internet.task import Clock
 from twisted.python.failure import Failure
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util import logging_treq
 from otter.util.deferredutils import TimedOutError
 from otter.test.utils import CheckFailure, DummyException, mock_log, patch
 
 
-class LoggingTreqTest(TestCase):
+class LoggingTreqTest(SynchronousTestCase):
     """
     Test to make sure all treq methods are supported and all requests are
     logged.

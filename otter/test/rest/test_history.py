@@ -3,12 +3,12 @@ Tests for `otter.rest.history`
 """
 import json
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.rest.request import RestAPITestMixin, request
 
 
-class OtterHistoryTestCase(RestAPITestMixin, TestCase):
+class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/history``
     """

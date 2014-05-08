@@ -6,7 +6,7 @@ import mock
 from testtools.matchers import ContainsDict, Equals, IsInstance
 
 from twisted.python.failure import Failure
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed, fail, Deferred, maybeDeferred
 from twisted.internet.task import Cooperator
 
@@ -21,7 +21,7 @@ from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
 
 
-class SupervisorTests(TestCase):
+class SupervisorTests(SynchronousTestCase):
     """
     Common stuff for tests in SupervisorService
     """
@@ -368,7 +368,7 @@ class ValidateLaunchConfigTests(SupervisorTests):
                                   mock.call('Validating launch server config')])
 
 
-class FindPendingJobsToCancelTests(TestCase):
+class FindPendingJobsToCancelTests(SynchronousTestCase):
     """
     Tests for :func:`otter.supervisor.find_pending_jobs_to_cancel`
     """
@@ -409,7 +409,7 @@ class FindPendingJobsToCancelTests(TestCase):
             ['1', '2', '3', '4', '5'])
 
 
-class FindServersToEvictTests(TestCase):
+class FindServersToEvictTests(SynchronousTestCase):
     """
     Tests for :func:`otter.supervisor.find_servers_to_evict`
     """
@@ -452,7 +452,7 @@ class FindServersToEvictTests(TestCase):
             sorted(self.data.values()))
 
 
-class DeleteActiveServersTests(TestCase):
+class DeleteActiveServersTests(SynchronousTestCase):
     """
     Tests for :func:`otter.supervisor.delete_active_servers`
     """
@@ -515,7 +515,7 @@ class DeleteActiveServersTests(TestCase):
         self.assertTrue(all([job.start.called for job in self.jobs]))
 
 
-class DeleteJobTests(TestCase):
+class DeleteJobTests(SynchronousTestCase):
     """
     Tests for :class:`supervisor._DeleteJob`
     """
@@ -563,7 +563,7 @@ class DeleteJobTests(TestCase):
                                              'Server deletion job failed')
 
 
-class ExecScaleDownTests(TestCase):
+class ExecScaleDownTests(SynchronousTestCase):
     """
     Tests for :func:`otter.supervisor.exec_scale_down`
     """
@@ -625,7 +625,7 @@ class ExecScaleDownTests(TestCase):
         self.assertFalse(self.del_active_servers.called)
 
 
-class ExecuteLaunchConfigTestCase(TestCase):
+class ExecuteLaunchConfigTestCase(SynchronousTestCase):
     """
     Tests for :func:`otter.supervisor.execute_launch_config`
     """
@@ -825,7 +825,7 @@ class DummyException(Exception):
     """
 
 
-class PrivateJobHelperTestCase(TestCase):
+class PrivateJobHelperTestCase(SynchronousTestCase):
     """
     Tests for the private helper class `_Job`
     """

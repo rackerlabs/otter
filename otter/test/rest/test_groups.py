@@ -9,7 +9,7 @@ from copy import deepcopy
 import mock
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.json_schema.group_examples import (
     launch_server_config as launch_examples,
@@ -37,7 +37,7 @@ from otter.worker.validate_config import InvalidLaunchConfiguration
 from otter.util.config import set_config_data
 
 
-class FormatterHelpers(TestCase):
+class FormatterHelpers(SynchronousTestCase):
     """
     Tests for formatting helpers in :mod:`otter.rest.groups`
     """
@@ -85,7 +85,7 @@ class FormatterHelpers(TestCase):
         })
 
 
-class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
+class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/`` endpoints (create, list)
     """
@@ -493,7 +493,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(AssertionError)
 
 
-class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
+class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/`` endpoints (create, list) with Bobby
 
@@ -568,7 +568,7 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
         create_group.assert_called_once_with('11111', '1')
 
 
-class OneGroupTestCase(RestAPITestMixin, TestCase):
+class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/`` endpoints (view manifest,
     view state, delete)
@@ -845,7 +845,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(GroupNotEmptyError)
 
 
-class GroupStateTestCase(RestAPITestMixin, TestCase):
+class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/state/`` endpoint
     """
@@ -907,7 +907,7 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
         mock_format.assert_called_once_with('group_state')
 
 
-class GroupPauseTestCase(RestAPITestMixin, TestCase):
+class GroupPauseTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/pause/`` endpoint
     """
@@ -934,7 +934,7 @@ class GroupPauseTestCase(RestAPITestMixin, TestCase):
         self.assert_status_code(501, method="POST")
 
 
-class GroupResumeTestCase(RestAPITestMixin, TestCase):
+class GroupResumeTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/resume/`` endpoint
     """

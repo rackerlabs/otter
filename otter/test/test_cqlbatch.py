@@ -1,5 +1,5 @@
 """ CQL Batch wrapper test """
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from otter.util.cqlbatch import Batch
 import mock
 from twisted.internet import defer
@@ -7,7 +7,7 @@ from twisted.internet import defer
 from silverberg.client import ConsistencyLevel
 
 
-class CqlBatchTestCase(TestCase):
+class CqlBatchTestCase(SynchronousTestCase):
     """
     CQL Batch wrapper test case
     """
