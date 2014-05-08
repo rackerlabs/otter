@@ -102,7 +102,7 @@ class NextMarkerByTimestampTestCase(SynchronousTestCase):
         collection's timestamp
         """
         next_marker = next_marker_by_timestamp(
-            [{'timestamp': 1, 'timestamp': 2}], 'ignore me', 'ignore me')
+            [{'timestamp': 1}, {'timestamp': 2}], 'ignore me', 'ignore me')
         self.assertEqual(next_marker, 2)
 
 
