@@ -5,14 +5,14 @@ import mock
 
 from twisted.internet.task import Clock
 from twisted.internet.defer import CancelledError, Deferred
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.deferredutils import (
     timeout_deferred, retry_and_timeout, TimedOutError, DeferredPool)
 from otter.test.utils import DummyException, patch
 
 
-class TimeoutDeferredTests(TestCase):
+class TimeoutDeferredTests(SynchronousTestCase):
     """
     Tests for the method method ``timeout_deferred``
     """
@@ -124,7 +124,7 @@ class TimeoutDeferredTests(TestCase):
         self.assertIn("It'sa ME! timed out after 5.3 seconds", str(f))
 
 
-class RetryAndTimeoutTests(TestCase):
+class RetryAndTimeoutTests(SynchronousTestCase):
     """
     Tests for ``retry_and_timeout``.  Since this is just a composition of two
     already tested functions, just ensure that the arguments passed
@@ -167,7 +167,7 @@ class RetryAndTimeoutTests(TestCase):
         self.assertIs(retry_clock, timeout_clock)
 
 
-class DeferredPoolTests(TestCase):
+class DeferredPoolTests(SynchronousTestCase):
     """
     Tests for :class:`DeferredPool`
     """
@@ -264,3 +264,14 @@ class DeferredPoolTests(TestCase):
         self.pool.add(holdup)
         holdup.errback(DummyException('hey'))
         self.failureResultOf(holdup, DummyException)
+
+    def test_len(self):
+        """
+        len(pool) returns number of deferreds waiting in the pool
+        """
+        self.assertEqual(len(self.pool), 0)
+        d = Deferred()
+        self.pool.add(d)
+        self.assertEqual(len(self.pool), 1)
+        d.callback(None)
+        self.assertEqual(len(self.pool), 0)

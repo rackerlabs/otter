@@ -83,6 +83,9 @@ class SchedulerService(TimerService):
 
         :return: Deferred that fires with tuple (Bool, `dict` of extra debug info)
         """
+        if not self.running:
+            return defer.succeed((False, {'reason': 'Not running'}))
+
         if not self.kz_partition.acquired:
             # TODO: Until there is check added for not being allocted for long time
             # it is fine to assume service is not healthy when it is allocating since

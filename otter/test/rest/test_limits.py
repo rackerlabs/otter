@@ -4,13 +4,13 @@ group limits
 """
 
 import json
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.rest.request import RestAPITestMixin, request
 from otter.util.config import set_config_data
 
 
-class OtterLimitsTestCase(RestAPITestMixin, TestCase):
+class OtterLimitsTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/limits``
     """

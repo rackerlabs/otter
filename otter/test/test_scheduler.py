@@ -2,7 +2,7 @@
 Tests for :mod:`otter.scheduler`
 """
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet import defer
 from twisted.internet.task import Clock
 
@@ -18,7 +18,7 @@ from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 from otter.controller import CannotExecutePolicyError
 
 
-class SchedulerTests(TestCase):
+class SchedulerTests(SynchronousTestCase):
     """
     Tests for `scheduler.py`
     """
@@ -63,6 +63,10 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
             100, 1, self.mock_store, self.kz_client, self.zk_partition_path,
             self.time_boundary, self.buckets, self.clock, threshold=600)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
+
+        # TODO: Would like to not do below 2 statements but leaving TimerService
+        # as such causes check_events to be called immediately when scheduler is started.
+        self.scheduler_service.running = False
         self.timer_service = patch(self, 'otter.scheduler.TimerService')
 
         self.check_events_in_bucket = patch(self, 'otter.scheduler.check_events_in_bucket')
@@ -70,11 +74,15 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.returns = []
         self.setup_func(self.mock_store.get_oldest_event)
 
+    def _start_service(self):
+        self.scheduler_service.startService()
+        self.scheduler_service.running = True
+
     def test_start_service(self):
         """
         startService() calls super's startService() and creates SetPartitioner object
         """
-        self.scheduler_service.startService()
+        self._start_service()
         self.kz_client.SetPartitioner.assert_called_once_with(
             self.zk_partition_path, set=set(self.buckets), time_boundary=self.time_boundary)
         self.assertEqual(self.scheduler_service.kz_partition, self.kz_partition)
@@ -85,7 +93,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         stopService() calls super's stopService() and stops the allocation if it
         is already acquired
         """
-        self.scheduler_service.startService()
+        self._start_service()
         self.kz_partition.acquired = True
         d = self.scheduler_service.stopService()
         self.timer_service.stopService.assert_called_once_with(self.scheduler_service)
@@ -97,7 +105,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         `service.health_check` returns False when trigger time is above threshold
         """
         self.kz_partition.acquired = True
-        self.scheduler_service.startService()
+        self._start_service()
         self.kz_partition.__iter__.return_value = [2, 3]
         now = datetime.utcnow()
         returns = [{'trigger': now - timedelta(hours=1), 'version': 'v1'},
@@ -115,7 +123,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         `service.health_check` returns True when trigger time is below threshold
         """
         self.kz_partition.acquired = True
-        self.scheduler_service.startService()
+        self._start_service()
         self.kz_partition.__iter__.return_value = [2, 3]
         now = datetime.utcnow()
         self.returns = [{'trigger': now + timedelta(hours=1), 'version': 'v1'},
@@ -132,7 +140,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         `service.health_check` returns True when there are no triggers
         """
         self.kz_partition.acquired = True
-        self.scheduler_service.startService()
+        self._start_service()
         self.kz_partition.__iter__.return_value = [2, 3]
         self.returns = [None, None]
 
@@ -147,7 +155,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         `service.health_check` returns False when partition is not acquired
         """
         self.kz_partition.acquired = False
-        self.scheduler_service.startService()
+        self._start_service()
         self.kz_partition.__iter__.return_value = [2, 3]
 
         d = self.scheduler_service.health_check()
@@ -155,11 +163,20 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.assertEqual(self.successResultOf(d), (False, {'reason': 'Not acquired'}))
         self.assertFalse(self.mock_store.get_oldest_event.called)
 
+    def test_health_check_not_running(self):
+        """
+        `service.health_check` returns False when scheduler is stopped
+        """
+        d = self.scheduler_service.health_check()
+
+        self.assertEqual(self.successResultOf(d), (False, {'reason': 'Not running'}))
+        self.assertFalse(self.mock_store.get_oldest_event.called)
+
     def test_stop_service_allocating(self):
         """
         stopService() does not stop the allocation (i.e. call finish) if it is not acquired
         """
-        self.scheduler_service.startService()
+        self._start_service()
         d = self.scheduler_service.stopService()
         self.assertFalse(self.kz_partition.finish.called)
         self.assertIsNone(d)
@@ -188,7 +205,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         buckets are still allocating
         """
         self.kz_partition.allocating = True
-        self.scheduler_service.startService()
+        self._start_service()
         self.scheduler_service.check_events(100)
         self.log.msg.assert_called_with('Partition allocating')
 
@@ -202,7 +219,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         partitioning has changed. It calls release_set() to re-partition
         """
         self.kz_partition.release = True
-        self.scheduler_service.startService()
+        self._start_service()
         self.scheduler_service.check_events(100)
         self.log.msg.assert_called_with('Partition changed. Repartitioning')
         self.kz_partition.release_set.assert_called_once_with()
@@ -217,7 +234,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         partitioning has failed. It creates a new partition
         """
         self.kz_partition.failed = True
-        self.scheduler_service.startService()
+        self._start_service()
 
         # after starting change SetPartitioner return value to check if
         # new value is set in self.scheduler_service.kz_partition
@@ -244,7 +261,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         logs it as err and starts a new partition
         """
         self.kz_partition.state = 'bad'
-        self.scheduler_service.startService()
+        self._start_service()
 
         # after starting change SetPartitioner return value to check if
         # new value is set in self.scheduler_service.kz_partition
@@ -273,7 +290,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         `check_events` checks events in each bucket when they are partitoned.
         """
         self.kz_partition.acquired = True
-        self.scheduler_service.startService()
+        self._start_service()
         self.kz_partition.__iter__.return_value = [2, 3]
         self.scheduler_service.log = mock.Mock()
         mock_datetime.utcnow.return_value = 'utcnow'

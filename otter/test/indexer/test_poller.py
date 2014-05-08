@@ -6,7 +6,7 @@ import mock
 
 from zope.interface import implements
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from twisted.internet.defer import succeed
 from twisted.internet.task import Cooperator
@@ -54,7 +54,7 @@ def feed_response(fixture_name):
         fixture(fixture_name)))
 
 
-class FeedPollerServiceTests(TestCase):
+class FeedPollerServiceTests(SynchronousTestCase):
     """
     Tests for :class:`otter.indexer.poller.FeedPollerService`
     """

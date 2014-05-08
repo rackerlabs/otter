@@ -8,7 +8,7 @@ import mock
 
 from jsonschema import ValidationError
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet import defer
 from twisted.python.failure import Failure
 
@@ -30,7 +30,7 @@ class DetailsError(Exception):
     details = 'this is a detail'
 
 
-class TransactionIdTestCase(TestCase):
+class TransactionIdTestCase(SynchronousTestCase):
     """Test case for the transaction ID"""
     def setUp(self):
         """ Basic Setup and patch the log """
@@ -104,7 +104,7 @@ class TransactionIdTestCase(TestCase):
         self.mock_log.bind().bind.assert_called_with(arg1='a1', arg2='a2')
 
 
-class FaultTestCase(TestCase):
+class FaultTestCase(SynchronousTestCase):
     """Test case for the fault system"""
     def setUp(self):
         """ Basic Setup and patch the log """
@@ -348,7 +348,7 @@ class FaultTestCase(TestCase):
         self.flushLoggedErrors(BlahError)
 
 
-class ValidateBodyTestCase(TestCase):
+class ValidateBodyTestCase(SynchronousTestCase):
     """
     Tests for the `validate_body` decorator
     """
@@ -432,7 +432,7 @@ class ValidateBodyTestCase(TestCase):
         self.failureResultOf(FakeApp().handle_body(self.request), ValidationError)
 
 
-class LogArgumentsTestCase(TestCase):
+class LogArgumentsTestCase(SynchronousTestCase):
     """
     Tests for the `log_arguments` decorator
     """
@@ -482,7 +482,7 @@ class LogArgumentsTestCase(TestCase):
         self.mockLog.bind.assert_called_once_with(**kwargs)
 
 
-class PaginatableTestCase(TestCase):
+class PaginatableTestCase(SynchronousTestCase):
     """
     Tests for the `paginatable` decorator
     """
@@ -564,7 +564,7 @@ class PaginatableTestCase(TestCase):
                          {'marker': '1234', 'limit': 10})
 
 
-class AuditLoggerTestCase(TestCase):
+class AuditLoggerTestCase(SynchronousTestCase):
     """
     Tests for AuditLogger
     """
@@ -604,7 +604,7 @@ class AuditLoggerTestCase(TestCase):
         self.assertFalse(log_a.msg.called)
 
 
-class AuditableTestCase(TestCase):
+class AuditableTestCase(SynchronousTestCase):
     """
     Tests for auditable decorator
     """
