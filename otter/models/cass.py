@@ -104,7 +104,7 @@ _cql_insert_webhook = (
     '"webhookKey") VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
     ':{name}Capability, :{name}Key)')
 _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", {column}) '
-               'VALUES (:tenantId, :groupId, {name})')
+               'VALUES (:tenantId, :groupId, {name}) USING TIMESTAMP {ts}')
 _cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
                        'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
 _cql_delete_all_in_group = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
@@ -680,7 +680,7 @@ class CassScalingGroup(object):
 
         def _do_update_config(lastRev):
             queries = [_cql_update.format(cf=self.group_table, column='group_config',
-                                          name=":scaling")]
+                                          name=":scaling", ts=self.using_ts())]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
@@ -700,7 +700,7 @@ class CassScalingGroup(object):
 
         def _do_update_launch(lastRev):
             queries = [_cql_update.format(cf=self.group_table, column='launch_config',
-                                          name=":launch")]
+                                          name=":launch", ts=self.using_ts())]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
