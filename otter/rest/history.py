@@ -56,7 +56,9 @@ def next_marker_by_timestamp(collection, limit, marker):
     collection.
 
     To be used in :func:`otter.util.http.get_collection_links` as the
-    ``next_marker`` callable.
+    ``next_marker`` callable, which is why there are 3 parameters, one of which
+    is not used (because :func:`otter.util.http.get_collection_links` always
+    calls the callable with these 3 parameters).
 
     :param collection: the collection to be paginated
     :type collection: iterable

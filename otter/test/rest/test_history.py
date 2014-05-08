@@ -49,7 +49,8 @@ class MakeAuditLogQueryTestCase(SynchronousTestCase):
 
     def test_limits_size_of_results(self):
         """
-        The filtered query sets 'size' as the limit passed to it
+        The audit log query's ``size`` parameter is the limit passed to
+        :func:`make_audit_log_query`
         """
         results = make_auditlog_query("MY_TENANT_ID", "dFW", limit=100)
         self.assertEquals(results['size'], 100)
@@ -159,7 +160,8 @@ class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
 
     def test_history_not_implemented_if_not_configured(self):
         """
-        A 501 not implemented error is returned if there is no configured host
+        A 501 not implemented error is returned if there is no configured
+        elasticsearch host
         """
         set_config_data({
             'limits': {'pagination': 20},
