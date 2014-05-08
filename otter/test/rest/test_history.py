@@ -102,8 +102,17 @@ class NextMarkerByTimestampTestCase(SynchronousTestCase):
         collection's timestamp
         """
         next_marker = next_marker_by_timestamp(
-            [{'timestamp': 1}, {'timestamp': 2}], 'ignore me', 'ignore me')
+            [{'timestamp': 1}, {'timestamp': 2}], 2, 'ignore me')
         self.assertEqual(next_marker, 2)
+
+    def test_marker_by_timestamp_correctly_limits_collection_size(self):
+        """
+        If the collection passed to ``next_marker_by_timestamp`` is too large,
+        returns the timestamp of the limit-1'th element.
+        """
+        next_marker = next_marker_by_timestamp(
+            [{'timestamp': 1}, {'timestamp': 2}], 1, 'ignore me')
+        self.assertEqual(next_marker, 1)
 
 
 class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):

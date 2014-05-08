@@ -70,7 +70,7 @@ def next_marker_by_timestamp(collection, limit, marker):
         based on the last item's timestamp.  This assumes the collection is
         sorted by timestamp.
     """
-    return collection[-1]['timestamp']
+    return collection[:limit][-1]['timestamp']
 
 
 class OtterHistory(object):
