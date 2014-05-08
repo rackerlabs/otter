@@ -5,7 +5,7 @@ Tests for the Audit Log.
 import mock
 import uuid
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
 
 from zope.interface.verify import verifyObject
@@ -18,7 +18,7 @@ ts1 = uuid.UUID('df3376c7-d86b-11e2-b92c-1040f3e9b720')
 ts2 = uuid.UUID('49825240-de87-11e2-8651-406c8f25a009')
 
 
-class CassandraAuditLogTests(TestCase):
+class CassandraAuditLogTests(SynchronousTestCase):
     """
     Test cassandra backed audit logs.
     """

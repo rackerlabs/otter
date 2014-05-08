@@ -5,12 +5,12 @@ import json
 import mock
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.rest.request import AdminRestAPITestMixin
 
 
-class MetricsEndpointsTestCase(AdminRestAPITestMixin, TestCase):
+class MetricsEndpointsTestCase(AdminRestAPITestMixin, SynchronousTestCase):
     """
     Tests for '/metrics' endpoint, which contains metrics regarding the
     Otter system as a whole.

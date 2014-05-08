@@ -3,14 +3,14 @@
 import json
 import mock
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.http import APIError
 from otter.worker.heat_client import HeatClient
 from otter.test.utils import mock_treq, mock_log, patch
 
 
-class HeatClientTests(TestCase):
+class HeatClientTests(SynchronousTestCase):
     """Tests for HeatClient."""
 
     def _assert_bound(self, orig_log, log, **kwargs):

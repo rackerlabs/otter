@@ -2,7 +2,7 @@
 Tests for :mod:`otter.scheduler`
 """
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet import defer
 from twisted.internet.task import Clock
 
@@ -18,7 +18,7 @@ from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 from otter.controller import CannotExecutePolicyError
 
 
-class SchedulerTests(TestCase):
+class SchedulerTests(SynchronousTestCase):
     """
     Tests for `scheduler.py`
     """

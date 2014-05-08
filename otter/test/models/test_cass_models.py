@@ -8,7 +8,7 @@ from datetime import datetime
 import itertools
 from copy import deepcopy
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from jsonschema import ValidationError
 
 from otter.json_schema import group_examples
@@ -91,7 +91,7 @@ def _cassandrify_data(list_of_dicts):
     return _de_identify(list_of_dicts)
 
 
-class SerialJsonDataTestCase(TestCase):
+class SerialJsonDataTestCase(SynchronousTestCase):
     """
     Serializing json data to be put into cassandra should append a version
     """
@@ -104,7 +104,7 @@ class SerialJsonDataTestCase(TestCase):
                          json.dumps({'_ver': 'version'}))
 
 
-class GetConsistencyTests(TestCase):
+class GetConsistencyTests(SynchronousTestCase):
     """
     Tests for `get_consistency_level`
     """
@@ -151,7 +151,7 @@ class GetConsistencyTests(TestCase):
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
 
-class AssembleWebhooksTests(TestCase):
+class AssembleWebhooksTests(SynchronousTestCase):
     """
     Tests for `assemble_webhooks_in_policies`
     """
@@ -239,7 +239,7 @@ class AssembleWebhooksTests(TestCase):
         self.assertEqual(policies[9]['webhooks'], ['9w91'])
 
 
-class VerifiedViewTests(TestCase):
+class VerifiedViewTests(SynchronousTestCase):
     """
     Tests for `verified_view`
     """
@@ -303,7 +303,7 @@ class VerifiedViewTests(TestCase):
         self.assertFalse(self.log.msg.called)
 
 
-class WeakLocksTests(TestCase):
+class WeakLocksTests(SynchronousTestCase):
     """
     Tests for `WeakLocks`
     """
@@ -333,7 +333,7 @@ class WeakLocksTests(TestCase):
         self.assertIsNot(self.locks.get_lock('a'), self.locks.get_lock('b'))
 
 
-class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
+class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, SynchronousTestCase):
     """
     Tests for :class:`MockScalingGroup`
     """
@@ -2184,7 +2184,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
 
 
 class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMixin,
-                                            TestCase):
+                                            SynchronousTestCase):
     """
     Tests for :class:`CassScalingScheduleCollection`
     """
@@ -2301,7 +2301,7 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
 
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
-                                          TestCase):
+                                          SynchronousTestCase):
     """
     Tests for :class:`CassScalingGroupCollection`
     """
@@ -2866,7 +2866,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
 
 class CassScalingGroupsCollectionHealthCheckTestCase(
-        IScalingGroupCollectionProviderMixin, LockMixin, TestCase):
+        IScalingGroupCollectionProviderMixin, LockMixin, SynchronousTestCase):
     """
     Tests for `health_check` and `kazoo_health_check` in
     :class:`CassScalingGroupCollection`
@@ -2960,7 +2960,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
             (True, {'cassandra_time': 0}))
 
 
-class CassAdminTestCase(TestCase):
+class CassAdminTestCase(SynchronousTestCase):
     """
     Tests for :class:`CassAdmin`
     """

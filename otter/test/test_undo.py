@@ -4,7 +4,7 @@ Tests for undo stacks.
 
 from zope.interface.verify import verifyObject
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import Deferred
 from twisted.internet.task import Cooperator
 
@@ -12,7 +12,7 @@ from otter.undo import IUndoStack
 from otter.undo import InMemoryUndoStack
 
 
-class InMemoryUndoStackTests(TestCase):
+class InMemoryUndoStackTests(SynchronousTestCase):
     """
     Tests for the in memory undo stack.
     """

@@ -4,7 +4,7 @@ Tests for ``otter.util``
 from datetime import datetime
 import mock
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed, fail, Deferred
 from twisted.internet.task import Clock
 from twisted.python.failure import Failure
@@ -20,7 +20,7 @@ from otter.util.deferredutils import with_lock, delay
 from otter.test.utils import patch, LockMixin, mock_log, DummyException
 
 
-class HTTPUtilityTests(TestCase):
+class HTTPUtilityTests(SynchronousTestCase):
     """
     Tests for ``otter.util.http``
     """
@@ -217,7 +217,7 @@ class HTTPUtilityTests(TestCase):
                           failure, 'url')
 
 
-class CapabilityTests(TestCase):
+class CapabilityTests(SynchronousTestCase):
     """
     Test capability generation.
     """
@@ -247,7 +247,7 @@ class CapabilityTests(TestCase):
         self.assertEqual(v, "1")
 
 
-class TimestampTests(TestCase):
+class TimestampTests(SynchronousTestCase):
     """
     Test timestamp utilities
     """
@@ -306,7 +306,7 @@ class TimestampTests(TestCase):
         self.assertEqual(parsed.replace(tzinfo=None), datetime.min)
 
 
-class ConfigTest(TestCase):
+class ConfigTest(SynchronousTestCase):
     """
     Test the simple configuration API.
     """
@@ -339,7 +339,7 @@ class ConfigTest(TestCase):
         self.assertIdentical(config.config_value('baz.blah'), None)
 
 
-class WithLockTests(TestCase):
+class WithLockTests(SynchronousTestCase):
     """
     Tests for `with_lock`
     """
@@ -422,7 +422,7 @@ class WithLockTests(TestCase):
         self.failureResultOf(d, ValueError)
 
 
-class DelayTests(TestCase):
+class DelayTests(SynchronousTestCase):
     """
     Tests for `delay`
     """

@@ -4,7 +4,7 @@ Unittests for the launch_server_v1 launch config.
 import mock
 import json
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
 from twisted.python.failure import Failure
@@ -60,7 +60,7 @@ fake_service_catalog = [
 ]
 
 
-class UtilityTests(TestCase):
+class UtilityTests(SynchronousTestCase):
     """
     Tests for non-specific utilities that should be refactored out of the
     worker implementation eventually.
@@ -117,7 +117,7 @@ expected_headers = {
 error_body = '{"code": 500, "message": "Internal Server Error"}'
 
 
-class LoadBalancersTests(TestCase):
+class LoadBalancersTests(SynchronousTestCase):
     """
     Test adding to one or more load balancers.
     """
@@ -642,7 +642,7 @@ class LoadBalancersTests(TestCase):
     test_removelb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
 
 
-class ServerTests(TestCase):
+class ServerTests(SynchronousTestCase):
     """
     Test server manipulation functions.
     """
@@ -1414,7 +1414,7 @@ class ServerTests(TestCase):
         self.assertFalse(mock_addlb.called)
 
 
-class ConfigPreparationTests(TestCase):
+class ConfigPreparationTests(SynchronousTestCase):
     """
     Test config preparation.
     """
@@ -1538,7 +1538,7 @@ instance_details = (
      (54321, {'nodes': [{'id': 2}]})])
 
 
-class DeleteServerTests(TestCase):
+class DeleteServerTests(SynchronousTestCase):
     """
     Test the delete server worker.
     """

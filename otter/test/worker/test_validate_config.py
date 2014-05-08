@@ -5,7 +5,7 @@ Tests for `worker.validate_config.py`
 import mock
 import base64
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.utils import mock_log, patch, mock_treq, CheckFailure
 from otter.util.config import set_config_data
@@ -19,7 +19,7 @@ from otter.worker.validate_config import (
     InvalidFileContentSize)
 
 
-class ValidateLaunchServerConfigTests(TestCase):
+class ValidateLaunchServerConfigTests(SynchronousTestCase):
     """
     Tests for `validate_launch_server_config`
     """
@@ -144,7 +144,7 @@ class ValidateLaunchServerConfigTests(TestCase):
         self.assertFalse(self.validate_flavor.called)
 
 
-class ShortenTests(TestCase):
+class ShortenTests(SynchronousTestCase):
     """
     Tests for `worker.shorten`
     """
@@ -169,7 +169,7 @@ class ShortenTests(TestCase):
         self.assertEqual(shorten(s, len(s)), s)
 
 
-class ValidateImageTests(TestCase):
+class ValidateImageTests(SynchronousTestCase):
     """
     Tests for `validate_image`
     """
@@ -223,7 +223,7 @@ class ValidateImageTests(TestCase):
         self.failureResultOf(d)
 
 
-class ValidateFlavorTests(TestCase):
+class ValidateFlavorTests(SynchronousTestCase):
     """
     Tests for `validate_flavor`
     """
@@ -267,7 +267,7 @@ class ValidateFlavorTests(TestCase):
         self.failureResultOf(d)
 
 
-class ValidatePersonalityTests(TestCase):
+class ValidatePersonalityTests(SynchronousTestCase):
     """
     Tests for `validate_personality`
     """
@@ -357,7 +357,7 @@ class ValidatePersonalityTests(TestCase):
             'File "/etc/banner.txt" content\'s size exceeds maximum size "35"')
 
 
-class GetServiceEndpointTests(TestCase):
+class GetServiceEndpointTests(SynchronousTestCase):
     """
     Tests for `get_service_endpoint`
     """

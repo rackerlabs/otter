@@ -7,7 +7,7 @@ import mock
 from datetime import datetime
 
 from twisted.python.failure import Failure
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from testtools.matchers import Contains, ContainsDict, Equals
 
@@ -21,7 +21,7 @@ from otter.log.formatters import (
 from otter.test.utils import SameJSON, matches
 
 
-class BoundLogTests(TestCase):
+class BoundLogTests(SynchronousTestCase):
     """
     Test the BoundLog utility.
     """
@@ -55,7 +55,7 @@ class BoundLogTests(TestCase):
         self.err.assert_called_once_with(exc, system='hello')
 
 
-class AuditLoggerTests(TestCase):
+class AuditLoggerTests(SynchronousTestCase):
     """
     Test the method that binds the audit log
     """
@@ -85,7 +85,7 @@ class AuditLoggerTests(TestCase):
         self.err.assert_called_once_with(exc, audit_log=True)
 
 
-class JSONObserverWrapperTests(TestCase):
+class JSONObserverWrapperTests(SynchronousTestCase):
     """
     Test the JSON observer wrapper.
     """
@@ -156,7 +156,7 @@ class JSONObserverWrapperTests(TestCase):
             {'message': (SameJSON({'foo': str(failure)}),)})
 
 
-class StreamObserverWrapperTests(TestCase):
+class StreamObserverWrapperTests(SynchronousTestCase):
     """
     Test the StreamObserverWrapper.
     """
@@ -215,7 +215,7 @@ class StreamObserverWrapperTests(TestCase):
              mock.call('bar')])
 
 
-class SystemFilterWrapperTests(TestCase):
+class SystemFilterWrapperTests(SynchronousTestCase):
     """
     Test the SystemFilterWrapper
     """
@@ -252,7 +252,7 @@ class SystemFilterWrapperTests(TestCase):
             {'system': 'otter.rest.blah.blargh'})
 
 
-class PEP3101FormattingWrapperTests(TestCase):
+class PEP3101FormattingWrapperTests(SynchronousTestCase):
     """
     Test the PEP3101 Formatting.
     """
@@ -307,7 +307,7 @@ class PEP3101FormattingWrapperTests(TestCase):
         })
 
 
-class ObserverWrapperTests(TestCase):
+class ObserverWrapperTests(SynchronousTestCase):
     """
     Test the ObserverWrapper.
     """
@@ -430,7 +430,7 @@ class ObserverWrapperTests(TestCase):
         ])
 
 
-class AuditLogFormatterTests(TestCase):
+class AuditLogFormatterTests(SynchronousTestCase):
     """
     Tests the audit log formatter
     """

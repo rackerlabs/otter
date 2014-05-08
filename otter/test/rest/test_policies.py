@@ -10,7 +10,7 @@ from jsonschema import ValidationError
 import mock
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.controller import CannotExecutePolicyError
 from otter.json_schema.group_examples import policy as policy_examples
@@ -25,7 +25,7 @@ from otter.rest.bobby import set_bobby
 from otter.bobby import BobbyClient
 
 
-class AllPoliciesTestCase(RestAPITestMixin, TestCase):
+class AllPoliciesTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{group_id}/policies`` endpoints (create, list)
     """
@@ -263,7 +263,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             system=mock.ANY)
 
 
-class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
+class AllBobbyPoliciesTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{group_id}/policies`` endpoints (create, list)
     """
@@ -395,7 +395,7 @@ class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp, {"policies": [expected_policy]})
 
 
-class OnePolicyTestCase(RestAPITestMixin, TestCase):
+class OnePolicyTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/policies`` endpoint, which updates
     and views the policy part of a scaling group.

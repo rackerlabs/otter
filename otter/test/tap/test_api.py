@@ -11,7 +11,7 @@ from twisted.internet import defer
 from twisted.internet.task import Clock
 
 from twisted.application.service import MultiService
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
 from otter.tap.api import (
@@ -32,7 +32,7 @@ test_config = {
 }
 
 
-class APIOptionsTests(TestCase):
+class APIOptionsTests(SynchronousTestCase):
     """
     Test the various command line options.
     """
@@ -63,7 +63,7 @@ class APIOptionsTests(TestCase):
         self.assertEqual(config['port'], 'tcp:9999')
 
 
-class HealthCheckerTests(TestCase):
+class HealthCheckerTests(SynchronousTestCase):
     """
     Tests for the HealthChecker object
     """
@@ -204,7 +204,7 @@ class HealthCheckerTests(TestCase):
         self.assertIn('a health check timed out', r['a']['details']['reason'])
 
 
-class CallAfterSupervisorTests(TestCase):
+class CallAfterSupervisorTests(SynchronousTestCase):
     """
     Tests for `call_after_supervisor`
     """
@@ -231,7 +231,7 @@ class CallAfterSupervisorTests(TestCase):
         self.assertEqual(self.successResultOf(d), 2)
 
 
-class APIMakeServiceTests(TestCase):
+class APIMakeServiceTests(SynchronousTestCase):
     """
     Test creation of the API service heirarchy.
     """
@@ -510,7 +510,7 @@ class APIMakeServiceTests(TestCase):
         self.assertTrue(kz_client.stop.called)
 
 
-class SchedulerSetupTests(TestCase):
+class SchedulerSetupTests(SynchronousTestCase):
     """
     Tests for `setup_scheduler`
     """
