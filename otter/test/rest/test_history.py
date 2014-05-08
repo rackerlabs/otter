@@ -3,7 +3,7 @@ Tests for `otter.rest.history`
 """
 import json
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from testtools.matchers import IsInstance
 
@@ -14,7 +14,7 @@ from otter.test.utils import mock_log, patch, mock_treq, matches
 from otter.rest.history import make_auditlog_query, next_marker_by_timestamp
 
 
-class MakeAuditLogQueryTestCase(TestCase):
+class MakeAuditLogQueryTestCase(SynchronousTestCase):
     """
     Tests for ``make_auditlog_query``
     """
@@ -23,14 +23,14 @@ class MakeAuditLogQueryTestCase(TestCase):
         Validates the form of the 'query' part of the query, and that
         `must_part` is in the correct part of the full query.
         """
-        self.assertEqual(full_query['query'],
+        self.assertEqual(
+            full_query['query'],
             {'filtered': {'filter': {'bool': {
                 'must': matches(IsInstance(list))
             }}}}
         )
         self.assertIn(must_part,
                       full_query["query"]["filtered"]["filter"]["bool"]["must"])
-
 
     def test_filters_by_tenant_id(self):
         """
@@ -92,7 +92,7 @@ class MakeAuditLogQueryTestCase(TestCase):
         self.assertEquals(results["sort"], [{"@timestamp": {'order': 'desc'}}])
 
 
-class NextMarkerByTimestampTestCase(TestCase):
+class NextMarkerByTimestampTestCase(SynchronousTestCase):
     """
     ``next_marker_by_timestamp`` tests
     """
@@ -106,7 +106,7 @@ class NextMarkerByTimestampTestCase(TestCase):
         self.assertEqual(next_marker, 2)
 
 
-class OtterHistoryTestCase(RestAPITestMixin, TestCase):
+class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/history``
     """
