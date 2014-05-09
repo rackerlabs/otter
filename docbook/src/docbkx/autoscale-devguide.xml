@@ -66,16 +66,18 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-devguide">
             </legalnotice>
             <revhistory>
                 <revision
-                    xmlns:raxm="http://docs.rackspace.com/api/metadata">
-                    <date>2014-04-15</date>
-                    <revdescription>
-                        <itemizedlist spacing="compact">
-                            <listitem>
-                                <para>Improved response code descriptions.</para>
-                            </listitem>
-                        </itemizedlist>
-                    </revdescription>
-                </revision>
+                xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <date>2014-05-09</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Improved Faults section and
+                                individual method response code
+                                descriptions.</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
                 <revision
                     xmlns:raxm="http://docs.rackspace.com/api/metadata">
                     <date>2014-04-08</date>
@@ -1381,26 +1383,42 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <para>Title</para>
                         </listitem>
                         <listitem>
-                            <para>Description</para>
+                            <para>Exception type</para>
                         </listitem>
                         <listitem>
-                            <para>Internal code</para>
+                            <para>HTTP status code</para>
                         </listitem>
                         <listitem>
-                            <para>Link to more information</para>
+                            <para>Message</para>
                         </listitem>
                     </itemizedlist>
                     <para>For &PROD; users, common faults are caused by invalid configurations. For example,
                         trying to boot a server from an image that does not exist causes a fault, as
                         does trying to attach a load balancer to a scaling group that does not exist.</para>
-                    <para>An example of an error message follows.</para>
-                    <!-- improve this example to show something that an Auto scale user would really see -->
+                    <para>An example of error message syntax:</para>
                     <example>
-                        <title>Error message: bad request</title>
-                        <programlisting>HTTP/1.1 400 Bad Request Content-Type: application/json { "title": "Unsupported
-                            limit", "description": "The given limit cannot be negative, and cannot be
-                            greater than 50.", "code": 1092, "link": { "rel": "help", "href": "http://docs.example.com/messages#limit",
-                            "text": "API documentation for the limit parameter" } }
+                        <title>Error message syntax</title>
+                        <programlisting>
+{ "error": {
+ "type": "failure type",
+ "code": HTTP status code,
+ "message": "detailed message",
+ "details": "any specific details about the error"
+ }
+}
+                        </programlisting>
+                    </example>
+                    <para>An example of an error message:</para>
+                    <example>
+                        <title>Error message:
+                            NoSuchScalingGroup</title>
+                        <programlisting>{ "error": {
+ "type": "NoSuchScalingGroupError",
+ "code": 404,
+ "message": "No such scaling group 5154258e-d7b7-43a3-a8a9-708b66fae2a2 for tenant 823364",
+ "details": ""
+ }
+}
                         </programlisting>
                     </example>
                     <para>Error information for each API operation is included with the description of that

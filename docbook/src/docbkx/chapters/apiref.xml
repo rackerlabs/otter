@@ -26,12 +26,6 @@
          <wadl:resource href="../../wadl/autoscale.wadl#state">
             <wadl:method href="#getGroupState"/>
          </wadl:resource>
-         <wadl:resource href="../../wadl/autoscale.wadl#pause">
-            <wadl:method href="#pauseGroup"/>
-         </wadl:resource>
-         <wadl:resource href="../../wadl/autoscale.wadl#resume">
-            <wadl:method href="#resumeGroup"/>
-         </wadl:resource>
       </wadl:resources>
    </section>
    <section xml:id="Configurations">

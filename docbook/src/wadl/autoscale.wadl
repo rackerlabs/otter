@@ -6,7 +6,7 @@
 <!-- -->
 <!-- xmllint -noent autoscale.wadl -->
 <!--*******************************************************-->
-<!-- need xmlns:identity to use &commonFaults; &getFaults; &postPutFaults; &listGroupFaults; &createGroupFaults; 
+<!-- need xmlns:identity to use &commonFaults; &postPutFaults; &listGroupFaults; &createGroupFaults; 
     &showGroupDetailsFaults; &deleteGroupFaults; &getGroupStateFaults; &getGroupConfigurationFaults; &updateGroupConfigurationFaults; 
     &getLaunchConfigurationFaults; &updateLaunchConfigurationFaults; &listPoliciesFaults; &createPolicyFaults; &showPolicyDetailsFaults; 
     &updatePolicyFaults; &deletePolicyFaults; &executePolicyFaults; &executeWebhookFaults; &listWebhookFaults; &createWebhookFaults; 
@@ -793,7 +793,7 @@
                         href="../docbkx/samples/resGetGroups.json"/>
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &listGroupFaults; </method>
+        </response> &commonFaults; &listGroupFaults; </method>
     <method id="showGroupManifest" name="GET"
         rax:roles="observer autoscale:observer">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
@@ -818,7 +818,7 @@
                     />
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &showGroupDetailsFaults; </method>
+        </response> &commonFaults; &showGroupDetailsFaults; </method>
        <method id="showGroupManifestWebhook" name="GET"
                 rax:roles="observer autoscale:observer">
            <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
@@ -857,7 +857,7 @@
                        />
                    </wadl:doc>
                </representation>
-           </response> &commonFaults; &getFaults; &showGroupDetailsFaults; </method>    
+           </response> &commonFaults; &showGroupDetailsFaults; </method>    
     <method id="deleteGroup" name="DELETE">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Delete scaling group">
@@ -931,7 +931,7 @@
                     />
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &getGroupStateFaults; </method>
+        </response> &commonFaults; &getGroupStateFaults; </method>
 
     <method id="getGroupConfig" name="GET"
         rax:roles="observer autoscale:observer">
@@ -956,7 +956,7 @@
                     />
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &getGroupConfigurationFaults; </method>
+        </response> &commonFaults; &getGroupConfigurationFaults; </method>
     <method id="putGroupConfig" name="PUT">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Update scaling group configuration">
@@ -1086,7 +1086,7 @@
                     />
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &getLaunchConfigurationFaults; </method>
+        </response> &commonFaults; &getLaunchConfigurationFaults; </method>
     <method id="putLaunchConfig" name="PUT">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Update launch configuration">
@@ -1313,8 +1313,7 @@
                 the Auto Scale API yet and will be implemented in a
                 future release.</para>
         </wadl:doc>
-        <response status="204"/> &commonFaults; &getFaults;
-        &postPutFaults; </method>
+        <response status="204"/> &commonFaults; &postPutFaults; </method>
     <method id="resumeGroup" name="POST">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Resume group policy execution">
@@ -1324,8 +1323,7 @@
                 the Auto Scale API yet and will be implemented in a
                 future release.</para>
         </wadl:doc>
-        <response status="204"/> &commonFaults; &getFaults;
-        &postPutFaults; </method>
+        <response status="204"/> &commonFaults; &postPutFaults; </method>
     
     
     <method name="GET" id="getPolicies"
@@ -1348,7 +1346,7 @@
                         href="../docbkx/samples/resGetPolicies.json"/>
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &listPoliciesFaults; </method>
+        </response> &commonFaults; &listPoliciesFaults; </method>
     <method name="POST" id="createPolicies">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Create policy">
@@ -1663,7 +1661,7 @@
                         href="../docbkx/samples/resGetPolicy.json"/>
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &showPolicyDetailsFaults; </method>
+        </response> &commonFaults; &showPolicyDetailsFaults; </method>
     <method id="putPolicy" name="PUT">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Update policy">
@@ -1836,7 +1834,7 @@
                         href="../docbkx/samples/resGetWebhooks.json"/>
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &listWebhookFaults; </method>
+        </response> &commonFaults; &listWebhookFaults; </method>
     <method id="createWebhook" name="POST">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Create webhook">
@@ -1917,7 +1915,7 @@
                         href="../docbkx/samples/resGetWebhook.json"/>
                 </wadl:doc>
             </representation>
-        </response> &commonFaults; &getFaults; &showWebhookDetailsFaults; </method>
+        </response> &commonFaults; &showWebhookDetailsFaults; </method>
     <method id="putWebhook" name="PUT">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Update webhook">
