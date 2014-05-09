@@ -120,9 +120,6 @@ class OtterHistory(object):
                         event[name] = field
                 events.append(event)
 
-            # in case too many results come back
-            events = events[:paginate['limit']]
-
             links = get_collection_links(
                 events, request.uri, 'self',
                 limit=paginate.get('limit'),
