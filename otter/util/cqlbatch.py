@@ -53,3 +53,9 @@ class TimingOutCQLClient(object):
         d = self._client.execute(*args, **kwargs)
         timeout_deferred(d, self._timeout, self._reactor, 'CQL query')
         return d
+
+    def disconnect(self):
+        """
+        See :py:func:`silverberg.client.CQLClient.disconnect`
+        """
+        return self._client.disconnect()

@@ -83,7 +83,7 @@ class TimingOutCQLClientTests(SynchronousTestCase):
         """
         Sample client and clock
         """
-        self.client = mock.Mock(spec=['execute'])
+        self.client = mock.Mock(spec=['execute', 'disconnect'])
         self.clock = Clock()
         self.tclient = TimingOutCQLClient(self.clock, self.client, 10)
 
@@ -95,6 +95,15 @@ class TimingOutCQLClientTests(SynchronousTestCase):
         d = self.tclient.execute(2, 3, a=4)
         self.assertEqual(self.successResultOf(d), 5)
         self.client.execute.assert_called_once_with(2, 3, a=4)
+
+    def test_disconnect(self):
+        """
+        `disconnect()` is delgated to the client
+        """
+        self.client.disconnect.return_value = defer.succeed(5)
+        d = self.tclient.disconnect()
+        self.assertEqual(self.successResultOf(d), 5)
+        self.client.disconnect.assert_called_once_with()
 
     def test_times_out(self):
         """
