@@ -832,16 +832,16 @@
                    format.</para>
                <para>
                    <note>
-                       <para>The <code>?webhook=true</code> parameter is required for this method.</para>
+                       <para>The <code>?webhooks=true</code> parameter is required for this method.</para>
                    </note>
                </para>
            </wadl:doc>
            <request>
-               <param name="webhook" style="query" required="true" default="true"
+               <param name="webhooks" style="query" required="true" default="true"
                    type="xsd:boolean">
                    <wadl:doc xml:lang="EN"
                        xmlns="http://docbook.org/ns/docbook">
-                       <para>Set <code>?webhook=true</code>
+                       <para>Set <code>?webhooks=true</code>
                            to display webhook configuration details in the results.</para></wadl:doc>
                </param>
            </request>

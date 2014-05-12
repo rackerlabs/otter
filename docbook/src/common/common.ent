@@ -142,7 +142,7 @@
      <!ENTITY deleteGroupFaults
            '
         <response status="400" xmlns="http://wadl.dev.java.net/2009/02">
-             <doc title="InvalidQueryArgument">The "force" query argument value is invalid. It must be "true" if there are servers in the group. If "false" or null, the request succeeds only if the group is empty.</doc>
+             <doc title="InvalidQueryArgument">The "force" query argument value is invalid. It must be "true", any other value is invalid. If there are servers in the group, only "true" succeeds. If there are no servers in the group, "true" and no value given succeed.</doc>
             <representation mediaType="application/xml" element="identity:badForceArg"/>
             <representation mediaType="application/json"/>
         </response>
