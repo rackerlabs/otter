@@ -8,7 +8,7 @@ import mock
 from testtools.matchers import ContainsDict, Equals
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase, SynchronousTestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter import controller
 
@@ -18,7 +18,7 @@ from otter.util.timestamp import MIN
 from otter.test.utils import iMock, matches, patch, mock_log
 
 
-class CalculateDeltaTestCase(TestCase):
+class CalculateDeltaTestCase(SynchronousTestCase):
     """
     Tests for :func:`otter.controller.calculate_delta`
     """
@@ -485,7 +485,7 @@ class CalculateDeltaTestCase(TestCase):
             'constrained_desired_capacity': Equals(1)})))
 
 
-class CheckCooldownsTestCase(TestCase):
+class CheckCooldownsTestCase(SynchronousTestCase):
     """
     Tests for :func:`otter.controller.check_cooldowns`
     """
@@ -582,7 +582,7 @@ class CheckCooldownsTestCase(TestCase):
                                                     'pol'))
 
 
-class ObeyConfigChangeTestCase(TestCase):
+class ObeyConfigChangeTestCase(SynchronousTestCase):
     """
     Tests for :func:`otter.controller.obey_config_change`
     """
@@ -773,7 +773,7 @@ def mock_group():
     return group
 
 
-class MaybeExecuteScalingPolicyTestCase(TestCase):
+class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
     """
     Tests for :func:`otter.controller.maybe_execute_scaling_policy`
     """

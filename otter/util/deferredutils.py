@@ -175,6 +175,12 @@ class DeferredPool(object):
         self._if_empty_notify()
         return d
 
+    def __len__(self):
+        """
+        Return number of deferreds in the pool
+        """
+        return len(self._pool)
+
 
 def log_with_time(result, reactor, log, start, msg, time_kwarg=None):
     """

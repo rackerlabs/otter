@@ -4,7 +4,7 @@ Tests for :mod:`otter.jsonschema.group_schemas`
 from copy import deepcopy
 from datetime import datetime, timedelta
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from jsonschema import Draft3Validator, ValidationError
 
 from otter.json_schema import validate
@@ -12,7 +12,7 @@ from otter.json_schema import group_schemas, group_examples, rest_schemas
 from otter.util.config import set_config_data
 
 
-class ScalingGroupConfigTestCase(TestCase):
+class ScalingGroupConfigTestCase(SynchronousTestCase):
     """
     Simple verification that the JSON schema for scaling groups is correct.
     """
@@ -123,7 +123,7 @@ class ScalingGroupConfigTestCase(TestCase):
                                 validate, invalid, group_schemas.config)
 
 
-class GeneralLaunchConfigTestCase(TestCase):
+class GeneralLaunchConfigTestCase(SynchronousTestCase):
     """
     Verification that the general JSON schema for launch configs is correct.
     """
@@ -178,7 +178,7 @@ class GeneralLaunchConfigTestCase(TestCase):
                  schema)
 
 
-class ServerLaunchConfigTestCase(TestCase):
+class ServerLaunchConfigTestCase(SynchronousTestCase):
     """
     Simple verification that the JSON schema for launch server launch configs
     is correct.
@@ -273,7 +273,7 @@ class ServerLaunchConfigTestCase(TestCase):
                                 validate, invalid, group_schemas.launch_config)
 
 
-class LaunchConfigServerPayloadValidationTests(TestCase):
+class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
     """
     Tests to verify json schema of 'server' attribute used to create servers
     Valid tests are already done in ServerLaunchConfigTestCase.test_valid_examples_validate
@@ -381,7 +381,7 @@ class LaunchConfigServerPayloadValidationTests(TestCase):
                                 validate, self.server, group_schemas.server)
 
 
-class ScalingPolicyTestCase(TestCase):
+class ScalingPolicyTestCase(SynchronousTestCase):
     """
     Simple verification that the JSON schema for scaling policies is correct.
     """
@@ -712,7 +712,7 @@ class ScalingPolicyTestCase(TestCase):
                                 group_schemas.validate_cron, invalid_cron)
 
 
-class CreateScalingPoliciesTestCase(TestCase):
+class CreateScalingPoliciesTestCase(SynchronousTestCase):
     """
     Verification that the JSON schema for creating scaling policies is correct
     """
@@ -760,7 +760,7 @@ class CreateScalingPoliciesTestCase(TestCase):
                           rest_schemas.create_policies_request)
 
 
-class CreateScalingGroupTestCase(TestCase):
+class CreateScalingGroupTestCase(SynchronousTestCase):
     """
     Simple verification that the JSON schema for creating a scaling group is
     correct.
@@ -906,7 +906,7 @@ class CreateScalingGroupTestCase(TestCase):
                 }, rest_schemas.create_group_request)
 
 
-class SingleWebhookTestCase(TestCase):
+class SingleWebhookTestCase(SynchronousTestCase):
     """
     Verify the webhook schema.
     """
@@ -930,7 +930,7 @@ class SingleWebhookTestCase(TestCase):
         validate({'name': 'foo'}, group_schemas.webhook)
 
 
-class CreateWebhooksTestCase(TestCase):
+class CreateWebhooksTestCase(SynchronousTestCase):
     """
     Verification that the JSON schema for creating scaling policies is correct
     """
@@ -978,7 +978,7 @@ class CreateWebhooksTestCase(TestCase):
                           rest_schemas.create_policies_request)
 
 
-class UpdateWebhookTestCase(TestCase):
+class UpdateWebhookTestCase(SynchronousTestCase):
     """
     Verify the update webhook schemas.
     """

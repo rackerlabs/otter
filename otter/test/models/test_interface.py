@@ -9,7 +9,7 @@ import mock
 from zope.interface.verify import verifyObject
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.models.interface import (
     GroupState, IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection,
@@ -18,7 +18,7 @@ from otter.json_schema.group_schemas import launch_config
 from otter.json_schema import model_schemas, validate
 
 
-class GroupStateTestCase(TestCase):
+class GroupStateTestCase(SynchronousTestCase):
     """
     Tests the state object `otter.mode.s
     """

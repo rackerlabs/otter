@@ -5,13 +5,13 @@ Unit tests for the Bobby interface
 import mock
 import json
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
 
 from otter.bobby import BobbyClient
 
 
-class BobbyTests(TestCase):
+class BobbyTests(SynchronousTestCase):
     """
     Bobby tests
     """

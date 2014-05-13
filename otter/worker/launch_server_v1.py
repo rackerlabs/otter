@@ -31,7 +31,7 @@ from otter.util.http import (append_segments, headers, check_success,
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
-                              TransientRetryError, random_interval)
+                              TransientRetryError, random_interval, compose_retries)
 
 # Number of times to retry when adding/removing nodes from LB
 LB_MAX_RETRIES = 10
@@ -119,15 +119,17 @@ def wait_for_active(log,
     def poll():
         def check_status(server):
             status = server['server']['status']
+            time_building = clock.seconds() - start_time
 
             if status == 'ACTIVE':
-                time_building = clock.seconds() - start_time
                 log.msg(("Server changed from 'BUILD' to 'ACTIVE' within "
                          "{time_building} seconds"),
                         time_building=time_building)
                 return server
 
             elif status != 'BUILD':
+                log.msg("Server changed to '{status}' in {time_building} seconds",
+                        time_building=time_building, status=status)
                 raise UnexpectedServerStatus(
                     server_id,
                     status,
@@ -371,7 +373,7 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
 
 
 def launch_server(log, region, scaling_group, service_catalog, auth_token,
-                  launch_config, undo):
+                  launch_config, undo, clock=None):
     """
     Launch a new server given the launch config auth tokens and service catalog.
     Possibly adding the newly launched server to a load balancer.
@@ -410,11 +412,12 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     log = log.bind(server_name=server_config['name'])
     ilog = [None]
 
-    d = create_server(server_endpoint, auth_token, server_config, log=log)
-
     def wait_for_server(server):
         server_id = server['server']['id']
 
+        # NOTE: If server create is retried, each server delete will be pushed
+        # to undo stack even after it will be deleted in check_error which is fine
+        # since verified_delete succeeds on deleted server
         undo.push(
             verified_delete, log, server_endpoint, auth_token, server_id)
 
@@ -425,8 +428,6 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
             auth_token,
             server_id)
 
-    d.addCallback(wait_for_server)
-
     def add_lb(server):
         ip_address = private_ip_addresses(server)[0]
         lbd = add_to_load_balancers(
@@ -434,19 +435,25 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
         lbd.addCallback(lambda lb_response: (server, lb_response))
         return lbd
 
-    d.addCallback(add_lb)
+    def _create_server():
+        d = create_server(server_endpoint, auth_token, server_config, log=log)
+        d.addCallback(wait_for_server)
+        d.addCallback(add_lb)
+        return d
 
-    def _add_to_bobby(result, client):
-        server, lb_response = result
+    def check_error(f):
+        f.trap(UnexpectedServerStatus)
+        if f.value.status == 'ERROR':
+            log.msg('{server_id} errored, deleting and creating new server instead',
+                    server_id=f.value.server_id)
+            # trigger server delete and return True to allow retry
+            verified_delete(log, server_endpoint, auth_token, f.value.server_id)
+            return True
+        else:
+            return False
 
-        d = client.create_server(scaling_group.tenant_id, scaling_group.uuid, server["server"]["id"])
-        return d.addCallback(lambda _: result)
-
-    from otter.rest.bobby import get_bobby
-
-    bobby = get_bobby()
-    if bobby is not None:
-        d.addCallback(_add_to_bobby, bobby)
+    d = retry(_create_server, can_retry=compose_retries(retry_times(3), check_error),
+              next_interval=repeating_interval(15), clock=clock)
 
     return d
 
