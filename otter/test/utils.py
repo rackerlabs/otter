@@ -8,7 +8,6 @@ import treq
 
 from twisted.internet import defer
 from twisted.python.failure import Failure
-from twisted.web.client import ResponseDone
 from zope.interface import directlyProvides
 
 from otter.log.bound import BoundLog
