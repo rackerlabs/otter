@@ -724,6 +724,55 @@ class ObeyConfigChangeTestCase(TestCase):
             webhook_id=None)
 
 
+def mock_controller_utilities(test_case):
+    """
+    Mock out the following functions in the controller module, in order to simplify
+    testing of scaling up and down.
+
+        - check_cooldowns (returns True)
+        - calculate_delta (return 1)
+        - exec_scale_down (return a dummy success)
+        - execute_launch_config (return a dummy success)
+    """
+    mocks = {}
+    things_and_return_vals = {
+        'check_cooldowns': True,
+        'calculate_delta': 1,
+        'exec_scale_down': defer.succeed("scaled down"),
+        'execute_launch_config': defer.succeed("scaled up")
+    }
+
+    for thing, return_val in things_and_return_vals.iteritems():
+        mocks[thing] = patch(test_case, 'otter.controller.{0}'.format(thing),
+                             return_value=return_val)
+
+    return mocks
+
+
+def mock_group_state():
+    """
+    Create a mocked GroupState.
+    """
+    mock_state = mock.MagicMock(GroupState)
+    mock_state.get_capacity.return_value = {
+        'desired_capacity': 5,
+        'pending_capacity': 2,
+        'active_capacity': 3
+    }
+    return mock_state
+
+
+def mock_group():
+    """
+    Create a mocked ScalingGroup.
+    """
+    group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
+    group.view_config.return_value = defer.succeed("config")
+    group.get_policy.return_value = defer.succeed("policy")
+    group.view_launch_config.return_value = defer.succeed("launch")
+    return group
+
+
 class MaybeExecuteScalingPolicyTestCase(TestCase):
     """
     Tests for :func:`otter.controller.maybe_execute_scaling_policy`
@@ -731,34 +780,12 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
 
     def setUp(self):
         """
-        Mock relevant controller methods. Also build a mock model that can be
-        used for testing.
+        Mock relevant controller methods.
         """
-        self.mocks = {}
-        things_and_return_vals = {
-            'check_cooldowns': True,
-            'calculate_delta': 1,
-            'exec_scale_down': defer.succeed(None),
-            'execute_launch_config': defer.succeed(None)
-        }
-
-        for thing, return_val in things_and_return_vals.iteritems():
-            self.mocks[thing] = patch(self,
-                                      'otter.controller.{0}'.format(thing),
-                                      return_value=return_val)
-
+        self.mocks = mock_controller_utilities(self)
         self.mock_log = mock.MagicMock()
-        self.mock_state = mock.MagicMock(GroupState)
-        self.mock_state.get_capacity.return_value = {
-            'desired_capacity': 5,
-            'pending_capacity': 2,
-            'active_capacity': 3
-        }
-
-        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
-        self.group.view_config.return_value = defer.succeed("config")
-        self.group.get_policy.return_value = defer.succeed("policy")
-        self.group.view_launch_config.return_value = defer.succeed("launch")
+        self.mock_state = mock_group_state()
+        self.group = mock_group()
 
     def test_maybe_execute_scaling_policy_no_such_policy(self):
         """
@@ -969,31 +996,10 @@ class ConvergeTestCase(SynchronousTestCase):
         Mock relevant controller methods. Also build a mock model that can be
         used for testing.
         """
-        self.mocks = {}
-        things_and_return_vals = {
-            'check_cooldowns': True,
-            'calculate_delta': 1,
-            'exec_scale_down': defer.succeed("scaled down"),
-            'execute_launch_config': defer.succeed("scaled up")
-        }
-
-        for thing, return_val in things_and_return_vals.iteritems():
-            self.mocks[thing] = patch(self,
-                                      'otter.controller.{0}'.format(thing),
-                                      return_value=return_val)
-
+        self.mocks = mock_controller_utilities(self)
         self.mock_log = mock.MagicMock()
-        self.mock_state = mock.MagicMock(GroupState)
-        self.mock_state.get_capacity.return_value = {
-            'desired_capacity': 5,
-            'pending_capacity': 2,
-            'active_capacity': 3
-        }
-
-        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
-        self.group.view_config.return_value = defer.succeed("config")
-        self.group.get_policy.return_value = defer.succeed("policy")
-        self.group.view_launch_config.return_value = defer.succeed("launch")
+        self.mock_state = mock_group_state()
+        self.group = mock_group()
 
     def test_no_change_returns_none(self):
         """
