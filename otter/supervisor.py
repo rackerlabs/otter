@@ -270,10 +270,10 @@ def exec_scale_down(log, transaction_id, state, scaling_group, delta):
         state.remove_job(job_id)
 
     # delete active servers if pending jobs are not enough
-    remaining = delta - len(jobs_to_cancel)
-    if remaining > 0:
+    remaining_to_delete = delta - len(jobs_to_cancel)
+    if remaining_to_delete > 0:
         delete_active_servers(log, transaction_id,
-                              scaling_group, remaining, state)
+                              scaling_group, remaining_to_delete, state)
 
     log.msg("Deleting {delta} servers.", delta=delta, **_log_capacity(state))
 
