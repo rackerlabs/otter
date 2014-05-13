@@ -8,7 +8,7 @@ import mock
 from testtools.matchers import ContainsDict, Equals
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import TestCase, SynchronousTestCase
 
 from otter import controller
 
@@ -958,7 +958,7 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
             webhook_id=None)
 
 
-class ConvergeTestCase(TestCase):
+class ConvergeTestCase(SynchronousTestCase):
     """
     Tests for :func:`otter.controller.converge`, currently using the Otter
     launch_server backend.
