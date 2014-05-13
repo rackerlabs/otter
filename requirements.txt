@@ -1,5 +1,6 @@
 klein==0.2.1
-twisted==13.1
+twisted==14.0.0
+service-identity==0.2
 tryfer==0.2.2
 jsonschema==2.0
 yunomi==0.2.2
