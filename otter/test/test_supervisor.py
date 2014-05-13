@@ -17,7 +17,6 @@ from otter.models.interface import (
     IScalingGroup, GroupState, NoSuchScalingGroupError)
 from otter.supervisor import ISupervisor, SupervisorService
 from otter.test.utils import iMock, patch, mock_log, CheckFailure, matches
-from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
 
 
@@ -45,13 +44,10 @@ class SupervisorTests(SynchronousTestCase):
                        'metadata': {}}
         }
 
-        set_config_data({'region': 'ORD'})
-        self.addCleanup(set_config_data, {})
-
         self.cooperator = mock.Mock(spec=Cooperator)
 
         self.supervisor = SupervisorService(
-            self.auth_function, self.cooperator.coiterate)
+            self.auth_function, 'ORD', self.cooperator.coiterate)
 
         self.InMemoryUndoStack = patch(self, 'otter.supervisor.InMemoryUndoStack')
         self.undo = self.InMemoryUndoStack.return_value

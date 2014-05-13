@@ -11,6 +11,7 @@ from otter.test.rest.request import RestAPITestMixin, request
 from otter.util.config import set_config_data
 from otter.test.utils import mock_log, patch, mock_treq, matches
 
+from otter.rest.application import Otter
 from otter.rest.history import make_auditlog_query, next_marker_by_timestamp
 
 
@@ -128,8 +129,8 @@ class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
     def setUp(self):
         """Set an elastic search config var."""
         super(OtterHistoryTestCase, self).setUp()
+        self.root = Otter(None, 'ord', es_host='http://dummy').app.resource()
         set_config_data({
-            'elasticsearch': {'host': 'http://dummy'},
             'limits': {'pagination': 20},
             'url_root': 'http://localhost'})
 
@@ -162,9 +163,7 @@ class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
         A 501 not implemented error is returned if there is no configured
         elasticsearch host
         """
-        set_config_data({
-            'limits': {'pagination': 20},
-            'url_root': 'http://localhost'})
+        self.root = Otter(None, 'ord').app.resource()
         self.assert_status_code(501)
 
     def test_history(self):
@@ -194,7 +193,7 @@ class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
             log=matches(IsInstance(self.log.__class__)))
         self.assertTrue(self.treq.json_content.called)
 
-        self.make_auditlog_query.assert_called_once_with('101010', None, limit=20)
+        self.make_auditlog_query.assert_called_once_with('101010', 'ord', limit=20)
 
     def test_history_with_one_page_pagination(self):
         """
@@ -229,4 +228,4 @@ class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
             log=matches(IsInstance(self.log.__class__)))
         self.assertTrue(self.treq.json_content.called)
 
-        self.make_auditlog_query.assert_called_once_with('101010', None, limit=1)
+        self.make_auditlog_query.assert_called_once_with('101010', 'ord', limit=1)

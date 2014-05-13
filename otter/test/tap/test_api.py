@@ -28,7 +28,8 @@ test_config = {
         'seed_hosts': ['tcp:127.0.0.1:9160'],
         'keyspace': 'otter_test'
     },
-    'environment': 'prod'
+    'environment': 'prod',
+    'region': 'ord'
 }
 
 
@@ -370,8 +371,9 @@ class APIMakeServiceTests(SynchronousTestCase):
         api store
         """
         makeService(test_config)
-        self.Otter.assert_called_once_with(self.store,
-                                           self.health_checker.health_check)
+        self.Otter.assert_called_once_with(self.store, 'ord',
+                                           self.health_checker.health_check,
+                                           es_host=None)
 
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_health_checker_no_zookeeper(self, supervisor):

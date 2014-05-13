@@ -298,7 +298,7 @@ class RestAPITestMixin(RequestTestMixin):
             return defer.succeed(None)
 
         self.mock_group.modify_state.side_effect = _mock_modify_state
-        self.root = Otter(self.mock_store).app.resource()
+        self.root = Otter(self.mock_store, 'ord').app.resource()
 
         # set pagination limits as it'll be used by all rest interfaces
         set_config_data({'limits': {'pagination': 100}, 'url_root': ''})
