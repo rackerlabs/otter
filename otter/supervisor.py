@@ -13,7 +13,6 @@ from otter.models.interface import NoSuchScalingGroupError
 from otter.log import audit
 from otter.util.deferredutils import DeferredPool, unwrap_first_error
 from otter.util.hashkey import generate_job_id
-from otter.util.config import config_value
 from otter.util.timestamp import from_timestamp
 from otter.worker import launch_server_v1, validate_config
 from otter.undo import InMemoryUndoStack
@@ -75,8 +74,9 @@ class SupervisorService(object, Service):
     """
     name = "supervisor"
 
-    def __init__(self, auth_function, coiterate):
+    def __init__(self, auth_function, region, coiterate):
         self.auth_function = auth_function
+        self.region = region
         self.coiterate = coiterate
         self.deferred_pool = DeferredPool()
 
@@ -112,7 +112,7 @@ class SupervisorService(object, Service):
             log.msg("Executing launch config.")
             return launch_server_v1.launch_server(
                 log,
-                config_value('region'),
+                self.region,
                 scaling_group,
                 service_catalog,
                 auth_token,
@@ -151,7 +151,7 @@ class SupervisorService(object, Service):
         def when_authenticated((auth_token, service_catalog)):
             return launch_server_v1.delete_server(
                 log,
-                config_value('region'),
+                self.region,
                 service_catalog,
                 auth_token,
                 (server['id'], server['lb_info']))
@@ -171,7 +171,7 @@ class SupervisorService(object, Service):
             log.msg('Validating launch server config')
             return validate_config.validate_launch_server_config(
                 log,
-                config_value('region'),
+                self.region,
                 service_catalog,
                 auth_token,
                 launch_config['args'])

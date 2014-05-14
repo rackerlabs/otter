@@ -179,6 +179,8 @@ def makeService(config):
 
     s = MultiService()
 
+    region = config_value('region')
+
     seed_endpoints = [
         clientFromString(reactor, str(host))
         for host in config_value('cassandra.seed_hosts')]
@@ -214,7 +216,8 @@ def makeService(config):
             retry_interval=config_value('identity.retry_interval')),
         cache_ttl)
 
-    supervisor = SupervisorService(authenticator.authenticate_tenant, coiterate)
+    supervisor = SupervisorService(authenticator.authenticate_tenant,
+                                   region, coiterate)
     supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
@@ -230,7 +233,8 @@ def makeService(config):
         s.addService(FunctionalService(stop=partial(call_after_supervisor,
                                                     cassandra_cluster.disconnect, supervisor)))
 
-    otter = Otter(store, health_checker.health_check)
+    otter = Otter(store, region, health_checker.health_check,
+                  es_host=config_value('elasticsearch.host'))
     site = Site(otter.app.resource())
     site.displayTracebacks = False
 
