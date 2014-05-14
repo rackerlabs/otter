@@ -102,7 +102,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         Set the Cassandra store, and also patch the controller
         """
         keyspace.resume()
-        self.root = Otter(store).app.resource()
+        self.root = Otter(store, 'ord').app.resource()
         set_config_data(limits)
         self.addCleanup(set_config_data, {})
 
@@ -319,7 +319,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         Set up a silverberg client
         """
         keyspace.resume()
-        self.root = Otter(store).app.resource()
+        self.root = Otter(store, 'ord').app.resource()
         store.kz_client = mock.Mock(Lock=self.mock_lock())
 
         set_config_data(limits)
