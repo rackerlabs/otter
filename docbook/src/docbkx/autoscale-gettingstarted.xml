@@ -68,13 +68,22 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
             </legalnotice>
             <revhistory>
                 <revision>
+                    <date>2014-05-14</date>
+                    <revdescription>
+                        <itemizedlist spacing="compact">
+                            <listitem>
+                                <para>Fixed link to KC FAQ that had changed.</para>
+                            </listitem>
+                        </itemizedlist>
+                    </revdescription>
+                </revision>
+                <revision>
                 <date>2014-03-26</date>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Final fix for AUTO-834, added IAD to
-                                service endpoints in the Getting
-                                Started Guide and added comment about
+                            <para>Added IAD to
+                                service endpoints and added comment about
                                 verifying the service endpoints by
                                 issuing the call being the best way to
                                 know what they are.</para>
@@ -973,7 +982,7 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
                     </listitem>
                     <listitem>
                         <para>For a list of FAQs on Auto Scale, read
-                            <link xlink:href="hhttp://www.rackspace.com/knowledge_center/article/rackspace-autoscale-faq">the Auto Scale FAQ page on the Knowledge Center
+                            <link xlink:href="http://www.rackspace.com/knowledge_center/product-faq/auto-scale">the Auto Scale FAQ page on the Knowledge Center
                             </link>.</para>
                     </listitem>
                     <listitem>
