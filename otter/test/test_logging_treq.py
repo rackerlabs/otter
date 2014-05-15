@@ -40,30 +40,30 @@ class LoggingTreqTest(SynchronousTestCase):
 
         self.url = 'myurl'
 
-    def _assert_success_logging(self, method, status, request_time):
+    def _assert_success_logging(self, method, status, request_time, headers=None):
         """
         msg expected to be made on a successful request are logged
         """
         self.assertEqual(self.log.msg.mock_calls, [
             mock.call(mock.ANY, url=self.url, system="treq.request",
-                      method=method, treq_request_id=mock.ANY),
+                      method=method, treq_request_id=mock.ANY, headers=headers),
             mock.call(
                 mock.ANY, url=self.url, status_code=status, headers={'1': '2'},
                 system="treq.request", request_time=request_time, method=method,
-                treq_request_id=mock.ANY)
+                treq_request_id=mock.ANY, request_headers=headers)
         ])
 
-    def _assert_failure_logging(self, method, exception_type, request_time):
+    def _assert_failure_logging(self, method, exception_type, request_time, headers=None):
         """
         msg expected to be made on a failed request are logged
         """
         self.assertEqual(self.log.msg.mock_calls, [
             mock.call(mock.ANY, url=self.url, system="treq.request",
-                      method=method, treq_request_id=mock.ANY),
+                      method=method, treq_request_id=mock.ANY, headers=headers),
             mock.call(
                 mock.ANY, url=self.url, reason=CheckFailure(exception_type),
                 system="treq.request", request_time=request_time, method=method,
-                treq_request_id=mock.ANY)
+                treq_request_id=mock.ANY, request_headers=headers)
         ])
 
     def test_request(self):
@@ -80,7 +80,23 @@ class LoggingTreqTest(SynchronousTestCase):
         self.treq.request.return_value.callback(self.response)
 
         self.assertIs(self.successResultOf(d), self.response)
-        self._assert_success_logging('patch', 204, 5)
+        self._assert_success_logging('patch', 204, 5, headers={})
+
+    def test_request_no_headers(self):
+        """
+        On successful call to request, response is returned and request logged.
+        request_headers defaults to None if not passed
+        """
+        d = logging_treq.request('get', self.url, log=self.log, clock=self.clock)
+        self.treq.request.assert_called_once_with(
+            method='get', url=self.url)
+        self.assertNoResult(d)
+
+        self.clock.advance(5)
+        self.treq.request.return_value.callback(self.response)
+
+        self.assertIs(self.successResultOf(d), self.response)
+        self._assert_success_logging('get', 204, 5)
 
     def test_request_failure(self):
         """
@@ -96,7 +112,7 @@ class LoggingTreqTest(SynchronousTestCase):
         self.treq.request.return_value.errback(Failure(DummyException('e')))
 
         self.failureResultOf(d, DummyException)
-        self._assert_failure_logging('patch', DummyException, 5)
+        self._assert_failure_logging('patch', DummyException, 5, headers={})
 
     def test_request_timeout(self):
         """
@@ -110,7 +126,7 @@ class LoggingTreqTest(SynchronousTestCase):
 
         self.clock.advance(45)
         self.failureResultOf(d, TimedOutError)
-        self._assert_failure_logging('patch', TimedOutError, 45)
+        self._assert_failure_logging('patch', TimedOutError, 45, headers={})
 
     def _test_method_success(self, method):
         """
@@ -129,7 +145,7 @@ class LoggingTreqTest(SynchronousTestCase):
         treq_function.return_value.callback(self.response)
 
         self.assertIs(self.successResultOf(d), self.response)
-        self._assert_success_logging(method, 204, 5)
+        self._assert_success_logging(method, 204, 5, headers={})
 
     def _test_method_failure(self, method):
         """
@@ -147,7 +163,7 @@ class LoggingTreqTest(SynchronousTestCase):
         treq_function.return_value.errback(Failure(DummyException('e')))
 
         self.failureResultOf(d, DummyException)
-        self._assert_failure_logging(method, DummyException, 5)
+        self._assert_failure_logging(method, DummyException, 5, headers={})
 
     def _test_method_timeout(self, method):
         """
@@ -163,7 +179,7 @@ class LoggingTreqTest(SynchronousTestCase):
 
         self.clock.advance(45)
         self.failureResultOf(d, TimedOutError)
-        self._assert_failure_logging(method, TimedOutError, 45)
+        self._assert_failure_logging(method, TimedOutError, 45, headers={})
 
     def test_head(self):
         """
