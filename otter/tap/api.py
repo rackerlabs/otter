@@ -35,6 +35,7 @@ from otter.auth import CachingAuthenticator
 from otter.log import log
 from silverberg.cluster import RoundRobinCassandraCluster
 from silverberg.logger import LoggingCQLClient
+from otter.util.cqlbatch import TimingOutCQLClient
 from otter.bobby import BobbyClient
 
 
@@ -185,9 +186,14 @@ def makeService(config):
         clientFromString(reactor, str(host))
         for host in config_value('cassandra.seed_hosts')]
 
-    cassandra_cluster = LoggingCQLClient(RoundRobinCassandraCluster(
-        seed_endpoints,
-        config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
+    cassandra_cluster = LoggingCQLClient(
+        TimingOutCQLClient(
+            reactor,
+            RoundRobinCassandraCluster(
+                seed_endpoints,
+                config_value('cassandra.keyspace')),
+            config_value('cassandra.timeout') or 30),
+        log.bind(system='otter.silverberg'))
 
     store = CassScalingGroupCollection(cassandra_cluster, reactor)
     admin_store = CassAdmin(cassandra_cluster)

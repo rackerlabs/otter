@@ -26,7 +26,8 @@ test_config = {
     'admin': 'tcp:9789',
     'cassandra': {
         'seed_hosts': ['tcp:127.0.0.1:9160'],
-        'keyspace': 'otter_test'
+        'keyspace': 'otter_test',
+        'timeout': 10
     },
     'environment': 'prod',
     'region': 'ord'
@@ -246,6 +247,7 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.RoundRobinCassandraCluster = patch(self, 'otter.tap.api.RoundRobinCassandraCluster')
         self.LoggingCQLClient = patch(self, 'otter.tap.api.LoggingCQLClient')
+        self.TimingOutCQLClient = patch(self, 'otter.tap.api.TimingOutCQLClient')
         self.log = patch(self, 'otter.tap.api.log')
 
         Otter_patcher = mock.patch('otter.tap.api.Otter')
@@ -351,7 +353,11 @@ class APIMakeServiceTests(SynchronousTestCase):
         """
         makeService(test_config)
         self.log.bind.assert_called_once_with(system='otter.silverberg')
-        self.LoggingCQLClient.assert_called_once_with(self.RoundRobinCassandraCluster.return_value,
+        self.TimingOutCQLClient.assert_called_once_with(
+            self.reactor,
+            self.RoundRobinCassandraCluster.return_value,
+            10)
+        self.LoggingCQLClient.assert_called_once_with(self.TimingOutCQLClient.return_value,
                                                       self.log.bind.return_value)
         self.CassScalingGroupCollection.assert_called_once_with(
             self.LoggingCQLClient.return_value, self.reactor)
