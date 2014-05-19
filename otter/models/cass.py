@@ -477,11 +477,11 @@ class WeakLocks(object):
         return lock
 
 
-def get_client_ts():
+def get_client_ts(reactor):
     """
     Return EPOCH as int
     """
-    return int(time.time() * 1000)
+    return int(reactor.seconds() * 1000)
 
 
 @implementer(IScalingGroup)
@@ -541,7 +541,7 @@ class CassScalingGroup(object):
         # Function used to return monotically increasing integer used while
         # inserting state. This integer is expected to resolve conflict in
         # CASS when CASS finds rows with different integers
-        self.using_ts = get_client_ts
+        self.get_timestamp = functools.partial(get_client_ts, self.reactor)
 
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
