@@ -558,6 +558,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                               {}, True, desired=5)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+        self.clock.advance(10.345)
 
         d = self.group.modify_state(modifier)
         self.assertEqual(self.successResultOf(d), None)
@@ -566,7 +567,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'INSERT INTO scaling_group("tenantId", "groupId", active, '
             'pending, "groupTouched", "policyTouched", paused, desired) VALUES('
             ':tenantId, :groupId, :active, :pending, :groupTouched, '
-            ':policyTouched, :paused, :desired)')
+            ':policyTouched, :paused, :desired) USING TIMESTAMP 10345')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
                         "active": _S({}), "pending": _S({}),
                         "groupTouched": '0001-01-01T00:00:00Z',
