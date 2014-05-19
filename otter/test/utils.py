@@ -209,6 +209,60 @@ def mock_log(*args, **kwargs):
     return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
 
 
+class StubResponse(object):
+    """
+    A fake pre-built Twisted Web Response object.
+    """
+    def __init__(self, code, content, headers):
+        self.code = code
+        self.content = content
+        self.headers = headers
+
+
+class StubTreq(object):
+    """
+    An object that looks like :module:`treq`.
+
+    :ivar requests: A list of request arguments.
+    :param response: A premade response to return from all requests.
+    """
+    def __init__(self, response):
+        self._response = response
+        self.requests = []
+
+    def json_content(self, response):
+        return self.content(response).addCallback(json.loads)
+
+    def content(self, response):
+        return defer.succeed(response.content)
+
+    def _request(self, method, url, headers=None, data=None, log=None):
+        self.requests.append({'method': method, 'url': url,
+                              'headers': headers,
+                              'data': data, 'log': log})
+        return defer.succeed(self._response)
+
+    def get(self, *args, **kwargs):
+        return self._request('get', *args, **kwargs)
+
+    def post(self, *args, **kwargs):
+        return self._request('post', *args, **kwargs)
+
+    def put(self, *args, **kwargs):
+        return self._request('put', *args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        return self._request('delete', *args, **kwargs)
+
+
+def stub_treq(code, content, headers=None):
+    """
+    Return a :class:`StubTreq` that always returns the same response.
+    """
+    treq = StubTreq(StubResponse(code, content, headers))
+    return treq
+
+
 def mock_treq(code=200, json_content={}, method='get', content='', treq_mock=None):
     """
     Return mocked treq instance configured based on arguments given

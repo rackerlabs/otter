@@ -113,7 +113,7 @@ class APIError(Exception):
         self.headers = headers
 
 
-def check_success(response, success_codes):
+def check_success(response, success_codes, treq_module=None):
     """
     Convert an HTTP response to an appropriate APIError if
     the response code does not match an expected success code.
@@ -124,14 +124,17 @@ def check_success(response, success_codes):
     :param IResponse response: The response to check.
     :param list success_codes: A list of int HTTP response codes that indicate
         "success".
+    :param treq_module: The treq implementation to use.
 
     :return: response or a deferred that errbacks with an APIError.
     """
+    if treq_module is None:
+        treq_module = treq
     def _raise_api_error(body):
         raise APIError(response.code, body, response.headers)
 
     if response.code not in success_codes:
-        return treq.content(response).addCallback(_raise_api_error)
+        return treq_module.content(response).addCallback(_raise_api_error)
 
     return response
 
