@@ -645,6 +645,10 @@ class CassScalingGroup(object):
         consistency = get_consistency_level('update', 'state')
 
         def _write_state(new_state):
+            d = self.get_timestamp()
+            return d.addCallback(lambda t: _actual_write_state(new_state, t))
+
+        def _actual_write_state(new_state, timestamp):
             assert (new_state.tenant_id == self.tenant_id and
                     new_state.group_id == self.uuid)
             params = {
@@ -658,7 +662,7 @@ class CassScalingGroup(object):
                 'policyTouched': serialize_json_data(new_state.policy_touched, 1)
             }
             return self.connection.execute(
-                _cql_insert_group_state.format(cf=self.group_table, ts=self.using_ts()),
+                _cql_insert_group_state.format(cf=self.group_table, ts=self.get_timestamp()),
                 params, consistency)
 
         def _modify_state():
