@@ -30,7 +30,7 @@ from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error, raise_error_on_code,
                              APIError, RequestError)
 from otter.util.hashkey import generate_server_name
-from otter.util.deferredutils import retry_and_timeout
+from otter.util.deferredutils import retry_and_timeout, log_with_time
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
                               TransientRetryError, random_interval, compose_retries)
 
@@ -572,7 +572,11 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
     """
     Check the status of the server to see if it's actually been deleted.
     Succeeds only if it has been either deleted (404) or acknowledged by Nova
-    to be deleted (task_state = "deleted")
+    to be deleted (task_state = "deleted").
+
+    Note that ``task_state`` is in the server details key
+    ``OS-EXT-STS:task_state``, which is supported by openstack but available
+    only when looking at the extended status of a server.
     """
     path = append_segments(server_endpoint, 'servers', server_id)
 
@@ -638,8 +642,6 @@ def verified_delete(log,
         from twisted.internet import reactor
         clock = reactor
 
-    start_time = clock.seconds()
-
     timeout_description = (
         "Waiting for Nova to actually delete server {0} (or acknowledge delete)"
         .format(server_id))
@@ -651,12 +653,8 @@ def verified_delete(log,
         clock=clock,
         deferred_description=timeout_description)
 
-    def on_success(_):
-        time_delete = clock.seconds() - start_time
-        serv_log.msg(
-            'Server deleted successfully (or acknowledged by Nova as '
-            'to-be-deleted) : {time_delete} seconds.', time_delete=time_delete)
-
-    d.addCallback(on_success)
+    d.addCallback(log_with_time, clock, serv_log, clock.seconds(),
+                  ('Server deleted successfully (or acknowledged by Nova as '
+                   'to-be-deleted) : {time_delete} seconds.'), 'time_delete')
     d.addErrback(serv_log.err)
     return d
