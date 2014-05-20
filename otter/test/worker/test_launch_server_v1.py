@@ -1749,7 +1749,10 @@ class DeleteServerTests(SynchronousTestCase):
 
         delete_and_verify.side_effect = lambda *a, **kw: None
         self.clock.pump([5])
-        self.assertEqual(delete_and_verify.call_count, 2)
+        self.assertEqual(
+            delete_and_verify.mock_calls,
+            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
+                       'my-auth-token', 'serverId')] * 2)
         self.successResultOf(d)
 
         # the loop has stopped
@@ -1775,7 +1778,10 @@ class DeleteServerTests(SynchronousTestCase):
         self.assertNoResult(d)
 
         self.clock.pump([5] * 4)
-        self.assertEqual(delete_and_verify.call_count, 4)
+        self.assertEqual(
+            delete_and_verify.mock_calls,
+            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
+                       'my-auth-token', 'serverId')] * 4)
         self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
                                              server_id='serverId')
 

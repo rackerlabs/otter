@@ -575,7 +575,7 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
     to be deleted (task_state = "deleted").
 
     Note that ``task_state`` is in the server details key
-    ``OS-EXT-STS:task_state``, which is supported by openstack but available
+    ``OS-EXT-STS:task_state``, which is supported by Openstack but available
     only when looking at the extended status of a server.
     """
     path = append_segments(server_endpoint, 'servers', server_id)
