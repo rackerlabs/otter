@@ -567,6 +567,35 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     return d
 
 
+def delete_and_verify(log, server_endpoint, auth_token, server_id):
+    """
+    Check the status of the server to see if it's actually been deleted.
+    Succeeds only if it has been either deleted (404) or acknowledged by Nova
+    to be deleted (task_state = "deleted")
+    """
+    path = append_segments(server_endpoint, 'servers', server_id)
+
+    def delete():
+        del_d = treq.delete(path, headers=headers(auth_token), log=log)
+        del_d.addCallback(check_success, [404])
+        del_d.addCallback(treq.content)
+        return del_d
+
+    def check_task_state(json_blob):
+        server_details = json_blob['server']
+        is_deleting = server_details.pop("OS-EXT-STS:task_state", "")
+        if is_deleting.strip().lower() != "deleting":
+            raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
+
+    def verify(_):
+        ver_d = server_details(server_endpoint, auth_token, server_id, log=log)
+        ver_d.addCallback(check_task_state)
+        ver_d.addErrback(lambda f: f.trap(ServerDeleted))
+        return ver_d
+
+    return delete().addErrback(verify)
+
+
 def verified_delete(log,
                     server_endpoint,
                     auth_token,
@@ -597,18 +626,12 @@ def verified_delete(log,
     serv_log = log.bind(server_id=server_id)
     serv_log.msg('Deleting server')
 
-    path = append_segments(server_endpoint, 'servers', server_id)
-
     if clock is None:  # pragma: no cover
         from twisted.internet import reactor
         clock = reactor
 
-    # just delete over and over until a 404 is received
     def delete():
-        del_d = treq.delete(path, headers=headers(auth_token), log=serv_log)
-        del_d.addCallback(check_success, [404])
-        del_d.addCallback(treq.content)
-        return del_d
+        return delete_and_verify(serv_log, server_endpoint, auth_token, server_id)
 
     start_time = clock.seconds()
 
