@@ -609,7 +609,10 @@ def verified_delete(log,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
-    deleted by trying again until deleting the server results in a 404.
+    deleted by trying again until deleting/getting the server results in a 404
+    or until ``OS-EXT-STS:task_state`` in server details is 'deleting',
+    indicating that Nova has acknowledged that the server is to be deleted
+    as soon as possible.
 
     Time out attempting to verify deletes after a period of time and log an
     error.
@@ -640,7 +643,8 @@ def verified_delete(log,
     start_time = clock.seconds()
 
     timeout_description = (
-        "Waiting for Nova to actually delete server {0}".format(server_id))
+        "Waiting for Nova to actually delete server {0} (or acknowledge delete)"
+        .format(server_id))
 
     d = retry_and_timeout(delete, timeout,
                           next_interval=repeating_interval(interval),
@@ -649,8 +653,9 @@ def verified_delete(log,
 
     def on_success(_):
         time_delete = clock.seconds() - start_time
-        serv_log.msg('Server deleted successfully: {time_delete} seconds.',
-                     time_delete=time_delete)
+        serv_log.msg(
+            'Server deleted successfully (or acknowledged by Nova as '
+            'to-be-deleted) : {time_delete} seconds.', time_delete=time_delete)
 
     d.addCallback(on_success)
     d.addErrback(serv_log.err)
