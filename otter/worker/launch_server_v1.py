@@ -587,7 +587,11 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
         if is_deleting.strip().lower() != "deleting":
             raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
 
-    def verify(_):
+    def verify(f):
+        f.trap(APIError)
+        if f.value.code != 204:
+            return wrap_request_error(f, path, 'delete_server')
+
         ver_d = server_details(server_endpoint, auth_token, server_id, log=log)
         ver_d.addCallback(check_task_state)
         ver_d.addErrback(lambda f: f.trap(ServerDeleted))

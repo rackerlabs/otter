@@ -1713,6 +1713,19 @@ class DeleteServerTests(SynchronousTestCase):
         self.assertEqual(self.treq.get.call_count, 1)
         self.failureResultOf(d, UnexpectedServerStatus)
 
+    def test_delete_and_verify_fails_if_delete_500s(self):
+        """
+        ``delete_and_verify`` fails if, when deleting, the response code
+        from deleting is neither a 404 nor a 204
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=500))
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 0)
+        self.failureResultOf(d, RequestError)
+
     def test_delete_and_verify_fails_if_verify_500s(self):
         """
         ``delete_and_verify`` fails if, when verifying, the response code
