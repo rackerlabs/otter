@@ -16,6 +16,7 @@ Also no attempt is currently being made to define the public API for
 initiating a launch_server job.
 """
 
+from functools import partial
 import json
 import itertools
 from copy import deepcopy
@@ -637,19 +638,18 @@ def verified_delete(log,
         from twisted.internet import reactor
         clock = reactor
 
-    def delete():
-        return delete_and_verify(serv_log, server_endpoint, auth_token, server_id)
-
     start_time = clock.seconds()
 
     timeout_description = (
         "Waiting for Nova to actually delete server {0} (or acknowledge delete)"
         .format(server_id))
 
-    d = retry_and_timeout(delete, timeout,
-                          next_interval=repeating_interval(interval),
-                          clock=clock,
-                          deferred_description=timeout_description)
+    d = retry_and_timeout(
+        partial(delete_and_verify, serv_log, server_endpoint, auth_token, server_id),
+        timeout,
+        next_interval=repeating_interval(interval),
+        clock=clock,
+        deferred_description=timeout_description)
 
     def on_success(_):
         time_delete = clock.seconds() - start_time
