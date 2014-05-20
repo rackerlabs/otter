@@ -65,7 +65,8 @@ _cql_view_webhook = ('SELECT data, capability FROM {cf} WHERE "tenantId" = :tena
 _cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, launch_config, active, '
                      'pending, "policyTouched", paused, desired, created_at) '
                      'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-                     ':pending, :policyTouched, :paused, :desired, :created_at)')
+                     ':pending, :policyTouched, :paused, :desired, :created_at) '
+                     'USING TIMESTAMP :ts')
 _cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                       'pending, "groupTouched", "policyTouched", paused, desired, created_at '
                       'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
@@ -75,7 +76,7 @@ _cql_insert_policy = (
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
                            '"policyTouched", paused, desired) VALUES(:tenantId, :groupId, :active, '
                            ':pending, :groupTouched, :policyTouched, :paused, :desired) '
-                           'USING TIMESTAMP {ts}')
+                           'USING TIMESTAMP :ts')
 _cql_view_group_state = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
                          '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
                          '"tenantId" = :tenantId AND "groupId" = :groupId;')
@@ -104,7 +105,7 @@ _cql_insert_webhook = (
     '"webhookKey") VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
     ':{name}Capability, :{name}Key)')
 _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", {column}) '
-               'VALUES (:tenantId, :groupId, {name}) USING TIMESTAMP {ts}')
+               'VALUES (:tenantId, :groupId, {name}) USING TIMESTAMP :ts')
 _cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
                        'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
 _cql_delete_all_in_group = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
@@ -481,7 +482,7 @@ def get_client_ts(reactor):
     """
     Return EPOCH as int
     """
-    return int(reactor.seconds() * 1000)
+    return defer.succeed(int(reactor.seconds() * 1000))
 
 
 @implementer(IScalingGroup)
@@ -659,10 +660,11 @@ class CassScalingGroup(object):
                 'paused': new_state.paused,
                 'desired': new_state.desired,
                 'groupTouched': new_state.group_touched,
-                'policyTouched': serialize_json_data(new_state.policy_touched, 1)
+                'policyTouched': serialize_json_data(new_state.policy_touched, 1),
+                'ts': timestamp
             }
             return self.connection.execute(
-                _cql_insert_group_state.format(cf=self.group_table, ts=self.get_timestamp()),
+                _cql_insert_group_state.format(cf=self.group_table),
                 params, consistency)
 
         def _modify_state():
@@ -682,18 +684,23 @@ class CassScalingGroup(object):
         """
         self.log.bind(updated_config=data).msg("Updating config")
 
-        def _do_update_config(lastRev):
+        def _get_ts_and_update(conf):
+            d = self.get_timestamp()
+            return d.addCallback(lambda ts: _do_update_config(conf, ts))
+
+        def _do_update_config(lastRev, ts):
             queries = [_cql_update.format(cf=self.group_table, column='group_config',
-                                          name=":scaling", ts=self.using_ts())]
+                                          name=":scaling")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
-                                "scaling": serialize_json_data(data, 1)},
+                                "scaling": serialize_json_data(data, 1),
+                                "ts": ts},
                       consistency=get_consistency_level('update', 'partial'))
             return b.execute(self.connection)
 
         d = self.view_config()
-        d.addCallback(_do_update_config)
+        d.addCallback(_get_ts_and_update)
         return d
 
     def update_launch_config(self, data):
@@ -702,19 +709,24 @@ class CassScalingGroup(object):
         """
         self.log.bind(updated_launch_config=data).msg("Updating launch config")
 
-        def _do_update_launch(lastRev):
+        def _get_ts_and_update(launch):
+            d = self.get_timestamp()
+            return d.addCallback(lambda ts: _do_update_launch(launch, ts))
+
+        def _do_update_launch(lastRev, ts):
             queries = [_cql_update.format(cf=self.group_table, column='launch_config',
-                                          name=":launch", ts=self.using_ts())]
+                                          name=":launch")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
-                                "launch": serialize_json_data(data, 1)},
+                                "launch": serialize_json_data(data, 1),
+                                "ts": ts},
                       consistency=get_consistency_level('update', 'partial'))
             d = b.execute(self.connection)
             return d
 
         d = self.view_config()
-        d.addCallback(_do_update_launch)
+        d.addCallback(_get_ts_and_update)
         return d
 
     def _naive_list_policies(self, limit=None, marker=None):
@@ -1104,6 +1116,7 @@ class CassScalingGroupCollection:
         """
         self.connection = connection
         self.reactor = reactor
+        self.get_timestamp = functools.partial(get_client_ts, self.reactor)
         self.local_locks = WeakLocks()
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
@@ -1141,7 +1154,7 @@ class CassScalingGroupCollection:
 
         d.addCallback(check_groups, max_groups)
 
-        def _create_group(_):
+        def _create_group(ts):
             log.msg("Creating scaling group")
             queries = [_cql_create_group.format(cf=self.group_table)]
 
@@ -1155,7 +1168,8 @@ class CassScalingGroupCollection:
                 "created_at": datetime.utcnow(),
                 "policyTouched": '{}',
                 "paused": False,
-                "desired": config.get('minEntities', 0)
+                "desired": config.get('minEntities', 0),
+                "ts": ts
             }
 
             scaling_group_state = GroupState(
@@ -1186,6 +1200,7 @@ class CassScalingGroupCollection:
 
             return bd
 
+        d.addCallback(lambda _: self.get_timestamp())
         return d.addCallback(_create_group)
 
     def list_scaling_group_states(self, log, tenant_id, limit=100, marker=None):

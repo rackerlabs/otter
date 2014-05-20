@@ -567,12 +567,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'INSERT INTO scaling_group("tenantId", "groupId", active, '
             'pending, "groupTouched", "policyTouched", paused, desired) VALUES('
             ':tenantId, :groupId, :active, :pending, :groupTouched, '
-            ':policyTouched, :paused, :desired) USING TIMESTAMP 10345')
+            ':policyTouched, :paused, :desired) USING TIMESTAMP :ts')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
                         "active": _S({}), "pending": _S({}),
                         "groupTouched": '0001-01-01T00:00:00Z',
                         "policyTouched": _S({}),
-                        "paused": True, "desired": 5}
+                        "paused": True, "desired": 5, "ts": 10345}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
@@ -803,15 +803,16 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         Test that you can update a config, and if its successful the return
         value is None
         """
+        self.clock.advance(10.345)
         d = self.group.update_config({"b": "lah"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
         expectedCql = ('BEGIN BATCH '
                        'INSERT INTO scaling_group("tenantId", "groupId", group_config) '
-                       'VALUES (:tenantId, :groupId, :scaling) '
+                       'VALUES (:tenantId, :groupId, :scaling) USING TIMESTAMP :ts '
                        'APPLY BATCH;')
         expectedData = {"scaling": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678g',
-                        "tenantId": '11111'}
+                        "tenantId": '11111', 'ts': 10345}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
@@ -822,15 +823,16 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         Test that you can update a launch config, and if successful the return
         value is None
         """
+        self.clock.advance(10.345)
         d = self.group.update_launch_config({"b": "lah"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
         expectedCql = ('BEGIN BATCH '
                        'INSERT INTO scaling_group("tenantId", "groupId", launch_config) '
-                       'VALUES (:tenantId, :groupId, :launch) '
+                       'VALUES (:tenantId, :groupId, :launch) USING TIMESTAMP :ts '
                        'APPLY BATCH;')
         expectedData = {"launch": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678g',
-                        "tenantId": '11111'}
+                        "tenantId": '11111', 'ts': 10345}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
@@ -2362,6 +2364,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Test that you can create a group, and if successful the group ID is
         returned
         """
+        self.clock.advance(10.345)
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
@@ -2371,13 +2374,15 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "pending": '{}',
             "policyTouched": '{}',
             "paused": False,
-            "desired": 0}
+            "desired": 0,
+            "ts": 10345}
         expectedCql = ('BEGIN BATCH '
                        'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
                        'launch_config, active, pending, "policyTouched", '
                        'paused, desired, created_at) '
                        'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
                        ':pending, :policyTouched, :paused, :desired, :created_at) '
+                       'USING TIMESTAMP :ts '
                        'APPLY BATCH;')
         self.mock_key.return_value = '12345678'
 
@@ -2407,6 +2412,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         policy = group_examples.policy()[0]
 
+        self.clock.advance(10.567)
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
@@ -2415,6 +2421,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "active": '{}',
             "pending": '{}',
             "desired": 0,
+            "ts": 10567,
             "policyTouched": '{}',
             "paused": False,
             'policy0policyId': '12345678',
@@ -2426,6 +2433,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'launch_config, active, pending, "policyTouched", paused, desired, created_at) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
             ':pending, :policyTouched, :paused, :desired, :created_at) '
+            'USING TIMESTAMP :ts '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
             'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
             'APPLY BATCH;')
@@ -2457,6 +2465,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         policies = group_examples.policy()[:2]
 
+        self.clock.advance(10.466)
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
@@ -2467,6 +2476,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "policyTouched": '{}',
             "paused": False,
             "desired": 0,
+            "ts": 10466,
             'policy0policyId': '2',
             'policy0data': _S(policies[0]),
             'policy0version': 'timeuuid',
@@ -2478,7 +2488,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
             'launch_config, active, pending, "policyTouched", paused, desired, created_at) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-            ':pending, :policyTouched, :paused, :desired, :created_at) '
+            ':pending, :policyTouched, :paused, :desired, :created_at) USING TIMESTAMP :ts '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
             'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
