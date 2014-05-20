@@ -583,7 +583,7 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
 
     def check_task_state(json_blob):
         server_details = json_blob['server']
-        is_deleting = server_details.pop("OS-EXT-STS:task_state", "")
+        is_deleting = server_details.get("OS-EXT-STS:task_state", "")
         if is_deleting.strip().lower() != "deleting":
             raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
 

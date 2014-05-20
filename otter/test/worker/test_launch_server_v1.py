@@ -1632,7 +1632,8 @@ class DeleteServerTests(SynchronousTestCase):
 
     def test_delete_and_verify_does_not_verify_if_404(self):
         """
-        ``delete_and_verify`` does not verify if delete returns 404
+        :func:`delete_and_verify` does not verify if the deletion response
+        code is a 404
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
         d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
@@ -1641,22 +1642,10 @@ class DeleteServerTests(SynchronousTestCase):
         self.assertEqual(self.treq.get.call_count, 0)
         self.successResultOf(d)
 
-    def test_delete_and_verify_verifies_if_not_404(self):
-        """
-        ``delete_and_verify`` verifies if delete does not return a 404
-        """
-        self.treq.delete.return_value = succeed(mock.Mock(code=204))
-        self.treq.get.return_value = Deferred()
-        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
-                              'serverId')
-        self.assertEqual(self.treq.delete.call_count, 1)
-        self.assertEqual(self.treq.get.call_count, 1)
-        self.assertNoResult(d)
-
     def test_delete_and_verify_succeeds_if_get_returns_404(self):
         """
-        ``delete_and_verify`` succeeds if, when verifying, the response code
-        to server details is a 404
+        :func:`delete_and_verify` succeeds if the verification response code
+        is a 404
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=204))
         self.treq.get.return_value = succeed(mock.Mock(code=404))
@@ -1669,8 +1658,8 @@ class DeleteServerTests(SynchronousTestCase):
 
     def test_delete_and_verify_succeeds_if_task_state_is_deleting(self):
         """
-        ``delete_and_verify`` succeeds if, when verifying, the task_state is
-        "deleting"
+        :func:`delete_and_verify` succeeds if the verification response body
+        has a task_state of "deleting"
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=204))
         self.treq.get.return_value = succeed(mock.Mock(code=200))
@@ -1685,8 +1674,8 @@ class DeleteServerTests(SynchronousTestCase):
 
     def test_delete_and_verify_fails_if_task_state_not_deleting(self):
         """
-        ``delete_and_verify`` fails if, when verifying, the task_state is
-        not "deleting"
+        :func:`delete_and_verify` fails if the verification response body
+        has a task_state that is not "deleting"
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=204))
         self.treq.get.return_value = succeed(mock.Mock(code=200))
@@ -1701,7 +1690,8 @@ class DeleteServerTests(SynchronousTestCase):
 
     def test_delete_and_verify_fails_if_no_task_state(self):
         """
-        ``delete_and_verify`` fails if, when verifying, there is no task_state
+        :func:`delete_and_verify` fails if the verification response body
+        does not have a task_state
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=204))
         self.treq.get.return_value = succeed(mock.Mock(code=200))
@@ -1715,8 +1705,8 @@ class DeleteServerTests(SynchronousTestCase):
 
     def test_delete_and_verify_fails_if_delete_500s(self):
         """
-        ``delete_and_verify`` fails if, when deleting, the response code
-        from deleting is neither a 404 nor a 204
+        :func:`delete_and_verify` fails if the deletion response code is
+        neither a 404 nor a 204
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=500))
 
@@ -1728,8 +1718,8 @@ class DeleteServerTests(SynchronousTestCase):
 
     def test_delete_and_verify_fails_if_verify_500s(self):
         """
-        ``delete_and_verify`` fails if, when verifying, the response code
-        from verifying is neither a 404 nor a 200
+        :func:`delete_and_verify` fails if the verification response code is
+        neither a 404 nor a 200
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=204))
         self.treq.get.return_value = succeed(mock.Mock(code=500))
