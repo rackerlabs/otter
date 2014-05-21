@@ -16,6 +16,7 @@ Also no attempt is currently being made to define the public API for
 initiating a launch_server job.
 """
 
+from functools import partial
 import json
 import itertools
 from copy import deepcopy
@@ -29,7 +30,7 @@ from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error, raise_error_on_code,
                              APIError, RequestError)
 from otter.util.hashkey import generate_server_name
-from otter.util.deferredutils import retry_and_timeout
+from otter.util.deferredutils import retry_and_timeout, log_with_time
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
                               TransientRetryError, random_interval, compose_retries)
 
@@ -567,6 +568,43 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     return d
 
 
+def delete_and_verify(log, server_endpoint, auth_token, server_id):
+    """
+    Check the status of the server to see if it's actually been deleted.
+    Succeeds only if it has been either deleted (404) or acknowledged by Nova
+    to be deleted (task_state = "deleted").
+
+    Note that ``task_state`` is in the server details key
+    ``OS-EXT-STS:task_state``, which is supported by Openstack but available
+    only when looking at the extended status of a server.
+    """
+    path = append_segments(server_endpoint, 'servers', server_id)
+
+    def delete():
+        del_d = treq.delete(path, headers=headers(auth_token), log=log)
+        del_d.addCallback(check_success, [404])
+        del_d.addCallback(treq.content)
+        return del_d
+
+    def check_task_state(json_blob):
+        server_details = json_blob['server']
+        is_deleting = server_details.get("OS-EXT-STS:task_state", "")
+        if is_deleting.strip().lower() != "deleting":
+            raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
+
+    def verify(f):
+        f.trap(APIError)
+        if f.value.code != 204:
+            return wrap_request_error(f, path, 'delete_server')
+
+        ver_d = server_details(server_endpoint, auth_token, server_id, log=log)
+        ver_d.addCallback(check_task_state)
+        ver_d.addErrback(lambda f: f.trap(ServerDeleted))
+        return ver_d
+
+    return delete().addErrback(verify)
+
+
 def verified_delete(log,
                     server_endpoint,
                     auth_token,
@@ -576,7 +614,10 @@ def verified_delete(log,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
-    deleted by trying again until deleting the server results in a 404.
+    deleted by trying again until deleting/getting the server results in a 404
+    or until ``OS-EXT-STS:task_state`` in server details is 'deleting',
+    indicating that Nova has acknowledged that the server is to be deleted
+    as soon as possible.
 
     Time out attempting to verify deletes after a period of time and log an
     error.
@@ -597,34 +638,23 @@ def verified_delete(log,
     serv_log = log.bind(server_id=server_id)
     serv_log.msg('Deleting server')
 
-    path = append_segments(server_endpoint, 'servers', server_id)
-
     if clock is None:  # pragma: no cover
         from twisted.internet import reactor
         clock = reactor
 
-    # just delete over and over until a 404 is received
-    def delete():
-        del_d = treq.delete(path, headers=headers(auth_token), log=serv_log)
-        del_d.addCallback(check_success, [404])
-        del_d.addCallback(treq.content)
-        return del_d
-
-    start_time = clock.seconds()
-
     timeout_description = (
-        "Waiting for Nova to actually delete server {0}".format(server_id))
+        "Waiting for Nova to actually delete server {0} (or acknowledge delete)"
+        .format(server_id))
 
-    d = retry_and_timeout(delete, timeout,
-                          next_interval=repeating_interval(interval),
-                          clock=clock,
-                          deferred_description=timeout_description)
+    d = retry_and_timeout(
+        partial(delete_and_verify, serv_log, server_endpoint, auth_token, server_id),
+        timeout,
+        next_interval=repeating_interval(interval),
+        clock=clock,
+        deferred_description=timeout_description)
 
-    def on_success(_):
-        time_delete = clock.seconds() - start_time
-        serv_log.msg('Server deleted successfully: {time_delete} seconds.',
-                     time_delete=time_delete)
-
-    d.addCallback(on_success)
+    d.addCallback(log_with_time, clock, serv_log, clock.seconds(),
+                  ('Server deleted successfully (or acknowledged by Nova as '
+                   'to-be-deleted) : {time_delete} seconds.'), 'time_delete')
     d.addErrback(serv_log.err)
     return d
