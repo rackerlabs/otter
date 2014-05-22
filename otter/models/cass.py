@@ -551,6 +551,17 @@ class CassScalingGroup(object):
         self.webhooks_table = "policy_webhooks"
         self.event_table = "scaling_schedule_v2"
 
+    def with_timestamp(self, func):
+        """
+        Decorator that calls the given function with timestamp
+        """
+        @functools.wraps(func)
+        def wrapper(*args):
+            d = self.get_timestamp()
+            d.addCallback(lambda ts: func(ts, *args))
+            return d
+        return wrapper
+
     def view_manifest(self, with_webhooks=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
@@ -645,11 +656,8 @@ class CassScalingGroup(object):
         log = self.log.bind(system='CassScalingGroup.modify_state')
         consistency = get_consistency_level('update', 'state')
 
-        def _write_state(new_state):
-            d = self.get_timestamp()
-            return d.addCallback(lambda t: _actual_write_state(new_state, t))
-
-        def _actual_write_state(new_state, timestamp):
+        @self.with_timestamp
+        def _write_state(timestamp, new_state):
             assert (new_state.tenant_id == self.tenant_id and
                     new_state.group_id == self.uuid)
             params = {
@@ -684,11 +692,8 @@ class CassScalingGroup(object):
         """
         self.log.bind(updated_config=data).msg("Updating config")
 
-        def _get_ts_and_update(conf):
-            d = self.get_timestamp()
-            return d.addCallback(lambda ts: _do_update_config(conf, ts))
-
-        def _do_update_config(lastRev, ts):
+        @self.with_timestamp
+        def _do_update_config(ts, lastRev):
             queries = [_cql_update.format(cf=self.group_table, column='group_config',
                                           name=":scaling")]
 
@@ -700,7 +705,7 @@ class CassScalingGroup(object):
             return b.execute(self.connection)
 
         d = self.view_config()
-        d.addCallback(_get_ts_and_update)
+        d.addCallback(_do_update_config)
         return d
 
     def update_launch_config(self, data):
@@ -709,11 +714,8 @@ class CassScalingGroup(object):
         """
         self.log.bind(updated_launch_config=data).msg("Updating launch config")
 
-        def _get_ts_and_update(launch):
-            d = self.get_timestamp()
-            return d.addCallback(lambda ts: _do_update_launch(launch, ts))
-
-        def _do_update_launch(lastRev, ts):
+        @self.with_timestamp
+        def _do_update_launch(ts, lastRev):
             queries = [_cql_update.format(cf=self.group_table, column='launch_config',
                                           name=":launch")]
 
@@ -726,7 +728,7 @@ class CassScalingGroup(object):
             return d
 
         d = self.view_config()
-        d.addCallback(_get_ts_and_update)
+        d.addCallback(_do_update_launch)
         return d
 
     def _naive_list_policies(self, limit=None, marker=None):
