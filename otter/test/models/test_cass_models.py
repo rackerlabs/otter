@@ -1794,17 +1794,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             [{'id': 'policyA'}, {'id': 'policyB'}])
 
         self.returns = [None]
+        self.clock.advance(34.575)
         result = self.successResultOf(self.group.delete_group())
         self.assertIsNone(result)  # delete returns None
         mock_naive.assert_called_once_with()
 
         expected_data = {'tenantId': self.tenant_id,
-                         'groupId': self.group_id}
+                         'groupId': self.group_id,
+                         'ts': 34575000}
         expected_cql = (
             'BEGIN BATCH '
-            'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM scaling_group USING TIMESTAMP :ts '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'APPLY BATCH;')
 
         self.connection.execute.assert_called_once_with(
@@ -1829,17 +1832,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         mock_naive.return_value = defer.succeed({})
 
         self.returns = [None]
+        self.clock.advance(34.575)
         result = self.successResultOf(self.group.delete_group())
         self.assertIsNone(result)  # delete returns None
         mock_naive.assert_called_once_with()
 
         expected_data = {'tenantId': self.tenant_id,
-                         'groupId': self.group_id}
+                         'groupId': self.group_id,
+                         'ts': 34575000}
         expected_cql = (
             'BEGIN BATCH '
-            'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM scaling_group USING TIMESTAMP :ts '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'APPLY BATCH;')
 
         self.connection.execute.assert_called_once_with(

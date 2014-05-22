@@ -108,6 +108,8 @@ _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", {column}) '
                'VALUES (:tenantId, :groupId, {name}) USING TIMESTAMP :ts')
 _cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
                        'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
+_cql_delete_group = ('DELETE FROM {cf} USING TIMESTAMP :ts '
+                     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_delete_all_in_group = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
                             '"groupId" = :groupId{name}')
 _cql_delete_all_in_policy = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId '
@@ -1041,14 +1043,17 @@ class CassScalingGroup(object):
 
         # Events can only be deleted by policy id, since that and trigger are
         # the only parts of the compound key
-        def _delete_everything(policies):
+        @self.with_timestamp
+        def _delete_everything(ts, policies):
             params = {
                 'tenantId': self.tenant_id,
-                'groupId': self.uuid
+                'groupId': self.uuid,
+                'ts': ts
             }
             queries = [
                 _cql_delete_all_in_group.format(cf=table, name='') for table in
-                (self.group_table, self.policies_table, self.webhooks_table)]
+                (self.policies_table, self.webhooks_table)]
+            queries.append(_cql_delete_group.format(cf=self.group_table))
 
             b = Batch(queries, params,
                       consistency=get_consistency_level('delete', 'group'))
