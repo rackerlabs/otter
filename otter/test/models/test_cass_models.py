@@ -572,7 +572,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                         "active": _S({}), "pending": _S({}),
                         "groupTouched": '0001-01-01T00:00:00Z',
                         "policyTouched": _S({}),
-                        "paused": True, "desired": 5, "ts": 10345}
+                        "paused": True, "desired": 5, "ts": 10345000}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
@@ -812,7 +812,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                        'APPLY BATCH;')
         expectedData = {"scaling": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678g',
-                        "tenantId": '11111', 'ts': 10345}
+                        "tenantId": '11111', 'ts': 10345000}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
@@ -832,7 +832,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                        'APPLY BATCH;')
         expectedData = {"launch": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678g',
-                        "tenantId": '11111', 'ts': 10345}
+                        "tenantId": '11111', 'ts': 10345000}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
@@ -2375,7 +2375,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "policyTouched": '{}',
             "paused": False,
             "desired": 0,
-            "ts": 10345}
+            "ts": 10345000}
         expectedCql = ('BEGIN BATCH '
                        'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
                        'launch_config, active, pending, "policyTouched", '
@@ -2421,7 +2421,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "active": '{}',
             "pending": '{}',
             "desired": 0,
-            "ts": 10567,
+            "ts": 10567000,
             "policyTouched": '{}',
             "paused": False,
             'policy0policyId': '12345678',
@@ -2476,7 +2476,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "policyTouched": '{}',
             "paused": False,
             "desired": 0,
-            "ts": 10466,
+            "ts": 10466000,
             'policy0policyId': '2',
             'policy0data': _S(policies[0]),
             'policy0version': 'timeuuid',

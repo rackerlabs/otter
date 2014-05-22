@@ -480,9 +480,9 @@ class WeakLocks(object):
 
 def get_client_ts(reactor):
     """
-    Return EPOCH as int
+    Return EPOCH with microseconds precision as a `Deferred`
     """
-    return defer.succeed(int(reactor.seconds() * 1000))
+    return defer.succeed(int(reactor.seconds() * 1000000))
 
 
 @implementer(IScalingGroup)
