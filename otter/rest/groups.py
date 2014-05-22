@@ -10,7 +10,7 @@ from twisted.internet import defer
 from otter import controller
 from otter.supervisor import get_supervisor
 
-from otter.json_schema.rest_schemas import create_group_request
+from otter.json_schema.rest_schemas import create_group_request, delete_server_request
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import log
 from otter.rest.configs import OtterConfig, OtterLaunch
@@ -579,6 +579,21 @@ class OtterGroup(object):
         """
         group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         return controller.resume_scaling_group(self.log, transaction_id(request), group)
+
+    @app.route('/delete_server/', methods=['POST'])
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(202)
+    @validate_body(delete_server_request)
+    def delete_server(self, request, data):
+        """
+        Delete a server from the group.
+        """
+        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        d = group.modify_state(
+            partial(controller.remove_server_from_group, self.log, transaction_id(request),
+                    group, data['server_id'], data.get('backfil', True)))
+        return d
 
     @app.route('/config/')
     def config(self, request):

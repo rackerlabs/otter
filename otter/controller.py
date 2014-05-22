@@ -31,7 +31,8 @@ from otter.log import audit
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
-from otter.supervisor import execute_launch_config, exec_scale_down
+from otter.supervisor import (execute_launch_config, exec_scale_down, get_supervisor,
+                              _DeleteJob)
 
 
 class CannotExecutePolicyError(Exception):
@@ -309,3 +310,39 @@ def calculate_delta(log, state, config, policy):
             server_delta=delta, current_active=len(state.active),
             current_pending=len(state.pending))
     return delta
+
+
+class ServerNotFoundError(Exception):
+    """
+    Exception to be raised when the given server is not found
+    """
+    def __init__(self, tenant_id, group_id, server_id):
+        self.tenant_id = tenant_id
+        self.group_id = group_id
+        self.server_id = server_id
+        super(ServerNotFoundError, self).__init__(
+            "Active server {} not found in tenant {}'s group {}".format(
+                server_id, tenant_id, group_id))
+
+
+def remove_server_from_group(log, trans_id, group, server_id, backfil, state):
+    """
+    Remove specific server from the group and create new one instead
+    unless asked otherwise
+    """
+    if server_id in state.active:
+        server_info = state.active[server_id]
+        state.remove_active[server_id]
+        # REVIEW: _DeleteJob imported from supervisor. Not sure if its internal.
+        # Also, should this whole function be in supervisor? I am kinda confused
+        # between their roles
+        _DeleteJob(log, trans_id, group, server_info, get_supervisor()).start()
+        if backfil:
+            d = group.view_launch_config()
+            d.addCallback(lambda lc: execute_launch_config(log, trans_id, state, lc, group, 1))
+            return d.addCallback(lambda _: state)
+        else:
+            state.desired -= 1
+            return state
+    else:
+        raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)

@@ -262,3 +262,25 @@ create_and_manifest_response = _openstackify_schema("group", {
 # ----- schemas for viewing configs
 view_config = _openstackify_schema("groupConfiguration", config)
 view_launch_config = _openstackify_schema("launchConfiguration", launch_config)
+
+
+# Schema for request body of POST ../groupId/delete_server
+delete_server_request = {
+    "type": "object",
+    "description": "Schema of JSON used to delete specific server from the group",
+    "properties": {
+        "server_id": {
+            "type": "string",
+            "description": "Server ID of server to be removed",
+            "maxLength": 36,
+            "minLength": 36,
+            "pattern": "\S+",
+            "required": True
+        },
+        "backfil": {
+            "description": "Should another server be created to replace this one? Defaults to true"
+            "type": boolean,
+            "required": False
+        }
+    }
+}
