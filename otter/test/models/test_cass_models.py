@@ -411,6 +411,31 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
     CassScalingGroup's tests
     """
 
+    def test_with_timestamp(self):
+        """
+        `with_timestamp` calls the decorated function with the timestamp got from
+        `get_client_ts`
+        """
+        self.clock.advance(23.566783)
+
+        @self.group.with_timestamp
+        def f(ts, a, b):
+            "f"
+            self.ts = ts
+            self.a = a
+            self.b = b
+            return 45
+
+        d = f(2, 3)
+        # Wrapped function's return is same
+        self.assertEqual(self.successResultOf(d), 45)
+        # Timestamp and arguments are passed correctly
+        self.assertEqual(self.ts, 23566783)
+        self.assertEqual(self.a, 2)
+        self.assertEqual(self.b, 3)
+        # has same docstring
+        self.assertEqual(f.__doc__, 'f')
+
     def test_view_config(self):
         """
         Test that you can call view and receive a valid parsed response

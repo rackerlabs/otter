@@ -541,11 +541,6 @@ class CassScalingGroup(object):
         self.reactor = reactor
         self.local_locks = local_locks
 
-        # Function used to return monotically increasing integer used while
-        # inserting state. This integer is expected to resolve conflict in
-        # CASS when CASS finds rows with different integers
-        self.get_timestamp = functools.partial(get_client_ts, self.reactor)
-
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
@@ -556,10 +551,16 @@ class CassScalingGroup(object):
     def with_timestamp(self, func):
         """
         Decorator that calls the given function with timestamp
+
+        The timestamp returned is used when inserting/deleting/updating group.
+        This is required because state updates very close in time can be corrupted
+        (even if they are serial). This is because of small clock drifts in cass nodes.
+        This ensures that state updates from same node is always serial. This however
+        does not (yet) handle simultaneous executions from multiple nodes.
         """
         @functools.wraps(func)
         def wrapper(*args):
-            d = self.get_timestamp()
+            d = get_client_ts(self.reactor)
             d.addCallback(lambda ts: func(ts, *args))
             return d
         return wrapper
@@ -1123,7 +1124,6 @@ class CassScalingGroupCollection:
         """
         self.connection = connection
         self.reactor = reactor
-        self.get_timestamp = functools.partial(get_client_ts, self.reactor)
         self.local_locks = WeakLocks()
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
@@ -1207,7 +1207,7 @@ class CassScalingGroupCollection:
 
             return bd
 
-        d.addCallback(lambda _: self.get_timestamp())
+        d.addCallback(lambda _: get_client_ts(self.reactor))
         return d.addCallback(_create_group)
 
     def list_scaling_group_states(self, log, tenant_id, limit=100, marker=None):
