@@ -138,7 +138,7 @@ class GetConsistencyTests(SynchronousTestCase):
         resource in that mapping it returns the consistency for that operation
         and resource in that mapping, even if it is different than the default.
         """
-        mapping={'event': {'fetch': ConsistencyLevel.TWO}}
+        mapping = {'event': {'fetch': ConsistencyLevel.TWO}}
         level = get_consistency_level('fetch', 'event', ConsistencyLevel.ONE,
                                       mapping)
         self.assertEqual(level, ConsistencyLevel.TWO)

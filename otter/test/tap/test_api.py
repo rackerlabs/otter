@@ -362,6 +362,22 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.CassScalingGroupCollection.assert_called_once_with(
             self.LoggingCQLClient.return_value, self.reactor)
 
+    def test_cassandra_scaling_group_collection_with_consistency_info(self):
+        """
+        makeService configures a CassandraScalingGroupCollection with the
+        default consistency and consistency mapping, if they are in the
+        configuration.
+        """
+        config = test_config.copy()
+        config['cassandra'] = test_config['cassandra'].copy()
+        config['cassandra']['default_consistency'] = 'default'
+        config['cassandra']['consistency_mapping'] = 'mapping'
+        makeService(config)
+        self.CassScalingGroupCollection.assert_called_once_with(
+            self.LoggingCQLClient.return_value, self.reactor,
+            default_consistency='default',
+            consistency_mapping='mapping')
+
     def test_cassandra_cluster_disconnects_on_stop(self):
         """
         Cassandra cluster connection is disconnected when main service is stopped

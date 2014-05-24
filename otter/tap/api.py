@@ -195,7 +195,14 @@ def makeService(config):
             config_value('cassandra.timeout') or 30),
         log.bind(system='otter.silverberg'))
 
-    store = CassScalingGroupCollection(cassandra_cluster, reactor)
+    store_kwargs = {
+        k: v for k, v in (
+            ('default_consistency', config_value('cassandra.default_consistency')),
+            ('consistency_mapping', config_value('cassandra.consistency_mapping')))
+        if v is not None
+    }
+
+    store = CassScalingGroupCollection(cassandra_cluster, reactor, **store_kwargs)
     admin_store = CassAdmin(cassandra_cluster)
 
     bobby_url = config_value('bobby_url')
