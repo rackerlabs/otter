@@ -1262,7 +1262,9 @@ class CassScalingGroupCollection:
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection, self.buckets, self.kz_client, self.reactor,
-                                self.local_locks)
+                                self.local_locks,
+                                default_consistency=self.default_consistency,
+                                consistency_mapping=self.consistency_mapping)
 
     def fetch_and_delete(self, bucket, now, size=100):
         """
@@ -1430,7 +1432,7 @@ class CassAdmin(object):
     .. autointerface:: otter.models.interface.IAdmin
     """
 
-    def __init__(self, connection, default_consistency):
+    def __init__(self, connection, default_consistency=ConsistencyLevel.ONE):
         self.connection = connection
         self.default_consistency = default_consistency
         self.get_consistency_level = functools.partial(

@@ -2746,13 +2746,16 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
     def test_get_scaling_group(self):
         """
         Tests that you can get a scaling group
-        (note that it doesn't request the database)
+        (note that it doesn't request the database), and the local locks and
+        consistency information is passed from the collection to the group.
         """
         g = self.collection.get_scaling_group(self.mock_log, '123', '12345678')
         self.assertTrue(isinstance(g, CassScalingGroup))
         self.assertEqual(g.uuid, '12345678')
         self.assertEqual(g.tenant_id, '123')
         self.assertIs(g.local_locks, self.collection.local_locks)
+        self.assertIs(g.default_consistency, self.collection.default_consistency)
+        self.assertIs(g.consistency_mapping, self.collection.consistency_mapping)
 
     def test_webhook_hash_from_table(self):
         """
