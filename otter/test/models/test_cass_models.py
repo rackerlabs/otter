@@ -110,44 +110,58 @@ class GetConsistencyTests(SynchronousTestCase):
     """
     def test_unknown_resource(self):
         """
-        When called with unknown resource it returns ConsistencyLevel.ONE
+        When called with unknown resource it returns the default consistency
+        passed to it
         """
-        level = get_consistency_level('list', 'junk')
+        level = get_consistency_level('list', 'junk', ConsistencyLevel.ONE)
         self.assertEqual(level, ConsistencyLevel.ONE)
 
     def test_unknown_operation(self):
         """
-        When called with unknown operation it returns ConsistencyLevel.ONE
+        When called with unknown operation it returns the default consistency
+        passed to it
         """
-        level = get_consistency_level('junk', 'event')
+        level = get_consistency_level('junk', 'event', ConsistencyLevel.ONE)
         self.assertEqual(level, ConsistencyLevel.ONE)
 
     def test_unknown_operation_and_resource(self):
         """
-        When called with unknown operation and resource it returns ConsistencyLevel.ONE
+        When called with unknown operation and resource it returns the default
+        consistency passed to it
         """
-        level = get_consistency_level('junk', 'junk2')
+        level = get_consistency_level('junk', 'junk2', ConsistencyLevel.ONE)
         self.assertEqual(level, ConsistencyLevel.ONE)
+
+    def test_uses_passed_consistency_mapping_to_get_consistency(self):
+        """
+        When a consistency mapping is passed, if called with an operation and
+        resource in that mapping it returns the consistency for that operation
+        and resource in that mapping, even if it is different than the default.
+        """
+        mapping={'event': {'fetch': ConsistencyLevel.TWO}}
+        level = get_consistency_level('fetch', 'event', ConsistencyLevel.ONE,
+                                      mapping)
+        self.assertEqual(level, ConsistencyLevel.TWO)
 
     def test_event_fetch(self):
         """
-        Gives QUORUM on event fetch
+        Gives QUORUM on event fetch by default
         """
-        level = get_consistency_level('fetch', 'event')
+        level = get_consistency_level('fetch', 'event', ConsistencyLevel.ONE)
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
     def test_group_create(self):
         """
-        Gives QUORUM on group create
+        Gives QUORUM on group create by default
         """
-        level = get_consistency_level('create', 'group')
+        level = get_consistency_level('create', 'group', ConsistencyLevel.ONE)
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
     def test_update_state(self):
         """
-        Gives QUORUM on updating state
+        Gives QUORUM on updating state by default
         """
-        level = get_consistency_level('update', 'state')
+        level = get_consistency_level('update', 'state', ConsistencyLevel.ONE)
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
 
@@ -384,7 +398,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, Synchronou
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
                                       self.connection, itertools.cycle(range(2, 10)),
-                                      self.kz_lock, self.clock, locks)
+                                      self.kz_lock, self.clock, locks,
+                                      default_consistency=ConsistencyLevel.TWO,
+                                      consistency_mapping={})
         self.assertIs(self.group.local_locks, locks)
         self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
                                                    tenant_id=self.tenant_id,
@@ -395,9 +411,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, Synchronou
                               return_value='12345678')
         self.mock_capability = patch(self, 'otter.models.cass.generate_capability',
                                      return_value=('ver', 'hash'))
-
-        patch(self, 'otter.models.cass.get_consistency_level',
-              return_value=ConsistencyLevel.TWO)
 
         self.uuid = patch(self, 'otter.models.cass.uuid')
         self.uuid.uuid1.return_value = 'timeuuid'
@@ -2325,7 +2338,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_log = mock_log()
         self.clock = Clock()
 
-        self.collection = CassScalingGroupCollection(self.connection, self.clock)
+        self.collection = CassScalingGroupCollection(
+            self.connection, self.clock,
+            default_consistency=ConsistencyLevel.TWO, consistency_mapping={})
+
         self.tenant_id = 'goo1234'
         self.config = _de_identify({
             'name': 'blah',
@@ -2337,8 +2353,6 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.launch = _de_identify(group_examples.launch_server_config()[0])
 
         self.mock_key = patch(self, 'otter.models.cass.generate_key_str')
-        patch(self, 'otter.models.cass.get_consistency_level',
-              return_value=ConsistencyLevel.TWO)
 
         self.uuid = patch(self, 'otter.models.cass.uuid')
         self.uuid.uuid1.return_value = 'timeuuid'
@@ -2981,10 +2995,8 @@ class CassAdminTestCase(SynchronousTestCase):
 
         self.mock_log = mock.MagicMock()
 
-        self.collection = CassAdmin(self.connection)
-
-        patch(self, 'otter.models.cass.get_consistency_level',
-              return_value=ConsistencyLevel.TWO)
+        self.collection = CassAdmin(self.connection,
+                                    default_consistency=ConsistencyLevel.TWO)
 
     @mock.patch('otter.models.cass.time')
     def test_get_metrics(self, time):
