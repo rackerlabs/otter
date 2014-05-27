@@ -21,7 +21,7 @@ from otter.json_schema.group_examples import (
     config, launch_server_config)
 from otter.models.interface import (
     GroupState, NoSuchPolicyError, NoSuchScalingGroupError)
-from otter.models.cass import CassScalingGroupCollection
+from otter.models.cass import CassScalingGroupCollection, Consistency
 from otter.rest.application import Otter
 from otter.supervisor import set_supervisor
 
@@ -85,7 +85,7 @@ except Exception as e:
     skip = "Cassandra unavailable: {0}".format(e)
 else:
     keyspace = keymaster.get_keyspace()
-    store = CassScalingGroupCollection(keyspace.client, reactor)
+    store = CassScalingGroupCollection(keyspace.client, reactor, Consistency())
 
 
 class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
