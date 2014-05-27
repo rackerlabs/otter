@@ -147,6 +147,10 @@ class GetConsistencyTests(SynchronousTestCase):
         self.assertEqual(level, ConsistencyLevel.TWO)
 
     def test_default_default_consistency_is_one(self):
+        """
+        If the default consistency is not passed, a consistency level of one is
+        used
+        """
         c_obj = Consistency()
         level = c_obj.get_consistency('nonexistant_resource', 'blow up')
         self.assertEqual(level, ConsistencyLevel.ONE)

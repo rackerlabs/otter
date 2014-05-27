@@ -1,7 +1,6 @@
 """
 Cassandra implementation of the store for the front-end scaling groups engine
 """
-from collections import defaultdict
 import time
 import itertools
 import uuid
