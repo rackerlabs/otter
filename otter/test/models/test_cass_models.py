@@ -146,6 +146,11 @@ class GetConsistencyTests(SynchronousTestCase):
         level = c_obj.get_consistency('fetch', 'event')
         self.assertEqual(level, ConsistencyLevel.TWO)
 
+    def test_default_default_consistency_is_one(self):
+        c_obj = Consistency()
+        level = c_obj.get_consistency('nonexistant_resource', 'blow up')
+        self.assertEqual(level, ConsistencyLevel.ONE)
+
     def test_event_fetch(self):
         """
         Gives QUORUM on event fetch by default

@@ -5,7 +5,9 @@ Tests for the otter-api tap plugin.
 import json
 import mock
 
-from testtools.matchers import Contains
+from silverberg.client import ConsistencyLevel
+
+from testtools.matchers import Contains, IsInstance
 
 from twisted.internet import defer
 from twisted.internet.task import Clock
@@ -13,6 +15,7 @@ from twisted.internet.task import Clock
 from twisted.application.service import MultiService
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.models.cass import Consistency
 from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
 from otter.tap.api import (
     Options, HealthChecker, makeService, setup_scheduler, call_after_supervisor)
@@ -360,7 +363,12 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.LoggingCQLClient.assert_called_once_with(self.TimingOutCQLClient.return_value,
                                                       self.log.bind.return_value)
         self.CassScalingGroupCollection.assert_called_once_with(
-            self.LoggingCQLClient.return_value, self.reactor)
+            self.LoggingCQLClient.return_value, self.reactor,
+            matches(IsInstance(Consistency)))
+
+        consistency = self.CassScalingGroupCollection.call_args[0][-1]
+        self.assertEqual(consistency.default, ConsistencyLevel.ONE)
+        self.assertTrue(len(consistency.special_case_consistencies) > 0)
 
     def test_cassandra_scaling_group_collection_with_consistency_info(self):
         """
@@ -375,8 +383,11 @@ class APIMakeServiceTests(SynchronousTestCase):
         makeService(config)
         self.CassScalingGroupCollection.assert_called_once_with(
             self.LoggingCQLClient.return_value, self.reactor,
-            default_consistency='default',
-            consistency_mapping='mapping')
+            matches(IsInstance(Consistency)))
+
+        consistency = self.CassScalingGroupCollection.call_args[0][-1]
+        self.assertEqual(consistency.default, 'default')
+        self.assertEqual(consistency.special_case_consistencies, 'mapping')
 
     def test_cassandra_cluster_disconnects_on_stop(self):
         """

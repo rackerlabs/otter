@@ -235,8 +235,10 @@ class Consistency(object):
         and ``consistency_level`` is one of the consistency levels in
         :class:`ConsistencyLevel`
     """
-    def __init__(self, default, special_case_consistencies=None):
+    def __init__(self, default=None, special_case_consistencies=None):
         self.default = default
+        if self.default is None:
+            self.default = ConsistencyLevel.ONE
         self.special_case_consistencies = special_case_consistencies
         if self.special_case_consistencies is None:
             self.special_case_consistencies = _consistency_levels
