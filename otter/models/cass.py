@@ -1,6 +1,7 @@
 """
 Cassandra implementation of the store for the front-end scaling groups engine
 """
+from collections import defaultdict
 import time
 import itertools
 import uuid
@@ -215,37 +216,41 @@ _consistency_levels = {'event': {'fetch': ConsistencyLevel.QUORUM,
                        'state': {'update': ConsistencyLevel.QUORUM}}
 
 
-def get_consistency_level(operation, resource, default, mapping=None):
+class Consistency(object):
     """
-    Get the consistency level for a particular operation.
+    A consistency object that can be used to look up the consistency for any
+    combination of operation-name and resource-name.
 
-    :param operation: one of (create, list, view, update, or delete)
-    :type operation: ``str``
-
-    :param resource: one of (group, partial, policy, webhook) -
-        "partial" covers group views such as the config, the launch
-        config, or the state
-    :type resource: ``str``
-
-    :param default: the default consistency level if one is not configured
+    :ivar default: the default consistency level if one is not configured
         for the given operation and resource
     :type default: one of the consistency levels in :class:`ConsistencyLevel`
 
-    :param mapping: the mapping of resource to mapping of operation to
-        consistency level - a default mapping will be used if not provided
-    :type mapping: ``dict`` of ``dict``
-
-    :return: the consistency level
-    :rtype: one of the consistency levels in :class:`ConsistencyLevel`
+    :ivar special_case_consistencies: a ``dict`` of ``dicts``, which the maps
+        a resource name and operation name to the consistency level desired for
+        that resource and operation pair.  Does not have to cover every single
+        case.
+    :type special_case_consistencies:
+        ``{resource_name: {op_name: consistency_level}}``, where
+        ``resource_name`` is ``unicode``, ``op_name`` is ``unicode``,
+        and ``consistency_level`` is one of the consistency levels in
+        :class:`ConsistencyLevel`
     """
-    if mapping is None:
-        mapping = _consistency_levels
+    def __init__(self, default, special_case_consistencies=None):
+        self.default = default
+        self.special_case_consistencies = special_case_consistencies
+        if self.special_case_consistencies is None:
+            self.special_case_consistencies = _consistency_levels
 
-    resource_operations = mapping.get(resource)
-    if resource_operations:
-        return resource_operations.get(operation, default)
-    else:
-        return default
+    def get_consistency(self, operation_name, resource_name):
+        """
+        :return: consistency level to use for a particular operation on a
+            particular resource
+        """
+        if resource_name in self.special_case_consistencies:
+            return self.special_case_consistencies[resource_name].get(
+                operation_name, self.default)
+
+        return self.default
 
 
 def _build_policies(policies, policies_table, event_table, queries, data, buckets):
@@ -523,14 +528,10 @@ class CassScalingGroup(object):
     :ivar local_locks: Local locks used when modifying state
     :type local_locks: :class:`WeakLocks`
 
-    :ivar default_consistency: the default consistency level if one is not
-        configured for the given operation and resource
-    :type default_consistency: one of the consistency levels in
-        :class:`ConsistencyLevel`
-
-    :ivar consistency_mapping: mapping of resource to a mapping of operations
-        to consistency level to use to instead of the default consistency.
-    :type consistency_mapping: ``dict`` of ``dict``
+    :param consistency_obj: something that can say which consistency to use
+        given a resource name and the name of the operation to preform on said
+        resource.
+    :type consistency_obj: an instance of :class:`Consistency`
 
     IMPORTANT REMINDER: In CQL, update will create a new row if one doesn't
     exist.  Therefore, before doing an update, a read must be performed first
@@ -544,8 +545,7 @@ class CassScalingGroup(object):
     deletes are also updates and hence a read must be performed before deletes.
     """
     def __init__(self, log, tenant_id, uuid, connection, buckets, kz_client, reactor,
-                 local_locks, default_consistency=ConsistencyLevel.ONE,
-                 consistency_mapping=None):
+                 local_locks, consistency_obj):
         """
         Creates a CassScalingGroup object.
         """
@@ -567,11 +567,8 @@ class CassScalingGroup(object):
         self.webhooks_table = "policy_webhooks"
         self.event_table = "scaling_schedule_v2"
 
-        self.default_consistency = default_consistency
-        self.consistency_mapping = consistency_mapping
-        self.get_consistency_level = functools.partial(
-            get_consistency_level, default=default_consistency,
-            mapping=consistency_mapping)
+        self.consistency_obj = consistency_obj
+        self.get_consistency_level = self.consistency_obj.get_consistency
 
     def with_timestamp(self, func):
         """

@@ -18,7 +18,7 @@ from otter.models.cass import (
     CassScalingGroupCollection,
     CassAdmin,
     serialize_json_data,
-    get_consistency_level,
+    Consistency,
     verified_view,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
@@ -106,14 +106,15 @@ class SerialJsonDataTestCase(SynchronousTestCase):
 
 class GetConsistencyTests(SynchronousTestCase):
     """
-    Tests for `get_consistency_level`
+    Tests for :class:`Consistency`
     """
     def test_unknown_resource(self):
         """
         When called with unknown resource it returns the default consistency
         passed to it
         """
-        level = get_consistency_level('list', 'junk', ConsistencyLevel.ONE)
+        c_obj = Consistency(ConsistencyLevel.ONE)
+        level = c_obj.get_consistency('list', 'junk')
         self.assertEqual(level, ConsistencyLevel.ONE)
 
     def test_unknown_operation(self):
@@ -121,7 +122,8 @@ class GetConsistencyTests(SynchronousTestCase):
         When called with unknown operation it returns the default consistency
         passed to it
         """
-        level = get_consistency_level('junk', 'event', ConsistencyLevel.ONE)
+        c_obj = Consistency(ConsistencyLevel.ONE)
+        level = c_obj.get_consistency('junk', 'event')
         self.assertEqual(level, ConsistencyLevel.ONE)
 
     def test_unknown_operation_and_resource(self):
@@ -129,7 +131,8 @@ class GetConsistencyTests(SynchronousTestCase):
         When called with unknown operation and resource it returns the default
         consistency passed to it
         """
-        level = get_consistency_level('junk', 'junk2', ConsistencyLevel.ONE)
+        c_obj = Consistency(ConsistencyLevel.ONE)
+        level = c_obj.get_consistency('junk', 'junk2')
         self.assertEqual(level, ConsistencyLevel.ONE)
 
     def test_uses_passed_consistency_mapping_to_get_consistency(self):
@@ -139,29 +142,32 @@ class GetConsistencyTests(SynchronousTestCase):
         and resource in that mapping, even if it is different than the default.
         """
         mapping = {'event': {'fetch': ConsistencyLevel.TWO}}
-        level = get_consistency_level('fetch', 'event', ConsistencyLevel.ONE,
-                                      mapping)
+        c_obj = Consistency(ConsistencyLevel.ONE, mapping)
+        level = c_obj.get_consistency('fetch', 'event')
         self.assertEqual(level, ConsistencyLevel.TWO)
 
     def test_event_fetch(self):
         """
         Gives QUORUM on event fetch by default
         """
-        level = get_consistency_level('fetch', 'event', ConsistencyLevel.ONE)
+        c_obj = Consistency(ConsistencyLevel.ONE)
+        level = c_obj.get_consistency('fetch', 'event')
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
     def test_group_create(self):
         """
         Gives QUORUM on group create by default
         """
-        level = get_consistency_level('create', 'group', ConsistencyLevel.ONE)
+        c_obj = Consistency(ConsistencyLevel.ONE)
+        level = c_obj.get_consistency('create', 'group')
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
     def test_update_state(self):
         """
         Gives QUORUM on updating state by default
         """
-        level = get_consistency_level('update', 'state', ConsistencyLevel.ONE)
+        c_obj = Consistency(ConsistencyLevel.ONE)
+        level = c_obj.get_consistency('update', 'state')
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
 
