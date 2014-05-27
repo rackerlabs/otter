@@ -528,7 +528,7 @@ class CassScalingGroup(object):
     :ivar local_locks: Local locks used when modifying state
     :type local_locks: :class:`WeakLocks`
 
-    :param consistency_obj: something that can say which consistency to use
+    :ivar consistency_obj: something that can say which consistency to use
         given a resource name and the name of the operation to preform on said
         resource.
     :type consistency_obj: an instance of :class:`Consistency`
@@ -1136,18 +1136,12 @@ class CassScalingGroupCollection:
     Also, because deletes are done as tombstones rather than actually deleting,
     deletes are also updates and hence a read must be performed before deletes.
 
-    :ivar default_consistency: the default consistency level if one is not
-        configured for the given operation and resource
-    :type default_consistency: one of the consistency levels in
-        :class:`ConsistencyLevel`
-
-    :ivar consistency_mapping: mapping of resource to a mapping of operations
-        to consistency level to use to instead of the default consistency.
-    :type consistency_mapping: ``dict`` of ``dict``
+    :ivar consistency_obj: something that can say which consistency to use
+        given a resource name and the name of the operation to preform on said
+        resource.
+    :type consistency_obj: an instance of :class:`Consistency`
     """
-    def __init__(self, connection, reactor,
-                 default_consistency=ConsistencyLevel.ONE,
-                 consistency_mapping=None):
+    def __init__(self, connection, reactor, consistency_obj):
         """
         Init
 
@@ -1168,11 +1162,8 @@ class CassScalingGroupCollection:
         self.buckets = None
         self.kz_client = None
 
-        self.default_consistency = default_consistency
-        self.consistency_mapping = consistency_mapping
-        self.get_consistency_level = functools.partial(
-            get_consistency_level, default=default_consistency,
-            mapping=consistency_mapping)
+        self.consistency_obj = consistency_obj
+        self.get_consistency_level = self.consistency_obj.get_consistency
 
     def set_scheduler_buckets(self, buckets):
         """
@@ -1299,9 +1290,7 @@ class CassScalingGroupCollection:
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection, self.buckets, self.kz_client, self.reactor,
-                                self.local_locks,
-                                default_consistency=self.default_consistency,
-                                consistency_mapping=self.consistency_mapping)
+                                self.local_locks, self.consistency_obj)
 
     def fetch_and_delete(self, bucket, now, size=100):
         """
@@ -1469,11 +1458,10 @@ class CassAdmin(object):
     .. autointerface:: otter.models.interface.IAdmin
     """
 
-    def __init__(self, connection, default_consistency=ConsistencyLevel.ONE):
+    def __init__(self, connection, consistency_obj):
         self.connection = connection
-        self.default_consistency = default_consistency
-        self.get_consistency_level = functools.partial(
-            get_consistency_level, default=default_consistency)
+        self.consistency_obj = consistency_obj
+        self.get_consistency_level = self.consistency_obj.get_consistency
 
     def get_metrics(self, log):
         """
