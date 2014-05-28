@@ -215,43 +215,48 @@ _consistency_levels = {'event': {'fetch': ConsistencyLevel.QUORUM,
                        'state': {'update': ConsistencyLevel.QUORUM}}
 
 
-class Consistency(object):
+def get_consistency_level(operation_name, resource_name,
+                          default=None, exceptions=None):
     """
-    A consistency object that can be used to look up the consistency for any
-    combination of operation-name and resource-name.
+    Looks up the consistency for any combination of operation-name and
+    resource-name.
 
-    :ivar default: the default consistency level if one is not configured
-        for the given operation and resource
+    :param operation_name: one of (create, list, view, update, or delete)
+    :type operation_name: ``str``
+
+    :param resource_name: one of (group, partial, policy, webhook) -
+        "partial" covers group views such as the config, the launch
+        config, or the state
+    :type resource_name: ``str``
+
+    :param default: the default consistency level if one is not configured
+        for the given operation and resource - defaults to a consistency of
+        ONE
     :type default: one of the consistency levels in :class:`ConsistencyLevel`
 
-    :ivar special_case_consistencies: a ``dict`` of ``dicts``, which the maps
-        a resource name and operation name to the consistency level desired for
-        that resource and operation pair.  Does not have to cover every single
-        case.
-    :type special_case_consistencies:
+    :param exceptions: a ``dict`` of ``dicts``, which maps a resource name and
+        operation name to the consistency level desired for that resource and
+        operation pair.  Does not have to cover every single case.  Defaults to
+        QUORUM for modifing state and events.
+    :type exceptions:
         ``{resource_name: {op_name: consistency_level}}``, where
         ``resource_name`` is ``unicode``, ``op_name`` is ``unicode``,
         and ``consistency_level`` is one of the consistency levels in
         :class:`ConsistencyLevel`
+
+    :return: consistency level to use for a particular operation on a
+        particular resource
     """
-    def __init__(self, default=None, special_case_consistencies=None):
-        self.default = default
-        if self.default is None:
-            self.default = ConsistencyLevel.ONE
-        self.special_case_consistencies = special_case_consistencies
-        if self.special_case_consistencies is None:
-            self.special_case_consistencies = _consistency_levels
+    if default is None:
+        default = ConsistencyLevel.ONE
 
-    def get_consistency(self, operation_name, resource_name):
-        """
-        :return: consistency level to use for a particular operation on a
-            particular resource
-        """
-        if resource_name in self.special_case_consistencies:
-            return self.special_case_consistencies[resource_name].get(
-                operation_name, self.default)
+    if exceptions is None:
+        exceptions = _consistency_levels
 
-        return self.default
+    if resource_name in exceptions:
+        return exceptions[resource_name].get(operation_name, default)
+
+    return default
 
 
 def _build_policies(policies, policies_table, event_table, queries, data, buckets):
