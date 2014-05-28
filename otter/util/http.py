@@ -2,10 +2,13 @@
 HTTP utils, such as formulation of URLs
 """
 
+import copy
+import json
 from itertools import chain
 from urllib import quote, urlencode
 from urlparse import urlsplit, urlunsplit, parse_qs
 
+from effect import Effect
 import treq
 
 from otter.util.config import config_value
@@ -409,3 +412,115 @@ def transaction_id(request):
     :returns: A string transaction id.
     """
     return request.responseHeaders.getRawHeaders('X-Response-Id')[0]
+
+
+
+def conj_obj(obj, **new_attrs):
+    new_obj = copy.copy(obj)
+    new_obj.__dict__.update(new_attrs)
+    return new_obj
+
+
+def conj(d, new_fields):
+    new_d = d.copy()
+    new_d.update(new_fields)
+    return new_d
+
+
+class Request(object):
+    """
+    An effect request for performing HTTP requests.
+
+    The effect results in a two-tuple of (response, content).
+    """
+    def __init__(self, method, url, headers=None, data=None, log=None):
+        self.method = method
+        self.url = url
+        self.headers = headers if headers is not None else {}
+        self.data = data
+        self.log = log
+
+    def perform_effect(self, handlers):
+        """
+        Perform the request with the given treq client.
+
+        :param treq: The treq object.
+        """
+        func = getattr(treq, self.method)
+        def got_response(response):
+            result = treq.content(response)
+            return result.addCallback(lambda content: (response, content))
+        result = func(self.url, headers=self.headers, data=self.data,
+                      log=self.log)
+        return result.addCallback(got_response)
+
+
+class ReauthenticationFailed(Exception):
+    """
+    Raised when an HTTP request returned 401 even after successful
+    reauthentication was performed.
+    """
+
+
+class OpenStackClient(object):
+    def __init__(self, treq, reauth, auth_token=None):
+        self.treq = treq
+        self.reauth = reauth
+        self.auth_token = auth_token
+
+    def _request_with_reauth(self, log, request, repeats=1):
+        """
+        Perform a request and automatically handle reauthentication.
+
+        If an HTTP 401 is returned, the `reauth` function will be called, and
+        when the returned Deferred fires, the request will be repeated.
+
+        If repeating the request fails, :class:`ReauthenticationFailed` will
+        be raised.
+        """
+        def _got_reauth_result(response):
+            return self._request_with_reauth(log, request, repeats - 1)
+
+        def _got_result(response):
+            if response.code == 401:
+                if repeats == 0:
+                    raise ReauthenticationFailed()
+                reauth_result = self.reauth()
+                reauth_result.addCallback(_got_reauth_result)
+                reauth_result.addErrback(_got_reauth_error)
+                return reauth_result
+            else:
+                return response
+
+        eff = Effect(conj_obj(request, conj(headers, headers(self.auth_token))))
+        return eff.on_success(_got_result)
+
+    def check_success(self, result, success_codes):
+        (response, content) = result
+        if response.code not in success_codes:
+            raise APIError(response.code, content, response.headers)
+        return content
+
+    def json_request(self, log, method, url, headers=None, data=None,
+                     success=(200,)):
+        """
+        Do a request, check the response code, and parse the JSON result.
+
+        Returns an Effect.
+
+        :param log: A bound log to pass on to the treq client.
+        :param method: The HTTP method to invoke.
+        :param url: As treq accepts.
+        :param headers: As treq accepts.
+        :param data: As treq accepts.
+        :param list success: The list of HTTP codes to consider successful.
+        """
+        eff = Effect(Request(
+            method,
+            url,
+            data=data,
+            headers=headers,
+            log=log))
+        return (eff.on_success(self._handle_reauth)
+                    .on_success(lambda r: self.check_success(r, success))
+                    .on_success(json.loads))
