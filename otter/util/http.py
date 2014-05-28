@@ -463,8 +463,7 @@ class ReauthenticationFailed(Exception):
 
 
 class OpenStackClient(object):
-    def __init__(self, treq, reauth, auth_token=None):
-        self.treq = treq
+    def __init__(self, reauth, auth_token=None):
         self.reauth = reauth
         self.auth_token = auth_token
 
@@ -495,7 +494,23 @@ class OpenStackClient(object):
         eff = Effect(conj_obj(request, conj(headers, headers(self.auth_token))))
         return eff.on_success(_got_result)
 
+    def _handle_reauth(self, result, repeats=1):
+        def _got_reauth_result(response):
+            return self._request_with_reauth(log, request, repeats - 1)
+        response, content = result
+        if response.code == 401:
+            if repeats == 0:
+                raise ReauthenticationFailed()
+            return (self.reauth()
+                        .on_success(_got_reauth_result)
+                        .on_error(_got_reauth_error))
+        else:
+            return response
+
     def check_success(self, result, success_codes):
+        """
+        Check if the HTTP response was returned with a particular HTTP code.
+        """
         (response, content) = result
         if response.code not in success_codes:
             raise APIError(response.code, content, response.headers)

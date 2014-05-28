@@ -1,5 +1,5 @@
 """
-Asynchronous client for Heat, using treq.
+Asynchronous client for Heat.
 """
 
 from __future__ import print_function
@@ -11,7 +11,6 @@ from otter.util.http import (append_segments, headers, check_success,
 
 
 __all__ = ['HeatClient']
-
 
 
 class HeatClient(object):
