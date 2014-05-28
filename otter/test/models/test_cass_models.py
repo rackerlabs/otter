@@ -604,7 +604,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         ``modify_state`` writes the state the modifier returns to the database
         with default quorum consistency for everything
         """
-        self.group.get_consistency = get_consistency_level # use default for all
+        self.group.get_consistency = get_consistency_level  # test defaults
 
         def modifier(group, state):
             return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None,

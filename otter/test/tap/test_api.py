@@ -7,7 +7,7 @@ import mock
 
 from silverberg.client import ConsistencyLevel
 
-from testtools.matchers import Contains, IsInstance
+from testtools.matchers import Contains
 
 from twisted.internet import defer
 from twisted.internet.task import Clock
@@ -15,7 +15,6 @@ from twisted.internet.task import Clock
 from twisted.application.service import MultiService
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.models.cass import Consistency
 from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
 from otter.tap.api import (
     Options, HealthChecker, makeService, setup_scheduler, call_after_supervisor)
@@ -363,31 +362,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.LoggingCQLClient.assert_called_once_with(self.TimingOutCQLClient.return_value,
                                                       self.log.bind.return_value)
         self.CassScalingGroupCollection.assert_called_once_with(
-            self.LoggingCQLClient.return_value, self.reactor,
-            matches(IsInstance(Consistency)))
-
-        consistency = self.CassScalingGroupCollection.call_args[0][-1]
-        self.assertEqual(consistency.default, ConsistencyLevel.ONE)
-        self.assertTrue(len(consistency.special_case_consistencies) > 0)
-
-    def test_cassandra_scaling_group_collection_with_consistency_info(self):
-        """
-        makeService configures a CassandraScalingGroupCollection with the
-        default consistency and consistency mapping, if they are in the
-        configuration.
-        """
-        config = test_config.copy()
-        config['cassandra'] = test_config['cassandra'].copy()
-        config['cassandra']['default_consistency'] = 'default'
-        config['cassandra']['consistency_mapping'] = 'mapping'
-        makeService(config)
-        self.CassScalingGroupCollection.assert_called_once_with(
-            self.LoggingCQLClient.return_value, self.reactor,
-            matches(IsInstance(Consistency)))
-
-        consistency = self.CassScalingGroupCollection.call_args[0][-1]
-        self.assertEqual(consistency.default, 'default')
-        self.assertEqual(consistency.special_case_consistencies, 'mapping')
+            self.LoggingCQLClient.return_value, self.reactor, mock.ANY)
 
     def test_cassandra_cluster_disconnects_on_stop(self):
         """
@@ -407,6 +382,39 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.Otter.assert_called_once_with(self.store, 'ord',
                                            self.health_checker.health_check,
                                            es_host=None)
+
+    def test_cassandra_scaling_group_collection_with_default_consistency(self):
+        """
+        makeService configures a CassScalingGroupCollection with a callable
+        that returns the default consistencies with the default exceptions,
+        if no other values are configured.
+        """
+        makeService(test_config)
+        # tests the defaults
+        get_consistency = self.CassScalingGroupCollection.call_args[0][-1]
+        self.assertEqual(get_consistency('nonexistant', 'nonexistant'),
+                         ConsistencyLevel.ONE)
+        self.assertEqual(get_consistency('update', 'state'),
+                         ConsistencyLevel.QUORUM)
+
+    def test_cassandra_scaling_group_collection_with_consistency_info(self):
+        """
+        makeService configures a CassandraScalingGroupCollection with the
+        default consistency and consistency mapping in the configuration
+        """
+        config = test_config.copy()
+        config['cassandra'] = test_config['cassandra'].copy()
+        config['cassandra']['default_consistency'] = ConsistencyLevel.TWO
+        config['cassandra']['consistency_exceptions'] = {
+            'state': {'update': ConsistencyLevel.ALL}
+        }
+
+        makeService(config)
+        get_consistency = self.CassScalingGroupCollection.call_args[0][-1]
+        self.assertEqual(get_consistency('nonexistant', 'nonexistant'),
+                         ConsistencyLevel.TWO)
+        self.assertEqual(get_consistency('update', 'state'),
+                         ConsistencyLevel.ALL)
 
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_health_checker_no_zookeeper(self, supervisor):
