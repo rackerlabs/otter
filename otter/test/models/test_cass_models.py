@@ -2,6 +2,7 @@
 Tests for :mod:`otter.models.mock`
 """
 from collections import namedtuple
+from functools import partial
 import json
 import mock
 from datetime import datetime
@@ -404,11 +405,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, Synchronou
         self.clock = Clock()
         locks = WeakLocks()
 
+        self.get_consistency = partial(get_consistency_level,
+                                       default=ConsistencyLevel.TWO)
+
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
                                       self.connection, itertools.cycle(range(2, 10)),
                                       self.kz_lock, self.clock, locks,
-                                      Consistency(ConsistencyLevel.TWO, {}))
+                                      self.get_consistency)
         self.assertIs(self.group.local_locks, locks)
         self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
                                                    tenant_id=self.tenant_id,
@@ -598,7 +602,10 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
     def test_modify_state_succeeds(self, mock_serial):
         """
         ``modify_state`` writes the state the modifier returns to the database
+        with default quorum consistency for everything
         """
+        self.group.get_consistency = get_consistency_level # use default for all
+
         def modifier(group, state):
             return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None,
                               {}, True, desired=5)
@@ -608,7 +615,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         d = self.group.modify_state(modifier)
         self.assertEqual(self.successResultOf(d), None)
-        self.group.view_state.assert_called_once_with(ConsistencyLevel.TWO)
+        self.group.view_state.assert_called_once_with(ConsistencyLevel.QUORUM)
         expectedCql = (
             'INSERT INTO scaling_group("tenantId", "groupId", active, '
             'pending, "groupTouched", "policyTouched", paused, desired) VALUES('
@@ -621,7 +628,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                         "paused": True, "desired": 5, "ts": 10345000}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.TWO)
+                                                        ConsistencyLevel.QUORUM)
 
         self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
 
@@ -2259,8 +2266,10 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         self.connection.execute.side_effect = _responses
 
         self.clock = Clock()
+        self.get_consistency = partial(get_consistency_level,
+                                       default=ConsistencyLevel.ONE)
         self.collection = CassScalingGroupCollection(
-            self.connection, self.clock, Consistency(ConsistencyLevel.ONE))
+            self.connection, self.clock, self.get_consistency)
 
         self.uuid = patch(self, 'otter.models.cass.uuid')
         self.uuid.uuid1.return_value = 'timeuuid'
@@ -2381,9 +2390,11 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_log = mock_log()
         self.clock = Clock()
 
-        self.consistency = Consistency(ConsistencyLevel.TWO, {})
+        self.get_consistency = partial(get_consistency_level,
+                                       default=ConsistencyLevel.TWO,
+                                       exceptions={})
         self.collection = CassScalingGroupCollection(
-            self.connection, self.clock, self.consistency)
+            self.connection, self.clock, self.get_consistency)
 
         self.tenant_id = 'goo1234'
         self.config = _de_identify({
@@ -2409,8 +2420,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         `CassScalingGroupCollection` keeps new WeakLocks object
         """
+        get_consistency = partial(get_consistency_level, default=ConsistencyLevel.ONE)
         collection = CassScalingGroupCollection(
-            self.connection, self.clock, Consistency(ConsistencyLevel.ONE))
+            self.connection, self.clock, get_consistency)
         mock_wl.assert_called_once_with()
         self.assertEqual(collection.local_locks, 2)
 
@@ -2806,7 +2818,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(g.uuid, '12345678')
         self.assertEqual(g.tenant_id, '123')
         self.assertIs(g.local_locks, self.collection.local_locks)
-        self.assertIs(g.consistency_obj, self.consistency)
+        self.assertIs(g.get_consistency, self.get_consistency)
 
     def test_webhook_hash_from_table(self):
         """
@@ -2945,8 +2957,10 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.connection = mock.MagicMock(spec=['execute'])
         self.connection.execute.return_value = defer.succeed([])
         self.clock = Clock()
+        self.get_consistency = partial(get_consistency_level,
+                                       default=ConsistencyLevel.ONE)
         self.collection = CassScalingGroupCollection(
-            self.connection, self.clock, Consistency(ConsistencyLevel.ONE))
+            self.connection, self.clock, self.get_consistency)
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
         self.lock = self.mock_lock()
@@ -3050,8 +3064,9 @@ class CassAdminTestCase(SynchronousTestCase):
 
         self.mock_log = mock.MagicMock()
 
-        self.collection = CassAdmin(self.connection,
-                                    Consistency(ConsistencyLevel.TWO))
+        self.get_consistency = partial(get_consistency_level,
+                                       default=ConsistencyLevel.TWO)
+        self.collection = CassAdmin(self.connection, self.get_consistency)
 
     @mock.patch('otter.models.cass.time')
     def test_get_metrics(self, time):

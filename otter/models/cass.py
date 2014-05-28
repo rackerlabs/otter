@@ -534,10 +534,10 @@ class CassScalingGroup(object):
     :ivar local_locks: Local locks used when modifying state
     :type local_locks: :class:`WeakLocks`
 
-    :ivar consistency_obj: something that can say which consistency to use
-        given a resource name and the name of the operation to preform on said
-        resource.
-    :type consistency_obj: an instance of :class:`Consistency`
+    :ivar get_consistency: callable that, given a resource name and the name of
+        the operation to preform on said resource, returns the consistency
+        level to use for said operation
+    :type consistency_obj: ``callable``
 
     IMPORTANT REMINDER: In CQL, update will create a new row if one doesn't
     exist.  Therefore, before doing an update, a read must be performed first
@@ -551,7 +551,7 @@ class CassScalingGroup(object):
     deletes are also updates and hence a read must be performed before deletes.
     """
     def __init__(self, log, tenant_id, uuid, connection, buckets, kz_client, reactor,
-                 local_locks, consistency_obj):
+                 local_locks, get_consistency):
         """
         Creates a CassScalingGroup object.
         """
@@ -573,8 +573,7 @@ class CassScalingGroup(object):
         self.webhooks_table = "policy_webhooks"
         self.event_table = "scaling_schedule_v2"
 
-        self.consistency_obj = consistency_obj
-        self.get_consistency_level = self.consistency_obj.get_consistency
+        self.get_consistency = get_consistency
 
     def with_timestamp(self, func):
         """
@@ -625,7 +624,7 @@ class CassScalingGroup(object):
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
-                          self.get_consistency_level('view', 'group'),
+                          self.get_consistency('view', 'group'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
         if with_webhooks:
             d.addCallback(_get_policies_and_webhooks)
@@ -644,7 +643,7 @@ class CassScalingGroup(object):
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
-                          self.get_consistency_level('view', 'partial'),
+                          self.get_consistency('view', 'partial'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
 
         return d.addCallback(lambda group: _jsonloads_data(group['group_config']))
@@ -658,7 +657,7 @@ class CassScalingGroup(object):
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
-                          self.get_consistency_level('view', 'partial'),
+                          self.get_consistency('view', 'partial'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
 
         return d.addCallback(lambda group: _jsonloads_data(group['launch_config']))
@@ -668,7 +667,7 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
         if consistency is None:
-            consistency = self.get_consistency_level('view', 'partial')
+            consistency = self.get_consistency('view', 'partial')
 
         view_query = _cql_view_group_state.format(cf=self.group_table)
         del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
@@ -685,7 +684,7 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
         log = self.log.bind(system='CassScalingGroup.modify_state')
-        consistency = self.get_consistency_level('update', 'state')
+        consistency = self.get_consistency('update', 'state')
 
         @self.with_timestamp
         def _write_state(timestamp, new_state):
@@ -732,7 +731,7 @@ class CassScalingGroup(object):
                                 "groupId": self.uuid,
                                 "scaling": serialize_json_data(data, 1),
                                 "ts": ts},
-                      consistency=self.get_consistency_level('update', 'partial'))
+                      consistency=self.get_consistency('update', 'partial'))
             return b.execute(self.connection)
 
         d = self.view_config()
@@ -754,7 +753,7 @@ class CassScalingGroup(object):
                                 "groupId": self.uuid,
                                 "launch": serialize_json_data(data, 1),
                                 "ts": ts},
-                      consistency=self.get_consistency_level('update', 'partial'))
+                      consistency=self.get_consistency('update', 'partial'))
             d = b.execute(self.connection)
             return d
 
@@ -782,7 +781,7 @@ class CassScalingGroup(object):
             params = {"tenantId": self.tenant_id, "groupId": self.uuid}
 
         d = self.connection.execute(cql.format(cf=self.policies_table), params,
-                                    self.get_consistency_level('list', 'policy'))
+                                    self.get_consistency('list', 'policy'))
         d.addCallback(insert_id)
         return d
 
@@ -809,7 +808,7 @@ class CassScalingGroup(object):
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid,
                                      "policyId": policy_id},
-                                    self.get_consistency_level('view', 'policy'))
+                                    self.get_consistency('view', 'policy'))
 
         def _extract_policy(rows):
             if len(rows) == 0 or version and rows[0]['version'] != version:
@@ -829,7 +828,7 @@ class CassScalingGroup(object):
                 _cql_count_for_group.format(cf=self.policies_table),
                 {"tenantId": self.tenant_id,
                  "groupId": self.uuid},
-                self.get_consistency_level("count", "policies"))
+                self.get_consistency("count", "policies"))
             return d.addCallback(_check_limit).addCallback(lambda _: lastRev)
 
         def _check_limit(curr_policies):
@@ -853,7 +852,7 @@ class CassScalingGroup(object):
                                           self.buckets)
 
             b = Batch(queries, cqldata,
-                      consistency=self.get_consistency_level('create', 'policy'))
+                      consistency=self.get_consistency('create', 'policy'))
             d = b.execute(self.connection)
             return d.addCallback(lambda _: outpolicies)
 
@@ -884,7 +883,7 @@ class CassScalingGroup(object):
             queries.append(_cql_insert_policy.format(cf=self.policies_table, name=""))
             cqldata['data'] = serialize_json_data(data, 1)
             b = Batch(queries, cqldata,
-                      consistency=self.get_consistency_level('update', 'policy'))
+                      consistency=self.get_consistency('update', 'policy'))
             return b.execute(self.connection)
 
         d = self.get_policy(policy_id)
@@ -905,7 +904,7 @@ class CassScalingGroup(object):
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "policyId": policy_id},
-                      consistency=self.get_consistency_level('delete', 'policy'))
+                      consistency=self.get_consistency('delete', 'policy'))
             return b.execute(self.connection)
 
         d = self.get_policy(policy_id)
@@ -921,7 +920,7 @@ class CassScalingGroup(object):
             _cql_list_all_in_group.format(cf=self.webhooks_table,
                                           order_by='ORDER BY "groupId", "policyId", "webhookId"'),
             {'tenantId': self.tenant_id, 'groupId': self.uuid},
-            self.get_consistency_level('list', 'webhook'))
+            self.get_consistency('list', 'webhook'))
         return d
 
     def _naive_list_webhooks(self, policy_id, limit, marker):
@@ -938,7 +937,7 @@ class CassScalingGroup(object):
                                       limit=limit, marker=marker)
 
         d = self.connection.execute(cql.format(cf=self.webhooks_table), params,
-                                    self.get_consistency_level('list', 'webhook'))
+                                    self.get_consistency('list', 'webhook'))
         d.addCallback(_assemble_webhook_results)
         return d
 
@@ -984,7 +983,7 @@ class CassScalingGroup(object):
             d = self.connection.execute(
                 _cql_count_for_policy.format(cf=self.webhooks_table),
                 main_params,
-                self.get_consistency_level('count', 'webhook'))
+                self.get_consistency('count', 'webhook'))
             return d.addCallback(_check_limit).addCallback(lambda _: lastRev)
 
         d.addCallback(_do_limits_check)
@@ -996,7 +995,7 @@ class CassScalingGroup(object):
                                      cql_params)
 
             b = Batch(queries, cql_params,
-                      consistency=self.get_consistency_level('create', 'webhook'))
+                      consistency=self.get_consistency('create', 'webhook'))
             d = b.execute(self.connection)
             return d.addCallback(lambda _: output)
 
@@ -1019,7 +1018,7 @@ class CassScalingGroup(object):
                                      "groupId": self.uuid,
                                      "policyId": policy_id,
                                      "webhookId": webhook_id},
-                                    self.get_consistency_level('view', 'webhook'))
+                                    self.get_consistency('view', 'webhook'))
         d.addCallback(_assemble_webhook)
         return d
 
@@ -1040,7 +1039,7 @@ class CassScalingGroup(object):
                  "policyId": policy_id,
                  "webhookId": webhook_id,
                  "data": serialize_json_data(data, 1)},
-                self.get_consistency_level('update', 'webhook'))
+                self.get_consistency('update', 'webhook'))
 
         d = self.get_webhook(policy_id, webhook_id)
         return d.addCallback(_update_data)
@@ -1059,7 +1058,7 @@ class CassScalingGroup(object):
                                          "groupId": self.uuid,
                                          "policyId": policy_id,
                                          "webhookId": webhook_id},
-                                        self.get_consistency_level('delete', 'webhook'))
+                                        self.get_consistency('delete', 'webhook'))
             return d
 
         return self.get_webhook(policy_id, webhook_id).addCallback(_do_delete)
@@ -1085,7 +1084,7 @@ class CassScalingGroup(object):
             queries.append(_cql_delete_group.format(cf=self.group_table))
 
             b = Batch(queries, params,
-                      consistency=self.get_consistency_level('delete', 'group'))
+                      consistency=self.get_consistency('delete', 'group'))
 
             return b.execute(self.connection)
 
@@ -1142,12 +1141,12 @@ class CassScalingGroupCollection:
     Also, because deletes are done as tombstones rather than actually deleting,
     deletes are also updates and hence a read must be performed before deletes.
 
-    :ivar consistency_obj: something that can say which consistency to use
-        given a resource name and the name of the operation to preform on said
-        resource.
-    :type consistency_obj: an instance of :class:`Consistency`
+    :ivar get_consistency: callable that, given a resource name and the name of
+        the operation to preform on said resource, returns the consistency
+        level to use for said operation
+    :type consistency_obj: ``callable``
     """
-    def __init__(self, connection, reactor, consistency_obj):
+    def __init__(self, connection, reactor, get_consistency):
         """
         Init
 
@@ -1168,8 +1167,7 @@ class CassScalingGroupCollection:
         self.buckets = None
         self.kz_client = None
 
-        self.consistency_obj = consistency_obj
-        self.get_consistency_level = self.consistency_obj.get_consistency
+        self.get_consistency = get_consistency
 
     def set_scheduler_buckets(self, buckets):
         """
@@ -1188,7 +1186,7 @@ class CassScalingGroupCollection:
         max_groups = config_value('limits.absolute.maxGroups')
         d = self.connection.execute(_cql_count_for_tenant.format(
             cf="scaling_group"), {'tenantId': tenant_id},
-            self.get_consistency_level('list', 'group'))
+            self.get_consistency('list', 'group'))
 
         def check_groups(cur_groups, max_groups):
             if cur_groups[0]['count'] >= max_groups:
@@ -1230,7 +1228,7 @@ class CassScalingGroupCollection:
                                           self.event_table, queries, data, self.buckets)
 
             b = Batch(queries, data,
-                      consistency=self.get_consistency_level('create', 'group'))
+                      consistency=self.get_consistency('create', 'group'))
 
             bd = b.execute(self.connection)
             bd.addCallback(lambda _: {
@@ -1279,13 +1277,13 @@ class CassScalingGroupCollection:
                       for i, group in enumerate(groups)}
             params['tenantId'] = tenant_id
 
-            b = Batch(queries, params, self.get_consistency_level('delete', 'group'))
+            b = Batch(queries, params, self.get_consistency('delete', 'group'))
             return b.execute(self.connection)
 
         log = log.bind(tenant_id=tenant_id)
         cql, params = _paginated_list(tenant_id, limit=limit, marker=marker)
         d = self.connection.execute(cql.format(cf=self.group_table), params,
-                                    self.get_consistency_level('list', 'group'))
+                                    self.get_consistency('list', 'group'))
         d.addCallback(_filter_resurrected)
         d.addCallback(_build_states)
         return d
@@ -1296,7 +1294,7 @@ class CassScalingGroupCollection:
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection, self.buckets, self.kz_client, self.reactor,
-                                self.local_locks, self.consistency_obj)
+                                self.local_locks, self.get_consistency)
 
     def fetch_and_delete(self, bucket, now, size=100):
         """
@@ -1315,12 +1313,12 @@ class CassScalingGroupCollection:
                                                     name=event_name))
                 data[event_name + 'policyId'] = event['policyId']
                 data[event_name + 'trigger'] = event['trigger']
-            b = Batch(queries, data, self.get_consistency_level('delete', 'event'))
+            b = Batch(queries, data, self.get_consistency('delete', 'event'))
             return b.execute(self.connection).addCallback(lambda _: events)
 
         d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
                                     {"size": size, "now": now, "bucket": bucket},
-                                    self.get_consistency_level('fetch', 'event'))
+                                    self.get_consistency('fetch', 'event'))
         return d.addCallback(delete_events)
 
     def add_cron_events(self, cron_events):
@@ -1334,7 +1332,7 @@ class CassScalingGroupCollection:
                                                          name=event_name))
             data[event_name + 'bucket'] = self.buckets.next()
             data.update({event_name + key: event[key] for key in event})
-        b = Batch(queries, data, self.get_consistency_level('insert', 'event'))
+        b = Batch(queries, data, self.get_consistency('insert', 'event'))
         return b.execute(self.connection)
 
     def get_oldest_event(self, bucket):
@@ -1343,7 +1341,7 @@ class CassScalingGroupCollection:
         """
         d = self.connection.execute(_cql_oldest_event.format(cf=self.event_table),
                                     {'bucket': bucket},
-                                    self.get_consistency_level('check', 'event'))
+                                    self.get_consistency('check', 'event'))
         d.addCallback(lambda r: r[0] if len(r) > 0 else None)
         return d
 
@@ -1367,7 +1365,7 @@ class CassScalingGroupCollection:
         """
         d = self.connection.execute(
             _cql_find_webhook_token.format(cf=self.webhook_keys_table),
-            {"webhookKey": capability_hash}, self.get_consistency_level('list', 'policy'))
+            {"webhookKey": capability_hash}, self.get_consistency('list', 'policy'))
 
         def extract_info(rows):
             if len(rows) == 0:
@@ -1392,7 +1390,7 @@ class CassScalingGroupCollection:
         query = _cql_find_webhook_token.format(cf=self.webhooks_table)
         d = self.connection.execute(query,
                                     {"webhookKey": capability_hash},
-                                    self.get_consistency_level('list', 'group'))
+                                    self.get_consistency('list', 'group'))
         d.addCallback(_do_webhook_lookup)
         return d
 
@@ -1404,7 +1402,7 @@ class CassScalingGroupCollection:
         fields = ['scaling_group', 'scaling_policies', 'policy_webhooks']
         deferred = [self.connection.execute(_cql_count_for_tenant.format(cf=field),
                                             {'tenantId': tenant_id},
-                                            self.get_consistency_level('count', 'group'))
+                                            self.get_consistency('count', 'group'))
                     for field in fields]
 
         d = defer.gatherResults(deferred)
@@ -1451,7 +1449,7 @@ class CassScalingGroupCollection:
 
         d = self.connection.execute(
             _cql_health_check.format(cf=self.group_table), {},
-            self.get_consistency_level('health', 'check'))
+            self.get_consistency('health', 'check'))
 
         d.addCallback(
             lambda _: (True, {'cassandra_time': (self.reactor.seconds() - start_time)}))
@@ -1462,12 +1460,16 @@ class CassScalingGroupCollection:
 class CassAdmin(object):
     """
     .. autointerface:: otter.models.interface.IAdmin
+
+    :ivar get_consistency: callable that, given a resource name and the name of
+        the operation to preform on said resource, returns the consistency
+        level to use for said operation
+    :type consistency_obj: ``callable``
     """
 
-    def __init__(self, connection, consistency_obj):
+    def __init__(self, connection, get_consistency):
         self.connection = connection
-        self.consistency_obj = consistency_obj
-        self.get_consistency_level = self.consistency_obj.get_consistency
+        self.get_consistency = get_consistency
 
     def get_metrics(self, log):
         """
@@ -1490,7 +1492,7 @@ class CassAdmin(object):
                     time=int(time.time()))
 
             dc = self.connection.execute(_cql_count_all.format(cf=table), {},
-                                         self.get_consistency_level('count', 'group'))
+                                         self.get_consistency('count', 'group'))
             dc.addCallback(_format_result, label)
             return dc
 
