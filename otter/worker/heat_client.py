@@ -1,5 +1,5 @@
 """
-Asynchronous client for Heat.
+Asynchronous client for Heat, using treq.
 """
 
 from __future__ import print_function
@@ -7,22 +7,27 @@ from __future__ import print_function
 import json
 
 from otter.util.http import (append_segments, headers, check_success,
-                             APIError)
+                             APIError, Request)
 
 
 __all__ = ['HeatClient']
 
 
 class HeatClient(object):
-    """
-    An Asynchronous Heat client.
-    """
+    """A purely functional Heat client. Action methods return Effects."""
+
     def __init__(self, log, http):
         self.http = http
         self.log = log.bind(system='heatclient')
 
-    def create_stack(self, heat_url, stack_name, parameters, timeout,
-                     template):
+    # auth_token is passed to each of these functions individually instead of
+    # being set as an attribute of the object because a reauth can happen at
+    # any time, and we shouldn't be stuck caching the old one here. It's the
+    # caller's responsibility to fetch it from storage every time a request is
+    # to be made.
+
+    def create_stack(self, auth_token, heat_url, stack_name, parameters,
+                     timeout, template):
         """Create a stack."""
         payload = {
             'stack_name': stack_name,
@@ -32,13 +37,12 @@ class HeatClient(object):
         }
         log = self.log.bind(event='create-stack', stack_name=stack_name)
         return self.http.json_request(
-            log,
-            'post',
-            append_segments(heat_url, 'stacks'),
-            data=json.dumps(payload),
-            success=[201])
+            auth_token,
+            Request('post', append_segments(heat_url, 'stacks'),
+                    data=json.dumps(payload), success=[201], log=log))
 
-    def update_stack(self, stack_url, parameters, timeout, template):
+    def update_stack(self, auth_token, stack_url, parameters, timeout,
+                     template):
         """Update a stack."""
         payload = {
             'parameters': parameters,
@@ -47,18 +51,15 @@ class HeatClient(object):
         }
         log = self.log.bind(event='update-stack')
         return self.http.json_request(
-            log,
-            'put',
-            stack_url,
-            data=json.dumps(payload),
-            success=[202])
+            auth_token,
+            Request('put', stack_url, data=json.dumps(payload), success=[202],
+                    log=log))
 
-    def get_stack(self, stack_url):
+    def get_stack(self, auth_token, stack_url):
         """Get the metadata about a stack."""
         log = self.log.bind(event='get-stack')
         return self.http.json_request(
-            log,
-            'get', stack_url)
+            auth_token, Request('get', stack_url, success=[200], log=log))
 
 
 def main(reactor, *args):
