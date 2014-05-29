@@ -4,7 +4,9 @@ Pure HTTP utilities.
 import copy
 import json
 
-from otter.utils.http import APIError
+from effect import Effect
+
+from otter.util.http import APIError, headers
 
 
 # These should probably be in a different module.
@@ -89,10 +91,11 @@ class OSHTTPClient(object):
             raise APIError(response.code, content, response.headers)
         return content
 
-    def _request_with_retry(self, auth_token, request, retries=1):
-        request = conj_obj(request, headers=conj(headers, headers(self.auth_token)))
+    def _request_with_retry(self, auth_token, request, success, retries=1):
+        request = conj_obj(request,
+                           headers=conj(request.headers, headers(auth_token)))
         return (Effect(request)
-                    .on_success(self._handle_reauth, retries)
+                    .on_success(lambda r: self._handle_reauth(r, retries))
                     .on_success(lambda r: self._check_success(r, success))
                     .on_success(json.loads))
 
@@ -110,4 +113,4 @@ class OSHTTPClient(object):
         :param data: As treq accepts.
         :param list success: The list of HTTP codes to consider successful.
         """
-        return self._request_with_retry(auth_token, request)
+        return self._request_with_retry(auth_token, request, success)

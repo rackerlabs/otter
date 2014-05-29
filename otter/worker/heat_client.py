@@ -7,7 +7,8 @@ from __future__ import print_function
 import json
 
 from otter.util.http import (append_segments, headers, check_success,
-                             APIError, Request)
+                             APIError)
+from otter.util.pure_http import Request
 
 
 __all__ = ['HeatClient']
