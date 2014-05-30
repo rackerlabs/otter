@@ -6,11 +6,15 @@ import mock
 import os
 import treq
 
+from zope.interface import implementer, directlyProvides
+
 from twisted.internet import defer
+from twisted.internet.defer import succeed, Deferred
 from twisted.python.failure import Failure
-from zope.interface import directlyProvides
+from twisted.application.service import Service
 
 from otter.log.bound import BoundLog
+from otter.supervisor import ISupervisor
 
 
 class matches(object):
@@ -231,3 +235,36 @@ class DummyException(Exception):
     """
     Fake exception
     """
+
+
+@implementer(ISupervisor)
+class FakeSupervisor(object, Service):
+    """
+    A fake supervisor that keeps track of calls made
+    """
+
+    def __init__(self, *args):
+        self.args = args
+        self.index = 0
+        self.exec_calls = []
+        self.exec_defs = []
+        self.del_index = 0
+        self.del_calls = []
+
+    def execute_config(self, log, transaction_id, scaling_group, launch_config):
+        """
+        Execute single launch config
+        """
+        self.index += 1
+        self.exec_calls.append((log, transaction_id, scaling_group, launch_config))
+        d = Deferred()
+        self.exec_defs.append(d)
+        return succeed((self.index, d))
+
+    def execute_delete_server(self, log, transaction_id, scaling_group, server):
+        """
+        Delete server
+        """
+        self.del_index += 1
+        self.del_calls.append((log, transaction_id, scaling_group, server))
+        return succeed(self.del_index)
