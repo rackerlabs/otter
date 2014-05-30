@@ -935,7 +935,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         """
         d = self.job.start('launch')
         self.assertEqual(self.successResultOf(d), self.job_id)
-        self.assertEqual(self.job.log, matches(IsInstance(self.log.__class__)))
+        self.assertEqual(self.job.log, self.log.bind(system='otter.job.launch',
+                                                     image_ref='imageID', flavor_ref='1'))
 
     def test_modify_state_called_on_job_completion_success(self):
         """
@@ -1167,7 +1168,7 @@ class RemoveServerTests(SynchronousTestCase):
         """
         self.assertRaises(
             ServerNotFoundError, remove_server_from_group, self.log,
-            self.tid, self.group, 's2', True, self.state)
+            self.tid, 's2', True, self.group, self.state)
         # no server launched or deleted
         self.assertEqual(self.supervisor.exec_calls, [])
         self.assertEqual(self.supervisor.del_calls, [])
@@ -1182,7 +1183,7 @@ class RemoveServerTests(SynchronousTestCase):
         Server is removed and replaced by creating new
         """
         self.group.view_launch_config.return_value = succeed('launch')
-        d = remove_server_from_group(self.log, self.tid, self.group, 's0', True, self.state)
+        d = remove_server_from_group(self.log, self.tid, 's0', True, self.group, self.state)
         state = self.successResultOf(d)
         # server removed?
         self._check_removed(state)
@@ -1197,7 +1198,7 @@ class RemoveServerTests(SynchronousTestCase):
         Server is removed, not replaced and desired is reduced by 1
         """
         self.group.view_config.return_value = succeed({'minEntities': 0})
-        d = remove_server_from_group(self.log, self.tid, self.group, 's0', False, self.state)
+        d = remove_server_from_group(self.log, self.tid, 's0', False, self.group, self.state)
         state = self.successResultOf(d)
         # server removed?
         self._check_removed(state)
@@ -1211,7 +1212,7 @@ class RemoveServerTests(SynchronousTestCase):
         `ServersBelowMinError` is raised if current desired == min servers
         """
         self.group.view_config.return_value = succeed({'minEntities': 1})
-        d = remove_server_from_group(self.log, self.tid, self.group, 's0', False, self.state)
+        d = remove_server_from_group(self.log, self.tid, 's0', False, self.group, self.state)
         self.failureResultOf(d, ServersBelowMinError)
         # server is not deleted
         self.assertIn('s0', self.state.active)
