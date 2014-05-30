@@ -220,25 +220,26 @@ class HelperTests(SynchronousTestCase):
         self.assertEqual(real_failure.value.code, 500)
         self.assertEqual(real_failure.value.body, 'error_body')
 
-    def test_user_for_tenant(self):
+    def test_user_for_tenant_and_returns_singleton_user(self):
         """
         user_for_tenant sends a properly formed request to the identity API for
         the list of users for a given tenant.
         """
         response = mock.Mock(code=200)
-        response_body = {'user': {'id': 'ausername'}}
+        response_body = {"users": [{"id": "a_user_id"}]}
+
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.get.return_value = succeed(response)
 
-        d = user_for_tenant('http://identity/v2.0', 'username', 'password',
+        d = user_for_tenant('http://identity/v2.0', 'auth-token',
                             111111, log=self.log)
 
-        self.assertEqual(self.successResultOf(d), 'ausername')
+        self.assertEqual(self.successResultOf(d), 'a_user_id')
 
         self.treq.get.assert_called_once_with(
-            'http://identity/v1.1/mosso/111111',
-            auth=('username', 'password'),
-            allow_redirects=False, log=self.log)
+            'http://identity/v2.0/tenants/111111/users',
+            headers=expected_headers,
+            log=self.log)
 
     def test_user_for_tenant_propagates_errors(self):
         """
@@ -248,8 +249,7 @@ class HelperTests(SynchronousTestCase):
         self.treq.content.return_value = succeed('error_body')
         self.treq.get.return_value = succeed(response)
 
-        d = user_for_tenant('http://identity/v2.0', 'username', 'password',
-                            111111)
+        d = user_for_tenant('http://identity/v2.0', 'auth-token', 111111)
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(RequestError))
@@ -318,16 +318,16 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         endpoint.
         """
         self.successResultOf(self.ia.authenticate_tenant(111111))
-        self.user_for_tenant.assert_called_once_with(self.admin_url, self.user,
-                                                     self.password, 111111,
+        self.user_for_tenant.assert_called_once_with(self.admin_url,
+                                                     'auth-token', 111111,
                                                      log=None)
 
         self.user_for_tenant.reset_mock()
 
         self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
 
-        self.user_for_tenant.assert_called_once_with(self.admin_url, self.user,
-                                                     self.password, 111111,
+        self.user_for_tenant.assert_called_once_with(self.admin_url,
+                                                     'auth-token', 111111,
                                                      log=self.log)
 
     def test_authenticate_tenant_impersonates_first_user(self):
