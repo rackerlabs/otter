@@ -255,16 +255,35 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token,
 
 def get_admin_user(auth_endpoint, identity_admin_token, user_id, log=None):
     """
+    Given a user ID, gets that user's tenant's admin user.  That is, the admin
+    user for the tenant account of the user with the given user id.
+
+    :param str auth_endpoint: Identity Admin API endpoint.
+    :param str identity_admin_token: An Auth token for an identity admin user
+        who can get the endpoints for a specified user token.
+    :param user_id: The user ID we wish to find the admin user for.
     """
-    pass
+    d = treq.get(
+        append_segments(auth_endpoint, 'users', str(user_id),
+                        'RAX-AUTH', 'admins'),
+        headers=headers(identity_admin_token), log=log)
+
+    d.addCallback(check_success, [200])
+    d.addErrback(wrap_request_error, auth_endpoint,
+                 data='admin_user_for_user')
+    d.addCallback(treq.json_content)
+    d.addCallback(lambda b: b['users'][0]['id'])
+    return d
 
 
 def user_for_tenant(auth_endpoint, identity_admin_token, tenant_id, log=None):
     """
-    Use the intenral API to get the admin user for a tenant.  This involves:
+    Use the internal API to get the admin user for a tenant.  This involves:
 
     1. Listing the users for that tenant.  If there is only 1 user, then that
-        is the admin user for that tenant.
+        is the admin user for that tenant. (see
+        )
+
     2. If there is more than 1 user, grab the first user, and use that user
         ID to get the admin account for that tenant via an admin user API.
 
