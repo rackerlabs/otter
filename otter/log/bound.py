@@ -29,3 +29,27 @@ class BoundLog(object):
         err = functools.partial(self.err, **kwargs)
 
         return self.__class__(msg, err)
+
+    def __eq__(self, other):
+        """
+        Check if other is BoundLog bound with the same args as self
+        """
+        if not isinstance(other, BoundLog):
+            return False
+
+        self.calls = []
+
+        def f(**kwargs):
+            self.calls.append(kwargs)
+
+        org_msg = self.msg
+        self.msg = f
+        self.msg()
+        self.msg = org_msg
+
+        org_msg = other.msg
+        other.msg = f
+        other.msg()
+        other.msg = org_msg
+
+        return self.calls[0] == self.calls[1]
