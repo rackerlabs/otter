@@ -228,7 +228,7 @@ class HelperTests(SynchronousTestCase):
         admin user (which may be different than the given user's id).
         """
         response = mock.Mock(code=200)
-        response_body = {"users": [{"id": "a_user_id"}]}
+        response_body = {"users": [{"id": "auserid", "username": "ausername"}]}
 
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.get.return_value = succeed(response)
@@ -236,7 +236,7 @@ class HelperTests(SynchronousTestCase):
         d = get_admin_user('http://identity/v2.0', 'auth-token',
                            2222, log=self.log)
 
-        self.assertEqual(self.successResultOf(d), 'a_user_id')
+        self.assertEqual(self.successResultOf(d), 'ausername')
 
         self.treq.get.assert_called_once_with(
             'http://identity/v2.0/users/2222/RAX-AUTH/admins',
@@ -268,7 +268,7 @@ class HelperTests(SynchronousTestCase):
         the user immediately if there is a single user for that account.
         """
         response = mock.Mock(code=200)
-        response_body = {"users": [{"id": "a_user_id"}]}
+        response_body = {"users": [{"id": "auserid", "username": "ausername"}]}
 
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.get.return_value = succeed(response)
@@ -276,7 +276,7 @@ class HelperTests(SynchronousTestCase):
         d = user_for_tenant('http://identity/v2.0', 'auth-token',
                             111111, log=self.log)
 
-        self.assertEqual(self.successResultOf(d), 'a_user_id')
+        self.assertEqual(self.successResultOf(d), 'ausername')
 
         self.treq.get.assert_called_once_with(
             'http://identity/v2.0/tenants/111111/users',
@@ -309,8 +309,12 @@ class HelperTests(SynchronousTestCase):
         """
         response = mock.Mock(code=200)
         response_bodies = [
-            {"users": [{"id": "not_admin1"}, {"id": "not_admin2"}]},  # list users
-            {"users": [{"id": "admin_user"}]}  # get admin user
+            # list users
+            {"users": [
+                {"id": "not_admin_id1", "username": "user1"},
+                {"id": "not_admin_id2", "username": "user2"}]},
+            # get admin user
+            {"users": [{"id": "admin_id", "username": "admin_name"}]}
         ]
 
         self.treq.get.side_effect = lambda *a, **kw: succeed(response)
@@ -320,14 +324,14 @@ class HelperTests(SynchronousTestCase):
         d = user_for_tenant('http://identity/v2.0', 'auth-token',
                             111111, log=self.log)
 
-        self.assertEqual(self.successResultOf(d), 'admin_user')
+        self.assertEqual(self.successResultOf(d), 'admin_name')
 
         self.assertEqual(
             self.treq.get.mock_calls,
             [mock.call('http://identity/v2.0/tenants/111111/users',
                        headers=expected_headers,
                        log=self.log),
-             mock.call('http://identity/v2.0/users/not_admin1/RAX-AUTH/admins',
+             mock.call('http://identity/v2.0/users/not_admin_id1/RAX-AUTH/admins',
                        headers=expected_headers,
                        log=self.log)])
 
@@ -339,8 +343,12 @@ class HelperTests(SynchronousTestCase):
         responses = [mock.Mock(code=200), mock.Mock(code=500)]
 
         # response for list users
-        self.treq.json_content.return_value = succeed(
-            {"users": [{"id": "not_admin1"}, {"id": "not_admin2"}]})
+        self.treq.json_content.return_value = succeed({
+            "users": [
+                {"id": "not_admin_id1", "username": "user1"},
+                {"id": "not_admin_id2", "username": "user2"}
+            ]
+        })
 
         # response for get admin user
         self.treq.content.return_value = succeed('error_body')
