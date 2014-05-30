@@ -6,7 +6,6 @@ from itertools import chain
 from urllib import quote, urlencode
 from urlparse import urlsplit, urlunsplit, parse_qs
 
-from effect import Effect
 import treq
 
 from otter.util.config import config_value

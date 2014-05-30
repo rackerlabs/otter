@@ -13,3 +13,4 @@ testtools==0.9.32
 croniter==0.3.3
 txkazoo==0.0.4
 effect==0.1a1
+characteristic==0.1.0

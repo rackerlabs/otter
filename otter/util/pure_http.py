@@ -3,8 +3,10 @@ Pure HTTP utilities.
 """
 import copy
 import json
+import treq
 
 from effect import Effect
+from characteristic import attributes
 
 from otter.util.http import APIError, headers
 
@@ -19,24 +21,23 @@ def conj_obj(obj, **new_attrs):
 
 def conj(d, new_fields):
     """Conj[oin] two dicts without side-effects."""
+    if d is None:
+        d = {}
+    if new_fields is None:
+        new_fields = {}
     new_d = d.copy()
     new_d.update(new_fields)
     return new_d
 
 
+@attributes(['method', 'url', 'headers', 'data', 'log'],
+            defaults={'headers': None, 'data': None, 'log': None})
 class Request(object):
     """
     An effect request for performing HTTP requests.
 
     The effect results in a two-tuple of (response, content).
     """
-    def __init__(self, method, url, headers=None, data=None, log=None):
-        self.method = method
-        self.url = url
-        self.headers = headers if headers is not None else {}
-        self.data = data
-        self.log = log
-
     def perform_effect(self, handlers):
         """
         Perform the request with the given treq client.
@@ -44,6 +45,7 @@ class Request(object):
         :param treq: The treq object.
         """
         func = getattr(treq, self.method)
+
         def got_response(response):
             result = treq.content(response)
             return result.addCallback(lambda content: (response, content))
@@ -52,7 +54,7 @@ class Request(object):
         return result.addCallback(got_response)
 
 
-class ReauthenticationFailed(Exception):
+class ReauthIneffectualError(Exception):
     """
     Raised when an HTTP request returned 401 even after successful
     reauthentication was performed.
@@ -62,23 +64,24 @@ class ReauthenticationFailed(Exception):
 class OSHTTPClient(object):
     """
     A slightly higher-level HTTP client, which:
+    - includes standard autoscale/openstack headers in requests
     - handles reauthentication when a 401 is received
-    - automatically parses JSON responses
+    - parses JSON responses
     - checks for successful HTTP codes
     """
     def __init__(self, reauth):
         self.reauth = reauth
 
-    def _handle_reauth(self, result, retries=1):
+    def _handle_reauth(self, result, request, success, retries=1):
         response, content = result
+
         def _got_reauth_result(auth_token):
-            return self._request_with_retry(auth_token, request, retries - 1)
+            return self._request_with_retry(auth_token, request, success,
+                                            retries - 1)
         if response.code == 401:
             if retries == 0:
-                raise ReauthenticationFailed()
-            return (self.reauth()
-                        .on(success=_got_reauth_result,
-                            error=_got_reauth_error))
+                raise ReauthIneffectualError()
+            return self.reauth().on_success(_got_reauth_result)
         else:
             return result
 
@@ -94,10 +97,8 @@ class OSHTTPClient(object):
     def _request_with_retry(self, auth_token, request, success, retries=1):
         request = conj_obj(request,
                            headers=conj(request.headers, headers(auth_token)))
-        return (Effect(request)
-                    .on_success(lambda r: self._handle_reauth(r, retries))
-                    .on_success(lambda r: self._check_success(r, success))
-                    .on_success(json.loads))
+        return Effect(request).on_success(
+            lambda r: self._handle_reauth(r, request, success, retries))
 
     def json_request(self, auth_token, request, success=(200,)):
         """
@@ -113,4 +114,6 @@ class OSHTTPClient(object):
         :param data: As treq accepts.
         :param list success: The list of HTTP codes to consider successful.
         """
-        return self._request_with_retry(auth_token, request, success)
+        return (self._request_with_retry(auth_token, request, success)
+                    .on_success(lambda r: self._check_success(r, success))
+                    .on_success(json.loads))
