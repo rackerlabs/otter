@@ -670,7 +670,7 @@ is external so it's handy for Getting Started to share -->
                 </example>
                 <calloutlist>
                     <callout arearefs="credentials.json.user">
-                        <para>The <code>username</code>supplied here
+                        <para>The <code>username</code> supplied here
                             is your common Rackspace Cloud user
                             name.</para>
                     </callout>
@@ -738,12 +738,12 @@ is external so it's handy for Getting Started to share -->
                             valid for a finite duration; a token's
                             default lifespan is 24 hours.</para>
                         <para>The token's
-                            <code>expires</code>attribute denotes the
+                            <code>expires</code> attribute denotes the
                             time after which the token automatically
                             becomes invalid. A token can be manually
                             revoked before the time identified by the
-                                <code>expires</code>attribute. The
-                                <code>expires</code>attribute predicts
+                                <code>expires</code> attribute. The
+                                <code>expires</code> attribute predicts
                             a token's maximum possible lifespan but
                             does not guarantee that it will reach that
                             lifespan. Users are encouraged to cache a
@@ -752,7 +752,7 @@ is external so it's handy for Getting Started to share -->
                             valid for 24 hours. Applications should be
                             designed to re-authenticate after
                             receiving a
-                            <errorcode>401</errorcode>(Unauthorized)
+                            <errorcode>401</errorcode> (Unauthorized)
                             response from a service endpoint.</para>
                         <note>
                             <para>The token's expiration time is
@@ -783,10 +783,10 @@ is external so it's handy for Getting Started to share -->
                         <para>Users can be assigned multiple roles,
                             with each role providing specific
                             privileges. In this example,
-                                <code>jsmith</code>is the
+                                <code>jsmith</code> is the
                             administrative user for the account and
                             holds the fully-privileged
-                                <code>identity:admin</code>role. Other
+                                <code>identity:admin</code> role. Other
                             users might hold other roles with
                             different privileges. Roles are not
                             necessarily associated with actual job
@@ -991,12 +991,12 @@ is external so it's handy for Getting Started to share -->
             <para>Replace the Tenant ID, <parameter>1234</parameter>,
                 with your actual Tenant ID.</para>
             <para>You will find your tenant Id after the final '/' in
-                the <code>publicURL</code>field returned by the
+                the <code>publicURL</code> field returned by the
                 authentication response. For example, in <olink
                     targetdoc="autoscale-devguide"
                     targetptr="auth-response-example-json">Example 2,
                     “Authentication Response for US Endpoint:
-                    JSON”</olink>the <code>publicURL</code>field for
+                    JSON”</olink>the <code>publicURL</code> field for
                     <code>autoscale</code>
                 ("https://ord.autoscale.api.rackspacecloud.com/v1.0/
                     <emphasis role="bold">1100111</emphasis>") shows
@@ -1025,15 +1025,8 @@ is external so it's handy for Getting Started to share -->
         </section>
         <section xml:id="Request_Response_Types-d1e903">
             <title>Request and response types</title>
-            <para>The &PRODNAME; API supports JSON data serialization
-                formats. You specify the request format by using the
-                    <code>Content-Type</code> header. The request
-                format is <emphasis role="italic">required</emphasis>
-                for calls that have a request body. You can specify
-                the response format in requests either by using the
-                    <code>Accept</code> header or by adding a
-                    <code>.json</code> extension to the request URI.
-                JSON is also used for the response format.</para>
+            <para>The &PRODNAME; API supports JSON data serialization formats only.
+                The request body is assumed to be JSON, and the response body is returned as JSON.</para>
             <table rules="all">
                 <caption>Response Format</caption>
                 <?dbfo keep-together="always" ?>
@@ -1084,7 +1077,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     regular expression boundary matcher '^' takes
                     effect after the root URI path.</para>
                 <para>For example, the regular expression
-                        <code>^/v1.0/execute</code>would match the
+                        <code>^/v1.0/execute</code> would match the
                     bolded portion of the following URI:
                     https://ord.autoscale.api.rackspacecloud.com
                         <emphasis role="bold"
@@ -1132,14 +1125,14 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <para>Rate limits are applied in order relative to the
                     verb, going from least to most specific. For
                     example, although the general threshold for
-                    operations to <code>/v1/0/*</code>is 1,000 per
+                    operations to <code>/v1/0/*</code> is 1,000 per
                     minute, one cannot &POST; to
                         <code>/v1.0/execute*</code>more than 1 time
                     per second, which is 60 times per minute.</para>
                 <para>If you exceed the thresholds established for
-                    your account, a <errorcode>413</errorcode>(Rate
+                    your account, a <errorcode>413</errorcode> (Rate
                     Control) HTTP response is returned with a
-                        <code>Retry-After</code>header to notify the
+                        <code>Retry-After</code> header to notify the
                     client when it can attempt to try again.</para>
             </section>
             <section xml:id="Absolute_Limits-d1e1397">
@@ -1292,16 +1285,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <para>webhooks</para>
                 </listitem>
             </itemizedlist>
-            <para>You can specify further pages with the
-                    <parameter>?page</parameter> parameter in the Link
-                header in the URI request, and set the number of items
-                to be displayed per page in the
-                    <parameter>per_page</parameter> parameter as shown
-                in the following example:</para>
-            <para>
-                <programlisting>Link: &lt;https://api.github.com/user/repos?page=3&amp;per_page=100&gt;; rel="next",
-                            &lt;https://api.github.com/user/repos?page=50&amp;per_page=100&gt;; rel="last"</programlisting>
-            </para>
+
             <para>To navigate the collection of items that are
                 returned in the request body, you can set the
                 following parameters in the URI: </para>
@@ -1350,59 +1334,25 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <note>
                     <para>The <parameter>limit</parameter> and
                             <parameter>marker</parameter> parameters
-                        are both optional. </para>
+                        are optional. </para>
                 </note>
             </para>
-            <para>To specify the direction for the next page of
-                results, you need to set the
-                    <parameter>rel</parameter> parameter at the end of
-                the request URI. The following values can be set: </para>
-            <table rules="all">
-                <caption>Values for Rel Parameter</caption>
-                <col width="20%"/>
-                <col width="80%"/>
-                <thead>
-                    <tr>
-                        <td>Value</td>
-                        <td>Description</td>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>next</td>
-                        <td>Shows the URL of the immediate next page
-                            of results. </td>
-                    </tr>
-                    <tr>
-                        <td>last</td>
-                        <td>Shows the URL of the last page of
-                            results.</td>
-                    </tr>
-                    <tr>
-                        <td>first</td>
-                        <td>Shows the URL of the first page of
-                            results.</td>
-                    </tr>
-                    <tr>
-                        <td>prev</td>
-                        <td>Shows the URL of the immediate previous
-                            page of results. </td>
-                    </tr>
-                </tbody>
-            </table>
+
             <section xml:id="Paginating_Group_Lists">
                 <title>Paginating group lists</title>
-                <para>When submitting a request for a group manifest,
+                <para>When you submit a request for a group manifest,
                     you receive a list of all the available scaling
                     groups and associated policies. However, the
-                    response body will only list 100, or whatever
-                    number of responses per page you configure, and
-                    provide a <code>next</code> link in the
-                        <parameter>rel</parameter> parameter as shown
-                    in the following example that has the
-                        <parameter>limit</parameter> parameter set to
-                    2 (two responses per page) shown in this
-                    command:</para>
+                    response body only lists 100, or whatever
+                    number of responses per page you configure using
+                    the <parameter>limit</parameter> parameter. If
+                    there are more results available than what you
+                    specified in the <parameter>limit</parameter>
+                    parameter, a <code>next</code> link is provided in
+                    the <parameter>rel</parameter> in the response
+                    body. This is shown in the following example that has
+                    the <parameter>limit</parameter> parameter set to
+                    2 (two responses per page):</para>
                 <para> <code>$ curl -H "x-auth-token: ${AUTHTOKEN}"
                     https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups?limit=2
                     | python -m json.tool </code></para>
@@ -1474,15 +1424,17 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <title>Paginating policy lists</title>
                 <para>When you submit a request to obtain all the
                     policies associated with a scaling group, a list
-                    of policies will be returned. However, the
-                    response body will only list 100, or whatever
-                    number of responses per page you configure, and
-                    provide a <code>next</code> link in the
-                        <parameter>rel</parameter> parameter as shown
-                    in the following example that has the
-                        <parameter>limit</parameter> parameter set to
-                    2 (two responses per page) shown in this
-                    command:</para>
+                    of policies is returned. However, the
+                    response body only lists 100, or whatever
+                    number of responses per page you configure using
+                    the <parameter>limit</parameter> parameter. If
+                    there are more results available than what you
+                    specified in the <parameter>limit</parameter>
+                    parameter, a <code>next</code> link is provided in
+                    the <parameter>rel</parameter> in the response
+                    body. This is shown in the following example that has
+                    the <parameter>limit</parameter> parameter set to
+                    2 (two responses per page):</para>
                 <para><code>$ curl -H "x-auth-token: ${AUTHTOKEN}"
                     https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies?limit=2
                     | python -m json.tool</code></para>
@@ -1539,15 +1491,17 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <title>Paginating webhook lists</title>
                 <para>When you submit a request to obtain all the
                     webhooks associated with a policy, a list of
-                    webhooks will be returned. However, the response
-                    body will only list 100, or whatever number of
-                    responses per page you configure, and provide a
-                        <code>next</code> link in the
-                        <parameter>rel</parameter> parameter as shown
-                    in the following example that has the
-                        <parameter>limit</parameter> parameter set to
-                    2 (two responses per page) shown in this
-                    command:</para>
+                    webhooks is returned. However, the
+                    response body only lists 100, or whatever
+                    number of responses per page you configure using
+                    the <parameter>limit</parameter> parameter. If
+                    there are more results available than what you
+                    specified in the <parameter>limit</parameter>
+                    parameter, a <code>next</code> link is provided in
+                    the <parameter>rel</parameter> in the response
+                    body. This is shown in the following example that has
+                    the <parameter>limit</parameter> parameter set to
+                    2 (two responses per page):</para>
                 <para><code>$ curl -H "x-auth-token: ${AUTHTOKEN}"
                     https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/25adccf9-0077-4510-b37d-90a48c9dc08f/webhooks?limit=2
                     | python -m json.tool</code></para>
