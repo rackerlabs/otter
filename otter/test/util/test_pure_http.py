@@ -2,6 +2,8 @@
 
 import json
 
+from twisted.trial.unittest import SynchronousTestCase
+from twisted.internet.defer import succeed
 from twisted.trial.unittest import TestCase
 
 from effect.testing import (StubRequest, get_request,
@@ -10,19 +12,58 @@ from effect import Effect
 
 from otter.util.pure_http import OSHTTPClient, Request, ReauthIneffectualError
 from otter.util.http import APIError
-from otter.test.utils import StubResponse
+from otter.test.utils import StubResponse, StubTreq
 
 
-class RequestEffectTests(TestCase):
+class RequestEffectTests(SynchronousTestCase):
     """
     Tests for the effects of pure_http.Request.
     """
-    pass
+    def test_perform(self):
+        """
+        The Request effect dispatches a request to treq, and returns a two-tuple
+        of the Twisted Response object and the content as bytes.
+        """
+        response = StubResponse(200, {})
+        treq = StubTreq(
+            gets={('http://google.com/', None, None, None): succeed(response)},
+            contents={response: succeed("content")})
+        req = Request(method="get", url="http://google.com/")
+        self.assertEqual(
+            self.successResultOf(req.perform_effect({}, treq=treq)),
+            (response, "content"))
+
+    def test_post(self):
+        """
+        treq dispatches to the appropriate treq method based on the method
+        specified in the Request.
+        """
+        response = StubResponse(200, {})
+        treq = StubTreq(
+            posts={('http://google.com/', (('foo', 'bar'),), 'my data', None):
+                   succeed(response)},
+            contents={response: succeed("content")})
+        req = Request(method="post", url="http://google.com/", headers={'foo': 'bar'},
+                      data='my data')
+        self.assertEqual(self.successResultOf(req.perform_effect({}, treq=treq)),
+                         (response, "content"))
+
+    def test_log(self):
+        """
+        The log specified in the Request is passed on to the treq implementation.
+        """
+        response = StubResponse(200, {})
+        log = object()
+        treq = StubTreq(
+            gets={('http://google.com/', None, None, log): succeed(response)},
+            contents={response: succeed("content")})
+        req = Request(method="get", url="http://google.com/", log=log)
+        self.assertEqual(self.successResultOf(req.perform_effect({}, treq=treq)),
+                         (response, "content"))
 
 
 class OSHTTPClientTests(TestCase):
     """Tests for OSHTTPClient."""
-    # test reauth required, reauth failed, ReauthIneffectualError
 
     def test_json_request(self):
         """
@@ -150,7 +191,6 @@ class OSHTTPClientTests(TestCase):
         self.assertIs(get_request(reauth_effect_result), reauth_effect.request)
         # 3. When retry succeeds, the original request is retried:
         retry_eff = resolve_stub(reauth_effect_result)
-        retry_req = get_request(retry_eff)
         # When 401 is returned *again*, we get the error.
         stub_response = (StubResponse(401, {}), '{"result": 1}')
         self.assertRaises(ReauthIneffectualError,

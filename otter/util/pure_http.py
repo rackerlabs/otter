@@ -3,7 +3,7 @@ Pure HTTP utilities.
 """
 import copy
 import json
-import treq
+from otter.util import logging_treq
 
 from effect import Effect
 from characteristic import attributes
@@ -38,12 +38,8 @@ class Request(object):
 
     The effect results in a two-tuple of (response, content).
     """
-    def perform_effect(self, handlers):
-        """
-        Perform the request with the given treq client.
-
-        :param treq: The treq object.
-        """
+    def perform_effect(self, handlers, treq=logging_treq):
+        """Perform the request with the given treq client."""
         func = getattr(treq, self.method)
 
         def got_response(response):
