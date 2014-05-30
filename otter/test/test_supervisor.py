@@ -15,8 +15,10 @@ from zope.interface.verify import verifyObject
 from otter import supervisor
 from otter.models.interface import (
     IScalingGroup, GroupState, NoSuchScalingGroupError)
-from otter.supervisor import ISupervisor, SupervisorService
-from otter.test.utils import iMock, patch, mock_log, CheckFailure, matches
+from otter.supervisor import (
+    ISupervisor, SupervisorService, set_supervisor, remove_server_from_group,
+    ServersBelowMinError, ServerNotFoundError)
+from otter.test.utils import iMock, patch, mock_log, CheckFailure, matches, FakeSupervisor
 from otter.util.deferredutils import DeferredPool
 
 
@@ -1139,3 +1141,81 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
                                              system="otter.job.launch",
                                              image_ref="imageID", flavor_ref="1",
                                              job_id=self.job_id)
+
+
+class RemoveServerTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.supervisor.remove_server_from_group`
+    """
+
+    def setUp(self):
+        """
+        Fake supervisor, group and state
+        """
+        self.tid = 'trans_id'
+        self.log = mock_log()
+        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
+        self.state = GroupState('tid', 'gid', 'g', {'s0': {'id': 's0'}}, {},
+                                None, None, None, desired=1)
+        self.supervisor = FakeSupervisor()
+        set_supervisor(self.supervisor)
+        self.addCleanup(set_supervisor, None)
+
+    def test_server_not_found(self):
+        """
+        If specific server is not in the group `ServerNotFoundError` is raised
+        """
+        self.assertRaises(
+            ServerNotFoundError, remove_server_from_group, self.log,
+            self.tid, self.group, 's2', True, self.state)
+        # no server launched or deleted
+        self.assertEqual(self.supervisor.exec_calls, [])
+        self.assertEqual(self.supervisor.del_calls, [])
+
+    def _check_removed(self, state):
+        self.assertNotIn('s0', state.active)
+        self.assertEqual(self.supervisor.del_calls[-1],
+                         (self.log.bind(server_id='s0'), self.tid, self.group, {'id': 's0'}))
+
+    def test_replaced_and_removed(self):
+        """
+        Server is removed and replaced by creating new
+        """
+        self.group.view_launch_config.return_value = succeed('launch')
+        d = remove_server_from_group(self.log, self.tid, self.group, 's0', True, self.state)
+        state = self.successResultOf(d)
+        # server removed?
+        self._check_removed(state)
+        # new server added?
+        self.assertIn(1, state.pending)
+        self.assertEqual(self.supervisor.exec_calls[-1],
+                         (self.log.bind(image_ref=mock.ANY, flavor_ref=mock.ANY),
+                          self.tid, self.group, 'launch'))
+
+    def test_not_replaced_removed(self):
+        """
+        Server is removed, not replaced and desired is reduced by 1
+        """
+        self.group.view_config.return_value = succeed({'minEntities': 0})
+        d = remove_server_from_group(self.log, self.tid, self.group, 's0', False, self.state)
+        state = self.successResultOf(d)
+        # server removed?
+        self._check_removed(state)
+        # desired reduced and no server launched?
+        self.assertEqual(state.desired, 0)
+        self.assertEqual(len(state.pending), 0)
+        self.assertEqual(len(self.supervisor.exec_calls), 0)
+
+    def test_not_replaced_below_min(self):
+        """
+        `ServersBelowMinError` is raised if current desired == min servers
+        """
+        self.group.view_config.return_value = succeed({'minEntities': 1})
+        d = remove_server_from_group(self.log, self.tid, self.group, 's0', False, self.state)
+        self.failureResultOf(d, ServersBelowMinError)
+        # server is not deleted
+        self.assertIn('s0', self.state.active)
+        self.assertEqual(self.supervisor.del_calls, [])
+        # server is not launched
+        self.assertEqual(self.state.pending, {})
+        self.assertEqual(len(self.supervisor.exec_calls), 0)

@@ -474,3 +474,74 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
     pendings_deferred.addCallback(_update_state)
     pendings_deferred.addErrback(unwrap_first_error)
     return pendings_deferred
+
+
+class ServerNotFoundError(Exception):
+    """
+    Exception to be raised when the given server is not found
+    """
+    def __init__(self, tenant_id, group_id, server_id):
+        self.tenant_id = tenant_id
+        self.group_id = group_id
+        self.server_id = server_id
+        super(ServerNotFoundError, self).__init__(
+            "Active server {} not found in tenant {}'s group {}".format(
+                server_id, tenant_id, group_id))
+
+
+class ServersBelowMinError(Exception):
+    """
+    Exception to be raised when server cannot be removed from the group
+    if it will be below minimum servers in the group
+    """
+    def __init__(self, tenant_id, group_id, server_id, min_servers):
+        self.tenant_id = tenant_id
+        self.group_id = group_id
+        self.server_id = server_id
+        self.min_servers = min_servers
+        super(ServersBelowMinError, self).__init__(
+            ("Cannot remove server {server_id} from tenant {tenant_id}'s group {group_id}. "
+             "It will reduce number of servers below required minimum {min_servers}.").format(
+                 server_id=server_id, min_servers=min_servers,
+                 tenant_id=tenant_id, group_id=group_id))
+
+
+def remove_server_from_group(log, trans_id, server_id, replace, group, state):
+    """
+    Remove specific server from the group and optionally replace it by creatig new
+    server
+
+    :param log: A bound logger
+    :param trans_id: transaction id for this operation
+    :param server_id: ID of server to be removed
+    :param replace: Should the server be replaced?
+    :param group: A :class:`otter.models.interface.IScalingGroup` implementation
+    :param state: A :class:`otter.models.interface.GroupState` object
+
+    :return: Deferred that fires with updated state object
+    """
+
+    def reduce_desired(config):
+        if state.desired == config['minEntities']:
+            raise ServersBelowMinError(group.tenant_id, group.uuid, server_id,
+                                       config['minEntities'])
+        else:
+            state.desired -= 1
+
+    def remove_server(_):
+        server_info = state.active[server_id]
+        state.remove_active(server_id)
+        _DeleteJob(log, trans_id, group, server_info, get_supervisor()).start()
+        return state
+
+    if server_id in state.active:
+        if replace:
+            d = group.view_launch_config()
+            d.addCallback(lambda lc: execute_launch_config(log, trans_id, state, lc, group, 1))
+        else:
+            # Before reducing servers, check if it is below minimum required servers
+            d = group.view_config()
+            d.addCallback(reduce_desired)
+        return d.addCallback(remove_server)
+    else:
+        raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)

@@ -21,7 +21,7 @@ from otter.json_schema.group_schemas import MAX_ENTITIES
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError)
-from otter.rest.decorators import InvalidJsonError
+from otter.rest.decorators import InvalidJsonError, InvalidQueryArgument
 
 from otter.rest.groups import format_state_dict
 
@@ -959,3 +959,74 @@ class GroupResumeTestCase(RestAPITestMixin, SynchronousTestCase):
         Resume currently raises 501 not implemented
         """
         self.assert_status_code(501, method="POST")
+
+
+class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
+    """
+    Tests for ``/{tenantId}/groups/{groupId}/servers/`` endpoint
+    """
+    endpoint = "/v1.0/11111/groups/one/servers/"
+    invalid_methods = ("POST", "PUT")
+
+    def setUp(self):
+        """
+        Mock remove_server_from_group
+        """
+        super(GroupServersTests, self).setUp()
+        self.mock_rsfg = patch(self, 'otter.rest.groups.remove_server_from_group',
+                               return_value=None)
+
+    def test_server_delete_no_arg(self):
+        """
+        Server is deleted and replaced by calling remove_server_from_group
+        with correct args when called without query args
+        """
+        response_body = self.assert_status_code(202, method="DELETE",
+                                                endpoint=self.endpoint + 's1')
+        self.assertEqual(response_body, "")
+        self.mock_rsfg.assert_called_once_with(
+            mock.ANY, 'transaction-id', 's1', True, self.mock_group, self.mock_state)
+
+    def test_server_delete_bad_arg(self):
+        """
+        InvalidQueryArgument is raised if replace arg is neither "true" or "false"
+        """
+        response_body = self.assert_status_code(400, method="DELETE",
+                                                endpoint=self.endpoint + 's1?replace=junk')
+        self.assertIn('InvalidQueryArgument', response_body)
+        self.flushLoggedErrors(InvalidQueryArgument)
+        self.assertFalse(self.mock_rsfg.called)
+
+    def test_server_delete_replace_true(self):
+        """
+        `remove_server_from_group` is called with replace True is replace=true
+        query arg is given
+        """
+        response_body = self.assert_status_code(202, method="DELETE",
+                                                endpoint=self.endpoint + 's1?replace=true')
+        self.assertEqual(response_body, "")
+        self.mock_rsfg.assert_called_once_with(
+            mock.ANY, 'transaction-id', 's1', True, self.mock_group, self.mock_state)
+
+    def test_server_delete_replace_false(self):
+        """
+        `remove_server_from_group` is called with replace False is replace=false
+        query arg is given
+        """
+        response_body = self.assert_status_code(202, method="DELETE",
+                                                endpoint=self.endpoint + 's1?replace=false')
+        self.assertEqual(response_body, "")
+        self.mock_rsfg.assert_called_once_with(
+            mock.ANY, 'transaction-id', 's1', False, self.mock_group, self.mock_state)
+
+    def test_get_servers_not_implemented(self):
+        """
+        GET /servers is not implemented
+        """
+        self.assert_status_code(501, method="GET")
+
+    def test_get_server_id_not_implemented(self):
+        """
+        GET /servers/id is not implemented
+        """
+        self.assert_status_code(501, method="GET", endpoint=self.endpoint + 's1')

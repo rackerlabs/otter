@@ -4,7 +4,8 @@ Errors mapped to http status codes in the rest module
 
 from jsonschema import ValidationError
 
-from otter.controller import CannotExecutePolicyError, ServerNotFoundError
+from otter.controller import CannotExecutePolicyError
+from otter.supervisor import ServerNotFoundError, ServersBelowMinError
 
 from otter.models.interface import (
     GroupNotEmptyError, NoSuchScalingGroupError,
@@ -31,6 +32,7 @@ exception_codes = {
     NoSuchWebhookError: 404,
     ServerNotFoundError: 404,
     GroupNotEmptyError: 403,
+    ServersBelowMinError: 403,
     CannotExecutePolicyError: 403,
     InvalidQueryArgument: 400,
     NotImplementedError: 501,
