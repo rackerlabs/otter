@@ -71,6 +71,23 @@
         <revhistory>
             <revision
                 xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <date>2014-05-28</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Swapped out pagination code samples
+                                for valid JSON. Fixed minor typos
+                                throughout. Added some Glossary
+                                entries. Added note about the service
+                                network being required for scaling
+                                group configurations that include a
+                                load balancer.</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
+            <revision
+                xmlns:raxm="http://docs.rackspace.com/api/metadata">
                 <date>2014-05-09</date>
                 <revdescription>
                     <itemizedlist spacing="compact">
@@ -410,8 +427,8 @@ is external so it's handy for Getting Started to share -->
                 are usually long, and random, and cannot be guessed by
                 a user.</para>
             <para>When a webhook is created, Auto Scale creates values
-                for the <parameter>capabilityVersion</parameter>and
-                    <parameter>capabilityHash</parameter>parameters.
+                for the <parameter>capabilityVersion</parameter> and
+                    <parameter>capabilityHash</parameter> parameters.
                 These values are created per webhook, not per policy.
                 When you create a webhook, you associate it with a
                 policy. The response to the webhook creation request
@@ -592,7 +609,7 @@ is external so it's handy for Getting Started to share -->
             </para>
             <para>Every REST request for &PROD; requires the inclusion
                 of a specific authentication token, supplied by the
-                    <code>X-Auth-Token</code>HTTP header. Customers
+                    <code>X-Auth-Token</code> HTTP header. Customers
                 obtain this token by first using the Rackspace Cloud
                 Identity service and supplying a valid user name and
                 API access key.</para>
@@ -604,7 +621,7 @@ is external so it's handy for Getting Started to share -->
                     in this section illustrate a general case. In your
                     authentication request, use your own credentials
                     rather than the sample values shown for
-                        <code>username</code>and <code>apiKey</code>.
+                        <code>username</code> and <code>apiKey</code>.
                     When you authenticate successfully, the response
                     to your authentication request includes a catalog
                     of the services to which you have subscribed
@@ -653,7 +670,7 @@ is external so it's handy for Getting Started to share -->
                 </example>
                 <calloutlist>
                     <callout arearefs="credentials.json.user">
-                        <para>The <code>username</code>supplied here
+                        <para>The <code>username</code> supplied here
                             is your common Rackspace Cloud user
                             name.</para>
                     </callout>
@@ -721,12 +738,12 @@ is external so it's handy for Getting Started to share -->
                             valid for a finite duration; a token's
                             default lifespan is 24 hours.</para>
                         <para>The token's
-                            <code>expires</code>attribute denotes the
+                            <code>expires</code> attribute denotes the
                             time after which the token automatically
                             becomes invalid. A token can be manually
                             revoked before the time identified by the
-                                <code>expires</code>attribute. The
-                                <code>expires</code>attribute predicts
+                                <code>expires</code> attribute. The
+                                <code>expires</code> attribute predicts
                             a token's maximum possible lifespan but
                             does not guarantee that it will reach that
                             lifespan. Users are encouraged to cache a
@@ -735,7 +752,7 @@ is external so it's handy for Getting Started to share -->
                             valid for 24 hours. Applications should be
                             designed to re-authenticate after
                             receiving a
-                            <errorcode>401</errorcode>(Unauthorized)
+                            <errorcode>401</errorcode> (Unauthorized)
                             response from a service endpoint.</para>
                         <note>
                             <para>The token's expiration time is
@@ -766,10 +783,10 @@ is external so it's handy for Getting Started to share -->
                         <para>Users can be assigned multiple roles,
                             with each role providing specific
                             privileges. In this example,
-                                <code>jsmith</code>is the
+                                <code>jsmith</code> is the
                             administrative user for the account and
                             holds the fully-privileged
-                                <code>identity:admin</code>role. Other
+                                <code>identity:admin</code> role. Other
                             users might hold other roles with
                             different privileges. Roles are not
                             necessarily associated with actual job
@@ -974,12 +991,12 @@ is external so it's handy for Getting Started to share -->
             <para>Replace the Tenant ID, <parameter>1234</parameter>,
                 with your actual Tenant ID.</para>
             <para>You will find your tenant Id after the final '/' in
-                the <code>publicURL</code>field returned by the
+                the <code>publicURL</code> field returned by the
                 authentication response. For example, in <olink
                     targetdoc="autoscale-devguide"
                     targetptr="auth-response-example-json">Example 2,
                     “Authentication Response for US Endpoint:
-                    JSON”</olink>the <code>publicURL</code>field for
+                    JSON”</olink>the <code>publicURL</code> field for
                     <code>autoscale</code>
                 ("https://ord.autoscale.api.rackspacecloud.com/v1.0/
                     <emphasis role="bold">1100111</emphasis>") shows
@@ -1008,15 +1025,8 @@ is external so it's handy for Getting Started to share -->
         </section>
         <section xml:id="Request_Response_Types-d1e903">
             <title>Request and response types</title>
-            <para>The &PRODNAME; API supports JSON data serialization
-                formats. You specify the request format by using the
-                    <code>Content-Type</code>header. The request
-                format is <emphasis role="italic"
-                >required</emphasis>for calls that have a request
-                body. You can specify the response format in requests
-                either by using the <code>Accept</code>header or by
-                adding a <code>.json</code>extension to the request
-                URI. JSON is also used for the response format.</para>
+            <para>The &PRODNAME; API supports JSON data serialization formats only.
+                The request body is assumed to be JSON, and the response body is returned as JSON.</para>
             <table rules="all">
                 <caption>Response Format</caption>
                 <?dbfo keep-together="always" ?>
@@ -1050,7 +1060,7 @@ is external so it's handy for Getting Started to share -->
             <para>All accounts, by default, have a preconfigured set
                 of thresholds (or limits) to manage capacity and
                 prevent abuse of the system. The system recognizes
-                    <firstterm>rate limits </firstterm>and
+                    <firstterm>rate limits </firstterm> and
                     <firstterm>absolute limits </firstterm>. Rate
                 limits are thresholds that are reset after a certain
                 amount of time passes. Absolute limits are
@@ -1067,7 +1077,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     regular expression boundary matcher '^' takes
                     effect after the root URI path.</para>
                 <para>For example, the regular expression
-                        <code>^/v1.0/execute</code>would match the
+                        <code>^/v1.0/execute</code> would match the
                     bolded portion of the following URI:
                     https://ord.autoscale.api.rackspacecloud.com
                         <emphasis role="bold"
@@ -1115,14 +1125,14 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <para>Rate limits are applied in order relative to the
                     verb, going from least to most specific. For
                     example, although the general threshold for
-                    operations to <code>/v1/0/*</code>is 1,000 per
+                    operations to <code>/v1/0/*</code> is 1,000 per
                     minute, one cannot &POST; to
                         <code>/v1.0/execute*</code>more than 1 time
                     per second, which is 60 times per minute.</para>
                 <para>If you exceed the thresholds established for
-                    your account, a <errorcode>413</errorcode>(Rate
+                    your account, a <errorcode>413</errorcode> (Rate
                     Control) HTTP response is returned with a
-                        <code>Retry-After</code>header to notify the
+                        <code>Retry-After</code> header to notify the
                     client when it can attempt to try again.</para>
             </section>
             <section xml:id="Absolute_Limits-d1e1397">
@@ -1275,16 +1285,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <para>webhooks</para>
                 </listitem>
             </itemizedlist>
-            <para>You can specify further pages with the
-                    <parameter>?page</parameter>parameter in the Link
-                header in the URI request, and set the number of items
-                to be displayed per page in the
-                    <parameter>per_page</parameter>parameter as shown
-                in the following example:</para>
-            <para>
-                <programlisting>Link: &lt;https://api.github.com/user/repos?page=3&amp;per_page=100&gt;; rel="next",
-                            &lt;https://api.github.com/user/repos?page=50&amp;per_page=100&gt;; rel="last"</programlisting>
-            </para>
+
             <para>To navigate the collection of items that are
                 returned in the request body, you can set the
                 following parameters in the URI: </para>
@@ -1308,7 +1309,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>Specifies the number of items that can
                                 be returned on one page. If the client
                                 requests a <emphasis role="italic"
-                                   >limit</emphasis>beyond the 100
+                                   >limit</emphasis> beyond the 100
                                 items supported by Auto Scale, an
                                 overLimit (413) response code will be
                                 returned.</td>
@@ -1331,67 +1332,81 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             </para>
             <para>
                 <note>
-                    <para>The <parameter>limit</parameter>and
-                            <parameter>marker</parameter>parameters
-                        are both optional. </para>
+                    <para>The <parameter>limit</parameter> and
+                            <parameter>marker</parameter> parameters
+                        are optional. </para>
                 </note>
             </para>
-            <para>To specify the direction for the next page of
-                results, you need to set the
-                    <parameter>rel</parameter>parameter at the end of
-                the request URI. The following values can be set: </para>
-            <table rules="all">
-                <caption>Values for Rel Parameter</caption>
-                <col width="20%"/>
-                <col width="80%"/>
-                <thead>
-                    <tr>
-                        <td>Value</td>
-                        <td>Description</td>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>next</td>
-                        <td>Shows the URL of the immediate next page
-                            of results. </td>
-                    </tr>
-                    <tr>
-                        <td>last</td>
-                        <td>Shows the URL of the last page of
-                            results.</td>
-                    </tr>
-                    <tr>
-                        <td>first</td>
-                        <td>Shows the URL of the first page of
-                            results.</td>
-                    </tr>
-                    <tr>
-                        <td>prev</td>
-                        <td>Shows the URL of the immediate previous
-                            page of results. </td>
-                    </tr>
-                </tbody>
-            </table>
+
             <section xml:id="Paginating_Group_Lists">
                 <title>Paginating group lists</title>
-                <para>When submitting a request for a group manifest,
+                <para>When you submit a request for a group manifest,
                     you receive a list of all the available scaling
-                    groups and associated policies. However, if there
-                    are too many, the response body will only list
-                    100, and provide a next link in the
-                        <parameter>rel</parameter>parameter as shown
-                    in the following example:</para>
+                    groups and associated policies. However, the
+                    response body only lists 100, or whatever
+                    number of responses per page you configure using
+                    the <parameter>limit</parameter> parameter. If
+                    there are more results available than what you
+                    specified in the <parameter>limit</parameter>
+                    parameter, a <code>next</code> link is provided in
+                    the <parameter>rel</parameter> in the response
+                    body. This is shown in the following example that has
+                    the <parameter>limit</parameter> parameter set to
+                    2 (two responses per page):</para>
+                <para> <code>$ curl -H "x-auth-token: ${AUTHTOKEN}"
+                    https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups?limit=2
+                    | python -m json.tool </code></para>
                 <example>
                     <title>Paginating group lists example</title>
-                    <programlisting language="json">{ "groups": [ ... ], "group_links": [ { "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/?limit=100&amp;marker=f82bb000-f451-40c8-9dc3-6919097d2f7e"
-                                "rel": "next" } ] }
-
+                    <programlisting language="json">{
+    "groups": [
+        {
+            "id": "1bb9d1e7-d7d2-4a87-baa3-8902fbfc8f02",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/1bb9d1e7-d7d2-4a87-baa3-8902fbfc8f02/",
+                    "rel": "self"
+                }
+            ],
+            "state": {
+                "active": [],
+                "activeCapacity": 0,
+                "desiredCapacity": 0,
+                "name": "test_sgroup711740",
+                "paused": false,
+                "pendingCapacity": 0
+            }
+        },
+        {
+            "id": "d8a0ed6a-c1cd-4578-85e9-ebe88291791d",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/d8a0ed6a-c1cd-4578-85e9-ebe88291791d/",
+                    "rel": "self"
+                }
+            ],
+            "state": {
+                "active": [],
+                "activeCapacity": 0,
+                "desiredCapacity": 0,
+                "name": "test_sgroup453884",
+                "paused": false,
+                "pendingCapacity": 0
+            }
+        }
+    ],
+    "groups_links": [
+        {
+            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/?limit=2&amp;marker=d8a0ed6a-c1cd-4578-85e9-ebe88291791d",
+            "rel": "next"
+        }
+    ]
+}
                             </programlisting>
                 </example>
-                <para>The <parameter>limit</parameter>parameter in the
-                    example above is set to 100, which means no more
-                    than 100 items can be displayed on one page. For
+                <para>The <parameter>limit</parameter> parameter in
+                    the example above is set to 2, which means no more
+                    than 2 items can be displayed on one page. For
                     Auto Scale, this number must be between 1 and 100.
                     So if you provide a query argument of more than
                     100, it will default to 100, and if you set the
@@ -1399,51 +1414,142 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <para>If you provide an invalid query argument for
                         <parameter>limit</parameter>, a 400 response
                     code will be returned. The
-                        <parameter>marker</parameter>parameter
+                        <parameter>marker</parameter> parameter
                     specifies the last seen group Id. When you click
                     on the link that is returned, all the groups
                     displayed will have group Ids that are greater
-                    than "f82bb000-f451-40c8-9dc3-6919097d2f7e".
-                </para>
+                    than "f82bb000-f451-40c8-9dc3-6919097d2f7e". </para>
             </section>
             <section xml:id="Paginating_Policy_Lists">
                 <title>Paginating policy lists</title>
                 <para>When you submit a request to obtain all the
                     policies associated with a scaling group, a list
-                    of policies will be returned. However, if there
-                    are too many policies, the response body will only
-                    list 100, and provide a next link in the
-                        <parameter>rel</parameter>parameter as shown
-                    in the following example:</para>
+                    of policies is returned. However, the
+                    response body only lists 100, or whatever
+                    number of responses per page you configure using
+                    the <parameter>limit</parameter> parameter. If
+                    there are more results available than what you
+                    specified in the <parameter>limit</parameter>
+                    parameter, a <code>next</code> link is provided in
+                    the <parameter>rel</parameter> in the response
+                    body. This is shown in the following example that has
+                    the <parameter>limit</parameter> parameter set to
+                    2 (two responses per page):</para>
+                <para><code>$ curl -H "x-auth-token: ${AUTHTOKEN}"
+                    https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies?limit=2
+                    | python -m json.tool</code></para>
                 <example>
                     <title>Paginating policy lists example</title>
-                    <programlisting language="json">{ "policies": [ ... ], "policies_links": [ { "href": "http://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/b5210aa2-5c8f-4c17-9fb4-71a351e519cd/policies/?limit=100&amp;marker=f82bb000-f451-40c8-9dc3-6919097d2f7e",
-                                "rel": "next" } ] }
+                    <programlisting language="json">{
+    "policies": [
+        {
+            "change": 10,
+            "cooldown": 5,
+            "id": "25adccf9-0077-4510-b37d-90a48c9dc08f",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/25adccf9-0077-4510-b37d-90a48c9dc08f/",
+                    "rel": "self"
+                }
+            ],
+            "name": "scale up by 10",
+            "type": "webhook"
+        },
+        {
+            "args": {
+                "cron": "0 */2 * * *"
+            },
+            "change": 10,
+            "cooldown": 3,
+            "id": "2d321cd2-b873-4865-9941-5ea6783fd58c",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/2d321cd2-b873-4865-9941-5ea6783fd58c/",
+                    "rel": "self"
+                }
+            ],
+            "name": "Schedule policy to run repeately",
+            "type": "schedule"
+        }
+    ],
+    "policies_links": [
+        {
+            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/?limit=2&amp;marker=2d321cd2-b873-4865-9941-5ea6783fd58c",
+            "rel": "next"
+        }
+    ]
+}
                             </programlisting>
                 </example>
-                <para>The <parameter>marker</parameter>parameter
+                <para>The <parameter>marker</parameter> parameter
                     points to the last seen policy Id. When you click
                     on the link that is returned, all the policies
                     displayed will have policy Ids that are greater
-                    than "f82bb000-f451-40c8-9dc3-6919097d2f7e".
-                </para>
+                    than "f82bb000-f451-40c8-9dc3-6919097d2f7e". </para>
             </section>
             <section xml:id="Paginating_Webhook_lists">
                 <title>Paginating webhook lists</title>
                 <para>When you submit a request to obtain all the
                     webhooks associated with a policy, a list of
-                    webhooks will be returned. However, if there are
-                    too many webhooks, the response body will only
-                    list 100, and provide a next link in the
-                        <parameter>rel</parameter>parameter as shown
-                    in the following example:</para>
+                    webhooks is returned. However, the
+                    response body only lists 100, or whatever
+                    number of responses per page you configure using
+                    the <parameter>limit</parameter> parameter. If
+                    there are more results available than what you
+                    specified in the <parameter>limit</parameter>
+                    parameter, a <code>next</code> link is provided in
+                    the <parameter>rel</parameter> in the response
+                    body. This is shown in the following example that has
+                    the <parameter>limit</parameter> parameter set to
+                    2 (two responses per page):</para>
+                <para><code>$ curl -H "x-auth-token: ${AUTHTOKEN}"
+                    https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/25adccf9-0077-4510-b37d-90a48c9dc08f/webhooks?limit=2
+                    | python -m json.tool</code></para>
                 <example>
                     <title>Paginating webhook lists example</title>
-                    <programlisting language="json">{ "webhooks": [ ... ], "webhooks_links": [ { "href": "http://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/b5210aa2-5c8f-4c17-9fb4-71a351e519cd/policies/5783f588-eba6-4ca2-a9c5-ce04f2c32992/webhooks/?limit=100&amp;marker=f82bb000-f451-40c8-9dc3-6919097d2f7e",
-                                "rel": "next" } ] }
+                    <programlisting language="json">{
+    "webhooks": [
+        {
+            "id": "012d0b95-8185-4955-be00-cee9bc25d177",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/25adccf9-0077-4510-b37d-90a48c9dc08f/webhooks/012d0b95-8185-4955-be00-cee9bc25d177/",
+                    "rel": "self"
+                },
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/3ae6d5b89b471fd6ac2d8496e19bea1ae6e766c83869903de745bf7ae3fbfd45/",
+                    "rel": "capability"
+                }
+            ],
+            "metadata": {},
+            "name": "webhook3"
+        },
+        {
+            "id": "a5aefc55-1ac8-41a0-8d70-7ee30f56af69",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/25adccf9-0077-4510-b37d-90a48c9dc08f/webhooks/a5aefc55-1ac8-41a0-8d70-7ee30f56af69/",
+                    "rel": "self"
+                },
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/ad1cad8361963cc350ac0f1fc4edd2cacc24e0d77eee03b8c0cfaf7feeec7ac3/",
+                    "rel": "capability"
+                }
+            ],
+            "metadata": {},
+            "name": "webhook1"
+        }
+    ],
+    "webhooks_links": [
+        {
+            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/25adccf9-0077-4510-b37d-90a48c9dc08f/webhooks/?limit=2&amp;marker=a5aefc55-1ac8-41a0-8d70-7ee30f56af69",
+            "rel": "next"
+        }
+    ]
+}
                             </programlisting>
                 </example>
-                <para>The <parameter>marker</parameter>parameter
+                <para>The <parameter>marker</parameter> parameter
                     points to the last seen webhook Id. When you click
                     on the link that is provided in the response body,
                     all the webhooks displayed will have webhook Ids
@@ -1614,7 +1720,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <para>If any &PRODNAME; request results in an error, the
                 service returns an appropriate 4 <emphasis
                     role="italic">xx</emphasis> or 5 <emphasis
-                    role="italic">xx</emphasis>HTTP status code, and
+                    role="italic">xx</emphasis> HTTP status code, and
                 the following information in the body:</para>
             <itemizedlist>
                 <listitem>
@@ -1769,8 +1875,8 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 </tbody>
             </table>
             <para>The number of resources entities that are specified
-                in <parameter>minEntities</parameter>and
-                    <parameter>maxEntities</parameter>overrides the
+                in <parameter>minEntities</parameter> and
+                    <parameter>maxEntities</parameter> overrides the
                 amount of resources that can be specified in a policy.
                 See also <link linkend="Min_and_Max_Policies">Using
                     the min and max values with policies
@@ -1782,7 +1888,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <note>
                     <para>Group metadata is stored within the Auto
                         Scale API and can be queried. You can use the
-                            <parameter>metadata</parameter>parameter
+                            <parameter>metadata</parameter> parameter
                         for customer automation, but it does not
                         change any functionality in Auto Scale.</para>
                 </note>
@@ -1858,8 +1964,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             </td>
                             <td>Specifies configuration information
                                 for the Cloud server image that will
-                                be created during the scaling process
-                            </td>
+                                be created during the scaling process. </td>
                         </tr>
                         <tr>
                             <td>
@@ -1867,8 +1972,13 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             </td>
                             <td>Specifies the configuration
                                 information for the load balancer(s)
-                                used in the cloud server deployment
-                            </td>
+                                used in the cloud server deployment.
+                                Please note that you must include the
+                                   <guimenuitem>service.net</guimenuitem>
+                                network in your configuration if you
+                                use a load balancer so the load
+                                balancer can retrieve the IP address
+                                of new servers. </td>
                         </tr>
                     </tbody>
                 </table>
@@ -1994,7 +2104,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <col width="60%"/>
                 <thead>
                     <tr>
-                        <td>Parameter Name</td>
+                        <td>Parameter</td>
                         <td>Description</td>
                     </tr>
                 </thead>
@@ -2291,7 +2401,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <col width="60%"/>
                         <thead>
                             <tr>
-                                <td>Parameter Name</td>
+                                <td>Parameter</td>
                                 <td>Description</td>
                             </tr>
                         </thead>
@@ -2550,14 +2660,15 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>tenantId</parameter> and
                         <parameter>groupId</parameter> parameters
                     specified in the request URL. Add the
-                        <parameter>?webhook=true</parameter> parameter
-                    to also get details about any webhooks associated
-                    with the scaling group's policies.</para>
+                        <parameter>?webhooks=true</parameter>
+                    parameter to also get details about any webhooks
+                    associated with the scaling group's
+                    policies.</para>
                 <example>
                     <title>Request</title>
                     <programlisting>GET /{tenantId}/groups/{groupId}/config</programlisting>
                 </example>
-                <para>If the <command>GET</command>request is
+                <para>If the <command>GET</command> request is
                     successful, the data is returned in the body of
                     the response in JSON format as shown in the
                     following example:</para>
@@ -2575,10 +2686,9 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <para>To edit the configuration for a scaling group,
                     which includes the minimum number of entities, the
                     maximum number of entities, global cooldown, and
-                    other metadata, submit a
-                    <command>PUT</command>request with the
-                        <parameter>tenantId</parameter>and
-                        <parameter>groupId</parameter>parameters
+                    other metadata, submit a <command>PUT</command>
+                    request with the <parameter>tenantId</parameter>
+                    and <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
                     <title>Request</title>
@@ -2587,7 +2697,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <xi:include href="./samples/reqPutGroupConfig.json" parse="text"/>
                         </programlisting>
                 </example>
-                <para>If the <command>PUT</command>request is
+                <para>If the <command>PUT</command> request is
                     successful, a 204 response code with an empty
                     response body will be returned</para>
             </section>
@@ -2599,15 +2709,15 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     group, which includes the details of how to create
                     a server, from what image, which load balancers to
                     join it to, what networks to add it to, and other
-                    metadata, submit a <command>GET</command>request
-                    with the <parameter>tenantId</parameter>and
-                        <parameter>groupId</parameter>parameters
+                    metadata, submit a <command>GET</command> request
+                    with the <parameter>tenantId</parameter> and
+                        <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
                     <title>Request</title>
                     <programlisting>GET /{tenantId}/groups/{groupId}/launch</programlisting>
                 </example>
-                <para>If the <command>GET</command>request is
+                <para>If the <command>GET</command> request is
                     successful, the data will be returned in the body
                     of the response in JSON format as shown in the
                     following example:</para>
@@ -2627,8 +2737,8 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     image, which load balancers to join it to, and
                     what networks to add it to, and other metadata,
                     submit a <command>PUT</command> request with the
-                        <parameter>tenantId</parameter>and
-                        <parameter>groupId</parameter>parameters
+                        <parameter>tenantId</parameter> and
+                        <parameter>groupId</parameter> parameters
                     specified in the request URL. In the request body,
                     specify the details about the server type, server
                     image, load balancers, network, and any other
@@ -2641,7 +2751,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <xi:include href="./samples/reqPutLaunchConfig.json" parse="text"/>
                         </programlisting>
                 </example>
-                <para>If the <command>PUT</command>request is
+                <para>If the <command>PUT</command> request is
                     successful, a 204 response code with an empty
                     response body will be returned. </para>
             </section>
@@ -2656,16 +2766,15 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </note>
                 </para>
                 <para>To pause all execution of scaling policies for a
-                    scaling group, submit a
-                    <command>POST</command>request with the
-                        <parameter>tenantId</parameter>and
-                        <parameter>groupId</parameter>parameters
+                    scaling group, submit a <command>POST</command>
+                    request with the <parameter>tenantId</parameter>
+                    and <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
                     <title>Request </title>
                     <programlisting>POST /{tenantId}/groups/{groupId}/pause</programlisting>
                 </example>
-                <para>If the <command>POST</command>request is
+                <para>If the <command>POST</command> request is
                     successful, a 204 response code is returned with
                     an empty response body. </para>
             </section>
@@ -2674,23 +2783,21 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     group </title>
                 <para>
                     <note>
-                        <para>The Resume feature has not been
+                        <para>The resume feature has not been
                             implemented in the Auto Scale API yet but
-                            will be implemented in a future release.
-                        </para>
+                            will be implemented in a future release. </para>
                     </note>
                 </para>
                 <para>To resume execution of all scaling policies for
-                    a scaling group, submit a
-                    <command>POST</command>request with the
-                        <parameter>tenantId</parameter>and
-                        <parameter>groupId</parameter>parameters
+                    a scaling group, submit a <command>POST</command>
+                    request with the <parameter>tenantId</parameter>
+                    and <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
                     <title>Request</title>
                     <programlisting>POST /{tenantId}/groups/{groupId}/resume</programlisting>
                 </example>
-                <para>If the <command>POST</command>request is
+                <para>If the <command>POST</command> request is
                     successful, a 204 response code is returned with
                     an empty response body. </para>
             </section>
@@ -2699,18 +2806,18 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <title>Create and manage scaling policies</title>
             <para>You can use the Auto Scale API to create and manage
                 the scaling policies for your scaling group. Create a
-                scaling policy by submitting a
-                <command>POST</command>request that contains the
-                    <parameter>tenantID</parameter>that you obtained
+                scaling policy by submitting a <command>POST</command>
+                request that contains the
+                    <parameter>tenantID</parameter> that you obtained
                 during the <olink
                     targetdoc="autoscale-getting-started"
                     targetptr="Authenticate"
                 >“Authenticate”</olink>step and the
-                    <parameter>groupID</parameter>that you obtained
+                    <parameter>groupID</parameter> that you obtained
                 during the <olink
                     targetdoc="autoscale-getting-started"
                     targetptr="Create_Group">“Create and Manage a
-                    Scaling Group” </olink>step.</para>
+                    Scaling Group” </olink> step.</para>
             <para>You can specify multiple policies to manage your
                 scaling group. </para>
             <para>
@@ -2766,9 +2873,9 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <section xml:id="Create_a_Scaling_Policy">
                 <title>Create a scaling policy</title>
                 <para>To create a scaling policy, submit a
-                        <command>POST</command>request with the
-                        <parameter>tenantId</parameter>and
-                        <parameter>groupId</parameter>parameters
+                        <command>POST</command> request with the
+                        <parameter>tenantId</parameter> and
+                        <parameter>groupId</parameter> parameters
                     specified in the request URL. The following
                     example shows how to create a policy that scales
                     the group up by one server with a cooldown phase
@@ -2784,7 +2891,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <programlisting language="json">
                         <xi:include href="./samples/reqCreatePolicies.json" parse="text"/>
                     </programlisting>
-                <para>If the <command>POST</command>request is
+                <para>If the <command>POST</command> request is
                     successful, an array of scaling policies is
                     provided in the request body in JSON format, as
                     shown in the following example.</para>
@@ -2799,10 +2906,9 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <section xml:id="Obtain_List_of_Scaling_Policies">
                 <title>List scaling policies</title>
                 <para>To obtain a list of scaling policies for a
-                    scaling group, submit a
-                    <command>GET</command>request with the
-                        <parameter>tenantId</parameter>and
-                        <parameter>groupId</parameter>parameters
+                    scaling group, submit a <command>GET</command>
+                    request with the <parameter>tenantId</parameter>
+                    and <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
                     <title>Request</title>
@@ -2810,7 +2916,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             GET /{tenantId}/groups/{groupId}/policies
                         </programlisting>
                 </example>
-                <para>If the <command>GET</command>request is
+                <para>If the <command>GET</command> request is
                     successful, the response data will be returned in
                     JSON format as shown in the following
                     example:</para>
@@ -2827,10 +2933,10 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <para>To obtain information about an individual
                     scaling policy, including policy id, name, type,
                     adjustment, and cooldown, submit a
-                        <command>GET</command>request with the
+                        <command>GET</command> request with the
                         <parameter>tenantId</parameter>,
-                        <parameter>groupId</parameter>and
-                        <parameter>policyId</parameter>parameters
+                        <parameter>groupId</parameter> and
+                        <parameter>policyId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
                     <title>Request</title>
@@ -2838,7 +2944,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             GET /{tenantId}/groups/{groupId}/policies/{policyId}
                         </programlisting>
                 </example>
-                <para>If the <command>GET</command>request is
+                <para>If the <command>GET</command> request is
                     successful, the data will be returned in the
                     response body in JSON format as shown in the
                     following example:</para>
@@ -2853,10 +2959,10 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <section xml:id="Updating_Scaling_Policy">
                 <title>Update a scaling policy</title>
                 <para>To update a scaling policy, submit a
-                        <command>PUT</command>request, with the
+                        <command>PUT</command> request, with the
                         <parameter>tenantId</parameter>,
-                        <parameter>groupId</parameter>and
-                        <parameter>policyId</parameter>parameters
+                        <parameter>groupId</parameter> and
+                        <parameter>policyId</parameter> parameters
                     specified in the request URL. In the request body
                     provide a name for the policy, a change value, and
                     a value for the cooldown and a method for
@@ -2873,17 +2979,17 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <xi:include href="./samples/reqPutPolicy.json" parse="text"/>
                         </programlisting>
                 </example>
-                <para>If the <command>PUT</command>request is
+                <para>If the <command>PUT</command> request is
                     successful, a 204 response code with an empty
                     response body will be returned.</para>
             </section>
             <section xml:id="Deleting_Scaling_Policy">
                 <title>Delete a scaling policy</title>
                 <para>To delete a scaling policy, submit a
-                        <command>DELETE</command>request with the
+                        <command>DELETE</command> request with the
                         <parameter>tenantId</parameter>,
-                        <parameter>groupId</parameter>and
-                        <parameter>policyId</parameter>parameters
+                        <parameter>groupId</parameter> and
+                        <parameter>policyId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
                     <title>Request</title>
@@ -2891,7 +2997,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
                         </programlisting>
                 </example>
-                <para>If the <command>DELETE</command>request is
+                <para>If the <command>DELETE</command> request is
                     successful, a 204 response code with an empty
                     response body will be returned.</para>
             </section>
@@ -2948,7 +3054,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <command>POST</command> request with the
                         <parameter>tenantID</parameter>,
                         <parameter>groupID</parameter>, and
-                        <parameter>policyID</parameter>specified in
+                        <parameter>policyID</parameter> specified in
                     the request URL. In the request body, specify the
                     name of the webhook, as well as any metadata for
                     the webhook. The following example shows how to
@@ -2962,7 +3068,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <xi:include href="./samples/reqCreateWebhook.json" parse="text"/>
                         </programlisting>
                 </example>
-                <para>If the <command>POST</command>request is
+                <para>If the <command>POST</command> request is
                     successful, the data will be returned in JSON
                     format as shown in the following example:</para>
                 <example>
@@ -2977,10 +3083,10 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <title>List webhooks and their IDs</title>
                 <para>To obtain a list of all scaling webhooks and
                     their corresponding ids, submit a
-                        <command>GET</command>request with the
+                        <command>GET</command> request with the
                         <parameter>tenantId</parameter>,
-                        <parameter>groupId</parameter>and
-                        <parameter>policyId</parameter>parameters
+                        <parameter>groupId</parameter> and
+                        <parameter>policyId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
                     <title>Request</title>
@@ -2988,7 +3094,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                         </programlisting>
                 </example>
-                <para>If the <command>GET</command>request is
+                <para>If the <command>GET</command> request is
                     successful, the data will be returned in the
                     response body in JSON format as shown in the
                     following example:</para>
@@ -3003,11 +3109,11 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <section xml:id="Update_Scaling_Webhook">
                 <title>Update a webhook</title>
                 <para>To modify a scaling webhook, submit a
-                        <command>PUT</command>request with the
+                        <command>PUT</command> request with the
                         <parameter>tenantId</parameter>,
                         <parameter>groupId</parameter>,
-                        <parameter>policyId</parameter>and
-                        <parameter>webhookId</parameter>parameters
+                        <parameter>policyId</parameter> and
+                        <parameter>webhookId</parameter> parameters
                     specified in the request URL. In the request body,
                     specify a name and metadata for the webhook as
                     shown in the following example. </para>
@@ -3020,7 +3126,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <xi:include href="./samples/reqPutWebhook.json" parse="text"/>
                         </programlisting>
                 </example>
-                <para>If the <command>PUT</command>request is
+                <para>If the <command>PUT</command> request is
                     successful, a 204 response code with an empty
                     response body will be returned. </para>
             </section>
@@ -3028,11 +3134,11 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <title>Get information about a specific
                     webhook</title>
                 <para>To obtain details about a specific webhook,
-                    submit a <command>GET</command>request with the
+                    submit a <command>GET</command> request with the
                         <parameter>tenantId</parameter>,
                         <parameter>groupId</parameter>,
-                        <parameter>policyId</parameter>and
-                        <parameter>webhookId</parameter>parameters
+                        <parameter>policyId</parameter> and
+                        <parameter>webhookId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
                     <title>Request</title>
@@ -3040,7 +3146,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                         </programlisting>
                 </example>
-                <para>If the <command>GET</command>request is
+                <para>If the <command>GET</command> request is
                     successful, the data will be returned in JSON
                     format as shown in the following example:</para>
                 <example>
@@ -3058,7 +3164,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>tenantID</parameter>,
                         <parameter>groupID</parameter>,
                         <parameter>policyID</parameter>, and the
-                        <parameter>webhookID</parameter>parameters
+                        <parameter>webhookID</parameter> parameters
                     specified in the request URL.</para>
                 <example>
                     <title>Request</title>
@@ -3066,9 +3172,9 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                         </programlisting>
                 </example>
-                <para>If the DELETE request is successful, a 204
-                    response code with an empty response body will be
-                    returned.</para>
+                <para>If the <command>DELETE</command> request  is
+                    successful, a 204 response code with an empty
+                    response body will be returned.</para>
             </section>
         </section>
         <section xml:id="Execute_Scaling_Policy">
@@ -3088,12 +3194,12 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute
                     </programlisting>
             </example>
-            <para>The <command>POST</command>request causes the <link
+            <para>The <command>POST</command> request causes the <link
                     linkend="Create_Scaling_Policies">scaling
-                    policy</link>to execute, which causes the scaling
+                    policy</link> to execute, which causes the scaling
                 group to transform if it is able to do so.</para>
             <para>Execution of a scaling policy always returns a
-                    <code>202 Accepted </code>status. This status
+                    <code>202 Accepted </code> status. This status
                 indicates that the scaling policy was executed but
                 does not indicate whether the execution successfully
                 caused the scaling group to scale. If some element of
