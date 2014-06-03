@@ -46,9 +46,11 @@ class matches(object):
     """
     def __init__(self, matcher):
         self._matcher = matcher
+        self._last_match = None
 
     def __eq__(self, other):
-        return self._matcher.match(other) is None
+        self._last_match = self._matcher.match(other)
+        return self._last_match is None
 
     def __ne__(self, other):
         return self != other
@@ -57,7 +59,10 @@ class matches(object):
         return str(self._matcher)
 
     def __repr__(self):
-        return 'matches({0!s}'.format(self._matcher)
+        if self._last_match:
+            return 'mismatch: {}'.format(self._last_match.describe())
+        else:
+            return 'matches({0!s})'.format(self._matcher)
 
 
 class IsBoundWith(object):
