@@ -10,7 +10,7 @@ from jsonschema import ValidationError
 import mock
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.json_schema.group_examples import (
     config as config_examples,
@@ -24,7 +24,7 @@ from otter.worker.validate_config import InvalidLaunchConfiguration
 from otter.test.rest.request import DummyException, RestAPITestMixin
 
 
-class GroupConfigTestCase(RestAPITestMixin, TestCase):
+class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/config`` endpoint, which updates
     and views the config part of a scaling group (having to do with the min,
@@ -283,7 +283,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         self.assert_status_code(204, method='PUT', body=json.dumps(invalid))
 
 
-class LaunchConfigTestCase(RestAPITestMixin, TestCase):
+class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/launch`` endpoint, which updates
     and views the launch config part of a scaling group (having to do with

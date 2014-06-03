@@ -35,6 +35,7 @@ from otter.auth import CachingAuthenticator
 from otter.log import log
 from silverberg.cluster import RoundRobinCassandraCluster
 from silverberg.logger import LoggingCQLClient
+from otter.util.cqlbatch import TimingOutCQLClient
 from otter.bobby import BobbyClient
 
 
@@ -179,13 +180,20 @@ def makeService(config):
 
     s = MultiService()
 
+    region = config_value('region')
+
     seed_endpoints = [
         clientFromString(reactor, str(host))
         for host in config_value('cassandra.seed_hosts')]
 
-    cassandra_cluster = LoggingCQLClient(RoundRobinCassandraCluster(
-        seed_endpoints,
-        config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
+    cassandra_cluster = LoggingCQLClient(
+        TimingOutCQLClient(
+            reactor,
+            RoundRobinCassandraCluster(
+                seed_endpoints,
+                config_value('cassandra.keyspace')),
+            config_value('cassandra.timeout') or 30),
+        log.bind(system='otter.silverberg'))
 
     store = CassScalingGroupCollection(cassandra_cluster, reactor)
     admin_store = CassAdmin(cassandra_cluster)
@@ -214,7 +222,8 @@ def makeService(config):
             retry_interval=config_value('identity.retry_interval')),
         cache_ttl)
 
-    supervisor = SupervisorService(authenticator.authenticate_tenant, coiterate)
+    supervisor = SupervisorService(authenticator.authenticate_tenant,
+                                   region, coiterate)
     supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
@@ -230,7 +239,8 @@ def makeService(config):
         s.addService(FunctionalService(stop=partial(call_after_supervisor,
                                                     cassandra_cluster.disconnect, supervisor)))
 
-    otter = Otter(store, health_checker.health_check)
+    otter = Otter(store, region, health_checker.health_check,
+                  es_host=config_value('elasticsearch.host'))
     site = Site(otter.app.resource())
     site.displayTracebacks = False
 

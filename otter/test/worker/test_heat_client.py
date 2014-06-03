@@ -5,7 +5,7 @@ import mock
 
 from effect.testing import resolve_effect
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.http import APIError, headers
 from otter.util.pure_http import OSHTTPClient, Request
@@ -13,7 +13,7 @@ from otter.worker.heat_client import HeatClient
 from otter.test.utils import StubLog, SameJSON, stub_pure_response
 
 
-class HeatClientTests(TestCase):
+class HeatClientTests(SynchronousTestCase):
     """Tests for HeatClient."""
 
     def _assert_bound(self, log, **kwargs):

@@ -548,7 +548,8 @@ class HealthCheckTestCase(RestAPITestMixin, TestCase):
         def health_check():
             return succeed({'blargh': 'boo'})
 
-        self.root = Otter(self.mock_store, health_check).app.resource()
+        otter = Otter(self.mock_store, 'region', health_check)
+        self.root = otter.app.resource()
 
         resp = self.assert_status_code(200)
         self.assertEqual(resp, json.dumps({'blargh': 'boo'}))
@@ -645,7 +646,7 @@ class SchedulerResetTests(RestAPITestMixin, TestCase):
         Sample scheduler
         """
         super(SchedulerResetTests, self).setUp()
-        otter = Otter(self.mock_store)
+        otter = Otter(self.mock_store, 'region')
         self.sch = otter.scheduler = mock.Mock(spec=['reset'])
         self.root = otter.app.resource()
 
@@ -681,7 +682,7 @@ class SchedulerStopTests(RestAPITestMixin, TestCase):
         Sample scheduler
         """
         super(SchedulerStopTests, self).setUp()
-        otter = Otter(self.mock_store)
+        otter = Otter(self.mock_store, 'region')
         self.sch = otter.scheduler = mock.Mock(spec=['stopService'])
         self.root = otter.app.resource()
 

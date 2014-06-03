@@ -6,14 +6,14 @@ import mock
 from twisted.internet.task import Clock
 from twisted.internet.defer import CancelledError, Deferred, succeed
 from twisted.python.failure import Failure
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.retry import (retry, repeating_interval, random_interval,
                               transient_errors_except, retry_times, compose_retries)
 from otter.test.utils import CheckFailure, DummyException
 
 
-class RetryTests(TestCase):
+class RetryTests(SynchronousTestCase):
     """
     Tests for the helper method method ``retry``
     """
@@ -284,7 +284,7 @@ class RetryTests(TestCase):
         self.assertNoResult(d)
 
 
-class CanRetryHelperTests(TestCase):
+class CanRetryHelperTests(SynchronousTestCase):
     """
     Tests for ``can_retry`` implementations such as ``transient_errors_except``
     """
@@ -330,7 +330,7 @@ class CanRetryHelperTests(TestCase):
         self.assertFalse(can_retry(3))
 
 
-class NextIntervalHelperTests(TestCase):
+class NextIntervalHelperTests(SynchronousTestCase):
     """
     Tests for ``next_interval`` implementations such as ``repeating_interval``
     """

@@ -11,7 +11,7 @@ from twisted.internet import defer
 from twisted.internet.task import Clock
 
 from twisted.application.service import MultiService
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
 from otter.tap.api import (
@@ -26,13 +26,15 @@ test_config = {
     'admin': 'tcp:9789',
     'cassandra': {
         'seed_hosts': ['tcp:127.0.0.1:9160'],
-        'keyspace': 'otter_test'
+        'keyspace': 'otter_test',
+        'timeout': 10
     },
-    'environment': 'prod'
+    'environment': 'prod',
+    'region': 'ord'
 }
 
 
-class APIOptionsTests(TestCase):
+class APIOptionsTests(SynchronousTestCase):
     """
     Test the various command line options.
     """
@@ -63,7 +65,7 @@ class APIOptionsTests(TestCase):
         self.assertEqual(config['port'], 'tcp:9999')
 
 
-class HealthCheckerTests(TestCase):
+class HealthCheckerTests(SynchronousTestCase):
     """
     Tests for the HealthChecker object
     """
@@ -204,7 +206,7 @@ class HealthCheckerTests(TestCase):
         self.assertIn('a health check timed out', r['a']['details']['reason'])
 
 
-class CallAfterSupervisorTests(TestCase):
+class CallAfterSupervisorTests(SynchronousTestCase):
     """
     Tests for `call_after_supervisor`
     """
@@ -231,7 +233,7 @@ class CallAfterSupervisorTests(TestCase):
         self.assertEqual(self.successResultOf(d), 2)
 
 
-class APIMakeServiceTests(TestCase):
+class APIMakeServiceTests(SynchronousTestCase):
     """
     Test creation of the API service heirarchy.
     """
@@ -245,6 +247,7 @@ class APIMakeServiceTests(TestCase):
 
         self.RoundRobinCassandraCluster = patch(self, 'otter.tap.api.RoundRobinCassandraCluster')
         self.LoggingCQLClient = patch(self, 'otter.tap.api.LoggingCQLClient')
+        self.TimingOutCQLClient = patch(self, 'otter.tap.api.TimingOutCQLClient')
         self.log = patch(self, 'otter.tap.api.log')
 
         Otter_patcher = mock.patch('otter.tap.api.Otter')
@@ -350,7 +353,11 @@ class APIMakeServiceTests(TestCase):
         """
         makeService(test_config)
         self.log.bind.assert_called_once_with(system='otter.silverberg')
-        self.LoggingCQLClient.assert_called_once_with(self.RoundRobinCassandraCluster.return_value,
+        self.TimingOutCQLClient.assert_called_once_with(
+            self.reactor,
+            self.RoundRobinCassandraCluster.return_value,
+            10)
+        self.LoggingCQLClient.assert_called_once_with(self.TimingOutCQLClient.return_value,
                                                       self.log.bind.return_value)
         self.CassScalingGroupCollection.assert_called_once_with(
             self.LoggingCQLClient.return_value, self.reactor)
@@ -370,8 +377,9 @@ class APIMakeServiceTests(TestCase):
         api store
         """
         makeService(test_config)
-        self.Otter.assert_called_once_with(self.store,
-                                           self.health_checker.health_check)
+        self.Otter.assert_called_once_with(self.store, 'ord',
+                                           self.health_checker.health_check,
+                                           es_host=None)
 
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_health_checker_no_zookeeper(self, supervisor):
@@ -510,7 +518,7 @@ class APIMakeServiceTests(TestCase):
         self.assertTrue(kz_client.stop.called)
 
 
-class SchedulerSetupTests(TestCase):
+class SchedulerSetupTests(SynchronousTestCase):
     """
     Tests for `setup_scheduler`
     """

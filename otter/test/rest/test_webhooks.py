@@ -9,7 +9,7 @@ from jsonschema import ValidationError
 import mock
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.json_schema import rest_schemas, validate
 from otter.models.interface import (
@@ -22,7 +22,7 @@ from otter.test.rest.request import DummyException, RestAPITestMixin
 from otter.controller import CannotExecutePolicyError
 
 
-class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
+class WebhookCollectionTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks``
     endpoints (create, list)
@@ -242,7 +242,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         })
 
 
-class OneWebhookTestCase(RestAPITestMixin, TestCase):
+class OneWebhookTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for
     ``/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}``

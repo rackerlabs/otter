@@ -8,7 +8,7 @@ from datetime import datetime
 import itertools
 from copy import deepcopy
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from jsonschema import ValidationError
 
 from otter.json_schema import group_examples
@@ -91,7 +91,7 @@ def _cassandrify_data(list_of_dicts):
     return _de_identify(list_of_dicts)
 
 
-class SerialJsonDataTestCase(TestCase):
+class SerialJsonDataTestCase(SynchronousTestCase):
     """
     Serializing json data to be put into cassandra should append a version
     """
@@ -104,7 +104,7 @@ class SerialJsonDataTestCase(TestCase):
                          json.dumps({'_ver': 'version'}))
 
 
-class GetConsistencyTests(TestCase):
+class GetConsistencyTests(SynchronousTestCase):
     """
     Tests for `get_consistency_level`
     """
@@ -151,7 +151,7 @@ class GetConsistencyTests(TestCase):
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
 
-class AssembleWebhooksTests(TestCase):
+class AssembleWebhooksTests(SynchronousTestCase):
     """
     Tests for `assemble_webhooks_in_policies`
     """
@@ -239,7 +239,7 @@ class AssembleWebhooksTests(TestCase):
         self.assertEqual(policies[9]['webhooks'], ['9w91'])
 
 
-class VerifiedViewTests(TestCase):
+class VerifiedViewTests(SynchronousTestCase):
     """
     Tests for `verified_view`
     """
@@ -303,7 +303,7 @@ class VerifiedViewTests(TestCase):
         self.assertFalse(self.log.msg.called)
 
 
-class WeakLocksTests(TestCase):
+class WeakLocksTests(SynchronousTestCase):
     """
     Tests for `WeakLocks`
     """
@@ -333,7 +333,7 @@ class WeakLocksTests(TestCase):
         self.assertIsNot(self.locks.get_lock('a'), self.locks.get_lock('b'))
 
 
-class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
+class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, SynchronousTestCase):
     """
     Tests for :class:`MockScalingGroup`
     """
@@ -410,6 +410,31 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
     """
     CassScalingGroup's tests
     """
+
+    def test_with_timestamp(self):
+        """
+        `with_timestamp` calls the decorated function with the timestamp got from
+        `get_client_ts`
+        """
+        self.clock.advance(23.566783)
+
+        @self.group.with_timestamp
+        def f(ts, a, b):
+            "f"
+            self.ts = ts
+            self.a = a
+            self.b = b
+            return 45
+
+        d = f(2, 3)
+        # Wrapped function's return is same
+        self.assertEqual(self.successResultOf(d), 45)
+        # Timestamp and arguments are passed correctly
+        self.assertEqual(self.ts, 23566783)
+        self.assertEqual(self.a, 2)
+        self.assertEqual(self.b, 3)
+        # has same docstring
+        self.assertEqual(f.__doc__, 'f')
 
     def test_view_config(self):
         """
@@ -558,6 +583,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                               {}, True, desired=5)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+        self.clock.advance(10.345)
 
         d = self.group.modify_state(modifier)
         self.assertEqual(self.successResultOf(d), None)
@@ -566,12 +592,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'INSERT INTO scaling_group("tenantId", "groupId", active, '
             'pending, "groupTouched", "policyTouched", paused, desired) VALUES('
             ':tenantId, :groupId, :active, :pending, :groupTouched, '
-            ':policyTouched, :paused, :desired)')
+            ':policyTouched, :paused, :desired) USING TIMESTAMP :ts')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
                         "active": _S({}), "pending": _S({}),
                         "groupTouched": '0001-01-01T00:00:00Z',
                         "policyTouched": _S({}),
-                        "paused": True, "desired": 5}
+                        "paused": True, "desired": 5, "ts": 10345000}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
@@ -802,15 +828,16 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         Test that you can update a config, and if its successful the return
         value is None
         """
+        self.clock.advance(10.345)
         d = self.group.update_config({"b": "lah"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
         expectedCql = ('BEGIN BATCH '
                        'INSERT INTO scaling_group("tenantId", "groupId", group_config) '
-                       'VALUES (:tenantId, :groupId, :scaling) '
+                       'VALUES (:tenantId, :groupId, :scaling) USING TIMESTAMP :ts '
                        'APPLY BATCH;')
         expectedData = {"scaling": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678g',
-                        "tenantId": '11111'}
+                        "tenantId": '11111', 'ts': 10345000}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
@@ -821,15 +848,16 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         Test that you can update a launch config, and if successful the return
         value is None
         """
+        self.clock.advance(10.345)
         d = self.group.update_launch_config({"b": "lah"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
         expectedCql = ('BEGIN BATCH '
                        'INSERT INTO scaling_group("tenantId", "groupId", launch_config) '
-                       'VALUES (:tenantId, :groupId, :launch) '
+                       'VALUES (:tenantId, :groupId, :launch) USING TIMESTAMP :ts '
                        'APPLY BATCH;')
         expectedData = {"launch": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678g',
-                        "tenantId": '11111'}
+                        "tenantId": '11111', 'ts': 10345000}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
@@ -1791,17 +1819,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             [{'id': 'policyA'}, {'id': 'policyB'}])
 
         self.returns = [None]
+        self.clock.advance(34.575)
         result = self.successResultOf(self.group.delete_group())
         self.assertIsNone(result)  # delete returns None
         mock_naive.assert_called_once_with()
 
         expected_data = {'tenantId': self.tenant_id,
-                         'groupId': self.group_id}
+                         'groupId': self.group_id,
+                         'ts': 34575000}
         expected_cql = (
             'BEGIN BATCH '
-            'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM scaling_group USING TIMESTAMP :ts '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'APPLY BATCH;')
 
         self.connection.execute.assert_called_once_with(
@@ -1826,17 +1857,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         mock_naive.return_value = defer.succeed({})
 
         self.returns = [None]
+        self.clock.advance(34.575)
         result = self.successResultOf(self.group.delete_group())
         self.assertIsNone(result)  # delete returns None
         mock_naive.assert_called_once_with()
 
         expected_data = {'tenantId': self.tenant_id,
-                         'groupId': self.group_id}
+                         'groupId': self.group_id,
+                         'ts': 34575000}
         expected_cql = (
             'BEGIN BATCH '
-            'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM scaling_group USING TIMESTAMP :ts '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'APPLY BATCH;')
 
         self.connection.execute.assert_called_once_with(
@@ -2184,7 +2218,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
 
 
 class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMixin,
-                                            TestCase):
+                                            SynchronousTestCase):
     """
     Tests for :class:`CassScalingScheduleCollection`
     """
@@ -2301,7 +2335,7 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
 
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
-                                          TestCase):
+                                          SynchronousTestCase):
     """
     Tests for :class:`CassScalingGroupCollection`
     """
@@ -2361,6 +2395,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Test that you can create a group, and if successful the group ID is
         returned
         """
+        self.clock.advance(10.345)
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
@@ -2370,13 +2405,15 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "pending": '{}',
             "policyTouched": '{}',
             "paused": False,
-            "desired": 0}
+            "desired": 0,
+            "ts": 10345000}
         expectedCql = ('BEGIN BATCH '
                        'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
                        'launch_config, active, pending, "policyTouched", '
                        'paused, desired, created_at) '
                        'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
                        ':pending, :policyTouched, :paused, :desired, :created_at) '
+                       'USING TIMESTAMP :ts '
                        'APPLY BATCH;')
         self.mock_key.return_value = '12345678'
 
@@ -2406,6 +2443,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         policy = group_examples.policy()[0]
 
+        self.clock.advance(10.567)
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
@@ -2414,6 +2452,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "active": '{}',
             "pending": '{}',
             "desired": 0,
+            "ts": 10567000,
             "policyTouched": '{}',
             "paused": False,
             'policy0policyId': '12345678',
@@ -2425,6 +2464,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'launch_config, active, pending, "policyTouched", paused, desired, created_at) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
             ':pending, :policyTouched, :paused, :desired, :created_at) '
+            'USING TIMESTAMP :ts '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
             'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
             'APPLY BATCH;')
@@ -2456,6 +2496,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         policies = group_examples.policy()[:2]
 
+        self.clock.advance(10.466)
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
@@ -2466,6 +2507,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "policyTouched": '{}',
             "paused": False,
             "desired": 0,
+            "ts": 10466000,
             'policy0policyId': '2',
             'policy0data': _S(policies[0]),
             'policy0version': 'timeuuid',
@@ -2477,7 +2519,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
             'launch_config, active, pending, "policyTouched", paused, desired, created_at) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-            ':pending, :policyTouched, :paused, :desired, :created_at) '
+            ':pending, :policyTouched, :paused, :desired, :created_at) USING TIMESTAMP :ts '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
             'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
@@ -2866,7 +2908,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
 
 class CassScalingGroupsCollectionHealthCheckTestCase(
-        IScalingGroupCollectionProviderMixin, LockMixin, TestCase):
+        IScalingGroupCollectionProviderMixin, LockMixin, SynchronousTestCase):
     """
     Tests for `health_check` and `kazoo_health_check` in
     :class:`CassScalingGroupCollection`
@@ -2960,7 +3002,7 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
             (True, {'cassandra_time': 0}))
 
 
-class CassAdminTestCase(TestCase):
+class CassAdminTestCase(SynchronousTestCase):
     """
     Tests for :class:`CassAdmin`
     """

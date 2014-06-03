@@ -4,7 +4,7 @@ Unittests for the launch_server_v1 launch config.
 import mock
 import json
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
 from twisted.python.failure import Failure
@@ -24,6 +24,7 @@ from otter.worker.launch_server_v1 import (
     public_endpoint_url,
     UnexpectedServerStatus,
     ServerDeleted,
+    delete_and_verify,
     verified_delete,
     LB_MAX_RETRIES, LB_RETRY_INTERVAL_RANGE
 )
@@ -60,7 +61,7 @@ fake_service_catalog = [
 ]
 
 
-class UtilityTests(TestCase):
+class UtilityTests(SynchronousTestCase):
     """
     Tests for non-specific utilities that should be refactored out of the
     worker implementation eventually.
@@ -117,7 +118,7 @@ expected_headers = {
 error_body = '{"code": 500, "message": "Internal Server Error"}'
 
 
-class LoadBalancersTests(TestCase):
+class LoadBalancersTests(SynchronousTestCase):
     """
     Test adding to one or more load balancers.
     """
@@ -642,7 +643,7 @@ class LoadBalancersTests(TestCase):
     test_removelb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
 
 
-class ServerTests(TestCase):
+class ServerTests(SynchronousTestCase):
     """
     Test server manipulation functions.
     """
@@ -1414,7 +1415,7 @@ class ServerTests(TestCase):
         self.assertFalse(mock_addlb.called)
 
 
-class ConfigPreparationTests(TestCase):
+class ConfigPreparationTests(SynchronousTestCase):
     """
     Test config preparation.
     """
@@ -1538,7 +1539,7 @@ instance_details = (
      (54321, {'nodes': [{'id': 2}]})])
 
 
-class DeleteServerTests(TestCase):
+class DeleteServerTests(SynchronousTestCase):
     """
     Test the delete server worker.
     """
@@ -1629,6 +1630,106 @@ class DeleteServerTests(TestCase):
                           'my-auth-token', instance_details)
         self.failureResultOf(d, TimedOutError)
 
+    def test_delete_and_verify_does_not_verify_if_404(self):
+        """
+        :func:`delete_and_verify` does not verify if the deletion response
+        code is a 404
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=404))
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 0)
+        self.successResultOf(d)
+
+    def test_delete_and_verify_succeeds_if_get_returns_404(self):
+        """
+        :func:`delete_and_verify` succeeds if the verification response code
+        is a 404
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        self.treq.get.return_value = succeed(mock.Mock(code=404))
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 1)
+        self.successResultOf(d)
+
+    def test_delete_and_verify_succeeds_if_task_state_is_deleting(self):
+        """
+        :func:`delete_and_verify` succeeds if the verification response body
+        has a task_state of "deleting"
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed(
+            {'server': {'OS-EXT-STS:task_state': 'deleting'}})
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 1)
+        self.successResultOf(d)
+
+    def test_delete_and_verify_fails_if_task_state_not_deleting(self):
+        """
+        :func:`delete_and_verify` fails if the verification response body
+        has a task_state that is not "deleting"
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed(
+            {'server': {'OS-EXT-STS:task_state': 'build'}})
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 1)
+        self.failureResultOf(d, UnexpectedServerStatus)
+
+    def test_delete_and_verify_fails_if_no_task_state(self):
+        """
+        :func:`delete_and_verify` fails if the verification response body
+        does not have a task_state
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({'server': {}})
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 1)
+        self.failureResultOf(d, UnexpectedServerStatus)
+
+    def test_delete_and_verify_fails_if_delete_500s(self):
+        """
+        :func:`delete_and_verify` fails if the deletion response code is
+        neither a 404 nor a 204
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=500))
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 0)
+        self.failureResultOf(d, RequestError)
+
+    def test_delete_and_verify_fails_if_verify_500s(self):
+        """
+        :func:`delete_and_verify` fails if the verification response code is
+        neither a 404 nor a 200
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        self.treq.get.return_value = succeed(mock.Mock(code=500))
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 1)
+        self.failureResultOf(d, RequestError)
+
     def test_verified_delete_retries_until_success(self):
         """
         If the first delete didn't work, wait a bit and try again until the
@@ -1637,20 +1738,26 @@ class DeleteServerTests(TestCase):
 
         It also logs deletion success.
         """
-        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        delete_and_verify = patch(
+            self, 'otter.worker.launch_server_v1.delete_and_verify')
+        delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
+
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
                             'serverId', interval=5, clock=self.clock)
-        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(delete_and_verify.call_count, 1)
         self.assertNoResult(d)
 
-        self.treq.delete.return_value = succeed(mock.Mock(code=404))
+        delete_and_verify.side_effect = lambda *a, **kw: None
         self.clock.pump([5])
-        self.assertEqual(self.treq.delete.call_count, 2)
+        self.assertEqual(
+            delete_and_verify.mock_calls,
+            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
+                       'my-auth-token', 'serverId')] * 2)
         self.successResultOf(d)
 
         # the loop has stopped
         self.clock.pump([5])
-        self.assertEqual(self.treq.delete.call_count, 2)
+        self.assertEqual(delete_and_verify.call_count, 2)
 
         # success logged
         self.log.msg.assert_called_with(
@@ -1662,19 +1769,22 @@ class DeleteServerTests(TestCase):
         If the deleting fails until the timeout, log a failure and do not
         keep trying to delete.
         """
-        self.treq.delete.side_effect = lambda *a, **kw: succeed(mock.Mock(code=500))
+        delete_and_verify = patch(
+            self, 'otter.worker.launch_server_v1.delete_and_verify')
+        delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
+
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
                             'serverId', interval=5, timeout=20, clock=self.clock)
         self.assertNoResult(d)
 
         self.clock.pump([5] * 4)
         self.assertEqual(
-            self.treq.delete.mock_calls,
-            [mock.call('http://url/servers/serverId', headers=expected_headers,
-                       log=mock.ANY)] * 4)
+            delete_and_verify.mock_calls,
+            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
+                       'my-auth-token', 'serverId')] * 4)
         self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
                                              server_id='serverId')
 
         # the loop has stopped
         self.clock.pump([5])
-        self.assertEqual(self.treq.delete.call_count, 4)
+        self.assertEqual(delete_and_verify.call_count, 4)

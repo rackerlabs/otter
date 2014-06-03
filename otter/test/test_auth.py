@@ -3,7 +3,7 @@ Test authentication functions.
 """
 import mock
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed, fail, Deferred
 from twisted.internet.task import Clock
 
@@ -33,7 +33,7 @@ expected_headers = {'accept': ['application/json'],
                     'User-Agent': ['OtterScale/0.0']}
 
 
-class HelperTests(TestCase):
+class HelperTests(SynchronousTestCase):
     """
     Test misc helpers for authentication.
     """
@@ -260,7 +260,7 @@ class HelperTests(TestCase):
         self.assertEqual(real_failure.value.body, 'error_body')
 
 
-class ImpersonatingAuthenticatorTests(TestCase):
+class ImpersonatingAuthenticatorTests(SynchronousTestCase):
     """
     Tests for the end-to-end impersonation workflow.
     """
@@ -413,7 +413,7 @@ class ImpersonatingAuthenticatorTests(TestCase):
         self.assertTrue(failure.check(APIError))
 
 
-class CachingAuthenticatorTests(TestCase):
+class CachingAuthenticatorTests(SynchronousTestCase):
     """
     Test the in memory cache of authentication tokens.
     """
@@ -554,7 +554,7 @@ class CachingAuthenticatorTests(TestCase):
         self.assertTrue(failure.check(APIError))
 
 
-class RetryingAuthenticatorTests(TestCase):
+class RetryingAuthenticatorTests(SynchronousTestCase):
     """
     Tests for `RetryingAuthenticator`
     """
