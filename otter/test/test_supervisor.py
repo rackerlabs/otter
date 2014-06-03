@@ -18,7 +18,8 @@ from otter.models.interface import (
 from otter.supervisor import (
     ISupervisor, SupervisorService, set_supervisor, remove_server_from_group,
     ServersBelowMinError, ServerNotFoundError)
-from otter.test.utils import iMock, patch, mock_log, CheckFailure, matches, FakeSupervisor
+from otter.test.utils import (
+    iMock, patch, mock_log, CheckFailure, matches, FakeSupervisor, IsBoundWith)
 from otter.util.deferredutils import DeferredPool
 
 
@@ -1176,7 +1177,8 @@ class RemoveServerTests(SynchronousTestCase):
     def _check_removed(self, state):
         self.assertNotIn('s0', state.active)
         self.assertEqual(self.supervisor.del_calls[-1],
-                         (self.log.bind(server_id='s0'), self.tid, self.group, {'id': 's0'}))
+                         (matches(IsBoundWith(server_id='s0', system='otter.job.delete')),
+                          self.tid, self.group, {'id': 's0'}))
 
     def test_replaced_and_removed(self):
         """
@@ -1190,7 +1192,8 @@ class RemoveServerTests(SynchronousTestCase):
         # new server added?
         self.assertIn(1, state.pending)
         self.assertEqual(self.supervisor.exec_calls[-1],
-                         (self.log.bind(image_ref=mock.ANY, flavor_ref=mock.ANY),
+                         (matches(IsBoundWith(image_ref=mock.ANY, flavor_ref=mock.ANY,
+                                              system='otter.job.launch')),
                           self.tid, self.group, 'launch'))
 
     def test_not_replaced_removed(self):

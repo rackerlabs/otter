@@ -54,14 +54,6 @@ class BoundLogTests(SynchronousTestCase):
 
         self.err.assert_called_once_with(exc, system='hello')
 
-    def test_eq(self):
-        """
-        __eq__ checks if different BoundLog instances are bound to same args
-        """
-        log = BoundLog(mock.Mock(), mock.Mock())
-        self.assertEqual(self.log.bind(a=2, b=3), log.bind(a=2, b=3))
-        self.assertNotEqual(self.log.bind(a=2, b=3), log.bind(a=2, b=4))
-
 
 class AuditLoggerTests(SynchronousTestCase):
     """
