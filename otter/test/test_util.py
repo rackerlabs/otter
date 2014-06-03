@@ -466,14 +466,14 @@ class IsBoundWithTests(SynchronousTestCase):
         """
         Returns None on matching kwargs
         """
-        log =  BoundLog(lambda: None, lambda: None).bind(a=10, b=20)
+        log = BoundLog(lambda: None, lambda: None).bind(a=10, b=20)
         self.assertIsNone(self.bound.match(log))
 
     def test_not_match_kwargs(self):
         """
         Returns mismatch on non-matching kwargs
         """
-        log =  BoundLog(lambda: None, lambda: None).bind(a=10, b=2)
+        log = BoundLog(lambda: None, lambda: None).bind(a=10, b=2)
         m = self.bound.match(log)
         self.assertEqual(
             m.describe(),
@@ -483,7 +483,7 @@ class IsBoundWithTests(SynchronousTestCase):
         """
         works with Nested BoundLog
         """
-        log =  BoundLog(lambda: None, lambda: None).bind(a=10, b=20).bind(c=3)
+        log = BoundLog(lambda: None, lambda: None).bind(a=10, b=20).bind(c=3)
         self.assertIsNone(IsBoundWith(a=10, b=20, c=3).match(log))
 
     def test_str(self):
