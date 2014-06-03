@@ -936,8 +936,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         """
         d = self.job.start('launch')
         self.assertEqual(self.successResultOf(d), self.job_id)
-        self.assertEqual(self.job.log, self.log.bind(system='otter.job.launch',
-                                                     image_ref='imageID', flavor_ref='1'))
+        self.assertEqual(self.job.log, matches(IsInstance(self.log.__class__)))
 
     def test_modify_state_called_on_job_completion_success(self):
         """
