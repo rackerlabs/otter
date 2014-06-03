@@ -72,16 +72,20 @@ class IsBoundWith(object):
         """
         if not isinstance(log, BoundLog):
             return Mismatch('log is not a BoundLog')
-        # Extract kwargs
+        # Collect kwargs
         f = log.msg
-        kwargs = {}
+        kwargs_list = []
         while True:
             try:
-                kwargs.update(f.keywords)
+                kwargs_list.append(f.keywords)
             except AttributeError:
                 break
             else:
                 f = f.func
+        # combine them in order they were bound
+        kwargs = {}
+        [kwargs.update(kwa) for kwa in reversed(kwargs_list)]
+        # Compare and return accordingly
         if self.kwargs == kwargs:
             return None
         else:

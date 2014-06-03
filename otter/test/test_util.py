@@ -474,9 +474,8 @@ class IsBoundWithTests(SynchronousTestCase):
         Returns mismatch on non-matching kwargs
         """
         log = BoundLog(lambda: None, lambda: None).bind(a=10, b=2)
-        m = self.bound.match(log)
         self.assertEqual(
-            m.describe(),
+            self.bound.match(log).describe(),
             'Expected kwargs {} but got {} instead'.format(dict(a=10, b=20), dict(a=10, b=2)))
 
     def test_nested_match(self):
@@ -485,6 +484,14 @@ class IsBoundWithTests(SynchronousTestCase):
         """
         log = BoundLog(lambda: None, lambda: None).bind(a=10, b=20).bind(c=3)
         self.assertIsNone(IsBoundWith(a=10, b=20, c=3).match(log))
+
+    def test_kwargs_order(self):
+        """
+        kwargs bound in order, i.e. next bound overriding previous bound should
+        retain the value
+        """
+        log = BoundLog(lambda: None, lambda: None).bind(a=10, b=20).bind(a=3)
+        self.assertIsNone(IsBoundWith(a=3, b=20).match(log))
 
     def test_str(self):
         """
