@@ -5,19 +5,16 @@ import mock
 
 from effect.testing import resolve_effect
 
-from twisted.trial.unittest import SynchronousTestCase
+from testtools import TestCase
 
 from otter.util.http import APIError, headers
 from otter.util.pure_http import OSHTTPClient, Request
 from otter.worker.heat_client import HeatClient
-from otter.test.utils import StubLog, SameJSON, stub_pure_response
+from otter.test.utils import SameJSON, stub_pure_response, IsBoundWith, mock_log
 
 
-class HeatClientTests(SynchronousTestCase):
+class HeatClientTests(TestCase):
     """Tests for HeatClient."""
-
-    def _assert_bound(self, log, **kwargs):
-        self.assertEqual(log.binds, kwargs)
 
     def _http_client(self):
         return OSHTTPClient(lambda: 1 / 0)
@@ -27,7 +24,7 @@ class HeatClientTests(SynchronousTestCase):
         create_stack POSTs data to the stack creation endpoint and returns
         the parsed JSON result.
         """
-        log = StubLog()
+        log = mock_log()
         http = self._http_client()
         client = HeatClient(log, http)
         eff = client.create_stack(
@@ -57,17 +54,17 @@ class HeatClientTests(SynchronousTestCase):
                 stub_pure_response(json.dumps({'hello': 'world'}), 201)),
            {'hello': 'world'})
 
-        self._assert_bound(
+        self.assertThat(
             req.log,
-            system='heatclient',
-            event='create-stack',
-            stack_name='my-stack-name')
+            IsBoundWith(system='heatclient',
+                        event='create-stack',
+                        stack_name='my-stack-name'))
 
     def test_create_stack_error(self):
         """
         On any result other than 201, create_stack raises an exception.
         """
-        log = StubLog()
+        log = mock_log()
         http = self._http_client()
         client = HeatClient(log, http)
         eff = client.create_stack(
@@ -81,7 +78,7 @@ class HeatClientTests(SynchronousTestCase):
         update_stack PUTs data to the stack endpoint and returns
         the parsed JSON result.
         """
-        log = StubLog()
+        log = mock_log()
         http = self._http_client()
         client = HeatClient(log, http)
         eff = client.update_stack(
@@ -105,12 +102,13 @@ class HeatClientTests(SynchronousTestCase):
                 eff,
                 stub_pure_response(json.dumps({'hello': 'world'}), code=202)),
             {'hello': 'world'})
-        self._assert_bound(eff.intent.log,
-                           system='heatclient', event='update-stack')
+        self.assertThat(
+            eff.intent.log,
+            IsBoundWith(system='heatclient', event='update-stack'))
 
     def test_update_stack_error(self):
         """Non-202 codes from updating a stack are considered an APIError."""
-        log = StubLog()
+        log = mock_log()
         http = self._http_client()
         client = HeatClient(log, http)
         eff = client.update_stack(
@@ -124,7 +122,7 @@ class HeatClientTests(SynchronousTestCase):
 
     def test_get_stack(self):
         """get_stack performs a GET on the given stack URL."""
-        log = StubLog()
+        log = mock_log()
         http = self._http_client()
         client = HeatClient(log, http)
         eff = client.get_stack('my-auth-token', 'http://heat-url/my-stack')
@@ -141,12 +139,13 @@ class HeatClientTests(SynchronousTestCase):
                 eff,
                 stub_pure_response(json.dumps({'hello': 'world'}), code=200)),
             {'hello': 'world'})
-        self._assert_bound(eff.intent.log,
-                           system='heatclient', event='get-stack')
+        self.assertThat(
+            eff.intent.log,
+            IsBoundWith(system='heatclient', event='get-stack'))
 
     def test_get_stack_error(self):
         """Non-200 codes from getting a stack are considered an APIError."""
-        log = StubLog()
+        log = mock_log()
         http = self._http_client()
         client = HeatClient(log, http)
         eff = client.get_stack('my-auth-token', 'http://heat-url/my-stack')

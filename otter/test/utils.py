@@ -230,34 +230,6 @@ class DeferredFunctionMixin(object):
         func.side_effect = mock_func
 
 
-class StubLog(object):
-    """
-    A fake BoundLog-like object that records log messages and binds in a way
-    that is easily testable.
-
-    :ivar binds: A dictionary of values bound to this log.
-    :ivar msgs: A record of calls to :func:`StubLog.msg`.
-    :ivar errs: A record of calls to :func:`StubLog.err`.
-    """
-    def __init__(self, binds=None):
-        self.binds = binds if binds is not None else {}
-        self.msgs = []
-        self.errs = []
-
-    def bind(self, **kwargs):
-        """
-        Return a new :class:`StubLog` with the given binds.
-        """
-        kwargs.update(self.binds)
-        return StubLog(kwargs)
-
-    def msg(self, *args, **kwargs):
-        self.msgs.append((args, kwargs))
-
-    def err(self, *args, **kwargs):
-        self.errs.append((args, kwargs))
-
-
 def mock_log(*args, **kwargs):
     """
     Returns a BoundLog whose msg and err methods are mocks.  Makes it easier
