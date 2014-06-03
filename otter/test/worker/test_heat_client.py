@@ -3,11 +3,14 @@
 import json
 import mock
 
+from effect.testing import resolve_effect
+
 from twisted.trial.unittest import TestCase
 
-from otter.util.http import APIError
-from otter.worker.heat_client import HeatClient, OpenStackClient
-from otter.test.utils import stub_treq, StubLog
+from otter.util.http import APIError, headers
+from otter.util.pure_http import OSHTTPClient, Request
+from otter.worker.heat_client import HeatClient
+from otter.test.utils import StubLog, SameJSON, stub_pure_response
 
 
 class HeatClientTests(TestCase):
@@ -16,9 +19,8 @@ class HeatClientTests(TestCase):
     def _assert_bound(self, log, **kwargs):
         self.assertEqual(log.binds, kwargs)
 
-    def _http_client(self, code, json_content):
-        treq = stub_treq(code, json.dumps(json_content))
-        return OpenStackClient(treq, lambda: None, auth_token='my-auth-token')
+    def _http_client(self):
+        return OSHTTPClient(lambda: 1 / 0)
 
     def test_create_stack(self):
         """
@@ -26,46 +28,53 @@ class HeatClientTests(TestCase):
         the parsed JSON result.
         """
         log = StubLog()
-        http = self._http_client(code=201,
-                                 json_content={'hello': 'world'})
-        treq = http.treq
+        http = self._http_client()
         client = HeatClient(log, http)
-        result = client.create_stack(
-            'http://heat-url/', 'my-stack-name', {'p1': 'v1'}, 60,
-            'my template')
+        eff = client.create_stack(
+            'my-auth-token', 'http://heat-url/', 'my-stack-name',
+            {'p1': 'v1'}, 60, 'my template')
+
+        req = eff.intent
+        self.assertEqual(req.method, 'post')
 
         self.assertEqual(
-            http.treq.requests,
-            [{'method': 'post',
-              'url': 'http://heat-url/stacks',
-              'headers': {'x-auth-token': ['my-auth-token'],
-                          'content-type': ['application/json'],
-                          'accept': ['application/json'],
-                          'User-Agent': ['OtterScale/0.0']},
-              'data': json.dumps({'stack_name': 'my-stack-name',
-                                  'parameters': {'p1': 'v1'},
-                                  'timeout_mins': 60,
-                                  'template': 'my template'}),
-              'log': mock.ANY}])
+            req,
+            Request(
+                method='post',
+                url='http://heat-url/stacks',
+                headers=headers('my-auth-token'),
+                data=SameJSON({
+                    'stack_name': 'my-stack-name',
+                    'parameters': {'p1': 'v1'},
+                    'timeout_mins': 60,
+                    'template': 'my template'}),
+                log=mock.ANY))
 
-        self.assertEqual(self.successResultOf(result), {'hello': 'world'})
-        self._assert_bound(http.treq.requests[-1]['log'],
-                           system='heatclient', event='create-stack',
-                           stack_name='my-stack-name')
+        # Currently, json response is returned directly.
+        self.assertEqual(
+            resolve_effect(
+                eff,
+                stub_pure_response(json.dumps({'hello': 'world'}), 201)),
+           {'hello': 'world'})
+
+        self._assert_bound(
+            req.log,
+            system='heatclient',
+            event='create-stack',
+            stack_name='my-stack-name')
 
     def test_create_stack_error(self):
         """
         On any result other than 201, create_stack raises an exception.
         """
         log = StubLog()
-        http = self._http_client(code=404,
-                                 json_content={'hello': 'world'})
+        http = self._http_client()
         client = HeatClient(log, http)
-        result = client.create_stack(
-            'http://heat-url/', 'my-stack-name', {'p1': 'v1'}, 60,
+        eff = client.create_stack(
+            'my-token', 'http://heat-url/', 'my-stack-name', {'p1': 'v1'}, 60,
             'my template')
-        failure = self.failureResultOf(result)
-        failure.trap(APIError)
+        self.assertRaises(APIError, resolve_effect, eff,
+                          stub_pure_response('', 500))
 
     def test_update_stack(self):
         """
@@ -73,65 +82,74 @@ class HeatClientTests(TestCase):
         the parsed JSON result.
         """
         log = StubLog()
-        http = self._http_client(code=202, json_content={'hello': 'world'})
+        http = self._http_client()
         client = HeatClient(log, http)
-        result = client.update_stack(
+        eff = client.update_stack(
+            'my-auth-token',
             'http://heat-url/my-stack', {'p1': 'v1'}, 60,
             'my template')
         self.assertEqual(
-            http.treq.requests,
-            [{'method': 'put',
-              'url': 'http://heat-url/my-stack',
-              'headers': {'x-auth-token': ['my-auth-token'],
-                          'content-type': ['application/json'],
-                          'accept': ['application/json'],
-                          'User-Agent': ['OtterScale/0.0']},
-              'data': json.dumps({
-                  'parameters': {'p1': 'v1'},
-                  'timeout_mins': 60,
-                  'template': 'my template'}),
-              'log': mock.ANY}])
+            eff.intent,
+            Request(method='put',
+                    url='http://heat-url/my-stack',
+                    headers=headers('my-auth-token'),
+                    data=SameJSON({
+                        'parameters': {'p1': 'v1'},
+                        'timeout_mins': 60,
+                        'template': 'my template'}),
+                    log=mock.ANY))
 
-        self.assertEqual(self.successResultOf(result), {'hello': 'world'})
-        self._assert_bound(http.treq.requests[-1]['log'],
+        # Currently, json response is returned directly.
+        self.assertEqual(
+            resolve_effect(
+                eff,
+                stub_pure_response(json.dumps({'hello': 'world'}), code=202)),
+            {'hello': 'world'})
+        self._assert_bound(eff.intent.log,
                            system='heatclient', event='update-stack')
 
     def test_update_stack_error(self):
         """Non-202 codes from updating a stack are considered an APIError."""
         log = StubLog()
-        http = self._http_client(code=204, json_content={'hello': 'world'})
+        http = self._http_client()
         client = HeatClient(log, http)
-        result = client.update_stack(
+        eff = client.update_stack(
+            'my-auth-token',
             'http://heat-url/my-stack', {'p1': 'v1'}, 60,
             'my template')
-        failure = self.failureResultOf(result)
-        failure.trap(APIError)
+
+        self.assertRaises(
+            APIError,
+            resolve_effect, eff, stub_pure_response('', code=200))
 
     def test_get_stack(self):
         """get_stack performs a GET on the given stack URL."""
         log = StubLog()
-        http = self._http_client(code=200, json_content={'hello': 'world'})
+        http = self._http_client()
         client = HeatClient(log, http)
-        result = client.get_stack('http://heat-url/my-stack')
+        eff = client.get_stack('my-auth-token', 'http://heat-url/my-stack')
         self.assertEqual(
-            http.treq.requests,
-            [{'method': 'get',
-              'url': 'http://heat-url/my-stack',
-              'headers': {'x-auth-token': ['my-auth-token'],
-                          'content-type': ['application/json'],
-                          'accept': ['application/json'],
-                          'User-Agent': ['OtterScale/0.0']},
-              'data': None,
-              'log': mock.ANY}])
-        self.assertEqual(self.successResultOf(result), {'hello': 'world'})
-        self._assert_bound(http.treq.requests[-1]['log'],
+            eff.intent,
+            Request(method='get',
+                    url='http://heat-url/my-stack',
+                    headers=headers('my-auth-token'),
+                    data=None,
+                    log=mock.ANY))
+        # Currently, json response is returned directly.
+        self.assertEqual(
+            resolve_effect(
+                eff,
+                stub_pure_response(json.dumps({'hello': 'world'}), code=200)),
+            {'hello': 'world'})
+        self._assert_bound(eff.intent.log,
                            system='heatclient', event='get-stack')
 
     def test_get_stack_error(self):
         """Non-200 codes from getting a stack are considered an APIError."""
         log = StubLog()
-        http = self._http_client(code=201, json_content={'hello': 'world'})
+        http = self._http_client()
         client = HeatClient(log, http)
-        result = client.get_stack('http://heat-url/my-stack')
-        failure = self.failureResultOf(result)
-        failure.trap(APIError)
+        eff = client.get_stack('my-auth-token', 'http://heat-url/my-stack')
+        self.assertRaises(
+            APIError,
+            resolve_effect, eff, stub_pure_response('', code=201))

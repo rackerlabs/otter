@@ -6,8 +6,7 @@ from __future__ import print_function
 
 import json
 
-from otter.util.http import (append_segments, headers, check_success,
-                             APIError)
+from otter.util.http import append_segments
 from otter.util.pure_http import Request
 
 
@@ -39,8 +38,9 @@ class HeatClient(object):
         log = self.log.bind(event='create-stack', stack_name=stack_name)
         return self.http.json_request(
             auth_token,
-            Request('post', append_segments(heat_url, 'stacks'),
-                    data=json.dumps(payload), success=[201], log=log))
+            Request(method='post', url=append_segments(heat_url, 'stacks'),
+                    data=json.dumps(payload), log=log),
+            success=[201])
 
     def update_stack(self, auth_token, stack_url, parameters, timeout,
                      template):
@@ -53,14 +53,17 @@ class HeatClient(object):
         log = self.log.bind(event='update-stack')
         return self.http.json_request(
             auth_token,
-            Request('put', stack_url, data=json.dumps(payload), success=[202],
-                    log=log))
+            Request(method='put', url=stack_url, data=json.dumps(payload),
+                    log=log),
+            success=[202])
 
     def get_stack(self, auth_token, stack_url):
         """Get the metadata about a stack."""
         log = self.log.bind(event='get-stack')
         return self.http.json_request(
-            auth_token, Request('get', stack_url, success=[200], log=log))
+            auth_token,
+            Request(method='get', url=stack_url, log=log),
+            success=[200])
 
 
 def main(reactor, *args):
@@ -70,6 +73,7 @@ def main(reactor, *args):
     import os
     import yaml
     from otter.log import log
+    from otter.util.http import APIError
 
     template = yaml.safe_load(open(args[1]))
     tenant = os.environ['OS_TENANT_ID']
