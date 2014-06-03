@@ -9,13 +9,33 @@
 ]>
 <glosslist xmlns="http://docbook.org/ns/docbook" xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xlink="http://www.w3.org/1999/xlink"
 version="5.0" xml:id="Glossary-000">
+    <glossentry xml:id="Agent">
+        <glossterm>
+            <emphasis role="bold">Agent</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>
+                A monitoring daemon that resides on the server being monitored. The agent gathers metrics based on agent checks and pushes them to Cloud Monitoring.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="AgentToken">
+        <glossterm>
+            <emphasis role="bold">Agent Token</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>
+                An authentication token used to identify the agent when it communicates with Cloud Monitoring.
+            </para>
+        </glossdef>
+    </glossentry>
     <glossentry xml:id="Alarm-d1e02">
         <glossterm>
             <emphasis role="bold">Alarm</emphasis>
         </glossterm>
         <glossdef>
             <para>
-                An alarm contains a set of rules that determine when a notification is triggered.
+                A mechanism that contains a set of rules that determine when a notification is triggered.
             </para>
         </glossdef>
     </glossentry>
@@ -24,7 +44,7 @@ version="5.0" xml:id="Glossary-000">
             <emphasis role="bold">Authentication</emphasis>
         </glossterm>
         <glossdef>
-            <para>Authentication is the act or process of confirming the identity of a user or the truth of
+            <para>The act or process of confirming the identity of a user or the truth of
                 a claim. The authentication service confirms that an incoming request is being made by
                 the user who claims to be making the request. The service does this by validating a set
                 of claims that the user makes. These claims are initially in the form of a set of credentials.
@@ -33,14 +53,55 @@ version="5.0" xml:id="Glossary-000">
                 evidence that the user's identity has already been authenticated.</para>
         </glossdef>
     </glossentry>
+    <glossentry xml:id="Check">
+        <glossterm>
+            <emphasis role="bold">Check</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>
+                A definition that explicitly specifies how you want to monitor an entity.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Collector">
+        <glossterm>
+            <emphasis role="bold">Collector</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>
+                Software that collects data from the monitoring zone. The collector is mapped directly to an individual computer or a virtual machine.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Convergence">
+        <glossterm>
+            <emphasis role="bold">Convergence</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>
+                The act of Auto Scale adding or removing enough servers to satisfy the needed capacity.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="ConvergenceDelta">
+        <glossterm>
+            <emphasis role="bold">Convergence Delta</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>
+                The change in the number of servers that the system makes when a scaling policy is executed. 
+                For example, if the convergence delta is 2, then the system adds 2 servers. If it is -10, the system removes 10 servers.
+            </para>
+        </glossdef>
+    </glossentry>
     <glossentry xml:id="Cooldown-d1e10">
         <glossterm>
             <emphasis role="bold">Cooldown</emphasis>
         </glossterm>
         <glossdef>
             <para>
-                A cooldown period is the length of time that a scaling group must wait after scaling before beginning
-                to scale again.
+                There are two types of cooldown: group and policy. A group cooldown is the configured length of time that a scaling group must wait after scaling before beginning
+                to scale again. A policy cooldown is the configured length of time that a scaling policy must wait before being able to be executed again.
             </para>
         </glossdef>
     </glossentry>
@@ -49,8 +110,62 @@ version="5.0" xml:id="Glossary-000">
             <emphasis role="bold">Flavor</emphasis>
         </glossterm>
         <glossdef>
-            <para>A flavor is a resource configuration for a server. Each flavor is a unique combination of
-                disk, memory, vCPUs, and network bandwidth.</para>
+            <para>A resource configuration for a server. Each flavor is a unique combination of
+                disk, memory, vCPUs, and network bandwidth. </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="HealthMonitor">
+        <glossterm>
+            <emphasis role="bold">Health Monitor</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>A configurable feature of each load balancer. A health monitor is used to determine whether a 
+                back-end node is usable for processing a request. The load balancing service currently supports active health monitoring.</para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Image">
+        <glossterm>
+            <emphasis role="bold">Image</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>A collection of files for a specific operating system (OS) that you use to create or rebuild a server. 
+                Rackspace provides pre-built images. You can also create custom images from servers that you have launched. 
+                Custom images can be used for data backups or as "gold" images for additional servers.</para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="LaunchConfiguration">
+        <glossterm>
+            <emphasis role="bold">Launch Configuration</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>A configuration that contains the necessary details for adding and removing servers from a 
+                scaling group in the Rackspace Auto Scale API. The <varname>launchConfiguration</varname> object specifies 
+                whether you are creating a server or a load balancer and the necessary details about the configuration.</para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="LoadBalancer">
+        <glossterm>
+            <emphasis role="bold">Load Balancer</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>A logical device that belongs to a cloud account. A load balancer is used to distribute 
+                workloads between multiple back-end systems or services, based on the criteria that is defined as part of its configuration.</para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Node">
+        <glossterm>
+            <emphasis role="bold">Node</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>A back-end device that provides a service on a specified IP and port.</para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Notification">
+        <glossterm>
+            <emphasis role="bold">Notification</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>An informational message that is sent to one or more addresses when an alarm is triggered.</para>
         </glossdef>
     </glossentry>
     <glossentry xml:id="Scaling-d1e11">
@@ -79,6 +194,32 @@ version="5.0" xml:id="Glossary-000">
             <para>
                 A scaling policy manages a scaling group.
             </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="SessionPersistence">
+        <glossterm>
+            <emphasis role="bold">Session persistence</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>A feature of the load balancing service that attempts to force subsequent connections to a service to be redirected to the same node as long as the node is online.</para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Server">
+        <glossterm>
+            <emphasis role="bold">Server</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>A computer that provides explicit services to the client software running on its system. 
+                A server is a virtual machine (VM) instance in the Cloud Servers environment. To create a server, you must specify a name, flavor reference, and image reference.</para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="VirtualIp">
+        <glossterm>
+            <emphasis role="bold">Virtual IP</emphasis>
+        </glossterm>
+        <glossdef>
+            <para>An Internet Protocol (IP) address that is configured on the load balancer. Clients use the virtual IP to connect to a service that is load balanced. 
+                Incoming connections are distributed to back-end nodes based on the configuration of the load balancer.</para>
         </glossdef>
     </glossentry>
     <glossentry xml:id="Webhook-d1e15">

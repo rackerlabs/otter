@@ -8,6 +8,8 @@ import treq
 
 from zope.interface import implementer, directlyProvides
 
+from testtools.matchers import Mismatch
+
 from twisted.internet import defer
 from twisted.internet.defer import succeed, Deferred
 from twisted.python.failure import Failure
@@ -56,6 +58,42 @@ class matches(object):
 
     def __repr__(self):
         return 'matches({0!s}'.format(self._matcher)
+
+
+class IsBoundWith(object):
+    """
+    Match if BoundLog is bound with given args
+    """
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __str__(self):
+        return 'IsBoundWith {}'.format(self.kwargs)
+
+    def match(self, log):
+        """
+        Return None if log is bound with given args/kwargs. Otherwise return Mismatch
+        """
+        if not isinstance(log, BoundLog):
+            return Mismatch('log is not a BoundLog')
+        # Collect kwargs
+        f = log.msg
+        kwargs_list = []
+        while True:
+            try:
+                kwargs_list.append(f.keywords)
+            except AttributeError:
+                break
+            else:
+                f = f.func
+        # combine them in order they were bound
+        kwargs = {}
+        [kwargs.update(kwa) for kwa in reversed(kwargs_list)]
+        # Compare and return accordingly
+        if self.kwargs == kwargs:
+            return None
+        else:
+            return Mismatch('Expected kwargs {} but got {} instead'.format(self.kwargs, kwargs))
 
 
 class CheckFailure(object):

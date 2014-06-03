@@ -44,8 +44,7 @@
 
 <book version="5.0" xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"
 xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:svg="http://www.w3.org/2000/svg" xmlns:m="http://www.w3.org/1998/Math/MathML"
-xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xmlns:raxm="http://docs.rackspace.com/api/metadata"
-xlink:href="http:// docs.autoscale.apiary.io/ ">
+xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xmlns:raxm="http://docs.rackspace.com/api/metadata">
     <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
     <title>&PRODNAME; API Getting Started Guide</title>
     <titleabbrev>&PRODABBV; Getting Started Guide</titleabbrev>
@@ -335,13 +334,6 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
                         </para>
                     </listitem>
                 </itemizedlist>
-                <para>
-                    <tip>
-                        <para>If you want to try these steps in your own environment, you can use
-                            <link xlink:href="http://docs.autoscale.apiary.io/">http://docs.autoscale.apiary.io/</link>
-                            to generate cURL commands.</para>
-                    </tip>
-                </para>
             </section>
         </chapter>
         <chapter xml:id="Core_Concepts">
@@ -974,11 +966,6 @@ xlink:href="http:// docs.autoscale.apiary.io/ ">
                         <para>If you want to learn more about configuring a Performance Cloud Server, read
                             <link xlink:href="http://www.rackspace.com/knowledge_center/article/creating-an-image-of-your-performance-cloud-server-with-the-control-panel">Creating an Image of Your Performance Cloud Server with the Control Panel</link>
                             on the Knowledge Center.</para>
-                    </listitem>
-                    <listitem>
-                        <para>To learn more about the Auto Scale API, visit the Auto Scale API documentation
-                            on apiary at
-                            <link xlink:href="http://docs.autoscale.apiary.io/">http://docs.autoscale.apiary.io/</link>.</para>
                     </listitem>
                     <listitem>
                         <para>For a list of FAQs on Auto Scale, read
