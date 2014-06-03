@@ -6,6 +6,8 @@ import mock
 import os
 import treq
 
+from testtools.matchers import Mismatch
+
 from twisted.internet import defer
 from twisted.python.failure import Failure
 from zope.interface import directlyProvides
@@ -52,6 +54,38 @@ class matches(object):
 
     def __repr__(self):
         return 'matches({0!s}'.format(self._matcher)
+
+
+class IsBoundWith(object):
+    """
+    Match if BoundLog is bound with given args
+    """
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __str__(self):
+        return 'IsBoundWith {}'.format(self.kwargs)
+
+    def match(self, log):
+        """
+        Return None if log is bound with given args/kwargs. Otherwise return Mismatch
+        """
+        if not isinstance(log, BoundLog):
+            return Mismatch('log is not a BoundLog')
+        # Extract kwargs
+        f = log.msg
+        kwargs = {}
+        while True:
+            try:
+                kwargs.update(f.keywords)
+            except AttributeError:
+                break
+            else:
+                f = f.func
+        if self.kwargs == kwargs:
+            return None
+        else:
+            return Mismatch('Expected kwargs {} but got {} instead'.format(self.kwargs, kwargs))
 
 
 class CheckFailure(object):
