@@ -246,6 +246,15 @@ class StubResponse(object):
         self.headers = headers
 
 
+def stub_pure_response(body, code=200, response_headers=None):
+    """
+    Return the type of two-tuple response that pure_http.Request returns.
+    """
+    if response_headers is None:
+        response_headers = {}
+    return (StubResponse(code, response_headers), body)
+
+
 class StubTreq(object):
     """
     A stub version of otter.utils.logging_treq that returns canned responses

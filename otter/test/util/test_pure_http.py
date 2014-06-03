@@ -6,13 +6,12 @@ from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import TestCase
 
-from effect.testing import (StubRequest, get_request,
-                            resolve_effect, resolve_stub)
+from effect.testing import StubIntent, resolve_effect, resolve_stub
 from effect import Effect
 
-from otter.util.pure_http import OSHTTPClient, Request, ReauthIneffectualError
-from otter.util.http import APIError
-from otter.test.utils import StubResponse, StubTreq
+from otter.util.pure_http import OSHTTPClient, Request, ReauthIneffectualError, conj
+from otter.util.http import APIError, headers
+from otter.test.utils import stub_pure_response, StubResponse, StubTreq
 
 
 class RequestEffectTests(SynchronousTestCase):
@@ -71,30 +70,17 @@ class OSHTTPClientTests(TestCase):
         """
         http = OSHTTPClient(lambda: 1 / 0)
         eff = http.json_request("my-token", Request(method="get", url="/foo"))
-        # - unit tests want to know about all the true effects that need to be
-        #   performed
-        # - unit tests do NOT want to know about how implementation organizes
-        #   its callbacks
-        # get_effect_request(eff) -> innermost effect request
-        # resolve_effect(eff, result) -> invokes callbacks, innermost to outer,
-        # and returns the result. If any callback returns an Effect, further callbacks
-        # will not be run, and instead a new effect is returned.
-        req = get_request(eff)
+        req = eff.intent
         self.assertEqual(req.method, "get")
         self.assertEqual(req.url, "/foo")
         self.assertIs(req.data, None)
-        self.assertEqual(
-            req.headers,
-            {'User-Agent': ['OtterScale/0.0'],
-             'accept': ['application/json'],
-             'content-type': ['application/json'],
-             'x-auth-token': ['my-token']})
+        self.assertEqual(req.headers, headers('my-token'))
 
     def test_json_response(self):
         """The JSON response is decoded into Python objects."""
         http = OSHTTPClient(lambda: 1 / 0)
         eff = http.json_request("my-token", Request(method="get", url="/foo"))
-        stub_result = (StubResponse(200, {}), json.dumps({"foo": "bar"}))
+        stub_result = stub_pure_response(json.dumps({"foo": "bar"}))
         result = resolve_effect(eff, stub_result)
         self.assertEqual(result, {"foo": "bar"})
 
@@ -107,14 +93,9 @@ class OSHTTPClientTests(TestCase):
         eff = http.json_request(
             "my-token",
             Request(method="get", url="/foo", headers={"x-mine": "abc123"}))
-        req = get_request(eff)
-        self.assertEqual(
-            req.headers,
-            {'User-Agent': ['OtterScale/0.0'],
-             'accept': ['application/json'],
-             'content-type': ['application/json'],
-             'x-auth-token': ['my-token'],
-             'x-mine': 'abc123'})
+        req = eff.intent
+        self.assertEqual(req.headers, conj(headers('my-token'),
+                                           {'x-mine': 'abc123'}))
 
     def test_data(self):
         """The data member in the request is passed through untouched."""
@@ -122,7 +103,7 @@ class OSHTTPClientTests(TestCase):
         eff = http.json_request(
             "my-token",
             Request(method="get", url="/foo", data="foo"))
-        req = get_request(eff)
+        req = eff.intent
         self.assertEqual(req.data, "foo")
 
     def test_api_error_default(self):
@@ -131,7 +112,7 @@ class OSHTTPClientTests(TestCase):
         """
         http = OSHTTPClient(lambda: 1 / 0)
         eff = http.json_request("my-token", Request(method="get", url="/foo"))
-        stub_result = (StubResponse(404, {}), json.dumps({"foo": "bar"}))
+        stub_result = stub_pure_response(json.dumps({"foo": "bar"}), code=404)
         self.assertRaises(APIError, resolve_effect, eff, stub_result)
 
     def test_api_error_specified(self):
@@ -139,7 +120,7 @@ class OSHTTPClientTests(TestCase):
         http = OSHTTPClient(lambda: 1 / 0)
         eff = http.json_request("my-token", Request(method="get", url="/foo"),
                                 success=[404])
-        stub_result = (StubResponse(404, {}), json.dumps({"foo": "bar"}))
+        stub_result = stub_pure_response(json.dumps({"foo": "bar"}), code=404)
         self.assertEqual(resolve_effect(eff, stub_result), {"foo": "bar"})
 
     def test_reauth_successful(self):
@@ -149,29 +130,24 @@ class OSHTTPClientTests(TestCase):
         retried with the x-auth-token header updated to use the new auth
         token.
         """
-        reauth_effect = Effect(StubRequest("new-token"))
+        reauth_effect = Effect(StubIntent("new-token"))
         http = OSHTTPClient(lambda: reauth_effect)
         # 1. First we try to make a simple request, but it returns 401:
         eff = http.json_request("first-token",
                                 Request(method="get", url="/foo"))
-        stub_result = (StubResponse(401, {}), "")
+        stub_result = stub_pure_response("", code=401)
         # 2. Reauthentication is then triggered:
         reauth_effect_result = resolve_effect(eff, stub_result)
-        self.assertIs(get_request(reauth_effect_result), reauth_effect.request)
+        self.assertIs(reauth_effect_result.intent, reauth_effect.intent)
         # 3. When retry succeeds, the original request is retried:
         retry_eff = resolve_stub(reauth_effect_result)
-        retry_req = get_request(retry_eff)
+        retry_req = retry_eff.intent
         # The x-auth-token header has been updated
-        self.assertEqual(
-            retry_req.headers,
-            {'User-Agent': ['OtterScale/0.0'],
-             'accept': ['application/json'],
-             'content-type': ['application/json'],
-             'x-auth-token': ['new-token']})
+        self.assertEqual(retry_req.headers, headers('new-token'))
 
         # The final request's result is returned as the ultimate result of the
         # original effect
-        stub_response = (StubResponse(200, {}), '{"result": 1}')
+        stub_response = stub_pure_response('{"result": 1}')
         final_result = resolve_effect(retry_eff, stub_response)
         self.assertEqual(final_result, {'result': 1})
 
@@ -180,18 +156,18 @@ class OSHTTPClientTests(TestCase):
         When a 401 is returned even after reauthentication, ReauthIneffectualError is
         raised.
         """
-        reauth_effect = Effect(StubRequest("new-token"))
+        reauth_effect = Effect(StubIntent("new-token"))
         http = OSHTTPClient(lambda: reauth_effect)
         # 1. First we try to make a simple request, but it returns 401:
         eff = http.json_request("first-token",
                                 Request(method="get", url="/foo"))
-        stub_result = (StubResponse(401, {}), "")
+        stub_result = stub_pure_response("", code=401)
         # 2. Reauthentication is then triggered:
         reauth_effect_result = resolve_effect(eff, stub_result)
-        self.assertIs(get_request(reauth_effect_result), reauth_effect.request)
+        self.assertIs(reauth_effect_result.intent, reauth_effect.intent)
         # 3. When retry succeeds, the original request is retried:
         retry_eff = resolve_stub(reauth_effect_result)
         # When 401 is returned *again*, we get the error.
-        stub_response = (StubResponse(401, {}), '{"result": 1}')
+        stub_response = stub_pure_response("", code=401)
         self.assertRaises(ReauthIneffectualError,
                           resolve_effect, retry_eff, stub_response)
