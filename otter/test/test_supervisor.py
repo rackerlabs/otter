@@ -1211,14 +1211,15 @@ class RemoveServerTests(SynchronousTestCase):
 
     def test_not_replaced_below_min(self):
         """
-        `CannotDeleteServerBelowMinError` is raised if current desired == min servers
+        `CannotDeleteServerBelowMinError` is raised if current (active + pending) == min servers
         """
-        self.group.view_config.return_value = succeed({'minEntities': 1})
+        self.state.add_job('j1')
+        self.group.view_config.return_value = succeed({'minEntities': 2})
         d = remove_server_from_group(self.log, self.tid, 's0', False, self.group, self.state)
         self.failureResultOf(d, CannotDeleteServerBelowMinError)
         # server is not deleted
         self.assertIn('s0', self.state.active)
         self.assertEqual(self.supervisor.del_calls, [])
         # server is not launched
-        self.assertEqual(self.state.pending, {})
+        self.assertIn('j1', self.state.pending)
         self.assertEqual(len(self.supervisor.exec_calls), 0)

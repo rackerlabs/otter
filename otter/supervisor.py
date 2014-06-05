@@ -522,7 +522,7 @@ def remove_server_from_group(log, trans_id, server_id, replace, group, state):
     """
 
     def reduce_desired(config):
-        if state.desired == config['minEntities']:
+        if len(state.active) + len(state.pending) == config['minEntities']:
             raise CannotDeleteServerBelowMinError(
                 group.tenant_id, group.uuid, server_id, config['minEntities'])
         else:
