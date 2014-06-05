@@ -4,7 +4,7 @@ Unittests for the launch_server_v1 launch config.
 import mock
 import json
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
 from twisted.python.failure import Failure
@@ -24,6 +24,7 @@ from otter.worker.launch_server_v1 import (
     public_endpoint_url,
     UnexpectedServerStatus,
     ServerDeleted,
+    delete_and_verify,
     verified_delete,
     LB_MAX_RETRIES, LB_RETRY_INTERVAL_RANGE
 )
@@ -38,8 +39,6 @@ from otter.util.deferredutils import unwrap_first_error, TimedOutError
 from otter.test.utils import iMock
 from otter.undo import IUndoStack
 
-from otter.rest.bobby import set_bobby
-from otter.bobby import BobbyClient
 
 fake_config = {
     'regionOverrides': {},
@@ -62,7 +61,7 @@ fake_service_catalog = [
 ]
 
 
-class UtilityTests(TestCase):
+class UtilityTests(SynchronousTestCase):
     """
     Tests for non-specific utilities that should be refactored out of the
     worker implementation eventually.
@@ -119,7 +118,7 @@ expected_headers = {
 error_body = '{"code": 500, "message": "Internal Server Error"}'
 
 
-class LoadBalancersTests(TestCase):
+class LoadBalancersTests(SynchronousTestCase):
     """
     Test adding to one or more load balancers.
     """
@@ -644,91 +643,7 @@ class LoadBalancersTests(TestCase):
     test_removelb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
 
 
-class BobbyServerTests(TestCase):
-    """
-    Test server manipulation functions with Bobby present -- will become part of the
-    regular tests later on.
-    """
-    def setUp(self):
-        """
-        Set up test dependencies.
-        """
-        self.log = mock_log()
-        set_config_data(fake_config)
-        self.addCleanup(set_config_data, {})
-
-        self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
-        patch(self, 'otter.util.http.treq', new=self.treq)
-
-        self.generate_server_name = patch(
-            self,
-            'otter.worker.launch_server_v1.generate_server_name')
-        self.generate_server_name.return_value = 'as000000'
-
-        self.scaling_group_uuid = '1111111-11111-11111-11111111'
-
-        self.scaling_group = mock.Mock(uuid=self.scaling_group_uuid, tenant_id='1234')
-
-        self.undo = iMock(IUndoStack)
-
-        set_bobby(BobbyClient("http://127.0.0.1:9876/"))
-
-    def tearDown(self):
-        """
-        Reset bobby dependencies.
-        """
-        set_bobby(None)
-
-    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
-    @mock.patch('otter.worker.launch_server_v1.create_server')
-    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
-    @mock.patch('otter.bobby.BobbyClient.create_server', return_value=succeed(''))
-    def test_launch_server_bobby(self, bobby_create_server, wait_for_active, create_server,
-                                 add_to_load_balancers):
-        """
-        launch_server creates a server, waits until the server is active then
-        adds the server's first private IPv4 address to any load balancers.
-        """
-        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
-                         'loadBalancers': [
-                             {'loadBalancerId': 12345, 'port': 80},
-                             {'loadBalancerId': 54321, 'port': 81}
-                         ]}
-
-        server_detail = {
-            'server': {
-                'id': '1',
-                'addresses': {'private': [
-                    {'version': 4, 'addr': '10.0.0.1'}]}}}
-
-        create_server.return_value = succeed(server_detail)
-
-        wait_for_active.return_value = succeed(server_detail)
-
-        add_to_load_balancers.return_value = succeed([
-            (12345, ('10.0.0.1', 80)),
-            (54321, ('10.0.0.1', 81))
-        ])
-
-        d = launch_server(self.log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          launch_config,
-                          self.undo)
-
-        result = self.successResultOf(d)
-        self.assertEqual(
-            result,
-            (server_detail, [
-                (12345, ('10.0.0.1', 80)),
-                (54321, ('10.0.0.1', 81))]))
-
-        bobby_create_server.assert_called_once_with('1234', self.scaling_group_uuid, '1')
-
-
-class ServerTests(TestCase):
+class ServerTests(SynchronousTestCase):
     """
     Test server manipulation functions.
     """
@@ -893,6 +808,9 @@ class ServerTests(TestCase):
                             'http://url/', 'my-auth-token', 'serverId',
                             interval=5, clock=clock)
 
+        self.log.msg.assert_called_once_with(
+            "Checking instance status every {interval} seconds", interval=5)
+
         server_details.assert_called_with('http://url/', 'my-auth-token',
                                           'serverId', log=mock.ANY)
         self.assertEqual(server_details.call_count, 1)
@@ -904,6 +822,10 @@ class ServerTests(TestCase):
         server_details.assert_called_with('http://url/', 'my-auth-token',
                                           'serverId', log=mock.ANY)
         self.assertEqual(server_details.call_count, 2)
+
+        self.log.msg.assert_called_with(
+            "Server changed from 'BUILD' to 'ACTIVE' within {time_building} seconds",
+            time_building=5.0)
 
         result = self.successResultOf(d)
 
@@ -932,6 +854,10 @@ class ServerTests(TestCase):
 
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(UnexpectedServerStatus))
+
+        self.log.msg.assert_called_with(
+            "Server changed to '{status}' in {time_building} seconds",
+            time_building=5.0, status='ERROR')
 
         self.assertEqual(failure.value.server_id, 'serverId')
         self.assertEqual(failure.value.status, 'ERROR')
@@ -1327,8 +1253,169 @@ class ServerTests(TestCase):
 
         self.assertEqual(self.undo.push.call_count, 0)
 
+    @mock.patch('otter.worker.launch_server_v1.verified_delete')
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_retries_on_error(self, mock_wfa, mock_cs, mock_addlb, mock_vd):
+        """
+        If server goes into ERROR state, launch_server deletes it and creates a new
+        one instead
+        """
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': [
+                             {'loadBalancerId': 12345, 'port': 80},
+                             {'loadBalancerId': 54321, 'port': 81}
+                         ]}
 
-class ConfigPreparationTests(TestCase):
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'private': [
+                    {'version': 4, 'addr': '10.0.0.1'}]}}}
+
+        mock_cs.side_effect = lambda *a, **kw: succeed(server_details)
+
+        wfa_returns = [fail(UnexpectedServerStatus('1', 'ERROR', 'ACTIVE')),
+                       fail(UnexpectedServerStatus('1', 'ERROR', 'ACTIVE')),
+                       succeed(server_details)]
+        mock_wfa.side_effect = lambda *a: wfa_returns.pop(0)
+        mock_vd.side_effect = lambda *a: Deferred()
+
+        clock = Clock()
+        d = launch_server(self.log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo, clock=clock)
+
+        # No result, create_server and wait_for_active called once, server deletion
+        # was started and it wasn't added to clb
+        self.assertNoResult(d)
+        self.assertEqual(mock_cs.call_count, 1)
+        self.assertEqual(mock_wfa.call_count, 1)
+        mock_vd.assert_called_once_with(
+            matches(IsInstance(self.log.__class__)), 'http://dfw.openstack/',
+            'my-auth-token', '1')
+        self.log.msg.assert_called_once_with(
+            '{server_id} errored, deleting and creating new server instead',
+            server_name='as000000', server_id='1')
+
+        self.assertFalse(mock_addlb.called)
+
+        # After 15 seconds, server was created again, notice that verified_delete
+        # incompletion doesn't hinder new server creation
+        clock.advance(15)
+        self.assertNoResult(d)
+        self.assertEqual(mock_cs.call_count, 2)
+        self.assertEqual(mock_wfa.call_count, 2)
+        self.assertEqual(
+            mock_vd.mock_calls,
+            [mock.call(matches(IsInstance(self.log.__class__)), 'http://dfw.openstack/',
+                       'my-auth-token', '1')] * 2)
+        self.assertEqual(
+            self.log.msg.mock_calls,
+            [mock.call('{server_id} errored, deleting and creating new server instead',
+                       server_name='as000000', server_id='1')] * 2)
+        self.assertFalse(mock_addlb.called)
+
+        # next time server creation succeeds
+        clock.advance(15)
+        self.successResultOf(d)
+        self.assertEqual(mock_cs.call_count, 3)
+        self.assertEqual(mock_wfa.call_count, 3)
+        self.assertEqual(mock_vd.call_count, 2)
+        self.assertEqual(self.log.msg.call_count, 2)
+        self.assertEqual(mock_addlb.call_count, 1)
+
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_no_retry_on_non_error(self, mock_wfa, mock_cs, mock_addlb):
+        """
+        launch_server does not retry to create server if server goes into any state
+        other than ERROR
+        """
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': [
+                             {'loadBalancerId': 12345, 'port': 80},
+                             {'loadBalancerId': 54321, 'port': 81}
+                         ]}
+
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'private': [
+                    {'version': 4, 'addr': '10.0.0.1'}]}}}
+
+        mock_cs.side_effect = lambda *a, **kw: succeed(server_details)
+
+        wfa_returns = [fail(UnexpectedServerStatus('1', 'SOME', 'ACTIVE')),
+                       succeed(server_details)]
+        mock_wfa.side_effect = lambda *a: wfa_returns.pop(0)
+
+        clock = Clock()
+        d = launch_server(self.log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo, clock=clock)
+
+        self.failureResultOf(d, UnexpectedServerStatus)
+        self.assertEqual(mock_cs.call_count, 1)
+        self.assertEqual(mock_wfa.call_count, 1)
+        self.assertFalse(mock_addlb.called)
+
+    @mock.patch('otter.worker.launch_server_v1.verified_delete')
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_max_retries(self, mock_wfa, mock_cs, mock_addlb, mock_vd):
+        """
+        server is created again max 3 times if it goes into ERROR state
+        """
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': [
+                             {'loadBalancerId': 12345, 'port': 80},
+                             {'loadBalancerId': 54321, 'port': 81}
+                         ]}
+
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'private': [
+                    {'version': 4, 'addr': '10.0.0.1'}]}}}
+
+        mock_cs.side_effect = lambda *a, **kw: succeed(server_details)
+
+        wfa_returns = [fail(UnexpectedServerStatus('1', 'ERROR', 'ACTIVE')),
+                       fail(UnexpectedServerStatus('1', 'ERROR', 'ACTIVE')),
+                       fail(UnexpectedServerStatus('1', 'ERROR', 'ACTIVE')),
+                       fail(UnexpectedServerStatus('1', 'ERROR', 'ACTIVE'))]
+        mock_wfa.side_effect = lambda *a: wfa_returns.pop(0)
+
+        clock = Clock()
+        d = launch_server(self.log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo, clock=clock)
+
+        clock.pump([15] * 3)
+        self.failureResultOf(d, UnexpectedServerStatus)
+        self.assertEqual(mock_cs.call_count, 4)
+        self.assertEqual(mock_wfa.call_count, 4)
+        self.assertEqual(mock_vd.call_count, 3)
+        self.assertFalse(mock_addlb.called)
+
+
+class ConfigPreparationTests(SynchronousTestCase):
     """
     Test config preparation.
     """
@@ -1452,7 +1539,7 @@ instance_details = (
      (54321, {'nodes': [{'id': 2}]})])
 
 
-class DeleteServerTests(TestCase):
+class DeleteServerTests(SynchronousTestCase):
     """
     Test the delete server worker.
     """
@@ -1543,6 +1630,106 @@ class DeleteServerTests(TestCase):
                           'my-auth-token', instance_details)
         self.failureResultOf(d, TimedOutError)
 
+    def test_delete_and_verify_does_not_verify_if_404(self):
+        """
+        :func:`delete_and_verify` does not verify if the deletion response
+        code is a 404
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=404))
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 0)
+        self.successResultOf(d)
+
+    def test_delete_and_verify_succeeds_if_get_returns_404(self):
+        """
+        :func:`delete_and_verify` succeeds if the verification response code
+        is a 404
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        self.treq.get.return_value = succeed(mock.Mock(code=404))
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 1)
+        self.successResultOf(d)
+
+    def test_delete_and_verify_succeeds_if_task_state_is_deleting(self):
+        """
+        :func:`delete_and_verify` succeeds if the verification response body
+        has a task_state of "deleting"
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed(
+            {'server': {'OS-EXT-STS:task_state': 'deleting'}})
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 1)
+        self.successResultOf(d)
+
+    def test_delete_and_verify_fails_if_task_state_not_deleting(self):
+        """
+        :func:`delete_and_verify` fails if the verification response body
+        has a task_state that is not "deleting"
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed(
+            {'server': {'OS-EXT-STS:task_state': 'build'}})
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 1)
+        self.failureResultOf(d, UnexpectedServerStatus)
+
+    def test_delete_and_verify_fails_if_no_task_state(self):
+        """
+        :func:`delete_and_verify` fails if the verification response body
+        does not have a task_state
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({'server': {}})
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 1)
+        self.failureResultOf(d, UnexpectedServerStatus)
+
+    def test_delete_and_verify_fails_if_delete_500s(self):
+        """
+        :func:`delete_and_verify` fails if the deletion response code is
+        neither a 404 nor a 204
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=500))
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 0)
+        self.failureResultOf(d, RequestError)
+
+    def test_delete_and_verify_fails_if_verify_500s(self):
+        """
+        :func:`delete_and_verify` fails if the verification response code is
+        neither a 404 nor a 200
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        self.treq.get.return_value = succeed(mock.Mock(code=500))
+
+        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+                              'serverId')
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(self.treq.get.call_count, 1)
+        self.failureResultOf(d, RequestError)
+
     def test_verified_delete_retries_until_success(self):
         """
         If the first delete didn't work, wait a bit and try again until the
@@ -1551,20 +1738,26 @@ class DeleteServerTests(TestCase):
 
         It also logs deletion success.
         """
-        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        delete_and_verify = patch(
+            self, 'otter.worker.launch_server_v1.delete_and_verify')
+        delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
+
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
                             'serverId', interval=5, clock=self.clock)
-        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertEqual(delete_and_verify.call_count, 1)
         self.assertNoResult(d)
 
-        self.treq.delete.return_value = succeed(mock.Mock(code=404))
+        delete_and_verify.side_effect = lambda *a, **kw: None
         self.clock.pump([5])
-        self.assertEqual(self.treq.delete.call_count, 2)
+        self.assertEqual(
+            delete_and_verify.mock_calls,
+            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
+                       'my-auth-token', 'serverId')] * 2)
         self.successResultOf(d)
 
         # the loop has stopped
         self.clock.pump([5])
-        self.assertEqual(self.treq.delete.call_count, 2)
+        self.assertEqual(delete_and_verify.call_count, 2)
 
         # success logged
         self.log.msg.assert_called_with(
@@ -1576,19 +1769,22 @@ class DeleteServerTests(TestCase):
         If the deleting fails until the timeout, log a failure and do not
         keep trying to delete.
         """
-        self.treq.delete.side_effect = lambda *a, **kw: succeed(mock.Mock(code=500))
+        delete_and_verify = patch(
+            self, 'otter.worker.launch_server_v1.delete_and_verify')
+        delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
+
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
                             'serverId', interval=5, timeout=20, clock=self.clock)
         self.assertNoResult(d)
 
         self.clock.pump([5] * 4)
         self.assertEqual(
-            self.treq.delete.mock_calls,
-            [mock.call('http://url/servers/serverId', headers=expected_headers,
-                       log=mock.ANY)] * 4)
+            delete_and_verify.mock_calls,
+            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
+                       'my-auth-token', 'serverId')] * 4)
         self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
                                              server_id='serverId')
 
         # the loop has stopped
         self.clock.pump([5])
-        self.assertEqual(self.treq.delete.call_count, 4)
+        self.assertEqual(delete_and_verify.call_count, 4)

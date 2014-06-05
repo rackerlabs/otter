@@ -28,11 +28,10 @@ import json
 from twisted.internet import defer
 
 from otter.log import audit
-from otter.models.interface import NoSuchScalingGroupError
-from otter.supervisor import get_supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
+from otter.supervisor import execute_launch_config, exec_scale_down
 
 
 class CannotExecutePolicyError(Exception):
@@ -112,24 +111,57 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
     :return: a ``Deferred`` that fires with the updated (or not)
         :class:`otter.models.interface.GroupState` if successful
     """
-    bound_log = log.bind(scaling_group_id=scaling_group.uuid)
+    log = log.bind(scaling_group_id=scaling_group.uuid)
 
-    # XXX:  this is a hack to create an internal zero-change policy so
+    # XXX: {'change': 0} is a hack to create an internal zero-change policy so
     # calculate delta will work
-    delta = calculate_delta(bound_log, state, config, {'change': 0})
+    d = converge(log, transaction_id, config, scaling_group, state,
+                 launch_config, {'change': 0})
+    if d is None:
+        return defer.succeed(state)
+    return d
+
+
+def converge(log, transaction_id, config, scaling_group, state, launch_config,
+             policy):
+    """
+    Apply a policy's change to a scaling group, and attempt to make the
+    resulting state a reality. This does no cooldown checking.
+
+    This is done by dispatching to the appropriate orchestration backend for
+    the scaling group; currently only direct nova interaction is supported.
+
+    :param log: A bound log for logging
+    :param str transaction_id: the transaction id
+    :param dict config: the scaling group config
+    :param otter.models.interface.IScalingGroup scaling_group: the scaling
+        group object
+    :param otter.models.interface.GroupState state: the group state
+    :param dict launch_config: the scaling group launch config
+    :param dict policy: the policy configuration dictionary
+
+    :return: a ``Deferred`` that fires with the updated
+        :class:`otter.models.interface.GroupState` if successful. If no changes
+        are to be made to the group, None will synchronously be returned.
+    """
+    delta = calculate_delta(log, state, config, policy)
+    execute_log = log.bind(server_delta=delta)
 
     if delta == 0:
-        return defer.succeed(state)
+        execute_log.msg("no change in servers")
+        return None
     elif delta > 0:
-        deferred = execute_launch_config(bound_log, transaction_id, state,
+        execute_log.msg("executing launch configs")
+        deferred = execute_launch_config(execute_log, transaction_id, state,
                                          launch_config, scaling_group,
                                          delta)
     else:
         # delta < 0 (scale down)
-        deferred = exec_scale_down(bound_log, transaction_id, state,
+        execute_log.msg("scaling down")
+        deferred = exec_scale_down(execute_log, transaction_id, state,
                                    scaling_group, -delta)
 
-    deferred.addCallback(_do_convergence_audit_log, bound_log, delta, state)
+    deferred.addCallback(_do_convergence_audit_log, log, delta, state)
     return deferred
 
 
@@ -187,26 +219,13 @@ def maybe_execute_scaling_policy(
             return state  # propagate the fully updated state back
 
         if check_cooldowns(bound_log, state, config, policy, policy_id):
-            delta = calculate_delta(bound_log, state, config, policy)
-            execute_bound_log = bound_log.bind(server_delta=delta)
-            if delta == 0:
-                execute_bound_log.msg("cooldowns checked, no change in servers")
+            d = converge(bound_log, transaction_id, config, scaling_group,
+                         state, launch, policy)
+            if d is None:
                 error_msg = "No change in servers"
                 raise CannotExecutePolicyError(scaling_group.tenant_id,
                                                scaling_group.uuid, policy_id,
                                                error_msg)
-            elif delta > 0:
-                execute_bound_log.msg("cooldowns checked, executing launch configs")
-                d = execute_launch_config(execute_bound_log, transaction_id, state,
-                                          launch, scaling_group, delta)
-            else:
-                # delta < 0 (scale down event)
-                execute_bound_log.msg("cooldowns checked, Scaling down")
-                d = exec_scale_down(execute_bound_log, transaction_id, state,
-                                    scaling_group, -delta)
-
-            d.addCallback(_do_convergence_audit_log, bound_log,
-                          delta, state)
             return d.addCallback(mark_executed)
 
         raise CannotExecutePolicyError(scaling_group.tenant_id,
@@ -290,262 +309,3 @@ def calculate_delta(log, state, config, policy):
             server_delta=delta, current_active=len(state.active),
             current_pending=len(state.pending))
     return delta
-
-
-def find_pending_jobs_to_cancel(log, state, delta):
-    """
-    Identify some pending jobs to cancel (usually for a scale down event)
-    """
-    if delta >= len(state.pending):  # don't bother sorting - return everything
-        return state.pending.keys()
-
-    sorted_jobs = sorted(state.pending.items(), key=lambda (_id, s): from_timestamp(s['created']),
-                         reverse=True)
-    return [job_id for job_id, _job_info in sorted_jobs[:delta]]
-
-
-def find_servers_to_evict(log, state, delta):
-    """
-    Find the servers most appropriate to evict from the scaling group
-
-    Returns list of server ``dict``
-    """
-    if delta >= len(state.active):  # don't bother sorting - return everything
-        return state.active.values()
-
-    # return delta number of oldest server
-    sorted_servers = sorted(state.active.values(), key=lambda s: from_timestamp(s['created']))
-    return sorted_servers[:delta]
-
-
-def delete_active_servers(log, transaction_id, scaling_group,
-                          delta, state):
-    """
-    Start deleting active servers jobs
-    """
-
-    # find servers to evict
-    servers_to_evict = find_servers_to_evict(log, state, delta)
-
-    # remove all the active servers to be deleted
-    for server in servers_to_evict:
-        state.remove_active(server['id'])
-
-    # then start deleting those servers
-    supervisor = get_supervisor()
-    for i, server_info in enumerate(servers_to_evict):
-        job = _DeleteJob(log, transaction_id, scaling_group, server_info, supervisor)
-        job.start()
-
-
-def exec_scale_down(log, transaction_id, state, scaling_group, delta):
-    """
-    Execute a scale down policy
-    """
-
-    # cancel pending jobs by removing them from the state. The servers will get
-    # deleted when they are finished building and their id is not found in pending
-    jobs_to_cancel = find_pending_jobs_to_cancel(log, state, delta)
-    for job_id in jobs_to_cancel:
-        state.remove_job(job_id)
-
-    # delete active servers if pending jobs are not enough
-    remaining = delta - len(jobs_to_cancel)
-    if remaining > 0:
-        delete_active_servers(log, transaction_id,
-                              scaling_group, remaining, state)
-
-    return defer.succeed(None)
-
-
-class _DeleteJob(object):
-    """
-    Server deletion job
-    """
-
-    def __init__(self, log, transaction_id, scaling_group, server_info, supervisor):
-        """
-        :param log: a bound logger instance that can be used for logging
-        :param str transaction_id: a transaction id
-        :param IScalingGroup scaling_group: the scaling group from where the server
-                    is deleted
-        :param dict server_info: a `dict` of server info
-        """
-        self.log = log.bind(system='otter.job.delete', server_id=server_info['id'])
-        self.trans_id = transaction_id
-        self.scaling_group = scaling_group
-        self.server_info = server_info
-        self.supervisor = supervisor
-
-    def start(self):
-        """
-        Start the job
-        """
-        d = self.supervisor.execute_delete_server(
-            self.log, self.trans_id, self.scaling_group, self.server_info)
-        d.addCallback(self._job_completed)
-        d.addErrback(self._job_failed)
-        self.log.msg('Started server deletion job')
-
-    def _job_completed(self, _):
-        audit(self.log).msg('Server deleted.', event_type="server.delete")
-
-    def _job_failed(self, failure):
-        # REVIEW: Logging this as err since failing to delete a server will cost
-        # money to customers and affect us. We should know and try to delete it manually asap
-        details = f.details() if f.check(UpstreamError) else 'unknown'
-        self.log.err(failure, 'Server deletion job failed', error=details)
-
-
-class _Job(object):
-    """
-    Private class representing a server creation job.  This calls the supervisor
-    to create one server, and also handles job completion.
-    """
-    def __init__(self, log, transaction_id, scaling_group, supervisor):
-        """
-        :param log: a bound logger instance that can be used for logging
-        :param str transaction_id: a transaction id
-        :param IScalingGroup scaling_group: the scaling group for which a job
-            should be created
-        :param dict launch_config: the launch config to scale up a server
-        """
-        self.log = log.bind(system='otter.job.launch')
-        self.transaction_id = transaction_id
-        self.scaling_group = scaling_group
-        self.supervisor = supervisor
-        self.job_id = None
-
-    def start(self, launch_config):
-        """
-        Kick off a job by calling the supervisor with a launch config.
-        """
-        try:
-            image = launch_config['args']['server']['imageRef']
-        except:
-            image = 'Unable to pull image ref.'
-
-        try:
-            flavor = launch_config['args']['server']['flavorRef']
-        except:
-            flavor = 'Unable to pull flavor ref.'
-
-        self.log = self.log.bind(image_ref=image, flavor_ref=flavor)
-
-        deferred = self.supervisor.execute_config(
-            self.log, self.transaction_id, self.scaling_group, launch_config)
-        deferred.addCallback(self.job_started)
-        return deferred
-
-    def _job_failed(self, f):
-        """
-        Job has failed. Remove the job, if it exists, and log the error.
-        """
-        details = f.details() if f.check(UpstreamError) else 'unknown'
-        self.log.err(f, 'Launching server failed', error=details)
-
-        def handle_failure(group, state):
-            # if it is not in pending, then the job was probably deleted before
-            # it got a chance to fail.
-            if self.job_id in state.pending:
-                state.remove_job(self.job_id)
-            return state
-
-        d = self.scaling_group.modify_state(handle_failure)
-
-        def ignore_error_if_group_deleted(f):
-            f.trap(NoSuchScalingGroupError)
-            self.log.msg("Relevant scaling group has already been deleted. "
-                         "Job failure logged and ignored.")
-
-        d.addErrback(ignore_error_if_group_deleted)
-        return d
-
-    def _job_succeeded(self, result):
-        """
-        Job succeeded. If the job exists, move the server from pending to active
-        and log.  If not, then the job has been canceled, so delete the server.
-        """
-        server_id = result['id']
-        log = self.log.bind(server_id=server_id)
-
-        def handle_success(group, state):
-            if self.job_id not in state.pending:
-                # server was slated to be deleted when it completed building.
-                # So, deleting it now
-                audit(log).msg(
-                    "A pending server that is no longer needed is now active, "
-                    "and hence deletable.  Deleting said server.",
-                    event_type="server.deletable")
-
-                job = _DeleteJob(self.log, self.transaction_id,
-                                 self.scaling_group, result, self.supervisor)
-                job.start()
-            else:
-                state.remove_job(self.job_id)
-                state.add_active(result['id'], result)
-                audit(log).msg("Server is active.", event_type="server.active")
-            return state
-
-        d = self.scaling_group.modify_state(handle_success)
-
-        def delete_if_group_deleted(f):
-            f.trap(NoSuchScalingGroupError)
-            audit(log).msg(
-                "A pending server belonging to a deleted scaling group "
-                "({scaling_group_id}) is now active, and hence deletable. "
-                "Deleting said server.",
-                event_type="server.deletable")
-
-            job = _DeleteJob(self.log, self.transaction_id,
-                             self.scaling_group, result, self.supervisor)
-            job.start()
-
-        d.addErrback(delete_if_group_deleted)
-        return d
-
-    def job_started(self, result):
-        """
-        Takes a tuple of (job_id, completion deferred), which will fire when a
-        job has been completed, and marks said job as completed by removing it
-        from pending.
-        """
-        self.job_id, completion_deferred = result
-        self.log = self.log.bind(job_id=self.job_id)
-
-        completion_deferred.addCallbacks(
-            self._job_succeeded, self._job_failed)
-        completion_deferred.addErrback(self.log.err)
-
-        return self.job_id
-
-
-def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
-    """
-    Execute a launch config some number of times.
-
-    :return: Deferred
-    """
-
-    def _update_state(pending_results):
-        """
-        :param pending_results: ``list`` of tuples of
-        ``(job_id, {'created': <job creation time>, 'jobType': [create/delete]})``
-        """
-        log.msg('updating state')
-
-        for job_id in pending_results:
-            state.add_job(job_id)
-
-    if delta > 0:
-        log.msg("Launching some servers.")
-        supervisor = get_supervisor()
-        deferreds = [
-            _Job(log, transaction_id, scaling_group, supervisor).start(launch)
-            for i in range(delta)
-        ]
-
-    pendings_deferred = defer.gatherResults(deferreds, consumeErrors=True)
-    pendings_deferred.addCallback(_update_state)
-    pendings_deferred.addErrback(unwrap_first_error)
-    return pendings_deferred

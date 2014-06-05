@@ -9,7 +9,7 @@ from copy import deepcopy
 import mock
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.json_schema.group_examples import (
     launch_server_config as launch_examples,
@@ -37,7 +37,7 @@ from otter.worker.validate_config import InvalidLaunchConfiguration
 from otter.util.config import set_config_data
 
 
-class FormatterHelpers(TestCase):
+class FormatterHelpers(SynchronousTestCase):
     """
     Tests for formatting helpers in :mod:`otter.rest.groups`
     """
@@ -85,7 +85,7 @@ class FormatterHelpers(TestCase):
         })
 
 
-class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
+class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/`` endpoints (create, list)
     """
@@ -98,14 +98,13 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         """
         super(AllGroupsEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
-        patch(self, 'otter.util.http.get_url_root', return_value="")
 
         # Patch supervisor
         self.supervisor = mock.Mock(spec=['validate_launch_config'])
         self.supervisor.validate_launch_config.return_value = defer.succeed(None)
         set_supervisor(self.supervisor)
 
-        set_config_data({'limits': {'pagination': 100}})
+        set_config_data({'limits': {'pagination': 100}, 'url_root': ''})
 
     def tearDown(self):
         """
@@ -260,7 +259,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         validate(resp, rest_schemas.list_groups_response)
         self.assertEqual(
             resp['groups_links'],
-            [{'href': self.endpoint + '?marker=one&limit=1', 'rel': 'next'}])
+            [{'href': self.endpoint + '?limit=1&marker=one', 'rel': 'next'}])
 
     def test_group_create_bad_input_400(self):
         """
@@ -494,7 +493,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(AssertionError)
 
 
-class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
+class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/`` endpoints (create, list) with Bobby
 
@@ -512,7 +511,8 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
 
         super(AllGroupsBobbyEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
-        patch(self, 'otter.util.http.get_url_root', return_value="")
+        set_config_data({'url_root': ''})
+        self.addCleanup(set_config_data, {})
 
         # Patch supervisor
         supervisor = mock.Mock(spec=['validate_launch_config'])
@@ -568,7 +568,7 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
         create_group.assert_called_once_with('11111', '1')
 
 
-class OneGroupTestCase(RestAPITestMixin, TestCase):
+class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/`` endpoints (view manifest,
     view state, delete)
@@ -845,7 +845,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(GroupNotEmptyError)
 
 
-class GroupStateTestCase(RestAPITestMixin, TestCase):
+class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/state/`` endpoint
     """
@@ -907,7 +907,7 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
         mock_format.assert_called_once_with('group_state')
 
 
-class GroupPauseTestCase(RestAPITestMixin, TestCase):
+class GroupPauseTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/pause/`` endpoint
     """
@@ -934,7 +934,7 @@ class GroupPauseTestCase(RestAPITestMixin, TestCase):
         self.assert_status_code(501, method="POST")
 
 
-class GroupResumeTestCase(RestAPITestMixin, TestCase):
+class GroupResumeTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/resume/`` endpoint
     """

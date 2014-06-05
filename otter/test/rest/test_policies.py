@@ -10,7 +10,7 @@ from jsonschema import ValidationError
 import mock
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.controller import CannotExecutePolicyError
 from otter.json_schema.group_examples import policy as policy_examples
@@ -25,7 +25,7 @@ from otter.rest.bobby import set_bobby
 from otter.bobby import BobbyClient
 
 
-class AllPoliciesTestCase(RestAPITestMixin, TestCase):
+class AllPoliciesTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{group_id}/policies`` endpoints (create, list)
     """
@@ -115,7 +115,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         validate(resp, rest_schemas.list_policies_response)
         expected_links = [
-            {'href': '/v1.0/11111/groups/1/policies/?marker=100&limit=100',
+            {'href': '/v1.0/11111/groups/1/policies/?limit=100&marker=100',
              'rel': 'next'}
         ]
         self.assertEqual(resp['policies_links'], expected_links)
@@ -245,7 +245,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         """
         Policy creation is audit-logged
         """
-        self.root = Otter(self.mock_store).app.resource()
+        self.root = Otter(self.mock_store, 'region').app.resource()
         self.assertFalse(logger.msg.called)
         resp = policy_examples()[0]
         resp['id'] = '5'
@@ -263,7 +263,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             system=mock.ANY)
 
 
-class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
+class AllBobbyPoliciesTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{group_id}/policies`` endpoints (create, list)
     """
@@ -395,7 +395,7 @@ class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp, {"policies": [expected_policy]})
 
 
-class OnePolicyTestCase(RestAPITestMixin, TestCase):
+class OnePolicyTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/policies`` endpoint, which updates
     and views the policy part of a scaling group.
@@ -551,7 +551,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         Policy deletion is audit-logged
         """
-        self.root = Otter(self.mock_store).app.resource()
+        self.root = Otter(self.mock_store, 'region').app.resource()
         self.assertFalse(logger.msg.called)
 
         self.mock_group.delete_policy.return_value = defer.succeed(None)

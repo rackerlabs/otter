@@ -5,23 +5,20 @@ from datetime import timedelta, datetime
 
 import mock
 
-from testtools.matchers import ContainsDict, Equals, IsInstance
+from testtools.matchers import ContainsDict, Equals
 
 from twisted.internet import defer
-from twisted.python.failure import Failure
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter import controller
-from otter.supervisor import ISupervisor
-from otter.util.deferredutils import DeferredPool
 
 from otter.models.interface import (
-    GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
+    GroupState, IScalingGroup, NoSuchPolicyError)
 from otter.util.timestamp import MIN
-from otter.test.utils import CheckFailure, iMock, matches, patch, mock_log
+from otter.test.utils import iMock, matches, patch, mock_log
 
 
-class CalculateDeltaTestCase(TestCase):
+class CalculateDeltaTestCase(SynchronousTestCase):
     """
     Tests for :func:`otter.controller.calculate_delta`
     """
@@ -488,7 +485,7 @@ class CalculateDeltaTestCase(TestCase):
             'constrained_desired_capacity': Equals(1)})))
 
 
-class CheckCooldownsTestCase(TestCase):
+class CheckCooldownsTestCase(SynchronousTestCase):
     """
     Tests for :func:`otter.controller.check_cooldowns`
     """
@@ -585,7 +582,7 @@ class CheckCooldownsTestCase(TestCase):
                                                     'pol'))
 
 
-class ObeyConfigChangeTestCase(TestCase):
+class ObeyConfigChangeTestCase(SynchronousTestCase):
     """
     Tests for :func:`otter.controller.obey_config_change`
     """
@@ -643,7 +640,8 @@ class ObeyConfigChangeTestCase(TestCase):
                                           'launch')
         self.assertIs(self.successResultOf(d), self.state)
         self.execute_launch_config.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state, 'launch',
+            self.log.bind.return_value.bind.return_value,
+            'transaction-id', self.state, 'launch',
             self.group, 5)
 
     def test_nonzero_delta_execute_errors_propagated(self):
@@ -659,7 +657,8 @@ class ObeyConfigChangeTestCase(TestCase):
         f = self.failureResultOf(d)
         self.assertTrue(f.check(Exception))
         self.execute_launch_config.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state, 'launch',
+            self.log.bind.return_value.bind.return_value,
+            'transaction-id', self.state, 'launch',
             self.group, 5)
 
     def test_negative_delta_state_is_returned_if_execute_successful(self):
@@ -672,7 +671,8 @@ class ObeyConfigChangeTestCase(TestCase):
                                           'config', self.group, self.state, 'launch')
         self.assertIs(self.successResultOf(d), self.state)
         self.exec_scale_down.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state,
+            self.log.bind.return_value.bind.return_value,
+            'transaction-id', self.state,
             self.group, 5)
 
     def test_negative_delta_execute_errors_propagated(self):
@@ -686,7 +686,8 @@ class ObeyConfigChangeTestCase(TestCase):
         f = self.failureResultOf(d)
         self.assertTrue(f.check(Exception))
         self.exec_scale_down.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state,
+            self.log.bind.return_value.bind.return_value,
+            'transaction-id', self.state,
             self.group, 5)
 
     def test_audit_log_events_logged_on_positive_delta(self):
@@ -699,7 +700,7 @@ class ObeyConfigChangeTestCase(TestCase):
                                           'config', self.group, self.state,
                                           'launch')
         self.assertIs(self.successResultOf(d), self.state)
-        log.msg.assert_called_once_with(
+        log.msg.assert_called_with(
             'Starting {convergence_delta} new servers to satisfy desired capacity',
             scaling_group_id=self.group.uuid, event_type="convergence.scale_up",
             convergence_delta=5, desired_capacity=5, pending_capacity=2,
@@ -715,7 +716,7 @@ class ObeyConfigChangeTestCase(TestCase):
         d = controller.obey_config_change(log, 'transaction-id',
                                           'config', self.group, self.state, 'launch')
         self.assertIs(self.successResultOf(d), self.state)
-        log.msg.assert_called_once_with(
+        log.msg.assert_called_with(
             'Deleting 5 servers to satisfy desired capacity',
             scaling_group_id=self.group.uuid, event_type="convergence.scale_down",
             convergence_delta=-5, desired_capacity=5, pending_capacity=2,
@@ -723,298 +724,68 @@ class ObeyConfigChangeTestCase(TestCase):
             webhook_id=None)
 
 
-class FindPendingJobsToCancelTests(TestCase):
+def mock_controller_utilities(test_case):
     """
-    Tests for :func:`otter.controller.find_pending_jobs_to_cancel`
+    Mock out the following functions in the controller module, in order to simplify
+    testing of scaling up and down.
+
+        - check_cooldowns (returns True)
+        - calculate_delta (return 1)
+        - exec_scale_down (return a dummy success)
+        - execute_launch_config (return a dummy success)
     """
-    def setUp(self):
-        """
-        Sets up a dictionary of job ID to creation dates in order to test
-        sorting.
-        """
-        self.data = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001'},
-            '2': {'created': '0001-01-04T00:02:02Z'},
-            '3': {'created': '0001-01-04T00:00:10Z'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513'},
-            '5': {'created': '0001-01-05T00:00:00Z'}
-        }  # ascending order by time would be: 1, 4, 3, 2, 5
+    mocks = {}
+    things_and_return_vals = {
+        'check_cooldowns': True,
+        'calculate_delta': 1,
+        'exec_scale_down': defer.succeed("scaled down"),
+        'execute_launch_config': defer.succeed("scaled up")
+    }
 
-        self.cancellable_state = GroupState('t', 'g', 'n', {}, self.data, None, {},
-                                            False)
+    for thing, return_val in things_and_return_vals.iteritems():
+        mocks[thing] = patch(test_case, 'otter.controller.{0}'.format(thing),
+                             return_value=return_val)
 
-    def test_returns_most_recent_jobs(self):
-        """
-        ``find_pending_jobs_to_cancel`` returns the top ``delta`` recent jobs.
-        """
-        self.assertEqual(
-            controller.find_pending_jobs_to_cancel(mock.ANY,
-                                                   self.cancellable_state,
-                                                   3),
-            ['5', '2', '3'])
-
-    def test_returns_all_jobs_if_delta_is_high(self):
-        """
-        ``find_pending_jobs_to_cancel`` returns all jobs if ``delta`` is
-        greater than the length of the jobs
-        """
-        self.assertEqual(
-            sorted(controller.find_pending_jobs_to_cancel(
-                mock.ANY, self.cancellable_state, 100)),
-            ['1', '2', '3', '4', '5'])
+    return mocks
 
 
-class FindServersToEvictTests(TestCase):
+def mock_group_state():
     """
-    Tests for :func:`otter.controller.find_servers_to_evict`
+    Create a mocked GroupState.
     """
-    def setUp(self):
-        """
-        Sets up a dictionary of job ID to creation dates in order to test
-        sorting.
-        """
-        self.data = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1',
-                  'lb': 'lb'},
-            '2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
-            '3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4',
-                  'lb': 'lb'},
-            '5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
-        }  # ascending order by time would be: 1, 4, 3, 2, 5
-
-        self.deletable_state = GroupState('t', 'g', 'n', self.data, {}, None, {},
-                                          False)
-
-    def test_returns_oldest_servers(self):
-        """
-        ``find_servers_to_evict`` returns the top ``delta`` oldest jobs.
-        """
-        self.assertEqual(
-            controller.find_servers_to_evict(mock.ANY,
-                                             self.deletable_state,
-                                             3),
-            [self.data['1'], self.data['4'], self.data['3']])
-
-    def test_returns_all_jobs_if_delta_is_high(self):
-        """
-        ``find_pending_jobs_to_cancel`` returns all jobs if ``delta`` is
-        greater than the length of the jobs
-        """
-        self.assertEqual(
-            sorted(controller.find_servers_to_evict(
-                mock.ANY, self.deletable_state, 100)),
-            sorted(self.data.values()))
+    mock_state = mock.MagicMock(GroupState)
+    mock_state.get_capacity.return_value = {
+        'desired_capacity': 5,
+        'pending_capacity': 2,
+        'active_capacity': 3
+    }
+    return mock_state
 
 
-class DeleteActiveServersTests(TestCase):
+def mock_group():
     """
-    Tests for :func:`otter.controller.delete_active_servers`
+    Create a mocked ScalingGroup.
     """
-
-    def setUp(self):
-        """
-        mock all the dependent functions and data
-        """
-        self.log = mock.Mock()
-        self.data = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1',
-                  'lb': 'lb'},
-            '2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
-            '3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4',
-                  'lb': 'lb'},
-            '5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
-        }  # ascending order by time would be: 1, 4, 3, 2, 5
-        self.fake_state = GroupState('t', 'g', 'n', self.data, {}, False, False,
-                                     False)
-        self.evict_servers = {'1': self.data['1'], '4': self.data['4'],
-                              '3': self.data['3']}
-
-        self.find_servers_to_evict = patch(
-            self, 'otter.controller.find_servers_to_evict',
-            return_value=self.evict_servers.values())
-
-        self.jobs = [mock.Mock(), mock.Mock(), mock.Mock()]
-        self.del_job = patch(
-            self, 'otter.controller._DeleteJob', side_effect=self.jobs)
-
-        self.supervisor = iMock(ISupervisor)
-        self.supervisor.deferred_pool = DeferredPool()
-        patch(self, 'otter.controller.get_supervisor',
-              return_value=self.supervisor)
-
-    def test_success(self):
-        """
-        Removes servers to evict from state and create `_DeleteJob` to start
-        deleting them
-        """
-        controller.delete_active_servers(self.log, 'trans-id', 'group',
-                                         3, self.fake_state)
-
-        # find_servers_to_evict was called
-        self.find_servers_to_evict.assert_called_once_with(
-            self.log, self.fake_state, 3)
-
-        # active servers removed from state
-        self.assertTrue(
-            all([_id not in self.fake_state.active for _id in self.evict_servers]))
-
-        # _DeleteJob was created for each server to delete
-        self.assertEqual(
-            self.del_job.call_args_list,
-            [mock.call(self.log, 'trans-id', 'group', data, self.supervisor)
-                for i, data in enumerate(self.evict_servers.values())])
-
-        # They were started
-        self.assertTrue(all([job.start.called for job in self.jobs]))
+    group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
+    group.view_config.return_value = defer.succeed("config")
+    group.get_policy.return_value = defer.succeed("policy")
+    group.view_launch_config.return_value = defer.succeed("launch")
+    return group
 
 
-class DeleteJobTests(TestCase):
-    """
-    Tests for :class:`controller._DeleteJob`
-    """
-
-    def setUp(self):
-        """
-        Create sample _DeleteJob
-        """
-        self.supervisor = iMock(ISupervisor)
-        log = mock.Mock()
-        self.job = controller._DeleteJob(log, 'trans_id', 'group', {'id': 2, 'b': 'lah'},
-                                         self.supervisor)
-        log.bind.assert_called_once_with(system='otter.job.delete', server_id=2)
-        self.log = log.bind.return_value
-
-    def test_start(self):
-        """
-        `start` calls `supervisor.execute_delete_server`
-        """
-        self.job.start()
-
-        self.supervisor.execute_delete_server.assert_called_once_with(
-            self.log, 'trans_id', 'group', {'id': 2, 'b': 'lah'})
-        d = self.supervisor.execute_delete_server.return_value
-        d.addCallback.assert_called_once_with(self.job._job_completed)
-        d.addErrback.assert_called_once_with(self.job._job_failed)
-        self.log.msg.assert_called_once_with('Started server deletion job')
-
-    def test_job_completed(self):
-        """
-        `_job_completed` audit logs a successful deletion
-        """
-        log = self.job.log = mock_log()
-        self.job._job_completed('ignore')
-        log.msg.assert_called_with('Server deleted.', audit_log=True,
-                                   event_type='server.delete')
-
-    def test_job_failed(self):
-        """
-        `_job_failed` logs failure
-        """
-        self.supervisor.execute_delete_server.return_value = defer.fail(ValueError('a'))
-        self.job.start()
-        self.log.err.assert_called_once_with(CheckFailure(ValueError),
-                                             'Server deletion job failed')
-
-
-class ExecScaleDownTests(TestCase):
-    """
-    Tests for :func:`otter.controller.exec_scale_down`
-    """
-
-    def setUp(self):
-        """
-        mock dependent objects and functions
-        """
-        self.log = mock.Mock()
-        self.pending = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001'},
-            '2': {'created': '0001-01-04T00:02:02Z'},
-            '3': {'created': '0001-01-04T00:00:10Z'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513'},
-            '5': {'created': '0001-01-05T00:00:00Z'}
-        }  # descending order by time would be: 5, 2, 3, 4, 1
-        self.active = {
-            'a1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1',
-                   'lb': 'lb'},
-            'a2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
-            'a3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
-            'a4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4',
-                   'lb': 'lb'},
-            'a5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
-        }  # ascending order by time would be: a1, a4, a3, a2, a5
-        self.fake_state = GroupState('t', 'g', '', self.active, self.pending,
-                                     False, False, False)
-        self.find_pending_jobs_to_cancel = patch(
-            self, 'otter.controller.find_pending_jobs_to_cancel')
-        self.del_active_servers = patch(
-            self, 'otter.controller.delete_active_servers')
-
-    def test_pending_jobs_removed(self):
-        """
-        Pending jobs are removed from state
-        """
-        exp_pending_jobs = ['5', '2', '3']
-        self.find_pending_jobs_to_cancel.return_value = exp_pending_jobs
-        controller.exec_scale_down(self.log, 'tid', self.fake_state, 'g', 3)
-        for job_id in exp_pending_jobs:
-            self.assertNotIn(job_id, self.fake_state.pending)
-
-    def test_del_active_servers_called(self):
-        """
-        ``delete_active_servers`` is called with correct arguments
-        """
-        self.find_pending_jobs_to_cancel.return_value = self.pending.keys()
-        controller.exec_scale_down(self.log, 'tid', self.fake_state, 'g', 7)
-        self.del_active_servers.assert_called_once_with(self.log, 'tid',
-                                                        'g', 2,
-                                                        self.fake_state)
-
-    def test_del_active_servers_not_called(self):
-        """
-        ``delete_active_servers`` is not called when pending jobs are enough
-        """
-        self.find_pending_jobs_to_cancel.return_value = ['5', '2', '3']
-        controller.exec_scale_down(self.log, 'tid', self.fake_state, 'g', 3)
-        self.assertFalse(self.del_active_servers.called)
-
-
-class MaybeExecuteScalingPolicyTestCase(TestCase):
+class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
     """
     Tests for :func:`otter.controller.maybe_execute_scaling_policy`
     """
 
     def setUp(self):
         """
-        Mock relevant controller methods. Also build a mock model that can be
-        used for testing.
+        Mock relevant controller methods.
         """
-        self.mocks = {}
-        things_and_return_vals = {
-            'check_cooldowns': True,
-            'calculate_delta': 1,
-            'exec_scale_down': defer.succeed(None),
-            'execute_launch_config': defer.succeed(None)
-        }
-
-        for thing, return_val in things_and_return_vals.iteritems():
-            self.mocks[thing] = patch(self,
-                                      'otter.controller.{0}'.format(thing),
-                                      return_value=return_val)
-
+        self.mocks = mock_controller_utilities(self)
         self.mock_log = mock.MagicMock()
-        self.mock_state = mock.MagicMock(GroupState)
-        self.mock_state.get_capacity.return_value = {
-            'desired_capacity': 5,
-            'pending_capacity': 2,
-            'active_capacity': 3
-        }
-
-        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
-        self.group.view_config.return_value = defer.succeed("config")
-        self.group.get_policy.return_value = defer.succeed("policy")
-        self.group.view_launch_config.return_value = defer.succeed("launch")
+        self.mock_state = mock_group_state()
+        self.group = mock_group()
 
     def test_maybe_execute_scaling_policy_no_such_policy(self):
         """
@@ -1214,522 +985,97 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
             webhook_id=None)
 
 
-class ExecuteLaunchConfigTestCase(TestCase):
+class ConvergeTestCase(SynchronousTestCase):
     """
-    Tests for :func:`otter.controller.execute_launch_config`
+    Tests for :func:`otter.controller.converge`, currently using the Otter
+    launch_server backend.
     """
 
     def setUp(self):
         """
-        Mock relevant controller methods, and also the supervisor.
-        Also build a mock model that can be used for testing.
+        Mock relevant controller methods. Also build a mock model that can be
+        used for testing.
         """
-        self.execute_config_deferreds = []
+        self.mocks = mock_controller_utilities(self)
+        self.mock_log = mock.MagicMock()
+        self.mock_state = mock_group_state()
+        self.group = mock_group()
 
-        def fake_execute(*args, **kwargs):
-            d = defer.Deferred()
-            self.execute_config_deferreds.append(d)
-            return defer.succeed((str(len(self.execute_config_deferreds)), d))
-
-        self.supervisor = iMock(ISupervisor)
-        self.supervisor.execute_config.side_effect = fake_execute
-
-        patch(self, 'otter.controller.get_supervisor', return_value=self.supervisor)
-        self.del_job = patch(self, 'otter.controller._DeleteJob')
-
-        self.log = mock_log()
-
-        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
-        self.fake_state = mock.MagicMock(GroupState)
-
-    def test_positive_delta_execute_config_called_delta_times(self):
+    def test_no_change_returns_none(self):
         """
-        If delta > 0, ``execute_launch_config`` calls
-        ``supervisor.execute_config`` delta times.
+        converge returns None when there are no changes to make.
         """
-        controller.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 5)
-        self.assertEqual(self.supervisor.execute_config.mock_calls,
-                         [mock.call(matches(IsInstance(self.log.__class__)), '1',
-                                    self.group, 'launch')] * 5)
+        log = mock_log()
+        self.mocks['calculate_delta'].return_value = 0
+        result = controller.converge(
+            log, 'transaction', 'config', self.group,
+            self.mock_state, 'launch', 'policy')
+        self.assertIs(result, None)
+        log.msg.assert_called_once_with('no change in servers', server_delta=0)
 
-    def test_positive_delta_execute_config_failures_propagated(self):
+    def test_scale_up_execute_launch_config(self):
         """
-        ``execute_launch_config`` fails if ``execute_config`` fails for any one
-        case, and propagates the first ``execute_config`` error.
+        Converge will invoke execute_launch_config when the delta is positive.
         """
-        class ExecuteException(Exception):
-            pass
+        self.mocks['calculate_delta'].return_value = 5
+        result = controller.converge(
+            self.mock_log, 'transaction', 'config', self.group,
+            self.mock_state, 'launch', 'policy')
 
-        def fake_execute(*args, **kwargs):
-            if len(self.execute_config_deferreds) > 1:
-                return defer.fail(ExecuteException('no more!'))
-            d = defer.Deferred()
-            self.execute_config_deferreds.append(d)
-            return defer.succeed((
-                str(len(self.execute_config_deferreds)), d))
+        self.mock_log.bind.assert_any_call(server_delta=5)
+        bound_log = self.mock_log.bind.return_value
+        self.assertIs(self.successResultOf(result), self.mock_state)
+        self.mocks['execute_launch_config'].assert_called_once_with(
+            bound_log, 'transaction', self.mock_state, 'launch', self.group, 5)
+        bound_log.msg.assert_any_call('executing launch configs')
 
-        self.supervisor.execute_config.side_effect = fake_execute
-        d = controller.execute_launch_config(self.log, '1', self.fake_state,
-                                             'launch', self.group, 3)
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(ExecuteException))
-
-    def test_add_job_called_with_new_jobs(self):
+    def test_scale_down_exec_scale_down(self):
         """
-        ``execute_launch_config`` calls ``add_job`` on the state for every job
-        that has been started
+        Converge will invoke exec_scale_down when the delta is negative.
         """
-        controller.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 3)
-        self.fake_state.add_job.assert_has_calls(
-            [mock.call(str(i)) for i in (1, 2, 3)])
-        self.assertEqual(self.fake_state.add_job.call_count, 3)
+        self.mocks['calculate_delta'].return_value = -5
+        result = controller.converge(
+            self.mock_log, 'transaction', 'config', self.group,
+            self.mock_state, 'launch', 'policy')
 
-    def test_propagates_add_job_failures(self):
+        self.mock_log.bind.assert_any_call(server_delta=-5)
+        bound_log = self.mock_log.bind.return_value
+        self.assertIs(self.successResultOf(result), self.mock_state)
+        self.mocks['exec_scale_down'].assert_called_once_with(
+            bound_log, 'transaction', self.mock_state, self.group, 5)
+        bound_log.msg.assert_any_call('scaling down')
+
+    def test_audit_log_scale_up(self):
         """
-        ``execute_launch_config`` fails if ``add_job`` raises an error
+        When converge scales up, an audit log is emitted.
         """
-        self.fake_state.add_job.side_effect = AssertionError
-        d = controller.execute_launch_config(self.log, '1', self.fake_state,
-                                             'launch', self.group, 1)
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(AssertionError))
+        log = mock_log()
+        self.mocks['calculate_delta'].return_value = 1
+        controller.converge(
+            log, 'transaction', 'config', self.group,
+            self.mock_state, 'launch', 'policy')
 
-    def test_on_job_completion_modify_state_called(self):
+        log.msg.assert_any_call(
+            "Starting {convergence_delta} new servers to satisfy desired "
+            "capacity", event_type="convergence.scale_up", convergence_delta=1,
+            policy_id=None, webhook_id=None,
+            active_capacity=3, desired_capacity=5, pending_capacity=2,
+            audit_log=True)
+
+    def test_audit_log_scale_down(self):
         """
-        ``execute_launch_config`` sets it up so that the group's
-        ``modify_state``state is called with the result as an arg whenever a
-        job finishes, whether successfully or not
+        When converge scales down, an audit log is emitted.
         """
-        controller.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 3)
-
-        self.execute_config_deferreds[0].callback({'id': '1'})       # job id 1
-        self.execute_config_deferreds[1].errback(Exception('meh'))   # job id 2
-        self.execute_config_deferreds[2].callback({'id': '3'})       # job id 3
-
-        self.assertEqual(self.group.modify_state.call_count, 3)
-
-    def test_job_success(self):
-        """
-        ``execute_launch_config`` sets it up so that when a job succeeds, it is
-        removed from pending and the server is added to active.  It is also
-        logged.
-        """
-        s = GroupState('tenant', 'group', 'name', {}, {'1': {}}, None, {}, False)
-
-        def fake_modify_state(callback, *args, **kwargs):
-            callback(self.group, s, *args, **kwargs)
-
-        self.group.modify_state.side_effect = fake_modify_state
-        controller.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 1)
-
-        self.execute_config_deferreds[0].callback({'id': 's1'})
-        self.assertEqual(s.pending, {})  # job removed
-        self.assertIn('s1', s.active)    # active server added
-
-    def test_pending_server_delete(self):
-        """
-        When a pending job is cancelled, it is deleted from the job list. When
-        the server finishes building, then ``execute_launch_config`` is called
-        to remove the job from pending job list. It then notices that pending
-        job_id is not there in job list and calls ``execute_delete_server``
-        to delete the server.
-        """
-        self.supervisor.execute_delete_server.return_value = defer.succeed(None)
-
-        s = GroupState('tenant', 'group', 'name', {}, {'1': {}}, None, {}, False)
-
-        def fake_modify_state(callback, *args, **kwargs):
-            callback(self.group, s, *args, **kwargs)
-
-        self.group.modify_state.side_effect = fake_modify_state
-        controller.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 1)
-
-        s.remove_job('1')
-        self.execute_config_deferreds[0].callback({'id': 's1'})
-
-        # first bind is system='otter.job.launch', second is job_id='1'
-        self.del_job.assert_called_once_with(
-            matches(IsInstance(self.log.__class__)), '1', self.group,
-            {'id': 's1'}, self.supervisor)
-        self.del_job.return_value.start.assert_called_once_with()
-
-    def test_job_failure(self):
-        """
-        ``execute_launch_config`` sets it up so that when a job fails, it is
-        removed from pending.  It is also lgoged.
-        """
-        s = GroupState('tenant', 'group', 'name', {}, {'1': {}}, None, {}, False)
-        written = []
-
-        # modify state writes on callback, doesn't write on error
-        def fake_modify_state(callback, *args, **kwargs):
-            d = defer.maybeDeferred(callback, self.group, s, *args, **kwargs)
-            d.addCallback(written.append)
-            return d
-
-        self.group.modify_state.side_effect = fake_modify_state
-        controller.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 1)
-
-        f = Failure(Exception('meh'))
-        self.execute_config_deferreds[0].errback(f)
-
-        # job is removed and no active servers added
-        self.assertEqual(s, GroupState('tenant', 'group', 'name', {}, {}, None, {},
-                                       False))
-        # state is written
-        self.assertEqual(len(written), 1)
-        self.assertEqual(written[0], s)
-
-        self.log.err.assert_called_with(f, 'Launching server failed',
-                                        system="otter.job.launch",
-                                        image_ref="Unable to pull image ref.",
-                                        flavor_ref="Unable to pull flavor ref.",
-                                        job_id='1')
-
-    def test_modify_state_failure_logged(self):
-        """
-        If the job succeeded but modifying the state fails, that error is
-        logged.
-        """
-        self.group.modify_state.side_effect = AssertionError
-        controller.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 1)
-        self.execute_config_deferreds[0].callback({'id': 's1'})
-
-        self.log.err.assert_called_once_with(
-            CheckFailure(AssertionError), system="otter.job.launch",
-            image_ref="Unable to pull image ref.",
-            flavor_ref="Unable to pull flavor ref.", job_id='1')
-
-
-class DummyException(Exception):
-    """
-    Dummy exception used in tests
-    """
-
-
-class PrivateJobHelperTestCase(TestCase):
-    """
-    Tests for the private helper class `_Job`
-    """
-    def setUp(self):
-        """
-        Mock a fake supervisor relevant controller methods, and also a fake
-        log and group
-        """
-        self.transaction_id = 'transaction_id'
-        self.job_id = 'job_id'
-        self.log = mock.MagicMock()
-        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
-        self.state = None
-        self.supervisor = iMock(ISupervisor)
-        self.completion_deferred = defer.Deferred()
-
-        self.supervisor.execute_config.return_value = defer.succeed(
-            (self.job_id, self.completion_deferred))
-
-        def fake_modify_state(f, *args, **kwargs):
-            return defer.maybeDeferred(
-                f, self.group, self.state, *args, **kwargs)
-
-        self.group.modify_state.side_effect = fake_modify_state
-
-        self.log = mock_log()
-        self.job = controller._Job(self.log, self.transaction_id, self.group,
-                                   self.supervisor)
-
-        self.del_job = patch(self, 'otter.controller._DeleteJob')
-        self.mock_launch = {'type': 'launch_server',
-                            'args': {'server': {'imageRef': 'imageID',
-                                                'flavorRef': '1'}}}
-
-    def test_start_binds_image_and_flavor_refs_to_log(self):
-        """
-        `start` binds the image ID and flavor, if provided, to the logs
-        """
-        self.job.job_started = mock.MagicMock()
-
-        self.job.start(self.mock_launch)
-
-        self.job.log.msg('')
-        self.log.msg.assert_called_once_with('', system='otter.job.launch',
-                                             image_ref="imageID", flavor_ref='1')
-
-    def test_start_binds_invalid_image_ref_to_log(self):
-        """
-        `start` binds the image ID to a string that says that we were unable
-        to find the image id in the logs, if the image ref could not be found
-        """
-        self.job.job_started = mock.MagicMock()
-
-        del self.mock_launch['args']['server']['imageRef']
-        self.job.start(self.mock_launch)
-
-        self.job.log.msg('')
-        self.log.msg.assert_called_once_with('', system='otter.job.launch',
-                                             image_ref="Unable to pull image ref.",
-                                             flavor_ref='1')
-
-    def test_start_binds_invalid_flavor_ref_to_log(self):
-        """
-        `start` binds the flavor ID to a string that says that we were unable
-        to find the flavor id in the logs, if the flavor ref could not be found
-        """
-        self.job.job_started = mock.MagicMock()
-
-        del self.mock_launch['args']['server']['flavorRef']
-        self.job.start(self.mock_launch)
-
-        self.job.log.msg('')
-        self.log.msg.assert_called_once_with('', system='otter.job.launch',
-                                             image_ref="imageID",
-                                             flavor_ref="Unable to pull flavor ref.")
-
-    def test_start_calls_supervisor(self):
-        """
-        `start` calls the supervisor's `execute_config` method, and adds
-        `job_started` as a callback to that deferred
-        """
-        self.job.job_started = mock.MagicMock()
-
-        self.job.start('launch')
-        self.supervisor.execute_config.assert_called_once_with(
-            matches(IsInstance(self.log.__class__)), self.transaction_id,
-            self.group, 'launch')
-        self.job.job_started.assert_called_once_with(
-            (self.job_id, self.completion_deferred))
-
-    def test_job_started_not_called_if_supervisor_error(self):
-        """
-        `job_started` is not called if the supervisor's `execute_config`
-        errbacks, and the failure propagates up.
-        """
-        self.job.job_started = mock.MagicMock()
-        self.supervisor.execute_config.return_value = defer.fail(
-            DummyException('e'))
-
-        d = self.job.start('launch')
-        self.assertEqual(self.job.job_started.call_count, 0)
-        f = self.failureResultOf(d)
-        self.assertTrue(f.check(DummyException))
-
-    def test_start_callbacks_with_job_id(self):
-        """
-        The deferred returned by start callbacks immediately with just the job
-        ID, without waiting for the `completion_deferred` to fire, and the log
-        is bound
-        """
-        d = self.job.start('launch')
-        self.assertEqual(self.successResultOf(d), self.job_id)
-        self.assertEqual(self.job.log, matches(IsInstance(self.log.__class__)))
-
-    def test_modify_state_called_on_job_completion_success(self):
-        """
-        If the job succeeded, and modify_state is called
-        """
-        self.job.start('launch')
-        self.assertEqual(self.group.modify_state.call_count, 0)
-        self.completion_deferred.callback({'id': 'blob'})
-        self.assertEqual(self.group.modify_state.call_count, 1)
-
-    def test_modify_state_called_on_job_completion_failure(self):
-        """
-        If the job failed, modify_state is called
-        """
-        self.job.start('launch')
-        self.assertEqual(self.group.modify_state.call_count, 0)
-        self.completion_deferred.errback(Exception('e'))
-        self.assertEqual(self.group.modify_state.call_count, 1)
-
-    def test_job_completion_success_job_marked_as_active(self):
-        """
-        If the job succeeded, and the job ID is still in pending, it is removed
-        and added to active.
-        """
-        self.state = GroupState('tenant', 'group', 'name', {}, {self.job_id: {}}, None,
-                                {}, False)
-        self.job.start('launch')
-        self.completion_deferred.callback({'id': 'active'})
-
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
-
-        self.assertEqual(self.state.pending, {})
-        self.assertEqual(
-            self.state.active,
-            {'active': matches(ContainsDict({'id': Equals('active')}))})
-
-    def test_job_completion_success_audit_logged(self):
-        """
-        If the job succeeded, and the job ID is still in pending, it is audit
-        logged as a "server.active" event.
-        """
-        self.state = GroupState('tenant', 'group', 'name', {},
-                                {self.job_id: {}}, None, {}, False)
-        self.job.start(self.mock_launch)
-        self.completion_deferred.callback({'id': 'yay'})
-
-        self.successResultOf(self.completion_deferred)
-
-        self.log.msg.assert_called_once_with(
-            "Server is active.", event_type="server.active", server_id='yay',
-            job_id=self.job_id, audit_log=True, system="otter.job.launch",
-            image_ref="imageID", flavor_ref="1")
-
-    def test_job_completion_success_job_deleted_pending(self):
-        """
-        If the job succeeded, but the job ID is no longer in pending, the
-        server is deleted and the state not changed.  No error is logged.
-        """
-        self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
-                                {}, False)
-        self.job.start('launch')
-        self.completion_deferred.callback({'id': 'active'})
-
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
-
-        self.assertEqual(self.state.pending, {})
-        self.assertEqual(self.state.active, {})
-
-        self.del_job.assert_called_once_with(
-            matches(IsInstance(self.log.__class__)), self.transaction_id,
-            self.group, {'id': 'active'}, self.supervisor)
-        self.del_job.return_value.start.assert_called_once_with()
-
-        self.assertEqual(self.log.err.call_count, 0)
-
-    def test_job_completion_success_job_deleted_audit_logged(self):
-        """
-        If the job succeeded, but the job ID is no longer in pending, it is
-        audit logged as a "server.deletable" event.
-        """
-        self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
-                                {}, False)
-        self.job.start(self.mock_launch)
-        self.completion_deferred.callback({'id': 'yay'})
-
-        self.successResultOf(self.completion_deferred)
-
-        self.log.msg.assert_called_once_with(
-            ("A pending server that is no longer needed is now active, "
-             "and hence deletable.  Deleting said server."),
-            event_type="server.deletable", server_id='yay', job_id=self.job_id,
-            audit_log=True, system="otter.job.launch", image_ref="imageID",
-            flavor_ref="1")
-
-    def test_job_completion_failure_job_removed(self):
-        """
-        If the job failed, the job ID is removed from the pending state.  The
-        failure is logged.
-        """
-        self.state = GroupState('tenant', 'group', 'name', {}, {self.job_id: {}}, None,
-                                {}, False)
-        self.job.start(self.mock_launch)
-        self.completion_deferred.errback(DummyException('e'))
-
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
-
-        self.assertEqual(self.state.pending, {})
-        self.assertEqual(self.state.active, {})
-
-        self.log.err.assert_called_once_with(
-            CheckFailure(DummyException), 'Launching server failed',
-            system="otter.job.launch", image_ref="imageID", job_id=self.job_id,
-            flavor_ref="1")
-
-    def test_job_completion_failure_job_deleted_pending(self):
-        """
-        If the job failed, but the job ID is no longer in pending, the job id
-        is not removed (and hence no error occurs).  The only error logged is
-        the failure. Nothing else in the state changes.
-        """
-        self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
-                                {}, False)
-        self.job.start(self.mock_launch)
-        self.completion_deferred.errback(DummyException('e'))
-
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
-
-        self.assertEqual(self.state.pending, {})
-        self.assertEqual(self.state.active, {})
-
-        self.log.err.assert_called_with(
-            CheckFailure(DummyException), 'Launching server failed',
-            system="otter.job.launch", image_ref="imageID", job_id=self.job_id,
-            flavor_ref="1")
-
-    def test_job_completion_success_NoSuchScalingGroupError(self):
-        """
-        If a job is completed successfully, but `modify_state` fails with a
-        `NoSuchScalingGroupError`, then the group has been deleted and so the
-        server is deleted
-        """
-        self.group.modify_state.side_effect = (
-            lambda *args: defer.fail(NoSuchScalingGroupError('tenant', 'group')))
-
-        self.job.start('launch')
-        self.completion_deferred.callback({'id': 'active'})
-
-        self.del_job.assert_called_once_with(
-            matches(IsInstance(self.log.__class__)), self.transaction_id,
-            self.group, {'id': 'active'}, self.supervisor)
-        self.del_job.return_value.start.assert_called_once_with()
-
-    def test_job_completion_success_NoSuchScalingGroupError_audit_logged(self):
-        """
-        If the job succeeded, but the job ID is no longer in pending, it is
-        audit logged as a "server.deletable" event.
-        """
-        self.group.modify_state.side_effect = (
-            lambda *args: defer.fail(NoSuchScalingGroupError('tenant', 'group')))
-
-        self.job.start(self.mock_launch)
-        self.completion_deferred.callback({'id': 'yay'})
-
-        self.successResultOf(self.completion_deferred)
-
-        self.log.msg.assert_called_once_with(
-            ("A pending server belonging to a deleted scaling group "
-             "({scaling_group_id}) is now active, and hence deletable. "
-             "Deleting said server."),
-            event_type="server.deletable", server_id='yay', job_id=self.job_id,
-            audit_log=True, system="otter.job.launch", image_ref="imageID",
-            flavor_ref="1")
-
-    def test_job_completion_failure_NoSuchScalingGroupError(self):
-        """
-        If a job fails, but `modify_state` fails with a
-        `NoSuchScalingGroupError`, then the group has been deleted and the
-        failure can be ignored (not logged)
-        """
-        self.group.modify_state.side_effect = (
-            lambda *args: defer.fail(NoSuchScalingGroupError('tenant', 'group')))
-
-        self.job.start('launch')
-        self.completion_deferred.callback({'id': 'active'})
-        self.assertEqual(self.log.err.call_count, 0)
-
-    def test_modify_state_failure_logged(self):
-        """
-        If `modify_state` fails with a non-`NoSuchScalingGroupError`, the error
-        is logged
-        """
-        self.group.modify_state.side_effect = (
-            lambda *args: defer.fail(DummyException('e')))
-
-        self.job.start(self.mock_launch)
-        self.completion_deferred.callback({'id': 'active'})
-
-        self.log.err.assert_called_once_with(CheckFailure(DummyException),
-                                             system="otter.job.launch",
-                                             image_ref="imageID", flavor_ref="1",
-                                             job_id=self.job_id)
+        log = mock_log()
+        self.mocks['calculate_delta'].return_value = -1
+        controller.converge(
+            log, 'transaction', 'config', self.group,
+            self.mock_state, 'launch', 'policy')
+
+        log.msg.assert_any_call(
+            "Deleting 1 servers to satisfy desired capacity",
+            event_type="convergence.scale_down",
+            convergence_delta=-1,
+            policy_id=None, webhook_id=None,
+            active_capacity=3, desired_capacity=5, pending_capacity=2,
+            audit_log=True)

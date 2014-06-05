@@ -5,6 +5,7 @@ HTTP utils, such as formulation of URLs
 from itertools import chain
 from urllib import quote, urlencode
 import json
+from urlparse import urlsplit, urlunsplit, parse_qs
 
 import treq
 
@@ -178,7 +179,85 @@ def get_url_root():
     return config_value('url_root')
 
 
-def get_collection_links(collection, url, rel, limit=None, marker=None):
+def _pagination_link(url, rel, limit, marker):
+    """
+    Generates a link dictionary where the href link has (possibly) limit
+    and marker query parameters, so long as they are not None.
+
+    :param url: URL of the collection
+    :param rel: What to put under 'rel'
+    :param limit: pagination limit
+    :param marker: the current pagination marker
+
+    :return: ``dict`` containing an href and the rel, the href being a link
+        to the collection represented by the url, limit, and marker
+    """
+    query_params = {}
+
+    if marker is not None:
+        query_params = {'marker': marker, 'limit': limit}
+    elif limit != (config_value('limits.pagination') or 100):
+        query_params['limit'] = limit
+
+    # split_url is a tuple that can't be modified, so listify it
+    # (scheme, netloc, path, query, fragment)
+    split_url = urlsplit(url)
+    mutable_url_parts = list(split_url)
+
+    # update mutable_url_parts with a scheme and netloc if either are missing
+    # so that the final URI will always be an absolute URI
+    if not (split_url.scheme and split_url.netloc):
+        # generate a new absolute URI so that when split, its scheme, netloc,
+        # and path parts can be cannabalized
+        donor = urlsplit(
+            append_segments(get_url_root(), split_url.path.lstrip('/')))
+
+        mutable_url_parts[:3] = [donor.scheme, donor.netloc, donor.path]
+
+    # update the query parameters with new query parameters if necessary
+    if query_params:
+        query = parse_qs(split_url.query)
+        query.update(query_params)
+        querystring = urlencode(query, doseq=True)
+
+        # sort alphabetically for easier testing
+        mutable_url_parts[3] = '&'.join(sorted(querystring.split('&')))
+
+    url = urlunsplit(mutable_url_parts)
+    return {'href': url, 'rel': rel}
+
+
+def next_marker_by_offset(collection, limit, marker):
+    """
+    Returns the next marker that is just the current marker offset by the
+    length of the collection or the limit, whichever is smaller
+
+    :param collection: an iterable containing the collection to be paginated
+    :param limit: the limit on the collection
+    :marker: the current marker used to obtain this collection
+
+    :return: the next marker that would be used to fetch the next collection,
+        based on the offset from the current marker
+    """
+    return (marker or 0) + limit
+
+
+def next_marker_by_id(collection, limit, marker):
+    """
+    Returns the next marker based on the limit-1 item in the collection
+
+    :param collection: an iterable containing the collection to be paginated
+    :param limit: the limit on the collection
+    :marker: the current marker used to obtain this collection
+
+    :return: the next marker that would be used to fetch the next collection,
+        based on the collection item ids
+    """
+    return collection[limit - 1]['id']
+
+
+def get_collection_links(collection, url, rel, limit=None, marker=None,
+                         next_marker=None):
     """
     Return links `dict` for given collection like below. The 'next' link is
     added only if number of items in `collection` has reached `limit`
@@ -203,16 +282,21 @@ def get_collection_links(collection, url, rel, limit=None, marker=None):
 
     :param limit: pagination limit
 
-    :param marker: pagination marker
+    :param marker: the current pagination marker
+
+    :param next_marker: a callable that takes the collection, the limit, and
+        the current marker, and returns the next marker
     """
-    limit = limit or config_value('limits.pagination') or 100
+    if next_marker is None:
+        next_marker = next_marker_by_id
+
     links = []
-    if not marker and rel is not None:
-        links.append({'href': url, 'rel': rel})
+    limit = limit or config_value('limits.pagination') or 100
+    if rel is not None:
+        links.append(_pagination_link(url, rel, limit, marker))
     if len(collection) >= limit:
-        query_params = {'limit': limit, 'marker': collection[limit - 1]['id']}
-        next_url = "{0}?{1}".format(url, urlencode(query_params))
-        links.append({'href': next_url, 'rel': 'next'})
+        links.append(_pagination_link(url, 'next', limit,
+                                      next_marker(collection, limit, marker)))
     return links
 
 

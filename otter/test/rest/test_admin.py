@@ -4,12 +4,12 @@ Tests for the OtterAdmin application.
 import json
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.rest.request import AdminRestAPITestMixin
 
 
-class AdminEndpointsTestCase(AdminRestAPITestMixin, TestCase):
+class AdminEndpointsTestCase(AdminRestAPITestMixin, SynchronousTestCase):
     """
     Tests against the OtterAdmin endpoints.
     """

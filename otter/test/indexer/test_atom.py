@@ -2,7 +2,7 @@
 Tests for :mod:`otter.indexer.atom`
 """
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.utils import fixture
 
@@ -11,7 +11,7 @@ from otter.indexer.atom import (
 )
 
 
-class SimpleAtomTestCase(TestCase):
+class SimpleAtomTestCase(SynchronousTestCase):
     """
     Tests for the public functions in :mod:`otter.indexer.atom` against a
     simple atom feed fixture.

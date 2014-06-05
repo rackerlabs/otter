@@ -22,10 +22,12 @@ class Otter(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, health_check_function=None, scheduler_reset=None):
+    def __init__(self, store, region, health_check_function=None, es_host=None):
         self.store = store
+        self.region = region
         self.health_check_function = health_check_function
-        self.scheduler_reset = scheduler_reset
+        self.es_host = es_host
+        self.scheduler = None
 
     @app.route('/', methods=['GET'])
     def base(self, request):
@@ -77,7 +79,8 @@ class Otter(object):
         """
         return audit history
         """
-        return OtterHistory(self.store, tenant_id).app.resource()
+        history = OtterHistory(self.store, tenant_id, self.region, self.es_host)
+        return history.app.resource()
 
     @app.route('/health', methods=['GET'])
     def health_check(self, request):
@@ -90,7 +93,7 @@ class Otter(object):
 
         return json.dumps({'healthy': True})
 
-    @app.route('/scheduler_reset', methods=['POST'])
+    @app.route('/scheduler/reset', methods=['POST'])
     def scheduler_reset(self, request):
         """
         Reset the scheduler with new path
@@ -98,9 +101,17 @@ class Otter(object):
         new_path = request.args.get('path')[0]
         request.setHeader('X-Response-Id', 'scheduler_reset')
         try:
-            self.scheduler_reset(new_path)
+            self.scheduler.reset(new_path)
         except ValueError as e:
             request.setResponseCode(400)
             return e.message
         else:
             return ''
+
+    @app.route('/scheduler/stop', methods=['POST'])
+    def scheduler_stop(self, request):
+        """
+        Stop the scheduler
+        """
+        request.setHeader('X-Response-Id', 'scheduler_stop')
+        return self.scheduler.stopService()

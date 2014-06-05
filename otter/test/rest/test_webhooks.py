@@ -9,7 +9,7 @@ from jsonschema import ValidationError
 import mock
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.json_schema import rest_schemas, validate
 from otter.models.interface import (
@@ -22,7 +22,7 @@ from otter.test.rest.request import DummyException, RestAPITestMixin
 from otter.controller import CannotExecutePolicyError
 
 
-class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
+class WebhookCollectionTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks``
     endpoints (create, list)
@@ -139,7 +139,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         validate(resp, rest_schemas.list_webhooks_response)
         self.assertEqual(len(resp['webhooks']), 3)
         self.assertEqual(resp['webhooks_links'], [{
-            'href': '/v1.0/11111/groups/1/policies/2/webhooks/?marker=2&limit=3',
+            'href': '/v1.0/11111/groups/1/policies/2/webhooks/?limit=3&marker=2',
             'rel': 'next'
         }])
 
@@ -242,7 +242,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         })
 
 
-class OneWebhookTestCase(RestAPITestMixin, TestCase):
+class OneWebhookTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for
     ``/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}``

@@ -15,7 +15,7 @@ import mock
 import os
 
 from twisted.trial.unittest import TestCase
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from otter.json_schema.group_examples import (
     config, launch_server_config)
@@ -85,7 +85,7 @@ except Exception as e:
     skip = "Cassandra unavailable: {0}".format(e)
 else:
     keyspace = keymaster.get_keyspace()
-    store = CassScalingGroupCollection(keyspace.client)
+    store = CassScalingGroupCollection(keyspace.client, reactor)
 
 
 class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
@@ -102,7 +102,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         Set the Cassandra store, and also patch the controller
         """
         keyspace.resume()
-        self.root = Otter(store).app.resource()
+        self.root = Otter(store, 'ord').app.resource()
         set_config_data(limits)
         self.addCleanup(set_config_data, {})
 
@@ -319,7 +319,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         Set up a silverberg client
         """
         keyspace.resume()
-        self.root = Otter(store).app.resource()
+        self.root = Otter(store, 'ord').app.resource()
         store.kz_client = mock.Mock(Lock=self.mock_lock())
 
         set_config_data(limits)

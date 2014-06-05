@@ -5,7 +5,7 @@ from datetime import datetime
 import mock
 import json
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed, fail, Deferred
 from twisted.internet.task import Clock
 from twisted.python.failure import Failure
@@ -18,10 +18,11 @@ from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
 from otter.util.deferredutils import with_lock, delay
 
-from otter.test.utils import patch, LockMixin, mock_log, DummyException
+from otter.test.utils import patch, LockMixin, mock_log, DummyException, IsBoundWith
+from otter.log.bound import BoundLog
 
 
-class HTTPUtilityTests(TestCase):
+class HTTPUtilityTests(SynchronousTestCase):
     """
     Tests for ``otter.util.http``
     """
@@ -235,7 +236,7 @@ class UpstreamErrorTests(TestCase):
             'apierr_message': 'b', 'code': 404, 'body': body, 'headers': {}})
 
 
-class CapabilityTests(TestCase):
+class CapabilityTests(SynchronousTestCase):
     """
     Test capability generation.
     """
@@ -265,7 +266,7 @@ class CapabilityTests(TestCase):
         self.assertEqual(v, "1")
 
 
-class TimestampTests(TestCase):
+class TimestampTests(SynchronousTestCase):
     """
     Test timestamp utilities
     """
@@ -324,7 +325,7 @@ class TimestampTests(TestCase):
         self.assertEqual(parsed.replace(tzinfo=None), datetime.min)
 
 
-class ConfigTest(TestCase):
+class ConfigTest(SynchronousTestCase):
     """
     Test the simple configuration API.
     """
@@ -357,7 +358,7 @@ class ConfigTest(TestCase):
         self.assertIdentical(config.config_value('baz.blah'), None)
 
 
-class WithLockTests(TestCase):
+class WithLockTests(SynchronousTestCase):
     """
     Tests for `with_lock`
     """
@@ -440,7 +441,7 @@ class WithLockTests(TestCase):
         self.failureResultOf(d, ValueError)
 
 
-class DelayTests(TestCase):
+class DelayTests(SynchronousTestCase):
     """
     Tests for `delay`
     """
@@ -459,3 +460,59 @@ class DelayTests(TestCase):
         self.assertNoResult(d)
         self.clock.advance(5)
         self.assertEqual(self.successResultOf(d), 2)
+
+
+class IsBoundWithTests(SynchronousTestCase):
+    """
+    Tests for :class:`otter.test.utils.IsBoundWith` class
+    """
+
+    def setUp(self):
+        """
+        Sample object
+        """
+        self.bound = IsBoundWith(a=10, b=20)
+
+    def test_match_not_boundlog(self):
+        """
+        Does not match non `BoundLog`
+        """
+        m = self.bound.match('junk')
+        self.assertEqual(m.describe(), 'log is not a BoundLog')
+
+    def test_match_kwargs(self):
+        """
+        Returns None on matching kwargs
+        """
+        log = BoundLog(lambda: None, lambda: None).bind(a=10, b=20)
+        self.assertIsNone(self.bound.match(log))
+
+    def test_not_match_kwargs(self):
+        """
+        Returns mismatch on non-matching kwargs
+        """
+        log = BoundLog(lambda: None, lambda: None).bind(a=10, b=2)
+        self.assertEqual(
+            self.bound.match(log).describe(),
+            'Expected kwargs {} but got {} instead'.format(dict(a=10, b=20), dict(a=10, b=2)))
+
+    def test_nested_match(self):
+        """
+        works with Nested BoundLog
+        """
+        log = BoundLog(lambda: None, lambda: None).bind(a=10, b=20).bind(c=3)
+        self.assertIsNone(IsBoundWith(a=10, b=20, c=3).match(log))
+
+    def test_kwargs_order(self):
+        """
+        kwargs bound in order, i.e. next bound overriding previous bound should
+        retain the value
+        """
+        log = BoundLog(lambda: None, lambda: None).bind(a=10, b=20).bind(a=3)
+        self.assertIsNone(IsBoundWith(a=3, b=20).match(log))
+
+    def test_str(self):
+        """
+        str(matcher) returns something useful
+        """
+        self.assertEqual(str(self.bound), 'IsBoundWith {}'.format(dict(a=10, b=20)))

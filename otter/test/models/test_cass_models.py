@@ -8,7 +8,7 @@ from datetime import datetime
 import itertools
 from copy import deepcopy
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 from jsonschema import ValidationError
 
 from otter.json_schema import group_examples
@@ -21,7 +21,8 @@ from otter.models.cass import (
     get_consistency_level,
     verified_view,
     _assemble_webhook_from_row,
-    assemble_webhooks_in_policies)
+    assemble_webhooks_in_policies,
+    WeakLocks)
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
@@ -35,7 +36,7 @@ from otter.test.models.test_interface import (
     IScalingScheduleCollectionProviderMixin)
 
 from otter.test.utils import patch, matches
-from testtools.matchers import IsInstance, ContainsDict, Equals
+from testtools.matchers import IsInstance
 from otter.util.timestamp import from_timestamp
 from otter.util.config import set_config_data
 
@@ -90,7 +91,7 @@ def _cassandrify_data(list_of_dicts):
     return _de_identify(list_of_dicts)
 
 
-class SerialJsonDataTestCase(TestCase):
+class SerialJsonDataTestCase(SynchronousTestCase):
     """
     Serializing json data to be put into cassandra should append a version
     """
@@ -103,7 +104,7 @@ class SerialJsonDataTestCase(TestCase):
                          json.dumps({'_ver': 'version'}))
 
 
-class GetConsistencyTests(TestCase):
+class GetConsistencyTests(SynchronousTestCase):
     """
     Tests for `get_consistency_level`
     """
@@ -150,7 +151,7 @@ class GetConsistencyTests(TestCase):
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
 
-class AssembleWebhooksTests(TestCase):
+class AssembleWebhooksTests(SynchronousTestCase):
     """
     Tests for `assemble_webhooks_in_policies`
     """
@@ -238,7 +239,7 @@ class AssembleWebhooksTests(TestCase):
         self.assertEqual(policies[9]['webhooks'], ['9w91'])
 
 
-class VerifiedViewTests(TestCase):
+class VerifiedViewTests(SynchronousTestCase):
     """
     Tests for `verified_view`
     """
@@ -302,7 +303,37 @@ class VerifiedViewTests(TestCase):
         self.assertFalse(self.log.msg.called)
 
 
-class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
+class WeakLocksTests(SynchronousTestCase):
+    """
+    Tests for `WeakLocks`
+    """
+
+    def setUp(self):
+        """
+        Sample `WeakLocks` object
+        """
+        self.locks = WeakLocks()
+
+    def test_returns_deferlock(self):
+        """
+        `get_lock` returns a `DeferredLock`
+        """
+        self.assertIsInstance(self.locks.get_lock('a'), defer.DeferredLock)
+
+    def test_same_lock(self):
+        """
+        `get_lock` on same uuid returns same `DeferredLock`
+        """
+        self.assertIs(self.locks.get_lock('a'), self.locks.get_lock('a'))
+
+    def test_diff_lock(self):
+        """
+        `get_lock` on different uuid returns different `DeferredLock`
+        """
+        self.assertIsNot(self.locks.get_lock('a'), self.locks.get_lock('b'))
+
+
+class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, SynchronousTestCase):
     """
     Tests for :class:`MockScalingGroup`
     """
@@ -348,10 +379,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.lock = self.mock_lock()
         self.kz_lock.Lock.return_value = self.lock
 
+        self.clock = Clock()
+        locks = WeakLocks()
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
                                       self.connection, itertools.cycle(range(2, 10)),
-                                      self.kz_lock)
+                                      self.kz_lock, self.clock, locks)
+        self.assertIs(self.group.local_locks, locks)
         self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
                                                    tenant_id=self.tenant_id,
                                                    scaling_group_id=self.group_id)
@@ -376,6 +410,31 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
     """
     CassScalingGroup's tests
     """
+
+    def test_with_timestamp(self):
+        """
+        `with_timestamp` calls the decorated function with the timestamp got from
+        `get_client_ts`
+        """
+        self.clock.advance(23.566783)
+
+        @self.group.with_timestamp
+        def f(ts, a, b):
+            "f"
+            self.ts = ts
+            self.a = a
+            self.b = b
+            return 45
+
+        d = f(2, 3)
+        # Wrapped function's return is same
+        self.assertEqual(self.successResultOf(d), 45)
+        # Timestamp and arguments are passed correctly
+        self.assertEqual(self.ts, 23566783)
+        self.assertEqual(self.a, 2)
+        self.assertEqual(self.b, 3)
+        # has same docstring
+        self.assertEqual(f.__doc__, 'f')
 
     def test_view_config(self):
         """
@@ -524,6 +583,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                               {}, True, desired=5)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+        self.clock.advance(10.345)
 
         d = self.group.modify_state(modifier)
         self.assertEqual(self.successResultOf(d), None)
@@ -532,12 +592,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'INSERT INTO scaling_group("tenantId", "groupId", active, '
             'pending, "groupTouched", "policyTouched", paused, desired) VALUES('
             ':tenantId, :groupId, :active, :pending, :groupTouched, '
-            ':policyTouched, :paused, :desired)')
+            ':policyTouched, :paused, :desired) USING TIMESTAMP :ts')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
                         "active": _S({}), "pending": _S({}),
                         "groupTouched": '0001-01-01T00:00:00Z',
                         "policyTouched": _S({}),
-                        "paused": True, "desired": 5}
+                        "paused": True, "desired": 5, "ts": 10345000}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
@@ -546,6 +606,44 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
+
+    def test_modify_state_local_lock_before_kz_lock(self):
+        """
+        ``modify_state`` first acquires local lock then acquires kz lock
+        """
+        def modifier(group, state):
+            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None,
+                              {}, True, desired=5)
+
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+        # setup local lock
+        llock = defer.DeferredLock()
+        self.group.local_locks = mock.Mock(get_lock=mock.Mock(return_value=llock))
+
+        # setup local and kz lock acquire and release returns
+        local_acquire_d = defer.Deferred()
+        llock.acquire = mock.Mock(return_value=local_acquire_d)
+        llock.release = mock.Mock(return_value=defer.succeed(None))
+        release_d = defer.Deferred()
+        self.lock.release.side_effect = lambda: release_d
+
+        d = self.group.modify_state(modifier)
+
+        self.assertNoResult(d)
+        # local lock was tried, but kz lock was not
+        llock.acquire.assert_called_once_with()
+        self.assertFalse(self.lock._acquire.called)
+        # After local lock acquired, kz lock is acquired
+        local_acquire_d.callback(None)
+        self.lock._acquire.assert_called_once_with(timeout=120)
+        # first kz lock is released
+        self.lock.release.assert_called_once_with()
+        self.assertFalse(llock.release.called)
+        # then local lock is relased
+        release_d.callback(None)
+        llock.release.assert_called_once_with()
+
+        self.assertEqual(self.successResultOf(d), None)
 
     @mock.patch('otter.models.cass.serialize_json_data',
                 side_effect=lambda *args: _S(args[0]))
@@ -730,15 +828,16 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         Test that you can update a config, and if its successful the return
         value is None
         """
+        self.clock.advance(10.345)
         d = self.group.update_config({"b": "lah"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
         expectedCql = ('BEGIN BATCH '
                        'INSERT INTO scaling_group("tenantId", "groupId", group_config) '
-                       'VALUES (:tenantId, :groupId, :scaling) '
+                       'VALUES (:tenantId, :groupId, :scaling) USING TIMESTAMP :ts '
                        'APPLY BATCH;')
         expectedData = {"scaling": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678g',
-                        "tenantId": '11111'}
+                        "tenantId": '11111', 'ts': 10345000}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
@@ -749,15 +848,16 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         Test that you can update a launch config, and if successful the return
         value is None
         """
+        self.clock.advance(10.345)
         d = self.group.update_launch_config({"b": "lah"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
         expectedCql = ('BEGIN BATCH '
                        'INSERT INTO scaling_group("tenantId", "groupId", launch_config) '
-                       'VALUES (:tenantId, :groupId, :launch) '
+                       'VALUES (:tenantId, :groupId, :launch) USING TIMESTAMP :ts '
                        'APPLY BATCH;')
         expectedData = {"launch": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678g',
-                        "tenantId": '11111'}
+                        "tenantId": '11111', 'ts': 10345000}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
@@ -1719,17 +1819,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             [{'id': 'policyA'}, {'id': 'policyB'}])
 
         self.returns = [None]
+        self.clock.advance(34.575)
         result = self.successResultOf(self.group.delete_group())
         self.assertIsNone(result)  # delete returns None
         mock_naive.assert_called_once_with()
 
         expected_data = {'tenantId': self.tenant_id,
-                         'groupId': self.group_id}
+                         'groupId': self.group_id,
+                         'ts': 34575000}
         expected_cql = (
             'BEGIN BATCH '
-            'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM scaling_group USING TIMESTAMP :ts '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'APPLY BATCH;')
 
         self.connection.execute.assert_called_once_with(
@@ -1754,17 +1857,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         mock_naive.return_value = defer.succeed({})
 
         self.returns = [None]
+        self.clock.advance(34.575)
         result = self.successResultOf(self.group.delete_group())
         self.assertIsNone(result)  # delete returns None
         mock_naive.assert_called_once_with()
 
         expected_data = {'tenantId': self.tenant_id,
-                         'groupId': self.group_id}
+                         'groupId': self.group_id,
+                         'ts': 34575000}
         expected_cql = (
             'BEGIN BATCH '
-            'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM scaling_group USING TIMESTAMP :ts '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'APPLY BATCH;')
 
         self.connection.execute.assert_called_once_with(
@@ -2112,7 +2218,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
 
 
 class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMixin,
-                                            TestCase):
+                                            SynchronousTestCase):
     """
     Tests for :class:`CassScalingScheduleCollection`
     """
@@ -2131,7 +2237,8 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
 
         self.connection.execute.side_effect = _responses
 
-        self.collection = CassScalingGroupCollection(self.connection)
+        self.clock = Clock()
+        self.collection = CassScalingGroupCollection(self.connection, self.clock)
 
         self.uuid = patch(self, 'otter.models.cass.uuid')
         self.uuid.uuid1.return_value = 'timeuuid'
@@ -2228,7 +2335,7 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
 
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
-                                          TestCase):
+                                          SynchronousTestCase):
     """
     Tests for :class:`CassScalingGroupCollection`
     """
@@ -2250,8 +2357,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.side_effect = _responses
 
         self.mock_log = mock_log()
+        self.clock = Clock()
 
-        self.collection = CassScalingGroupCollection(self.connection)
+        self.collection = CassScalingGroupCollection(self.connection, self.clock)
         self.tenant_id = 'goo1234'
         self.config = _de_identify({
             'name': 'blah',
@@ -2273,11 +2381,21 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
                                  side_effect=lambda *args: _S(args[0]))
 
+    @mock.patch('otter.models.cass.WeakLocks', return_value=2)
+    def test_locks(self, mock_wl):
+        """
+        `CassScalingGroupCollection` keeps new WeakLocks object
+        """
+        collection = CassScalingGroupCollection(self.connection, self.clock)
+        mock_wl.assert_called_once_with()
+        self.assertEqual(collection.local_locks, 2)
+
     def test_create(self):
         """
         Test that you can create a group, and if successful the group ID is
         returned
         """
+        self.clock.advance(10.345)
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
@@ -2287,13 +2405,15 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "pending": '{}',
             "policyTouched": '{}',
             "paused": False,
-            "desired": 0}
+            "desired": 0,
+            "ts": 10345000}
         expectedCql = ('BEGIN BATCH '
                        'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
                        'launch_config, active, pending, "policyTouched", '
                        'paused, desired, created_at) '
                        'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
                        ':pending, :policyTouched, :paused, :desired, :created_at) '
+                       'USING TIMESTAMP :ts '
                        'APPLY BATCH;')
         self.mock_key.return_value = '12345678'
 
@@ -2323,6 +2443,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         policy = group_examples.policy()[0]
 
+        self.clock.advance(10.567)
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
@@ -2331,6 +2452,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "active": '{}',
             "pending": '{}',
             "desired": 0,
+            "ts": 10567000,
             "policyTouched": '{}',
             "paused": False,
             'policy0policyId': '12345678',
@@ -2342,6 +2464,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'launch_config, active, pending, "policyTouched", paused, desired, created_at) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
             ':pending, :policyTouched, :paused, :desired, :created_at) '
+            'USING TIMESTAMP :ts '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
             'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
             'APPLY BATCH;')
@@ -2373,6 +2496,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         policies = group_examples.policy()[:2]
 
+        self.clock.advance(10.466)
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
@@ -2383,6 +2507,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "policyTouched": '{}',
             "paused": False,
             "desired": 0,
+            "ts": 10466000,
             'policy0policyId': '2',
             'policy0data': _S(policies[0]),
             'policy0version': 'timeuuid',
@@ -2394,7 +2519,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
             'launch_config, active, pending, "policyTouched", paused, desired, created_at) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-            ':pending, :policyTouched, :paused, :desired, :created_at) '
+            ':pending, :policyTouched, :paused, :desired, :created_at) USING TIMESTAMP :ts '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
             'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
@@ -2655,6 +2780,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(g, CassScalingGroup))
         self.assertEqual(g.uuid, '12345678')
         self.assertEqual(g.tenant_id, '123')
+        self.assertIs(g.local_locks, self.collection.local_locks)
 
     def test_webhook_hash_from_table(self):
         """
@@ -2782,123 +2908,101 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
 
 class CassScalingGroupsCollectionHealthCheckTestCase(
-        IScalingGroupCollectionProviderMixin, TestCase):
+        IScalingGroupCollectionProviderMixin, LockMixin, SynchronousTestCase):
     """
-    Tests for :class:`CassScalingGroupCollection`
+    Tests for `health_check` and `kazoo_health_check` in
+    :class:`CassScalingGroupCollection`
     """
 
     def setUp(self):
         """ Setup the mocks """
         self.connection = mock.MagicMock(spec=['execute'])
         self.connection.execute.return_value = defer.succeed([])
-        self.collection = CassScalingGroupCollection(self.connection)
+        self.clock = Clock()
+        self.collection = CassScalingGroupCollection(self.connection, self.clock)
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
-        self.clock = Clock()
+        self.lock = self.mock_lock()
+        self.collection.kz_client.Lock.return_value = self.lock
 
-    def test_health_check_no_zookeeper(self):
+    def test_kazoo_no_zookeeper(self):
         """
-        Health check fails if there is no zookeeper client
+        Kazoo health check fails if there is no zookeeper client
         """
         self.collection.kz_client = None
-        d = self.collection.health_check(self.clock)
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'zookeeper': Equals(False),
-                 'zookeeper_state': Equals('Not connected yet')}))))
+        d = self.collection.kazoo_health_check()
+        self.assertEqual(d, (False, {'reason': 'No client yet'}))
 
-    def test_health_check_zookeeper_not_connected(self):
+    def test_kazoo_zookeeper_not_connected(self):
         """
-        Health check fails if there is no zookeeper client
+        Kazoo health check fails if there is no zookeeper client
         """
-        self.collection.kz_client = mock.MagicMock(connected=False)
-        d = self.collection.health_check(self.clock)
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'zookeeper': Equals(False),
-                 'zookeeper_state': Equals('Not connected yet')}))))
+        self.collection.kz_client.connected = False
+        d = self.collection.kazoo_health_check()
+        self.assertEqual(d, (False, {'reason': 'Not connected yet'}))
 
-    def test_health_check_zookeeper_connected(self):
+    def test_kazoo_zookeeper_suspended(self):
         """
-        Health check for zookeeper succeeds if the zookeeper client state is
-        CONNECTED
+        Kazoo Health check fails if the zookeeper client state is not CONNECTED
         """
-        self.collection.kz_client = mock.MagicMock(connected=True,
-                                                   state=KazooState.CONNECTED)
-        d = self.collection.health_check(self.clock)
-        self.assertEqual(
-            self.successResultOf(d),
-            (True, matches(ContainsDict(
-                {'zookeeper': Equals(True),
-                 'zookeeper_state': Equals('CONNECTED')}))))
+        self.collection.kz_client.state = KazooState.SUSPENDED
+        d = self.collection.kazoo_health_check()
+        self.assertEqual(d, (False, {'zookeeper_state': KazooState.SUSPENDED}))
 
-    def test_health_check_zookeeper_suspended(self):
+    @mock.patch('otter.models.cass.uuid')
+    def test_zookeeper_lock_acquired(self, mock_uuid):
         """
-        Health check fails if the zookeeper client state is not CONNECTED
+        Acquires sample lock and succeeds if it is able to acquire. Deletes the lock
+        path before returning
         """
-        self.collection.kz_client = mock.MagicMock(connected=True,
-                                                   state=KazooState.SUSPENDED)
-        d = self.collection.health_check(self.clock)
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'zookeeper': Equals(False),
-                 'zookeeper_state': Equals('SUSPENDED')}))))
+        self.collection.kz_client.delete.return_value = defer.succeed(None)
+        mock_uuid.uuid1.return_value = 'uuid1'
+
+        d = self.collection.kazoo_health_check()
+
+        self.assertEqual(self.successResultOf(d), (True, {'total_time': 0}))
+        self.collection.kz_client.Lock.assert_called_once_with('/locks/test_uuid1')
+        self.lock._acquire.assert_called_once_with(timeout=5)
+        self.lock.release.assert_called_once_with()
+        self.collection.kz_client.delete.assert_called_once_with(
+            '/locks/test_uuid1', recursive=True)
+
+    @mock.patch('otter.models.cass.uuid')
+    def test_zookeeper_lock_failed(self, mock_uuid):
+        """
+        Acquires sample lock and fails if it is not able to acquire.
+        """
+        self.lock._acquire.side_effect = lambda timeout: defer.fail(ValueError('e'))
+        mock_uuid.uuid1.return_value = 'uuid1'
+
+        d = self.collection.kazoo_health_check()
+
+        self.failureResultOf(d, ValueError)
+        self.collection.kz_client.Lock.assert_called_once_with('/locks/test_uuid1')
+        self.lock._acquire.assert_called_once_with(timeout=5)
+        self.assertFalse(self.lock.release.called)
+        self.assertFalse(self.collection.kz_client.delete.called)
 
     def test_health_check_cassandra_fails(self):
         """
         Health check fails if cassandra fails
         """
         self.connection.execute.return_value = defer.fail(Exception('boo'))
-        d = self.collection.health_check(self.clock)
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'cassandra': Equals(False),
-                 'cassandra_failure': Equals("Exception('boo',)"),
-                 'cassandra_time': Equals(0)}))))
-
-    def test_health_check_cassandra_times_out(self):
-        """
-        Health check for cassandra fails if cassandra check times out
-        """
-        self.connection.execute.return_value = defer.Deferred()
-        d = self.collection.health_check(self.clock)
-        self.assertNoResult(d)
-
-        self.clock.advance(15)
-        self.assertEqual(
-            self.successResultOf(d),
-            (False, matches(ContainsDict(
-                {'cassandra': Equals(False),
-                 'cassandra_failure': Equals("TimedOutError('cassandra health check "
-                                             "timed out after 15 seconds.',)"),
-                 'cassandra_time': Equals(15)}))))
-        # to make sure the deferred doesn't get GCed without being called
-        self.connection.execute.return_value.callback(None)
+        d = self.collection.health_check()
+        f = self.failureResultOf(d, Exception)
+        self.assertEqual(f.value.args, ('boo',))
 
     def test_health_check_cassandra_succeeds(self):
         """
         Health check fails if cassandra fails
         """
-        d = self.collection.health_check(self.clock)
+        d = self.collection.health_check()
         self.assertEqual(
             self.successResultOf(d),
-            (True, matches(ContainsDict(
-                {'cassandra': Equals(True),
-                 'cassandra_time': Equals(0)}))))
-
-    def test_health_check_succeeds_if_both_succeed(self):
-        """
-        If both zookeeper and cassandra are healthy, the store is healthy
-        """
-        d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), (True, mock.ANY))
+            (True, {'cassandra_time': 0}))
 
 
-class CassAdminTestCase(TestCase):
+class CassAdminTestCase(SynchronousTestCase):
     """
     Tests for :class:`CassAdmin`
     """

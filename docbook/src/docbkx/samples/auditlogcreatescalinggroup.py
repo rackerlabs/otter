@@ -1,7 +1,7 @@
  ("Creating a group successfully", [
 {
 "timestamp": "2013-01-01T00:00:01.000001Z",
-"_message": "Created a group.",
+"message": "Created a group.",
 "request_ip": "85.125.12.1",
 "user_id": "11111",
 "scaling_group_id": "10000000-0000-0000-0000-00000000001",
@@ -36,7 +36,7 @@
 },
 {
 "timestamp": "2013-01-01T00:00:02.000001Z",
-"_message": "Starting two new servers to satisfy desired capacity",
+"message": "Starting two new servers to satisfy desired capacity",
 "scaling_group_id": "10000000-0000-0000-0000-00000000001",
 "parent_id": "00000000-0000-0000-0000-00000000001",
 "transaction_id": "00000000-0000-0000-0000-00000000002",
@@ -49,7 +49,7 @@
 },
 {
 "timestamp": "2013-01-01T00:05:01.000001Z",
-"_message": "Server is Active",
+"message": "Server is Active",
 "scaling_group_id": "10000000-0000-0000-0000-00000000001",
 "parent_id": "00000000-0000-0000-0000-00000000002",
 "transaction_id": "00000000-0000-0000-0000-00000000003",
@@ -58,7 +58,7 @@
 },
 {
 "timestamp": "2013-01-01T00:05:01.000001Z",
-"_message": "Server is Active",
+"message": "Server is Active",
 "scaling_group_id": "10000000-0000-0000-0000-00000000001",
 "parent_id": "00000000-0000-0000-0000-00000000002",
 "transaction_id": "00000000-0000-0000-0000-00000000004",
