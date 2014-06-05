@@ -17,7 +17,7 @@ from otter.models.interface import (
     IScalingGroup, GroupState, NoSuchScalingGroupError)
 from otter.supervisor import (
     ISupervisor, SupervisorService, set_supervisor, remove_server_from_group,
-    ServersBelowMinError, ServerNotFoundError)
+    CannotDeleteServerBelowMinError, ServerNotFoundError)
 from otter.test.utils import (
     iMock, patch, mock_log, CheckFailure, matches, FakeSupervisor, IsBoundWith)
 from otter.util.deferredutils import DeferredPool
@@ -1211,11 +1211,11 @@ class RemoveServerTests(SynchronousTestCase):
 
     def test_not_replaced_below_min(self):
         """
-        `ServersBelowMinError` is raised if current desired == min servers
+        `CannotDeleteServerBelowMinError` is raised if current desired == min servers
         """
         self.group.view_config.return_value = succeed({'minEntities': 1})
         d = remove_server_from_group(self.log, self.tid, 's0', False, self.group, self.state)
-        self.failureResultOf(d, ServersBelowMinError)
+        self.failureResultOf(d, CannotDeleteServerBelowMinError)
         # server is not deleted
         self.assertIn('s0', self.state.active)
         self.assertEqual(self.supervisor.del_calls, [])

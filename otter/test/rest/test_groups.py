@@ -10,6 +10,8 @@ import mock
 
 from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
+from twisted.web.http import Request
+from twisted.web.test.requesthelper import DummyChannel
 
 from otter.json_schema.group_examples import (
     launch_server_config as launch_examples,
@@ -23,15 +25,17 @@ from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError)
 from otter.rest.decorators import InvalidJsonError, InvalidQueryArgument
 
-from otter.rest.groups import format_state_dict
+from otter.rest.groups import format_state_dict, extract_bool_arg
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
-from otter.test.utils import patch
+from otter.test.utils import patch, matches, IsBoundWith
+
+from testtools.matchers import IsInstance
 
 from otter.rest.bobby import set_bobby
 from otter.bobby import BobbyClient
 
-from otter.supervisor import set_supervisor
+from otter.supervisor import set_supervisor, ServerNotFoundError, CannotDeleteServerBelowMinError
 from otter.worker.validate_config import InvalidLaunchConfiguration
 
 from otter.util.config import set_config_data
@@ -83,6 +87,58 @@ class FormatterHelpers(SynchronousTestCase):
             'desiredCapacity': 6,
             'paused': True
         })
+
+
+class ExtractBoolArgTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.rest.groups.extract_bool_arg`
+    """
+
+    def setUp(self):
+        """
+        Sample request
+        """
+        self.request = Request(DummyChannel(), True)
+        self.request.args = {'key': ['false']}
+
+    def test_no_key(self):
+        """
+        Request with no key returns default
+        """
+        self.request.args = {}
+        self.assertFalse(extract_bool_arg(self.request, 'key', False))
+
+    def test_valid_key(self):
+        """
+        Request with valid key gets correct value
+        """
+        self.assertFalse(extract_bool_arg(self.request, 'key', False))
+
+    def test_valid_true_key(self):
+        """
+        Request with valid key with value "true" gets correct value
+        """
+        self.request.args = {'key': ['true']}
+        self.assertTrue(extract_bool_arg(self.request, 'key', False))
+
+    def test_mixed_case_key(self):
+        """
+        Mixed case value for key works
+        """
+        self.request.args['key'][0] = 'FaLse'
+        self.assertFalse(extract_bool_arg(self.request, 'key', False))
+
+    def test_invalid_key(self):
+        """
+        Invalid key raises InvalidQueryArgument
+        """
+        self.request.args['key'][0] = 'junk'
+        e = self.assertRaises(InvalidQueryArgument, extract_bool_arg,
+                              self.request, 'key', False)
+        self.assertEqual(
+            e.message,
+            ('Invalid "key" query argument: "junk". Must be "true" or "false". '
+             'Defaults to "false" if not provided'))
 
 
 class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
@@ -975,49 +1031,59 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         super(GroupServersTests, self).setUp()
         self.mock_rsfg = patch(self, 'otter.rest.groups.remove_server_from_group',
                                return_value=None)
+        self.mock_eba = patch(self, 'otter.rest.groups.extract_bool_arg',
+                              return_value=True)
 
-    def test_server_delete_no_arg(self):
+    def _check_calls(self, replace):
+        self.mock_eba.assert_called_once_with(matches(IsInstance(Request)), 'replace', True)
+        req = self.mock_eba.call_args[0][0]
+        self.assertEqual(req.uri, self.endpoint + 's1')
+        self.mock_rsfg.assert_called_once_with(
+            matches(IsBoundWith(system='otter.rest.groups.delete_server', tenant_id='11111',
+                                scaling_group_id='one', server_id='s1',
+                                transaction_id='transaction-id')),
+            'transaction-id', 's1', replace, self.mock_group, self.mock_state)
+
+    def test_server_delete_true(self):
         """
         Server is deleted and replaced by calling remove_server_from_group
-        with correct args when called without query args
+        with correct args when "replace" query is True
         """
         response_body = self.assert_status_code(202, method="DELETE",
                                                 endpoint=self.endpoint + 's1')
         self.assertEqual(response_body, "")
-        self.mock_rsfg.assert_called_once_with(
-            mock.ANY, 'transaction-id', 's1', True, self.mock_group, self.mock_state)
+        self._check_calls(True)
 
-    def test_server_delete_bad_arg(self):
+    def test_server_delete_false(self):
         """
-        InvalidQueryArgument is raised if replace arg is neither "true" or "false"
+        Server is deleted and not replaced by calling remove_server_from_group
+        with correct args when "replace" query is false
         """
-        response_body = self.assert_status_code(400, method="DELETE",
-                                                endpoint=self.endpoint + 's1?replace=junk')
-        self.assertIn('InvalidQueryArgument', response_body)
-        self.flushLoggedErrors(InvalidQueryArgument)
-        self.assertFalse(self.mock_rsfg.called)
-
-    def test_server_delete_replace_true(self):
-        """
-        `remove_server_from_group` is called with replace True is replace=true
-        query arg is given
-        """
+        self.mock_eba.return_value = False
         response_body = self.assert_status_code(202, method="DELETE",
-                                                endpoint=self.endpoint + 's1?replace=true')
+                                                endpoint=self.endpoint + 's1')
         self.assertEqual(response_body, "")
-        self.mock_rsfg.assert_called_once_with(
-            mock.ANY, 'transaction-id', 's1', True, self.mock_group, self.mock_state)
+        self._check_calls(False)
 
-    def test_server_delete_replace_false(self):
+    def test_server_delete_server_not_found(self):
         """
-        `remove_server_from_group` is called with replace False is replace=false
-        query arg is given
+        404 error is returned when server is not found
         """
-        response_body = self.assert_status_code(202, method="DELETE",
-                                                endpoint=self.endpoint + 's1?replace=false')
-        self.assertEqual(response_body, "")
-        self.mock_rsfg.assert_called_once_with(
-            mock.ANY, 'transaction-id', 's1', False, self.mock_group, self.mock_state)
+        self.mock_rsfg.return_value = defer.fail(ServerNotFoundError('t', 'g', 's'))
+        response_body = self.assert_status_code(404, method="DELETE",
+                                                endpoint=self.endpoint + 's1')
+        self.assertIn('ServerNotFoundError', response_body)
+        self._check_calls(True)
+
+    def test_server_delete_size_error(self):
+        """
+        403 error is returned if deleting server will break min/max boundary
+        """
+        self.mock_rsfg.return_value = defer.fail(CannotDeleteServerBelowMinError('t', 'g', 's', 3))
+        response_body = self.assert_status_code(403, method="DELETE",
+                                                endpoint=self.endpoint + 's1')
+        self.assertIn('CannotDeleteServerBelowMinError', response_body)
+        self._check_calls(True)
 
     def test_get_servers_not_implemented(self):
         """

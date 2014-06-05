@@ -489,7 +489,7 @@ class ServerNotFoundError(Exception):
                 server_id, tenant_id, group_id))
 
 
-class ServersBelowMinError(Exception):
+class CannotDeleteServerBelowMinError(Exception):
     """
     Exception to be raised when server cannot be removed from the group
     if it will be below minimum servers in the group
@@ -499,7 +499,7 @@ class ServersBelowMinError(Exception):
         self.group_id = group_id
         self.server_id = server_id
         self.min_servers = min_servers
-        super(ServersBelowMinError, self).__init__(
+        super(CannotDeleteServerBelowMinError, self).__init__(
             ("Cannot remove server {server_id} from tenant {tenant_id}'s group {group_id}. "
              "It will reduce number of servers below required minimum {min_servers}.").format(
                  server_id=server_id, min_servers=min_servers,
@@ -523,8 +523,8 @@ def remove_server_from_group(log, trans_id, server_id, replace, group, state):
 
     def reduce_desired(config):
         if state.desired == config['minEntities']:
-            raise ServersBelowMinError(group.tenant_id, group.uuid, server_id,
-                                       config['minEntities'])
+            raise CannotDeleteServerBelowMinError(
+                group.tenant_id, group.uuid, server_id, config['minEntities'])
         else:
             state.desired -= 1
 

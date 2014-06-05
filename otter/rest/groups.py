@@ -52,6 +52,28 @@ def format_state_dict(state):
     }
 
 
+def extract_bool_arg(request, key, default=False):
+    """
+    Get bool query arg from the request
+
+    :param request: :class:`twisted.web.http.Request` object
+    :param str key: The argument key
+    :param bool default: The default value to return if key is not there
+    """
+    if key in request.args:
+        value = request.args[key][0].lower()
+        if value == 'true':
+            return True
+        elif value == 'false':
+            return False
+        else:
+            raise InvalidQueryArgument(
+                'Invalid "{}" query argument: "{}". Must be "true" or "false". '
+                'Defaults to "{}" if not provided'.format(key, value, str(default).lower()))
+    else:
+        return default
+
+
 class OtterGroups(object):
     """
     REST endpoints for managing scaling groups.
@@ -616,7 +638,7 @@ class OtterServers(object):
     app = OtterApp()
 
     def __init__(self, store, tenant_id, scaling_group_id):
-        self.log = log.bind(system='otter.rest.servers',
+        self.log = log.bind(system='otter.rest.group.servers',
                             tenant_id=tenant_id,
                             scaling_group_id=scaling_group_id)
         self.store = store
@@ -652,23 +674,9 @@ class OtterServers(object):
         """
         Delete a server from the group.
         """
-
-        def replace(_request):
-            if 'replace' in _request.args:
-                value = _request.args['replace'][0].lower()
-                if value == 'true':
-                    return True
-                elif value == 'false':
-                    return False
-                else:
-                    raise InvalidQueryArgument('Incorrect "replace" query argument. '
-                                               'Must be "true" or "false". Defaults to "true" '
-                                               'if not provided')
-            else:
-                return True
-
         group = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
         d = group.modify_state(
-            partial(remove_server_from_group, self.log, transaction_id(request),
-                    server_id, replace(request)))
+            partial(remove_server_from_group, self.log.bind(server_id=server_id),
+                    transaction_id(request), server_id,
+                    extract_bool_arg(request, 'replace', True)))
         return d
