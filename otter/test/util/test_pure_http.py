@@ -7,6 +7,7 @@ from twisted.internet.defer import succeed
 from twisted.trial.unittest import TestCase
 
 from effect.testing import StubIntent, resolve_effect, resolve_stub
+from effect.twisted import perform
 from effect import Effect
 
 from otter.util.pure_http import OSHTTPClient, Request, ReauthIneffectualError, conj
@@ -28,8 +29,9 @@ class RequestEffectTests(SynchronousTestCase):
             gets={('http://google.com/', None, None, None): succeed(response)},
             contents={response: succeed("content")})
         req = Request(method="get", url="http://google.com/")
+        req.treq = treq
         self.assertEqual(
-            self.successResultOf(req.perform_effect({}, treq=treq)),
+            self.successResultOf(perform(Effect(req))),
             (response, "content"))
 
     def test_post(self):
@@ -44,7 +46,8 @@ class RequestEffectTests(SynchronousTestCase):
             contents={response: succeed("content")})
         req = Request(method="post", url="http://google.com/", headers={'foo': 'bar'},
                       data='my data')
-        self.assertEqual(self.successResultOf(req.perform_effect({}, treq=treq)),
+        req.treq = treq
+        self.assertEqual(self.successResultOf(perform(Effect(req))),
                          (response, "content"))
 
     def test_log(self):
@@ -57,7 +60,8 @@ class RequestEffectTests(SynchronousTestCase):
             gets={('http://google.com/', None, None, log): succeed(response)},
             contents={response: succeed("content")})
         req = Request(method="get", url="http://google.com/", log=log)
-        self.assertEqual(self.successResultOf(req.perform_effect({}, treq=treq)),
+        req.treq = treq
+        self.assertEqual(self.successResultOf(perform(Effect(req))),
                          (response, "content"))
 
 

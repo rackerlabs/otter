@@ -6,6 +6,7 @@ import json
 from otter.util import logging_treq
 
 from effect import Effect
+from effect.twisted import deferred_performer
 from characteristic import attributes
 
 from otter.util.http import APIError, headers
@@ -38,12 +39,13 @@ class Request(object):
 
     The effect results in a two-tuple of (response, content).
     """
-    def perform_effect(self, dispatcher, treq=logging_treq):
+    @deferred_performer
+    def perform_effect(self, dispatcher):
         """Perform the request with the given treq client."""
-        func = getattr(treq, self.method)
+        func = getattr(self.treq, self.method)
 
         def got_response(response):
-            result = treq.content(response)
+            result = self.treq.content(response)
             return result.addCallback(lambda content: (response, content))
         result = func(self.url, headers=self.headers, data=self.data,
                       log=self.log)
