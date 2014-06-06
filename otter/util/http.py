@@ -12,6 +12,22 @@ import treq
 from otter.util.config import config_value
 
 
+def _extract_error_message(system, body, unparsed):
+    """
+    Extract readable message from error body received from upstream system
+    """
+    if system not in ('nova', 'clb', 'identity'):
+        raise NotImplementedError
+    # NOTE: Since all the above upstream systems return error in similar format,
+    # this parses in one way. In future, if the format changes this implementation
+    # need to change
+    try:
+        body = json.loads(body)
+        return body[body.keys()[0]]['message']
+    except:
+        return unparsed
+
+
 # REVIEW: I started with specific subclasses for each system (nova, clb and identity)
 # but they had too much in common. So decided to put stuff in this class itself
 class UpstreamError(Exception):
@@ -29,31 +45,25 @@ class UpstreamError(Exception):
         self.system = system
         self.operation = operation
         self.url = url
-        self.apierr_message = None
         msg = self.system + ' error: '
         if error.check(APIError):
-            self._parse_message(error.value.body)
+            self.apierr_message = _extract_error_message(self.system, error.value.body,
+                                                         'Could not parse API error body')
             msg += '{} - {}'.format(error.value.code, self.apierr_message)
         else:
             msg += str(error)
         super(UpstreamError, self).__init__(msg)
 
-    def _parse_message(self, body):
-        try:
-            body = json.loads(body)
-            self.apierr_message = body[body.keys()[0]]['message']
-        except:
-            self.apierr_message = 'Could not parse API error body'
-
+    @property
     def details(self):
         """
         Return `dict` of all the details within this object
         """
-        d = self.__dict__.copy()
-        del d['error']
+        d = {'system': self.system, 'operation': self.operation, 'url': self.url}
         if self.error.check(APIError):
             e = self.error.value
-            d.update({'code': e.code, 'body': e.body, 'headers': e.headers})
+            d.update({'code': e.code, 'message': self.apierr_message, 'body': e.body,
+                      'headers': e.headers})
         return d
 
 

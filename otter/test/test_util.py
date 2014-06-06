@@ -12,7 +12,7 @@ from twisted.python.failure import Failure
 from twisted.web.http_headers import Headers
 
 from otter.util.http import (
-    append_segments, APIError, check_success, RequestError, headers,
+    append_segments, APIError, check_success, headers,
     raise_error_on_code, wrap_request_error, UpstreamError)
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
@@ -219,7 +219,7 @@ class HTTPUtilityTests(SynchronousTestCase):
                           failure, 'url')
 
 
-class UpstreamErrorTests(TestCase):
+class UpstreamErrorTests(SynchronousTestCase):
     """
     Tests for `UpstreamError`
     """
@@ -231,9 +231,9 @@ class UpstreamErrorTests(TestCase):
         self.assertEqual(err.apierr_message, 'b')
         self.assertEqual(err.message, 'nova error: 404 - b')
         self.assertEqual(str(err), 'nova error: 404 - b')
-        self.assertEqual(err.details(), {
+        self.assertEqual(err.details, {
             'system': 'nova', 'operation': 'add', 'url': 'xkcd.com',
-            'apierr_message': 'b', 'code': 404, 'body': body, 'headers': {}})
+            'message': 'b', 'code': 404, 'body': body, 'headers': {}})
 
 
 class CapabilityTests(SynchronousTestCase):
