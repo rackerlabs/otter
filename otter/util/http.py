@@ -23,7 +23,10 @@ def _extract_error_message(system, body, unparsed):
     # need to change
     try:
         body = json.loads(body)
-        return body[body.keys()[0]]['message']
+        if system == 'clb':
+            return body['message']
+        else:
+            return body[body.keys()[0]]['message']
     except:
         return unparsed
 
