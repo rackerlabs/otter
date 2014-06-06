@@ -3,7 +3,7 @@ Tests for the worker supervisor.
 """
 import mock
 
-from testtools.matchers import ContainsDict, Equals, IsInstance
+from testtools.matchers import ContainsDict, Equals, IsInstance, KeysEqual
 
 from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
@@ -1172,6 +1172,10 @@ class RemoveServerTests(SynchronousTestCase):
         # no server launched or deleted
         self.assertEqual(self.supervisor.exec_calls, [])
         self.assertEqual(self.supervisor.del_calls, [])
+        # desired & active/pending not changed
+        self.assertEqual(self.state.desired, 1)
+        self.assertEqual(self.state.active, {'s0': {'id': 's0'}})
+        self.assertEqual(self.state.pending, {})
 
     def _check_removed(self, state):
         self.assertNotIn('s0', state.active)
@@ -1194,6 +1198,8 @@ class RemoveServerTests(SynchronousTestCase):
                          (matches(IsBoundWith(image_ref=mock.ANY, flavor_ref=mock.ANY,
                                               system='otter.job.launch')),
                           self.tid, self.group, 'launch'))
+        # desired not changed
+        self.assertEqual(self.state.desired, 1)
 
     def test_not_replaced_removed(self):
         """
@@ -1221,5 +1227,8 @@ class RemoveServerTests(SynchronousTestCase):
         self.assertIn('s0', self.state.active)
         self.assertEqual(self.supervisor.del_calls, [])
         # server is not launched
-        self.assertIn('j1', self.state.pending)
+        self.assertEqual(self.state.pending, matches(KeysEqual('j1')))
         self.assertEqual(len(self.supervisor.exec_calls), 0)
+        # desired & active not changed
+        self.assertEqual(self.state.desired, 1)
+        self.assertEqual(self.state.active, {'s0': {'id': 's0'}})
