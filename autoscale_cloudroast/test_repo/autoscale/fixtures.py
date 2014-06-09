@@ -259,9 +259,8 @@ class AutoscaleFixture(BaseTestFixture):
         elif server_name:
             params = server_name
         list_server_resp = self.server_client.list_servers_with_detail(name=params)
-        filtered_servers = list_server_resp.entity
-        return [server.id for server in filtered_servers
-                if getattr(server, 'OS-EXT-STS:task_state', '').strip().lower() != 'deleting']
+        return [server.id for server in list_server_resp.entity
+                if server.task_state != 'deleting']
 
     def verify_server_count_using_server_metadata(self, group_id, expected_count):
         """
@@ -270,12 +269,10 @@ class AutoscaleFixture(BaseTestFixture):
         """
         end_time = time.time() + 60
         while time.time() < end_time:
-            list_servers_on_tenant = self.server_client.list_servers_with_detail().entity
-            list_servers_on_tenant = [
-                server for server in list_servers_on_tenant
-                if getattr(server, 'OS-EXT-STS:task_state', '').strip().lower() != 'deleting']
-            metadata_list = [self.autoscale_behaviors.to_data(each_server.metadata) for each_server
-                             in list_servers_on_tenant]
+            servers = self.server_client.list_servers_with_detail().entity
+            servers = filter(lambda s: s.task_state != 'deleting', servers)
+            metadata_list = [self.autoscale_behaviors.to_data(server.metadata)
+                             for server in servers]
             group_ids_list_from_metadata = [each.get('rax:auto_scaling_group_id') for each
                                             in metadata_list]
             actual_count = group_ids_list_from_metadata.count(group_id)
