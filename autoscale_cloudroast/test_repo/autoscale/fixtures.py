@@ -245,12 +245,9 @@ class AutoscaleFixture(BaseTestFixture):
 
     def get_servers_containing_given_name_on_tenant(self, group_id=None, server_name=None):
         """
-        The group_id or the server_name should be provided.
-        Given the group id, the server name is got from the group's launch
-        config and returns server ID list of servers containing that server name
-        on the tenant, from nova.
-        list_servers(name=params) returns list of servers that contain the
-        specified name within the server name.
+        Get ID of servers in the group from nova based on their name that are not in the
+        process of getting deleted.
+        Name is got from launch config if group_id is given otherwise `server_name` is used.
         """
         if group_id:
             launch_config = self.autoscale_client.view_launch_config(
