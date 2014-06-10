@@ -5,7 +5,9 @@
     "cassandra": {
         "seed_hosts": ["tcp:127.0.0.1:9160"],
         "keyspace": "otter",
-        "timeout": 30
+        "timeout": 30,
+        "default_consistency": 1,
+        "consistency_exceptions": null
     },
     "identity": {
         "username": "autoscale",
