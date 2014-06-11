@@ -2054,8 +2054,9 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>Specifies how the disk on new servers
                                 is partitioned. Valid values are
                                 <parameter>AUTO</parameter>" or <parameter>MANUAL</parameter>. For non-Rackspace
-                                servers, this value must always be
-                                <parameter>MANUAL</parameter>. For more information, see the
+                                server images, this value must always be
+                                <parameter>MANUAL</parameter>. A non-Rackspace server
+                                image would be one that you created by snapshotting a non-Rackspace server. For more information, see the
                                    <link
                                    xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html"
                                    >Disk Configuration Extension
@@ -2757,10 +2758,11 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     specify the details about the server type, server
                     image, load balancers, network, and any other
                     information you want to edit, as shown in the
-                    following example. For non-Rackspace servers, the
+                    following example. For non-Rackspace server images, the
                         <parameter>OS-DCF:diskConfig</parameter>
                     parameter value must always be
-                        <parameter>MANUAL</parameter>. For more
+                    <parameter>MANUAL</parameter>. A non-Rackspace server
+                    image would be one that you created by snapshotting a non-Rackspace server. For more
                     information, see the <link
                         xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html"
                         >Disk Configuration Extension
