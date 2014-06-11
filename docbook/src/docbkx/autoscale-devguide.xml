@@ -77,7 +77,7 @@
                         <listitem>
                             <para>Updated the <parameter>launchConfiguration</parameter> parameter <parameter>diskConfig</parameter> argument to note that, 
                                 when using non-Rackspace server images, the value must always be <parameter>MANUAL</parameter>. A non-Rackspace server
-                            image would be one that you created by snapshotting a non-Rackspace server. </para>
+                            image would be one that you imported using a non-Rackspace server. </para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
@@ -2056,7 +2056,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                 <parameter>AUTO</parameter>" or <parameter>MANUAL</parameter>. For non-Rackspace
                                 server images, this value must always be
                                 <parameter>MANUAL</parameter>. A non-Rackspace server
-                                image would be one that you created by snapshotting a non-Rackspace server. For more information, see the
+                                image would be one that you imported using a non-Rackspace server. For more information, see the
                                    <link
                                    xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html"
                                    >Disk Configuration Extension
@@ -2762,7 +2762,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>OS-DCF:diskConfig</parameter>
                     parameter value must always be
                     <parameter>MANUAL</parameter>. A non-Rackspace server
-                    image would be one that you created by snapshotting a non-Rackspace server. For more
+                    image would be one that you imported using a non-Rackspace server. For more
                     information, see the <link
                         xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html"
                         >Disk Configuration Extension
