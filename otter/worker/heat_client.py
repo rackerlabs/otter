@@ -7,7 +7,7 @@ from __future__ import print_function
 import json
 
 from otter.util.http import append_segments
-from otter.util.pure_http import Request
+from otter.util.pure_http import request
 
 
 __all__ = ['HeatClient']
@@ -16,9 +16,9 @@ __all__ = ['HeatClient']
 class HeatClient(object):
     """A purely functional Heat client. Action methods return Effects."""
 
-    def __init__(self, log, http):
-        self.http = http
+    def __init__(self, log, request):
         self.log = log.bind(system='heatclient')
+        self.request = request
 
     # auth_token is passed to each of these functions individually instead of
     # being set as an attribute of the object because a reauth can happen at
@@ -26,7 +26,7 @@ class HeatClient(object):
     # caller's responsibility to fetch it from storage every time a request is
     # to be made.
 
-    def create_stack(self, auth_token, heat_url, stack_name, parameters,
+    def create_stack(self, heat_url, stack_name, parameters,
                      timeout, template):
         """Create a stack."""
         payload = {
@@ -36,13 +36,11 @@ class HeatClient(object):
             'template': template
         }
         log = self.log.bind(event='create-stack', stack_name=stack_name)
-        return self.http.json_request(
-            auth_token,
-            Request(method='post', url=append_segments(heat_url, 'stacks'),
-                    data=json.dumps(payload), log=log),
-            success=[201])
+        return self.request(
+            'post', append_segments(heat_url, 'stacks'),
+            data=payload, log=log, success_codes=[201])
 
-    def update_stack(self, auth_token, stack_url, parameters, timeout,
+    def update_stack(self, stack_url, parameters, timeout,
                      template):
         """Update a stack."""
         payload = {
@@ -51,19 +49,13 @@ class HeatClient(object):
             'template': template,
         }
         log = self.log.bind(event='update-stack')
-        return self.http.json_request(
-            auth_token,
-            Request(method='put', url=stack_url, data=json.dumps(payload),
-                    log=log),
-            success=[202])
+        return self.request('put', stack_url, data=payload, log=log,
+                            success_codes=[202])
 
-    def get_stack(self, auth_token, stack_url):
+    def get_stack(self, stack_url):
         """Get the metadata about a stack."""
         log = self.log.bind(event='get-stack')
-        return self.http.json_request(
-            auth_token,
-            Request(method='get', url=stack_url, log=log),
-            success=[200])
+        return self.request('get', stack_url, log=log, success_codes=[200])
 
 
 def main(reactor, *args):

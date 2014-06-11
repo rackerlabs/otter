@@ -3,31 +3,14 @@ Pure HTTP utilities.
 """
 import copy
 import json
-from otter.util import logging_treq
+from functools import partial
 
 from effect import Effect
 from characteristic import attributes
 
-from otter.util.http import APIError, headers
-
-
-# These should probably be in a different module.
-def conj_obj(obj, **new_attrs):
-    """Conj[oin] an object with some new attributes, without side-effects."""
-    new_obj = copy.copy(obj)
-    new_obj.__dict__.update(new_attrs)
-    return new_obj
-
-
-def conj(d, new_fields):
-    """Conj[oin] two dicts without side-effects."""
-    if d is None:
-        d = {}
-    if new_fields is None:
-        new_fields = {}
-    new_d = d.copy()
-    new_d.update(new_fields)
-    return new_d
+from otter.util import logging_treq
+from otter.util.fp import conj, wrappers
+from otter.util.http import APIError, headers as otter_headers
 
 
 @attributes(['method', 'url', 'headers', 'data', 'log'],
@@ -39,8 +22,10 @@ class Request(object):
     The effect results in a two-tuple of (response, content).
     """
 
+    treq = logging_treq
+
     def perform_effect(self, dispatcher):
-        """Perform the request with the given treq client."""
+        """Perform the request with treq."""
         func = getattr(self.treq, self.method)
 
         def got_response(response):
@@ -51,66 +36,75 @@ class Request(object):
         return result.addCallback(got_response)
 
 
-class ReauthIneffectualError(Exception):
+class ReauthFailedError(Exception):
     """
     Raised when an HTTP request returned 401 even after successful
     reauthentication was performed.
     """
 
 
-class OSHTTPClient(object):
-    """
-    A slightly higher-level HTTP client, which:
-    - includes standard autoscale/openstack headers in requests
-    - handles reauthentication when a 401 is received
-    - parses JSON responses
-    - checks for successful HTTP codes
-    """
-    def __init__(self, reauth):
-        self.reauth = reauth
+def get_request(method, url, **kwargs):
+    """Return a Request wrapped in an Effect."""
+    return Effect(Request(method=method, url=url, **kwargs))
 
-    def _handle_reauth(self, result, request, success, retries=1):
+
+def request_with_reauth(get_request, method, url, auth=None,
+                        headers=None, **kwargs):
+    """Create a request which will reauthenticate upon 401 and retry."""
+
+    def handle_reauth(result, retries):
         response, content = result
 
-        def _got_reauth_result(auth_token):
-            return self._request_with_retry(auth_token, request, success,
-                                            retries - 1)
         if response.code == 401:
             if retries == 0:
-                raise ReauthIneffectualError()
-            return self.reauth().on_success(_got_reauth_result)
+                raise ReauthFailedError()
+            return auth(refresh=True).on_success(
+                partial(try_request, retries=retries - 1))
         else:
             return result
 
-    def _check_success(self, result, success_codes):
-        """
-        Check if the HTTP response was returned with a particular HTTP code.
-        """
+    def try_request(token, retries=1):
+        req_headers = conj(headers, otter_headers(token))
+        eff = get_request(method, url, headers=req_headers, **kwargs)
+        return eff.on_success(lambda r: handle_reauth(r, retries))
+
+    return auth().on_success(try_request)
+
+
+def request_with_status_check(get_request, method, url, success_codes=(200,), **kwargs):
+    """Ensure that the response code is acceptable. If not, raise APIError."""
+
+    def check_success(result):
         (response, content) = result
         if response.code not in success_codes:
             raise APIError(response.code, content, response.headers)
-        return content
+        return result
+    eff = get_request(method, url, **kwargs)
+    return eff.on_success(partial(check_success))
 
-    def _request_with_retry(self, auth_token, request, success, retries=1):
-        request = conj_obj(request,
-                           headers=conj(request.headers, headers(auth_token)))
-        return Effect(request).on_success(
-            lambda r: self._handle_reauth(r, request, success, retries))
 
-    def json_request(self, auth_token, request, success=(200,)):
-        """
-        Do a request, check the response code, and parse the JSON result.
+def json_request(get_request, method, url, data=None, **kwargs):
+    """Convert the request body to JSON, and parse the response as JSON."""
+    if data is not None:
+        data = json.dumps(data)
+    return get_request(method, url, data=data, **kwargs).on_success(
+        lambda r: (r[0], json.loads(r[1])))
 
-        Returns an Effect which results in the parsed json returned by the
-        server.
 
-        :param log: A bound log to pass on to the treq client.
-        :param method: The HTTP method to invoke.
-        :param url: As treq accepts.
-        :param headers: As treq accepts.
-        :param data: As treq accepts.
-        :param list success: The list of HTTP codes to consider successful.
-        """
-        return (self._request_with_retry(auth_token, request, success)
-                    .on_success(lambda r: self._check_success(r, success))
-                    .on_success(json.loads))
+def content_request(get_request, method, url, **kwargs):
+    """Only return the content part of a response."""
+    return get_request(method, url, **kwargs).on_success(lambda r: r[1])
+
+
+_request = wrappers(get_request, request_with_reauth, request_with_status_check, json_request, content_request)
+
+
+def request(method, url, *args, **kwargs):
+    """
+    Make an HTTP request, with a number of conveniences:
+
+    :param success_codes: HTTP codes to accept as successful.
+    :param data: python object, to be encoded with json
+    :param auth: a function to be used to retrieve auth tokens.
+    """
+    return _request(method, url, *args, **kwargs)
