@@ -15,3 +15,4 @@ croniter==0.3.3
 txkazoo==0.0.4
 effect==0.1a3
 characteristic==0.1.0
+toolz==0.6.0

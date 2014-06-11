@@ -15,7 +15,6 @@ from effect import Effect
 from otter.util.pure_http import request, Request, ReauthFailedError
 from otter.util.http import APIError, headers
 from otter.test.utils import stub_pure_response, StubResponse, StubTreq
-from otter.util.fp import conj
 
 
 class RequestEffectTests(SynchronousTestCase):
@@ -105,8 +104,9 @@ class OSHTTPClientTests(TestCase):
         request = self._no_reauth_client()
         eff = request("get", "/foo", headers={"x-mine": "abc123"})
         req = eff.intent
-        self.assertEqual(req.headers, conj(headers('my-token'),
-                                           {'x-mine': 'abc123'}))
+        expected_headers = headers('my-token')
+        expected_headers['x-mine'] = 'abc123'
+        self.assertEqual(req.headers, expected_headers)
 
     def test_data(self):
         """The data member in the request is encoded with json."""

@@ -18,6 +18,7 @@ class HeatClientTests(TestCase):
     """Tests for HeatClient."""
 
     def _http_client(self):
+        """Return a request function which automatically skips authentication."""
         def auth(refresh=False):
             assert not refresh
             return Effect(StubIntent("my-token"))

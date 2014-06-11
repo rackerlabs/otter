@@ -7,9 +7,10 @@ from functools import partial
 
 from effect import Effect
 from characteristic import attributes
+from toolz.dicttoolz import merge
 
 from otter.util import logging_treq
-from otter.util.fp import conj, wrappers
+from otter.util.fp import wrappers
 from otter.util.http import APIError, headers as otter_headers
 
 
@@ -64,7 +65,8 @@ def request_with_reauth(get_request, method, url, auth=None,
             return result
 
     def try_request(token, retries=1):
-        req_headers = conj(headers, otter_headers(token))
+        req_headers = {} if headers is None else headers
+        req_headers = merge(req_headers, otter_headers(token))
         eff = get_request(method, url, headers=req_headers, **kwargs)
         return eff.on_success(lambda r: handle_reauth(r, retries))
 

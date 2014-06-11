@@ -3,17 +3,6 @@
 """Functional programming helpers."""
 
 
-def conj(d, new_fields):
-    """Conj[oin] two dicts without side-effects."""
-    if d is None:
-        d = {}
-    if new_fields is None:
-        new_fields = {}
-    new_d = d.copy()
-    new_d.update(new_fields)
-    return new_d
-
-
 def wrap(f, g):
     """
     'The wrapper combinator'
