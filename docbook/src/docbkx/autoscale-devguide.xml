@@ -71,6 +71,19 @@
         <revhistory>
             <revision
                 xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <date>2014-06-11</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Updated the <parameter>launchConfiguration</parameter> parameter <parameter>diskConfig</parameter> argument to note that, 
+                                when using non-Rackspace server images, the value must always be <parameter>MANUAL</parameter>. A non-Rackspace server
+                            image would be one that you imported using a non-Rackspace server. </para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
+            <revision
+                xmlns:raxm="http://docs.rackspace.com/api/metadata">
                 <date>2014-05-28</date>
                 <revdescription>
                     <itemizedlist spacing="compact">
@@ -96,8 +109,8 @@
                                 individual method response code
                                 descriptions. Also fixed "Show scaling
                                 group details including webhooks"
-                                parameter description; the parameter
-                                is "webhooks" not "webhook."</para>
+                                description; the parameter
+                                is <parameter>webhooks</parameter> not <parameter>webhook</parameter>.</para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
@@ -109,7 +122,7 @@
                     <itemizedlist spacing="compact">
                         <listitem>
                             <para>Removed duplicate parameter
-                                descriptions. Improved "at" parameter
+                                descriptions. Improved <parameter>at</parameter> parameter
                                 description. Removed internal bug
                                 numbers. Modified titles per new
                                 convention.</para>
@@ -990,7 +1003,7 @@ is external so it's handy for Getting Started to share -->
             </para>
             <para>Replace the Tenant ID, <parameter>1234</parameter>,
                 with your actual Tenant ID.</para>
-            <para>You will find your tenant Id after the final '/' in
+            <para>You will find your tenant ID after the final '/' in
                 the <code>publicURL</code> field returned by the
                 authentication response. For example, in <olink
                     targetdoc="autoscale-devguide"
@@ -1000,7 +1013,7 @@ is external so it's handy for Getting Started to share -->
                     <code>autoscale</code>
                 ("https://ord.autoscale.api.rackspacecloud.com/v1.0/
                     <emphasis role="bold">1100111</emphasis>") shows
-                that the tenant Id is 1100111.</para>
+                that the tenant ID is 1100111.</para>
         </section>
         <section xml:id="contractVersion">
             <title>Contract versions</title>
@@ -1318,11 +1331,11 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>marker</parameter>
                             </td>
-                            <td>Specifies the Id of the last item in
+                            <td>Specifies the ID of the last item in
                                 the previous list. Items are sorted by
                                 create time in descending order. When
                                 a create time is not available they
-                                are sorted by Id. If the Id specified
+                                are sorted by ID. If the ID specified
                                 for this parameter is invalid, a 400
                                 response code (badRequest) will be
                                 returned. </td>
@@ -1415,7 +1428,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>limit</parameter>, a 400 response
                     code will be returned. The
                         <parameter>marker</parameter> parameter
-                    specifies the last seen group Id. When you click
+                    specifies the last seen group ID. When you click
                     on the link that is returned, all the groups
                     displayed will have group Ids that are greater
                     than "f82bb000-f451-40c8-9dc3-6919097d2f7e". </para>
@@ -1482,7 +1495,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             </programlisting>
                 </example>
                 <para>The <parameter>marker</parameter> parameter
-                    points to the last seen policy Id. When you click
+                    points to the last seen policy ID. When you click
                     on the link that is returned, all the policies
                     displayed will have policy Ids that are greater
                     than "f82bb000-f451-40c8-9dc3-6919097d2f7e". </para>
@@ -1550,7 +1563,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             </programlisting>
                 </example>
                 <para>The <parameter>marker</parameter> parameter
-                    points to the last seen webhook Id. When you click
+                    points to the last seen webhook ID. When you click
                     on the link that is provided in the response body,
                     all the webhooks displayed will have webhook Ids
                     that are greater than
@@ -1565,8 +1578,8 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 configuration for a server. Each flavor has a unique
                 combination of disk space and memory capacity. The
                 server flavor that is specified in the Control Panel
-                maps to a specific flavor id in the Rackspace API. The
-                following table outlines the mapping between flavor Id
+                maps to a specific flavor ID in the Rackspace API. The
+                following table outlines the mapping between flavor ID
                 and the available flavors in the Control Panel.</para>
             <table rules="all">
                 <caption>Rackspace Cloud Server Flavors</caption>
@@ -1974,7 +1987,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                 information for the load balancer(s)
                                 used in the cloud server deployment.
                                 Please note that you must include the
-                                   <guimenuitem>service.net</guimenuitem>
+                                   <parameter>service.net</parameter>
                                 network in your configuration if you
                                 use a load balancer so the load
                                 balancer can retrieve the IP address
@@ -2016,7 +2029,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>flavorRef</parameter>
                             </td>
-                            <td>Specifies the flavor Id for the
+                            <td>Specifies the flavor ID for the
                                 server. A flavor is a resource
                                 configuration for a server. For more
                                 information on available flavors, see
@@ -2030,7 +2043,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>imageRef</parameter>
                             </td>
-                            <td>Specifies the Id of the Cloud Server
+                            <td>Specifies the ID of the Cloud Server
                                 image to start. Example:
                                 0d589460-f177-4b0f-81c1-8ab8903ac7d8.</td>
                         </tr>
@@ -2038,12 +2051,14 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>OS-DCF:diskConfig</parameter>
                             </td>
-                            <td>Specifies the disk configuration
-                                value, specifically, how the disk on
-                                new servers is partitioned. . Valid
-                                values are "AUTO" or "MANUAL." For
-                                more information, see the <link
-                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/ch_extensions.html#diskconfig_attribute"
+                            <td>Specifies how the disk on new servers
+                                is partitioned. Valid values are
+                                <parameter>AUTO</parameter>" or <parameter>MANUAL</parameter>. For non-Rackspace
+                                server images, this value must always be
+                                <parameter>MANUAL</parameter>. A non-Rackspace server
+                                image would be one that you imported using a non-Rackspace server. For more information, see the
+                                   <link
+                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html"
                                    >Disk Configuration Extension
                                 </link>documentation for Rackspace
                                 Cloud Servers.</td>
@@ -2743,7 +2758,15 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     specify the details about the server type, server
                     image, load balancers, network, and any other
                     information you want to edit, as shown in the
-                    following example.</para>
+                    following example. For non-Rackspace server images, the
+                        <parameter>OS-DCF:diskConfig</parameter>
+                    parameter value must always be
+                    <parameter>MANUAL</parameter>. A non-Rackspace server
+                    image would be one that you imported using a non-Rackspace server. For more
+                    information, see the <link
+                        xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html"
+                        >Disk Configuration Extension
+                    </link>documentation.</para>
                 <example>
                     <title>Request </title>
                     <programlisting>PUT /{tenantId}/groups/{groupId}/launch</programlisting>
@@ -2931,7 +2954,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <section xml:id="Getting_Individual_Scaling_Policy">
                 <title>Get an individual scaling policy</title>
                 <para>To obtain information about an individual
-                    scaling policy, including policy id, name, type,
+                    scaling policy, including policy ID, name, type,
                     adjustment, and cooldown, submit a
                         <command>GET</command> request with the
                         <parameter>tenantId</parameter>,
