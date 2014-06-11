@@ -328,7 +328,7 @@ is external so it's handy for Getting Started to share -->
             <title>Glossary</title>
             <!-- Glossary section, defining basic terms,
 is external so it's handy for Getting Started to share -->
-            <xi:include href="chapters/glossary.xml"/>
+            <xi:include href="chapters/glossary.xml" xpointer="element(Glossary-000)"/>
             <!-- -->
         </section>
         <section xml:id="Scaling_groups"
