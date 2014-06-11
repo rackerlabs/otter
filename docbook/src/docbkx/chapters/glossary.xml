@@ -7,7 +7,7 @@
 <!-- in body -->
 <!ENTITY PROD "Auto Scale">
 ]>
-<glossary xmlns="http://docbook.org/ns/docbook" xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xlink="http://www.w3.org/1999/xlink"
+<glosslist xmlns="http://docbook.org/ns/docbook" xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xlink="http://www.w3.org/1999/xlink"
 version="5.0" xml:id="Glossary-000">
     <glossentry xml:id="Agent">
         <glossterm>
@@ -105,14 +105,6 @@ version="5.0" xml:id="Glossary-000">
             </para>
         </glossdef>
     </glossentry>
-    <glossentry xml:id="Entity">
-        <glossterm>
-            <emphasis role="bold">Entity</emphasis>
-        </glossterm>
-        <glossdef>
-            <para>A resource that you want to monitor. Some examples are a server, a website, or a service. </para>
-        </glossdef>
-    </glossentry>
     <glossentry xml:id="Flavor-d1e20">
         <glossterm>
             <emphasis role="bold">Flavor</emphasis>
@@ -120,15 +112,6 @@ version="5.0" xml:id="Glossary-000">
         <glossdef>
             <para>A resource configuration for a server. Each flavor is a unique combination of
                 disk, memory, vCPUs, and network bandwidth. </para>
-        </glossdef>
-    </glossentry>
-    <glossentry xml:id="GroupCooldown">
-        <glossterm>
-            <emphasis role="bold">Group (Global) Cooldown</emphasis>
-        </glossterm>
-        <glossdef>
-            <para>The length of time that must pass before a scaling group can be scaled up or down again. The purpose is to prevent events from 
-                triggering a policy execution before the requisite build time for creating servers in process because of a previous policy execution.</para>
         </glossdef>
     </glossentry>
     <glossentry xml:id="HealthMonitor">
@@ -183,16 +166,6 @@ version="5.0" xml:id="Glossary-000">
         </glossterm>
         <glossdef>
             <para>An informational message that is sent to one or more addresses when an alarm is triggered.</para>
-        </glossdef>
-    </glossentry>
-    <glossentry xml:id="PolicyCooldown">
-        <glossterm>
-            <emphasis role="bold">Policy Cooldown</emphasis>
-        </glossterm>
-        <glossdef>
-            <para>
-                The length of time that must pass before a policy can be executed again. The purpose is to allow for a fast scale-up and a slow scale-down of servers.
-            </para>
         </glossdef>
     </glossentry>
     <glossentry xml:id="Scaling-d1e11">
@@ -259,4 +232,4 @@ version="5.0" xml:id="Glossary-000">
             </para>
         </glossdef>
     </glossentry>
-</glossary>
+</glosslist>
