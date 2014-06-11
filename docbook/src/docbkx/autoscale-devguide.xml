@@ -76,8 +76,8 @@
                     <itemizedlist spacing="compact">
                         <listitem>
                             <para>Updated the <parameter>launchConfiguration</parameter> parameter <parameter>diskConfig</parameter> argument to note that, 
-                                when using non-Rackspace servers, the value must
-                                always be <parameter>MANUAL</parameter>.</para>
+                                when using non-Rackspace server images, the value must always be <parameter>MANUAL</parameter>. A non-Rackspace server
+                            image would be one that you created by snapshotting a non-Rackspace server. </para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
