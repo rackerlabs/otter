@@ -18,6 +18,7 @@ from otter.util.http import APIError, RequestError
 from otter.log import log as default_log
 
 from otter.auth import authenticate_user
+from otter.auth import get_admin_user
 from otter.auth import extract_token
 from otter.auth import impersonate_user
 from otter.auth import endpoints_for_token
@@ -220,36 +221,141 @@ class HelperTests(SynchronousTestCase):
         self.assertEqual(real_failure.value.code, 500)
         self.assertEqual(real_failure.value.body, 'error_body')
 
-    def test_user_for_tenant(self):
+    def test_get_admin_user(self):
         """
-        user_for_tenant sends a properly formed request to the identity API for
-        the list of users for a given tenant.
+        :func:`get_admin_user` sends a properly formed request to the identity
+        API to get the admin user for the given user, and returns the id of the
+        admin user (which may be different than the given user's id).
         """
         response = mock.Mock(code=200)
-        response_body = {'user': {'id': 'ausername'}}
+        response_body = {"users": [{"id": "auserid", "username": "ausername"}]}
+
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.get.return_value = succeed(response)
 
-        d = user_for_tenant('http://identity/v2.0', 'username', 'password',
-                            111111, log=self.log)
+        d = get_admin_user('http://identity/v2.0', 'auth-token',
+                           2222, log=self.log)
 
         self.assertEqual(self.successResultOf(d), 'ausername')
 
         self.treq.get.assert_called_once_with(
-            'http://identity/v1.1/mosso/111111',
-            auth=('username', 'password'),
-            allow_redirects=False, log=self.log)
+            'http://identity/v2.0/users/2222/RAX-AUTH/admins',
+            headers=expected_headers,
+            log=self.log)
 
-    def test_user_for_tenant_propagates_errors(self):
+    def test_get_admin_user_propagates_errors(self):
         """
-        user_for_tenant propagates API errors.
+        :func:`get_admin_user` propagates API errors.
         """
         response = mock.Mock(code=500)
         self.treq.content.return_value = succeed('error_body')
         self.treq.get.return_value = succeed(response)
 
-        d = user_for_tenant('http://identity/v2.0', 'username', 'password',
-                            111111)
+        d = get_admin_user('http://identity/v2.0', 'auth-token', 2222)
+        failure = self.failureResultOf(d)
+
+        self.assertTrue(failure.check(RequestError))
+        real_failure = failure.value.reason
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+        self.assertEqual(real_failure.value.body, 'error_body')
+
+    def test_user_for_tenant_returns_singleton_user(self):
+        """
+        :func:`user_for_tenant` sends a properly formed request to the identity
+        API for the list of users for a given tenant, and returns the id of
+        the user immediately if there is a single user for that account.
+        """
+        response = mock.Mock(code=200)
+        response_body = {"users": [{"id": "auserid", "username": "ausername"}]}
+
+        self.treq.json_content.return_value = succeed(response_body)
+        self.treq.get.return_value = succeed(response)
+
+        d = user_for_tenant('http://identity/v2.0', 'auth-token',
+                            111111, log=self.log)
+
+        self.assertEqual(self.successResultOf(d), 'ausername')
+
+        self.treq.get.assert_called_once_with(
+            'http://identity/v2.0/tenants/111111/users',
+            headers=expected_headers,
+            log=self.log)
+
+    def test_user_for_tenant_propagates_list_users_errors(self):
+        """
+        :func:`user_for_tenant` propagates API errors from listing users.
+        """
+        response = mock.Mock(code=500)
+        self.treq.content.return_value = succeed('error_body')
+        self.treq.get.return_value = succeed(response)
+
+        d = user_for_tenant('http://identity/v2.0', 'auth-token', 111111)
+        failure = self.failureResultOf(d)
+
+        self.assertTrue(failure.check(RequestError))
+        real_failure = failure.value.reason
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+        self.assertEqual(real_failure.value.body, 'error_body')
+
+    def test_user_for_tenant_calls_get_admin_user_if_too_many_users(self):
+        """
+        :func:`user_for_tenant` sends a properly formed request to the identity
+        API for the list of users for a given tenant, and if there is more than
+        one user, gets the admin user for the first user in the list
+        """
+        response = mock.Mock(code=200)
+        response_bodies = [
+            # list users
+            {"users": [
+                {"id": "not_admin_id1", "username": "user1"},
+                {"id": "not_admin_id2", "username": "user2"}]},
+            # get admin user
+            {"users": [{"id": "admin_id", "username": "admin_name"}]}
+        ]
+
+        self.treq.get.side_effect = lambda *a, **kw: succeed(response)
+        self.treq.json_content.side_effect = (
+            lambda _: succeed(response_bodies.pop(0)))
+
+        d = user_for_tenant('http://identity/v2.0', 'auth-token',
+                            111111, log=self.log)
+
+        self.assertEqual(self.successResultOf(d), 'admin_name')
+
+        self.assertEqual(
+            self.treq.get.mock_calls,
+            [mock.call('http://identity/v2.0/tenants/111111/users',
+                       headers=expected_headers,
+                       log=self.log),
+             mock.call('http://identity/v2.0/users/not_admin_id1/RAX-AUTH/admins',
+                       headers=expected_headers,
+                       log=self.log)])
+
+    def test_user_for_tenant_propagates_get_admin_user_errors(self):
+        """
+        :func:`user_for_tenant` propagates API errors from getting the admin
+        user
+        """
+        responses = [mock.Mock(code=200), mock.Mock(code=500)]
+
+        # response for list users
+        self.treq.json_content.return_value = succeed({
+            "users": [
+                {"id": "not_admin_id1", "username": "user1"},
+                {"id": "not_admin_id2", "username": "user2"}
+            ]
+        })
+
+        # response for get admin user
+        self.treq.content.return_value = succeed('error_body')
+
+        self.treq.get.side_effect = lambda *a, **kw: succeed(responses.pop(0))
+
+        d = user_for_tenant('http://identity/v2.0', 'auth-token', 111111)
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(RequestError))
@@ -318,16 +424,16 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         endpoint.
         """
         self.successResultOf(self.ia.authenticate_tenant(111111))
-        self.user_for_tenant.assert_called_once_with(self.admin_url, self.user,
-                                                     self.password, 111111,
+        self.user_for_tenant.assert_called_once_with(self.admin_url,
+                                                     'auth-token', 111111,
                                                      log=None)
 
         self.user_for_tenant.reset_mock()
 
         self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
 
-        self.user_for_tenant.assert_called_once_with(self.admin_url, self.user,
-                                                     self.password, 111111,
+        self.user_for_tenant.assert_called_once_with(self.admin_url,
+                                                     'auth-token', 111111,
                                                      log=self.log)
 
     def test_authenticate_tenant_impersonates_first_user(self):
