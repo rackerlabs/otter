@@ -243,6 +243,15 @@ class AutoscaleFixture(BaseTestFixture):
             schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
         time.sleep(self.scheduler_interval + delay)
 
+    def get_non_deleting_servers(self, name=None):
+        """
+        Get servers that are not in the process of getting deleted
+
+        :param name: if given, return servers with this name
+        """
+        return filter(lambda s: s.task_state != 'deleting' and s.status != 'DELETED',
+                      self.server_client.list_servers_with_detail(name=name).entity)
+
     def get_servers_containing_given_name_on_tenant(self, group_id=None, server_name=None):
         """
         Get a list of server IDs not marked pending deletion from Nova based on the
@@ -256,8 +265,7 @@ class AutoscaleFixture(BaseTestFixture):
         elif server_name:
             params = server_name
         list_server_resp = self.server_client.list_servers_with_detail(name=params)
-        return [server.id for server in list_server_resp.entity
-                if server.task_state != 'deleting']
+        return [server.id for server in self.get_non_deleting_servers(params)]
 
     def verify_server_count_using_server_metadata(self, group_id, expected_count):
         """
@@ -266,8 +274,7 @@ class AutoscaleFixture(BaseTestFixture):
         """
         end_time = time.time() + 60
         while time.time() < end_time:
-            servers = self.server_client.list_servers_with_detail().entity
-            servers = filter(lambda s: s.task_state != 'deleting', servers)
+            servers = self.get_non_deleting_servers()
             metadata_list = [self.autoscale_behaviors.to_data(server.metadata)
                              for server in servers]
             group_ids_list_from_metadata = [each.get('rax:auto_scaling_group_id') for each
