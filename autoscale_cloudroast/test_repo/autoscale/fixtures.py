@@ -264,7 +264,6 @@ class AutoscaleFixture(BaseTestFixture):
             params = launch_config.server.name
         elif server_name:
             params = server_name
-        list_server_resp = self.server_client.list_servers_with_detail(name=params)
         return [server.id for server in self.get_non_deleting_servers(params)]
 
     def verify_server_count_using_server_metadata(self, group_id, expected_count):
