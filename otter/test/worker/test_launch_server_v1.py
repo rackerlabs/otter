@@ -1,7 +1,9 @@
 """
 Unittests for the launch_server_v1 launch config.
 """
+from datetime import datetime, timedelta
 import mock
+from iso8601.iso8601 import Utc
 import json
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -26,7 +28,9 @@ from otter.worker.launch_server_v1 import (
     ServerDeleted,
     delete_and_verify,
     verified_delete,
-    LB_MAX_RETRIES, LB_RETRY_INTERVAL_RANGE
+    LB_MAX_RETRIES, LB_RETRY_INTERVAL_RANGE,
+    match_server,
+    find_server
 )
 
 
@@ -105,6 +109,42 @@ class UtilityTests(SynchronousTestCase):
             public_endpoint_url(fake_service_catalog, 'cloudServersOpenStack',
                                 'DFW'),
             'http://dfw.openstack/')
+
+    def test_match_server_exact_metadata_and_time(self):
+        """
+        :func:`match_server` returns True if the timestamps are the same
+        time and the metadata are exactly equivalent
+        """
+        self.assertTrue(match_server(
+            {'metadata': {'1': '2'}, 'created': '1970-01-01T01:00:00Z'},
+            {'1': '2'}, datetime(1970, 1, 1, 1, 0, 0)))
+
+    def test_match_server_negative_metadata_matches(self):
+        """
+        :func:`match_server` returns False if the timestamps are around the same
+        time but the metadata are not exactly equivalent
+        """
+        self.assertFalse(match_server(
+            {'metadata': {'1': '2'}, 'created': '1970-01-01T01:00:00Z'},
+            {'1': '2', '2': '3'}, datetime(1970, 1, 1, 1, 0, 0)))
+
+    def test_match_server_created_fuzz_seconds_before(self):
+        """
+        :func:`match_server` returns True if the metadata is equivalent and the
+        server was created ``fuzz`` seconds before the specified creation time
+        """
+        self.assertTrue(match_server(
+            {'metadata': {}, 'created': '1970-01-01T01:00:00Z'},
+            {}, datetime(1970, 1, 1, 1, 0, 10), 10))
+
+    def test_match_server_created_fuzz_seconds_after(self):
+        """
+        :func:`match_server` returns True if the metadata is equivalent and the
+        server was created ``fuzz`` seconds after the specified creation time
+        """
+        self.assertTrue(match_server(
+            {'metadata': {}, 'created': '1970-01-01T01:00:10Z'},
+            {}, datetime(1970, 1, 1, 1, 0, 0), 10))
 
 
 expected_headers = {
@@ -714,6 +754,32 @@ class ServerTests(SynchronousTestCase):
 
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
+
+    def test_find_server_tells_nova_to_filter_by_image_flavor_and_name(self):
+        """
+        :func:`find_server` makes a call to nova to list server details while
+        filtering on the image id, flavor id, and exact name in the server
+        config
+        """
+        server_config = {
+            'server': {
+                'name': 'abcd',
+                'imageRef': '123',
+                'flavor': 'xyz',
+                'metadata': {}
+            }
+        }
+        self.treq.get.return_value = succeed(mock.Mock(code=500))
+        self.treq.content.return_value = succeed(error_body)
+
+        d = find_server('http://url/', 'my-auth-token', server_config,
+                         datetime.now())
+        self.failureResultOf(d)
+
+        self.treq.get.assert_called_once_with(
+            "http://url/servers/details?image=123&flavor=xyz&name=^abcd$",
+            mock.ANY, mock.ANY)
+
 
     def test_create_server(self):
         """

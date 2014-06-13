@@ -20,9 +20,11 @@ from functools import partial
 import json
 import itertools
 from copy import deepcopy
+from urllib import urlencode
 
 from twisted.internet.defer import gatherResults, maybeDeferred, DeferredSemaphore
 
+from otter.util.timestamp import from_timestamp
 from otter.util import logging_treq as treq
 
 from otter.util.config import config_value
@@ -157,6 +159,71 @@ def wait_for_active(log,
 # limit on 2 servers to be created simultaneously
 MAX_CREATE_SERVER = 2
 create_server_sem = DeferredSemaphore(MAX_CREATE_SERVER)
+
+
+def match_server(server_details, server_metadata, creation_time, fuzz=5):
+    """
+    :param dict server_details: List server details JSON blob, as would
+        come back from a list server details call to Nova
+    :param dict server_metadata: The exact metadata to check
+    :param datetime creation_time:  The approximate time during wich the server
+        should have been created.
+    :param int fuzz: number of seconds before or after the given creation time
+        during which the server could have been created.
+
+    :return: True if the server metadata matches the given server metadata,
+        and the creation time falls within ``fuzz`` seconds of ``creation_time``
+    :rtype: ``bool``
+    """
+    created = from_timestamp(server_details['created'])
+
+    # if the creation time is naive and the created timestamp is timezone-aware,
+    # they can't be compared.  So make the created timezone also timezone
+    # unaware
+    if creation_time.tzinfo is None:
+        created = created.replace(tzinfo=None)
+
+    diff = abs((creation_time - created).total_seconds())
+
+    return server_details['metadata'] == server_metadata and diff <= fuzz
+
+
+def find_server(server_endpoint, auth_token, server_config, creation_time,
+                fuzz=5, log=None):
+    """
+    Given a server config, attempts to find a server created with that config
+    within ``fuzz`` seconds of ``creation_time``.
+
+    Uses the Nova list server details endpoint to filter out any server that
+    does not have the exact server name (the filter is a regex, so can filter
+    by ``^<name>$``), image ID, and flavor ID (both of which are exact filters).
+
+    :param str server_endpoint: Server endpoint URI.
+    :param str auth_token: Keystone Auth Token.
+    :param dict server_config: Nova server config.
+    :param datetime creation_time:  The approximate time during wich the server
+        should have been created.
+    :param int fuzz: number of seconds before or after the given creation time
+        during which the server could have been created.
+
+    :return: Deferred that fires with a list of servers that match that server
+        config and creation time
+    """
+    query_params = {
+        'image': server_config['server']['imageRef'],
+        'flavor': server_config['server']['flavorRef'],
+        'name': '^{0}$'.format(server_config['server']['name'])
+    }
+    url = '{path}?{query}'.format(
+        path=append_segments(server_endpoint, 'servers', 'details'),
+        query=urlencode(query_params))
+
+    d = treq.get(url, headers=headers(auth_token), log=log)
+    d.addCallback(check_success, [200])
+
+    d.addErrback(raise_error_on_code, 404, ServerDeleted(server_id),
+                 path, 'server_details')
+    return d.addCallback(treq.json_content)
 
 
 def create_server(server_endpoint, auth_token, server_config, log=None):
