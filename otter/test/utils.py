@@ -49,7 +49,7 @@ class matches(object):
         return self._last_match is None
 
     def __ne__(self, other):
-        return self != other
+        return not self == other
 
     def __str__(self):
         return str(self._matcher)
