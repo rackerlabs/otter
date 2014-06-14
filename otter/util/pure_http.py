@@ -59,8 +59,8 @@ def request_with_reauth(get_request, method, url, auth=None,
         if response.code == 401:
             if retries == 0:
                 raise ReauthFailedError()
-            return auth(refresh=True).on_success(
-                partial(try_request, retries=retries - 1))
+            return auth(refresh=True).on(
+                success=partial(try_request, retries=retries - 1))
         else:
             return result
 
@@ -68,9 +68,9 @@ def request_with_reauth(get_request, method, url, auth=None,
         req_headers = {} if headers is None else headers
         req_headers = merge(req_headers, otter_headers(token))
         eff = get_request(method, url, headers=req_headers, **kwargs)
-        return eff.on_success(lambda r: handle_reauth(r, retries))
+        return eff.on(success=lambda r: handle_reauth(r, retries))
 
-    return auth().on_success(try_request)
+    return auth().on(success=try_request)
 
 
 def request_with_status_check(get_request, method, url, success_codes=(200,), **kwargs):
@@ -82,20 +82,20 @@ def request_with_status_check(get_request, method, url, success_codes=(200,), **
             raise APIError(response.code, content, response.headers)
         return result
     eff = get_request(method, url, **kwargs)
-    return eff.on_success(partial(check_success))
+    return eff.on(success=partial(check_success))
 
 
 def json_request(get_request, method, url, data=None, **kwargs):
     """Convert the request body to JSON, and parse the response as JSON."""
     if data is not None:
         data = json.dumps(data)
-    return get_request(method, url, data=data, **kwargs).on_success(
-        lambda r: (r[0], json.loads(r[1])))
+    return get_request(method, url, data=data, **kwargs).on(
+        success=lambda r: (r[0], json.loads(r[1])))
 
 
 def content_request(get_request, method, url, **kwargs):
     """Only return the content part of a response."""
-    return get_request(method, url, **kwargs).on_success(lambda r: r[1])
+    return get_request(method, url, **kwargs).on(success=lambda r: r[1])
 
 
 _request = wrappers(get_request, request_with_reauth, request_with_status_check, json_request, content_request)
