@@ -843,9 +843,15 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.supervisor.execute_config.return_value = succeed(
             (self.job_id, self.completion_deferred))
 
+        self.delay_modify_state = False
+
         def fake_modify_state(f, *args, **kwargs):
-            return maybeDeferred(
-                f, self.group, self.state, *args, **kwargs)
+            d = maybeDeferred(f, self.group, self.state, *args, **kwargs)
+            if self.delay_modify_state:
+                self.modify_state_d = Deferred()
+                return self.modify_state_d.addCallback(lambda _: d)
+            else:
+                return d
 
         self.group.modify_state.side_effect = fake_modify_state
 
@@ -955,6 +961,17 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.assertEqual(self.group.modify_state.call_count, 0)
         self.completion_deferred.errback(Exception('e'))
         self.assertEqual(self.group.modify_state.call_count, 1)
+
+    def test_job_in_supervisor_pool(self):
+        """
+        `completion_deferred` is added to supervisor's deferred_pool after
+        adding other callbacks to ensure it is removed from the pool only
+        when job and related state updation completes
+        """
+        self.delay_modify_state = True
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'blob'})
+        self.modify_state_d.callback(None)
 
     def test_job_completion_success_job_marked_as_active(self):
         """
