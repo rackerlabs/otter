@@ -17,7 +17,7 @@
       <plugin>
         <groupId>com.rackspace.cloud.api</groupId>
         <artifactId>olink-maven-plugin</artifactId>
-        <version>1.2.5</version>
+        <version>1.2.6</version>
         <executions>
           <execution>
 	    <phase>initialize</phase>
