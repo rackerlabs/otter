@@ -8,7 +8,7 @@ import json
 from twisted.internet import defer
 
 from otter import controller
-from otter.supervisor import get_supervisor
+from otter.supervisor import get_supervisor, remove_server_from_group
 
 from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import MAX_ENTITIES
@@ -50,6 +50,28 @@ def format_state_dict(state):
             } for key, server_blob in state.active.iteritems()
         ]
     }
+
+
+def extract_bool_arg(request, key, default=False):
+    """
+    Get bool query arg from the request
+
+    :param request: :class:`twisted.web.http.Request` object
+    :param str key: The argument key
+    :param bool default: The default value to return if key is not there
+    """
+    if key in request.args:
+        value = request.args[key][0].lower()
+        if value == 'true':
+            return True
+        elif value == 'false':
+            return False
+        else:
+            raise InvalidQueryArgument(
+                'Invalid "{}" query argument: "{}". Must be "true" or "false". '
+                'Defaults to "{}" if not provided'.format(key, value, str(default).lower()))
+    else:
+        return default
 
 
 class OtterGroups(object):
@@ -580,6 +602,13 @@ class OtterGroup(object):
         group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         return controller.resume_scaling_group(self.log, transaction_id(request), group)
 
+    @app.route('/servers/', branch=True)
+    def servers(self, request):
+        """
+        servers/ route handling
+        """
+        return OtterServers(self.store, self.tenant_id, self.group_id).app.resource()
+
     @app.route('/config/')
     def config(self, request):
         """
@@ -600,3 +629,54 @@ class OtterGroup(object):
         policies routes handled by OtterPolicies
         """
         return OtterPolicies(self.store, self.tenant_id, self.group_id).app.resource()
+
+
+class OtterServers(object):
+    """
+    REST endpoints to access servers in a scaling group
+    """
+    app = OtterApp()
+
+    def __init__(self, store, tenant_id, scaling_group_id):
+        self.log = log.bind(system='otter.rest.group.servers',
+                            tenant_id=tenant_id,
+                            scaling_group_id=scaling_group_id)
+        self.store = store
+        self.tenant_id = tenant_id
+        self.scaling_group_id = scaling_group_id
+
+    @app.route('/', methods=['GET'])
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(200)
+    @paginatable
+    def list_servers(self, request, paginate):
+        """
+        Get a list of servers in the group.
+        """
+        raise NotImplementedError
+
+    @app.route('/<string:server_id>', methods=['GET'])
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(200)
+    def get_server(self, request, server_id):
+        """
+        Get particular server from the group
+        """
+        raise NotImplementedError
+
+    @app.route('/<string:server_id>/', methods=['DELETE'])
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(202)
+    def delete_server(self, request, server_id):
+        """
+        Delete a server from the group.
+        """
+        group = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
+        d = group.modify_state(
+            partial(remove_server_from_group, self.log.bind(server_id=server_id),
+                    transaction_id(request), server_id,
+                    extract_bool_arg(request, 'replace', True)))
+        return d
