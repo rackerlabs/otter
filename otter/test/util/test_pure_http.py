@@ -28,7 +28,7 @@ class RequestEffectTests(SynchronousTestCase):
         """
         response = StubResponse(200, {})
         treq = StubTreq(
-            gets={('http://google.com/', None, None, None): succeed(response)},
+            reqs={('GET', 'http://google.com/', None, None, None): succeed(response)},
             contents={response: succeed("content")})
         req = Request(method="get", url="http://google.com/")
         req.treq = treq
@@ -43,7 +43,7 @@ class RequestEffectTests(SynchronousTestCase):
         """
         response = StubResponse(200, {})
         treq = StubTreq(
-            posts={('http://google.com/', (('foo', 'bar'),), 'my data', None):
+            reqs={('POST', 'http://google.com/', (('foo', 'bar'),), 'my data', None):
                    succeed(response)},
             contents={response: succeed("content")})
         req = Request(method="post", url="http://google.com/", headers={'foo': 'bar'},
@@ -59,7 +59,7 @@ class RequestEffectTests(SynchronousTestCase):
         response = StubResponse(200, {})
         log = object()
         treq = StubTreq(
-            gets={('http://google.com/', None, None, log): succeed(response)},
+            reqs={('GET', 'http://google.com/', None, None, log): succeed(response)},
             contents={response: succeed("content")})
         req = Request(method="get", url="http://google.com/", log=log)
         req.treq = treq

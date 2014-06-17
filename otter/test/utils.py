@@ -270,21 +270,14 @@ class StubTreq(object):
     A stub version of otter.utils.logging_treq that returns canned responses
     from dictionaries.
     """
-    def __init__(self, gets=None, posts=None, contents=None):
-        self.gets = gets
-        self.posts = posts
+    def __init__(self, reqs=None, contents=None):
+        self.reqs = reqs
         self.contents = contents
 
-    def _dispatch(self, d, url, headers, data, log):
+    def request(self, method, url, headers, data, log):
         if headers is not None:
             headers = tuple(sorted(headers.items()))
-        return d[(url, headers, data, log)]
-
-    def get(self, url, headers=None, data=None, log=None):
-        return self._dispatch(self.gets, url, headers, data, log)
-
-    def post(self, url, headers=None, data=None, log=None):
-        return self._dispatch(self.posts, url, headers, data, log)
+        return self.reqs[(method, url, headers, data, log)]
 
     def content(self, response):
         return self.contents[response]

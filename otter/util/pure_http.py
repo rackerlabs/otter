@@ -27,13 +27,13 @@ class Request(object):
 
     def perform_effect(self, dispatcher):
         """Perform the request with treq."""
-        func = getattr(self.treq, self.method)
 
         def got_response(response):
             result = self.treq.content(response)
             return result.addCallback(lambda content: (response, content))
-        result = func(self.url, headers=self.headers, data=self.data,
-                      log=self.log)
+        result = self.treq.request(
+            self.method.upper(), self.url, headers=self.headers, data=self.data,
+            log=self.log)
         return result.addCallback(got_response)
 
 
