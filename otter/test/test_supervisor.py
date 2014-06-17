@@ -197,46 +197,24 @@ class LaunchConfigTests(SupervisorTests):
 
         self.InMemoryUndoStack.assert_called_once_with(self.cooperator.coiterate)
 
-    def test_job_deferred_added_to_deferred_pool(self):
-        """
-        The launch config job deferred is added to a deferred pool, if it is
-        provided to the constructor
-        """
-        self.launch_server.return_value = Deferred()  # block forward progress
-
-        # the pool starts off empty
-        self.successResultOf(self.supervisor.deferred_pool.notify_when_empty())
-
-        self.supervisor.execute_config(self.log, 'transaction-id',
-                                       self.group, self.launch_config)
-
-        # the pool is now not empty, since the job has been added
-        empty = self.supervisor.deferred_pool.notify_when_empty()
-        self.assertNoResult(empty)  # the pool is not empty now
-
-        # after launch server returns, the pool empties
-        self.launch_server.return_value.callback((self.fake_server_details, {}))
-        self.successResultOf(empty)
-
     def test_will_not_stop_until_pool_empty(self):
         """
         The deferred returned by stopService will not fire until the deferred
         pool is empty.
         """
-        self.launch_server.return_value = Deferred()  # block forward progress
-
         # the pool starts off empty
         self.successResultOf(self.supervisor.deferred_pool.notify_when_empty())
 
-        self.supervisor.execute_config(self.log, 'transaction-id',
-                                       self.group, self.launch_config)
+        # block forward progress
+        d = Deferred()
+        self.supervisor.deferred_pool.add(d)
 
         sd = self.supervisor.stopService()
 
         self.assertFalse(self.supervisor.running)
         self.assertNoResult(sd)
 
-        self.launch_server.return_value.callback((self.fake_server_details, {}))
+        d.callback((self.fake_server_details, {}))
 
         self.successResultOf(sd)
 
@@ -271,15 +249,6 @@ class DeleteServerTests(SupervisorTests):
             self.service_catalog,
             self.auth_token,
             (self.fake_server['id'], self.fake_server['lb_info']))
-
-    def test_execute_delete_added_to_pool(self):
-        """
-        `execute_delete_server` returned deferred is added to the pool
-        """
-        self.delete_server.return_value = Deferred()
-        d = self.supervisor.execute_delete_server(
-            self.log, 'transaction-id', self.group, self.fake_server)
-        self.assertIn(d, self.supervisor.deferred_pool._pool)
 
     def test_execute_delete_auths(self):
         """
@@ -523,43 +492,39 @@ class DeleteJobTests(SynchronousTestCase):
         """
         Create sample _DeleteJob
         """
-        self.supervisor = iMock(ISupervisor)
-        log = mock.Mock()
-        self.job = supervisor._DeleteJob(log, 'trans_id', 'group', {'id': 2, 'b': 'lah'},
-                                         self.supervisor)
-        log.bind.assert_called_once_with(system='otter.job.delete', server_id=2)
-        self.log = log.bind.return_value
+        self.supervisor = FakeSupervisor()
+        self.log = mock_log()
+        self.job = supervisor._DeleteJob(self.log, 'trans_id', 'group',
+                                         {'id': 2, 'b': 'lah'}, self.supervisor)
 
-    def test_start(self):
+    def test_success(self):
         """
-        `start` calls `supervisor.execute_delete_server`
+        `start` calls `supervisor.execute_delete_server` and audit logs success
         """
         self.job.start()
+        self.assertEqual(
+            self.supervisor.del_calls[0],
+            (matches(IsBoundWith(system='otter.job.delete', server_id=2)),
+             'trans_id', 'group', {'id': 2, 'b': 'lah'}))
+        self.log.msg.assert_called_once_with(
+            'Started server deletion job', system='otter.job.delete', server_id=2)
+        self.assertIn(self.supervisor.del_defs[0], self.supervisor.deferred_pool)
+        self.supervisor.del_defs[0].callback(None)
+        self.log.msg.assert_called_with(
+            'Server deleted', audit_log=True, event_type='server.delete',
+            system='otter.job.delete', server_id=2)
+        self.assertNotIn(self.supervisor.del_defs[0], self.supervisor.deferred_pool)
 
-        self.supervisor.execute_delete_server.assert_called_once_with(
-            self.log, 'trans_id', 'group', {'id': 2, 'b': 'lah'})
-        d = self.supervisor.execute_delete_server.return_value
-        d.addCallback.assert_called_once_with(self.job._job_completed)
-        d.addErrback.assert_called_once_with(self.job._job_failed)
-        self.log.msg.assert_called_once_with('Started server deletion job')
+    def test_failed(self):
+        """
+        failed Job logs failure
+        """
 
-    def test_job_completed(self):
-        """
-        `_job_completed` audit logs a successful deletion
-        """
-        log = self.job.log = mock_log()
-        self.job._job_completed('ignore')
-        log.msg.assert_called_with('Server deleted.', audit_log=True,
-                                   event_type='server.delete')
-
-    def test_job_failed(self):
-        """
-        `_job_failed` logs failure
-        """
-        self.supervisor.execute_delete_server.return_value = fail(ValueError('a'))
+        self.supervisor.execute_delete_server = lambda *_: fail(ValueError('a'))
         self.job.start()
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
-                                             'Server deletion job failed')
+                                             'Server deletion job failed',
+                                             system='otter.job.delete', server_id=2)
 
 
 class ExecScaleDownTests(SynchronousTestCase):
@@ -634,17 +599,10 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
         Mock relevant supervisor methods.
         Also build a mock model that can be used for testing.
         """
-        self.execute_config_deferreds = []
+        self.supervisor = FakeSupervisor()
+        set_supervisor(self.supervisor)
+        self.addCleanup(set_supervisor, None)
 
-        def fake_execute(*args, **kwargs):
-            d = Deferred()
-            self.execute_config_deferreds.append(d)
-            return succeed((str(len(self.execute_config_deferreds)), d))
-
-        self.supervisor = iMock(ISupervisor)
-        self.supervisor.execute_config.side_effect = fake_execute
-
-        patch(self, 'otter.supervisor.get_supervisor', return_value=self.supervisor)
         self.del_job = patch(self, 'otter.supervisor._DeleteJob')
 
         self.log = mock_log()
@@ -659,31 +617,18 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
         """
         supervisor.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 5)
-        self.assertEqual(self.supervisor.execute_config.mock_calls,
-                         [mock.call(matches(IsInstance(self.log.__class__)), '1',
-                                    self.group, 'launch')] * 5)
+        self.assertEqual(self.supervisor.exec_calls,
+                         [(matches(IsInstance(self.log.__class__)), '1', self.group, 'launch')] * 5)
 
     def test_positive_delta_execute_config_failures_propagated(self):
         """
         ``execute_launch_config`` fails if ``execute_config`` fails for any one
         case, and propagates the first ``execute_config`` error.
         """
-        class ExecuteException(Exception):
-            pass
-
-        def fake_execute(*args, **kwargs):
-            if len(self.execute_config_deferreds) > 1:
-                return fail(ExecuteException('no more!'))
-            d = Deferred()
-            self.execute_config_deferreds.append(d)
-            return succeed((
-                str(len(self.execute_config_deferreds)), d))
-
-        self.supervisor.execute_config.side_effect = fake_execute
+        self.supervisor.execute_config = lambda *_: fail(DummyException('a'))
         d = supervisor.execute_launch_config(self.log, '1', self.fake_state,
                                              'launch', self.group, 3)
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(ExecuteException))
+        self.failureResultOf(d, DummyException)
 
     def test_add_job_called_with_new_jobs(self):
         """
@@ -693,7 +638,7 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
         supervisor.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 3)
         self.fake_state.add_job.assert_has_calls(
-            [mock.call(str(i)) for i in (1, 2, 3)])
+            [mock.call(i) for i in (1, 2, 3)])
         self.assertEqual(self.fake_state.add_job.call_count, 3)
 
     def test_propagates_add_job_failures(self):
@@ -703,8 +648,7 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
         self.fake_state.add_job.side_effect = AssertionError
         d = supervisor.execute_launch_config(self.log, '1', self.fake_state,
                                              'launch', self.group, 1)
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(AssertionError))
+        self.failureResultOf(d, AssertionError)
 
     def test_on_job_completion_modify_state_called(self):
         """
@@ -715,9 +659,9 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
         supervisor.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 3)
 
-        self.execute_config_deferreds[0].callback({'id': '1'})       # job id 1
-        self.execute_config_deferreds[1].errback(Exception('meh'))   # job id 2
-        self.execute_config_deferreds[2].callback({'id': '3'})       # job id 3
+        self.supervisor.exec_defs[0].callback({'id': '1'})       # job id 1
+        self.supervisor.exec_defs[1].errback(Exception('meh'))   # job id 2
+        self.supervisor.exec_defs[2].callback({'id': '3'})       # job id 3
 
         self.assertEqual(self.group.modify_state.call_count, 3)
 
@@ -727,16 +671,16 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
         removed from pending and the server is added to active.  It is also
         logged.
         """
-        s = GroupState('tenant', 'group', 'name', {}, {'1': {}}, None, {}, False)
+        s = GroupState('tenant', 'group', 'name', {}, {1: {}}, None, {}, False)
 
         def fake_modify_state(callback, *args, **kwargs):
             callback(self.group, s, *args, **kwargs)
 
         self.group.modify_state.side_effect = fake_modify_state
-        supervisor.execute_launch_config(self.log, '1', self.fake_state,
+        supervisor.execute_launch_config(self.log, 'tid', self.fake_state,
                                          'launch', self.group, 1)
 
-        self.execute_config_deferreds[0].callback({'id': 's1'})
+        self.supervisor.exec_defs[0].callback({'id': 's1'})
         self.assertEqual(s.pending, {})  # job removed
         self.assertIn('s1', s.active)    # active server added
 
@@ -748,7 +692,7 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
         job_id is not there in job list and calls ``execute_delete_server``
         to delete the server.
         """
-        self.supervisor.execute_delete_server.return_value = succeed(None)
+        self.supervisor.execute_delete_server = lambda *_: succeed(None)
 
         s = GroupState('tenant', 'group', 'name', {}, {'1': {}}, None, {}, False)
 
@@ -760,7 +704,7 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
                                          'launch', self.group, 1)
 
         s.remove_job('1')
-        self.execute_config_deferreds[0].callback({'id': 's1'})
+        self.supervisor.exec_defs[0].callback({'id': 's1'})
 
         # first bind is system='otter.job.launch', second is job_id='1'
         self.del_job.assert_called_once_with(
@@ -773,7 +717,7 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
         ``execute_launch_config`` sets it up so that when a job fails, it is
         removed from pending.  It is also lgoged.
         """
-        s = GroupState('tenant', 'group', 'name', {}, {'1': {}}, None, {}, False)
+        s = GroupState('tenant', 'group', 'name', {}, {1: {}}, None, {}, False)
         written = []
 
         # modify state writes on callback, doesn't write on error
@@ -783,11 +727,11 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
             return d
 
         self.group.modify_state.side_effect = fake_modify_state
-        supervisor.execute_launch_config(self.log, '1', self.fake_state,
+        supervisor.execute_launch_config(self.log, 'trans-id', self.fake_state,
                                          'launch', self.group, 1)
 
         f = Failure(Exception('meh'))
-        self.execute_config_deferreds[0].errback(f)
+        self.supervisor.exec_defs[0].errback(f)
 
         # job is removed and no active servers added
         self.assertEqual(s, GroupState('tenant', 'group', 'name', {}, {}, None, {},
@@ -800,7 +744,7 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
                                         system="otter.job.launch",
                                         image_ref="Unable to pull image ref.",
                                         flavor_ref="Unable to pull flavor ref.",
-                                        job_id='1')
+                                        job_id=1)
 
     def test_modify_state_failure_logged(self):
         """
@@ -808,14 +752,14 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
         logged.
         """
         self.group.modify_state.side_effect = AssertionError
-        supervisor.execute_launch_config(self.log, '1', self.fake_state,
+        supervisor.execute_launch_config(self.log, 'trans-id', self.fake_state,
                                          'launch', self.group, 1)
-        self.execute_config_deferreds[0].callback({'id': 's1'})
+        self.supervisor.exec_defs[0].callback({'id': 's1'})
 
         self.log.err.assert_called_once_with(
             CheckFailure(AssertionError), system="otter.job.launch",
             image_ref="Unable to pull image ref.",
-            flavor_ref="Unable to pull flavor ref.", job_id='1')
+            flavor_ref="Unable to pull flavor ref.", job_id=1)
 
 
 class DummyException(Exception):
