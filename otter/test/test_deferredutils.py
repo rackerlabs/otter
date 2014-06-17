@@ -265,6 +265,15 @@ class DeferredPoolTests(SynchronousTestCase):
         holdup.errback(DummyException('hey'))
         self.failureResultOf(holdup, DummyException)
 
+    def test_contains(self):
+        """
+        `d in pool` will check if d is in the pool
+        """
+        d = Deferred()
+        self.pool.add(d)
+        self.assertIn(d, self.pool)
+        self.assertNotIn(Deferred(), self.pool)
+
     def test_len(self):
         """
         len(pool) returns number of deferreds waiting in the pool
