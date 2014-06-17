@@ -206,8 +206,9 @@ def find_server(server_endpoint, auth_token, server_config, creation_time,
     :param int fuzz: number of seconds before or after the given creation time
         during which the server could have been created.
 
-    :return: Deferred that fires with a list of servers that match that server
-        config and creation time
+    :return: Deferred that fires with a server (in the format of a server
+        detail response) that matches that server config and creation time, or
+        None if none matches
     """
     query_params = {
         'image': server_config['server']['imageRef'],
@@ -215,15 +216,30 @@ def find_server(server_endpoint, auth_token, server_config, creation_time,
         'name': '^{0}$'.format(server_config['server']['name'])
     }
     url = '{path}?{query}'.format(
-        path=append_segments(server_endpoint, 'servers', 'details'),
+        path=append_segments(server_endpoint, 'servers', 'detail'),
         query=urlencode(query_params))
 
     d = treq.get(url, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200])
+    d.addCallback(treq.json_content)
 
-    d.addErrback(raise_error_on_code, 404, ServerDeleted(server_id),
-                 path, 'server_details')
-    return d.addCallback(treq.json_content)
+    def get_server(list_server_details):
+        matches = [
+            s for s in list_server_details['servers']
+            if match_server(s, server_config['server']['metadata'],
+                            creation_time, fuzz)
+        ]
+
+        if len(matches) > 1:
+            log.err("{n} servers were created by the same job",
+                    n=len(matches), servers=matches)
+
+        if len(matches) >= 1:
+            return {'server': matches[0]}
+        return None
+
+    d.addCallback(get_server)
+    return d
 
 
 def create_server(server_endpoint, auth_token, server_config, log=None):

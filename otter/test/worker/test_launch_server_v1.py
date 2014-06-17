@@ -1,10 +1,10 @@
 """
 Unittests for the launch_server_v1 launch config.
 """
-from datetime import datetime, timedelta
+from datetime import datetime
 import mock
-from iso8601.iso8601 import Utc
 import json
+from urllib import quote_plus
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import Deferred, fail, succeed
@@ -683,6 +683,20 @@ class LoadBalancersTests(SynchronousTestCase):
     test_removelb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
 
 
+def _get_server_info(metadata=None, created=None):
+    config = {
+        'name': 'abcd',
+        'imageRef': '123',
+        'flavorRef': 'xyz',
+        'metadata': {}
+    }
+    if metadata is not None:
+        config['metadata'] = metadata
+    if created is not None:
+        config['created'] = created
+    return config
+
+
 class ServerTests(SynchronousTestCase):
     """
     Test server manipulation functions.
@@ -759,27 +773,113 @@ class ServerTests(SynchronousTestCase):
         """
         :func:`find_server` makes a call to nova to list server details while
         filtering on the image id, flavor id, and exact name in the server
-        config
+        config.
         """
-        server_config = {
-            'server': {
-                'name': 'abcd',
-                'imageRef': '123',
-                'flavor': 'xyz',
-                'metadata': {}
-            }
-        }
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.content.return_value = succeed('{"servers": []}')
+
+        find_server('http://url/', 'my-auth-token', server_config,
+                    datetime.now())
+
+        url = "http://url/servers/detail?image=123&flavor=xyz&name={0}".format(
+            quote_plus("^abcd$"))  # urlencoded to look like %5abcd%24
+
+        self.treq.get.assert_called_once_with(url, headers=expected_headers,
+                                              log=mock.ANY)
+
+    def test_find_server_propagates_api_errors(self):
+        """
+        :func:`find_server` propagates any errors from Nova
+        """
+        server_config = {'server': _get_server_info()}
+
         self.treq.get.return_value = succeed(mock.Mock(code=500))
         self.treq.content.return_value = succeed(error_body)
 
         d = find_server('http://url/', 'my-auth-token', server_config,
                          datetime.now())
-        self.failureResultOf(d)
+        failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(APIError))
+        self.assertEqual(failure.value.code, 500)
 
-        self.treq.get.assert_called_once_with(
-            "http://url/servers/details?image=123&flavor=xyz&name=^abcd$",
-            mock.ANY, mock.ANY)
+    def test_find_server_returns_None_if_no_servers_from_nova(self):
+        """
+        :func:`find_server` will return None for servers if Nova returns no
+        matching servers
+        """
+        server_config = {'server': _get_server_info()}
 
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.content.return_value = succeed('{"servers": []}')
+        d = find_server('http://url/', 'my-auth-token', server_config,
+                         datetime.now())
+        self.assertIsNone(self.successResultOf(d))
+
+    def test_find_server_returns_None_if_no_servers_from_nova_match(self):
+        """
+        :func:`find_server` will return None for servers even if Nova returned
+        some servers, if :func:`match_servers` does not match any of the servers
+        (for instance if the creation time is off)
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.content.return_value = succeed(json.dumps({
+            'servers': [
+                _get_server_info(created='2000-01-01T01:01:00Z'),
+                _get_server_info(metadata={'hello': 'there'},
+                                 created='2014-04-04T04:04:04Z')
+            ]
+        }))
+
+        d = find_server('http://url/', 'my-auth-token', server_config,
+                         datetime(2014, 04, 04, 04, 04, 04))
+        self.assertIsNone(self.successResultOf(d))
+
+    def test_find_server_returns_match_from_nova(self):
+        """
+        :func:`find_server` will return a server returned from Nova if the
+        metadata and creation dates match.
+        """
+        server_config = {'server': _get_server_info(metadata={'hey': 'there'})}
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed(
+            {'servers': [_get_server_info(metadata={'hey': 'there'},
+                                          created="2014-04-04T04:04:04Z")]})
+
+        d = find_server('http://url/', 'my-auth-token', server_config,
+                         datetime(2014, 04, 04, 04, 04, 04))
+
+        self.assertEqual(
+            self.successResultOf(d),
+            {'server': _get_server_info(metadata={'hey': 'there'},
+                                        created="2014-04-04T04:04:04Z")})
+
+    def test_find_server_returns_first_match_from_nova_and_logs_more(self):
+        """
+        :func:`find_server` will return a the first server returned from Nova
+        whose metadata and creation dates match.  It logs if there more than 1
+        match.
+        """
+        server_config = {'server': _get_server_info()}
+        servers = [
+            _get_server_info(created='2014-04-04T04:04:04Z'),
+            _get_server_info(created='2014-04-04T04:04:05Z'),
+        ]
+
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({'servers': servers})
+
+        d = find_server('http://url/', 'my-auth-token', server_config,
+                         datetime(2014, 04, 04, 04, 04, 04), log=self.log)
+
+        self.assertEqual(self.successResultOf(d), {'server': servers[0]})
+        self.log.err.assert_called_once_with(
+            "{n} servers were created by the same job", n=2, servers=servers
+        )
 
     def test_create_server(self):
         """
