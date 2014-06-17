@@ -833,21 +833,17 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         Mock a fake supervisor, and also a fake log and group.
         """
         self.transaction_id = 'transaction_id'
-        self.job_id = 'job_id'
+        self.job_id = 1
         self.log = mock.MagicMock()
         self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
         self.state = None
-        self.supervisor = iMock(ISupervisor)
-        self.completion_deferred = Deferred()
+        self.supervisor = FakeSupervisor()
 
-        self.supervisor.execute_config.return_value = succeed(
-            (self.job_id, self.completion_deferred))
-
-        self.delay_modify_state = False
+        self.pause_modify_state = False
 
         def fake_modify_state(f, *args, **kwargs):
             d = maybeDeferred(f, self.group, self.state, *args, **kwargs)
-            if self.delay_modify_state:
+            if self.pause_modify_state:
                 self.modify_state_d = Deferred()
                 return self.modify_state_d.addCallback(lambda _: d)
             else:
@@ -914,11 +910,12 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.job.job_started = mock.MagicMock()
 
         self.job.start('launch')
-        self.supervisor.execute_config.assert_called_once_with(
-            matches(IsInstance(self.log.__class__)), self.transaction_id,
-            self.group, 'launch')
+        self.assertEqual(
+            self.supervisor.exec_calls[0],
+            (matches(IsInstance(self.log.__class__)), self.transaction_id,
+             self.group, 'launch'))
         self.job.job_started.assert_called_once_with(
-            (self.job_id, self.completion_deferred))
+            (self.job_id, self.supervisor.exec_defs[0]))
 
     def test_job_started_not_called_if_supervisor_error(self):
         """
@@ -926,8 +923,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         errbacks, and the failure propagates up.
         """
         self.job.job_started = mock.MagicMock()
-        self.supervisor.execute_config.return_value = fail(
-            DummyException('e'))
+        self.supervisor.execute_config = lambda *_: fail(DummyException('e'))
 
         d = self.job.start('launch')
         self.assertEqual(self.job.job_started.call_count, 0)
@@ -950,7 +946,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         """
         self.job.start('launch')
         self.assertEqual(self.group.modify_state.call_count, 0)
-        self.completion_deferred.callback({'id': 'blob'})
+        self.supervisor.exec_defs[0].callback({'id': 'blob'})
         self.assertEqual(self.group.modify_state.call_count, 1)
 
     def test_modify_state_called_on_job_completion_failure(self):
@@ -959,7 +955,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         """
         self.job.start('launch')
         self.assertEqual(self.group.modify_state.call_count, 0)
-        self.completion_deferred.errback(Exception('e'))
+        self.supervisor.exec_defs[0].errback(Exception('e'))
         self.assertEqual(self.group.modify_state.call_count, 1)
 
     def test_job_in_supervisor_pool(self):
@@ -968,10 +964,35 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         adding other callbacks to ensure it is removed from the pool only
         when job and related state updation completes
         """
-        self.delay_modify_state = True
+        # Pause modify state and start job
+        self.pause_modify_state = True
         self.job.start('launch')
-        self.completion_deferred.callback({'id': 'blob'})
+        # Job added in pool
+        self.assertIn(self.supervisor.exec_defs[0], self.supervisor.deferred_pool)
+        # Finish job and job still in pool
+        self.supervisor.exec_defs[0].callback({'id': 'blob'})
+        self.assertIn(self.supervisor.exec_defs[0], self.supervisor.deferred_pool)
+        # Finish modifying state and job removed
         self.modify_state_d.callback(None)
+        self.assertNotIn(self.supervisor.exec_defs[0], self.supervisor.deferred_pool)
+
+    def test_failed_job_in_supervisor_pool(self):
+        """
+        `completion_deferred` is added to supervisor's deferred_pool after
+        adding other errbacks to ensure it is removed from the pool only
+        when job and related state updation completes
+        """
+        # Pause modify state and start job
+        self.pause_modify_state = True
+        self.job.start('launch')
+        # Job added in pool
+        self.assertIn(self.supervisor.exec_defs[0], self.supervisor.deferred_pool)
+        # Error job and job still in pool
+        self.supervisor.exec_defs[0].errback(DummyException('a'))
+        self.assertIn(self.supervisor.exec_defs[0], self.supervisor.deferred_pool)
+        # Finish modifying state and job removed
+        self.modify_state_d.callback(None)
+        self.assertNotIn(self.supervisor.exec_defs[0], self.supervisor.deferred_pool)
 
     def test_job_completion_success_job_marked_as_active(self):
         """
@@ -981,9 +1002,9 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.state = GroupState('tenant', 'group', 'name', {}, {self.job_id: {}}, None,
                                 {}, False)
         self.job.start('launch')
-        self.completion_deferred.callback({'id': 'active'})
+        self.supervisor.exec_defs[0].callback({'id': 'active'})
 
-        self.assertIs(self.successResultOf(self.completion_deferred),
+        self.assertIs(self.successResultOf(self.supervisor.exec_defs[0]),
                       self.state)
 
         self.assertEqual(self.state.pending, {})
@@ -999,9 +1020,9 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.state = GroupState('tenant', 'group', 'name', {},
                                 {self.job_id: {}}, None, {}, False)
         self.job.start(self.mock_launch)
-        self.completion_deferred.callback({'id': 'yay'})
+        self.supervisor.exec_defs[0].callback({'id': 'yay'})
 
-        self.successResultOf(self.completion_deferred)
+        self.successResultOf(self.supervisor.exec_defs[0])
 
         self.log.msg.assert_called_once_with(
             "Server is active.", event_type="server.active", server_id='yay',
@@ -1016,9 +1037,9 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
                                 {}, False)
         self.job.start('launch')
-        self.completion_deferred.callback({'id': 'active'})
+        self.supervisor.exec_defs[0].callback({'id': 'active'})
 
-        self.assertIs(self.successResultOf(self.completion_deferred),
+        self.assertIs(self.successResultOf(self.supervisor.exec_defs[0]),
                       self.state)
 
         self.assertEqual(self.state.pending, {})
@@ -1039,9 +1060,9 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
                                 {}, False)
         self.job.start(self.mock_launch)
-        self.completion_deferred.callback({'id': 'yay'})
+        self.supervisor.exec_defs[0].callback({'id': 'yay'})
 
-        self.successResultOf(self.completion_deferred)
+        self.successResultOf(self.supervisor.exec_defs[0])
 
         self.log.msg.assert_called_once_with(
             ("A pending server that is no longer needed is now active, "
@@ -1058,9 +1079,9 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.state = GroupState('tenant', 'group', 'name', {}, {self.job_id: {}}, None,
                                 {}, False)
         self.job.start(self.mock_launch)
-        self.completion_deferred.errback(DummyException('e'))
+        self.supervisor.exec_defs[0].errback(DummyException('e'))
 
-        self.assertIs(self.successResultOf(self.completion_deferred),
+        self.assertIs(self.successResultOf(self.supervisor.exec_defs[0]),
                       self.state)
 
         self.assertEqual(self.state.pending, {})
@@ -1080,9 +1101,9 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
                                 {}, False)
         self.job.start(self.mock_launch)
-        self.completion_deferred.errback(DummyException('e'))
+        self.supervisor.exec_defs[0].errback(DummyException('e'))
 
-        self.assertIs(self.successResultOf(self.completion_deferred),
+        self.assertIs(self.successResultOf(self.supervisor.exec_defs[0]),
                       self.state)
 
         self.assertEqual(self.state.pending, {})
@@ -1103,7 +1124,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
             lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
 
         self.job.start('launch')
-        self.completion_deferred.callback({'id': 'active'})
+        self.supervisor.exec_defs[0].callback({'id': 'active'})
 
         self.del_job.assert_called_once_with(
             matches(IsInstance(self.log.__class__)), self.transaction_id,
@@ -1119,9 +1140,9 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
             lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
 
         self.job.start(self.mock_launch)
-        self.completion_deferred.callback({'id': 'yay'})
+        self.supervisor.exec_defs[0].callback({'id': 'yay'})
 
-        self.successResultOf(self.completion_deferred)
+        self.successResultOf(self.supervisor.exec_defs[0])
 
         self.log.msg.assert_called_once_with(
             ("A pending server belonging to a deleted scaling group "
@@ -1141,7 +1162,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
             lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
 
         self.job.start('launch')
-        self.completion_deferred.callback({'id': 'active'})
+        self.supervisor.exec_defs[0].callback({'id': 'active'})
         self.assertEqual(self.log.err.call_count, 0)
 
     def test_modify_state_failure_logged(self):
@@ -1153,7 +1174,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
             lambda *args: fail(DummyException('e')))
 
         self.job.start(self.mock_launch)
-        self.completion_deferred.callback({'id': 'active'})
+        self.supervisor.exec_defs[0].callback({'id': 'active'})
 
         self.log.err.assert_called_once_with(CheckFailure(DummyException),
                                              system="otter.job.launch",
