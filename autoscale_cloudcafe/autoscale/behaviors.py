@@ -116,6 +116,30 @@ class AutoscaleBehaviors(BaseBehavior):
             self, create_response.entity, create_response.status_code)
         return policy
 
+    def create_policy_min_batch(self, group_id, sp_name=None, sp_cooldown=None,
+                                sp_change=None, sp_change_percent=None,
+                                sp_desired_capacity=None, sp_policy_type=None, batch_size=1):
+        """
+        :summary: Creates batch_size policies with change set to default config value.
+                  The name of each policy uses name as the root, and appends a count (done in client.py)
+        :params: group_id
+        :return: returns information on the created policies in the form of a list of dicts
+        :rtype: returns a list of policy dicts
+        """
+        sp_name = sp_name and str(sp_name) or rand_name('test_sp')
+        if sp_cooldown is None:
+            sp_cooldown = int(self.autoscale_config.sp_cooldown)
+        if sp_policy_type is None:
+            sp_policy_type = self.autoscale_config.sp_policy_type
+        sp_change = int(self.autoscale_config.sp_change)
+        create_response = self.autoscale_client.create_policy_batch(
+            group_id=group_id,
+            name=sp_name, cooldown=sp_cooldown,
+            change=sp_change, policy_type=sp_policy_type, batch_size=batch_size)
+        policy_list = [AutoscaleBehaviors.get_policy_properties(
+            self, [each_policy], create_response.status_code) for each_policy in create_response.entity]
+        return policy_list
+
     def create_policy_given(self, group_id, sp_name=None, sp_cooldown=None,
                             sp_change=None, sp_change_percent=None,
                             sp_desired_capacity=None, sp_policy_type=None):
@@ -390,7 +414,10 @@ class AutoscaleBehaviors(BaseBehavior):
 
     def get_policy_properties(self, policy_list, status_code=None,
                               headers=None):
-        """converts policy list object to a dict"""
+        """
+        This function converts a policy list containing a single policy object to a dict.
+        If there are multiple policies in the list, the properties of the first are returned.
+        """
         # :todo : find the change type
         policy = {}
         for policy_type in policy_list:
@@ -498,7 +525,7 @@ class AutoscaleBehaviors(BaseBehavior):
             return policy
 
     def get_webhooks_properties(self, webhook_list):
-        """converts webhook list object to a dict"""
+        """converts the first item in a webhook list object to a dict"""
         webhook = {}
         for i in webhook_list:
             webhook['id'] = i.id
