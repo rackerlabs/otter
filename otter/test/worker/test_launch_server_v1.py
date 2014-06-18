@@ -799,7 +799,7 @@ class ServerTests(SynchronousTestCase):
         self.treq.content.return_value = succeed(error_body)
 
         d = find_server('http://url/', 'my-auth-token', server_config,
-                         datetime.now())
+                        datetime.now())
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(APIError))
         self.assertEqual(failure.value.code, 500)
@@ -814,7 +814,7 @@ class ServerTests(SynchronousTestCase):
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.content.return_value = succeed('{"servers": []}')
         d = find_server('http://url/', 'my-auth-token', server_config,
-                         datetime.now())
+                        datetime.now())
         self.assertIsNone(self.successResultOf(d))
 
     def test_find_server_returns_None_if_no_servers_from_nova_match(self):
@@ -835,7 +835,7 @@ class ServerTests(SynchronousTestCase):
         }))
 
         d = find_server('http://url/', 'my-auth-token', server_config,
-                         datetime(2014, 04, 04, 04, 04, 04))
+                        datetime(2014, 04, 04, 04, 04, 04))
         self.assertIsNone(self.successResultOf(d))
 
     def test_find_server_returns_match_from_nova(self):
@@ -850,7 +850,7 @@ class ServerTests(SynchronousTestCase):
                                           created="2014-04-04T04:04:04Z")]})
 
         d = find_server('http://url/', 'my-auth-token', server_config,
-                         datetime(2014, 04, 04, 04, 04, 04))
+                        datetime(2014, 04, 04, 04, 04, 04))
 
         self.assertEqual(
             self.successResultOf(d),
@@ -869,12 +869,11 @@ class ServerTests(SynchronousTestCase):
             _get_server_info(created='2014-04-04T04:04:05Z'),
         ]
 
-
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({'servers': servers})
 
         d = find_server('http://url/', 'my-auth-token', server_config,
-                         datetime(2014, 04, 04, 04, 04, 04), log=self.log)
+                        datetime(2014, 04, 04, 04, 04, 04), log=self.log)
 
         self.assertEqual(self.successResultOf(d), {'server': servers[0]})
         self.log.err.assert_called_once_with(
