@@ -84,25 +84,12 @@ class SupervisorService(object, Service):
         """
         see :meth:`ISupervisor.execute_config`
         """
-        job_id = generate_job_id(scaling_group.uuid)
-        completion_d = Deferred()
-
-        log = log.bind(job_id=job_id,
-                       worker=launch_config['type'],
+        log = log.bind(worker=launch_config['type'],
                        tenant_id=scaling_group.tenant_id)
 
         assert launch_config['type'] == 'launch_server'
 
         undo = InMemoryUndoStack(self.coiterate)
-
-        def when_fails(result):
-            log.msg("Encountered an error, rewinding {worker!r} job undo stack.",
-                    exc=result.value)
-            ud = undo.rewind()
-            ud.addCallback(lambda _: result)
-            return ud
-
-        completion_d.addErrback(when_fails)
 
         log.msg("Authenticating for tenant")
 
@@ -135,11 +122,16 @@ class SupervisorService(object, Service):
 
         d.addCallback(when_launch_server_completed)
 
+        def when_fails(result):
+            log.msg("Encountered an error, rewinding {worker!r} job undo stack.",
+                    exc=result.value)
+            ud = undo.rewind()
+            ud.addCallback(lambda _: result)
+            return ud
+
+        d.addErrback(when_fails)
         self.deferred_pool.add(d)
-
-        d.chainDeferred(completion_d)
-
-        return succeed((job_id, completion_d))
+        return d
 
     def execute_delete_server(self, log, transaction_id, scaling_group, server):
         """
@@ -356,12 +348,14 @@ class _Job(object):
         except:
             flavor = 'Unable to pull flavor ref.'
 
-        self.log = self.log.bind(image_ref=image, flavor_ref=flavor)
+        self.job_id = generate_job_id(self.scaling_group.uuid)
+        self.log = self.log.bind(image_ref=image, flavor_ref=flavor, job_id=self.job_id)
 
-        deferred = self.supervisor.execute_config(
+        d = self.supervisor.execute_config(
             self.log, self.transaction_id, self.scaling_group, launch_config)
-        deferred.addCallback(self.job_started)
-        return deferred
+        d.addCallbacks(self._job_succeeded, self._job_failed)
+
+        return self.job_id
 
     def _job_failed(self, f):
         """
@@ -429,51 +423,19 @@ class _Job(object):
         d.addErrback(delete_if_group_deleted)
         return d
 
-    def job_started(self, result):
-        """
-        Takes a tuple of (job_id, completion deferred), which will fire when a
-        job has been completed, and marks said job as completed by removing it
-        from pending.
-        """
-        self.job_id, completion_deferred = result
-        self.log = self.log.bind(job_id=self.job_id)
-
-        completion_deferred.addCallbacks(
-            self._job_succeeded, self._job_failed)
-        completion_deferred.addErrback(self.log.err)
-
-        return self.job_id
-
 
 def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
     """
     Execute a launch config some number of times.
-
-    :return: Deferred
     """
+    log.msg("Launching {delta} servers.", delta=delta)
+    supervisor = get_supervisor()
+    for i in range(delta):
+        job_id = _Job(log, transaction_id, scaling_group, supervisor).start(launch)
+        state.add_job(job_id)
 
-    def _update_state(pending_results):
-        """
-        :param pending_results: ``list`` of tuples of
-        ``(job_id, {'created': <job creation time>, 'jobType': [create/delete]})``
-        """
-        log.msg('updating state')
-
-        for job_id in pending_results:
-            state.add_job(job_id)
-
-    if delta > 0:
-        log.msg("Launching some servers.")
-        supervisor = get_supervisor()
-        deferreds = [
-            _Job(log, transaction_id, scaling_group, supervisor).start(launch)
-            for i in range(delta)
-        ]
-
-    pendings_deferred = gatherResults(deferreds, consumeErrors=True)
-    pendings_deferred.addCallback(_update_state)
-    pendings_deferred.addErrback(unwrap_first_error)
-    return pendings_deferred
+    #TODO: Doing this to not cause change in controller but would be nice to remove it
+    return succeed(None)
 
 
 class ServerNotFoundError(Exception):
