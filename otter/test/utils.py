@@ -306,3 +306,26 @@ class FakeSupervisor(object, Service):
         self.del_index += 1
         self.del_calls.append((log, transaction_id, scaling_group, server))
         return succeed(self.del_index)
+
+
+def mock_group(state, tenant_id='tenant', uuid='group'):
+    """
+    Return mocked `IScalingGroup` that has tunable `modify_state` method
+
+    :param state: This will be passed to `modify_state` callable
+    """
+    group = iMock(IScalingGroup, tenant_id, uuid)
+    group.pause_modify_state = False
+    group.modify_state_values = []
+
+    def fake_modify_state(f, *args, **kwargs):
+        d = maybeDeferred(f, group, state, *args, **kwargs)
+        d.addCallback(lambda r: group.modify_state_values.append(r) or r)
+        if pause_modify_state:
+            group.modify_state_d = Deferred()
+            return group.modify_state_d.addCallback(lambda _: d)
+        else:
+            return d
+
+    group.modify_state.side_effect = fake_modify_state
+    return group
