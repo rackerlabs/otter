@@ -56,7 +56,7 @@ class matches(object):
 
     def __repr__(self):
         if self._last_match:
-            return 'mismatch: {}'.format(self._last_match.describe())
+            return '({}) mismatch: {}'.format(self._matcher, self._last_match.describe())
         else:
             return 'matches({0!s})'.format(self._matcher)
 
