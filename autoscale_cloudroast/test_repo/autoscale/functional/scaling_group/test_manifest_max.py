@@ -19,7 +19,7 @@ class GetMaxManifest(ScalingGroupFixture):
         """
         Create MAX scaling policies, each with MAX webhooks and comfirm that all are
         listed in the manifest. Each policy and webhook is created using a separate
-        API call, which
+        API call.
         """
         # Create and record ids for the maximum number of policies and webhooks
         manifest_dict = {}
