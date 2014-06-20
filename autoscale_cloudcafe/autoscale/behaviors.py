@@ -120,9 +120,9 @@ class AutoscaleBehaviors(BaseBehavior):
                                 sp_change=None, sp_change_percent=None,
                                 sp_desired_capacity=None, sp_policy_type=None, batch_size=1):
         """
-        :summary: Creates batch_size policies with change set to default config value.
-                  The name of each policy uses name as the root, and appends a count (done in client.py)
-        :params: group_id
+        :summary: Use a single API call to create the requested number of scaling policies.
+        :param: group_id
+        :param: name -  Names take the form "name_#" with numbers from 0 to batch_size (done in client.py)
         :return: returns information on the created policies in the form of a list of dicts
         :rtype: returns a list of policy dicts
         """

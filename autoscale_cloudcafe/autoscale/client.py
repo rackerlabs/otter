@@ -403,8 +403,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             target_alias=None, target_hostname=None,
                             target_resolver=None, requestslib_kwargs=None, batch_size=1):
         """
-        :summary: Create a set of scaling policies in a single API call
-        :param name: A unique name root for the scaling policy
+        :summary: Create multiple scaling policies in a single API call
+        :param name: Name root - Names take the form "name_#" with numbers from 0 to batch_size
         :type name: String
         :param cooldown: The cooldown time for the policy
         :type cooldown: Number
@@ -419,8 +419,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type desired_capacity: Integer
         :param policy_type: What type of policy this is
         :type policy_type: String
-        :return: Response Object containing response code 201
-         on success and empty body
+        :return: Response Object containing response code 201 on success
+         and a list of policy objects
         :rtype: Response Object
 
         POST
@@ -592,12 +592,12 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def create_webhooks_multiple(self, group_id, policy_id, webhook_list,
                                  requestslib_kwargs=None):
         """
-        :summary: Takes a list of webhook request dictionaries, transforms them into requests
-        and creates them using a single API call
-        :param webhook_list: The name of the webhook
+        :summary: Use a single API call to create multiple webhooks on a policy based
+         on a list of request dictionaries
+        :param webhook_list: A list of dictionaries representing the desired webhooks
         :type webhook_list: List
         :return: Response Object containing response code 201
-         on success and body TBD
+         on success and a list of webhook objects
         :rtype: Response Object
 
             POST
