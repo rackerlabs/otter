@@ -223,7 +223,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
-    lb_log = log.bind(loadbalancer_id=lb_id)
+    lb_log = log.bind(loadbalancer_id=lb_id, ip_address=ip_address)
 
     def add():
         d = treq.post(path, headers=headers(auth_token),
@@ -244,7 +244,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
         clock=clock)
 
     def when_done(result):
-        lb_log.msg('Added to load balancer')
+        lb_log.msg('Added to load balancer', node_id=result['nodes'][0]['id'])
         undo.push(remove_from_load_balancer,
                   lb_log,
                   endpoint,
