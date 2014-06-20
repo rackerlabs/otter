@@ -179,6 +179,10 @@ class LoadBalancersTests(SynchronousTestCase):
 
         self.treq.json_content.assert_called_once_with(mock.ANY)
 
+        self.log.msg.assert_called_with(
+            'Added to load balancer', loadbalancer_id=12345,
+            ip_address='192.168.1.1', node_id=1)
+
     def test_add_lb_retries(self):
         """
         add_to_load_balancer will retry again until it succeeds
@@ -271,7 +275,8 @@ class LoadBalancersTests(SynchronousTestCase):
         self.successResultOf(d)
         self.log.msg.assert_has_calls(
             [mock.call('Got LB error while {m}: {e}', loadbalancer_id=12345,
-                       m='add_node', e=matches(IsInstance(RequestError)))] * bad_codes_len)
+                       ip_address='192.168.1.1', m='add_node',
+                       e=matches(IsInstance(RequestError)))] * bad_codes_len)
 
     def test_add_lb_retries_logs_unexpected_errors(self):
         """
