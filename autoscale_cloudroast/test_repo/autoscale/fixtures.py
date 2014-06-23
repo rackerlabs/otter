@@ -549,12 +549,12 @@ class ScalingGroupPolicyFixture(ScalingGroupFixture):
     @classmethod
     def setUpClass(cls, name=None, cooldown=None, change=None,
                    change_percent=None, desired_capacity=None,
-                   policy_type=None):
+                   policy_type=None, **kwargs):
         """
         Creates a scaliing policy
         """
 
-        super(ScalingGroupPolicyFixture, cls).setUpClass()
+        super(ScalingGroupPolicyFixture, cls).setUpClass(**kwargs)
         if name is None:
             name = cls.sp_name
         if cooldown is None:
