@@ -209,6 +209,7 @@ def find_server(server_endpoint, auth_token, server_config, creation_time,
         should have been created.
     :param int fuzz: number of seconds before or after the given creation time
         during which the server could have been created.
+    :param log: A bound logger
 
     :return: Deferred that fires with a server (in the format of a server
         detail response) that matches that server config and creation time, or
@@ -228,12 +229,14 @@ def find_server(server_endpoint, auth_token, server_config, creation_time,
     d.addCallback(treq.json_content)
 
     def get_server(list_server_details):
-        print list_server_details['servers']
-        matches = [
-            s for s in list_server_details['servers']
-            if match_server(s, server_config['server']['metadata'],
-                            creation_time, fuzz)
-        ]
+        server_metadata = server_config['server']['metadata']
+        more_strictly_match = partial(match_server,
+                                      server_metadata=server_metadata,
+                                      creation_time=creation_time,
+                                      fuzz=fuzz)
+
+        matches = [s for s in list_server_details['servers']
+                   if more_strictly_match(s)]
 
         if len(matches) > 1:
             log.err("{n} servers were created by the same job",
