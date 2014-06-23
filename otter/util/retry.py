@@ -189,10 +189,10 @@ def random_interval(minimum, maximum):
 
 def exponential_backoff_interval(start=2):
     """
-    Returns a ``can_retry`` function for :py:func:retry` that returns previous
+    Returns a ``next_interval`` function for `:py:func:retry` that returns previous
     interval * 2 as new interval each time it is called
 
-    :param start: number of seconds to start with
+    :param start: number of seconds > 0 to start with
     :return: a function that accepts a :class:`Failure` and returns ``interval``
     """
     last_interval = [0]
