@@ -228,6 +228,7 @@ def find_server(server_endpoint, auth_token, server_config, creation_time,
     d.addCallback(treq.json_content)
 
     def get_server(list_server_details):
+        print list_server_details['servers']
         matches = [
             s for s in list_server_details['servers']
             if match_server(s, server_config['server']['metadata'],

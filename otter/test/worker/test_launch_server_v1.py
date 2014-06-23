@@ -779,7 +779,7 @@ class ServerTests(SynchronousTestCase):
         server_config = {'server': _get_server_info()}
 
         self.treq.get.return_value = succeed(mock.Mock(code=200))
-        self.treq.content.return_value = succeed('{"servers": []}')
+        self.treq.json_content.return_value = succeed({"servers": []})
 
         find_server('http://url/', 'my-auth-token', server_config,
                     datetime.now())
@@ -813,7 +813,8 @@ class ServerTests(SynchronousTestCase):
         server_config = {'server': _get_server_info()}
 
         self.treq.get.return_value = succeed(mock.Mock(code=200))
-        self.treq.content.return_value = succeed('{"servers": []}')
+        self.treq.json_content.return_value = succeed({"servers": []})
+
         d = find_server('http://url/', 'my-auth-token', server_config,
                         datetime.now())
         self.assertIsNone(self.successResultOf(d))
@@ -827,13 +828,13 @@ class ServerTests(SynchronousTestCase):
         server_config = {'server': _get_server_info()}
 
         self.treq.get.return_value = succeed(mock.Mock(code=200))
-        self.treq.content.return_value = succeed(json.dumps({
+        self.treq.json_content.return_value = succeed({
             'servers': [
                 _get_server_info(created='2000-01-01T01:01:00Z'),
                 _get_server_info(metadata={'hello': 'there'},
                                  created='2014-04-04T04:04:04Z')
             ]
-        }))
+        })
 
         d = find_server('http://url/', 'my-auth-token', server_config,
                         datetime(2014, 04, 04, 04, 04, 04))
