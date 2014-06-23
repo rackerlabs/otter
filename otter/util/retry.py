@@ -187,6 +187,23 @@ def random_interval(minimum, maximum):
     return lambda f: random.uniform(minimum, maximum)
 
 
+def exponential_backoff_interval(start=2):
+    """
+    Returns a ``can_retry`` function for :py:func:retry` that returns previous
+    interval * 2 as new interval each time it is called
+
+    :param start: number of seconds to start with
+    :return: a function that accepts a :class:`Failure` and returns ``interval``
+    """
+    last_interval = [1]
+
+    def next_interval(f):
+        last_interval[0] = last_interval[0] * 2
+        return last_interval[0]
+
+    return next_interval
+
+
 def retry(do_work, can_retry=None, next_interval=None, clock=None):
     """
     Retries the `do_work` function if it does not succeed and the ``can_retry``
