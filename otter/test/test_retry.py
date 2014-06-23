@@ -365,7 +365,7 @@ class NextIntervalHelperTests(SynchronousTestCase):
         time it is called
         """
         err = DummyException()
-        next_interval = exponential_backoff_interval(2)
-        self.assertEqual(next_interval(err), 2)
-        self.assertEqual(next_interval(err), 4)
-        self.assertEqual(next_interval(err), 8)
+        next_interval = exponential_backoff_interval(3)
+        self.assertEqual(next_interval(err), 3)
+        self.assertEqual(next_interval(err), 6)
+        self.assertEqual(next_interval(err), 12)

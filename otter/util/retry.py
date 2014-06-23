@@ -195,10 +195,13 @@ def exponential_backoff_interval(start=2):
     :param start: number of seconds to start with
     :return: a function that accepts a :class:`Failure` and returns ``interval``
     """
-    last_interval = [1]
+    last_interval = [0]
 
     def next_interval(f):
-        last_interval[0] = last_interval[0] * 2
+        if last_interval[0]:
+            last_interval[0] *= 2
+        else:
+            last_interval[0] = start
         return last_interval[0]
 
     return next_interval
