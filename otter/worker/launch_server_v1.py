@@ -163,15 +163,19 @@ create_server_sem = DeferredSemaphore(MAX_CREATE_SERVER)
 
 def match_server(server_details, server_metadata, creation_time, fuzz=5):
     """
-    :param dict server_details: List server details JSON blob, as would
-        come back from a list server details call to Nova
+    Matches a server by its metadata and creation time.
+
+    :param dict server_details: Server details JSON blob, as would
+        come back from a server details or as part of a list server details call
+        to Nova
     :param dict server_metadata: The exact metadata to check
     :param datetime creation_time:  The approximate time during wich the server
-        should have been created.
+        should have been created.  This datetime should be timezone-aware, or
+        if it is timezone-naive, it will be assumed to be UTC.
     :param int fuzz: number of seconds before or after the given creation time
         during which the server could have been created.
 
-    :return: True if the server metadata matches the given server metadata,
+    :return: True if the server metadata matches the given metadata,
         and the creation time falls within ``fuzz`` seconds of ``creation_time``
     :rtype: ``bool``
     """

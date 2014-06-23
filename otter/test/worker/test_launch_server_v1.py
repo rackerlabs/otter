@@ -28,7 +28,8 @@ from otter.worker.launch_server_v1 import (
     ServerDeleted,
     delete_and_verify,
     verified_delete,
-    LB_MAX_RETRIES, LB_RETRY_INTERVAL_RANGE,
+    LB_MAX_RETRIES,
+    LB_RETRY_INTERVAL_RANGE,
     match_server,
     find_server
 )
@@ -119,7 +120,7 @@ class UtilityTests(SynchronousTestCase):
             {'metadata': {'1': '2'}, 'created': '1970-01-01T01:00:00Z'},
             {'1': '2'}, datetime(1970, 1, 1, 1, 0, 0)))
 
-    def test_match_server_negative_metadata_matches(self):
+    def test_match_server_returns_false_if_metadata_not_equal(self):
         """
         :func:`match_server` returns False if the timestamps are around the same
         time but the metadata are not exactly equivalent
