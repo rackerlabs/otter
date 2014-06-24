@@ -17,9 +17,10 @@ class GetMaxManifest(ScalingGroupFixture):
     @tags(stress='true')
     def test_manifest_max(self):
         """
-        Create MAX scaling policies, each with MAX webhooks and comfirm that all are
+        Create MAX_POLICIES scaling policies, each with MAX_WEBHOOKS webhooks and comfirm that all are
         listed in the manifest. Each policy and webhook is created using a separate
         API call.
+        Note: BaseTestFixture imports max_policies and max_webhooks from otter_constants.py
         """
         # Create and record ids for the maximum number of policies and webhooks
         manifest_dict = {}
@@ -51,8 +52,9 @@ class GetMaxManifest(ScalingGroupFixture):
 
     def test_manifest_max_batch(self):
         """
-        Create MAX scaling policies, each with MAX webhooks and comfirm that all are
+        Create MAX_POLICIES scaling policies, each with MAX_WEBHOOKS webhooks and comfirm that all are
         listed in the manifest.
+        Note: BaseTestFixture imports max_policies and max_webhooks from otter_constants.py
 
         """
 

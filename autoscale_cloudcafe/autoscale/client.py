@@ -357,14 +357,14 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :param change_percent: The changepercent to make in the number of
                               servers in the scaling group
         :type change_percent: Number
-        :param desired_capacity: The desired capacity is the no of servers to be
+        :param desired_capacity: The desired capacity is the number of servers to be
                             in the scaling group
         :type desired_capacity: Integer
         :param policy_type: What type of policy this is
         :type policy_type: String
         :return: Response Object containing response code 201
          on success and empty body
-        :rtype: Response Object
+        :rtype: Policy Response Object
 
         POST
         '/{tenantId}/groups/{groupId}/policy'
@@ -403,25 +403,25 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             target_alias=None, target_hostname=None,
                             target_resolver=None, requestslib_kwargs=None, batch_size=1):
         """
-        :summary: Create multiple scaling policies in a single API call
+        :summary: Create multiple scaling policies with the same configuration in a single API call
         :param name: Name root - Names take the form "name_#" with numbers from 0 to batch_size
-        :type name: String
+        :type name: str
         :param cooldown: The cooldown time for the policy
-        :type cooldown: Number
+        :type cooldown: int|float
         :param change: The change to make in the number of servers in the
                       scaling group (non-zero)
-        :type change: Integer
+        :type change: int
         :param change_percent: The changepercent to make in the number of
                               servers in the scaling group
-        :type change_percent: Number
-        :param desired_capacity: The desired capacity is the no of servers to be
+        :type change_percent: int|float
+        :param desired_capacity: The desired capacity is the number of servers to be
                             in the scaling group
-        :type desired_capacity: Integer
-        :param policy_type: What type of policy this is
-        :type policy_type: String
+        :type desired_capacity: int
+        :param policy_type: What type of policy this is ("webhook", "schedule")
+        :type policy_type: str
         :return: Response Object containing response code 201 on success
          and a list of policy objects
-        :rtype: Response Object
+        :rtype: Policy Response Object
 
         POST
         '/{tenantId}/groups/{groupId}/policy'
@@ -595,10 +595,11 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :summary: Use a single API call to create multiple webhooks on a policy based
          on a list of request dictionaries
         :param webhook_list: A list of dictionaries representing the desired webhooks
-        :type webhook_list: List
+         (i.e. {"name": str, "metadata": {key: str, ...}})
+        :type webhook_list: list of dict
         :return: Response Object containing response code 201
          on success and a list of webhook objects
-        :rtype: Response Object
+        :rtype: Webhook Response Object
 
             POST
             '/{tenantId}/groups/{groupId}/policy/{policyId}/webhooks/'

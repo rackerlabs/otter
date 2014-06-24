@@ -122,7 +122,7 @@ class AutoscaleBehaviors(BaseBehavior):
         """
         :summary: Use a single API call to create the requested number of scaling policies.
         :param: group_id
-        :param: name -  Names take the form "name_#" with numbers from 0 to batch_size (done in client.py)
+        :param: name - Names take the form "name_#" with numbers from 0 to batch_size (done in client.py)
         :return: returns information on the created policies in the form of a list of dicts
         :rtype: returns a list of policy dicts
         """
