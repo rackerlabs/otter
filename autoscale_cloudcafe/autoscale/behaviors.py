@@ -107,7 +107,7 @@ class AutoscaleBehaviors(BaseBehavior):
             sp_cooldown = int(self.autoscale_config.sp_cooldown)
         if sp_policy_type is None:
             sp_policy_type = self.autoscale_config.sp_policy_type
-        sp_change = int(self.autoscale_config.sp_change)
+        sp_change = sp_change or int(self.autoscale_config.sp_change)
         create_response = self.autoscale_client.create_policy(
             group_id=group_id,
             name=sp_name, cooldown=sp_cooldown,
