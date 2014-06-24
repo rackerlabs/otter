@@ -4,7 +4,7 @@ Unittests for the launch_server_v1 launch config.
 from datetime import datetime
 import mock
 import json
-from urllib import quote_plus
+from urllib import quote_plus, unquote
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import Deferred, fail, succeed
@@ -789,6 +789,25 @@ class ServerTests(SynchronousTestCase):
 
         self.treq.get.assert_called_once_with(url, headers=expected_headers,
                                               log=mock.ANY)
+
+    def test_find_server_regex_escapes_server_name(self):
+        """
+        :func:`find_server` when giving the exact name of the server,
+        regex-escapes the name
+        """
+        server_config = {'server': _get_server_info()}
+        server_config['server']['name'] = r"this.is[]regex\dangerous()*"
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({"servers": []})
+
+        find_server('http://url/', 'my-auth-token', server_config,
+                    datetime.now())
+
+        url = ("http://url/servers/detail?image=123&flavor=xyz&name="
+               r"^this\.is\[\]regex\\dangerous\(\)\*$")
+
+        self.assertEqual(unquote(self.treq.get.mock_calls[0][1][0]), url)
 
     def test_find_server_propagates_api_errors(self):
         """

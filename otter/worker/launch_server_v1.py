@@ -20,6 +20,7 @@ from functools import partial
 import json
 import itertools
 from copy import deepcopy
+import re
 from urllib import urlencode
 
 from twisted.internet.defer import gatherResults, maybeDeferred, DeferredSemaphore
@@ -218,7 +219,7 @@ def find_server(server_endpoint, auth_token, server_config, creation_time,
     query_params = {
         'image': server_config['server']['imageRef'],
         'flavor': server_config['server']['flavorRef'],
-        'name': '^{0}$'.format(server_config['server']['name'])
+        'name': '^{0}$'.format(re.escape(server_config['server']['name']))
     }
     url = '{path}?{query}'.format(
         path=append_segments(server_endpoint, 'servers', 'detail'),
