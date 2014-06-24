@@ -25,8 +25,7 @@ class ServersTests(ScalingGroupPolicyFixture):
         """
         `DELETE serverId` actually deletes the server and replaces with new server
         """
-        self.wait_for_expected_number_of_active_servers(self.group.id, 1)
-        server_id = self.get_servers_containing_given_name_on_tenant(group_id=self.group.id)[0]
+        server_id = self.wait_for_expected_number_of_active_servers(self.group.id, 1)[0]
         resp = self.autoscale_client.delete_server(self.group.id, server_id, replace)
         self.assertEqual(resp.status_code, 202,
                          'Delete server status is {}. Expected 202'.format(resp.status_code))
@@ -48,9 +47,8 @@ class ServersTests(ScalingGroupPolicyFixture):
         """
         # Spin 1 more server
         self.autoscale_client.execute_policy(self.group.id, self.policy['id'])
-        self.wait_for_expected_number_of_active_servers(self.group.id, 2)
         # Delete server
-        server_id = self.get_servers_containing_given_name_on_tenant(group_id=self.group.id)[0]
+        server_id = self.wait_for_expected_number_of_active_servers(self.group.id, 2)[0]
         resp = self.autoscale_client.delete_server(self.group.id, server_id, replace='false')
         self.assertEqual(resp.status_code, 202,
                          'Delete server status is {}. Expected 202'.format(resp.status_code))
@@ -71,8 +69,7 @@ class ServersTests(ScalingGroupPolicyFixture):
         """
         Calling `DELETE serverId` when number of servers are at minimum returns 403
         """
-        self.wait_for_expected_number_of_active_servers(self.group.id, 1)
-        server_id = self.get_servers_containing_given_name_on_tenant(group_id=self.group.id)[0]
+        server_id = self.wait_for_expected_number_of_active_servers(self.group.id, 1)[0]
         resp = self.autoscale_client.delete_server(self.group.id, server_id, replace='false')
         self.assertEqual(resp.status_code, 403,
                          'Delete server status is {}. Expected 403'.format(resp.status_code))
