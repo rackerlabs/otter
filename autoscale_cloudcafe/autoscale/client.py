@@ -676,9 +676,9 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         """
         Delete server from the group
 
-        :param group_id: Scaling group ID
-        :param server_id: ID of server in the group
-        :param replace: replace bool query argument
+        :param str group_id: Scaling group ID
+        :param str server_id: ID of server in the group
+        :param str replace: replace query argument. "?replace" is not passed if this is None
         """
         url = '{}/groups/{}/servers/{}'.format(self.url, group_id, server_id)
         return self.request('DELETE', url, params={'replace': replace})
