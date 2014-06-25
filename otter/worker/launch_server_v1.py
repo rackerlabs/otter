@@ -32,7 +32,8 @@ from otter.util.http import (append_segments, headers, check_success,
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout, log_with_time
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
-                              TransientRetryError, random_interval, compose_retries)
+                              exponential_backoff_interval, TransientRetryError,
+                              random_interval, compose_retries)
 
 # Number of times to retry when adding/removing nodes from LB
 LB_MAX_RETRIES = 10
@@ -609,8 +610,8 @@ def verified_delete(log,
                     server_endpoint,
                     auth_token,
                     server_id,
-                    interval=10,
-                    timeout=3660,
+                    exp_start=2,
+                    max_retries=10,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
@@ -626,12 +627,8 @@ def verified_delete(log,
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param int interval: Deletion interval in seconds - how long until
-        verifying a delete is retried. Default: 5.
-    :param int timeout: Seconds after which the deletion will be logged as a
-        failure, if Nova fails to return a 404.  Default is 3660, because if
-        the server is building, the delete will not happen until immediately
-        after it has finished building.
+    :param int exp_start: Exponential backoff interval start seconds. Default 2
+    :param int max_retries: Maximum number of retry attempts
 
     :return: Deferred that fires when the expected status has been seen.
     """
@@ -642,19 +639,13 @@ def verified_delete(log,
         from twisted.internet import reactor
         clock = reactor
 
-    timeout_description = (
-        "Waiting for Nova to actually delete server {0} (or acknowledge delete)"
-        .format(server_id))
-
-    d = retry_and_timeout(
+    d = retry(
         partial(delete_and_verify, serv_log, server_endpoint, auth_token, server_id),
-        timeout,
-        next_interval=repeating_interval(interval),
-        clock=clock,
-        deferred_description=timeout_description)
+        can_retry=retry_times(max_retries),
+        next_interval=exponential_backoff_interval(exp_start),
+        clock=clock)
 
     d.addCallback(log_with_time, clock, serv_log, clock.seconds(),
                   ('Server deleted successfully (or acknowledged by Nova as '
                    'to-be-deleted) : {time_delete} seconds.'), 'time_delete')
-    d.addErrback(serv_log.err)
     return d
