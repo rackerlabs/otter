@@ -426,7 +426,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         POST
         '/{tenantId}/groups/{groupId}/policy'
         """
-        url = '%s/groups/%s/policies/' % (self.url, group_id)
+        url = '{0}/groups/{1}/policies/'.format(self.url, group_id)
         policy_list = []
         for p in range(batch_size):
             name_num = name + '_{0}'.format(p)
@@ -604,8 +604,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
             POST
             '/{tenantId}/groups/{groupId}/policy/{policyId}/webhooks/'
         """
-        url = '%s/groups/%s/policies/%s/webhooks/' % (self.url, group_id,
-                                                      policy_id)
+        url = '{0}/groups/{1}/policies/{2}/webhooks/'.format(self.url, group_id,
+                                                             policy_id)
         request_list = [Webhook_Request(w['name'], w['metadata']) for w in webhook_list]
         webhooks = Webhook_Multi_Request(request_list=request_list)
         return self.request('POST', url,
