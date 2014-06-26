@@ -4,7 +4,7 @@
 
 
 def wrap(f, g):
-    """
+    u"""
     'The wrapper combinator'
 
     Given f, any function, and g, a function which accepts a callable as its

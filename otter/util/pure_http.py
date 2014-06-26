@@ -1,7 +1,6 @@
 """
 Pure HTTP utilities.
 """
-import copy
 import json
 from functools import partial
 

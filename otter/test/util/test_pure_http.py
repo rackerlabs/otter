@@ -2,8 +2,6 @@
 
 import json
 
-from functools import partial
-
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import TestCase
@@ -44,7 +42,7 @@ class RequestEffectTests(SynchronousTestCase):
         response = StubResponse(200, {})
         treq = StubTreq(
             reqs={('POST', 'http://google.com/', (('foo', 'bar'),), 'my data', None):
-                   succeed(response)},
+                  succeed(response)},
             contents={response: succeed("content")})
         req = Request(method="post", url="http://google.com/", headers={'foo': 'bar'},
                       data='my data')
@@ -80,8 +78,8 @@ class OSHTTPClientTests(TestCase):
         """
         The request we pass in is performed after adding some standard headers.
         """
-        request = self._no_reauth_client()
-        eff = request("get", "/foo")
+        request_ = self._no_reauth_client()
+        eff = request_("get", "/foo")
         req = eff.intent
         self.assertEqual(req.method, "get")
         self.assertEqual(req.url, "/foo")
@@ -90,8 +88,8 @@ class OSHTTPClientTests(TestCase):
 
     def test_json_response(self):
         """The JSON response is decoded into Python objects."""
-        request = self._no_reauth_client()
-        eff = request("get", "/foo")
+        request_ = self._no_reauth_client()
+        eff = request_("get", "/foo")
         stub_result = stub_pure_response(json.dumps({"foo": "bar"}))
         result = resolve_effect(eff, stub_result)
         self.assertEqual(result, {"foo": "bar"})
@@ -101,8 +99,8 @@ class OSHTTPClientTests(TestCase):
         The headers passed in the original request are merged with a
         pre-defined set.
         """
-        request = self._no_reauth_client()
-        eff = request("get", "/foo", headers={"x-mine": "abc123"})
+        request_ = self._no_reauth_client()
+        eff = request_("get", "/foo", headers={"x-mine": "abc123"})
         req = eff.intent
         expected_headers = headers('my-token')
         expected_headers['x-mine'] = 'abc123'
@@ -110,8 +108,8 @@ class OSHTTPClientTests(TestCase):
 
     def test_data(self):
         """The data member in the request is encoded with json."""
-        request = self._no_reauth_client()
-        eff = request("get", "/foo", data={'foo': 'bar'})
+        request_ = self._no_reauth_client()
+        eff = request_("get", "/foo", data={'foo': 'bar'})
         req = eff.intent
         self.assertEqual(req.data, '{"foo": "bar"}')
 
@@ -119,15 +117,15 @@ class OSHTTPClientTests(TestCase):
         """
         APIError is raised when the response code isn't 200, by default.
         """
-        request = self._no_reauth_client()
-        eff = request("get", "/foo")
+        request_ = self._no_reauth_client()
+        eff = request_("get", "/foo")
         stub_result = stub_pure_response(json.dumps({"foo": "bar"}), code=404)
         self.assertRaises(APIError, resolve_effect, eff, stub_result)
 
     def test_api_error_specified(self):
         """Any HTTP response code can be specified as being successful."""
-        request = self._no_reauth_client()
-        eff = request("get", url="/foo", success_codes=[404])
+        request_ = self._no_reauth_client()
+        eff = request_("get", url="/foo", success_codes=[404])
         stub_result = stub_pure_response(json.dumps({"foo": "bar"}), code=404)
         self.assertEqual(resolve_effect(eff, stub_result), {"foo": "bar"})
 
@@ -139,6 +137,7 @@ class OSHTTPClientTests(TestCase):
         token.
         """
         reauth_effect = Effect(StubIntent("new-token"))
+
         def auth(refresh=False):
             if refresh:
                 return reauth_effect
@@ -171,6 +170,7 @@ class OSHTTPClientTests(TestCase):
         raised.
         """
         reauth_effect = Effect(StubIntent("new-token"))
+
         def auth(refresh=False):
             if refresh:
                 return reauth_effect
