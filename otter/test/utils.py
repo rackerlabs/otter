@@ -245,10 +245,46 @@ def mock_log(*args, **kwargs):
 
         log.msg.assert_called_with(mock.ANY, bound_value1="val", ...)
 
-    Since in all likelyhood, testing that certain values are bound would be more
-    important than testing the exact logged message.
+    Since in all likelyhood, testing that certain values are bound would be
+    more important than testing the exact logged message.
     """
     return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
+
+
+class StubResponse(object):
+    """
+    A fake pre-built Twisted Web Response object.
+    """
+    def __init__(self, code, headers):
+        self.code = code
+        self.headers = headers
+
+
+def stub_pure_response(body, code=200, response_headers=None):
+    """
+    Return the type of two-tuple response that pure_http.Request returns.
+    """
+    if response_headers is None:
+        response_headers = {}
+    return (StubResponse(code, response_headers), body)
+
+
+class StubTreq(object):
+    """
+    A stub version of otter.utils.logging_treq that returns canned responses
+    from dictionaries.
+    """
+    def __init__(self, reqs=None, contents=None):
+        self.reqs = reqs
+        self.contents = contents
+
+    def request(self, method, url, headers, data, log):
+        if headers is not None:
+            headers = tuple(sorted(headers.items()))
+        return self.reqs[(method, url, headers, data, log)]
+
+    def content(self, response):
+        return self.contents[response]
 
 
 def mock_treq(code=200, json_content={}, method='get', content='', treq_mock=None):
