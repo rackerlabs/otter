@@ -275,15 +275,24 @@ class StubTreq(object):
     from dictionaries.
     """
     def __init__(self, reqs=None, contents=None):
+        """
+        :param reqs: A dictionary specifying the values that the `request` method should return. Keys
+            are tuples of (method, url, headers, data, log). Since headers is usually passed as a dict,
+            here it should be specified as a tuple of two-tuples in sorted order.
+        :param contents: A dictionary specifying the values that the `content` method should return.
+            Keys should match up with the values of the `reqs` dict.
+        """
         self.reqs = reqs
         self.contents = contents
 
     def request(self, method, url, headers, data, log):
+        """Return a result by looking up the arguments in the `reqs` dict."""
         if headers is not None:
             headers = tuple(sorted(headers.items()))
         return self.reqs[(method, url, headers, data, log)]
 
     def content(self, response):
+        """Return a result by looking up the response in the `contents` dict."""
         return self.contents[response]
 
 

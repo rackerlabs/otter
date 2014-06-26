@@ -12,7 +12,7 @@ def wrap(f, g):
 
         λ(*args, **kwargs): g(f, *args, **kwargs)
 
-    This allows g to "wrap" f, so that g is responsible for calling f. f must expect a
+    This allows g to "wrap" f, so that g is responsible for calling f. g must expect a
     callable as its first argument, of course.
 
     This is basically a way to do dependency injection -- if a function g
