@@ -8,6 +8,7 @@ from functools import partial
 from effect import Effect
 from characteristic import attributes
 from toolz.dicttoolz import merge
+from toolz.functoolz import compose
 
 from otter.util import logging_treq
 from otter.util.fp import wrappers
@@ -93,12 +94,13 @@ def json_request(get_request, method, url, data=None, **kwargs):
         success=lambda r: (r[0], json.loads(r[1])))
 
 
-def content_request(get_request, method, url, **kwargs):
+def content_request(result):
     """Only return the content part of a response."""
-    return get_request(method, url, **kwargs).on(success=lambda r: r[1])
+    return result.on(success=lambda r: r[1])
 
 
-_request = wrappers(get_request, request_with_reauth, request_with_status_check, json_request, content_request)
+_request = wrappers(get_request, request_with_reauth, request_with_status_check, json_request)
+_request = compose(content_request, _request)
 
 
 def request(method, url, *args, **kwargs):
