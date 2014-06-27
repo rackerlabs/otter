@@ -21,3 +21,13 @@ class SQLScalingScheduleCollectionTests(SynchronousTestCase):
         """
         sched_coll = sql.SQLScalingScheduleCollection()
         verifyObject(interface.IScalingScheduleCollection, sched_coll)
+
+
+class SQLScalingGroupCollectionTests(SynchronousTestCase):
+    def test_interface(self):
+        """
+        The SQL scaling group collection implementation implements the
+        :class:`interface.IScalingGroupCollection` interface.
+        """
+        group = sql.SQLScalingGroupCollection()
+        verifyObject(interface.IScalingGroupCollection, group)

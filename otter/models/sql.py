@@ -14,3 +14,10 @@ class SQLScalingScheduleCollection(object):
     """
     A scaling schedule collection backed by a SQL store.
     """
+
+
+@implementer(interface.IScalingGroupCollection)
+class SQLScalingGroupCollection(object):
+    """
+    A collection of scaling groups backed by a SQL store.
+    """
