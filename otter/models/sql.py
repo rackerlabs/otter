@@ -1,7 +1,16 @@
-from otter.models.interface import IScalingGroup
+from otter.models import interface
 from zope.interface import implementer
 
 
-@implementer(IScalingGroup)
+@implementer(interface.IScalingGroup)
 class SQLScalingGroup(object):
-    pass
+    """
+    A scaling group backed by a SQL store.
+    """
+
+
+@implementer(interface.IScalingGroup)
+class SQLScalingScheduleCollection(object):
+    """
+    A scaling schedule collection backed by a SQL store.
+    """
