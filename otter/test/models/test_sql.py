@@ -31,3 +31,13 @@ class SQLScalingGroupCollectionTests(SynchronousTestCase):
         """
         group_coll = sql.SQLScalingGroupCollection()
         verifyObject(interface.IScalingGroupCollection, group_coll)
+
+
+class SQLAdminTests(SynchronousTestCase):
+    def test_interface(self):
+        """
+        The SQL admin interface implementation implements the
+        :class:`interface.IAdmin` interface.
+        """
+        admin = sql.SQLAdmin()
+        verifyObject(interface.IAdmin, admin)

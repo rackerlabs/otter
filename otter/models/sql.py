@@ -21,3 +21,10 @@ class SQLScalingGroupCollection(object):
     """
     A collection of scaling groups backed by a SQL store.
     """
+
+
+@implementer(interface.IAdmin)
+class SQLAdmin(object):
+    """
+    An admin interface backed by a SQL store.
+    """
