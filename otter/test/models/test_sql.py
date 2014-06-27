@@ -29,5 +29,5 @@ class SQLScalingGroupCollectionTests(SynchronousTestCase):
         The SQL scaling group collection implementation implements the
         :class:`interface.IScalingGroupCollection` interface.
         """
-        group = sql.SQLScalingGroupCollection()
-        verifyObject(interface.IScalingGroupCollection, group)
+        group_coll = sql.SQLScalingGroupCollection()
+        verifyObject(interface.IScalingGroupCollection, group_coll)
