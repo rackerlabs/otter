@@ -34,20 +34,19 @@ class SQLScalingGroupCollection(object):
 
 
     def get_counts(self, log, tenant_id):
-        # FIXME: do something with log
-
-        import pudb; pudb.set_trace()
-
         statements = [t.select().where(t.c.tenant_id == tenant_id).count()
                       for t in [scaling_groups, policies, webhooks]]
 
         d = gatherResults(map(self.engine.execute, statements))
 
         @d.addCallback
-        def query_executed(result):
-            return {"groups": result[0],
-                    "policies": result[1],
-                    "webhooks": result[2]}
+        def query_executed(results):
+            return gatherResults([r.fetchone() for r in results])
+
+        @d.addCallback
+        def query_executed(results):
+            (groups,), (policies,), (webhooks,) = results
+            return dict(groups=groups, policies=policies, webhooks=webhooks)
 
         return d
 

@@ -6,12 +6,35 @@ responses. Canned responses would be really easy to get wrong, leading
 to useless tests. Furthermore, in-memory SQLite is plenty fast to be
 useful as tests.
 
+That leaves us with a choice between using regular, blocking
+SQLAlchemy APIs, or using Alchimia. Alchimia is asynchronous, so using
+it means we can't really use SynchronousTestCase if we're using a real
+reactor. Not using Alchimia would mean we get a blocking API (which is
+probably acceptable since it's in-memory SQLite), but would further
+degrade the quality of the tests: any APIs we use that work with
+blocking SQLAlchemy but not alchimia would cause false positives.
+
+In-memory SQLite has an issue. Trying to use a connection from
+multiple threads closes the connection. In-memory SQLite databases
+only have one connection to them: closing it gets rid of the database.
+So, we can only have one thread in Alchimia's thread pool: but
+Alchimia unfortunately uses the reactor thread pool.
+
+Two possible resolutions:
+
+- Use a fake reactor that actually runs things in a thread
+  synchronously instead of deferring to a thread pool.
+- Limit the reactor pool to a single thread.
+
+This code chooses the former, because it means not having to mess with
+the real reactor, while keeping the benefit of testing the alchimia
+code paths.
 """
 
 from alchimia import TWISTED_STRATEGY as STRATEGY
 from otter.models import interface, sql
+from otter.test.utils import FakeReactorThreads
 from sqlalchemy import create_engine
-from twisted.internet import reactor
 from twisted.trial.unittest import TestCase
 from zope.interface.verify import verifyObject
 
@@ -23,8 +46,9 @@ def log(*a, **kw):
     """
 
 
-def _create_sqlite(_reactor=reactor):
-    return create_engine("sqlite://", reactor=_reactor, strategy=STRATEGY)
+def _create_sqlite():
+    reactor = FakeReactorThreads()
+    return create_engine("sqlite://", reactor=reactor, strategy=STRATEGY)
 
 
 class SQLiteTestMixin(object):
