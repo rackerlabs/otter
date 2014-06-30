@@ -1,9 +1,28 @@
+from alchimia import TWISTED_STRATEGY as STRATEGY
 from otter.models import interface, sql
-from twisted.trial.unittest import SynchronousTestCase
+from sqlalchemy import create_engine
+from twisted.internet import reactor
+from twisted.trial.unittest import TestCase
 from zope.interface.verify import verifyObject
 
 
-class SQLScalingGroupTests(SynchronousTestCase):
+def _create_sqlite():
+    return create_engine("sqlite://", reactor=reactor, strategy=STRATEGY)
+
+
+class SQLiteTestMixin(object):
+    """
+    A test mixin that sets up an asynchronous, in-memory SQLite
+    database, with some alchimia + SQLAlchemy chrome plating.
+    """
+    def setUp(self):
+        TestCase.setUp(self)
+
+        self.engine = _create_sqlite()
+        sql.create_tables(self.engine)
+
+
+class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
     def test_interface(self):
         """
         The SQL scaling group implementation implements the
@@ -13,7 +32,7 @@ class SQLScalingGroupTests(SynchronousTestCase):
         verifyObject(interface.IScalingGroup, group)
 
 
-class SQLScalingScheduleCollectionTests(SynchronousTestCase):
+class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
     def test_interface(self):
         """
         The SQL scaling schedule collection implementation implements the
@@ -23,7 +42,7 @@ class SQLScalingScheduleCollectionTests(SynchronousTestCase):
         verifyObject(interface.IScalingScheduleCollection, sched_coll)
 
 
-class SQLScalingGroupCollectionTests(SynchronousTestCase):
+class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
     def test_interface(self):
         """
         The SQL scaling group collection implementation implements the
@@ -33,7 +52,7 @@ class SQLScalingGroupCollectionTests(SynchronousTestCase):
         verifyObject(interface.IScalingGroupCollection, group_coll)
 
 
-class SQLAdminTests(SynchronousTestCase):
+class SQLAdminTests(SQLiteTestMixin, TestCase):
     def test_interface(self):
         """
         The SQL admin interface implementation implements the
