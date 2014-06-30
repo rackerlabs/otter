@@ -25,6 +25,8 @@ class ServersTests(AutoscaleFixture):
         Delete the group
         """
         self.autoscale_client.delete_scaling_group(self.groupid, force='true')
+        if hasattr(self, 'groupid2'):
+            self.autoscale_client.delete_scaling_group(self.groupid2, force='true')
 
     def assert_server_deleted(self, server_id):
         """
@@ -91,6 +93,19 @@ class ServersTests(AutoscaleFixture):
         `DELETE invalid_serverId` returns 404
         """
         resp = self.autoscale_client.delete_server(self.groupid, 'junk')
+        self.assertEqual(resp.status_code, 404,
+                         'Delete server status is {}. Expected 404'.format(resp.status_code))
+
+    def test_delete_server_not_found_in_diff_group(self):
+        """
+        `DELETE serverId` on server in same tenant but different group returns 404
+        """
+        # Create another group and get server from there
+        behavior = AutoscaleBehaviors(self.autoscale_config, self.autoscale_client)
+        self.groupid2 = behavior.create_scaling_group_min(gc_min_entities=1).entity.id
+        server_id = self.wait_for_expected_number_of_active_servers(self.groupid2, 1)[0]
+        # Delete that server from first group
+        resp = self.autoscale_client.delete_server(self.groupid, server_id)
         self.assertEqual(resp.status_code, 404,
                          'Delete server status is {}. Expected 404'.format(resp.status_code))
 
