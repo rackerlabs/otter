@@ -76,8 +76,8 @@ class ServersTests(AutoscaleFixture):
             self.autoscale_config, self.autoscale_client).create_policy_min(
                 self.groupid, sp_change=1)['id']
         self.autoscale_client.execute_policy(self.groupid, policyid)
-        # Delete server
-        server_id = self.wait_for_expected_number_of_active_servers(self.groupid, 2)[0]
+        # Delete 2nd server to check that any server can be deleted
+        server_id = self.wait_for_expected_number_of_active_servers(self.groupid, 2)[1]
         resp = self.autoscale_client.delete_server(self.groupid, server_id, replace='false')
         self.assertEqual(resp.status_code, 202,
                          'Delete server status is {}. Expected 202'.format(resp.status_code))
