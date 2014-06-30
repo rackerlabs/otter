@@ -237,7 +237,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
             return False
         if apierr.code == 422:
             message = json.loads(apierr.body)['message']
-            if 'load balancer is deleted' in message:
+            if ('load balancer is deleted' in message or 'PENDING_DELETE' in message):
                 return False
         return True
 
