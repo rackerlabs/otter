@@ -28,7 +28,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         The SQL scaling group implementation implements the
         :class:`interface.IScalingGroup` interface.
         """
-        group = sql.SQLScalingGroup()
+        group = sql.SQLScalingGroup(self.engine)
         verifyObject(interface.IScalingGroup, group)
 
 
@@ -38,7 +38,7 @@ class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
         The SQL scaling schedule collection implementation implements the
         :class:`interface.IScalingScheduleCollection` interface.
         """
-        sched_coll = sql.SQLScalingScheduleCollection()
+        sched_coll = sql.SQLScalingScheduleCollection(self.engine)
         verifyObject(interface.IScalingScheduleCollection, sched_coll)
 
 
@@ -48,7 +48,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         The SQL scaling group collection implementation implements the
         :class:`interface.IScalingGroupCollection` interface.
         """
-        group_coll = sql.SQLScalingGroupCollection()
+        group_coll = sql.SQLScalingGroupCollection(self.engine)
         verifyObject(interface.IScalingGroupCollection, group_coll)
 
 
@@ -58,5 +58,5 @@ class SQLAdminTests(SQLiteTestMixin, TestCase):
         The SQL admin interface implementation implements the
         :class:`interface.IAdmin` interface.
         """
-        admin = sql.SQLAdmin()
+        admin = sql.SQLAdmin(self.engine)
         verifyObject(interface.IAdmin, admin)

@@ -10,6 +10,8 @@ class SQLScalingGroup(object):
     """
     A scaling group backed by a SQL store.
     """
+    def __init__(self, engine):
+        self.engine = engine
 
 
 @implementer(interface.IScalingGroup)
@@ -17,6 +19,8 @@ class SQLScalingScheduleCollection(object):
     """
     A scaling schedule collection backed by a SQL store.
     """
+    def __init__(self, engine):
+        self.engine = engine
 
 
 @implementer(interface.IScalingGroupCollection)
@@ -24,6 +28,8 @@ class SQLScalingGroupCollection(object):
     """
     A collection of scaling groups backed by a SQL store.
     """
+    def __init__(self, engine):
+        self.engine = engine
 
 
 @implementer(interface.IAdmin)
@@ -31,6 +37,8 @@ class SQLAdmin(object):
     """
     An admin interface backed by a SQL store.
     """
+    def __init__(self, engine):
+        self.engine = engine
 
 
 metadata = MetaData()
