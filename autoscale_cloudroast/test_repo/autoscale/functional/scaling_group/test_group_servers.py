@@ -44,7 +44,10 @@ class ServersTests(AutoscaleFixture):
     @tags(speed='slow')
     def test_delete_removes_and_replaces(self, replace=None):
         """
-        `DELETE serverId` actually deletes the server and replaces with new server
+        `DELETE serverId` actually deletes the server and replaces with new server. This
+        tests with optional replace argument as the same behavior can be tested with it.
+        By default, replace is not provided. This test also shows that server can be
+        deleted with min servers
         """
         server_id = self.wait_for_expected_number_of_active_servers(self.groupid, 1)[0]
         resp = self.autoscale_client.delete_server(self.groupid, server_id, replace)
