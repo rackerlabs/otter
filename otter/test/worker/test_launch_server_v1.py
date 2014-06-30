@@ -130,7 +130,7 @@ class LoadBalancersTests(SynchronousTestCase):
         self.json_content = {'nodes': [{'id': 1}]}
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
                           new=mock_treq(code=200, json_content=self.json_content,
-                                        method='post'))
+                                        content='{"message": "bad"}', method='post'))
         patch(self, 'otter.util.http.treq', new=self.treq)
         self.log = mock_log()
         self.log.msg.return_value = None
@@ -205,6 +205,51 @@ class LoadBalancersTests(SynchronousTestCase):
                                     headers=expected_headers, data=mock.ANY,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
         self.rand_interval.assert_called_once_with(5, 7)
+
+    def test_add_lb_stops_retrying_on_404(self):
+        """
+        add_to_load_balancer will stop retrying if it encounters 404
+        """
+        codes = [422, 422, 404]
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=codes.pop(0)))
+        clock = Clock()
+
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo, clock=clock)
+        clock.advance(self.retry_interval)
+        self.assertNoResult(d)
+
+        clock.advance(self.retry_interval)
+        f = self.failureResultOf(d, RequestError)
+        self.assertIsInstance(f.value.reason.value, APIError)
+        self.assertEqual(f.value.reason.value.code, 404)
+
+    def test_add_lb_stops_retrying_on_422_deleted_clb(self):
+        """
+        add_to_load_balancer will stop retrying if it encounters 422 with deleted CLB
+        """
+        codes = [422, 422, 422]
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=codes.pop(0)))
+        messages = ['bad', 'huh', 'The load balancer is deleted']
+        self.treq.content.side_effect = lambda *a: succeed(
+            json.dumps({"message": "{}".format(messages.pop(0))}))
+        clock = Clock()
+
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo, clock=clock)
+        clock.advance(self.retry_interval)
+        self.assertNoResult(d)
+
+        clock.advance(self.retry_interval)
+        f = self.failureResultOf(d, RequestError)
+        self.assertIsInstance(f.value.reason.value, APIError)
+        self.assertEqual(f.value.reason.value.code, 422)
 
     def test_add_lb_defaults_retries_configs(self):
         """

@@ -226,6 +226,21 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
     lb_log = log.bind(loadbalancer_id=lb_id, ip_address=ip_address)
 
+    def check_deleted_clb(f):
+        """
+        Return False if CLB is deleted to stop retrying. True otherwise
+        """
+        if not (f.check(RequestError) and f.value.reason.check(APIError)):
+            return True
+        apierr = f.value.reason.value
+        if apierr.code == 404:
+            return False
+        if apierr.code == 422:
+            message = json.loads(apierr.body)['message']
+            if 'load balancer is deleted' in message:
+                return False
+        return True
+
     def add():
         d = treq.post(path, headers=headers(auth_token),
                       data=json.dumps({"nodes": [{"address": ip_address,
@@ -239,7 +254,9 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
 
     d = retry(
         add,
-        can_retry=retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES),
+        can_retry=compose_retries(
+            check_deleted_clb,
+            retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES)),
         next_interval=random_interval(
             *(config_value('worker.lb_retry_interval_range') or LB_RETRY_INTERVAL_RANGE)),
         clock=clock)

@@ -264,8 +264,8 @@ def mock_treq(code=200, json_content={}, method='get', content='', treq_mock=Non
         treq_mock = mock.MagicMock(spec=treq)
     response = mock.MagicMock(code=code)
     treq_mock.configure_mock(**{method + '.return_value': defer.succeed(response)})
-    treq_mock.json_content.return_value = defer.succeed(json_content)
-    treq_mock.content.return_value = defer.succeed(content)
+    treq_mock.json_content.side_effect = lambda r: defer.succeed(json_content)
+    treq_mock.content.side_effect = lambda r: defer.succeed(content)
     return treq_mock
 
 
