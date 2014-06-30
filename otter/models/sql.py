@@ -1,6 +1,7 @@
 from otter.models import interface
 from sqlalchemy import Column, Integer, MetaData, String, Table
 from sqlalchemy.schema import CreateTable
+from sqlalchemy.sql import func, select
 from twisted.internet.defer import gatherResults, maybeDeferred
 from zope.interface import implementer
 
@@ -32,6 +33,25 @@ class SQLScalingGroupCollection(object):
         self.engine = engine
 
 
+    def get_counts(self, log, tenant_id):
+        # FIXME: do something with log
+
+        import pudb; pudb.set_trace()
+
+        statements = [t.select().where(t.c.tenant_id == tenant_id).count()
+                      for t in [scaling_groups, policies, webhooks]]
+
+        d = gatherResults(map(self.engine.execute, statements))
+
+        @d.addCallback
+        def query_executed(result):
+            return {"groups": result[0],
+                    "policies": result[1],
+                    "webhooks": result[2]}
+
+        return d
+
+
 @implementer(interface.IAdmin)
 class SQLAdmin(object):
     """
@@ -44,26 +64,27 @@ class SQLAdmin(object):
 metadata = MetaData()
 
 scaling_groups = Table("scaling_groups", metadata,
-                       Column("id", Integer(), primary_key=True))
+                       Column("id", Integer(), primary_key=True),
+                       Column("tenant_id", String()))
 
 policies = Table("policies", metadata,
-                 Column("id", Integer(), primary_key=True))
+                 Column("id", Integer(), primary_key=True),
+                 Column("tenant_id", String()))
+
+webhooks = Table("webhooks", metadata,
+                 Column("id", Integer(), primary_key=True),
+                 Column("tenant_id", String()))
 
 load_balancers = Table("load_balancers", metadata,
                        Column("id", Integer(), primary_key=True),
                        Column("port", Integer()))
 
-all_tables = (scaling_groups, policies, load_balancers)
+all_tables = (scaling_groups, policies, webhooks, load_balancers)
 
 
 def create_tables(engine, tables=all_tables):
     """Creates all the given tables on the given engine.
 
-    This returns a :class:`Deferred<twisted.internet.defer.Deferred>`
-    that will fire when all the tables have been created. This is only
-    actually asynchronous if the provided engine is asynchronous. If
-    you're using a regular SQLAlchemy engine, this will still block,
-    despite returning a Deferred!
-
     """
-    return gatherResults(maybeDeferred(CreateTable, t) for t in tables)
+    return gatherResults(engine.execute(CreateTable(table))
+                         for table in tables)

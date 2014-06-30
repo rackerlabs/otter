@@ -1,3 +1,13 @@
+"""
+Tests for a SQL-backed otter store.
+
+This uses an in-memory SQLite database, instead of canned
+responses. Canned responses would be really easy to get wrong, leading
+to useless tests. Furthermore, in-memory SQLite is plenty fast to be
+useful as tests.
+
+"""
+
 from alchimia import TWISTED_STRATEGY as STRATEGY
 from otter.models import interface, sql
 from sqlalchemy import create_engine
@@ -6,8 +16,15 @@ from twisted.trial.unittest import TestCase
 from zope.interface.verify import verifyObject
 
 
-def _create_sqlite():
-    return create_engine("sqlite://", reactor=reactor, strategy=STRATEGY)
+def log(*a, **kw):
+    """FIXME! DO SOMETHING USEFUL HERE.
+
+    The interfaces fail to document what they want from me.
+    """
+
+
+def _create_sqlite(_reactor=reactor):
+    return create_engine("sqlite://", reactor=_reactor, strategy=STRATEGY)
 
 
 class SQLiteTestMixin(object):
@@ -16,10 +33,8 @@ class SQLiteTestMixin(object):
     database, with some alchimia + SQLAlchemy chrome plating.
     """
     def setUp(self):
-        TestCase.setUp(self)
-
         self.engine = _create_sqlite()
-        sql.create_tables(self.engine)
+        return sql.create_tables(self.engine)
 
 
 class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
@@ -50,6 +65,23 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         """
         group_coll = sql.SQLScalingGroupCollection(self.engine)
         verifyObject(interface.IScalingGroupCollection, group_coll)
+
+
+    def test_empty_count(self):
+        """
+        A scaling group collection has no groups, policies or webhooks.
+
+        FIXME: this actually tests what happens for nonexistant
+        tenants... maybe the sql schema can't tell the difference?
+
+        """
+        coll = sql.SQLScalingGroupCollection(self.engine)
+        d = coll.get_counts(log, "tenant")
+
+        d.addCallback(self.assertEqual, {"groups": 0,
+                                         "policies": 0,
+                                         "webhooks": 0})
+        return d
 
 
 class SQLAdminTests(SQLiteTestMixin, TestCase):
