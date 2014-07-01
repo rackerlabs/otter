@@ -708,13 +708,12 @@ class IScalingGroupCollection(Interface):
 
     def health_check():
         """
-        Returns a JSON dictionary specifying whether the store is healthy.  The
-        dictionary must have the parameters ``'healthy': boolean``, but can
-        contain other information as well
+        Check if the collection is healthy, and additionally provides some
+        extra free-form health data.
 
-        :return: ``tuple`` of (``bool``, ``dict``), where the boolean is
-            whether the services is healthy and the dictionar contains
-            extra health information.
+        :return: The health information in the form of a boolean and some
+            additional free-form health data (possibly empty).
+        :rtype: :class:`tuple` of (:class:`bool`, :class:`dict`)
         """
 
 
