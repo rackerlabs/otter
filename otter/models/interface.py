@@ -477,9 +477,9 @@ class IScalingGroup(Interface):
             new webhook.
         :type policy_id: ``str``
 
-        :param data: a list of details of the webhook in JSON format, as
-            specified by :data:`otter.json_schema.group_schemas.webhook`
-        :type data: ``list``
+        :param data: A list of details for each webhook, as specified by
+            :data:`otter.json_schema.group_schemas.webhook`
+        :type data: ``list`` of :class:`dict`
 
         :return: a list of the webhooks with their ids, as specified by
             :data:`otter.json_schema.model_schemas.webhook_list`
