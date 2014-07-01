@@ -316,7 +316,7 @@ class IScalingGroup(Interface):
         Enforcing the new min/max constraints should be done elsewhere.
 
         :param config: Configuration data in JSON format, as specified by
-            :data:`otter.json_schema.scaling_group.config`
+            :data:`otter.json_schema.group_schemas.config`
         :type config: ``dict``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
@@ -332,7 +332,7 @@ class IScalingGroup(Interface):
         values, or just overwrite them - it is up to the implementation.
 
         :param launch_config: launch config data in JSON format, as specified
-            by :data:`otter.json_schema.scaling_group.launch_config`
+            by :data:`otter.json_schema.group_schemas.launch_config`
         :type launch_config: ``dict``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
@@ -620,17 +620,17 @@ class IScalingGroupCollection(Interface):
         :type tenant_id: ``str``
 
         :param config: scaling group configuration options in JSON format, as
-            specified by :data:`otter.json_schema.scaling_group.config`
+            specified by :data:`otter.json_schema.group_schemas.config`
         :type data: ``dict``
 
         :param launch: scaling group launch configuration options in JSON
             format, as specified by
-            :data:`otter.json_schema.scaling_group.launch_config`
+            :data:`otter.json_schema.group_schemas.launch_config`
         :type data: ``dict``
 
         :param policies: list of scaling group policies, each one given as a
             JSON blob as specified by
-            :data:`otter.json_schema.scaling_group.scaling_policy`
+            :data:`otter.json_schema.group_schemas.scaling_policy`
         :type data: ``list`` of ``dict``
 
         :return: a dictionary corresponding to the JSON schema at
