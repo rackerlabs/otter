@@ -475,11 +475,11 @@ class IScalingGroup(Interface):
 
         :param policy_id: The UUID of the policy for which to create a
             new webhook.
-        :type policy_id: ``str``
+        :type policy_id: :class:`str`
 
         :param data: A list of details for each webhook, as specified by
             :data:`otter.json_schema.group_schemas.webhook`
-        :type data: ``list`` of :class:`dict`
+        :type data: :class:`list` of :class:`dict`
 
         :return: a list of the webhooks with their ids, as specified by
             :data:`otter.json_schema.model_schemas.webhook_list`
