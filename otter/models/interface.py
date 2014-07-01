@@ -473,7 +473,8 @@ class IScalingGroup(Interface):
         """
         Creates a new webhook URL for a scaling policy.
 
-        :param policy_id: the uuid of the policy to be deleted
+        :param policy_id: The UUID of the policy for which to create a
+            new webhook.
         :type policy_id: ``str``
 
         :param data: a list of details of the webhook in JSON format, as
