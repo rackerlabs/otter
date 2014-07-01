@@ -38,7 +38,7 @@ from otter.json_schema import group_examples
 from otter.models import interface, sql
 from otter.test.utils import FakeReactorThreads
 from sqlalchemy import create_engine
-from twisted.internet.defer import gatherResults
+from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 from twisted.trial.unittest import TestCase
 from zope.interface.verify import verifyObject
 
@@ -107,26 +107,47 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
                                          "webhooks": 0})
         return d
 
+    @inlineCallbacks
     def test_non_empty_count(self):
         """
-        The count works correctly for a collection that has one group,
-        policy and webhook.
+        Counting works correctly for a collection that isn't empty.
 
-        It will only return items for the correct tenant. Tenants do not affect each other.
+        It will only return items for the correct tenant. Tenants do
+        not affect each other.
         """
         coll = sql.SQLScalingGroupCollection(self.engine)
 
-        coll.create_scaling_group(log, "tenant", {}, {}, [])
+        group_cfg = group_examples.config()[0]
+        launch_cfg = group_examples.launch_server_config()[0]
 
-        d = coll.get_counts(log, "tenant")
-        d.addCallback(self.assertEqual, {"groups": 1,
-                                         "policies": 1,
-                                         "webhooks": 1})
-        return d
+        res = yield coll.create_scaling_group(log, b"tenant",
+                                              group_cfg, launch_cfg)
+        group = yield coll.get_scaling_group(log, b"tenant", res["id"])
+
+        # add some policies
+        policy_cfgs = group_examples.policy()
+        policies = yield group.create_policies(policy_cfgs)
+
+        # add some webhooks for the first policy
+        first_webhook_policy_id = next(policy["id"] for policy in policies
+                                       if policy["type"] == "webhook")
+        webhook_cfgs = _webhook_examples()
+        yield group.create_webhooks(first_webhook_policy_id, webhook_cfgs)
+
+        # add a couple of false flags for a different tenant
+        res = yield coll.create_scaling_group(log, b"tenant2",
+                                              group_cfg, launch_cfg)
+        group = yield coll.get_scaling_group(log, b"tenant2", res["id"])
+
+        # actually count how many tenant 1 had
+        result = yield coll.get_counts(log, b"tenant")
+        self.assertEqual(result, {"groups": 1,
+                                  "policies": 1,
+                                  "webhooks": 1})
 
     def test_create_scaling_group(self):
         """
-        Can create a scaling group with various configurations.
+        Can create a scaling group with various test configurations.
         """
         coll = sql.SQLScalingGroupCollection(self.engine)
 
@@ -137,7 +158,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         ds = []
         expected_manifests = []
         for args in product(group_cfgs, launch_cfgs, policies):
-            ds.append(coll.create_scaling_group(log, "tenant", *args))
+            ds.append(coll.create_scaling_group(log, b"tenant", *args))
             expected_manifests.append()
 
         d = gatherResults(ds)
@@ -159,7 +180,6 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
 
         return d
 
-
     def test_names_are_unique(self):
         """
         Scaling group names must be unique for a given tenant.
@@ -171,13 +191,14 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         launch_cfg1, launch_cfg2 = launch_cfgs[:2]
 
         create = partial(coll.create_scaling_group, "tenant", group_cfg)
-
-        d = coll.create_scaling_group(log, "tenant", group_cfg, launch_cfg1)
+        d = create(launch_cfg1)
 
         @d.addCallback
         def try_again_same_name(_result):
-            return coll.create_scaling_group(log, "tenant", group_cfg, launch_cfg2)
+            return create(launch_cfg2)
 
+        self.assertFailure(d, KeyError)
+        return d
 
 
 class SQLAdminTests(SQLiteTestMixin, TestCase):
@@ -188,3 +209,8 @@ class SQLAdminTests(SQLiteTestMixin, TestCase):
         """
         admin = sql.SQLAdmin(self.engine)
         verifyObject(interface.IAdmin, admin)
+
+
+def _webhook_examples():
+    return ({"name": "webhook 1", "metadata": {"a": "1", "b": "1"}},
+            {"name": "webhook 2", "metadata": {"a": "2", "b": "2"}})
