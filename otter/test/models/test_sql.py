@@ -190,7 +190,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         launch_cfgs = group_examples.launch_server_config()
         launch_cfg1, launch_cfg2 = launch_cfgs[:2]
 
-        create = partial(coll.create_scaling_group, "tenant", group_cfg)
+        create = partial(coll.create_scaling_group, log, "tenant", group_cfg)
         d = create(launch_cfg1)
 
         @d.addCallback

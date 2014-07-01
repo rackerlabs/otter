@@ -33,7 +33,6 @@ class SQLScalingGroupCollection(object):
     def __init__(self, engine):
         self.engine = engine
 
-
     def create_scaling_group(self, log, tenant_id, group_cfg, launch_cfg,
                              policies=None):
         """
