@@ -672,6 +672,17 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Audit)
 
+    def delete_server(self, group_id, server_id, replace=None):
+        """
+        Delete server from the group
+
+        :param str group_id: Scaling group ID
+        :param str server_id: ID of server in the group
+        :param str replace: replace query argument. "?replace" is not passed if this is None
+        """
+        url = '{}/groups/{}/servers/{}'.format(self.url, group_id, server_id)
+        return self.request('DELETE', url, params={'replace': replace})
+
 
 class LbaasAPIClient(AutoMarshallingRestClient):
 
