@@ -32,9 +32,13 @@ code paths.
 """
 
 from alchimia import TWISTED_STRATEGY as STRATEGY
+from functools import partial
+from itertools import product
+from otter.json_schema import group_examples
 from otter.models import interface, sql
 from otter.test.utils import FakeReactorThreads
 from sqlalchemy import create_engine
+from twisted.internet.defer import gatherResults
 from twisted.trial.unittest import TestCase
 from zope.interface.verify import verifyObject
 
@@ -96,12 +100,84 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         A scaling group collection has no groups, policies or webhooks.
         """
         coll = sql.SQLScalingGroupCollection(self.engine)
-        d = coll.get_counts(log, "tenant")
 
+        d = coll.get_counts(log, "tenant")
         d.addCallback(self.assertEqual, {"groups": 0,
                                          "policies": 0,
                                          "webhooks": 0})
         return d
+
+    def test_non_empty_count(self):
+        """
+        The count works correctly for a collection that has one group,
+        policy and webhook.
+
+        It will only return items for the correct tenant. Tenants do not affect each other.
+        """
+        coll = sql.SQLScalingGroupCollection(self.engine)
+
+        coll.create_scaling_group(log, "tenant", {}, {}, [])
+
+        d = coll.get_counts(log, "tenant")
+        d.addCallback(self.assertEqual, {"groups": 1,
+                                         "policies": 1,
+                                         "webhooks": 1})
+        return d
+
+    def test_create_scaling_group(self):
+        """
+        Can create a scaling group with various configurations.
+        """
+        coll = sql.SQLScalingGroupCollection(self.engine)
+
+        group_cfgs = group_examples.config()
+        launch_cfgs = group_examples.launch_server_config()
+        policies = group_examples.policy() + [None]
+
+        ds = []
+        expected_manifests = []
+        for args in product(group_cfgs, launch_cfgs, policies):
+            ds.append(coll.create_scaling_group(log, "tenant", *args))
+            expected_manifests.append()
+
+        d = gatherResults(ds)
+
+        @d.addCallback
+        def check_manifests(manifests):
+            n_products = len(group_cfgs) * len(launch_cfgs) * len(policies)
+            self.assertEqual(len(manifests), n_products)
+            self.assertEqual(len(expected_manifests), n_products)
+
+            seen_ids = set()
+            for manifest, expected in zip(manifests, expected_manifests):
+                self.assertIn("id", manifest)
+                seen_ids.add(manifest.pop("id"))
+                self.assertEqual(manifest, expected)
+
+            self.assertEqual(len(seen_ids), n_products,
+                             "group ids must be unique")
+
+        return d
+
+
+    def test_names_are_unique(self):
+        """
+        Scaling group names must be unique for a given tenant.
+        """
+        coll = sql.SQLScalingGroupCollection(self.engine)
+
+        group_cfg = group_examples.config()[0]
+        launch_cfgs = group_examples.launch_server_config()
+        launch_cfg1, launch_cfg2 = launch_cfgs[:2]
+
+        create = partial(coll.create_scaling_group, "tenant", group_cfg)
+
+        d = coll.create_scaling_group(log, "tenant", group_cfg, launch_cfg1)
+
+        @d.addCallback
+        def try_again_same_name(_result):
+            return coll.create_scaling_group(log, "tenant", group_cfg, launch_cfg2)
+
 
 
 class SQLAdminTests(SQLiteTestMixin, TestCase):
