@@ -1,16 +1,9 @@
 from otter.models import interface
-<<<<<<< Updated upstream
-from sqlalchemy import Column, Enum, Integer, MetaData, String, Table
-from sqlalchemy.schema import CreateTable
-from sqlalchemy.sql import func, select
-from twisted.internet.defer import gatherResults, maybeDeferred
-=======
 from sqlalchemy import Column, ForeignKey, MetaData, Table
 from sqlalchemy.types import Enum, Integer, String
 from sqlalchemy.schema import CreateTable
 from twisted.internet.defer import gatherResults, maybeDeferred
 from uuid import uuid4
->>>>>>> Stashed changes
 from zope.interface import implementer
 
 
@@ -46,10 +39,7 @@ class SQLScalingGroupCollection(object):
         """
         Creates a scaling group backed by a SQL store.
         """
-<<<<<<< Updated upstream
-=======
         scaling_group_id = bytes(uuid4())
->>>>>>> Stashed changes
 
     def get_counts(self, log, tenant_id):
         statements = [t.select().where(t.c.tenant_id == tenant_id).count()
@@ -76,32 +66,6 @@ def _create_policy(conn, policy_cfg):
     This should only ever be called within a transaction: multiple
     insert statements may be issued.
     """
-<<<<<<< Updated upstream
-    effect_names = ["change", "changePercent", "desiredCapacity"]
-    for effect_namein effect_names:
-        if effect_namein policy_cfg:
-            break
-    else:
-        raise KeyError("No effect (one of {}) in policy config {}"
-                       .format(effect_names, policy_cfg))
-
-    d = conn.execute(policies.insert()
-                     .values(effect=effect,
-                             value=policy_cfg["value"]))
-
-    if "args" not in policy_cfg:
-        return d
-
-    # How do I know what the primary key is going to be here? Nested
-    # txns? UUIDs?
-    pkey = None
-
-    ds = [d]
-    for key, value in policy_cfg["args"].items():
-        ds.append(conn.execute(policy_args))
-
-    return gatherResults(ds)
-=======
     policy_id = bytes(uuid4())
 
     adjustment_type = _get_adjustment_type(policy_cfg)
@@ -143,8 +107,6 @@ def _get_adjustment_type(policy_cfg):
         raise KeyError("No adjustment_type (one of {}) in policy config {}"
                        .format(adjustment_types, policy_cfg))
 
->>>>>>> Stashed changes
-
 
 @implementer(interface.IAdmin)
 class SQLAdmin(object):
@@ -158,18 +120,6 @@ class SQLAdmin(object):
 metadata = MetaData()
 
 scaling_groups = Table("scaling_groups", metadata,
-<<<<<<< Updated upstream
-                       Column("id", Integer(), primary_key=True),
-                       Column("tenant_id", String()))
-
-policies = Table("policies", metadata,
-                 Column("id", Integer(), primary_key=True),
-                 Column("name", String()),
-                 Column("tenant_id", String()),
-                 Column("effect", Enum("change", "changePercent", "desiredCapacity")),
-                 Column("value", Integer()),
-                 Column("type", Enum("webhook", "schedule", "cloud_monitoring")))
-=======
                        Column("id", String(32), primary_key=True),
                        Column("tenant_id", String()))
 
@@ -182,7 +132,6 @@ policies = Table("policies", metadata,
                  Column("adjustment_value", Integer()),
                  Column("type",
                         Enum("webhook", "schedule", "cloud_monitoring")))
->>>>>>> Stashed changes
 
 policy_args = Table("policy_args", metadata,
                     Column("id", Integer(), primary_key=True),
