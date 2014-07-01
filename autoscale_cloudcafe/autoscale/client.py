@@ -421,7 +421,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type policy_type: str
         :return: Response Object containing response code 201 on success
          and a list of policy objects
-        :rtype: Policy Response Object
+        :rtype: :class: `Policy`
 
         POST
         '/{tenantId}/groups/{groupId}/policy'
@@ -599,7 +599,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type webhook_list: list of dict
         :return: Response Object containing response code 201
          on success and a list of webhook objects
-        :rtype: Webhook Response Object
+        :rtype: :class: `Webhook`
 
             POST
             '/{tenantId}/groups/{groupId}/policy/{policyId}/webhooks/'
