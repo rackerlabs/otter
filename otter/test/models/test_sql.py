@@ -94,10 +94,6 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
     def test_empty_count(self):
         """
         A scaling group collection has no groups, policies or webhooks.
-
-        FIXME: this actually tests what happens for nonexistant
-        tenants... maybe the sql schema can't tell the difference?
-
         """
         coll = sql.SQLScalingGroupCollection(self.engine)
         d = coll.get_counts(log, "tenant")
