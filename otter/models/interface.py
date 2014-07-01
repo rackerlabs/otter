@@ -471,7 +471,7 @@ class IScalingGroup(Interface):
 
     def create_webhooks(policy_id, data):
         """
-        Creates a new capability URL for one particular scaling policy
+        Creates a new webhook URL for a scaling policy.
 
         :param policy_id: the uuid of the policy to be deleted
         :type policy_id: ``str``
