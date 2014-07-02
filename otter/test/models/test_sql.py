@@ -74,6 +74,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         group = sql.SQLScalingGroup(self.engine, b"GROUP", b"TENANT")
         verifyObject(interface.IScalingGroup, group)
 
+    @inlineCallbacks
     def test_create_policies_happy_case(self):
         """
         The user can create a policy.
