@@ -74,6 +74,48 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         group = sql.SQLScalingGroup(self.engine)
         verifyObject(interface.IScalingGroup, group)
 
+    @inlineCallbacks
+    def test_create_webhook_happy_case(self):
+        """
+        The user can create a webhook for an extant policy.
+        """
+        group = sql.SQLScalingGroup(self.engine)
+
+        # Create a policy
+        policy_cfg = group_examples.policy()[0]
+        res = yield group.create_policies(policy_cfg)
+        policy_id = res["id"]
+
+        res = yield group.create_webhooks(policy_id, _webhook_examples())
+        raise RuntimeError("do something here")
+
+    def test_create_webhook_for_nonexistant_policy(self):
+        """
+        When attempting to create a webhook for a nonexistant policy, an
+        exception is raised.
+        """
+        group = sql.SQLScalingGroup(self.engine)
+        d = group.create_webhooks(b"BOGUS", _webhook_examples())
+        return self.assertFailure(d, interface.NoSuchPolicyError)
+
+    @inlineCallbacks
+    def test_create_webhook_at_limit(self):
+        """
+        When attempting to create a webhook for an extant policy, but there
+        are already too many webhooks for that policy, an exception is
+        raised.
+        """
+        group = sql.SQLScalingGroup(self.engine)
+
+        # Create a policy
+        policy_cfg = group_examples.policy()[0]
+        res = yield group.create_policies(policy_cfg)
+        policy_id = res["id"]
+
+        # Create a webhook
+        d = group.create_webhooks(policy_id, _webhook_examples())
+        yield self.assertFailure(d, interface.NoSuchPolicyError)
+
 
 class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
     def test_interface(self):
