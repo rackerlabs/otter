@@ -481,10 +481,10 @@ class IScalingGroup(Interface):
             :data:`otter.json_schema.group_schemas.webhook`
         :type data: :class:`list` of :class:`dict`
 
-        :return: a list of the webhooks with their ids, as specified by
-            :data:`otter.json_schema.model_schemas.webhook_list`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with said
-            ``list``
+        :return: A list of the created webhooks with their unique ids.
+        :rtype: :class:`twisted.internet.defer.Deferred` :class:`list` as
+            specified by :data:`otter.json_schema.model_schemas.webhook_list`,
+            with each dict in the list additionally having an ``id`` key.
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         :raises: :class:`WebhooksOverLimitError` if creating all the specified
