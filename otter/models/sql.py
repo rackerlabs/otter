@@ -12,8 +12,10 @@ class SQLScalingGroup(object):
     """
     A scaling group backed by a SQL store.
     """
-    def __init__(self, engine):
+    def __init__(self, engine, uuid, tenant_id):
         self.engine = engine
+        self.uuid = uuid
+        self.tenant_id = tenant_id
 
 
 @implementer(interface.IScalingGroup)
