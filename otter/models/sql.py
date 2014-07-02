@@ -1,10 +1,29 @@
+from functools import wraps
 from otter.models import interface
 from sqlalchemy import Column, ForeignKey, MetaData, Table
 from sqlalchemy.types import Enum, Integer, String
 from sqlalchemy.schema import CreateTable
-from twisted.internet.defer import gatherResults, maybeDeferred
+from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 from uuid import uuid4
 from zope.interface import implementer
+
+
+def _with_transaction(f):
+    @inlineCallbacks
+    def decorated(self, *args, **kwargs):
+        conn = yield self.engine.connect()
+        txn = yield conn.begin()
+
+        try:
+            result = yield f(self, conn, *args, **kwargs)
+        except:
+            txn.rollback()
+            raise
+        else:
+            txn.commit()
+            returnValue(result)
+
+    return decorated
 
 
 @implementer(interface.IScalingGroup)
@@ -16,6 +35,22 @@ class SQLScalingGroup(object):
         self.engine = engine
         self.uuid = uuid
         self.tenant_id = tenant_id
+
+
+    @_with_transaction
+    def create_policies(self, conn, policy_cfgs):
+        """
+        Create some policies.
+        """
+        ds = [_create_policy(conn, cfg) for cfg in policy_cfgs]
+        d = gatherResults(ds)
+
+        @d.addCallback
+        def created_policies(policy_ids):
+            return [dict(id=policy_id, **policy_cfg)
+                    for policy_id, policy_cfg in zip(policy_ids, policy_cfgs)]
+
+        return d
 
 
 @implementer(interface.IScalingGroupCollection)
@@ -88,12 +123,12 @@ def _create_policy(conn, policy_cfg):
 
     args = policy_cfg.get("args")
     if args:
-        d.addCallback(lambda _result: _create_policy_args(policy_id, args))
+        d.addCallback(lambda _result: _create_policy_args(conn, policy_id, args))
 
     return d.addCallback(lambda _result: policy_id)
 
 
-def _create_policy_args(policy_id, args):
+def _create_policy_args(conn, policy_id, args):
     """
     Adds args to the policy with given policy_id.
     """
@@ -147,7 +182,11 @@ load_balancers = Table("load_balancers", metadata,
                        Column("id", Integer(), primary_key=True),
                        Column("port", Integer()))
 
-all_tables = (scaling_groups, policies, webhooks, load_balancers)
+all_tables = (scaling_groups,
+              policies,
+              policy_args,
+              webhooks,
+              load_balancers)
 
 
 def create_tables(engine, tables=all_tables):
