@@ -112,7 +112,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         res = yield group.create_policies(policy_cfg)
         policy_id = res["id"]
 
-        # Create a webhook
+        # Attempt to create a webhook
         d = group.create_webhooks(policy_id, _webhook_examples())
         yield self.assertFailure(d, interface.NoSuchPolicyError)
 
