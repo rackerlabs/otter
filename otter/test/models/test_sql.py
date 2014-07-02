@@ -97,8 +97,6 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         self.assertEqual(len(seen_ids), len(policy_cfgs),
                          "policy ids must be unique")
 
-        raise RuntimeError("TODO: test listing policies")
-
     def test_create_policies_for_nonexistant_scaling_group(self):
         """
         When attempting to create one or more policies for a group that
