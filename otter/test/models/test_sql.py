@@ -74,6 +74,52 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         group = sql.SQLScalingGroup(self.engine)
         verifyObject(interface.IScalingGroup, group)
 
+    def test_create_policies_happy_case(self):
+        """
+        The user can create a policy.
+
+        After it is created, the user can list the policies and see
+        all of them.
+        """
+        group = sql.SQLScalingGroup(self.engine)
+
+        policy_cfgs = group_examples.policy()
+        response = yield group.create_policies(policy_cfgs)
+
+        self.assertEqual(len(response), len(policy_cfgs))
+
+        seen_ids = set()
+        for policy, policy_cfg in zip(response, policy_cfgs):
+            seen_ids.add(policy.pop("id"))
+            self.assertEqual(policy, policy_cfg)
+
+        self.assertEqual(len(seen_ids), len(policy_cfgs),
+                         "policy ids must be unique")
+
+        raise RuntimeError("TODO: test listing policies")
+
+    def test_create_policies_for_nonexistant_scaling_group(self):
+        """
+        When attempting to create one or more policies for a group that
+        doesn't exist, an exception is raised.
+        """
+        group = sql.SQLScalingGroup(self.engine, b"BOGUS_GROUP")
+        d = group.create_policies(group_examples.policy())
+        return self.assertFailure(d, interface.NoSuchScalingGroupError)
+
+    def test_create_policies_at_limit(self):
+        """
+        When attempting to create a policy, but there are already too many
+        policies for this group, an exception is raised.
+        """
+        group = sql.SQLScalingGroup(self.engine, b"GROUP")
+
+        # TODO: figure out a way to put us at the limit
+
+        # Create a policy
+        d = group.create_policies(group_examples.policy())
+        return self.assertFailure(d, interface.PoliciesOverLimitError)
+
     @inlineCallbacks
     def test_create_webhook_happy_case(self):
         """
