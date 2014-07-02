@@ -71,7 +71,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         The SQL scaling group implementation implements the
         :class:`interface.IScalingGroup` interface.
         """
-        group = sql.SQLScalingGroup(self.engine)
+        group = sql.SQLScalingGroup(self.engine, b"GROUP", b"TENANT")
         verifyObject(interface.IScalingGroup, group)
 
     def test_create_policies_happy_case(self):
@@ -81,7 +81,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         After it is created, the user can list the policies and see
         all of them.
         """
-        group = sql.SQLScalingGroup(self.engine)
+        group = sql.SQLScalingGroup(self.engine, b"GROUP", b"TENANT")
 
         policy_cfgs = group_examples.policy()
         response = yield group.create_policies(policy_cfgs)
@@ -103,7 +103,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         When attempting to create one or more policies for a group that
         doesn't exist, an exception is raised.
         """
-        group = sql.SQLScalingGroup(self.engine, b"BOGUS_GROUP")
+        group = sql.SQLScalingGroup(self.engine, b"BOGUS_GROUP", b"TENANT")
         d = group.create_policies(group_examples.policy())
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
 
@@ -112,7 +112,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         When attempting to create a policy, but there are already too many
         policies for this group, an exception is raised.
         """
-        group = sql.SQLScalingGroup(self.engine, b"GROUP")
+        group = sql.SQLScalingGroup(self.engine, b"GROUP", b"TENANT")
 
         # TODO: figure out a way to put us at the limit
 
