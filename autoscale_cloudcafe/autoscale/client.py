@@ -362,9 +362,9 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type desired_capacity: Integer
         :param policy_type: What type of policy this is
         :type policy_type: String
-        :return: Response Object containing response code 201
+        :return: Policy Response Object containing response code 201
          on success and empty body
-        :rtype: Policy Response Object
+        :rtype: :class:`Policy`
 
         POST
         '/{tenantId}/groups/{groupId}/policy'
@@ -421,7 +421,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type policy_type: str
         :return: Response Object containing response code 201 on success
          and a list of policy objects
-        :rtype: :class: `Policy`
+        :rtype: :class:`Policy`
 
         POST
         '/{tenantId}/groups/{groupId}/policy'
@@ -448,7 +448,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type group_id: String
         :return: Response Object containing response code 200 and body with
                  the list of the policy configs
-        :rtype: Response Object
+        :rtype: :class:`Policies`
 
         GET
         '/<string:tenantId>/groups/<string:groupId>/policy'
@@ -576,7 +576,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type cooldown: dict
         :return: Response Object containing response code 201
          on success and empty body
-        :rtype: Response Object
+        :rtype: :class:`Webhook`
 
             POST
             '/{tenantId}/groups/{groupId}/policy/{policyId}/webhooks/'
@@ -599,7 +599,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type webhook_list: list of dict
         :return: Response Object containing response code 201
          on success and a list of webhook objects
-        :rtype: :class: `Webhook`
+        :rtype: :class:`Webhook`
 
             POST
             '/{tenantId}/groups/{groupId}/policy/{policyId}/webhooks/'
