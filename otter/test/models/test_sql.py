@@ -222,7 +222,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
 
         return d
 
-    def test_names_are_unique(self):
+    def test_scaling_group_names_are_unique(self):
         """
         Scaling group names must be unique for a given tenant.
         """
