@@ -120,6 +120,44 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         return self.assertFailure(d, interface.PoliciesOverLimitError)
 
     @inlineCallbacks
+    def test_list_policies_for_nonexistant_scaling_group(self):
+        """
+        When attempting to list policies for a group that doesn't exist,
+        an exception is raised.
+        """
+        group = sql.SQLScalingGroup(self.engine, b"BOGUS", b"TENANT")
+        d = group.list_policies(limit=1)
+        return self.assertFailure(d, interface.NoSuchScalingGroupError)
+
+    @inlineCallbacks
+    def test_list_zero_policies(self):
+        """
+        Listing policies works when there are no policies.
+        """
+        group = sql.SQLScalingGroup(self.engine, b"GROUP", b"TENANT")
+        list_response = yield group.list_policies(limit=1)
+        self.assertEqual(list_response, [])
+
+    @inlineCallbacks
+    def test_list_policies(self):
+        """
+        Listing policies works, as does pagination.
+        """
+        group = sql.SQLScalingGroup(self.engine, b"GROUP", b"TENANT")
+
+        policy_cfgs = group_examples.policy()
+        response = yield group.create_policies(policy_cfgs)
+
+        policy_ids = sorted([p["id"] for p in response])
+
+        list_response = yield group.list_policies(limit=1)
+        self.assertEqual(list_response, [policy_cfgs[0]])
+
+        last_id = list_response[-1]["id"]
+        list_response = yield group.list_policies(limit=3, marker=last_id)
+        self.assertEqual(list_response, [policy_cfgs[1:4]])
+
+    @inlineCallbacks
     def test_create_webhook_happy_case(self):
         """
         The user can create a webhook for an extant policy.
