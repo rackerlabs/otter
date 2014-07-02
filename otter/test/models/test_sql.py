@@ -239,8 +239,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         def try_again_same_name(_result):
             return create(launch_cfg2)
 
-        self.assertFailure(d, KeyError)
-        return d
+        return self.assertFailure(d, KeyError)
 
 
 class SQLAdminTests(SQLiteTestMixin, TestCase):
