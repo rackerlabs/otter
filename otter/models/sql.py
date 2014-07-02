@@ -18,15 +18,6 @@ class SQLScalingGroup(object):
         self.tenant_id = tenant_id
 
 
-@implementer(interface.IScalingGroup)
-class SQLScalingScheduleCollection(object):
-    """
-    A scaling schedule collection backed by a SQL store.
-    """
-    def __init__(self, engine):
-        self.engine = engine
-
-
 @implementer(interface.IScalingGroupCollection)
 class SQLScalingGroupCollection(object):
     """
@@ -58,6 +49,23 @@ class SQLScalingGroupCollection(object):
             return dict(groups=groups, policies=policies, webhooks=webhooks)
 
         return d
+
+@implementer(interface.IScalingGroup)
+class SQLScalingScheduleCollection(object):
+    """
+    A scaling schedule collection backed by a SQL store.
+    """
+    def __init__(self, engine):
+        self.engine = engine
+
+
+@implementer(interface.IAdmin)
+class SQLAdmin(object):
+    """
+    An admin interface backed by a SQL store.
+    """
+    def __init__(self, engine):
+        self.engine = engine
 
 
 def _create_policy(conn, policy_cfg):
@@ -107,15 +115,6 @@ def _get_adjustment_type(policy_cfg):
     else:
         raise KeyError("No adjustment_type (one of {}) in policy config {}"
                        .format(adjustment_types, policy_cfg))
-
-
-@implementer(interface.IAdmin)
-class SQLAdmin(object):
-    """
-    An admin interface backed by a SQL store.
-    """
-    def __init__(self, engine):
-        self.engine = engine
 
 
 metadata = MetaData()
