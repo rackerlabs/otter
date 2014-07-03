@@ -29,7 +29,6 @@ from otter.worker.launch_server_v1 import (
     verified_delete,
     LB_MAX_RETRIES,
     LB_RETRY_INTERVAL_RANGE,
-    match_server,
     find_server
 )
 
@@ -109,20 +108,6 @@ class UtilityTests(SynchronousTestCase):
             public_endpoint_url(fake_service_catalog, 'cloudServersOpenStack',
                                 'DFW'),
             'http://dfw.openstack/')
-
-    def test_match_server_exact_metadata(self):
-        """
-        :func:`match_server` returns True the metadata are exactly equivalent
-        """
-        self.assertTrue(match_server({'metadata': {'1': '2'}}, {'1': '2'}))
-
-    def test_match_server_returns_false_if_metadata_not_equal(self):
-        """
-        :func:`match_server` returns False the metadata are not exactly
-        equivalent
-        """
-        self.assertFalse(match_server(
-            {'metadata': {'1': '2'}}, {'1': '2', '2': '3'}))
 
 
 expected_headers = {
@@ -817,7 +802,7 @@ class ServerTests(SynchronousTestCase):
     def test_find_server_returns_None_if_no_servers_from_nova_match(self):
         """
         :func:`find_server` will return None for servers even if Nova returned
-        some servers, if :func:`match_servers` does not match any of the servers
+        some servers, if the server metadata doe not match
         """
         server_config = {'server': _get_server_info()}
 

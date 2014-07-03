@@ -161,21 +161,6 @@ MAX_CREATE_SERVER = 2
 create_server_sem = DeferredSemaphore(MAX_CREATE_SERVER)
 
 
-def match_server(server_details, server_metadata):
-    """
-    Matches a server by its metadata and creation time.
-
-    :param dict server_details: Server details JSON blob, as would
-        come back from a server details or as part of a list server details call
-        to Nova
-    :param dict server_metadata: The exact metadata to check
-
-    :return: True if the server metadata contains the given metadata,
-    :rtype: ``bool``
-    """
-    return server_details['metadata'] == server_metadata
-
-
 def find_server(server_endpoint, auth_token, server_config, log=None):
     """
     Given a server config, attempts to find a server created with that config.
@@ -208,15 +193,13 @@ def find_server(server_endpoint, auth_token, server_config, log=None):
 
     def get_server(list_server_details):
         server_metadata = server_config['server']['metadata']
-        more_strictly_match = partial(match_server,
-                                      server_metadata=server_metadata)
 
         if len(list_server_details['servers']) > 1:
             log.err("More than 1 server of the same name was returned by Nova",
                     servers=list_server_details['servers'])
 
         matches = [s for s in list_server_details['servers']
-                   if more_strictly_match(s)]
+                   if s['metadata'] == server_metadata]
 
         if len(matches) >= 1:
             return {'server': matches[0]}
