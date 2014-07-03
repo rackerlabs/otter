@@ -28,7 +28,7 @@ from otter.util import logging_treq as treq
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error, raise_error_on_code,
-                             APIError)
+                             APIError, RequestError)
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout, log_with_time
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
@@ -195,39 +195,49 @@ def log_lb_unexpected_errors(f, log, msg):
         log.err(f, 'Unknown error while ' + msg)
     elif not (f.value.code == 404 or
               f.value.code == 422 and 'PENDING_UPDATE' in f.value.body):
-        log.msg('Got unexpected LB error while {m}: {f}', m=msg, f=f)
+        log.msg('Got unexpected LB status {status} while {msg}: {error}',
+                status=f.value.code, msg=msg, error=f.value)
     return f
 
 
 class CLBOrNodeDeleted(Exception):
     """
-    CLB or Node is deleted
+    CLB or Node is deleted or in process of getting deleted
+
+    :param :class:`RequestError` error: Error that caused this exception
+    :param str clb_id: ID of deleted load balancer
+    :param str node_id: ID of deleted node in above load balancer
     """
-    def __init__(self, clb_id, node_id=None):
+    def __init__(self, error, clb_id, node_id=None):
         super(CLBOrNodeDeleted, self).__init__(
-            'CLB {} or node {} deleted'.format(clb_id, node_id))
+            'CLB {} or node {} deleted due to {}'.format(clb_id, node_id, error))
+        self.error = error
         self.clb_id = clb_id
         self.node_id = node_id
 
 
 def check_deleted_clb(f, clb_id, node_id=None):
     """
-    Raise `CLBOrNodeDeleted` error based on information in `APIError` in f.
+    Raise `CLBOrNodeDeleted` error based on information in `RequestError` in f.
     Otherwise return f
 
-    :param :class:`Failure` f: failure from adding/removing node
+    :param :class:`Failure` f: failure containing :class:`RequestError`
+                               from adding/removing node
+    :param str clb_id: ID of load balancer causing the error
+    :param str node_id: ID of node of above load balancer
     """
-    # A LB being deleted sometimes results in a 422.  This function
+    # A LB being deleted sometimes results in a 422. This function
     # unfortunately has to parse the body of the message to see if this is an
     # acceptable 422 (if the LB has been deleted or in the process of being deleted)
-    f.trap(APIError)
-    error = f.value
+    f.trap(RequestError)
+    f.value.reason.trap(APIError)
+    error = f.value.reason.value
     if error.code == 404:
-        raise CLBOrNodeDeleted(clb_id, node_id)
+        raise CLBOrNodeDeleted(f.value, clb_id, node_id)
     if error.code == 422:
         message = json.loads(error.body)['message']
         if ('load balancer is deleted' in message or 'PENDING_DELETE' in message):
-            raise CLBOrNodeDeleted(clb_id, node_id)
+            raise CLBOrNodeDeleted(f.value, clb_id, node_id)
     return f
 
 
@@ -262,6 +272,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
                       log=lb_log)
         d.addCallback(check_success, [200, 202])
         d.addErrback(log_lb_unexpected_errors, lb_log, 'add_node')
+        d.addErrback(wrap_request_error, path, 'add_node')
         d.addErrback(check_deleted_clb, lb_id)
         return d
 
@@ -284,7 +295,6 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
                   result['nodes'][0]['id'])
         return result
 
-    d.addErrback(lambda f: f.trap(APIError) and wrap_request_error(f, path, 'add_node'))
     return d.addCallback(treq.json_content).addCallback(when_done)
 
 
@@ -515,6 +525,7 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
         # TODO: This may not be required since Twisted 14.0?
         d.addCallback(treq.content)  # To avoid https://twistedmatrix.com/trac/ticket/6751
         d.addErrback(log_lb_unexpected_errors, lb_log, 'remove_node')
+        d.addErrback(wrap_request_error, path, 'remove_node')
         d.addErrback(check_deleted_clb, loadbalancer_id, node_id)
         return d
 
@@ -528,8 +539,7 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
         clock=clock)
 
     # A node or CLB deleted is considered successful removal
-    d.addErrback(lambda f: f.trap(CLBOrNodeDeleted))
-    d.addErrback(lambda f: f.trap(APIError) and wrap_request_error(f, path, 'remove_node'))
+    d.addErrback(lambda f: f.trap(CLBOrNodeDeleted) and lb_log.msg(f.value.message))
     d.addCallback(lambda _: lb_log.msg('Removed from load balancer'))
     return d
 
