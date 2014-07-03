@@ -522,7 +522,6 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
     def remove():
         d = treq.delete(path, headers=headers(auth_token), log=lb_log)
         d.addCallback(check_success, [200, 202])
-        # TODO: This may not be required since Twisted 14.0?
         d.addCallback(treq.content)  # To avoid https://twistedmatrix.com/trac/ticket/6751
         d.addErrback(log_lb_unexpected_errors, lb_log, 'remove_node')
         d.addErrback(wrap_request_error, path, 'remove_node')
