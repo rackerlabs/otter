@@ -123,10 +123,26 @@ def transient_errors_except(*args):
 
     :return: a function that accepts a :class:`Failure` and returns ``True``
         only if the :class:`Failure` does not wrap an Exception passed in the
-        args.  If no args are passed, all Exceptions are treated as transient.
+        args.  If no args are passed, all :class:`Exception`s are treated as
+        transient.
     """
     def can_retry(f):
         return not f.check(*args)
+
+    return can_retry
+
+
+def terminal_errors_except(*args):
+    """
+    Returns a ``can_retry`` function for :py:func:retry` that only retries if
+    errors the ``Exception`` types specified.
+
+    :return: a function that accepts a :class:`Failure` and returns ``True``
+        only if the :class:`Failure` wraps an Exception passed in the args.
+        If no args are passed, no :class:`Exception` is treated as transient.
+    """
+    def can_retry(f):
+        return f.check(*args)
 
     return can_retry
 

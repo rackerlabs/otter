@@ -9,7 +9,8 @@ from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.retry import (retry, repeating_interval, random_interval,
-                              transient_errors_except, retry_times, compose_retries)
+                              transient_errors_except, retry_times,
+                              compose_retries, terminal_errors_except)
 from otter.test.utils import CheckFailure, DummyException
 
 
@@ -328,6 +329,24 @@ class CanRetryHelperTests(SynchronousTestCase):
         # False otherwise
         self.assertFalse(can_retry(8))
         self.assertFalse(can_retry(3))
+
+    def test_terminal_errors_except_defaults_to_all_errors_bad(self):
+        """
+        If no args are provided to :func:`fail_unless`, the
+        function it returns treats all errors as terminal (returns False)
+        """
+        can_retry = terminal_errors_except()
+
+        for exception in (DummyException(), NotImplementedError()):
+            self.assertFalse(can_retry(Failure(exception)))
+
+    def test_terminal_errors_except_continues_on_provided_exceptions(self):
+        """
+        If the failure is of a type provided to :func:`transient_errors_except`,
+        the function it returns will treat it as transient (returns True)
+        """
+        can_retry = terminal_errors_except(DummyException)
+        self.assertTrue(can_retry(Failure(DummyException())))
 
 
 class NextIntervalHelperTests(SynchronousTestCase):

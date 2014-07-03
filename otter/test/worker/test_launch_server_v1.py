@@ -850,10 +850,12 @@ class ServerTests(SynchronousTestCase):
         self.assertEqual(self.successResultOf(d), {'server': servers[0]})
         self.log.err.assert_called_once_with(mock.ANY, servers=servers)
 
-    def test_create_server(self):
+    @mock.patch('otter.worker.launch_server_v1.find_server')
+    def test_create_server(self, fs):
         """
-        create_server will perform a properly formed POST request to the
-        server endpoint and return the decoded json content.
+        :func:`create_server` will perform a properly formed POST request to the
+        server endpoint and return the decoded json content.  It will not
+        attempt to find a server in Nova if the create request succeeds.
         """
         response = mock.Mock()
         response.code = 202
@@ -871,6 +873,8 @@ class ServerTests(SynchronousTestCase):
         result = self.successResultOf(d)
 
         self.assertEqual(result, self.treq.json_content.return_value)
+
+        self.assertEqual(len(fs.mock_calls), 0)
 
     def test_create_server_limits(self):
         """
@@ -904,19 +908,112 @@ class ServerTests(SynchronousTestCase):
         self.successResultOf(ret_ds[1])
         self.successResultOf(ret_ds[2])
 
-    def test_create_server_propagates_api_failure(self):
+    @mock.patch('otter.worker.launch_server_v1.find_server')
+    def test_create_server_propagates_api_failure_from_create(self, fs):
         """
-        create_server will propagate API failures.
+        :func:`create_server` will propagate API failures from the call to
+        create the server, if :func:`find_server` also failed with an API
+        failure.
         """
-        response = mock.Mock()
-        response.code = 500
-
-        self.treq.post.return_value = succeed(response)
+        self.treq.post.return_value = succeed(mock.Mock(code=500))
         self.treq.content.return_value = succeed(error_body)
+        fs.return_value = fail(APIError(401, '', {}))
 
-        d = create_server('http://url/', 'my-auth-token', {})
+        d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
+                          retries=0)
 
         failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(RequestError))
+        real_failure = failure.value.reason
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+
+        self.assertEqual(len(fs.mock_calls), 1)
+
+    @mock.patch('otter.worker.launch_server_v1.find_server')
+    def test_create_server_returns_found_server(self, fs):
+        """
+        If attempting to create a server fails due to a Nova error or identity
+        error, but a server was indeed created and found, :func:`create_server`
+        returns this found server successfully.  Creation is not retried.
+        """
+        self.treq.post.return_value = succeed(mock.Mock(code=500))
+        self.treq.content.return_value = succeed(error_body)
+        fs.return_value = succeed("I'm a server!")
+
+        server_config = {
+            'name': 'someServer',
+            'imageRef': '1',
+            'flavorRef': '3'
+        }
+
+        d = create_server('http://url/', 'my-auth-token', server_config)
+
+        result = self.successResultOf(d)
+        self.assertEqual(result, "I'm a server!")
+        self.assertEqual(len(self.treq.post.mock_calls), 1)
+
+    @mock.patch('otter.worker.launch_server_v1.find_server')
+    def test_create_server_errors_if_no_server_found(self, fs):
+        """
+        If attempting to create a server fails due to a Nova error or identity
+        error, and a created server was not found, :func:`create_server`
+        returns original error when on the last retry.
+        """
+        self.treq.post.return_value = succeed(mock.Mock(code=500))
+        self.treq.content.return_value = succeed(error_body)
+        fs.return_value = succeed(None)
+
+        server_config = {
+            'name': 'someServer',
+            'imageRef': '1',
+            'flavorRef': '3'
+        }
+
+        d = create_server('http://url/', 'my-auth-token', server_config,
+                          retries=0)
+
+        failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(RequestError))
+        real_failure = failure.value.reason
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+
+        self.assertEqual(len(fs.mock_calls), 1)
+
+    @mock.patch('otter.worker.launch_server_v1.find_server')
+    def test_create_server_retries_if_no_server_found(self, fs):
+        """
+        If attempting to create a server fails due to a Nova error or identity
+        error, and no server was found to be created, :func:`create_server`
+        reties the create up to 3 times by default
+        """
+        self.treq.post.side_effect = lambda *a, **kw: succeed(mock.Mock(code=500))
+        self.treq.content.side_effect = lambda *a, **kw: succeed(error_body)
+        fs.side_effect = lambda *a, **kw: succeed(None)
+
+        server_config = {
+            'name': 'someServer',
+            'imageRef': '1',
+            'flavorRef': '3'
+        }
+
+        clock = Clock()
+
+        d = create_server('http://url/', 'my-auth-token', server_config,
+                          clock=clock)
+
+        for i in range(3):
+            self.assertEqual(len(self.treq.post.mock_calls), i + 1)
+            self.assertEqual(len(fs.mock_calls), i + 1)
+            clock.advance(15)
+
+        failure = self.failureResultOf(d)
+        self.assertEqual(len(self.treq.post.mock_calls), 4)
+        self.assertEqual(len(fs.mock_calls), 4)
+
         self.assertTrue(failure.check(RequestError))
         real_failure = failure.value.reason
 

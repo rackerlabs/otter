@@ -16,6 +16,7 @@ Also no attempt is currently being made to define the public API for
 initiating a launch_server job.
 """
 
+from datetime import datetime
 from functools import partial
 import json
 import itertools
@@ -23,6 +24,7 @@ from copy import deepcopy
 import re
 from urllib import urlencode
 
+from twisted.python.failure import Failure
 from twisted.internet.defer import gatherResults, maybeDeferred, DeferredSemaphore
 
 from otter.util import logging_treq as treq
@@ -33,8 +35,10 @@ from otter.util.http import (append_segments, headers, check_success,
                              APIError, RequestError)
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout, log_with_time
-from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
-                              TransientRetryError, random_interval, compose_retries)
+from otter.util.retry import (retry, retry_times, repeating_interval,
+                              transient_errors_except, TransientRetryError,
+                              random_interval, compose_retries,
+                              terminal_errors_except)
 
 # Number of times to retry when adding/removing nodes from LB
 LB_MAX_RETRIES = 10
@@ -210,9 +214,22 @@ def find_server(server_endpoint, auth_token, server_config, log=None):
     return d
 
 
-def create_server(server_endpoint, auth_token, server_config, log=None):
+class _NoCreatedServerFound(Exception):
     """
-    Create a new server.
+    Exception to be used only to indicate that retrying a create server can be
+    attempted.  The original create server failure is wrapped so that if there
+    are no more retries, the original failure can be propagated.
+    """
+    def __init__(self, original_failure):
+        self.original = original_failure
+
+
+def create_server(server_endpoint, auth_token, server_config, log=None,
+                  clock=None, retries=3):
+    """
+    Create a new server.  If there is an error from Nova from this call,
+    checks to see if the server was created anyway.  If not, will retry the
+    create ``retry_times`` (checking each time if a server)
 
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth Token.
@@ -221,11 +238,53 @@ def create_server(server_endpoint, auth_token, server_config, log=None):
     :return: Deferred that fires with the CreateServer response as a dict.
     """
     path = append_segments(server_endpoint, 'servers')
-    d = create_server_sem.run(treq.post, path, headers=headers(auth_token),
+
+    def _check_results(result, propagated_f):
+        """
+        Return the original failure, if checking a server resulted in a
+        failure too, or a wrapped propagated failure, if there were no servers
+        created, so that the
+        """
+        if isinstance(result, Failure):
+            log.msg("Attempt to find a created server in nova resulted in "
+                    "{failure}. Propagating the original create error instead.",
+                    failure=result)
+            return propagated_f
+
+        if result is None:
+            raise _NoCreatedServerFound(propagated_f)
+
+        return result
+
+    def _check_server_created(f):
+        f.trap(APIError)
+        if f.value.code == 400:  # if it's a 400, nova would not create a server
+            return f
+
+        d = find_server(server_endpoint, auth_token, server_config,
+                        datetime.now(), fuzz=60, log=log)
+        d.addBoth(_check_results, f)
+        return d
+
+    def _create_server():
+        d = create_server_sem.run(treq.post, path, headers=headers(auth_token),
                               data=json.dumps({'server': server_config}), log=log)
-    d.addCallback(check_success, [202])
+        d.addCallback(check_success, [202])
+        d.addCallback(treq.json_content)
+        d.addErrback(_check_server_created)
+        return d
+
+    d = retry(
+        _create_server,
+        can_retry=compose_retries(
+            retry_times(retries),
+            terminal_errors_except(_NoCreatedServerFound)),
+        next_interval=repeating_interval(15), clock=clock)
+
+    d.addErrback(lambda f: f.trap(_NoCreatedServerFound) and f.value.original)
     d.addErrback(wrap_request_error, path, 'server_create')
-    return d.addCallback(treq.json_content)
+
+    return d
 
 
 def log_on_response_code(response, log, msg, code):
