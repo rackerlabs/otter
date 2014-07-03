@@ -169,9 +169,9 @@ policies = Table("policies", metadata,
                         Enum("webhook", "schedule", "cloud_monitoring")))
 
 policy_args = Table("policy_args", metadata,
-                    Column("id", Integer(), primary_key=True),
-                    Column("policy_id", ForeignKey("policies.id")),
-                    Column("key", String()),
+                    Column("policy_id", ForeignKey("policies.id"),
+                           primary_key=True),
+                    Column("key", String(), primary_key=True),
                     Column("value", String()))
 
 webhooks = Table("webhooks", metadata,
