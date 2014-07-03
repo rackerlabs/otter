@@ -95,6 +95,7 @@ class ServersTests(AutoscaleFixture):
         """
         `DELETE invalid_serverId` returns 404
         """
+        # TODO: This may need to goto functional
         resp = self.autoscale_client.delete_server(self.groupid, 'junk')
         self.assertEqual(resp.status_code, 404,
                          'Delete server status is {}. Expected 404'.format(resp.status_code))
