@@ -281,25 +281,25 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         policies = group_examples.policy() + [None]
 
         ds = []
-        expected_manifests = []
+        expected_groups = []
         for args in product(group_cfgs, launch_cfgs, policies):
             ds.append(coll.create_scaling_group(log, b"tenant", *args))
 
             group_cfg, launch_cfg, policy_cfg = args
-            expected_manifests.append({"groupConfiguration": group_cfg,
-                                       "launchConfiguration": launch_cfg,
-                                       "scalingPolicies": policy_cfg or []})
+            expected_groups.append({"groupConfiguration": group_cfg,
+                                    "launchConfiguration": launch_cfg,
+                                    "scalingPolicies": policy_cfg or []})
 
         d = gatherResults(ds)
 
         @d.addCallback
-        def check_manifests(manifests):
+        def check_groups(groups):
             n_products = len(group_cfgs) * len(launch_cfgs) * len(policies)
-            self.assertEqual(len(manifests), n_products)
-            self.assertEqual(len(expected_manifests), n_products)
+            self.assertEqual(len(groups), n_products)
+            self.assertEqual(len(expected_groups), n_products)
 
             seen_ids = set()
-            for manifest, expected in zip(manifests, expected_manifests):
+            for manifest, expected in zip(groups, expected_groups):
                 self.assertIn("id", manifest)
                 seen_ids.add(manifest.pop("id"))
 
