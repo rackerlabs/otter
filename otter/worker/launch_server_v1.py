@@ -16,7 +16,6 @@ Also no attempt is currently being made to define the public API for
 initiating a launch_server job.
 """
 
-from datetime import datetime
 from functools import partial
 import json
 import itertools
@@ -261,14 +260,14 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
         if f.value.code == 400:  # if it's a 400, nova would not create a server
             return f
 
-        d = find_server(server_endpoint, auth_token, server_config,
-                        datetime.now(), fuzz=60, log=log)
+        d = find_server(server_endpoint, auth_token, server_config, log=log)
         d.addBoth(_check_results, f)
         return d
 
     def _create_server():
         d = create_server_sem.run(treq.post, path, headers=headers(auth_token),
-                              data=json.dumps({'server': server_config}), log=log)
+                                  data=json.dumps({'server': server_config}),
+                                  log=log)
         d.addCallback(check_success, [202])
         d.addCallback(treq.json_content)
         d.addErrback(_check_server_created)

@@ -1010,15 +1010,9 @@ class ServerTests(SynchronousTestCase):
             self.assertEqual(len(fs.mock_calls), i + 1)
             clock.advance(15)
 
-        failure = self.failureResultOf(d)
+        self.failureResultOf(d)
         self.assertEqual(len(self.treq.post.mock_calls), 4)
         self.assertEqual(len(fs.mock_calls), 4)
-
-        self.assertTrue(failure.check(RequestError))
-        real_failure = failure.value.reason
-
-        self.assertTrue(real_failure.check(APIError))
-        self.assertEqual(real_failure.value.code, 500)
 
     @mock.patch('otter.worker.launch_server_v1.server_details')
     def test_wait_for_active(self, server_details):
