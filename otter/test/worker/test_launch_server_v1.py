@@ -1,7 +1,6 @@
 """
 Unittests for the launch_server_v1 launch config.
 """
-from datetime import datetime
 import mock
 import json
 from urllib import quote_plus, unquote
@@ -111,41 +110,19 @@ class UtilityTests(SynchronousTestCase):
                                 'DFW'),
             'http://dfw.openstack/')
 
-    def test_match_server_exact_metadata_and_time(self):
+    def test_match_server_exact_metadata(self):
         """
-        :func:`match_server` returns True if the timestamps are the same
-        time and the metadata are exactly equivalent
+        :func:`match_server` returns True the metadata are exactly equivalent
         """
-        self.assertTrue(match_server(
-            {'metadata': {'1': '2'}, 'created': '1970-01-01T01:00:00Z'},
-            {'1': '2'}, datetime(1970, 1, 1, 1, 0, 0)))
+        self.assertTrue(match_server({'metadata': {'1': '2'}}, {'1': '2'}))
 
     def test_match_server_returns_false_if_metadata_not_equal(self):
         """
-        :func:`match_server` returns False if the timestamps are around the same
-        time but the metadata are not exactly equivalent
+        :func:`match_server` returns False the metadata are not exactly
+        equivalent
         """
         self.assertFalse(match_server(
-            {'metadata': {'1': '2'}, 'created': '1970-01-01T01:00:00Z'},
-            {'1': '2', '2': '3'}, datetime(1970, 1, 1, 1, 0, 0)))
-
-    def test_match_server_created_fuzz_seconds_before(self):
-        """
-        :func:`match_server` returns True if the metadata is equivalent and the
-        server was created ``fuzz`` seconds before the specified creation time
-        """
-        self.assertTrue(match_server(
-            {'metadata': {}, 'created': '1970-01-01T01:00:00Z'},
-            {}, datetime(1970, 1, 1, 1, 0, 10), 10))
-
-    def test_match_server_created_fuzz_seconds_after(self):
-        """
-        :func:`match_server` returns True if the metadata is equivalent and the
-        server was created ``fuzz`` seconds after the specified creation time
-        """
-        self.assertTrue(match_server(
-            {'metadata': {}, 'created': '1970-01-01T01:00:10Z'},
-            {}, datetime(1970, 1, 1, 1, 0, 0), 10))
+            {'metadata': {'1': '2'}}, {'1': '2', '2': '3'}))
 
 
 expected_headers = {
@@ -685,6 +662,9 @@ class LoadBalancersTests(SynchronousTestCase):
 
 
 def _get_server_info(metadata=None, created=None):
+    """
+    Created gives an extra field to distinguish the servers from each other
+    """
     config = {
         'name': 'abcd',
         'imageRef': '123',
@@ -781,8 +761,7 @@ class ServerTests(SynchronousTestCase):
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({"servers": []})
 
-        find_server('http://url/', 'my-auth-token', server_config,
-                    datetime.now())
+        find_server('http://url/', 'my-auth-token', server_config)
 
         url = "http://url/servers/detail?image=123&flavor=xyz&name={0}".format(
             quote_plus("^abcd$"))  # urlencoded to look like %5abcd%24
@@ -801,8 +780,7 @@ class ServerTests(SynchronousTestCase):
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({"servers": []})
 
-        find_server('http://url/', 'my-auth-token', server_config,
-                    datetime.now())
+        find_server('http://url/', 'my-auth-token', server_config)
 
         url = ("http://url/servers/detail?image=123&flavor=xyz&name="
                r"^this\.is\[\]regex\\dangerous\(\)\*$")
@@ -818,8 +796,7 @@ class ServerTests(SynchronousTestCase):
         self.treq.get.return_value = succeed(mock.Mock(code=500))
         self.treq.content.return_value = succeed(error_body)
 
-        d = find_server('http://url/', 'my-auth-token', server_config,
-                        datetime.now())
+        d = find_server('http://url/', 'my-auth-token', server_config)
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(APIError))
         self.assertEqual(failure.value.code, 500)
@@ -834,55 +811,44 @@ class ServerTests(SynchronousTestCase):
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({"servers": []})
 
-        d = find_server('http://url/', 'my-auth-token', server_config,
-                        datetime.now())
+        d = find_server('http://url/', 'my-auth-token', server_config)
         self.assertIsNone(self.successResultOf(d))
 
     def test_find_server_returns_None_if_no_servers_from_nova_match(self):
         """
         :func:`find_server` will return None for servers even if Nova returned
         some servers, if :func:`match_servers` does not match any of the servers
-        (for instance if the creation time is off)
         """
         server_config = {'server': _get_server_info()}
 
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({
-            'servers': [
-                _get_server_info(created='2000-01-01T01:01:00Z'),
-                _get_server_info(metadata={'hello': 'there'},
-                                 created='2014-04-04T04:04:04Z')
-            ]
+            'servers': [_get_server_info(metadata={'hello': 'there'})]
         })
 
-        d = find_server('http://url/', 'my-auth-token', server_config,
-                        datetime(2014, 04, 04, 04, 04, 04))
+        d = find_server('http://url/', 'my-auth-token', server_config)
         self.assertIsNone(self.successResultOf(d))
 
     def test_find_server_returns_match_from_nova(self):
         """
         :func:`find_server` will return a server returned from Nova if the
-        metadata and creation dates match.
+        metadata match.
         """
         server_config = {'server': _get_server_info(metadata={'hey': 'there'})}
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed(
-            {'servers': [_get_server_info(metadata={'hey': 'there'},
-                                          created="2014-04-04T04:04:04Z")]})
+            {'servers': [_get_server_info(metadata={'hey': 'there'})]})
 
-        d = find_server('http://url/', 'my-auth-token', server_config,
-                        datetime(2014, 04, 04, 04, 04, 04))
+        d = find_server('http://url/', 'my-auth-token', server_config)
 
         self.assertEqual(
             self.successResultOf(d),
-            {'server': _get_server_info(metadata={'hey': 'there'},
-                                        created="2014-04-04T04:04:04Z")})
+            {'server': _get_server_info(metadata={'hey': 'there'})})
 
     def test_find_server_returns_first_match_from_nova_and_logs_more(self):
         """
         :func:`find_server` will return a the first server returned from Nova
-        whose metadata and creation dates match.  It logs if there more than 1
-        match.
+        whose metadata match.  It logs if there more than 1 server from Nova.
         """
         server_config = {'server': _get_server_info()}
         servers = [
@@ -894,12 +860,10 @@ class ServerTests(SynchronousTestCase):
         self.treq.json_content.return_value = succeed({'servers': servers})
 
         d = find_server('http://url/', 'my-auth-token', server_config,
-                        datetime(2014, 04, 04, 04, 04, 04), log=self.log)
+                        self.log)
 
         self.assertEqual(self.successResultOf(d), {'server': servers[0]})
-        self.log.err.assert_called_once_with(
-            "{n} servers were created by the same job", n=2, servers=servers
-        )
+        self.log.err.assert_called_once_with(mock.ANY, servers=servers)
 
     def test_create_server(self):
         """

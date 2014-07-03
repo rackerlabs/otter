@@ -25,7 +25,6 @@ from urllib import urlencode
 
 from twisted.internet.defer import gatherResults, maybeDeferred, DeferredSemaphore
 
-from otter.util.timestamp import from_timestamp
 from otter.util import logging_treq as treq
 
 from otter.util.config import config_value
@@ -162,7 +161,7 @@ MAX_CREATE_SERVER = 2
 create_server_sem = DeferredSemaphore(MAX_CREATE_SERVER)
 
 
-def match_server(server_details, server_metadata, creation_time, fuzz=5):
+def match_server(server_details, server_metadata):
     """
     Matches a server by its metadata and creation time.
 
@@ -170,34 +169,16 @@ def match_server(server_details, server_metadata, creation_time, fuzz=5):
         come back from a server details or as part of a list server details call
         to Nova
     :param dict server_metadata: The exact metadata to check
-    :param datetime creation_time:  The approximate time during wich the server
-        should have been created.  This datetime should be timezone-aware, or
-        if it is timezone-naive, it will be assumed to be UTC.
-    :param int fuzz: number of seconds before or after the given creation time
-        during which the server could have been created.
 
-    :return: True if the server metadata matches the given metadata,
-        and the creation time falls within ``fuzz`` seconds of ``creation_time``
+    :return: True if the server metadata contains the given metadata,
     :rtype: ``bool``
     """
-    created = from_timestamp(server_details['created'])
-
-    # if the creation time is naive and the created timestamp is timezone-aware,
-    # they can't be compared.  So make the created timezone also timezone
-    # unaware
-    if creation_time.tzinfo is None:
-        created = created.replace(tzinfo=None)
-
-    diff = abs((creation_time - created).total_seconds())
-
-    return server_details['metadata'] == server_metadata and diff <= fuzz
+    return server_details['metadata'] == server_metadata
 
 
-def find_server(server_endpoint, auth_token, server_config, creation_time,
-                fuzz=5, log=None):
+def find_server(server_endpoint, auth_token, server_config, log=None):
     """
-    Given a server config, attempts to find a server created with that config
-    within ``fuzz`` seconds of ``creation_time``.
+    Given a server config, attempts to find a server created with that config.
 
     Uses the Nova list server details endpoint to filter out any server that
     does not have the exact server name (the filter is a regex, so can filter
@@ -206,10 +187,6 @@ def find_server(server_endpoint, auth_token, server_config, creation_time,
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth Token.
     :param dict server_config: Nova server config.
-    :param datetime creation_time:  The approximate time during wich the server
-        should have been created.
-    :param int fuzz: number of seconds before or after the given creation time
-        during which the server could have been created.
     :param log: A bound logger
 
     :return: Deferred that fires with a server (in the format of a server
@@ -232,19 +209,18 @@ def find_server(server_endpoint, auth_token, server_config, creation_time,
     def get_server(list_server_details):
         server_metadata = server_config['server']['metadata']
         more_strictly_match = partial(match_server,
-                                      server_metadata=server_metadata,
-                                      creation_time=creation_time,
-                                      fuzz=fuzz)
+                                      server_metadata=server_metadata)
+
+        if len(list_server_details['servers']) > 1:
+            log.err("More than 1 server of the same name was returned by Nova",
+                    servers=list_server_details['servers'])
 
         matches = [s for s in list_server_details['servers']
                    if more_strictly_match(s)]
 
-        if len(matches) > 1:
-            log.err("{n} servers were created by the same job",
-                    n=len(matches), servers=matches)
-
         if len(matches) >= 1:
             return {'server': matches[0]}
+
         return None
 
     d.addCallback(get_server)
