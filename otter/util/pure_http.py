@@ -50,13 +50,13 @@ def get_request(method, url, **kwargs):
 
 
 def request_with_reauth(get_request, method, url, auth=None,
-                        headers=None, **kwargs):
-    """Create a request which will reauthenticate upon 401 and retry."""
+                        headers=None, reauth_codes=(401, 403), **kwargs):
+    """Create a request which will reauthenticate upon 401 and optionally retry."""
 
     def handle_reauth(result, retries):
         response, content = result
 
-        if response.code == 401:
+        if response.code in reauth_codes:
             if retries == 0:
                 raise ReauthFailedError()
             return auth(refresh=True).on(

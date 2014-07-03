@@ -2,9 +2,8 @@
 
 import json
 
-from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import SynchronousTestCase
 
 from effect.testing import StubIntent, resolve_effect, resolve_stub
 from effect.twisted import perform
@@ -65,7 +64,7 @@ class RequestEffectTests(SynchronousTestCase):
                          (response, "content"))
 
 
-class OSHTTPClientTests(TestCase):
+class OSHTTPClientTests(SynchronousTestCase):
     """Tests for OSHTTPClient."""
 
     def _no_reauth_client(self):
@@ -136,6 +135,21 @@ class OSHTTPClientTests(TestCase):
         retried with the x-auth-token header updated to use the new auth
         token.
         """
+        return self._test_reauth(401)
+
+    def test_reauth_on_403(self):
+        """
+        Reauthentication also automatically happens on a 403 response.
+        """
+        return self._test_reauth(403)
+
+    def test_reauth_on_custom_code(self):
+        """
+        Reauthentication can happen on other codes too.
+        """
+        return self._test_reauth(500, reauth_codes=(401, 403, 500))
+
+    def _test_reauth(self, code, reauth_codes=None):
         reauth_effect = Effect(StubIntent("new-token"))
 
         def auth(refresh=False):
@@ -144,12 +158,15 @@ class OSHTTPClientTests(TestCase):
             else:
                 return Effect(StubIntent("first-token"))
         # First we try to make a simple request.
-        eff = request("get", "/foo", auth=auth)
+        kwargs = {}
+        if reauth_codes is not None:
+            kwargs['reauth_codes'] = reauth_codes
+        eff = request("get", "/foo", auth=auth, **kwargs)
         # The initial (cached) token is retrieved.
         eff = resolve_stub(eff)
 
         # Reauthentication is then triggered:
-        stub_result = stub_pure_response("", code=401)
+        stub_result = stub_pure_response("", code=code)
         reauth_effect_result = resolve_effect(eff, stub_result)
         self.assertIs(reauth_effect_result.intent, reauth_effect.intent)
         # When retry succeeds, the original request is retried:
