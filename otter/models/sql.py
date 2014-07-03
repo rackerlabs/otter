@@ -61,12 +61,37 @@ class SQLScalingGroupCollection(object):
     def __init__(self, engine):
         self.engine = engine
 
-    def create_scaling_group(self, log, tenant_id, group_cfg, launch_cfg,
-                             policies=None):
+    @_with_transaction
+    def create_scaling_group(self, conn, log, tenant_id, group_cfg,
+                             launch_cfg, policies=None):
         """
         Creates a scaling group backed by a SQL store.
         """
-        scaling_group_id = bytes(uuid4())
+        group_id = bytes(uuid4())
+
+        d = conn.execute(scaling_groups.insert()
+                         .values(id=group_id,
+                                 tenant_id=tenant_id))
+
+        @d.addCallback
+        def build_response(result):
+            return {
+                "id": group_id,
+                "state": interface.GroupState(tenant_id=tenant_id,
+                                              group_id=group_id,
+                                              group_name=group_cfg["name"],
+                                              active={},
+                                              pending={},
+                                              policy_touched={},
+                                              group_touched={},
+                                              paused=False),
+                "groupConfiguration": group_cfg,
+                "launchConfiguration": launch_cfg,
+                "scalingPolicies": policies if policies is not None else []
+            }
+
+        return d
+
 
     def get_counts(self, log, tenant_id):
         statements = [t.select().where(t.c.tenant_id == tenant_id).count()
@@ -156,7 +181,16 @@ metadata = MetaData()
 
 scaling_groups = Table("scaling_groups", metadata,
                        Column("id", String(32), primary_key=True),
-                       Column("tenant_id", String()))
+                       Column("tenant_id", String()),
+                       Column("cooldown", Integer()),
+                       Column("minEntities", Integer()),
+                       Column("maxEntities", Integer()))
+
+group_metadata = Table("group_metadata", metadata,
+                       Column("group_id", ForeignKey("scaling_groups.id"),
+                              primary_key=True),
+                       Column("key", String(), primary_key=True),
+                       Column("value", String()))
 
 policies = Table("policies", metadata,
                  Column("id", String(32), primary_key=True),
