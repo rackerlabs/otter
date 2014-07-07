@@ -491,8 +491,8 @@ class IScalingGroup(Interface):
         :rtype: :class:`twisted.internet.defer.Deferred` :class:`list` as
             specified by :data:`otter.json_schema.model_schemas.webhook_list`
 
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-        :raises: :class:`WebhooksOverLimitError` if creating all the specified
+        :raises NoSuchPolicyError: if the policy id does not exist
+        :raises WebhooksOverLimitError: if creating all the specified
             webhooks would put the user over their limit of webhooks per policy
         """
 
