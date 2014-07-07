@@ -3,7 +3,8 @@ Unittests for the launch_server_v1 launch config.
 """
 import mock
 import json
-from urllib import quote_plus, unquote
+from urllib import urlencode
+from urlparse import urlunsplit
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import Deferred, fail, succeed
@@ -748,8 +749,10 @@ class ServerTests(SynchronousTestCase):
 
         find_server('http://url/', 'my-auth-token', server_config)
 
-        url = "http://url/servers/detail?image=123&flavor=xyz&name={0}".format(
-            quote_plus("^abcd$"))  # urlencoded to look like %5abcd%24
+        url = urlunsplit([
+            'http', 'url', 'servers/detail',
+            urlencode({"image": "123", "flavor": "xyz", "name": "^abcd$"}),
+            None])
 
         self.treq.get.assert_called_once_with(url, headers=expected_headers,
                                               log=mock.ANY)
@@ -767,10 +770,14 @@ class ServerTests(SynchronousTestCase):
 
         find_server('http://url/', 'my-auth-token', server_config)
 
-        url = ("http://url/servers/detail?image=123&flavor=xyz&name="
-               r"^this\.is\[\]regex\\dangerous\(\)\*$")
+        url = urlunsplit([
+            'http', 'url', 'servers/detail',
+            urlencode({"image": "123", "flavor": "xyz",
+                       "name": r"^this\.is\[\]regex\\dangerous\(\)\*$"}),
+            None])
 
-        self.assertEqual(unquote(self.treq.get.mock_calls[0][1][0]), url)
+        self.treq.get.assert_called_once_with(url, headers=expected_headers,
+                                              log=mock.ANY)
 
     def test_find_server_propagates_api_errors(self):
         """
