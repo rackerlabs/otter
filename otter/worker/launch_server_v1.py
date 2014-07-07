@@ -228,7 +228,13 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
     """
     Create a new server.  If there is an error from Nova from this call,
     checks to see if the server was created anyway.  If not, will retry the
-    create ``retry_times`` (checking each time if a server)
+    create ``retry_times`` (checking each time if a server).
+
+    If the error from Nova is a 400, does not retry, because that implies that
+    retrying will just result in another 400 (bad args).
+
+    If checking to see if the server is created also results in a failure,
+    does not retry because there might just be something wrong with Nova.
 
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth Token.
@@ -241,8 +247,9 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
     def _check_results(result, propagated_f):
         """
         Return the original failure, if checking a server resulted in a
-        failure too, or a wrapped propagated failure, if there were no servers
-        created, so that the
+        failure too.  Returns a wrapped propagated failure, if there were no
+        servers created, so that the retry utility knows that server creation
+        can be retried.
         """
         if isinstance(result, Failure):
             log.msg("Attempt to find a created server in nova resulted in "
@@ -256,8 +263,17 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
         return result
 
     def _check_server_created(f):
+        """
+        If creating a server failed with anything other than a 400, see if
+        Nova created a server anyway (a 400 means that the server creation args
+        were bad, and there is no point in retrying).
+
+        If Nova created a server, just return it and pretend that the error
+        never happened.  If it didn't, or if checking resulted in another
+        failure response, return a failure of some type.
+        """
         f.trap(APIError)
-        if f.value.code == 400:  # if it's a 400, nova would not create a server
+        if f.value.code == 400:
             return f
 
         d = find_server(server_endpoint, auth_token, server_config, log=log)
@@ -265,6 +281,13 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
         return d
 
     def _create_server():
+        """
+        Attempt to create a server, handling spurious non-400 errors from Nova
+        by seeing if Nova created a server anyway in spite of the error.  If so
+        then create server succeeded.
+
+        If not, and if no further errors occur, server creation can be retried.
+        """
         d = create_server_sem.run(treq.post, path, headers=headers(auth_token),
                                   data=json.dumps({'server': server_config}),
                                   log=log)
