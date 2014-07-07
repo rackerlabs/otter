@@ -647,7 +647,7 @@ class LoadBalancersTests(SynchronousTestCase):
     test_removelb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
 
 
-def _get_server_info(metadata={}, created=None):
+def _get_server_info(metadata=None, created=None):
     """
     Creates a fake server config to be used when testing creating servers
     (either as the config to use when creating, or as the config to return as
@@ -661,7 +661,7 @@ def _get_server_info(metadata={}, created=None):
         'name': 'abcd',
         'imageRef': '123',
         'flavorRef': 'xyz',
-        'metadata': metadata
+        'metadata': {} if metadata is None else metadata
     }
     if created is not None:
         config['created'] = created
