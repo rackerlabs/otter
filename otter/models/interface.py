@@ -471,7 +471,13 @@ class IScalingGroup(Interface):
 
     def create_webhooks(policy_id, data):
         """
-        Creates a new webhook URL for a scaling policy.
+        Creates a new webhook for a scaling policy.
+
+        The return value will contain information about both the webhook URL
+        (the URL pointing to the webhook resource itself, which allows an
+        authenticated user to access and modify the webhook) as well as the
+        capability URL (the unguessable URL which allows the referenced policy
+        to be executed without further authentication).
 
         :param policy_id: The UUID of the policy for which to create a
             new webhook.
