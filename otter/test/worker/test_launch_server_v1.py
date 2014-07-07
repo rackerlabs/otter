@@ -646,18 +646,22 @@ class LoadBalancersTests(SynchronousTestCase):
     test_removelb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
 
 
-def _get_server_info(metadata=None, created=None):
+def _get_server_info(metadata={}, created=None):
     """
-    Created gives an extra field to distinguish the servers from each other
+    Creates a fake server config to be used when testing creating servers
+    (either as the config to use when creating, or as the config to return as
+    a response).
+
+    :param ``dict`` metadata: metadata to include in the server config
+    :param ``created``: this is only used in server responses, but gives an
+        extra field to distinguish one server config from another
     """
     config = {
         'name': 'abcd',
         'imageRef': '123',
         'flavorRef': 'xyz',
-        'metadata': {}
+        'metadata': metadata
     }
-    if metadata is not None:
-        config['metadata'] = metadata
     if created is not None:
         config['created'] = created
     return config
