@@ -24,6 +24,22 @@ class Webhook_Request(AutoMarshallingModel):
         return json.dumps(req)
 
 
+class Webhook_Multi_Request(AutoMarshallingModel):
+
+    """
+    Marshalling for webhook batch requests
+    """
+
+    def __init__(self, request_list):
+        super(Webhook_Multi_Request, self).__init__()
+        self.request_list = request_list
+
+    def _obj_to_json(self):
+         # request_list is a list of objects -> turn request_list into a list of dicts, then serialize
+        req_list = [webhook._auto_to_dict() for webhook in self.request_list]
+        return json.dumps(req_list)
+
+
 class Update_Webhook_Request(AutoMarshallingModel):
 
     """
@@ -61,6 +77,22 @@ class Policy_Request(AutoMarshallingModel):
         req = []
         req.append(self._auto_to_dict())
         return json.dumps(req)
+
+
+class Policy_Batch_Request(AutoMarshallingModel):
+
+    """
+    Marshalling for policy batch requests
+    """
+
+    def __init__(self, request_list):
+        super(Policy_Batch_Request, self).__init__()
+        self.request_list = request_list
+
+    def _obj_to_json(self):
+        # request_list is a list of objects -> turn request_list into a list of dicts, then serialize
+        req_list = [policy._auto_to_dict() for policy in self.request_list]
+        return json.dumps(req_list)
 
 
 class Update_Policy_Request(AutoMarshallingModel):
