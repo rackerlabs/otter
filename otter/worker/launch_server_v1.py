@@ -296,6 +296,18 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
         d.addErrback(_check_server_created)
         return d
 
+    def _unwrap_NoCreatedServerFound(f):
+        """
+        The original failure was wrapped in a :class:`_NoCreatedServerFound`
+        for ease of retry, but that should not be the final error propagated up
+        by :func:`create_server`.
+
+        This errback unwraps the :class:`_NoCreatedServerFound` error and
+        returns the original failure.
+        """
+        f.trap(_NoCreatedServerFound)
+        return f.value.original
+
     d = retry(
         _create_server,
         can_retry=compose_retries(
@@ -303,7 +315,7 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
             terminal_errors_except(_NoCreatedServerFound)),
         next_interval=repeating_interval(15), clock=clock)
 
-    d.addErrback(lambda f: f.trap(_NoCreatedServerFound) and f.value.original)
+    d.addErrback(_unwrap_NoCreatedServerFound)
     d.addErrback(wrap_request_error, path, 'server_create')
 
     return d
