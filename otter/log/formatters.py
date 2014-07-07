@@ -50,6 +50,7 @@ def JSONObserverWrapper(observer, **kwargs):
 def StreamObserverWrapper(stream, delimiter='\n', buffered=False):
     """
     Create a log observer that will write bytes to the specified stream.
+
     :param str or None delimter: A delimiter for each message.
     :param bool buffered: True if output should be buffered, if False we will
         call `flush` on the `stream` after writing every message.
