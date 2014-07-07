@@ -97,6 +97,7 @@ def SystemFilterWrapper(observer):
 def PEP3101FormattingWrapper(observer):
     """
     Format messages using PEP3101 format strings.
+
     :param ILogObserver observer: The log observer to delegate to after
         formatting message.
 
