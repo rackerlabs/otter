@@ -134,7 +134,9 @@ class GroupState(object):
 
     def get_capacity(self):
         """
-        :returns: a dictionary with the desired_capcity, current_capacity, and
+        Get the capacities for a group.
+
+        :return: A dictionary with the desired_capcity, current_capacity, and
         pending_capacity.
         """
         return {'current_capacity': len(self.active),
