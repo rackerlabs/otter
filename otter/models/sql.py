@@ -196,13 +196,18 @@ group_metadata = Table("group_metadata", metadata,
 
 policies = Table("policies", metadata,
                  Column("id", String(32), primary_key=True),
-                 Column("tenant_id", String()),
-                 Column("name", String()),
+                 Column("tenant_id", String(), nullable=False),
+                 Column("group_id", ForeignKey("scaling_groups.id"),
+                        nullable=False),
+                 Column("name", String(), nullable=False),
                  Column("adjustment_type",
-                        Enum("change", "changePercent", "desiredCapacity")),
-                 Column("adjustment_value", Integer()),
+                        Enum("change", "changePercent", "desiredCapacity"),
+                        nullable=False),
+                 Column("adjustment_value", Integer(),
+                        nullable=False),
                  Column("type",
-                        Enum("webhook", "schedule", "cloud_monitoring")))
+                        Enum("webhook", "schedule", "cloud_monitoring"),
+                        nullable=False))
 
 policy_args = Table("policy_args", metadata,
                     Column("policy_id", ForeignKey("policies.id"),
