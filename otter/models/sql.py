@@ -31,11 +31,10 @@ class SQLScalingGroup(object):
     """
     A scaling group backed by a SQL store.
     """
-    def __init__(self, engine, uuid, tenant_id):
+    def __init__(self, engine, tenant_id, uuid):
         self.engine = engine
-        self.uuid = uuid
         self.tenant_id = tenant_id
-
+        self.uuid = uuid
 
     @_with_transaction
     def create_policies(self, conn, policy_cfgs):
