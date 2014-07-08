@@ -491,7 +491,7 @@ class WeakLocks(object):
         Get lock based on uuid
 
         :param str uuid: Lock's corresponding UUID
-        :return `DeferredLock`
+        :return: :class:`~defer.DeferredLock`
         """
         lock = self._locks.get(uuid)
         if not lock:

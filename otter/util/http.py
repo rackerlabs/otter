@@ -241,8 +241,9 @@ def next_marker_by_id(collection, limit, marker):
 def get_collection_links(collection, url, rel, limit=None, marker=None,
                          next_marker=None):
     """
-    Return links `dict` for given collection like below. The 'next' link is
-    added only if number of items in `collection` has reached `limit`
+    Return links `dict` for given collection.
+
+    The links will look somewhat like this::
 
         [
           {
@@ -254,6 +255,9 @@ def get_collection_links(collection, url, rel, limit=None, marker=None,
             "rel": "next"
           }
         ]
+
+    The 'next' link is added only if number of items in `collection`
+    has reached `limit`.
 
     :param collection: the collection whose links are required.
     :type collection: list of dict that has 'id' in it

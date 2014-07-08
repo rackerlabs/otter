@@ -709,7 +709,7 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
     def test_on_job_completion_modify_state_called(self):
         """
         ``execute_launch_config`` sets it up so that the group's
-        ``modify_state``state is called with the result as an arg whenever a
+        ``modify_state`` state is called with the result as an arg whenever a
         job finishes, whether successfully or not
         """
         supervisor.execute_launch_config(self.log, '1', self.fake_state,
