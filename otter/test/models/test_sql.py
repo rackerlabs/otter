@@ -66,13 +66,18 @@ class SQLiteTestMixin(object):
 
 
 class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
+    def _create_group(self, tenant_id=b"TENANT", group_id=b"GROUP"):
+        """
+        Creates a group, for testing.
+        """
+        return sql.SQLScalingGroup(self.engine, group_id, tenant_id)
+
     def test_interface(self):
         """
         The SQL scaling group implementation implements the
         :class:`interface.IScalingGroup` interface.
         """
-        group = sql.SQLScalingGroup(self.engine, b"GROUP", b"TENANT")
-        verifyObject(interface.IScalingGroup, group)
+        verifyObject(interface.IScalingGroup, self._create_group())
 
     @inlineCallbacks
     def test_create_policies_happy_case(self):
@@ -82,7 +87,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         After it is created, the user can list the policies and see
         all of them.
         """
-        group = sql.SQLScalingGroup(self.engine, b"GROUP", b"TENANT")
+        group = self._create_group()
 
         policy_cfgs = group_examples.policy()
         response = yield group.create_policies(policy_cfgs)
@@ -102,7 +107,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         When attempting to create one or more policies for a group that
         doesn't exist, an exception is raised.
         """
-        group = sql.SQLScalingGroup(self.engine, b"BOGUS_GROUP", b"TENANT")
+        group = self._create_group(group_id=b"BOGUS_GROUP")
         d = group.create_policies(group_examples.policy())
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
 
@@ -111,7 +116,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         When attempting to create a policy, but there are already too many
         policies for this group, an exception is raised.
         """
-        group = sql.SQLScalingGroup(self.engine, b"GROUP", b"TENANT")
+        group = self._create_group()
 
         # TODO: figure out a way to put us at the limit
 
@@ -125,7 +130,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         When attempting to list policies for a group that doesn't exist,
         an exception is raised.
         """
-        group = sql.SQLScalingGroup(self.engine, b"BOGUS", b"TENANT")
+        group = self._create_group(group_id=b"BOGUS_GROUP")
         d = group.list_policies(limit=1)
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
 
@@ -134,7 +139,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         """
         Listing policies works when there are no policies.
         """
-        group = sql.SQLScalingGroup(self.engine, b"GROUP", b"TENANT")
+        group = self._create_group()
         list_response = yield group.list_policies(limit=1)
         self.assertEqual(list_response, [])
 
@@ -143,7 +148,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         """
         Listing policies works, as does pagination.
         """
-        group = sql.SQLScalingGroup(self.engine, b"GROUP", b"TENANT")
+        group = self._create_group()
 
         policy_cfgs = group_examples.policy()
         response = yield group.create_policies(policy_cfgs)
@@ -162,7 +167,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         """
         The user can create a webhook for an extant policy.
         """
-        group = sql.SQLScalingGroup(self.engine)
+        group = self._create_group()
 
         # Create a policy
         policy_cfg = group_examples.policy()[0]
@@ -177,7 +182,8 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         When attempting to create a webhook for a nonexistant policy, an
         exception is raised.
         """
-        group = sql.SQLScalingGroup(self.engine)
+        group = self._create_group()
+
         d = group.create_webhooks(b"BOGUS", _webhook_examples())
         return self.assertFailure(d, interface.NoSuchPolicyError)
 
@@ -188,7 +194,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         are already too many webhooks for that policy, an exception is
         raised.
         """
-        group = sql.SQLScalingGroup(self.engine)
+        group = self._create_group()
 
         # Create a policy
         policy_cfg = group_examples.policy()[0]
@@ -247,7 +253,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
 
         res = yield coll.create_scaling_group(log, b"tenant",
                                               group_cfg, launch_cfg)
-        group = yield coll.get_scaling_group(log, b"tenant", res["id"])
+        group = coll.get_scaling_group(log, b"tenant", res["id"])
 
         # add some policies
         policy_cfgs = group_examples.policy()
@@ -310,34 +316,6 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
 
             self.assertEqual(len(seen_ids), n_products,
                              "group ids must be unique")
-
-        return d
-
-    def test_scaling_group_names_are_unique_per_tenant(self):
-        """
-        Scaling group names must be unique for a given tenant.
-
-        Scaling group names do *not* have to be unique between
-        tenants: tenants do not affect each other.
-        """
-        coll = sql.SQLScalingGroupCollection(self.engine)
-
-        group_cfg = group_examples.config()[0]
-        launch_cfgs = group_examples.launch_server_config()
-        launch_cfg1, launch_cfg2 = launch_cfgs[:2]
-
-        create = partial(coll.create_scaling_group, log, config=group_cfg)
-        d = create(tenant_id="tenant1", launch=launch_cfg1)
-
-        @d.addCallback
-        def try_again_with_same_name(_result):
-            return create(tenant_id="tenant1", launch=launch_cfg2)
-
-        self.assertFailure(d, KeyError)
-
-        @d.addCallback
-        def try_again_with_same_name_but_for_different_tenant(_result):
-            return create(tenant_id="tenant2", launch=launch_cfg1)
 
         return d
 
