@@ -475,11 +475,12 @@ class IScalingGroup(Interface):
         """
         Creates a new webhook for a scaling policy.
 
-        The return value will contain information about both the webhook URL
-        (the URL pointing to the webhook resource itself, which allows an
+        The return value will contain both the webhook identifier (the
+        identifier for the webhook resource itself, which allows an
         authenticated user to access and modify the webhook) as well as the
-        capability URL (the unguessable URL which allows the referenced policy
-        to be executed without further authentication).
+        capability hash (the unguessable identifier for a webhook which allows
+        the referenced policy to be executed without further authentication).
+        The REST layer turns these identifiers into URLs for the user.
 
         :param policy_id: The UUID of the policy for which to create a
             new webhook.
