@@ -148,7 +148,8 @@ def _create_policy(conn, tenant_id, group_id, policy_cfg):
                              group_id=group_id,
                              name=policy_cfg["name"],
                              adjustment_type=adjustment_type,
-                             adjustment_value=adjustment_value))
+                             adjustment_value=adjustment_value,
+                             type=policy_cfg["type"]))
 
     args = policy_cfg.get("args")
     if args:
