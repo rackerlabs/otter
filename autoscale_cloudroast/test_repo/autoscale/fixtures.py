@@ -14,6 +14,7 @@ from autoscale.otter_constants import OtterConstants
 
 import os
 import time
+from functools import partial
 
 
 class AutoscaleFixture(BaseTestFixture):
@@ -528,7 +529,7 @@ class ScalingGroupFixture(AutoscaleFixture):
                 lc_load_balancers=lc_load_balancers)
         cls.group = cls.create_group_response.entity
         cls.resources.add(cls.group.id,
-                          cls.autoscale_client.delete_scaling_group)
+                          partial(cls.autoscale_client.delete_scaling_group, force='true'))
 
     @classmethod
     def tearDownClass(cls):
@@ -548,12 +549,12 @@ class ScalingGroupPolicyFixture(ScalingGroupFixture):
     @classmethod
     def setUpClass(cls, name=None, cooldown=None, change=None,
                    change_percent=None, desired_capacity=None,
-                   policy_type=None):
+                   policy_type=None, **kwargs):
         """
         Creates a scaliing policy
         """
 
-        super(ScalingGroupPolicyFixture, cls).setUpClass()
+        super(ScalingGroupPolicyFixture, cls).setUpClass(**kwargs)
         if name is None:
             name = cls.sp_name
         if cooldown is None:
