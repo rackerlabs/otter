@@ -1,8 +1,10 @@
 from otter.models import interface
 from sqlalchemy import Column, ForeignKey, MetaData, Table
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.types import Enum, Integer, String
 from sqlalchemy.schema import CreateTable
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
+from twisted.internet.defer import FirstError
 from uuid import uuid4
 from zope.interface import implementer
 
@@ -48,6 +50,15 @@ class SQLScalingGroup(object):
         def created_policies(policy_ids):
             return [dict(id=policy_id, **policy_cfg)
                     for policy_id, policy_cfg in zip(policy_ids, policy_cfgs)]
+
+        @d.addErrback
+        def check_if_group_exists(f):
+            f.trap(FirstError)
+
+            subFailure = f.value.subFailure
+            subFailure.trap(IntegrityError)
+
+            raise interface.NoSuchScalingGroupError(self.tenant_id, self.uuid)
 
         return d
 
