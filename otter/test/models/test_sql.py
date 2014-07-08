@@ -119,6 +119,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         group = self._create_group(group_id=b"BOGUS_GROUP")
         d = group.create_policies(group_examples.policy())
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
+        # TODO: We should verify the tenant_id and group_id of that error
 
     def test_create_policies_at_limit(self):
         """
