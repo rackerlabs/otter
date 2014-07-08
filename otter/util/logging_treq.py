@@ -53,7 +53,7 @@ def _log_request(treq_call, url, **kwargs):
 
 def request(method, url, **kwargs):
     """
-    Wrapper around :method:`treq.request` that logs the request.
+    Wrapper around :meth:`treq.request` that logs the request.
 
     See :py:func:`treq.request`
     """
@@ -62,7 +62,7 @@ def request(method, url, **kwargs):
 
 def head(url, headers=None, **kwargs):
     """
-    Wrapper around :method:`treq.head` that logs the request.
+    Wrapper around :meth:`treq.head` that logs the request.
 
     See :py:func:`treq.head`
     """
@@ -71,7 +71,7 @@ def head(url, headers=None, **kwargs):
 
 def get(url, headers=None, **kwargs):
     """
-    Wrapper around :method:`treq.get` that logs the request.
+    Wrapper around :meth:`treq.get` that logs the request.
 
     See :py:func:`treq.get`
     """
@@ -80,7 +80,7 @@ def get(url, headers=None, **kwargs):
 
 def post(url, data=None, **kwargs):
     """
-    Wrapper around :method:`treq.post` that logs the request.
+    Wrapper around :meth:`treq.post` that logs the request.
 
     See :py:func:`treq.post`
     """
@@ -89,7 +89,7 @@ def post(url, data=None, **kwargs):
 
 def put(url, data=None, **kwargs):
     """
-    Wrapper around :method:`treq.put` that logs the request.
+    Wrapper around :meth:`treq.put` that logs the request.
 
     See :py:func:`treq.put`
     """
@@ -98,7 +98,7 @@ def put(url, data=None, **kwargs):
 
 def patch(url, data=None, **kwargs):
     """
-    Wrapper around :method:`treq.patch` that logs the request.
+    Wrapper around :meth:`treq.patch` that logs the request.
 
     See :py:func:`treq.patch`
     """
@@ -107,7 +107,7 @@ def patch(url, data=None, **kwargs):
 
 def delete(url, **kwargs):
     """
-    Wrapper around :method:`treq.delete` that logs the request.
+    Wrapper around :meth:`treq.delete` that logs the request.
 
     See :py:func:`treq.delete`
     """
