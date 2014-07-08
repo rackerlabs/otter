@@ -313,9 +313,12 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
 
         return d
 
-    def test_scaling_group_names_are_unique(self):
+    def test_scaling_group_names_are_unique_per_tenant(self):
         """
         Scaling group names must be unique for a given tenant.
+
+        Scaling group names do *not* have to be unique between
+        tenants: tenants do not affect each other.
         """
         coll = sql.SQLScalingGroupCollection(self.engine)
 
@@ -323,14 +326,20 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         launch_cfgs = group_examples.launch_server_config()
         launch_cfg1, launch_cfg2 = launch_cfgs[:2]
 
-        create = partial(coll.create_scaling_group, log, "tenant", group_cfg)
-        d = create(launch_cfg1)
+        create = partial(coll.create_scaling_group, log, config=group_cfg)
+        d = create(tenant_id="tenant1", launch=launch_cfg1)
 
         @d.addCallback
         def try_again_with_same_name(_result):
-            return create(launch_cfg2)
+            return create(tenant_id="tenant1", launch=launch_cfg2)
 
-        return self.assertFailure(d, KeyError)
+        self.assertFailure(d, KeyError)
+
+        @d.addCallback
+        def try_again_with_same_name_but_for_different_tenant(_result):
+            return create(tenant_id="tenant2", launch=launch_cfg1)
+
+        return d
 
 
 class SQLAdminTests(SQLiteTestMixin, TestCase):
