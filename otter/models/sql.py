@@ -1,4 +1,3 @@
-from functools import wraps
 from otter.models import interface
 from sqlalchemy import Column, ForeignKey, MetaData, Table
 from sqlalchemy.types import Enum, Integer, String
