@@ -71,7 +71,8 @@ class SQLScalingGroupCollection(object):
 
         d = conn.execute(scaling_groups.insert()
                          .values(id=group_id,
-                                 tenant_id=tenant_id))
+                                 tenant_id=tenant_id,
+                                 name=config["name"]))
 
         @d.addCallback
         def build_response(result):
@@ -181,6 +182,7 @@ metadata = MetaData()
 
 scaling_groups = Table("scaling_groups", metadata,
                        Column("id", String(32), primary_key=True),
+                       Column("name", String()),
                        Column("tenant_id", String()),
                        Column("cooldown", Integer()),
                        Column("minEntities", Integer()),
