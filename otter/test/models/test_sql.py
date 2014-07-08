@@ -319,6 +319,17 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
 
         return d
 
+    def test_get_scaling_group(self):
+        """
+        Scaling groups are created with the collection's engine and the
+        correct identifiers.
+        """
+        coll = sql.SQLScalingGroupCollection(self.engine)
+        group = coll.get_scaling_group(log, b"TENANT", b"GROUP")
+        self.assertEqual(group.uuid, b"GROUP")
+        self.assertEqual(group.tenant_id, b"TENANT")
+        self.assertEqual(group.engine, coll.engine)
+
 
 class SQLAdminTests(SQLiteTestMixin, TestCase):
     def test_interface(self):
