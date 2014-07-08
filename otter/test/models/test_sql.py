@@ -327,7 +327,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         d = create(launch_cfg1)
 
         @d.addCallback
-        def try_again_same_name(_result):
+        def try_again_with_same_name(_result):
             return create(launch_cfg2)
 
         return self.assertFailure(d, KeyError)
