@@ -32,13 +32,13 @@ code paths.
 """
 
 from alchimia import TWISTED_STRATEGY as STRATEGY
-from functools import partial
 from itertools import product
 from otter.json_schema import group_examples
 from otter.models import interface, sql
 from otter.test.utils import FakeReactorThreads
-from sqlalchemy import create_engine
-from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
+from twisted.internet.defer import gatherResults, inlineCallbacks
 from twisted.trial.unittest import TestCase
 from zope.interface.verify import verifyObject
 
@@ -48,6 +48,13 @@ def log(*a, **kw):
 
     The interfaces fail to document what they want from me.
     """
+
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 def _create_sqlite():
@@ -60,9 +67,11 @@ class SQLiteTestMixin(object):
     A test mixin that sets up an asynchronous, in-memory SQLite
     database, with some alchimia + SQLAlchemy chrome plating.
     """
+    @inlineCallbacks
     def setUp(self):
         self.engine = _create_sqlite()
-        return sql.create_tables(self.engine)
+        yield self.engine
+        yield sql.create_tables(self.engine)
 
 
 class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
