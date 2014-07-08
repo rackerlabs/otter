@@ -92,6 +92,8 @@ class SQLScalingGroupCollection(object):
 
         return d
 
+    def get_scaling_group(self, log, tenant_id, scaling_group_id):
+        return SQLScalingGroup(self.engine, scaling_group_id, tenant_id)
 
     def get_counts(self, log, tenant_id):
         statements = [t.select().where(t.c.tenant_id == tenant_id).count()

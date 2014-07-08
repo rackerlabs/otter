@@ -70,7 +70,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         """
         Creates a group, for testing.
         """
-        return sql.SQLScalingGroup(self.engine, group_id, tenant_id)
+        return sql.SQLScalingGroup(self.engine, tenant_id, group_id)
 
     def test_interface(self):
         """
