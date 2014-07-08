@@ -62,8 +62,8 @@ class SQLScalingGroupCollection(object):
         self.engine = engine
 
     @_with_transaction
-    def create_scaling_group(self, conn, log, tenant_id, group_cfg,
-                             launch_cfg, policies=None):
+    def create_scaling_group(self, conn, log, tenant_id, config, launch,
+                             policies=None):
         """
         Creates a scaling group backed by a SQL store.
         """
@@ -79,14 +79,14 @@ class SQLScalingGroupCollection(object):
                 "id": group_id,
                 "state": interface.GroupState(tenant_id=tenant_id,
                                               group_id=group_id,
-                                              group_name=group_cfg["name"],
+                                              group_name=config["name"],
                                               active={},
                                               pending={},
                                               policy_touched={},
                                               group_touched={},
                                               paused=False),
-                "groupConfiguration": group_cfg,
-                "launchConfiguration": launch_cfg,
+                "groupConfiguration": config,
+                "launchConfiguration": launch,
                 "scalingPolicies": policies if policies is not None else []
             }
 
