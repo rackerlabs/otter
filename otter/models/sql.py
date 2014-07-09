@@ -5,8 +5,9 @@ from sqlalchemy import Column, ForeignKey, MetaData, Table
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.types import Enum, Integer, String
 from sqlalchemy.schema import CreateTable
-from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
-from twisted.internet.defer import FirstError
+from twisted.internet.defer import succeed
+from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import gatherResults, FirstError
 from uuid import uuid4
 from zope.interface import implementer
 
@@ -146,6 +147,9 @@ def _get_policy_args(conn, policy_ids):
     :return: All the policy args for the given policies.
     :rtype: mapping ``{policy_id: {key: value}}``
     """
+    if not policy_ids:
+        return succeed({})
+
     q = policy_args.select(policy_args.c.policy_id.in_(policy_ids))
     d = conn.execute(q).addCallback(_fetchall)
 
