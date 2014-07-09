@@ -291,7 +291,8 @@ policies = Table("policies", metadata,
                         nullable=False),
                  Column("type",
                         Enum("webhook", "schedule", "cloud_monitoring"),
-                        nullable=False))
+                        nullable=False),
+                 Column("cooldown", Integer(), nullable=False))
 
 policy_args = Table("policy_args", metadata,
                     Column("policy_id", ForeignKey("policies.id"),
