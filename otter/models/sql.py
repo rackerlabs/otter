@@ -123,6 +123,7 @@ class SQLScalingGroupCollection(object):
 
         return d
 
+
 @implementer(interface.IScalingGroup)
 class SQLScalingScheduleCollection(object):
     """
