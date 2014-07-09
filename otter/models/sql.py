@@ -1,3 +1,5 @@
+from collections import defaultdict
+from operator import methodcaller
 from otter.models import interface
 from sqlalchemy import Column, ForeignKey, MetaData, Table
 from sqlalchemy.exc import IntegrityError
@@ -61,6 +63,70 @@ class SQLScalingGroup(object):
             raise interface.NoSuchScalingGroupError(self.tenant_id, self.uuid)
 
         return d
+
+    @_with_transaction
+    def list_policies(self, conn, limit=100, marker=None):
+        """
+        List up to *limit* policies, starting with id *marker*.
+        """
+        # TODO: only for this tenant & group!
+        c = policies.c
+        query = policies.select().order_by(c.id).limit(1)
+        if marker is not None:
+            query = query.where(c.id > marker)
+
+        d = conn.execute(query).addCallback(_fetchall)
+
+        @d.addCallback
+        def get_policy_args(policy_rows):
+            policy_ids = [r[c.id] for r in policy_rows]
+            d = _get_policy_args(conn, policy_ids)
+            d.addCallback(lambda args_by_policy: (policy_rows, args_by_policy))
+            return d
+
+        @d.addCallback
+        def format_result(result):
+            policy_rows, args_by_policy = result
+
+            policies = []
+            for r in policy_rows:
+                policy = {"id": r[c.id],
+                          "name": r[c.name],
+                          "type": r[c.type],
+                          r[c.adjustment_type]: r[c.adjustment_value]}
+
+                args = args_by_policy.get(policy["id"])
+                if args is not None:
+                    policy["args"] = args
+
+                policies.append(policy)
+
+            return policies
+
+        return d
+
+
+def _get_policy_args(conn, policy_ids):
+    """
+    Gets the policy args for the given policies.
+
+    :return: A dictionary of all the policy args for the given policies.
+    :rtype: mapping ``{policy_id: {key: value}}``
+    """
+    q = policy_args.select(policy_args.c.policy_id in policy_ids)
+    d = conn.execute(q).addCallback(_fetchall)
+
+    @d.addCallback
+    def format_args(rows):
+        policy_args = defaultdict(dict)
+        for row in rows:
+            c = policy_args.c
+            policy_id, key, value = row[c.policy_id], row[c.key], row[c.value]
+            policy_args[policy_id][key] = value
+
+        return policy_args
+
+    return d
 
 
 @implementer(interface.IScalingGroupCollection)
@@ -252,3 +318,5 @@ def create_tables(engine, tables=all_tables):
     """
     return gatherResults(engine.execute(CreateTable(table))
                          for table in tables)
+
+_fetchall = methodcaller("fetchall")
