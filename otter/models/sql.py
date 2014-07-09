@@ -93,7 +93,8 @@ class SQLScalingGroup(object):
                 policy = {"id": r[c.id],
                           "name": r[c.name],
                           "type": r[c.type],
-                          r[c.adjustment_type]: r[c.adjustment_value]}
+                          r[c.adjustment_type]: r[c.adjustment_value],
+                          "cooldown": r[c.cooldown]}
 
                 args = args_by_policy.get(policy["id"])
                 if args is not None:
