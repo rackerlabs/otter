@@ -44,7 +44,7 @@ class SQLScalingGroup(object):
         """
         ds = [_create_policy(conn, self.tenant_id, self.uuid, cfg)
               for cfg in policy_cfgs]
-        d = gatherResults(ds)
+        d = gatherResults(ds, consumeErrors=True)
 
         @d.addCallback
         def created_policies(policy_ids):
