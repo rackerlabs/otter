@@ -78,6 +78,17 @@ class SQLScalingGroup(object):
         d = conn.execute(query).addCallback(_fetchall)
 
         @d.addCallback
+        def maybe_check_if_group_even_exists(policy_rows):
+            """
+            If there are no policies, maybe the group doesn't even exist. If
+            that's the case, raise an exception instead.
+            """
+            if not policy_rows:
+                d = _verify_group_exists(conn, self.tenant_id, self.uuid)
+                return d.addCallback(lambda _result: policy_rows)
+            return policy_rows
+
+        @d.addCallback
         def get_policy_args(policy_rows):
             policy_ids = [r[c.id] for r in policy_rows]
             d = _get_policy_args(conn, policy_ids)
@@ -106,6 +117,16 @@ class SQLScalingGroup(object):
 
         return d
 
+def _verify_group_exists(conn, tenant_id, group_id):
+    d = conn.execute(scaling_groups
+                     .select(scaling_groups.c.id == group_id)
+                     .limit(1).count())
+    d.addCallback(_fetchone)
+    @d.addCallback
+    def raise_if_count_is_zero(row):
+        if row[0] == 0:
+            raise interface.NoSuchScalingGroupError(tenant_id, group_id)
+    return d
 
 def _get_policy_args(conn, policy_ids):
     """
@@ -322,3 +343,4 @@ def create_tables(engine, tables=all_tables):
                          for table in tables)
 
 _fetchall = methodcaller("fetchall")
+_fetchone = methodcaller("fetchone")
