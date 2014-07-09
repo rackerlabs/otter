@@ -207,10 +207,10 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         When attempting to create a webhook for a nonexistant policy, an
         exception is raised.
         """
-        group = self._create_group()
+        group = yield self._create_group()
 
         d = group.create_webhooks(b"BOGUS", _webhook_examples())
-        return self.assertFailure(d, interface.NoSuchPolicyError)
+        yield self.assertFailure(d, interface.NoSuchPolicyError)
 
     @inlineCallbacks
     def test_create_webhook_at_limit(self):
