@@ -150,7 +150,6 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         d = group.create_policies(group_examples.policy())
         yield self.assertFailure(d, interface.PoliciesOverLimitError)
 
-    @inlineCallbacks
     def test_list_policies_for_nonexistant_scaling_group(self):
         """
         When attempting to list policies for a group that doesn't exist,
