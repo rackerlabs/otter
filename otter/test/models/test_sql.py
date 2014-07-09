@@ -173,12 +173,10 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         """
         Listing policies works, as does pagination.
         """
-        group = self._create_group()
+        group = yield self._create_group()
 
         policy_cfgs = group_examples.policy()
-        response = yield group.create_policies(policy_cfgs)
-
-        policy_ids = sorted([p["id"] for p in response])
+        yield group.create_policies(policy_cfgs)
 
         list_response = yield group.list_policies(limit=1)
         self.assertEqual(list_response, [policy_cfgs[0]])
