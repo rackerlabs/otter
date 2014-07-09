@@ -143,7 +143,7 @@ def _get_policy_args(conn, policy_ids):
     """
     Gets the policy args for the given policies.
 
-    :return: A dictionary of all the policy args for the given policies.
+    :return: All the policy args for the given policies.
     :rtype: mapping ``{policy_id: {key: value}}``
     """
     q = policy_args.select(policy_args.c.policy_id.in_(policy_ids))
