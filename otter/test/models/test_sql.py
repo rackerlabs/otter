@@ -178,6 +178,8 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         policy_cfgs = group_examples.policy()
         policies = yield group.create_policies(policy_cfgs)
 
+        policies.sort(key=lambda policy: policy["id"])
+
         list_response = yield group.list_policies(limit=1)
         self.assertEqual(list_response, [policies[0]])
 
