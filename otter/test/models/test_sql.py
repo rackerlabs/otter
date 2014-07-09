@@ -192,7 +192,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         """
         The user can create a webhook for an extant policy.
         """
-        group = self._create_group()
+        group = yield self._create_group()
 
         # Create a policy
         policy_cfg = group_examples.policy()[0]
