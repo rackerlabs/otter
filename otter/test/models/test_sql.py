@@ -176,14 +176,14 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         group = yield self._create_group()
 
         policy_cfgs = group_examples.policy()
-        yield group.create_policies(policy_cfgs)
+        policies = yield group.create_policies(policy_cfgs)
 
         list_response = yield group.list_policies(limit=1)
-        self.assertEqual(list_response, [policy_cfgs[0]])
+        self.assertEqual(list_response, [policies[0]])
 
         last_id = list_response[-1]["id"]
         list_response = yield group.list_policies(limit=3, marker=last_id)
-        self.assertEqual(list_response, [policy_cfgs[1:4]])
+        self.assertEqual(list_response, [policies[1:4]])
 
     @inlineCallbacks
     def test_create_webhook_happy_case(self):
