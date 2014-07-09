@@ -228,7 +228,8 @@ def _create_policy(conn, tenant_id, group_id, policy_cfg):
                              name=policy_cfg["name"],
                              adjustment_type=adjustment_type,
                              adjustment_value=adjustment_value,
-                             type=policy_cfg["type"]))
+                             type=policy_cfg["type"],
+                             cooldown=policy_cfg["cooldown"]))
 
     args = policy_cfg.get("args")
     if args:
