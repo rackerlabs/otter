@@ -71,7 +71,7 @@ class SQLScalingGroup(object):
         """
         # TODO: only for this tenant & group!
         c = policies.c
-        query = policies.select().order_by(c.id).limit(1)
+        query = policies.select().order_by(c.id).limit(limit)
         if marker is not None:
             query = query.where(c.id > marker)
 
