@@ -90,6 +90,17 @@ class SQLScalingGroup(object):
 
         @d.addCallback
         def get_policy_args(policy_rows):
+            """
+            Fetches the arguments (if any) for the policies in the given
+            policy rows.
+
+            :param policy_rows: The rows for the matched policies.
+            :type policy_rows: :class:`list` of SQLAlchemy row-likes
+
+            :return: The rows that were passed in, as well as all
+                policy args for the given policies.
+            :rtype: deferred ``(policy_rows, args_by_policy)``
+            """
             policy_ids = [r[c.id] for r in policy_rows]
             d = _get_policy_args(conn, policy_ids)
             d.addCallback(lambda args_by_policy: (policy_rows, args_by_policy))
