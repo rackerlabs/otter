@@ -242,10 +242,9 @@ def _create_policy_args(conn, policy_id, args):
     """
     Adds args to the policy with given policy_id.
     """
-    d = conn.execute(policy_args.insert(),
-                     [dict(policy_id=policy_id, key=key, value=value)
-                      for key, value in args.items()])
-    return d
+    row_data = [dict(policy_id=policy_id, key=key, value=value)
+                for key, value in args.items()]
+    return conn.execute(policy_args.insert(), row_data)
 
 
 def _get_adjustment_type(policy_cfg):
