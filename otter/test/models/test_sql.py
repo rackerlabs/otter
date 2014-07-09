@@ -136,6 +136,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
 
         return d
 
+    @inlineCallbacks
     def test_create_policies_at_limit(self):
         """
         When attempting to create a policy, but there are already too many
@@ -147,7 +148,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
 
         # Create a policy
         d = group.create_policies(group_examples.policy())
-        return self.assertFailure(d, interface.PoliciesOverLimitError)
+        yield self.assertFailure(d, interface.PoliciesOverLimitError)
 
     @inlineCallbacks
     def test_list_policies_for_nonexistant_scaling_group(self):
