@@ -181,7 +181,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         policies.sort(key=lambda policy: policy["id"])
 
         list_response = yield group.list_policies(limit=1)
-        self.assertEqual(list_response, [policies[0]])
+        self.assertEqual(list_response, policies[:1])
 
         last_id = list_response[-1]["id"]
         list_response = yield group.list_policies(limit=3, marker=last_id)
