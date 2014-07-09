@@ -185,7 +185,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
 
         last_id = list_response[-1]["id"]
         list_response = yield group.list_policies(limit=3, marker=last_id)
-        self.assertEqual(list_response, [policies[1:4]])
+        self.assertEqual(list_response, policies[1:4])
 
     @inlineCallbacks
     def test_create_webhook_happy_case(self):
