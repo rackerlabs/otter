@@ -202,6 +202,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         res = yield group.create_webhooks(policy_id, _webhook_examples())
         raise RuntimeError("do something here")
 
+    @inlineCallbacks
     def test_create_webhook_for_nonexistant_policy(self):
         """
         When attempting to create a webhook for a nonexistant policy, an
