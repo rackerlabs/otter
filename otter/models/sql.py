@@ -119,13 +119,13 @@ def _get_policy_args(conn, policy_ids):
 
     @d.addCallback
     def format_args(rows):
-        policy_args = defaultdict(dict)
+        args_by_policy = defaultdict(dict)
         for row in rows:
             c = policy_args.c
             policy_id, key, value = row[c.policy_id], row[c.key], row[c.value]
-            policy_args[policy_id][key] = value
+            args_by_policy[policy_id][key] = value
 
-        return policy_args
+        return args_by_policy
 
     return d
 
