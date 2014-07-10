@@ -414,7 +414,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
 
         """
         d = self.collection.webhook_info_by_hash(log, b"BOGUS")
-        d.assertFailure(interface.UnrecognizedCapabilityError)
+        self.assertFailure(d, interface.UnrecognizedCapabilityError)
         return d
 
     def test_health_check(self):
