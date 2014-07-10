@@ -224,8 +224,10 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
 
         # Create a policy
         policy_cfg = group_examples.policy()[0]
-        res = yield group.create_policies(policy_cfg)
-        policy_id = res["id"]
+        res = yield group.create_policies([policy_cfg])
+        policy_id = res[0]["id"]
+
+        # TODO: Figure out a way to put us at the limit
 
         # Attempt to create a webhook
         d = group.create_webhooks(policy_id, _webhook_examples())
