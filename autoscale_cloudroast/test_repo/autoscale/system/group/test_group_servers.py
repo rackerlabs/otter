@@ -1,8 +1,6 @@
 """
 Tests for `/groups/<groupId>/servers/` endpoint
 """
-import unittest
-
 from cafe.drivers.unittest.decorators import tags
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from autoscale.behaviors import AutoscaleBehaviors
@@ -10,7 +8,6 @@ from autoscale.behaviors import AutoscaleBehaviors
 import time
 
 
-@unittest.skip('Until repose changes are made')
 class ServersTests(AutoscaleFixture):
     """
     Group servers tests

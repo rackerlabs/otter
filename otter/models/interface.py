@@ -134,7 +134,9 @@ class GroupState(object):
 
     def get_capacity(self):
         """
-        :returns: a dictionary with the desired_capcity, current_capacity, and
+        Get the capacities for a group.
+
+        :return: A dictionary with the desired_capcity, current_capacity, and
         pending_capacity.
         """
         return {'current_capacity': len(self.active),
@@ -471,22 +473,29 @@ class IScalingGroup(Interface):
 
     def create_webhooks(policy_id, data):
         """
-        Creates a new capability URL for one particular scaling policy
+        Creates a new webhook for a scaling policy.
 
-        :param policy_id: the uuid of the policy to be deleted
-        :type policy_id: ``str``
+        The return value will contain both the webhook identifier (the
+        identifier for the webhook resource itself, which allows an
+        authenticated user to access and modify the webhook) as well as the
+        capability hash (the unguessable identifier for a webhook which allows
+        the referenced policy to be executed without further authentication).
+        The REST layer turns these identifiers into URLs for the user.
 
-        :param data: a list of details of the webhook in JSON format, as
-            specified by :data:`otter.json_schema.group_schemas.webhook`
-        :type data: ``list``
+        :param policy_id: The UUID of the policy for which to create a
+            new webhook.
+        :type policy_id: :class:`str`
 
-        :return: a list of the webhooks with their ids, as specified by
-            :data:`otter.json_schema.model_schemas.webhook_list`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with said
-            ``list``
+        :param data: A list of details for each webhook, as specified by
+            :data:`otter.json_schema.group_schemas.webhook`
+        :type data: :class:`list` of :class:`dict`
 
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-        :raises: :class:`WebhooksOverLimitError` if creating all the specified
+        :return: A list of the created webhooks with their unique ids.
+        :rtype: :class:`twisted.internet.defer.Deferred` :class:`list` as
+            specified by :data:`otter.json_schema.model_schemas.webhook_list`
+
+        :raises NoSuchPolicyError: if the policy id does not exist
+        :raises WebhooksOverLimitError: if creating all the specified
             webhooks would put the user over their limit of webhooks per policy
         """
 
@@ -713,7 +722,7 @@ class IScalingGroupCollection(Interface):
 
         :return: The health information in the form of a boolean and some
             additional free-form health data (possibly empty).
-        :rtype: :class:`tuple` of (:class:`bool`, :class:`dict`)
+        :rtype: deferred :class:`tuple` of (:class:`bool`, :class:`dict`)
         """
 
 

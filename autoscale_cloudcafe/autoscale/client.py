@@ -10,7 +10,8 @@ from autoscale.models.response.limits_response import Limits
 from autoscale.models.request.autoscale_requests import (
     Group_Request, Policy_Request, Webhook_Request, Config_Request,
     ScalingGroup_Request, Update_Policy_Request, Update_Webhook_Request,
-    Maas_Policy_Request, Update_Maas_Policy_Request)
+    Maas_Policy_Request, Update_Maas_Policy_Request, Policy_Batch_Request,
+    Webhook_Multi_Request)
 from autoscale.models.lbaas import NodeList, LoadBalancer
 from cafe.engine.clients.rest import AutoMarshallingRestClient
 from urlparse import urlparse
@@ -356,14 +357,14 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :param change_percent: The changepercent to make in the number of
                               servers in the scaling group
         :type change_percent: Number
-        :param desired_capacity: The desired capacity is the no of servers to be
+        :param desired_capacity: The desired capacity is the number of servers to be
                             in the scaling group
         :type desired_capacity: Integer
         :param policy_type: What type of policy this is
         :type policy_type: String
-        :return: Response Object containing response code 201
+        :return: Policy Response Object containing response code 201
          on success and empty body
-        :rtype: Response Object
+        :rtype: :class:`Policy`
 
         POST
         '/{tenantId}/groups/{groupId}/policy'
@@ -392,6 +393,53 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             request_entity=policy,
                             requestslib_kwargs=requestslib_kwargs)
 
+    def create_policy_batch(self, group_id, name, cooldown,
+                            change=None, change_percent=None,
+                            desired_capacity=None, policy_type=None,
+                            args=None, check_label=None,
+                            check_type=None, check_url=None, check_method=None,
+                            monitoring_zones=None, check_timeout=None, check_period=None,
+                            alarm_criteria=None, check_disabled=None, check_metadata=None,
+                            target_alias=None, target_hostname=None,
+                            target_resolver=None, requestslib_kwargs=None, batch_size=1):
+        """
+        :summary: Create multiple scaling policies with the same configuration in a single API call
+        :param name: Name root - Names take the form "name_#" with numbers from 0 to batch_size
+        :type name: str
+        :param cooldown: The cooldown time for the policy
+        :type cooldown: int|float
+        :param change: The change to make in the number of servers in the
+                      scaling group (non-zero)
+        :type change: int
+        :param change_percent: The changepercent to make in the number of
+                              servers in the scaling group
+        :type change_percent: int|float
+        :param desired_capacity: The desired capacity is the number of servers to be
+                            in the scaling group
+        :type desired_capacity: int
+        :param policy_type: What type of policy this is ("webhook", "schedule")
+        :type policy_type: str
+        :return: Response Object containing response code 201 on success
+         and a list of policy objects
+        :rtype: :class:`Policy`
+
+        POST
+        '/{tenantId}/groups/{groupId}/policy'
+        """
+        url = '{0}/groups/{1}/policies/'.format(self.url, group_id)
+        policy_list = []
+        for p in range(batch_size):
+            name_num = name + '_{0}'.format(p)
+            policy_list.append(Policy_Request(
+                name=name_num, cooldown=cooldown, change=change,
+                change_percent=change_percent,
+                desired_capacity=desired_capacity,
+                policy_type=policy_type, args=args))
+        return self.request('POST', url,
+                            response_entity_type=Policy,
+                            request_entity=Policy_Batch_Request(policy_list),
+                            requestslib_kwargs=requestslib_kwargs)
+
     def list_policies(self, group_id, marker=None, limit=None,
                       requestslib_kwargs=None, url=None):
         """
@@ -400,7 +448,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type group_id: String
         :return: Response Object containing response code 200 and body with
                  the list of the policy configs
-        :rtype: Response Object
+        :rtype: :class:`Policies`
 
         GET
         '/<string:tenantId>/groups/<string:groupId>/policy'
@@ -528,7 +576,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type cooldown: dict
         :return: Response Object containing response code 201
          on success and empty body
-        :rtype: Response Object
+        :rtype: :class:`Webhook`
 
             POST
             '/{tenantId}/groups/{groupId}/policy/{policyId}/webhooks/'
@@ -536,6 +584,30 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         url = '%s/groups/%s/policies/%s/webhooks/' % (self.url, group_id,
                                                       policy_id)
         webhooks = Webhook_Request(name=name, metadata=metadata)
+        return self.request('POST', url,
+                            response_entity_type=Webhook,
+                            request_entity=webhooks,
+                            requestslib_kwargs=requestslib_kwargs)
+
+    def create_webhooks_multiple(self, group_id, policy_id, webhook_list,
+                                 requestslib_kwargs=None):
+        """
+        :summary: Use a single API call to create multiple webhooks on a policy based
+         on a list of request dictionaries
+        :param webhook_list: A list of dictionaries representing the desired webhooks
+         (i.e. {"name": str, "metadata": {key: str, ...}})
+        :type webhook_list: list of dict
+        :return: Response Object containing response code 201
+         on success and a list of webhook objects
+        :rtype: :class:`Webhook`
+
+            POST
+            '/{tenantId}/groups/{groupId}/policy/{policyId}/webhooks/'
+        """
+        url = '{0}/groups/{1}/policies/{2}/webhooks/'.format(self.url, group_id,
+                                                             policy_id)
+        request_list = [Webhook_Request(w['name'], w['metadata']) for w in webhook_list]
+        webhooks = Webhook_Multi_Request(request_list=request_list)
         return self.request('POST', url,
                             response_entity_type=Webhook,
                             request_entity=webhooks,
