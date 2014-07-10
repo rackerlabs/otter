@@ -265,6 +265,10 @@ class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
 
 
 class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
+    def setUp(self):
+        SQLiteTestMixin.setUp(self)
+        TestCase.setUp(self)
+        self.collection = sql.SQLScalingGroupCollection(self.engine)
     def test_interface(self):
         """
         The SQL scaling group collection implementation implements the
