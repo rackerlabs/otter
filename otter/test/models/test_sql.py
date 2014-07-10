@@ -417,6 +417,14 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         self.assertFailure(d, interface.UnrecognizedCapabilityError)
         return d
 
+    def test_scaling_group_states_empty(self):
+        """
+        Getting scaling group states works when there are no scaling groups.
+        """
+        d = self.collection.list_scaling_group_states(log, b"BOGUS")
+        d.addCallback(self.assertEqual, [])
+        return d
+
     def test_health_check(self):
         """
         The scaling group collection provides health info.
