@@ -5,6 +5,7 @@ from sqlalchemy import Column, ForeignKey, MetaData, Table
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.types import Enum, Integer, String
 from sqlalchemy.schema import CreateTable
+from sqlalchemy.sql import and_, exists, select
 from twisted.internet.defer import succeed
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.defer import gatherResults, FirstError
@@ -256,21 +257,30 @@ class SQLScalingGroupCollection(object):
         return SQLScalingGroup(self.engine, tenant_id, scaling_group_id)
 
     def get_counts(self, log, tenant_id):
-        statements = [t.select().where(t.c.tenant_id == tenant_id).count()
-                      for t in [scaling_groups, policies, webhooks]]
+        # REVIEW: I certainly hope that the query planner knows how to
+        # do this sanely. It may be easier to read, albeit with more
+        # database roundtrips, to do the right thing manually.
 
-        d = gatherResults(map(self.engine.execute, statements))
+        sg, p, wh = scaling_groups, policies, webhooks
 
-        @d.addCallback
-        def query_executed(results):
-            return gatherResults([r.fetchone() for r in results])
+        queries = {
+            "groups": (sg.select()
+                         .where(sg.c.tenant_id == tenant_id)),
+            "policies": (p.select()
+                           .where(exists([sg.c.id],
+                                         and_((sg.c.tenant_id == tenant_id),
+                                              (p.c.group_id == sg.c.id))))),
+            "webhooks": (wh.select()
+                           .where(exists([sg.c.id],
+                                         and_((sg.c.tenant_id == tenant_id),
+                                              (p.c.group_id == sg.c.id),
+                                              (wh.c.policy_id == p.c.id)))))
+        }
 
-        @d.addCallback
-        def query_executed(results):
-            (groups,), (policies,), (webhooks,) = results
-            return dict(groups=groups, policies=policies, webhooks=webhooks)
-
-        return d
+        query = select([query.count().label(name)
+                        for name, query in queries.iteritems()])
+        d = self.engine.execute(query).addCallback(_fetchone)
+        return d.addCallback(dict)
 
 
 @implementer(iface.IScalingScheduleCollection)
