@@ -1,6 +1,6 @@
 from collections import defaultdict
 from operator import methodcaller
-from otter.models import interface
+from otter.models import interface as iface
 from sqlalchemy import Column, ForeignKey, MetaData, Table
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.types import Enum, Integer, String
@@ -30,7 +30,7 @@ def _with_transaction(f):
     return decorated
 
 
-@implementer(interface.IScalingGroup)
+@implementer(iface.IScalingGroup)
 class SQLScalingGroup(object):
     """
     A scaling group backed by a SQL store.
@@ -61,7 +61,7 @@ class SQLScalingGroup(object):
             subFailure = f.value.subFailure
             subFailure.trap(IntegrityError)
 
-            raise interface.NoSuchScalingGroupError(self.tenant_id, self.uuid)
+            raise iface.NoSuchScalingGroupError(self.tenant_id, self.uuid)
 
         return d
 
@@ -179,7 +179,7 @@ def _verify_group_exists(conn, tenant_id, group_id):
     @d.addCallback
     def raise_if_count_is_zero(row):
         if row[0] == 0:
-            raise interface.NoSuchScalingGroupError(tenant_id, group_id)
+            raise iface.NoSuchScalingGroupError(tenant_id, group_id)
     return d
 
 def _get_policy_args(conn, policy_ids):
@@ -208,7 +208,7 @@ def _get_policy_args(conn, policy_ids):
     return d
 
 
-@implementer(interface.IScalingGroupCollection)
+@implementer(iface.IScalingGroupCollection)
 class SQLScalingGroupCollection(object):
     """
     A collection of scaling groups backed by a SQL store.
@@ -233,14 +233,14 @@ class SQLScalingGroupCollection(object):
         def build_response(result):
             return {
                 "id": group_id,
-                "state": interface.GroupState(tenant_id=tenant_id,
-                                              group_id=group_id,
-                                              group_name=config["name"],
-                                              active={},
-                                              pending={},
-                                              policy_touched={},
-                                              group_touched={},
-                                              paused=False),
+                "state": iface.GroupState(tenant_id=tenant_id,
+                                          group_id=group_id,
+                                          group_name=config["name"],
+                                          active={},
+                                          pending={},
+                                          policy_touched={},
+                                          group_touched={},
+                                          paused=False),
                 "groupConfiguration": config,
                 "launchConfiguration": launch,
                 "scalingPolicies": policies if policies is not None else []
@@ -269,7 +269,7 @@ class SQLScalingGroupCollection(object):
         return d
 
 
-@implementer(interface.IScalingGroup)
+@implementer(iface.IScalingGroup)
 class SQLScalingScheduleCollection(object):
     """
     A scaling schedule collection backed by a SQL store.
@@ -278,7 +278,7 @@ class SQLScalingScheduleCollection(object):
         self.engine = engine
 
 
-@implementer(interface.IAdmin)
+@implementer(iface.IAdmin)
 class SQLAdmin(object):
     """
     An admin interface backed by a SQL store.
