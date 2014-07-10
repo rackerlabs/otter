@@ -281,9 +281,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         """
         A scaling group collection has no groups, policies or webhooks.
         """
-        coll = sql.SQLScalingGroupCollection(self.engine)
-
-        d = coll.get_counts(log, "tenant")
+        d = self.collection.get_counts(log, "tenant")
         d.addCallback(self.assertEqual, {"groups": 0,
                                          "policies": 0,
                                          "webhooks": 0})
@@ -388,16 +386,15 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         causes an exception.
 
         """
-        coll = sql.SQLScalingGroupCollection(self.engine)
-        d = coll.webhook_info_by_hash(log, b"BOGUS")
+        d = self.collection.webhook_info_by_hash(log, b"BOGUS")
         d.assertFailure(interface.UnrecognizedCapabilityError)
         return d
+
     def test_health_check(self):
         """
         The scaling group collection provides health info.
         """
-        coll = sql.SQLScalingGroupCollection(self.engine)
-        is_healthy, _extra_info = coll.health_check()
+        is_healthy, _extra_info = self.collection.health_check()
         self.assertTrue(is_healthy)
 
 
