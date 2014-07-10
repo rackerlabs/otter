@@ -71,11 +71,7 @@ class SQLScalingGroup(object):
         List up to *limit* policies, starting with id *marker*.
         """
         # TODO: only for this tenant & group!
-        c = policies.c
-        query = policies.select().order_by(c.id).limit(limit)
-        if marker is not None:
-            query = query.where(c.id > marker)
-
+        query = _paginated(policies, limit, marker)
         d = conn.execute(query).addCallback(_fetchall)
 
         @d.addCallback
@@ -456,3 +452,17 @@ def create_tables(engine, tables=all_tables):
 
 _fetchall = methodcaller("fetchall")
 _fetchone = methodcaller("fetchone")
+
+
+def _paginated(table, limit, marker):
+    """
+    Builds a pagination query for the items in *table*.
+
+    If the marker is :data:`None`, starts from the start.
+    """
+    query = table.select().order_by(table.c.id).limit(limit)
+
+    if marker is not None:
+        query = query.where(table.c.id > marker)
+
+    return query
