@@ -312,7 +312,7 @@ class SQLScalingGroupCollection(object):
         """
         Performs a health check.
         """
-        return True, {}
+        return succeed((True, {}))
 
 
 @implementer(iface.IScalingScheduleCollection)
