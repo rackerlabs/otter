@@ -33,7 +33,7 @@ code paths.
 
 from alchimia import TWISTED_STRATEGY as STRATEGY
 from itertools import product
-from otter.json_schema import group_examples
+from otter.json_schema import group_examples, model_schemas, validate
 from otter.models import interface, sql
 from otter.test.utils import FakeReactorThreads
 from sqlalchemy import create_engine, event
@@ -199,8 +199,28 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         res = yield group.create_policies([policy_cfg])
         policy_id = res[0]["id"]
 
-        res = yield group.create_webhooks(policy_id, _webhook_examples())
-        raise RuntimeError("do something here")
+        # Create a webhook
+        webhook_cfgs = _webhook_examples()
+        webhooks = yield group.create_webhooks(policy_id, webhook_cfgs)
+
+        # Inspect the result:
+
+        # Webhooks have different ids and capability hashes:
+        for getter in [lambda x: x["id"], lambda x: x["capability"]["hash"]]:
+            attrs = map(getter, webhooks)
+            self.assertEqual(len(attrs), len(set(attrs)))
+
+        # Webhooks have a capability version that is always "1":
+        for webhook in webhooks:
+            self.assertEqual(webhook["capability"]["version"], "1")
+
+        # Webhooks have their expected name and metadata from the config:
+        for key in ["name", "metadata"]:
+            for webhook, cfg in zip(webhooks, webhook_cfgs):
+                self.assertEqual(webhook[key], cfg[key])
+
+        # Check against the schema for good measure:
+        validate(webhooks, model_schemas.webhook_list)
 
     @inlineCallbacks
     def test_create_webhook_for_nonexistant_policy(self):
