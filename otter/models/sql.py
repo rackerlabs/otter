@@ -282,6 +282,15 @@ class SQLScalingGroupCollection(object):
         d = self.engine.execute(query).addCallback(_fetchone)
         return d.addCallback(dict)
 
+    def webhook_info_by_hash(self, log, capability_hash):
+        query = select([scaling_groups.c.tenant_id,
+                        scaling_groups.c.id,
+                        policies.c.id],
+                       and_(policies.c.group_id == scaling_groups.c.id,
+                            webhooks.c.policy_id == policies.c.id,
+                            webhooks.c.capability_hash == capability_hash))
+        return self.engine.execute(query).addCallback(_fetchone)
+
     def health_check(self):
         """
         Performs a health check.
