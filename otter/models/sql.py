@@ -274,7 +274,7 @@ class SQLScalingGroupCollection(object):
         return d
 
 
-@implementer(iface.IScalingGroup)
+@implementer(iface.IScalingScheduleCollection)
 class SQLScalingScheduleCollection(object):
     """
     A scaling schedule collection backed by a SQL store.
