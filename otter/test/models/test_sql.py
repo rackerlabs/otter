@@ -38,7 +38,8 @@ from otter.models import interface, sql
 from otter.test.utils import FakeReactorThreads
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
-from twisted.internet.defer import gatherResults, inlineCallbacks
+from twisted.internet.defer import gatherResults
+from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.trial.unittest import TestCase
 from zope.interface.verify import verifyObject
 
@@ -269,6 +270,18 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         SQLiteTestMixin.setUp(self)
         TestCase.setUp(self)
         self.collection = sql.SQLScalingGroupCollection(self.engine)
+
+
+    @inlineCallbacks
+    def _create_group(self, tenant_id=b"TENANT"):
+        config = group_examples.config()[0]
+        launch = group_examples.launch_server_config()[0]
+        res = yield self.collection.create_scaling_group(log, tenant_id,
+                                                         config, launch)
+        group = self.collection.get_scaling_group(log, tenant_id, res["id"])
+        returnValue(group)
+
+
     def test_interface(self):
         """
         The SQL scaling group collection implementation implements the
@@ -295,15 +308,8 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         It will only return items for the correct tenant. Tenants do
         not affect each other.
         """
-        coll = sql.SQLScalingGroupCollection(self.engine)
-
         # create a scaling group
-        group_cfg = group_examples.config()[0]
-        launch_cfg = group_examples.launch_server_config()[0]
-
-        res = yield coll.create_scaling_group(log, b"tenant",
-                                              group_cfg, launch_cfg)
-        group = coll.get_scaling_group(log, b"tenant", res["id"])
+        group = self._create_group()
 
         # add some policies
         policy_cfgs = group_examples.policy()
@@ -316,12 +322,10 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         yield group.create_webhooks(first_webhook_policy_id, webhook_cfgs)
 
         # add a couple of false flags for a different tenant
-        res = yield coll.create_scaling_group(log, b"tenant2",
-                                              group_cfg, launch_cfg)
-        group = yield coll.get_scaling_group(log, b"tenant2", res["id"])
+        self._create_group(tenant_id=b"TENANT2")
 
         # actually count how many tenant 1 had
-        result = yield coll.get_counts(log, b"tenant")
+        result = yield self.collection.get_counts(log, group.tenant_id)
         self.assertEqual(result, {"groups": 1,
                                   "policies": len(policy_cfgs),
                                   "webhooks": len(webhook_cfgs)})
