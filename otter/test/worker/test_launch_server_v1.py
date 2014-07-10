@@ -223,8 +223,8 @@ class AddNodeTests(LoadBalancersTests):
         """
         add_to_load_balancer will stop retrying if it encounters 404
         """
-        codes = [422, 422, 404]
-        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=codes.pop(0)))
+        codes = iter([422, 422, 404])
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
         clock = Clock()
 
         d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
@@ -243,11 +243,11 @@ class AddNodeTests(LoadBalancersTests):
         """
         add_to_load_balancer will stop retrying if it encounters 422 with deleted CLB
         """
-        codes = [422, 422, 422]
-        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=codes.pop(0)))
+        codes = iter([422, 422, 422])
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
         messages = ['bad', 'huh', 'The load balancer is deleted']
         self.treq.content.side_effect = lambda *a: succeed(
-            json.dumps({"message": "{}".format(messages.pop(0))}))
+            json.dumps({"message": messages.pop(0)}))
         clock = Clock()
 
         d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
@@ -318,11 +318,11 @@ class AddNodeTests(LoadBalancersTests):
         """
         add_to_load_balancer will log all failures while it is trying
         """
-        self.codes = [500, 503, 422, 422, 401, 200]
-        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        codes = iter([500, 503, 422, 422, 401, 200])
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
         messages = ['bad'] * 3 + ['PENDING_UPDATE'] + ['hmm']
         self.treq.content.side_effect = lambda *a: succeed(
-            json.dumps({"message": "{}".format(messages.pop(0))}))
+            json.dumps({"message": messages.pop(0)}))
         bad_codes = [500, 503, 422, 401]
         clock = Clock()
 
