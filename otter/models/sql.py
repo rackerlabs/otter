@@ -139,10 +139,14 @@ class SQLScalingGroup(object):
 
         for d in data:
             webhook_id = bytes(uuid4())
+            capability_hash = bytes(uuid4())
+            # REVIEW: I really don't like the name capability_hash
+
             metadata = d.pop("metadata")
 
             data_with_ids.append(dict(id=webhook_id,
                                       policy_id=policy_id,
+                                      capability_hash=capability_hash,
                                       **d))
             meta_with_ids.append(dict(id=webhook_id,
                                       metadata=metadata))
@@ -372,7 +376,9 @@ webhooks = Table("webhooks", metadata,
                  Column("id", String(), primary_key=True),
                  Column("policy_id", ForeignKey("policies.id"),
                         nullable=False),
-                 Column("name", String(), nullable=False))
+                 Column("name", String(), nullable=False),
+                 Column("capability_hash", String(), nullable=False,
+                        unique=True))
 
 webhook_metadata = Table("webhook_metadata", metadata,
                          Column("webhook_id", ForeignKey("webhooks.id"),
