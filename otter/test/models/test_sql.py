@@ -296,6 +296,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         """
         coll = sql.SQLScalingGroupCollection(self.engine)
 
+        # create a scaling group
         group_cfg = group_examples.config()[0]
         launch_cfg = group_examples.launch_server_config()[0]
 
