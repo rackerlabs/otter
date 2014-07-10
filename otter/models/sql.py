@@ -253,6 +253,11 @@ class SQLScalingGroupCollection(object):
 
         return d
 
+    def list_scaling_group_states(log, tenant_id, limit=100, marker=None):
+        """
+        List the states of the scaling groups for this tenant.
+        """
+
     def get_scaling_group(self, log, tenant_id, scaling_group_id):
         return SQLScalingGroup(self.engine, tenant_id, scaling_group_id)
 
