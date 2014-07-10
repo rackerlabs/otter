@@ -150,6 +150,11 @@ class SQLScalingGroup(object):
 
         d = conn.execute(webhooks.insert(), data_with_ids)
 
+        @d.addErrback
+        def check_if_policy_even_exists(f):
+            f.trap(IntegrityError)
+            raise iface.NoSuchPolicyError(self.tenant_id, self.uuid, policy_id)
+
         @d.addCallback
         def insert_metadata(_result):
             # TODO: refactor this logic with the stuff that sets group
