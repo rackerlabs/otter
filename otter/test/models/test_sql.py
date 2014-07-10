@@ -382,6 +382,14 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         self.assertEqual(group.tenant_id, b"TENANT")
         self.assertEqual(group.engine, coll.engine)
 
+    def test_health_check(self):
+        """
+        The scaling group collection provides health info.
+        """
+        coll = sql.SQLScalingGroupCollection(self.engine)
+        is_healthy, _extra_info = coll.health_check()
+        self.assertTrue(is_healthy)
+
 
 class SQLAdminTests(SQLiteTestMixin, TestCase):
     def test_interface(self):
