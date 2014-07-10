@@ -309,7 +309,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         not affect each other.
         """
         # create a scaling group
-        group = self._create_group()
+        group = yield self._create_group()
 
         # add some policies
         policy_cfgs = group_examples.policy()
