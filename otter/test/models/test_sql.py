@@ -196,8 +196,8 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
 
         # Create a policy
         policy_cfg = group_examples.policy()[0]
-        res = yield group.create_policies(policy_cfg)
-        policy_id = res["id"]
+        res = yield group.create_policies([policy_cfg])
+        policy_id = res[0]["id"]
 
         res = yield group.create_webhooks(policy_id, _webhook_examples())
         raise RuntimeError("do something here")
