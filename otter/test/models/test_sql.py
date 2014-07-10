@@ -379,6 +379,16 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         self.assertEqual(group.tenant_id, b"TENANT")
         self.assertEqual(group.engine, coll.engine)
 
+    def test_webhook_info_by_hash_for_nonexistent_webhook(self):
+        """
+        Trying to find the webhook info for a nonexistent capability hash
+        causes an exception.
+
+        """
+        coll = sql.SQLScalingGroupCollection(self.engine)
+        d = coll.webhook_info_by_hash(log, b"BOGUS")
+        d.assertFailure(interface.UnrecognizedCapabilityError)
+        return d
     def test_health_check(self):
         """
         The scaling group collection provides health info.
