@@ -384,6 +384,29 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         self.assertEqual(group.tenant_id, b"TENANT")
         self.assertEqual(group.engine, coll.engine)
 
+    @inlineCallbacks
+    def test_webhook_info_by_hash_happy_case(self):
+        """
+        Getting the webhook info by capability hash works.
+        """
+        group = yield self._create_group()
+
+        # Set up a policy
+        # TODO: refactor creating a policy
+        policy_cfgs = group_examples.policy()
+        response = yield group.create_policies([policy_cfgs[0]])
+        policy_id = response[0]["id"]
+
+        # Set up a webhook for the policy
+        # TODO_ refactor creating a webhook
+        webhook_cfg = _webhook_examples()[0]
+        response = yield group.create_webhooks(policy_id, [webhook_cfg])
+        capa_hash = response[0]["capability"]["hash"]
+
+        # Try to get the webhook back
+        response = yield self.collection.webhook_info_by_hash(log, capa_hash)
+        self.assertEqual(response, (group.tenant_id, group.uuid, policy_id))
+
     def test_webhook_info_by_hash_for_nonexistent_webhook(self):
         """
         Trying to find the webhook info for a nonexistent capability hash
