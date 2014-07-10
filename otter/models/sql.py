@@ -135,7 +135,7 @@ class SQLScalingGroup(object):
         Creates some webhooks.
         """
         data_with_ids = []
-        meta_with_ids = []
+        metadata_by_id = {}
 
         for d in data:
             webhook_id = bytes(uuid4())
@@ -147,8 +147,6 @@ class SQLScalingGroup(object):
                                       policy_id=policy_id,
                                       capability_hash=capability_hash,
                                       **d))
-            meta_with_ids.append(dict(id=webhook_id,
-                                      metadata=metadata))
 
         d = conn.execute(webhooks.insert(), data_with_ids)
 
@@ -156,11 +154,19 @@ class SQLScalingGroup(object):
         def insert_metadata(_result):
             # TODO: refactor this logic with the stuff that sets group
             # metadata & policy args, because it's probably the same
-            d = conn.execute(webhook_metadata.insert(),
-                             [dict(webhook_id=d["id"], key=key, value=value)
-                              for d in meta_with_ids
-                              for (key, value) in d["metadata"].iteritems()])
-            return d
+            meta_rows = [dict(webhook_id=webhook_id, key=key, value=value)
+                         for (webhook_id, meta) in metadata_by_id.iteritems()
+                         for (key, value) in meta.iteritems()]
+            return conn.execute(webhook_metadata.insert(), meta_rows)
+
+        @d.addCallback
+        def format_result(_result):
+            return [{"id": d["id"],
+                     "name": d["name"],
+                     "capability": {"hash": d["capability_hash"],
+                                    "version": "1"},
+                     "metadata": metadata_by_id[d["id"]]}
+                    for d in data_with_ids]
 
         return d
 
