@@ -282,6 +282,12 @@ class SQLScalingGroupCollection(object):
         d = self.engine.execute(query).addCallback(_fetchone)
         return d.addCallback(dict)
 
+    def health_check(self):
+        """
+        Performs a health check.
+        """
+        return True, {}
+
 
 @implementer(iface.IScalingScheduleCollection)
 class SQLScalingScheduleCollection(object):
