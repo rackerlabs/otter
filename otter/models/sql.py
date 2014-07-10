@@ -45,8 +45,7 @@ class SQLScalingGroup(object):
         """
         Create some policies.
         """
-        ds = [_create_policy(conn, self.tenant_id, self.uuid, cfg)
-              for cfg in policy_cfgs]
+        ds = [_create_policy(conn, self.uuid, cfg) for cfg in policy_cfgs]
         d = gatherResults(ds, consumeErrors=True)
 
         @d.addCallback
@@ -292,7 +291,7 @@ class SQLAdmin(object):
         self.engine = engine
 
 
-def _create_policy(conn, tenant_id, group_id, policy_cfg):
+def _create_policy(conn, group_id, policy_cfg):
     """
     Creates a single scaling policy.
 
@@ -306,7 +305,6 @@ def _create_policy(conn, tenant_id, group_id, policy_cfg):
 
     d = conn.execute(policies.insert()
                      .values(id=policy_id,
-                             tenant_id=tenant_id,
                              group_id=group_id,
                              name=policy_cfg["name"],
                              adjustment_type=adjustment_type,
@@ -362,7 +360,6 @@ group_metadata = Table("group_metadata", metadata,
 
 policies = Table("policies", metadata,
                  Column("id", String(32), primary_key=True),
-                 Column("tenant_id", String(), nullable=False),
                  Column("group_id", ForeignKey("scaling_groups.id"),
                         nullable=False),
                  Column("name", String(), nullable=False),
