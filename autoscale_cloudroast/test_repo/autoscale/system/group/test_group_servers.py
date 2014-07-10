@@ -20,8 +20,8 @@ class ServersTests(AutoscaleFixture):
         """
         Create scaling group with minEntities 1
         """
-        behavior = AutoscaleBehaviors(self.autoscale_config, self.autoscale_client)
-        self.groupid = behavior.create_scaling_group_min(gc_min_entities=1).entity.id
+        self.groupid = self.autoscale_behaviors.create_scaling_group_min(
+            gc_min_entities=1).entity.id
 
     def tearDown(self):
         """
