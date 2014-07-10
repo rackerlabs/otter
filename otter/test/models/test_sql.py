@@ -321,8 +321,8 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         # actually count how many tenant 1 had
         result = yield coll.get_counts(log, b"tenant")
         self.assertEqual(result, {"groups": 1,
-                                  "policies": 1,
-                                  "webhooks": 1})
+                                  "policies": len(policy_cfgs),
+                                  "webhooks": len(webhook_cfgs)})
 
     def test_create_scaling_group(self):
         """
