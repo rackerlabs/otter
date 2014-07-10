@@ -289,7 +289,19 @@ class SQLScalingGroupCollection(object):
                        and_(policies.c.group_id == scaling_groups.c.id,
                             webhooks.c.policy_id == policies.c.id,
                             webhooks.c.capability_hash == capability_hash))
-        return self.engine.execute(query).addCallback(_fetchone)
+        d = self.engine.execute(query).addCallback(_fetchone)
+
+        @d.addCallback
+        def maybe_raise(result):
+            """
+            Maybe there is no such webhook: if so, raise an exception.
+            """
+            if result is None:
+                raise iface.UnrecognizedCapabilityError(capability_hash, "1")
+            else:
+                return result
+
+        return d
 
     def health_check(self):
         """
