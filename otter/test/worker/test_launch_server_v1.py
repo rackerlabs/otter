@@ -314,9 +314,10 @@ class AddNodeTests(LoadBalancersTests):
                        headers=expected_headers, data=mock.ANY,
                        log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
 
-    def test_add_lb_retries_logs(self):
+    def test_add_lb_retries_logs_unexpected_failure(self):
         """
-        add_to_load_balancer will log all failures while it is trying
+        add_to_load_balancer will log all unexpected failures while it is trying. This
+        includes any failure other than "422 PENDING_UPDATE"
         """
         codes = iter([500, 503, 422, 422, 401, 200])
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
