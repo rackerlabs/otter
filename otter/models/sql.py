@@ -129,6 +129,39 @@ class SQLScalingGroup(object):
 
         return d
 
+    @_with_transaction
+    def create_webhooks(self, conn, policy_id, data):
+        """
+        Creates some webhooks.
+        """
+        data_with_ids = []
+        meta_with_ids = []
+
+        for d in data:
+            webhook_id = bytes(uuid4())
+            metadata = d.pop("metadata")
+
+            data_with_ids.append(dict(id=webhook_id,
+                                      policy_id=policy_id,
+                                      **d))
+            meta_with_ids.append(dict(id=webhook_id,
+                                      metadata=metadata))
+
+        d = conn.execute(webhooks.insert(), data_with_ids)
+
+        @d.addCallback
+        def insert_metadata(_result):
+            # TODO: refactor this logic with the stuff that sets group
+            # metadata & policy args, because it's probably the same
+            d = conn.execute(webhook_metadata.insert(),
+                             [dict(webhook_id=d["id"], key=key, value=value)
+                              for d in meta_with_ids
+                              for (key, value) in d["metadata"].iteritems()])
+            return d
+
+        return d
+
+
 def _verify_group_exists(conn, tenant_id, group_id):
     d = conn.execute(scaling_groups
                      .select(scaling_groups.c.id == group_id)
@@ -336,8 +369,16 @@ policy_args = Table("policy_args", metadata,
                     Column("value", String(), nullable=False))
 
 webhooks = Table("webhooks", metadata,
-                 Column("id", Integer(), primary_key=True),
-                 Column("tenant_id", String(), nullable=False))
+                 Column("id", String(), primary_key=True),
+                 Column("policy_id", ForeignKey("policies.id"),
+                        nullable=False),
+                 Column("name", String(), nullable=False))
+
+webhook_metadata = Table("webhook_metadata", metadata,
+                         Column("webhook_id", ForeignKey("webhooks.id"),
+                              primary_key=True),
+                         Column("key", String(), primary_key=True),
+                         Column("value", String(), nullable=False))
 
 load_balancers = Table("load_balancers", metadata,
                        Column("id", Integer(), primary_key=True),
@@ -347,6 +388,7 @@ all_tables = (scaling_groups,
               policies,
               policy_args,
               webhooks,
+              webhook_metadata,
               load_balancers)
 
 
