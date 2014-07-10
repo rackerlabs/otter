@@ -429,8 +429,14 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         """
         The scaling group collection provides health info.
         """
-        is_healthy, _extra_info = self.collection.health_check()
-        self.assertTrue(is_healthy)
+        d = self.collection.health_check()
+
+        @d.addCallback
+        def check_response(result):
+            healthy, _extra = result
+            self.assertTrue(healthy)
+
+        return d
 
 
 class SQLAdminTests(SQLiteTestMixin, TestCase):
