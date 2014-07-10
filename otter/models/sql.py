@@ -333,11 +333,11 @@ policy_args = Table("policy_args", metadata,
                     Column("policy_id", ForeignKey("policies.id"),
                            primary_key=True),
                     Column("key", String(), primary_key=True),
-                    Column("value", String()))
+                    Column("value", String(), nullable=False))
 
 webhooks = Table("webhooks", metadata,
                  Column("id", Integer(), primary_key=True),
-                 Column("tenant_id", String()))
+                 Column("tenant_id", String(), nullable=False))
 
 load_balancers = Table("load_balancers", metadata,
                        Column("id", Integer(), primary_key=True),
