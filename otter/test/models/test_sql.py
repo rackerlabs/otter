@@ -372,3 +372,8 @@ class SQLAdminTests(SQLiteTestMixin, TestCase):
 def _webhook_examples():
     return ({"name": "webhook 1", "metadata": {"a": "1", "b": "1"}},
             {"name": "webhook 2", "metadata": {"a": "2", "b": "2"}})
+
+# REVIEW: is a webhook without metadata property allowed? if so add
+# some examples because I'm pretty sure the code doesn't handle that
+
+# REVIEW: Should these examples live here?
