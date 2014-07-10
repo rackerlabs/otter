@@ -142,8 +142,7 @@ class SQLScalingGroup(object):
             capability_hash = bytes(uuid4())
             # REVIEW: I really don't like the name capability_hash
 
-            metadata = d.pop("metadata")
-
+            metadata_by_id[webhook_id] = d["metadata"]
             data_with_ids.append(dict(id=webhook_id,
                                       policy_id=policy_id,
                                       capability_hash=capability_hash,
