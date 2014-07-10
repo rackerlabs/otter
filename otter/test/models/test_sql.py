@@ -318,6 +318,10 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
                                               group_cfg, launch_cfg)
         group = yield coll.get_scaling_group(log, b"tenant2", res["id"])
 
+        # REVIEW: we should probably add a scaling group and some
+        # policies, webhooks for a different tenant to prove that
+        # tenants don't affect each other
+
         # actually count how many tenant 1 had
         result = yield coll.get_counts(log, b"tenant")
         self.assertEqual(result, {"groups": 1,
