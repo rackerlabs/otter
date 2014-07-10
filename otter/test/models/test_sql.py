@@ -274,8 +274,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         The SQL scaling group collection implementation implements the
         :class:`interface.IScalingGroupCollection` interface.
         """
-        group_coll = sql.SQLScalingGroupCollection(self.engine)
-        verifyObject(interface.IScalingGroupCollection, group_coll)
+        verifyObject(interface.IScalingGroupCollection, self.collection)
 
 
     def test_empty_count(self):
