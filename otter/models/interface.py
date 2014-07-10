@@ -722,7 +722,7 @@ class IScalingGroupCollection(Interface):
 
         :return: The health information in the form of a boolean and some
             additional free-form health data (possibly empty).
-        :rtype: :class:`tuple` of (:class:`bool`, :class:`dict`)
+        :rtype: deferred :class:`tuple` of (:class:`bool`, :class:`dict`)
         """
 
 
