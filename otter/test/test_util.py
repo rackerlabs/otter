@@ -17,7 +17,8 @@ from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
 from otter.util.deferredutils import with_lock, delay
 
-from otter.test.utils import patch, LockMixin, mock_log, DummyException, IsBoundWith
+from otter.test.utils import (
+    patch, LockMixin, mock_log, DummyException, IsBoundWith, matches)
 from otter.log.bound import BoundLog
 
 
@@ -498,3 +499,48 @@ class IsBoundWithTests(SynchronousTestCase):
         str(matcher) returns something useful
         """
         self.assertEqual(str(self.bound), 'IsBoundWith {}'.format(dict(a=10, b=20)))
+
+
+class MatchesTests(SynchronousTestCase):
+    """
+    Tests for :class:`otter.test.utils.matches` class
+    """
+
+    def setUp(self):
+        """
+        Sample matches object
+        """
+        self.matcher = mock.MagicMock(spec=['match', '__str__'])
+        self.matches = matches(self.matcher)
+
+    def test_eq(self):
+        """
+        matches == another if matcher.match returns None
+        """
+        self.matcher.match.return_value = None
+        self.assertEqual(self.matches, 2)
+        self.matcher.match.assert_called_with(2)
+
+    def test_not_eq(self):
+        """
+        matches != another if matcher.match does not return None
+        """
+        self.matcher.match.return_value = 'not none'
+        self.assertNotEqual(self.matches, 2)
+        self.matcher.match.assert_called_with(2)
+
+    def test_repr(self):
+        """
+        repr(matches) returns matcher's representation
+        """
+        self.matcher.__str__.return_value = 'mystr'
+        self.assertEqual(repr(self.matches), 'matches(mystr)')
+
+    def test_repr_mismatch(self):
+        """
+        repr(matches) returns mismatch description also if match fails
+        """
+        self.matcher.__str__.return_value = 'ms'
+        self.matcher.match.return_value = mock.Mock(describe=lambda: 'not none')
+        self.matches == 'else'
+        self.assertEqual(repr(self.matches), 'matches(ms): <mismatch: not none>')
