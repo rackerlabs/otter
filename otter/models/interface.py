@@ -80,7 +80,7 @@ class GroupState(object):
 
         :param str job_id:  the id of the job to complete
         :returns: None
-        :raises: :class:`AssertionError` if the job doesn't exist
+        :raises AssertionError: if the job doesn't exist
         """
         assert job_id in self.pending, "Job doesn't exist: {0}".format(job_id)
         del self.pending[job_id]
@@ -92,7 +92,7 @@ class GroupState(object):
 
         :param str job_id:  the id of the job to complete
         :returns: None
-        :raises: :class:`AssertionError` if the job already exists
+        :raises AssertionError: if the job already exists
         """
         assert job_id not in self.pending, "Job exists: {0}".format(job_id)
         self.pending[job_id] = {'created': self.now()}
@@ -106,7 +106,7 @@ class GroupState(object):
         :param dict server_info: a dictionary containing relevant server info.
             TBD: What's in server_info ultimately - currently: name, url
         :returns: None
-        :raises: :class:`AssertionError` if the server id already exists
+        :raises AssertionError: if the server id already exists
         """
         assert server_id not in self.active, "Server already exists: {}".format(server_id)
         server_info.setdefault('created', self.now())
@@ -117,7 +117,7 @@ class GroupState(object):
         Removes a server to the collection of active servers.
 
         :param str server_id:  the id of the server to delete
-        :raises: :class:`AssertionError` if the server id does not exist
+        :raises AssertionError: if the server id does not exist
         """
         assert server_id in self.active, "Server does not exists: {}".format(server_id)
         del self.active[server_id]
@@ -259,7 +259,7 @@ class IScalingGroup(Interface):
             :data:``otter.json_schema.model_schemas.view_manifest``
         :rtype: ``dict``
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
         """
 
@@ -270,7 +270,7 @@ class IScalingGroup(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
         """
 
@@ -281,7 +281,7 @@ class IScalingGroup(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
         """
 
@@ -292,7 +292,7 @@ class IScalingGroup(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
         """
 
@@ -303,9 +303,9 @@ class IScalingGroup(Interface):
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
-        :raises: :class:`NoSuchScalingGroupError` if the scaling group id
+        :raises NoSuchScalingGroupError: if the scaling group id
             doesn't exist for this tenant id
-        :raises: :class:`GroupNotEmptyError` if the scaling group cannot be
+        :raises GroupNotEmptyError: if the scaling group cannot be
             deleted (e.g. if the state is not empty)
         """
 
@@ -323,7 +323,7 @@ class IScalingGroup(Interface):
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
         """
 
@@ -339,7 +339,7 @@ class IScalingGroup(Interface):
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
         """
 
@@ -358,7 +358,7 @@ class IScalingGroup(Interface):
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
         """
 
@@ -375,9 +375,9 @@ class IScalingGroup(Interface):
             specified by :data:`otter.json_schema.model_schemas.policy_list`
         :rtype: ``list`` of ``dict``
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
-        :raises: :class:`PoliciesOverLimitError` if newly created policies
+        :raises PoliciesOverLimitError: if newly created policies
             breaches maximum policies per group
         """
 
@@ -393,9 +393,9 @@ class IScalingGroup(Interface):
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises NoSuchPolicyError: if the policy id does not exist
         """
 
     def list_policies(limit=100, marker=None):
@@ -412,7 +412,7 @@ class IScalingGroup(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``list``
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
         """
 
@@ -431,8 +431,8 @@ class IScalingGroup(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
 
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchPolicyError: if the policy id does not exist
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist - this error is optional - a
             :class:`NoSuchPolicyError` can be raised instead
         """
@@ -447,9 +447,9 @@ class IScalingGroup(Interface):
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises NoSuchPolicyError: if the policy id does not exist
         """
 
     def list_webhooks(policy_id, limit=100, marker=None):
@@ -468,7 +468,7 @@ class IScalingGroup(Interface):
             :data:`otter.json_schema.model_schemas.webhook_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with None
 
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises NoSuchPolicyError: if the policy id does not exist
         """
 
     def create_webhooks(policy_id, data):
@@ -515,10 +515,10 @@ class IScalingGroup(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        :raises NoSuchPolicyError: if the policy id does not exist
+        :raises NoSuchWebhookError: if the webhook id does not exist
         """
 
     def update_webhook(policy_id, webhook_id, data):
@@ -537,10 +537,10 @@ class IScalingGroup(Interface):
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        :raises NoSuchPolicyError: if the policy id does not exist
+        :raises NoSuchWebhookError: if the webhook id does not exist
         """
 
     def delete_webhook(policy_id, webhook_id):
@@ -556,10 +556,10 @@ class IScalingGroup(Interface):
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        :raises NoSuchPolicyError: if the policy id does not exist
+        :raises NoSuchWebhookError: if the webhook id does not exist
         """
 
 
@@ -693,7 +693,7 @@ class IScalingGroupCollection(Interface):
         :return: a :class:`twisted.internet.defer.Deferred` that fires with
             a 3-tuple of (tenant_id, group_id, policy_id).
 
-        :raises: :class:`UnrecognizedCapabilityError` if the capability hash
+        :raises UnrecognizedCapabilityError: if the capability hash
             does not match any non-deleted policy
         """
 
