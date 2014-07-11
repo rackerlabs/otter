@@ -410,7 +410,6 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         """
         Trying to find the webhook info for a nonexistent capability hash
         causes an exception.
-
         """
         d = self.collection.webhook_info_by_hash(log, b"BOGUS")
         self.assertFailure(d, interface.UnrecognizedCapabilityError)
