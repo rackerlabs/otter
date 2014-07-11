@@ -30,7 +30,8 @@ from otter.worker.launch_server_v1 import (
 )
 
 
-from otter.test.utils import mock_log, patch, CheckFailure, mock_treq, matches
+from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
+                              matches, DummyException, IsBoundWith)
 from testtools.matchers import IsInstance, StartsWith
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
@@ -179,6 +180,10 @@ class LoadBalancersTests(SynchronousTestCase):
 
         self.treq.json_content.assert_called_once_with(mock.ANY)
 
+        self.log.msg.assert_called_with(
+            'Added to load balancer', loadbalancer_id=12345,
+            ip_address='192.168.1.1', node_id=1)
+
     def test_add_lb_retries(self):
         """
         add_to_load_balancer will retry again until it succeeds
@@ -271,7 +276,8 @@ class LoadBalancersTests(SynchronousTestCase):
         self.successResultOf(d)
         self.log.msg.assert_has_calls(
             [mock.call('Got LB error while {m}: {e}', loadbalancer_id=12345,
-                       m='add_node', e=matches(IsInstance(RequestError)))] * bad_codes_len)
+                       ip_address='192.168.1.1', m='add_node',
+                       e=matches(IsInstance(RequestError)))] * bad_codes_len)
 
     def test_add_lb_retries_logs_unexpected_errors(self):
         """
@@ -1743,15 +1749,16 @@ class DeleteServerTests(SynchronousTestCase):
         delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', interval=5, clock=self.clock)
+                            'serverId', exp_start=2, max_retries=2, clock=self.clock)
         self.assertEqual(delete_and_verify.call_count, 1)
         self.assertNoResult(d)
 
         delete_and_verify.side_effect = lambda *a, **kw: None
-        self.clock.pump([5])
+
+        self.clock.advance(2)
         self.assertEqual(
             delete_and_verify.mock_calls,
-            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
+            [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
                        'my-auth-token', 'serverId')] * 2)
         self.successResultOf(d)
 
@@ -1762,7 +1769,7 @@ class DeleteServerTests(SynchronousTestCase):
         # success logged
         self.log.msg.assert_called_with(
             matches(StartsWith("Server deleted successfully")),
-            server_id='serverId', time_delete=5)
+            server_id='serverId', time_delete=2.0)
 
     def test_verified_delete_retries_verification_until_timeout(self):
         """
@@ -1771,20 +1778,23 @@ class DeleteServerTests(SynchronousTestCase):
         """
         delete_and_verify = patch(
             self, 'otter.worker.launch_server_v1.delete_and_verify')
-        delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
+        delete_and_verify.side_effect = lambda *a, **kw: fail(DummyException("bad"))
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', interval=5, timeout=20, clock=self.clock)
+                            'serverId', exp_start=2, max_retries=2, clock=self.clock)
         self.assertNoResult(d)
 
-        self.clock.pump([5] * 4)
+        self.clock.advance(2)
+        self.assertNoResult(d)
+        self.assertEqual(delete_and_verify.call_count, 2)
+
+        self.clock.advance(4)
+        self.failureResultOf(d, DummyException)
         self.assertEqual(
             delete_and_verify.mock_calls,
-            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
-                       'my-auth-token', 'serverId')] * 4)
-        self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
-                                             server_id='serverId')
+            [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
+                       'my-auth-token', 'serverId')] * 3)
 
         # the loop has stopped
-        self.clock.pump([5])
-        self.assertEqual(delete_and_verify.call_count, 4)
+        self.clock.pump([16, 32])
+        self.assertEqual(delete_and_verify.call_count, 3)

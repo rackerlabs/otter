@@ -20,7 +20,7 @@ from otter.json_schema import model_schemas, validate
 
 class GroupStateTestCase(SynchronousTestCase):
     """
-    Tests the state object `otter.mode.s
+    Tests for :class:`GroupState`.
     """
     def test_repr_str(self):
         """

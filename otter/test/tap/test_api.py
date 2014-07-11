@@ -5,6 +5,8 @@ Tests for the otter-api tap plugin.
 import json
 import mock
 
+from silverberg.client import ConsistencyLevel
+
 from testtools.matchers import Contains
 
 from twisted.internet import defer
@@ -13,6 +15,7 @@ from twisted.internet.task import Clock
 from twisted.application.service import MultiService
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.models.cass import CassScalingGroupCollection as original_store
 from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
 from otter.tap.api import (
     Options, HealthChecker, makeService, setup_scheduler, call_after_supervisor)
@@ -256,8 +259,12 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.reactor = patch(self, 'otter.tap.api.reactor')
 
-        self.CassScalingGroupCollection = patch(self, 'otter.tap.api.CassScalingGroupCollection')
-        self.store = self.CassScalingGroupCollection.return_value
+        def scaling_group_collection(*args, **kwargs):
+            self.store = original_store(*args, **kwargs)
+            return self.store
+
+        patch(self, 'otter.tap.api.CassScalingGroupCollection',
+              wraps=scaling_group_collection)
 
         self.health_checker = None
 
@@ -359,8 +366,9 @@ class APIMakeServiceTests(SynchronousTestCase):
             10)
         self.LoggingCQLClient.assert_called_once_with(self.TimingOutCQLClient.return_value,
                                                       self.log.bind.return_value)
-        self.CassScalingGroupCollection.assert_called_once_with(
-            self.LoggingCQLClient.return_value, self.reactor)
+
+        self.assertEqual(self.store.connection, self.LoggingCQLClient.return_value)
+        self.assertEqual(self.store.reactor, self.reactor)
 
     def test_cassandra_cluster_disconnects_on_stop(self):
         """
@@ -380,6 +388,38 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.Otter.assert_called_once_with(self.store, 'ord',
                                            self.health_checker.health_check,
                                            es_host=None)
+
+    def test_cassandra_scaling_group_collection_with_default_consistency(self):
+        """
+        makeService configures a CassScalingGroupCollection with a callable
+        that returns the default consistencies with the default exceptions,
+        if no other values are configured.
+        """
+        makeService(test_config)
+        # tests the defaults
+
+        self.assertEqual(self.store.get_consistency('nonexistant', 'nonexistant'),
+                         ConsistencyLevel.ONE)
+        self.assertEqual(self.store.get_consistency('update', 'state'),
+                         ConsistencyLevel.QUORUM)
+
+    def test_cassandra_scaling_group_collection_with_consistency_info(self):
+        """
+        makeService configures a CassandraScalingGroupCollection with the
+        default consistency and consistency mapping in the configuration
+        """
+        config = test_config.copy()
+        config['cassandra'] = test_config['cassandra'].copy()
+        config['cassandra']['default_consistency'] = ConsistencyLevel.TWO
+        config['cassandra']['consistency_exceptions'] = {
+            'state': {'update': ConsistencyLevel.ALL}
+        }
+
+        makeService(config)
+        self.assertEqual(self.store.get_consistency('nonexistant', 'nonexistant'),
+                         ConsistencyLevel.TWO)
+        self.assertEqual(self.store.get_consistency('update', 'state'),
+                         ConsistencyLevel.ALL)
 
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_health_checker_no_zookeeper(self, supervisor):
@@ -424,7 +464,6 @@ class APIMakeServiceTests(SynchronousTestCase):
         start_d = defer.Deferred()
         kz_client.start.return_value = start_d
         mock_txkz.return_value = kz_client
-        self.store.kz_client = None
 
         parent = makeService(config)
 
@@ -479,7 +518,6 @@ class APIMakeServiceTests(SynchronousTestCase):
         kz_client = mock.Mock(spec=['start', 'stop'])
         kz_client.start.return_value = defer.succeed(None)
         mock_txkz.return_value = kz_client
-        self.store.kz_client = None
 
         parent = makeService(config)
 
@@ -503,7 +541,6 @@ class APIMakeServiceTests(SynchronousTestCase):
         kz_client.start.return_value = defer.succeed(None)
         kz_client.stop.return_value = defer.succeed(None)
         mock_txkz.return_value = kz_client
-        self.store.kz_client = None
 
         parent = makeService(config)
 

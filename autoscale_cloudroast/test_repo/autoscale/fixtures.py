@@ -14,6 +14,7 @@ from autoscale.otter_constants import OtterConstants
 
 import os
 import time
+from functools import partial
 
 
 class AutoscaleFixture(BaseTestFixture):
@@ -243,14 +244,20 @@ class AutoscaleFixture(BaseTestFixture):
             schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
         time.sleep(self.scheduler_interval + delay)
 
+    def get_non_deleting_servers(self, name=None):
+        """
+        Get servers that are not in the process of getting deleted
+
+        :param name: if given, return servers with this name
+        """
+        return filter(lambda s: s.task_state != 'deleting' and s.status != 'DELETED',
+                      self.server_client.list_servers_with_detail(name=name).entity)
+
     def get_servers_containing_given_name_on_tenant(self, group_id=None, server_name=None):
         """
-        The group_id or the server_name should be provided.
-        Given the group id, the server name is got from the group's launch
-        config and returns server ID list of servers containing that server name
-        on the tenant, from nova.
-        list_servers(name=params) returns list of servers that contain the
-        specified name within the server name.
+        Get a list of server IDs not marked pending deletion from Nova based on the
+        given server_name. If the group_id is given, use the server_name extracted
+        from the launch config instead
         """
         if group_id:
             launch_config = self.autoscale_client.view_launch_config(
@@ -258,9 +265,7 @@ class AutoscaleFixture(BaseTestFixture):
             params = launch_config.server.name
         elif server_name:
             params = server_name
-        list_server_resp = self.server_client.list_servers(name=params)
-        filtered_servers = list_server_resp.entity
-        return [server.id for server in filtered_servers]
+        return [server.id for server in self.get_non_deleting_servers(params)]
 
     def verify_server_count_using_server_metadata(self, group_id, expected_count):
         """
@@ -269,9 +274,9 @@ class AutoscaleFixture(BaseTestFixture):
         """
         end_time = time.time() + 60
         while time.time() < end_time:
-            list_servers_on_tenant = self.server_client.list_servers_with_detail().entity
-            metadata_list = [self.autoscale_behaviors.to_data(each_server.metadata) for each_server
-                             in list_servers_on_tenant]
+            servers = self.get_non_deleting_servers()
+            metadata_list = [self.autoscale_behaviors.to_data(server.metadata)
+                             for server in servers]
             group_ids_list_from_metadata = [each.get('rax:auto_scaling_group_id') for each
                                             in metadata_list]
             actual_count = group_ids_list_from_metadata.count(group_id)
@@ -524,7 +529,7 @@ class ScalingGroupFixture(AutoscaleFixture):
                 lc_load_balancers=lc_load_balancers)
         cls.group = cls.create_group_response.entity
         cls.resources.add(cls.group.id,
-                          cls.autoscale_client.delete_scaling_group)
+                          partial(cls.autoscale_client.delete_scaling_group, force='true'))
 
     @classmethod
     def tearDownClass(cls):
@@ -544,12 +549,12 @@ class ScalingGroupPolicyFixture(ScalingGroupFixture):
     @classmethod
     def setUpClass(cls, name=None, cooldown=None, change=None,
                    change_percent=None, desired_capacity=None,
-                   policy_type=None):
+                   policy_type=None, **kwargs):
         """
         Creates a scaliing policy
         """
 
-        super(ScalingGroupPolicyFixture, cls).setUpClass()
+        super(ScalingGroupPolicyFixture, cls).setUpClass(**kwargs)
         if name is None:
             name = cls.sp_name
         if cooldown is None:

@@ -3,7 +3,7 @@ Tests for the worker supervisor.
 """
 import mock
 
-from testtools.matchers import ContainsDict, Equals, IsInstance
+from testtools.matchers import ContainsDict, Equals, IsInstance, KeysEqual
 
 from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
@@ -15,8 +15,11 @@ from zope.interface.verify import verifyObject
 from otter import supervisor
 from otter.models.interface import (
     IScalingGroup, GroupState, NoSuchScalingGroupError)
-from otter.supervisor import ISupervisor, SupervisorService
-from otter.test.utils import iMock, patch, mock_log, CheckFailure, matches
+from otter.supervisor import (
+    ISupervisor, SupervisorService, set_supervisor, remove_server_from_group,
+    CannotDeleteServerBelowMinError, ServerNotFoundError)
+from otter.test.utils import (
+    iMock, patch, mock_log, CheckFailure, matches, FakeSupervisor, IsBoundWith)
 from otter.util.deferredutils import DeferredPool
 
 
@@ -706,7 +709,7 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
     def test_on_job_completion_modify_state_called(self):
         """
         ``execute_launch_config`` sets it up so that the group's
-        ``modify_state``state is called with the result as an arg whenever a
+        ``modify_state`` state is called with the result as an arg whenever a
         job finishes, whether successfully or not
         """
         supervisor.execute_launch_config(self.log, '1', self.fake_state,
@@ -1139,3 +1142,93 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
                                              system="otter.job.launch",
                                              image_ref="imageID", flavor_ref="1",
                                              job_id=self.job_id)
+
+
+class RemoveServerTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.supervisor.remove_server_from_group`
+    """
+
+    def setUp(self):
+        """
+        Fake supervisor, group and state
+        """
+        self.tid = 'trans_id'
+        self.log = mock_log()
+        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
+        self.state = GroupState('tid', 'gid', 'g', {'s0': {'id': 's0'}}, {},
+                                None, None, None, desired=1)
+        self.supervisor = FakeSupervisor()
+        set_supervisor(self.supervisor)
+        self.addCleanup(set_supervisor, None)
+
+    def test_server_not_found(self):
+        """
+        If specific server is not in the group `ServerNotFoundError` is raised
+        """
+        self.assertRaises(
+            ServerNotFoundError, remove_server_from_group, self.log,
+            self.tid, 's2', True, self.group, self.state)
+        # no server launched or deleted
+        self.assertEqual(self.supervisor.exec_calls, [])
+        self.assertEqual(self.supervisor.del_calls, [])
+        # desired & active/pending not changed
+        self.assertEqual(self.state.desired, 1)
+        self.assertEqual(self.state.active, {'s0': {'id': 's0'}})
+        self.assertEqual(self.state.pending, {})
+
+    def _check_removed(self, state):
+        self.assertNotIn('s0', state.active)
+        self.assertEqual(self.supervisor.del_calls[-1],
+                         (matches(IsBoundWith(server_id='s0', system='otter.job.delete')),
+                          self.tid, self.group, {'id': 's0'}))
+
+    def test_replaced_and_removed(self):
+        """
+        Server is removed and replaced by creating new
+        """
+        self.group.view_launch_config.return_value = succeed('launch')
+        d = remove_server_from_group(self.log, self.tid, 's0', True, self.group, self.state)
+        state = self.successResultOf(d)
+        # server removed?
+        self._check_removed(state)
+        # new server added?
+        self.assertIn(1, state.pending)
+        self.assertEqual(self.supervisor.exec_calls[-1],
+                         (matches(IsBoundWith(image_ref=mock.ANY, flavor_ref=mock.ANY,
+                                              system='otter.job.launch')),
+                          self.tid, self.group, 'launch'))
+        # desired not changed
+        self.assertEqual(self.state.desired, 1)
+
+    def test_not_replaced_removed(self):
+        """
+        Server is removed, not replaced and desired is reduced by 1
+        """
+        self.group.view_config.return_value = succeed({'minEntities': 0})
+        d = remove_server_from_group(self.log, self.tid, 's0', False, self.group, self.state)
+        state = self.successResultOf(d)
+        # server removed?
+        self._check_removed(state)
+        # desired reduced and no server launched?
+        self.assertEqual(state.desired, 0)
+        self.assertEqual(len(state.pending), 0)
+        self.assertEqual(len(self.supervisor.exec_calls), 0)
+
+    def test_not_replaced_below_min(self):
+        """
+        `CannotDeleteServerBelowMinError` is raised if current (active + pending) == min servers
+        """
+        self.state.add_job('j1')
+        self.group.view_config.return_value = succeed({'minEntities': 2})
+        d = remove_server_from_group(self.log, self.tid, 's0', False, self.group, self.state)
+        self.failureResultOf(d, CannotDeleteServerBelowMinError)
+        # server is not deleted
+        self.assertIn('s0', self.state.active)
+        self.assertEqual(self.supervisor.del_calls, [])
+        # server is not launched
+        self.assertEqual(self.state.pending, matches(KeysEqual('j1')))
+        self.assertEqual(len(self.supervisor.exec_calls), 0)
+        # desired & active not changed
+        self.assertEqual(self.state.desired, 1)
+        self.assertEqual(self.state.active, {'s0': {'id': 's0'}})

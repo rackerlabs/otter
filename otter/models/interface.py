@@ -134,7 +134,9 @@ class GroupState(object):
 
     def get_capacity(self):
         """
-        :returns: a dictionary with the desired_capcity, current_capacity, and
+        Get the capacities for a group.
+
+        :return: A dictionary with the desired_capcity, current_capacity, and
         pending_capacity.
         """
         return {'current_capacity': len(self.active),
@@ -316,7 +318,7 @@ class IScalingGroup(Interface):
         Enforcing the new min/max constraints should be done elsewhere.
 
         :param config: Configuration data in JSON format, as specified by
-            :data:`otter.json_schema.scaling_group.config`
+            :data:`otter.json_schema.group_schemas.config`
         :type config: ``dict``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
@@ -332,7 +334,7 @@ class IScalingGroup(Interface):
         values, or just overwrite them - it is up to the implementation.
 
         :param launch_config: launch config data in JSON format, as specified
-            by :data:`otter.json_schema.scaling_group.launch_config`
+            by :data:`otter.json_schema.group_schemas.launch_config`
         :type launch_config: ``dict``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
@@ -471,22 +473,29 @@ class IScalingGroup(Interface):
 
     def create_webhooks(policy_id, data):
         """
-        Creates a new capability URL for one particular scaling policy
+        Creates a new webhook for a scaling policy.
 
-        :param policy_id: the uuid of the policy to be deleted
-        :type policy_id: ``str``
+        The return value will contain both the webhook identifier (the
+        identifier for the webhook resource itself, which allows an
+        authenticated user to access and modify the webhook) as well as the
+        capability hash (the unguessable identifier for a webhook which allows
+        the referenced policy to be executed without further authentication).
+        The REST layer turns these identifiers into URLs for the user.
 
-        :param data: a list of details of the webhook in JSON format, as
-            specified by :data:`otter.json_schema.group_schemas.webhook`
-        :type data: ``list``
+        :param policy_id: The UUID of the policy for which to create a
+            new webhook.
+        :type policy_id: :class:`str`
 
-        :return: a list of the webhooks with their ids, as specified by
-            :data:`otter.json_schema.model_schemas.webhook_list`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with said
-            ``list``
+        :param data: A list of details for each webhook, as specified by
+            :data:`otter.json_schema.group_schemas.webhook`
+        :type data: :class:`list` of :class:`dict`
 
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-        :raises: :class:`WebhooksOverLimitError` if creating all the specified
+        :return: A list of the created webhooks with their unique ids.
+        :rtype: :class:`twisted.internet.defer.Deferred` :class:`list` as
+            specified by :data:`otter.json_schema.model_schemas.webhook_list`
+
+        :raises NoSuchPolicyError: if the policy id does not exist
+        :raises WebhooksOverLimitError: if creating all the specified
             webhooks would put the user over their limit of webhooks per policy
         """
 
@@ -620,17 +629,17 @@ class IScalingGroupCollection(Interface):
         :type tenant_id: ``str``
 
         :param config: scaling group configuration options in JSON format, as
-            specified by :data:`otter.json_schema.scaling_group.config`
+            specified by :data:`otter.json_schema.group_schemas.config`
         :type data: ``dict``
 
         :param launch: scaling group launch configuration options in JSON
             format, as specified by
-            :data:`otter.json_schema.scaling_group.launch_config`
+            :data:`otter.json_schema.group_schemas.launch_config`
         :type data: ``dict``
 
         :param policies: list of scaling group policies, each one given as a
             JSON blob as specified by
-            :data:`otter.json_schema.scaling_group.scaling_policy`
+            :data:`otter.json_schema.group_schemas.scaling_policy`
         :type data: ``list`` of ``dict``
 
         :return: a dictionary corresponding to the JSON schema at
@@ -708,13 +717,12 @@ class IScalingGroupCollection(Interface):
 
     def health_check():
         """
-        Returns a JSON dictionary specifying whether the store is healthy.  The
-        dictionary must have the parameters ``'healthy': boolean``, but can
-        contain other information as well
+        Check if the collection is healthy, and additionally provides some
+        extra free-form health data.
 
-        :return: ``tuple`` of (``bool``, ``dict``), where the boolean is
-            whether the services is healthy and the dictionar contains
-            extra health information.
+        :return: The health information in the form of a boolean and some
+            additional free-form health data (possibly empty).
+        :rtype: deferred :class:`tuple` of (:class:`bool`, :class:`dict`)
         """
 
 
