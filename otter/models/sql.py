@@ -249,10 +249,18 @@ class SQLScalingGroupCollection(object):
 
         return d
 
-    def list_scaling_group_states(log, tenant_id, limit=100, marker=None):
+    def list_scaling_group_states(self, log, tenant_id, limit=100, marker=None):
         """
         List the states of the scaling groups for this tenant.
         """
+        query = _paginated(scaling_groups, limit, marker)
+        d = self.engine.execute(query).addCallback(_fetchall)
+
+        @d.addCallback
+        def format_result(rows):
+            return [iface.GroupState() for row in rows]
+
+        return d
 
     def get_scaling_group(self, log, tenant_id, scaling_group_id):
         return SQLScalingGroup(self.engine, tenant_id, scaling_group_id)
