@@ -12,6 +12,50 @@ import treq
 from otter.util.config import config_value
 
 
+class RequestError(Exception):
+    """
+    An error that wraps other errors (such a timeout error) that also
+    include the URL so we know what we failed to connect to.
+
+    :ivar Failure reason: The connection failure that is wrapped
+    :ivar str target: some representation of the connection endpoint -
+        e.g. a hostname or ip or a url
+    :ivar data: extra information that can be included - this will be
+        stringified in the ``repr`` and the ``str``, and can be anything
+        with a decent string output (``str``, ``dict``, ``list``, etc.)
+    """
+    def __init__(self, failure, url, data=None):
+        super(RequestError, self).__init__(failure, url)
+        self.reason = failure
+        self.url = url
+        self.data = data
+
+    def __repr__(self):
+        """
+        The ``repr`` of :class:`RequestError` includes the ``repr`` of the
+        wrapped failure's exception and the target
+        """
+        return "RequestError[{0}, {1!r}, data={2!s}]".format(
+            self.url, self.reason.value, self.data)
+
+    def __str__(self):
+        """
+        The ``str`` of :class:`RequestError` includes the ``str`` of the
+        wrapped failure and the target
+        """
+        return "RequestError[{0}, {1!s}, data={2!s}]".format(
+            self.url, self.reason, self.data)
+
+
+def wrap_request_error(failure, target, data=None):
+    """
+    Some errors, such as connection timeouts, aren't useful becuase they don't
+    contain the url that is timing out, so wrap the error in one that also has
+    the url.
+    """
+    raise RequestError(failure, target, data)
+
+
 def _extract_error_message(system, body, unparsed):
     """
     Extract readable message from error body received from upstream system
@@ -77,7 +121,7 @@ def wrap_upstream_error(f, system, operation, url=None):
     raise UpstreamError(f, system, operation, url)
 
 
-def raise_error_on_code(failure, code, error, system, operation, url):
+def raise_error_on_code(failure, code, error, url, data=None):
     """
     Raise `error` if given `code` in APIError.code inside failure matches.
     Otherwise `RequestError` is raised with `url` and `data`
@@ -85,16 +129,7 @@ def raise_error_on_code(failure, code, error, system, operation, url):
     failure.trap(APIError)
     if failure.value.code == code:
         raise error
-    raise UpstreamError(failure, system, operation, url)
-
-
-def wrap_request_error(failure, target, data=None):
-    """
-    Some errors, such as connection timeouts, aren't useful becuase they don't
-    contain the url that is timing out, so wrap the error in one that also has
-    the url.
-    """
-    raise RequestError(failure, target, data)
+    raise RequestError(failure, url, data)
 
 
 def append_segments(uri, *segments):

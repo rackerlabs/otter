@@ -13,7 +13,7 @@ from twisted.web.http_headers import Headers
 
 from otter.util.http import (
     append_segments, APIError, check_success, headers,
-    raise_error_on_code, wrap_request_error, UpstreamError)
+    raise_error_on_code, wrap_request_error, RequestError, UpstreamError)
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
 from otter.util.deferredutils import with_lock, delay
