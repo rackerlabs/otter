@@ -397,7 +397,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         policy_id = response[0]["id"]
 
         # Set up a webhook for the policy
-        # TODO_ refactor creating a webhook
+        # TODO: refactor creating a webhook
         webhook_cfg = _webhook_examples()[0]
         response = yield group.create_webhooks(policy_id, [webhook_cfg])
         capa_hash = response[0]["capability"]["hash"]
