@@ -27,12 +27,13 @@ from otter.util import logging_treq as treq
 
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
-                             wrap_upstream_error, raise_error_on_code,
-                             APIError)
+                             wrap_request_error, raise_error_on_code,
+                             APIError, RequestError)
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout, log_with_time
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
-                              TransientRetryError, random_interval, compose_retries)
+                              exponential_backoff_interval, TransientRetryError,
+                              random_interval, compose_retries)
 
 # Number of times to retry when adding/removing nodes from LB
 LB_MAX_RETRIES = 10
@@ -83,8 +84,8 @@ def server_details(server_endpoint, auth_token, server_id, log=None):
     path = append_segments(server_endpoint, 'servers', server_id)
     d = treq.get(path, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(raise_error_on_code, 404, ServerDeleted(server_id), 'nova',
-                 'server_details', path)
+    d.addErrback(raise_error_on_code, 404, ServerDeleted(server_id),
+                 path, 'server_details')
     return d.addCallback(treq.json_content)
 
 
@@ -146,19 +147,12 @@ def wait_for_active(log,
     timeout_description = ("Waiting for server <{0}> to change from BUILD "
                            "state to ACTIVE state").format(server_id)
 
-    d = retry_and_timeout(
+    return retry_and_timeout(
         poll, timeout,
         can_retry=transient_errors_except(UnexpectedServerStatus, ServerDeleted),
         next_interval=repeating_interval(interval),
         clock=clock,
         deferred_description=timeout_description)
-
-    def wrap_nova_errors(f):
-        f.trap(UnexpectedServerStatus, ServerDeleted, TimedOutError)
-        raise UpstreamError(f, 'nova', 'server_create')
-
-    d.addErrback(wrap_nova_errors)
-    return d
 
 
 # limit on 2 servers to be created simultaneously
@@ -180,7 +174,7 @@ def create_server(server_endpoint, auth_token, server_config, log=None):
     d = create_server_sem.run(treq.post, path, headers=headers(auth_token),
                               data=json.dumps({'server': server_config}), log=log)
     d.addCallback(check_success, [202])
-    d.addErrback(wrap_upstream_error, 'nova', 'server_create', path)
+    d.addErrback(wrap_request_error, path, 'server_create')
     return d.addCallback(treq.json_content)
 
 
@@ -199,7 +193,8 @@ def log_lb_unexpected_errors(f, path, log, msg):
     """
     if not f.check(APIError):
         log.err(f, 'Unknown error while ' + msg)
-    error = UpstreamError(f, 'clb', msg, path)
+        return f
+    error = RequestError(f, path, msg)
     log.msg('Got LB error while {m}: {e}', m=msg, e=error)
     # TODO: Will do it after LB delete works fine
     # 422 is PENDING_UPDATE
@@ -229,7 +224,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
-    lb_log = log.bind(loadbalancer_id=lb_id)
+    lb_log = log.bind(loadbalancer_id=lb_id, ip_address=ip_address)
 
     def add():
         d = treq.post(path, headers=headers(auth_token),
@@ -250,7 +245,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
         clock=clock)
 
     def when_done(result):
-        lb_log.msg('Added to load balancer')
+        lb_log.msg('Added to load balancer', node_id=result['nodes'][0]['id'])
         undo.push(remove_from_load_balancer,
                   lb_log,
                   endpoint,
@@ -615,8 +610,8 @@ def verified_delete(log,
                     server_endpoint,
                     auth_token,
                     server_id,
-                    interval=10,
-                    timeout=3660,
+                    exp_start=2,
+                    max_retries=10,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
@@ -632,12 +627,8 @@ def verified_delete(log,
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param int interval: Deletion interval in seconds - how long until
-        verifying a delete is retried. Default: 5.
-    :param int timeout: Seconds after which the deletion will be logged as a
-        failure, if Nova fails to return a 404.  Default is 3660, because if
-        the server is building, the delete will not happen until immediately
-        after it has finished building.
+    :param int exp_start: Exponential backoff interval start seconds. Default 2
+    :param int max_retries: Maximum number of retry attempts
 
     :return: Deferred that fires when the expected status has been seen.
     """
@@ -648,19 +639,13 @@ def verified_delete(log,
         from twisted.internet import reactor
         clock = reactor
 
-    timeout_description = (
-        "Waiting for Nova to actually delete server {0} (or acknowledge delete)"
-        .format(server_id))
-
-    d = retry_and_timeout(
+    d = retry(
         partial(delete_and_verify, serv_log, server_endpoint, auth_token, server_id),
-        timeout,
-        next_interval=repeating_interval(interval),
-        clock=clock,
-        deferred_description=timeout_description)
+        can_retry=retry_times(max_retries),
+        next_interval=exponential_backoff_interval(exp_start),
+        clock=clock)
 
     d.addCallback(log_with_time, clock, serv_log, clock.seconds(),
                   ('Server deleted successfully (or acknowledged by Nova as '
                    'to-be-deleted) : {time_delete} seconds.'), 'time_delete')
-    d.addErrback(serv_log.err)
     return d

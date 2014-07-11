@@ -179,8 +179,8 @@ def validate_image(log, auth_token, server_endpoint, image_ref):
     url = append_segments(server_endpoint, 'images', image_ref)
     d = treq.get(url, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(raise_error_on_code, 404, UnknownImage(image_ref), 'nova',
-                 'get_image', url)
+    d.addErrback(raise_error_on_code, 404, UnknownImage(image_ref), url,
+                 'get_image')
 
     def is_image_active(image_detail):
         if image_detail['image']['status'] != 'ACTIVE':
@@ -197,8 +197,8 @@ def validate_flavor(log, auth_token, server_endpoint, flavor_ref):
     url = append_segments(server_endpoint, 'flavors', flavor_ref)
     d = treq.get(url, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(raise_error_on_code, 404, UnknownFlavor(flavor_ref), 'nova',
-                 'get_flavor', url)
+    d.addErrback(raise_error_on_code, 404, UnknownFlavor(flavor_ref), url,
+                 'get_flavor')
 
     # Extracting the content to avoid a strange bug in twisted/treq where next
     # subsequent call to nova hangs indefintely
