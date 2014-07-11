@@ -271,7 +271,6 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         TestCase.setUp(self)
         self.collection = sql.SQLScalingGroupCollection(self.engine)
 
-
     @inlineCallbacks
     def _create_group(self, tenant_id=b"TENANT"):
         config = group_examples.config()[0]
