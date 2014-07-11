@@ -81,24 +81,24 @@ class UpstreamError(Exception):
     """
     An upstream system error that wraps more detailed error
 
-    :ivar Failure error: The detailed error being wrapped
+    :ivar Failure reason: The detailed error being wrapped
     :ivar str system: the upstream system being contacted, eg: nova, clb, identity
     :ivar str operation: the operation being performed
     :ivar str url: some representation of the connection endpoint -
         e.g. a hostname or ip or a url
     """
     def __init__(self, error, system, operation, url=None):
-        self.error = error
+        self.reason = error
         self.system = system
         self.operation = operation
         self.url = url
         msg = self.system + ' error: '
-        if error.check(APIError):
-            self.apierr_message = _extract_error_message(self.system, error.value.body,
+        if self.reason.check(APIError):
+            self.apierr_message = _extract_error_message(self.system, self.reason.value.body,
                                                          'Could not parse API error body')
-            msg += '{} - {}'.format(error.value.code, self.apierr_message)
+            msg += '{} - {}'.format(self.reason.value.code, self.apierr_message)
         else:
-            msg += str(error)
+            msg += str(self.reason.value)
         super(UpstreamError, self).__init__(msg)
 
     @property
@@ -107,8 +107,8 @@ class UpstreamError(Exception):
         Return `dict` of all the details within this object
         """
         d = {'system': self.system, 'operation': self.operation, 'url': self.url}
-        if self.error.check(APIError):
-            e = self.error.value
+        if self.reason.check(APIError):
+            e = self.reason.value
             d.update({'code': e.code, 'message': self.apierr_message, 'body': e.body,
                       'headers': e.headers})
         return d
