@@ -24,6 +24,7 @@ version="5.0-extension RaxBook-2.0" xml:id="autoscale-releasenotes">
             </author>
             <copyright>
                 <year>2013</year>
+                <year>2014</year>
                 <holder>Rackspace US, Inc.</holder>
             </copyright>
             <releaseinfo>API v1.0</releaseinfo>
@@ -36,16 +37,17 @@ version="5.0-extension RaxBook-2.0" xml:id="autoscale-releasenotes">
                 </annotation>
             </legalnotice>
             <abstract>
-                <para>This document is intended for software developers who want to develop applications by
-                    using...</para>
+                <para>This document is intended for software developers
+                    interested in developing applications using the
+                    Rackspace Auto Scale API. </para>
             </abstract>
             <revhistory>
                 <revision>
-                    <date>2013-06-17</date>
+                    <date>2014-07-11</date>
                     <revdescription>
                         <itemizedlist>
                             <listitem xmlns:db="http://docbook.org/ns/docbook">
-                                <para>Ipsum lorem.</para>
+                                <para>Initial Release Notes.</para>
                             </listitem>
                         </itemizedlist>
                     </revdescription>
@@ -57,50 +59,92 @@ version="5.0-extension RaxBook-2.0" xml:id="autoscale-releasenotes">
                 <raxm:priority>30</raxm:priority>
             </raxm:metadata>
         </info>
-        <chapter xml:id="doc_change_history">
-            <title>Document Change History</title>
-            <para>This version of the Release Notes replaces and obsoletes all previous versions. The most
-                recent changes are described in the table below:</para>
-            <?rax revhistory?>
-        </chapter>
         <chapter xml:id="v1">
-            <title>v1.0, November 20, 2013</title>
-            <para>This is the initial release of Cloud Auto Scale.</para>
+            <title>v1.0, Initial release</title>
+            <para>The initial release of Rackspace Auto Scale happened on November 20, 2013.</para>
+            <para>Rackspace Auto Scale automatically scales resources that are allocated to your application up or down based on user-defined need. 
+                Scaling events can be based on scaling rules that you define through your monitoring system, or on a simple schedule that you configure.</para>
+            <para></para>
             <itemizedlist>
                 <title>New Features</title>
                 <listitem>
-                    <para>Activate Sydney for Cloud Load Balancers PTR management.</para>
+                    <para>03/12/2014 : Added <code>webhooks=true</code> argument to <guimenuitem>show scaling group details</guimenuitem> manifest view for 
+                        finer grained scaling group display with fewer requests.</para>
+                </listitem>
+                <listitem>
+                    <para>07/09/2014: Added <code>/servers/{/serverId}?replace=true</code> argument to 
+                        <guimenuitem>delete scaling group</guimenuitem> for deleting a particular server.</para>
                 </listitem>
             </itemizedlist>
             <itemizedlist>
-                <title>Bug Fixes</title>
+                <title>Enhancements</title>
                 <listitem>
-                    <para>Fixed incorrect error response when updating multiple records that include an SRV
-                        record.</para>
+                    <para>1/16/2014: Changed maximum allowed scaling policies per scaling group to <guimenuitem>100</guimenuitem>.</para>
+                </listitem>
+                <listitem>
+                    <para>1/16/2014: Changed maximum allowed webhooks per scaling policy to <guimenuitem>25</guimenuitem>.</para>
                 </listitem>
             </itemizedlist>
             <itemizedlist>
-                <title>Resources</title>
+                <title>Documentation</title>
                 <listitem>
-                    <para>
-                        <link xlink:href="http://docs.rackspace.com/api/">DNS Developer Guide</link>
-                    </para>
+                    <para>Try some simple Auto Scale exercises in the </para>
+                    <para><link xlink:href="http://docs.rackspace.com/api/v1.0/autoscale-gettingstarted/content/Overview.html">
+                        <emphasis role="italic">Rackspace Auto Scale Getting Started Guide</emphasis></link>.</para>
                 </listitem>
                 <listitem>
-                    <para>
-                        <link xlink:href="http://feedback.rackspacecloud.com/forums/71021-product-feedback">Product Feedback Forum</link>
-                    </para>
+                    <para>Get reference information and examples for all endpoints in the </para>
+                    <para><link xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-devguide/content/index.html">
+                        <emphasis role="italic">Rackspace Auto Scale Developers Guide</emphasis></link>.</para>
                 </listitem>
                 <listitem>
-                    <para>
-                        <link xlink:href="http://www.rackspace.com/cloud/blog/2011/07/11/using-rackspace-dnsaas-with-curl-part-1/">Cloud DNS Tutorial</link>
-                    </para>
+                    <para>Get reference information per programming language in the </para>
+                    <para><link xlink:href="https://developer.rackspace.com/docs/auto-scale/getting-started//">
+                        <emphasis role="italic">Rackspace Auto Scale Quick Start Guide</emphasis></link>.</para>
+                </listitem>    
+            </itemizedlist>
+            <itemizedlist>
+                <title>Talk to us</title>
+                <listitem xmlns:svg="http://www.w3.org/2000/svg"
+                    xmlns:m="http://www.w3.org/1998/Math/MathML"
+                    xmlns:html="http://www.w3.org/1999/xhtml">
+                    <para>You can also provide feedback using our feedback form:</para>
+                    <para><link
+                        xlink:href="http://feedback.rackspacecloud.com/forums/71021-product-feedback/category/70225-auto-scale"
+                        >Product Feedback Forum</link></para>
                 </listitem>
-                <listitem>
+                <listitem xmlns:svg="http://www.w3.org/2000/svg"
+                    xmlns:m="http://www.w3.org/1998/Math/MathML"
+                    xmlns:html="http://www.w3.org/1999/xhtml">
+                    <para>Get support:</para>
                     <para>
-                        <link xlink:href="http://developer.rackspace.com/">Use Cloud DNS with an SDK</link>
-                    </para>
+                        <link
+                            xlink:href="https://manage.rackspacecloud.com/Tickets/YourTickets.do"
+                            >File a ticket here (managed customers only)</link></para>
+                    <para>
+                        <link xlink:href="http://support.rackspace.com/">Rackspace Support site</link></para>
                 </listitem>
             </itemizedlist>
+            <section security="internal" xml:id="cmv1.7-internal">
+                <title>Internal Changes</title>
+                <itemizedlist>
+                    <title>New Features</title>
+                    <listitem>
+                        <para>???</para>
+                    </listitem>
+                </itemizedlist>
+                <itemizedlist>
+                    <title>Enhancements</title>
+                    <listitem>
+                        <para> ???.</para>
+                    </listitem>
+                </itemizedlist>
+                <itemizedlist>
+                    <title>Resolved Issues</title>
+                    <listitem>
+                        <para>???.</para>
+                    </listitem>
+                </itemizedlist>
+            </section>
         </chapter>
 </book>
