@@ -75,8 +75,6 @@ def _extract_error_message(system, body, unparsed):
         return unparsed
 
 
-# REVIEW: I started with specific subclasses for each system (nova, clb and identity)
-# but they had too much in common. So decided to put stuff in this class itself
 class UpstreamError(Exception):
     """
     An upstream system error that wraps more detailed error
