@@ -3,6 +3,7 @@ Tests for ``otter.util``
 """
 from datetime import datetime
 import mock
+import json
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed, fail, Deferred
@@ -11,8 +12,8 @@ from twisted.python.failure import Failure
 from twisted.web.http_headers import Headers
 
 from otter.util.http import (
-    append_segments, APIError, check_success, RequestError, headers,
-    raise_error_on_code, wrap_request_error)
+    append_segments, APIError, check_success, headers,
+    raise_error_on_code, wrap_request_error, RequestError, UpstreamError)
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
 from otter.util.deferredutils import with_lock, delay
@@ -217,6 +218,70 @@ class HTTPUtilityTests(SynchronousTestCase):
         failure = Failure(Exception())
         self.assertRaises(RequestError, wrap_request_error,
                           failure, 'url')
+
+
+class UpstreamErrorTests(SynchronousTestCase):
+    """
+    Tests for `UpstreamError`
+    """
+
+    def test_apierror_nova(self):
+        """
+        Wraps APIError from nova and parses error body accordingly
+        """
+        body = json.dumps({"computeFault": {"message": "b"}})
+        apie = APIError(404, body, {})
+        err = UpstreamError(Failure(apie), 'nova', 'add', 'xkcd.com')
+        self.assertEqual(str(err), 'nova error: 404 - b')
+        self.assertEqual(err.details, {
+            'system': 'nova', 'operation': 'add', 'url': 'xkcd.com',
+            'message': 'b', 'code': 404, 'body': body, 'headers': {}})
+
+    def test_apierror_clb(self):
+        """
+        Wraps APIError from clb and parses error body accordingly
+        """
+        body = json.dumps({"message": "b"})
+        apie = APIError(403, body, {'h1': 2})
+        err = UpstreamError(Failure(apie), 'clb', 'remove', 'xkcd.com')
+        self.assertEqual(str(err), 'clb error: 403 - b')
+        self.assertEqual(err.details, {
+            'system': 'clb', 'operation': 'remove', 'url': 'xkcd.com',
+            'message': 'b', 'code': 403, 'body': body, 'headers': {'h1': 2}})
+
+    def test_apierror_identity(self):
+        """
+        Wraps APIError from identity and parses error body accordingly
+        """
+        body = json.dumps({"identityFault": {"message": "ba"}})
+        apie = APIError(410, body, {})
+        err = UpstreamError(Failure(apie), 'identity', 'stuff', 'xkcd.com')
+        self.assertEqual(str(err), 'identity error: 410 - ba')
+        self.assertEqual(err.details, {
+            'system': 'identity', 'operation': 'stuff', 'url': 'xkcd.com',
+            'message': 'ba', 'code': 410, 'body': body, 'headers': {}})
+
+    def test_apierror_unparsed(self):
+        """
+        Wraps APIError from identity and uses default string if unable to parses
+        error body
+        """
+        body = json.dumps({"identityFault": {"m": "ba"}})
+        apie = APIError(410, body, {})
+        err = UpstreamError(Failure(apie), 'identity', 'stuff', 'xkcd.com')
+        self.assertEqual(str(err), 'identity error: 410 - Could not parse API error body')
+        self.assertEqual(err.details, {
+            'system': 'identity', 'operation': 'stuff', 'url': 'xkcd.com',
+            'message': 'Could not parse API error body', 'code': 410, 'body': body, 'headers': {}})
+
+    def test_non_apierror(self):
+        """
+        Wraps any other error and has message and details accordingly
+        """
+        err = UpstreamError(Failure(ValueError('heh')), 'identity', 'stuff', 'xkcd.com')
+        self.assertEqual(str(err), 'identity error: heh')
+        self.assertEqual(err.details, {
+            'system': 'identity', 'operation': 'stuff', 'url': 'xkcd.com'})
 
 
 class CapabilityTests(SynchronousTestCase):
