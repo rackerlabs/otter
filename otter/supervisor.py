@@ -130,7 +130,6 @@ class SupervisorService(object, Service):
             return ud
 
         d.addErrback(when_fails)
-        self.deferred_pool.add(d)
         return d
 
     def execute_delete_server(self, log, transaction_id, scaling_group, server):
@@ -151,7 +150,6 @@ class SupervisorService(object, Service):
         d = self.auth_function(scaling_group.tenant_id, log=log)
         log.msg("Authenticating for tenant")
         d.addCallback(when_authenticated)
-        self.deferred_pool.add(d)
 
         return d
 
@@ -254,7 +252,7 @@ def delete_active_servers(log, transaction_id, scaling_group,
     supervisor = get_supervisor()
     for i, server_info in enumerate(servers_to_evict):
         job = _DeleteJob(log, transaction_id, scaling_group, server_info, supervisor)
-        job.start()
+        supervisor.deferred_pool.add(job.start())
 
 
 def exec_scale_down(log, transaction_id, state, scaling_group, delta):
@@ -305,6 +303,7 @@ class _DeleteJob(object):
         d.addCallback(self._job_completed)
         d.addErrback(self._job_failed)
         self.log.msg('Started server deletion job')
+        return d
 
     def _job_completed(self, _):
         audit(self.log).msg('Server deleted.', event_type="server.delete")
@@ -355,7 +354,7 @@ class _Job(object):
             self.log, self.transaction_id, self.scaling_group, launch_config)
         d.addCallbacks(self._job_succeeded, self._job_failed)
 
-        return self.job_id
+        return d
 
     def _job_failed(self, f):
         """
@@ -399,7 +398,8 @@ class _Job(object):
 
                 job = _DeleteJob(self.log, self.transaction_id,
                                  self.scaling_group, result, self.supervisor)
-                job.start()
+                d = job.start()
+                self.supervisor.deferred_pool.add(d)
             else:
                 state.remove_job(self.job_id)
                 state.add_active(result['id'], result)
@@ -418,7 +418,8 @@ class _Job(object):
 
             job = _DeleteJob(self.log, self.transaction_id,
                              self.scaling_group, result, self.supervisor)
-            job.start()
+            d = job.start()
+            self.supervisor.deferred_pool.add(d)
 
         d.addErrback(delete_if_group_deleted)
         return d
@@ -431,8 +432,11 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
     log.msg("Launching {delta} servers.", delta=delta)
     supervisor = get_supervisor()
     for i in range(delta):
-        job_id = _Job(log, transaction_id, scaling_group, supervisor).start(launch)
-        state.add_job(job_id)
+        job = _Job(log, transaction_id, scaling_group, supervisor)
+        d = job.start(launch)
+        state.add_job(job.job_id)
+        # Add the job to the pool to ensure otter does not shut down until job is completed
+        supervisor.deferred_pool.add(d)
 
     #TODO: Doing this to not cause change in controller but would be nice to remove it
     return succeed(None)
@@ -493,7 +497,9 @@ def remove_server_from_group(log, trans_id, server_id, replace, group, state):
     def remove_server(_):
         server_info = state.active[server_id]
         state.remove_active(server_id)
-        _DeleteJob(log, trans_id, group, server_info, get_supervisor()).start()
+        supervisor = get_supervisor()
+        d = _DeleteJob(log, trans_id, group, server_info, supervisor).start()
+        supervisor.deferred_pool.add(d)
         return state
 
     if server_id in state.active:
