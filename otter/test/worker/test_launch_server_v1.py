@@ -887,9 +887,7 @@ class ServerTests(SynchronousTestCase):
         d = create_server('http://url/', 'my-auth-token', server_config)
 
         result = self.successResultOf(d)
-
         self.assertEqual(result, self.treq.json_content.return_value)
-
         self.assertEqual(len(fs.mock_calls), 0)
 
     def test_create_server_limits(self):
@@ -938,8 +936,7 @@ class ServerTests(SynchronousTestCase):
         d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
                           retries=0)
 
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(RequestError))
+        failure = self.failureResultOf(d, RequestError)
         real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
@@ -990,8 +987,7 @@ class ServerTests(SynchronousTestCase):
         d = create_server('http://url/', 'my-auth-token', server_config,
                           retries=0)
 
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(RequestError))
+        failure = self.failureResultOf(d, RequestError)
         real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
