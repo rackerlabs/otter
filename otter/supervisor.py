@@ -135,8 +135,6 @@ class SupervisorService(object, Service):
 
         d.addCallback(when_launch_server_completed)
 
-        self.deferred_pool.add(d)
-
         d.chainDeferred(completion_d)
 
         return succeed((job_id, completion_d))
@@ -159,7 +157,6 @@ class SupervisorService(object, Service):
         d = self.auth_function(scaling_group.tenant_id, log=log)
         log.msg("Authenticating for tenant")
         d.addCallback(when_authenticated)
-        self.deferred_pool.add(d)
 
         return d
 
@@ -312,10 +309,11 @@ class _DeleteJob(object):
             self.log, self.trans_id, self.scaling_group, self.server_info)
         d.addCallback(self._job_completed)
         d.addErrback(self._job_failed)
+        self.supervisor.deferred_pool.add(d)
         self.log.msg('Started server deletion job')
 
     def _job_completed(self, _):
-        audit(self.log).msg('Server deleted.', event_type="server.delete")
+        audit(self.log).msg('Server deleted', event_type="server.delete")
 
     def _job_failed(self, failure):
         # REVIEW: Logging this as err since failing to delete a server will cost
@@ -441,6 +439,7 @@ class _Job(object):
         completion_deferred.addCallbacks(
             self._job_succeeded, self._job_failed)
         completion_deferred.addErrback(self.log.err)
+        self.supervisor.deferred_pool.add(completion_deferred)
 
         return self.job_id
 

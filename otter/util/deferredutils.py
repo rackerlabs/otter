@@ -175,6 +175,12 @@ class DeferredPool(object):
         self._if_empty_notify()
         return d
 
+    def __contains__(self, deferred):
+        """
+        Is given `deferred` in the pool
+        """
+        return deferred in self._pool
+
     def __len__(self):
         """
         Return number of deferreds in the pool
