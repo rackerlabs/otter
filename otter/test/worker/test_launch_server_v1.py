@@ -662,7 +662,7 @@ def _get_server_info(metadata=None, created=None):
         'name': 'abcd',
         'imageRef': '123',
         'flavorRef': 'xyz',
-        'metadata': {} if metadata is None else metadata
+        'metadata': metadata or {}
     }
     if created is not None:
         config['created'] = created
@@ -794,8 +794,7 @@ class ServerTests(SynchronousTestCase):
         self.treq.content.return_value = succeed(error_body)
 
         d = find_server('http://url/', 'my-auth-token', server_config)
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(APIError))
+        failure = self.failureResultOf(d, APIError)
         self.assertEqual(failure.value.code, 500)
 
     def test_find_server_returns_None_if_no_servers_from_nova(self):
