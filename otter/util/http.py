@@ -71,7 +71,7 @@ def _extract_error_message(system, body, unparsed):
             return body['message']
         else:
             return body[body.keys()[0]]['message']
-    except:
+    except Exception:
         return unparsed
 
 
