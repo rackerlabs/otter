@@ -89,12 +89,12 @@ version="5.0-extension RaxBook-2.0" xml:id="autoscale-releasenotes">
                 <title>Documentation</title>
                 <listitem>
                     <para>Try some simple Auto Scale exercises in the </para>
-                    <para><link xlink:href="http://docs.rackspace.com/api/v1.0/autoscale-gettingstarted/content/Overview.html">
+                    <para><link xlink:href="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstarted/content/Overview.html">
                         <emphasis role="italic">Rackspace Auto Scale Getting Started Guide</emphasis></link>.</para>
                 </listitem>
                 <listitem>
                     <para>Get reference information and examples for all endpoints in the </para>
-                    <para><link xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-devguide/content/index.html">
+                    <para><link xlink:href="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/Overview.html">
                         <emphasis role="italic">Rackspace Auto Scale Developers Guide</emphasis></link>.</para>
                 </listitem>
                 <listitem>
