@@ -161,6 +161,13 @@ MAX_CREATE_SERVER = 2
 create_server_sem = DeferredSemaphore(MAX_CREATE_SERVER)
 
 
+class ServerCreationRetryError(Exception):
+    """
+    Exception to be raised when Nova behaves counter-intuitively, for instance
+    if there is more than one server of a certain name
+    """
+
+
 def find_server(server_endpoint, auth_token, server_config, log=None):
     """
     Given a server config, attempts to find a server created with that config.
@@ -177,11 +184,14 @@ def find_server(server_endpoint, auth_token, server_config, log=None):
     :return: Deferred that fires with a server (in the format of a server
         detail response) that matches that server config and creation time, or
         None if none matches
+    :raises: Server
     """
+    server_info = server_config['server']
+
     query_params = {
-        'image': server_config['server']['imageRef'],
-        'flavor': server_config['server']['flavorRef'],
-        'name': '^{0}$'.format(re.escape(server_config['server']['name']))
+        'image': server_info['imageRef'],
+        'flavor': server_info['flavorRef'],
+        'name': '^{0}$'.format(re.escape(server_info['name']))
     }
     url = '{path}?{query}'.format(
         path=append_segments(server_endpoint, 'servers', 'detail'),
@@ -192,17 +202,26 @@ def find_server(server_endpoint, auth_token, server_config, log=None):
     d.addCallback(treq.json_content)
 
     def get_server(list_server_details):
-        server_metadata = server_config['server']['metadata']
+        nova_servers = list_server_details['servers']
 
-        if len(list_server_details['servers']) > 1:
-            log.err("More than 1 server of the same name was returned by Nova",
-                    servers=list_server_details['servers'])
+        if len(nova_servers) > 1:
+            raise ServerCreationRetryError(
+                "Nova returned {0} servers that match the same "
+                "image/flavor and name {1}.".format(
+                    len(nova_servers), server_info['name']))
 
-        matches = [s for s in list_server_details['servers']
-                   if s['metadata'] == server_metadata]
+        elif len(nova_servers) == 1:
+            nova_server = list_server_details['servers'][0]
 
-        if len(matches) >= 1:
-            return {'server': matches[0]}
+            if nova_server['metadata'] != server_info['metadata']:
+                raise ServerCreationRetryError(
+                    "Nova found a server of the right name but wrong metadata. "
+                    "Expected {expected_metadata} and got {nova_metadata}"
+                    .format(expected_metadata=server_info['metadata'],
+                            nova_metadata=nova_server['metadata']))
+
+
+            return {'server': nova_server}
 
         return None
 

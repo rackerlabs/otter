@@ -30,7 +30,8 @@ from otter.worker.launch_server_v1 import (
     verified_delete,
     LB_MAX_RETRIES,
     LB_RETRY_INTERVAL_RANGE,
-    find_server
+    find_server,
+    ServerCreationRetryError
 )
 
 
@@ -810,10 +811,10 @@ class ServerTests(SynchronousTestCase):
         d = find_server('http://url/', 'my-auth-token', server_config)
         self.assertIsNone(self.successResultOf(d))
 
-    def test_find_server_returns_None_if_no_servers_from_nova_match(self):
+    def test_find_server_raises_if_server_from_nova_has_wrong_metadata(self):
         """
-        :func:`find_server` will return None for servers even if Nova returned
-        some servers, if the server metadata doe not match
+        :func:`find_server` will fail if the server Nova returned does not have
+        matching metadata
         """
         server_config = {'server': _get_server_info()}
 
@@ -823,7 +824,7 @@ class ServerTests(SynchronousTestCase):
         })
 
         d = find_server('http://url/', 'my-auth-token', server_config)
-        self.assertIsNone(self.successResultOf(d))
+        self.failureResultOf(d, ServerCreationRetryError)
 
     def test_find_server_returns_match_from_nova(self):
         """
@@ -841,7 +842,7 @@ class ServerTests(SynchronousTestCase):
             self.successResultOf(d),
             {'server': _get_server_info(metadata={'hey': 'there'})})
 
-    def test_find_server_returns_first_match_from_nova_and_logs_more(self):
+    def test_find_server_raises_if_nova_returns_more_than_one_server(self):
         """
         :func:`find_server` will return a the first server returned from Nova
         whose metadata match.  It logs if there more than 1 server from Nova.
@@ -858,8 +859,7 @@ class ServerTests(SynchronousTestCase):
         d = find_server('http://url/', 'my-auth-token', server_config,
                         self.log)
 
-        self.assertEqual(self.successResultOf(d), {'server': servers[0]})
-        self.log.err.assert_called_once_with(mock.ANY, servers=servers)
+        self.failureResultOf(d, ServerCreationRetryError)
 
     def test_create_server(self):
         """
