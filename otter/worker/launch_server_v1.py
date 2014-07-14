@@ -197,10 +197,6 @@ def find_server(server_endpoint, auth_token, server_config, log=None):
         path=append_segments(server_endpoint, 'servers', 'detail'),
         query=urlencode(query_params))
 
-    d = treq.get(url, headers=headers(auth_token), log=log)
-    d.addCallback(check_success, [200])
-    d.addCallback(treq.json_content)
-
     def _check_if_server_exists(list_server_details):
         nova_servers = list_server_details['servers']
 
@@ -225,6 +221,9 @@ def find_server(server_endpoint, auth_token, server_config, log=None):
 
         return None
 
+    d = treq.get(url, headers=headers(auth_token), log=log)
+    d.addCallback(check_success, [200])
+    d.addCallback(treq.json_content)
     d.addCallback(_check_if_server_exists)
     return d
 
