@@ -184,7 +184,7 @@ def find_server(server_endpoint, auth_token, server_config, log=None):
     :return: Deferred that fires with a server (in the format of a server
         detail response) that matches that server config and creation time, or
         None if none matches
-    :raises: Server
+    :raises: :class:`ServerCreationRetryError`
     """
     server_info = server_config['server']
 
@@ -201,7 +201,7 @@ def find_server(server_endpoint, auth_token, server_config, log=None):
     d.addCallback(check_success, [200])
     d.addCallback(treq.json_content)
 
-    def get_server(list_server_details):
+    def _check_if_server_exists(list_server_details):
         nova_servers = list_server_details['servers']
 
         if len(nova_servers) > 1:
@@ -215,17 +215,17 @@ def find_server(server_endpoint, auth_token, server_config, log=None):
 
             if nova_server['metadata'] != server_info['metadata']:
                 raise ServerCreationRetryError(
-                    "Nova found a server of the right name but wrong metadata. "
-                    "Expected {expected_metadata} and got {nova_metadata}"
+                    "Nova found a server of the right name ({name}) but wrong "
+                    "metadata. Expected {expected_metadata} and got {nova_metadata}"
                     .format(expected_metadata=server_info['metadata'],
-                            nova_metadata=nova_server['metadata']))
-
+                            nova_metadata=nova_server['metadata'],
+                            name=server_info['name']))
 
             return {'server': nova_server}
 
         return None
 
-    d.addCallback(get_server)
+    d.addCallback(_check_if_server_exists)
     return d
 
 
