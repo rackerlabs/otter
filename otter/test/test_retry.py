@@ -10,7 +10,8 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.retry import (retry, repeating_interval, random_interval,
                               transient_errors_except, retry_times,
-                              compose_retries, terminal_errors_except)
+                              compose_retries, exponential_backoff_interval,
+                              terminal_errors_except)
 from otter.test.utils import CheckFailure, DummyException
 
 
@@ -376,3 +377,14 @@ class NextIntervalHelperTests(SynchronousTestCase):
             self.assertTrue(5 <= interval <= 10)
             self.assertNotIn(interval, intervals)
             intervals.add(interval)
+
+    def test_exp_backoff_interval(self):
+        """
+        ``exponential_backoff_interval`` returns previous interval * 2 every
+        time it is called
+        """
+        err = DummyException()
+        next_interval = exponential_backoff_interval(3)
+        self.assertEqual(next_interval(err), 3)
+        self.assertEqual(next_interval(err), 6)
+        self.assertEqual(next_interval(err), 12)

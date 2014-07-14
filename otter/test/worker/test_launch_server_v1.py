@@ -30,11 +30,13 @@ from otter.worker.launch_server_v1 import (
     verified_delete,
     LB_MAX_RETRIES,
     LB_RETRY_INTERVAL_RANGE,
-    find_server
+    find_server,
+    ServerCreationRetryError
 )
 
 
-from otter.test.utils import mock_log, patch, CheckFailure, mock_treq, matches
+from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
+                              matches, DummyException, IsBoundWith)
 from testtools.matchers import IsInstance, StartsWith
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
@@ -183,6 +185,10 @@ class LoadBalancersTests(SynchronousTestCase):
 
         self.treq.json_content.assert_called_once_with(mock.ANY)
 
+        self.log.msg.assert_called_with(
+            'Added to load balancer', loadbalancer_id=12345,
+            ip_address='192.168.1.1', node_id=1)
+
     def test_add_lb_retries(self):
         """
         add_to_load_balancer will retry again until it succeeds
@@ -275,7 +281,8 @@ class LoadBalancersTests(SynchronousTestCase):
         self.successResultOf(d)
         self.log.msg.assert_has_calls(
             [mock.call('Got LB error while {m}: {e}', loadbalancer_id=12345,
-                       m='add_node', e=matches(IsInstance(RequestError)))] * bad_codes_len)
+                       ip_address='192.168.1.1', m='add_node',
+                       e=matches(IsInstance(RequestError)))] * bad_codes_len)
 
     def test_add_lb_retries_logs_unexpected_errors(self):
         """
@@ -661,7 +668,7 @@ def _get_server_info(metadata=None, created=None):
         'name': 'abcd',
         'imageRef': '123',
         'flavorRef': 'xyz',
-        'metadata': {} if metadata is None else metadata
+        'metadata': metadata or {}
     }
     if created is not None:
         config['created'] = created
@@ -793,8 +800,7 @@ class ServerTests(SynchronousTestCase):
         self.treq.content.return_value = succeed(error_body)
 
         d = find_server('http://url/', 'my-auth-token', server_config)
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(APIError))
+        failure = self.failureResultOf(d, APIError)
         self.assertEqual(failure.value.code, 500)
 
     def test_find_server_returns_None_if_no_servers_from_nova(self):
@@ -810,10 +816,10 @@ class ServerTests(SynchronousTestCase):
         d = find_server('http://url/', 'my-auth-token', server_config)
         self.assertIsNone(self.successResultOf(d))
 
-    def test_find_server_returns_None_if_no_servers_from_nova_match(self):
+    def test_find_server_raises_if_server_from_nova_has_wrong_metadata(self):
         """
-        :func:`find_server` will return None for servers even if Nova returned
-        some servers, if the server metadata doe not match
+        :func:`find_server` will fail if the server Nova returned does not have
+        matching metadata
         """
         server_config = {'server': _get_server_info()}
 
@@ -823,7 +829,7 @@ class ServerTests(SynchronousTestCase):
         })
 
         d = find_server('http://url/', 'my-auth-token', server_config)
-        self.assertIsNone(self.successResultOf(d))
+        self.failureResultOf(d, ServerCreationRetryError)
 
     def test_find_server_returns_match_from_nova(self):
         """
@@ -841,7 +847,7 @@ class ServerTests(SynchronousTestCase):
             self.successResultOf(d),
             {'server': _get_server_info(metadata={'hey': 'there'})})
 
-    def test_find_server_returns_first_match_from_nova_and_logs_more(self):
+    def test_find_server_raises_if_nova_returns_more_than_one_server(self):
         """
         :func:`find_server` will return a the first server returned from Nova
         whose metadata match.  It logs if there more than 1 server from Nova.
@@ -858,8 +864,7 @@ class ServerTests(SynchronousTestCase):
         d = find_server('http://url/', 'my-auth-token', server_config,
                         self.log)
 
-        self.assertEqual(self.successResultOf(d), {'server': servers[0]})
-        self.log.err.assert_called_once_with(mock.ANY, servers=servers)
+        self.failureResultOf(d, ServerCreationRetryError)
 
     @mock.patch('otter.worker.launch_server_v1.find_server')
     def test_create_server(self, fs):
@@ -1980,15 +1985,16 @@ class DeleteServerTests(SynchronousTestCase):
         delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', interval=5, clock=self.clock)
+                            'serverId', exp_start=2, max_retries=2, clock=self.clock)
         self.assertEqual(delete_and_verify.call_count, 1)
         self.assertNoResult(d)
 
         delete_and_verify.side_effect = lambda *a, **kw: None
-        self.clock.pump([5])
+
+        self.clock.advance(2)
         self.assertEqual(
             delete_and_verify.mock_calls,
-            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
+            [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
                        'my-auth-token', 'serverId')] * 2)
         self.successResultOf(d)
 
@@ -1999,7 +2005,7 @@ class DeleteServerTests(SynchronousTestCase):
         # success logged
         self.log.msg.assert_called_with(
             matches(StartsWith("Server deleted successfully")),
-            server_id='serverId', time_delete=5)
+            server_id='serverId', time_delete=2.0)
 
     def test_verified_delete_retries_verification_until_timeout(self):
         """
@@ -2008,20 +2014,23 @@ class DeleteServerTests(SynchronousTestCase):
         """
         delete_and_verify = patch(
             self, 'otter.worker.launch_server_v1.delete_and_verify')
-        delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
+        delete_and_verify.side_effect = lambda *a, **kw: fail(DummyException("bad"))
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', interval=5, timeout=20, clock=self.clock)
+                            'serverId', exp_start=2, max_retries=2, clock=self.clock)
         self.assertNoResult(d)
 
-        self.clock.pump([5] * 4)
+        self.clock.advance(2)
+        self.assertNoResult(d)
+        self.assertEqual(delete_and_verify.call_count, 2)
+
+        self.clock.advance(4)
+        self.failureResultOf(d, DummyException)
         self.assertEqual(
             delete_and_verify.mock_calls,
-            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
-                       'my-auth-token', 'serverId')] * 4)
-        self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
-                                             server_id='serverId')
+            [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
+                       'my-auth-token', 'serverId')] * 3)
 
         # the loop has stopped
-        self.clock.pump([5])
-        self.assertEqual(delete_and_verify.call_count, 4)
+        self.clock.pump([16, 32])
+        self.assertEqual(delete_and_verify.call_count, 3)

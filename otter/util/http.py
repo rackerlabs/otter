@@ -4,6 +4,7 @@ HTTP utils, such as formulation of URLs
 
 from itertools import chain
 from urllib import quote, urlencode
+import json
 from urlparse import urlsplit, urlunsplit, parse_qs
 
 import treq
@@ -46,6 +47,78 @@ class RequestError(Exception):
             self.url, self.reason, self.data)
 
 
+def wrap_request_error(failure, target, data=None):
+    """
+    Some errors, such as connection timeouts, aren't useful becuase they don't
+    contain the url that is timing out, so wrap the error in one that also has
+    the url.
+    """
+    raise RequestError(failure, target, data)
+
+
+def _extract_error_message(system, body, unparsed):
+    """
+    Extract readable message from error body received from upstream system
+    """
+    if system not in ('nova', 'clb', 'identity'):
+        raise NotImplementedError
+    # NOTE: Since all the above upstream systems return error in similar format,
+    # this parses in one way. In future, if the format changes this implementation
+    # need to change
+    try:
+        body = json.loads(body)
+        if system == 'clb':
+            return body['message']
+        else:
+            return body[body.keys()[0]]['message']
+    except Exception:
+        return unparsed
+
+
+class UpstreamError(Exception):
+    """
+    An upstream system error that wraps more detailed error
+
+    :ivar Failure reason: The detailed error being wrapped
+    :ivar str system: the upstream system being contacted, eg: nova, clb, identity
+    :ivar str operation: the operation being performed
+    :ivar str url: some representation of the connection endpoint -
+        e.g. a hostname or ip or a url
+    """
+    def __init__(self, error, system, operation, url=None):
+        self.reason = error
+        self.system = system
+        self.operation = operation
+        self.url = url
+        msg = self.system + ' error: '
+        if self.reason.check(APIError):
+            self.apierr_message = _extract_error_message(self.system, self.reason.value.body,
+                                                         'Could not parse API error body')
+            msg += '{} - {}'.format(self.reason.value.code, self.apierr_message)
+        else:
+            msg += str(self.reason.value)
+        super(UpstreamError, self).__init__(msg)
+
+    @property
+    def details(self):
+        """
+        Return `dict` of all the details within this object
+        """
+        d = {'system': self.system, 'operation': self.operation, 'url': self.url}
+        if self.reason.check(APIError):
+            e = self.reason.value
+            d.update({'code': e.code, 'message': self.apierr_message, 'body': e.body,
+                      'headers': e.headers})
+        return d
+
+
+def wrap_upstream_error(f, system, operation, url=None):
+    """
+    Wrap error in UpstreamError
+    """
+    raise UpstreamError(f, system, operation, url)
+
+
 def raise_error_on_code(failure, code, error, url, data=None):
     """
     Raise `error` if given `code` in APIError.code inside failure matches.
@@ -55,15 +128,6 @@ def raise_error_on_code(failure, code, error, url, data=None):
     if failure.value.code == code:
         raise error
     raise RequestError(failure, url, data)
-
-
-def wrap_request_error(failure, target, data=None):
-    """
-    Some errors, such as connection timeouts, aren't useful becuase they don't
-    contain the url that is timing out, so wrap the error in one that also has
-    the url.
-    """
-    raise RequestError(failure, target, data)
 
 
 def append_segments(uri, *segments):
@@ -241,8 +305,9 @@ def next_marker_by_id(collection, limit, marker):
 def get_collection_links(collection, url, rel, limit=None, marker=None,
                          next_marker=None):
     """
-    Return links `dict` for given collection like below. The 'next' link is
-    added only if number of items in `collection` has reached `limit`
+    Return links `dict` for given collection.
+
+    The links will look somewhat like this::
 
         [
           {
@@ -254,6 +319,9 @@ def get_collection_links(collection, url, rel, limit=None, marker=None,
             "rel": "next"
           }
         ]
+
+    The 'next' link is added only if number of items in `collection`
+    has reached `limit`.
 
     :param collection: the collection whose links are required.
     :type collection: list of dict that has 'id' in it

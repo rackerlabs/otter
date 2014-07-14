@@ -13,7 +13,7 @@ from zope.interface.verify import verifyObject
 
 from otter.test.utils import patch, SameJSON, iMock, matches
 
-from otter.util.http import APIError, RequestError
+from otter.util.http import APIError, UpstreamError
 
 from otter.log import log as default_log
 
@@ -96,7 +96,7 @@ class HelperTests(SynchronousTestCase):
         d = authenticate_user('http://identity/v2.0', 'user', 'pass')
         failure = self.failureResultOf(d)
 
-        self.assertTrue(failure.check(RequestError))
+        self.assertTrue(failure.check(UpstreamError))
         real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
@@ -175,7 +175,7 @@ class HelperTests(SynchronousTestCase):
                              expire_in=60)
         failure = self.failureResultOf(d)
 
-        self.assertTrue(failure.check(RequestError))
+        self.assertTrue(failure.check(UpstreamError))
         real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
@@ -213,7 +213,7 @@ class HelperTests(SynchronousTestCase):
                                 'user-token')
         failure = self.failureResultOf(d)
 
-        self.assertTrue(failure.check(RequestError))
+        self.assertTrue(failure.check(UpstreamError))
         real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
@@ -252,7 +252,7 @@ class HelperTests(SynchronousTestCase):
                             111111)
         failure = self.failureResultOf(d)
 
-        self.assertTrue(failure.check(RequestError))
+        self.assertTrue(failure.check(UpstreamError))
         real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
