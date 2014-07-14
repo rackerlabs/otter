@@ -20,6 +20,8 @@ from functools import partial
 import json
 import itertools
 from copy import deepcopy
+import re
+from urllib import urlencode
 
 from twisted.internet.defer import gatherResults, maybeDeferred, DeferredSemaphore
 
@@ -158,6 +160,73 @@ def wait_for_active(log,
 # limit on 2 servers to be created simultaneously
 MAX_CREATE_SERVER = 2
 create_server_sem = DeferredSemaphore(MAX_CREATE_SERVER)
+
+
+class ServerCreationRetryError(Exception):
+    """
+    Exception to be raised when Nova behaves counter-intuitively, for instance
+    if there is more than one server of a certain name
+    """
+
+
+def find_server(server_endpoint, auth_token, server_config, log=None):
+    """
+    Given a server config, attempts to find a server created with that config.
+
+    Uses the Nova list server details endpoint to filter out any server that
+    does not have the exact server name (the filter is a regex, so can filter
+    by ``^<name>$``), image ID, and flavor ID (both of which are exact filters).
+
+    :param str server_endpoint: Server endpoint URI.
+    :param str auth_token: Keystone Auth Token.
+    :param dict server_config: Nova server config.
+    :param log: A bound logger
+
+    :return: Deferred that fires with a server (in the format of a server
+        detail response) that matches that server config and creation time, or
+        None if none matches
+    :raises: :class:`ServerCreationRetryError`
+    """
+    server_info = server_config['server']
+
+    query_params = {
+        'image': server_info['imageRef'],
+        'flavor': server_info['flavorRef'],
+        'name': '^{0}$'.format(re.escape(server_info['name']))
+    }
+    url = '{path}?{query}'.format(
+        path=append_segments(server_endpoint, 'servers', 'detail'),
+        query=urlencode(query_params))
+
+    def _check_if_server_exists(list_server_details):
+        nova_servers = list_server_details['servers']
+
+        if len(nova_servers) > 1:
+            raise ServerCreationRetryError(
+                "Nova returned {0} servers that match the same "
+                "image/flavor and name {1}.".format(
+                    len(nova_servers), server_info['name']))
+
+        elif len(nova_servers) == 1:
+            nova_server = list_server_details['servers'][0]
+
+            if nova_server['metadata'] != server_info['metadata']:
+                raise ServerCreationRetryError(
+                    "Nova found a server of the right name ({name}) but wrong "
+                    "metadata. Expected {expected_metadata} and got {nova_metadata}"
+                    .format(expected_metadata=server_info['metadata'],
+                            nova_metadata=nova_server['metadata'],
+                            name=server_info['name']))
+
+            return {'server': nova_server}
+
+        return None
+
+    d = treq.get(url, headers=headers(auth_token), log=log)
+    d.addCallback(check_success, [200])
+    d.addCallback(treq.json_content)
+    d.addCallback(_check_if_server_exists)
+    return d
 
 
 def create_server(server_endpoint, auth_token, server_config, log=None):
