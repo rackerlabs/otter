@@ -20,6 +20,8 @@ from functools import partial
 import json
 import itertools
 from copy import deepcopy
+import re
+from urllib import urlencode
 
 from twisted.internet.defer import gatherResults, maybeDeferred, DeferredSemaphore
 
@@ -32,7 +34,8 @@ from otter.util.http import (append_segments, headers, check_success,
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout, log_with_time
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
-                              TransientRetryError, random_interval, compose_retries)
+                              exponential_backoff_interval, TransientRetryError,
+                              random_interval, compose_retries)
 
 # Number of times to retry when adding/removing nodes from LB
 LB_MAX_RETRIES = 10
@@ -159,6 +162,73 @@ MAX_CREATE_SERVER = 2
 create_server_sem = DeferredSemaphore(MAX_CREATE_SERVER)
 
 
+class ServerCreationRetryError(Exception):
+    """
+    Exception to be raised when Nova behaves counter-intuitively, for instance
+    if there is more than one server of a certain name
+    """
+
+
+def find_server(server_endpoint, auth_token, server_config, log=None):
+    """
+    Given a server config, attempts to find a server created with that config.
+
+    Uses the Nova list server details endpoint to filter out any server that
+    does not have the exact server name (the filter is a regex, so can filter
+    by ``^<name>$``), image ID, and flavor ID (both of which are exact filters).
+
+    :param str server_endpoint: Server endpoint URI.
+    :param str auth_token: Keystone Auth Token.
+    :param dict server_config: Nova server config.
+    :param log: A bound logger
+
+    :return: Deferred that fires with a server (in the format of a server
+        detail response) that matches that server config and creation time, or
+        None if none matches
+    :raises: :class:`ServerCreationRetryError`
+    """
+    server_info = server_config['server']
+
+    query_params = {
+        'image': server_info['imageRef'],
+        'flavor': server_info['flavorRef'],
+        'name': '^{0}$'.format(re.escape(server_info['name']))
+    }
+    url = '{path}?{query}'.format(
+        path=append_segments(server_endpoint, 'servers', 'detail'),
+        query=urlencode(query_params))
+
+    def _check_if_server_exists(list_server_details):
+        nova_servers = list_server_details['servers']
+
+        if len(nova_servers) > 1:
+            raise ServerCreationRetryError(
+                "Nova returned {0} servers that match the same "
+                "image/flavor and name {1}.".format(
+                    len(nova_servers), server_info['name']))
+
+        elif len(nova_servers) == 1:
+            nova_server = list_server_details['servers'][0]
+
+            if nova_server['metadata'] != server_info['metadata']:
+                raise ServerCreationRetryError(
+                    "Nova found a server of the right name ({name}) but wrong "
+                    "metadata. Expected {expected_metadata} and got {nova_metadata}"
+                    .format(expected_metadata=server_info['metadata'],
+                            nova_metadata=nova_server['metadata'],
+                            name=server_info['name']))
+
+            return {'server': nova_server}
+
+        return None
+
+    d = treq.get(url, headers=headers(auth_token), log=log)
+    d.addCallback(check_success, [200])
+    d.addCallback(treq.json_content)
+    d.addCallback(_check_if_server_exists)
+    return d
+
+
 def create_server(server_endpoint, auth_token, server_config, log=None):
     """
     Create a new server.
@@ -223,7 +293,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
-    lb_log = log.bind(loadbalancer_id=lb_id)
+    lb_log = log.bind(loadbalancer_id=lb_id, ip_address=ip_address)
 
     def add():
         d = treq.post(path, headers=headers(auth_token),
@@ -244,7 +314,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
         clock=clock)
 
     def when_done(result):
-        lb_log.msg('Added to load balancer')
+        lb_log.msg('Added to load balancer', node_id=result['nodes'][0]['id'])
         undo.push(remove_from_load_balancer,
                   lb_log,
                   endpoint,
@@ -609,8 +679,8 @@ def verified_delete(log,
                     server_endpoint,
                     auth_token,
                     server_id,
-                    interval=10,
-                    timeout=3660,
+                    exp_start=2,
+                    max_retries=10,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
@@ -626,12 +696,8 @@ def verified_delete(log,
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param int interval: Deletion interval in seconds - how long until
-        verifying a delete is retried. Default: 5.
-    :param int timeout: Seconds after which the deletion will be logged as a
-        failure, if Nova fails to return a 404.  Default is 3660, because if
-        the server is building, the delete will not happen until immediately
-        after it has finished building.
+    :param int exp_start: Exponential backoff interval start seconds. Default 2
+    :param int max_retries: Maximum number of retry attempts
 
     :return: Deferred that fires when the expected status has been seen.
     """
@@ -642,19 +708,13 @@ def verified_delete(log,
         from twisted.internet import reactor
         clock = reactor
 
-    timeout_description = (
-        "Waiting for Nova to actually delete server {0} (or acknowledge delete)"
-        .format(server_id))
-
-    d = retry_and_timeout(
+    d = retry(
         partial(delete_and_verify, serv_log, server_endpoint, auth_token, server_id),
-        timeout,
-        next_interval=repeating_interval(interval),
-        clock=clock,
-        deferred_description=timeout_description)
+        can_retry=retry_times(max_retries),
+        next_interval=exponential_backoff_interval(exp_start),
+        clock=clock)
 
     d.addCallback(log_with_time, clock, serv_log, clock.seconds(),
                   ('Server deleted successfully (or acknowledged by Nova as '
                    'to-be-deleted) : {time_delete} seconds.'), 'time_delete')
-    d.addErrback(serv_log.err)
     return d

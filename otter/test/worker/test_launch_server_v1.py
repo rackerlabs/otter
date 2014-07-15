@@ -3,6 +3,8 @@ Unittests for the launch_server_v1 launch config.
 """
 import mock
 import json
+from urllib import urlencode
+from urlparse import urlunsplit
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import Deferred, fail, succeed
@@ -26,11 +28,15 @@ from otter.worker.launch_server_v1 import (
     ServerDeleted,
     delete_and_verify,
     verified_delete,
-    LB_MAX_RETRIES, LB_RETRY_INTERVAL_RANGE
+    LB_MAX_RETRIES,
+    LB_RETRY_INTERVAL_RANGE,
+    find_server,
+    ServerCreationRetryError
 )
 
 
-from otter.test.utils import mock_log, patch, CheckFailure, mock_treq, matches
+from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
+                              matches, DummyException, IsBoundWith)
 from testtools.matchers import IsInstance, StartsWith
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
@@ -179,6 +185,10 @@ class LoadBalancersTests(SynchronousTestCase):
 
         self.treq.json_content.assert_called_once_with(mock.ANY)
 
+        self.log.msg.assert_called_with(
+            'Added to load balancer', loadbalancer_id=12345,
+            ip_address='192.168.1.1', node_id=1)
+
     def test_add_lb_retries(self):
         """
         add_to_load_balancer will retry again until it succeeds
@@ -271,7 +281,8 @@ class LoadBalancersTests(SynchronousTestCase):
         self.successResultOf(d)
         self.log.msg.assert_has_calls(
             [mock.call('Got LB error while {m}: {e}', loadbalancer_id=12345,
-                       m='add_node', e=matches(IsInstance(RequestError)))] * bad_codes_len)
+                       ip_address='192.168.1.1', m='add_node',
+                       e=matches(IsInstance(RequestError)))] * bad_codes_len)
 
     def test_add_lb_retries_logs_unexpected_errors(self):
         """
@@ -643,6 +654,27 @@ class LoadBalancersTests(SynchronousTestCase):
     test_removelb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
 
 
+def _get_server_info(metadata=None, created=None):
+    """
+    Creates a fake server config to be used when testing creating servers
+    (either as the config to use when creating, or as the config to return as
+    a response).
+
+    :param ``dict`` metadata: metadata to include in the server config
+    :param ``created``: this is only used in server responses, but gives an
+        extra field to distinguish one server config from another
+    """
+    config = {
+        'name': 'abcd',
+        'imageRef': '123',
+        'flavorRef': 'xyz',
+        'metadata': metadata or {}
+    }
+    if created is not None:
+        config['created'] = created
+    return config
+
+
 class ServerTests(SynchronousTestCase):
     """
     Test server manipulation functions.
@@ -714,6 +746,125 @@ class ServerTests(SynchronousTestCase):
 
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
+
+    def test_find_server_tells_nova_to_filter_by_image_flavor_and_name(self):
+        """
+        :func:`find_server` makes a call to nova to list server details while
+        filtering on the image id, flavor id, and exact name in the server
+        config.
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({"servers": []})
+
+        find_server('http://url/', 'my-auth-token', server_config)
+
+        url = urlunsplit([
+            'http', 'url', 'servers/detail',
+            urlencode({"image": "123", "flavor": "xyz", "name": "^abcd$"}),
+            None])
+
+        self.treq.get.assert_called_once_with(url, headers=expected_headers,
+                                              log=mock.ANY)
+
+    def test_find_server_regex_escapes_server_name(self):
+        """
+        :func:`find_server` when giving the exact name of the server,
+        regex-escapes the name
+        """
+        server_config = {'server': _get_server_info()}
+        server_config['server']['name'] = r"this.is[]regex\dangerous()*"
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({"servers": []})
+
+        find_server('http://url/', 'my-auth-token', server_config)
+
+        url = urlunsplit([
+            'http', 'url', 'servers/detail',
+            urlencode({"image": "123", "flavor": "xyz",
+                       "name": r"^this\.is\[\]regex\\dangerous\(\)\*$"}),
+            None])
+
+        self.treq.get.assert_called_once_with(url, headers=expected_headers,
+                                              log=mock.ANY)
+
+    def test_find_server_propagates_api_errors(self):
+        """
+        :func:`find_server` propagates any errors from Nova
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=500))
+        self.treq.content.return_value = succeed(error_body)
+
+        d = find_server('http://url/', 'my-auth-token', server_config)
+        failure = self.failureResultOf(d, APIError)
+        self.assertEqual(failure.value.code, 500)
+
+    def test_find_server_returns_None_if_no_servers_from_nova(self):
+        """
+        :func:`find_server` will return None for servers if Nova returns no
+        matching servers
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({"servers": []})
+
+        d = find_server('http://url/', 'my-auth-token', server_config)
+        self.assertIsNone(self.successResultOf(d))
+
+    def test_find_server_raises_if_server_from_nova_has_wrong_metadata(self):
+        """
+        :func:`find_server` will fail if the server Nova returned does not have
+        matching metadata
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({
+            'servers': [_get_server_info(metadata={'hello': 'there'})]
+        })
+
+        d = find_server('http://url/', 'my-auth-token', server_config)
+        self.failureResultOf(d, ServerCreationRetryError)
+
+    def test_find_server_returns_match_from_nova(self):
+        """
+        :func:`find_server` will return a server returned from Nova if the
+        metadata match.
+        """
+        server_config = {'server': _get_server_info(metadata={'hey': 'there'})}
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed(
+            {'servers': [_get_server_info(metadata={'hey': 'there'})]})
+
+        d = find_server('http://url/', 'my-auth-token', server_config)
+
+        self.assertEqual(
+            self.successResultOf(d),
+            {'server': _get_server_info(metadata={'hey': 'there'})})
+
+    def test_find_server_raises_if_nova_returns_more_than_one_server(self):
+        """
+        :func:`find_server` will return a the first server returned from Nova
+        whose metadata match.  It logs if there more than 1 server from Nova.
+        """
+        server_config = {'server': _get_server_info()}
+        servers = [
+            _get_server_info(created='2014-04-04T04:04:04Z'),
+            _get_server_info(created='2014-04-04T04:04:05Z'),
+        ]
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({'servers': servers})
+
+        d = find_server('http://url/', 'my-auth-token', server_config,
+                        self.log)
+
+        self.failureResultOf(d, ServerCreationRetryError)
 
     def test_create_server(self):
         """
@@ -1743,15 +1894,16 @@ class DeleteServerTests(SynchronousTestCase):
         delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', interval=5, clock=self.clock)
+                            'serverId', exp_start=2, max_retries=2, clock=self.clock)
         self.assertEqual(delete_and_verify.call_count, 1)
         self.assertNoResult(d)
 
         delete_and_verify.side_effect = lambda *a, **kw: None
-        self.clock.pump([5])
+
+        self.clock.advance(2)
         self.assertEqual(
             delete_and_verify.mock_calls,
-            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
+            [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
                        'my-auth-token', 'serverId')] * 2)
         self.successResultOf(d)
 
@@ -1762,7 +1914,7 @@ class DeleteServerTests(SynchronousTestCase):
         # success logged
         self.log.msg.assert_called_with(
             matches(StartsWith("Server deleted successfully")),
-            server_id='serverId', time_delete=5)
+            server_id='serverId', time_delete=2.0)
 
     def test_verified_delete_retries_verification_until_timeout(self):
         """
@@ -1771,20 +1923,23 @@ class DeleteServerTests(SynchronousTestCase):
         """
         delete_and_verify = patch(
             self, 'otter.worker.launch_server_v1.delete_and_verify')
-        delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
+        delete_and_verify.side_effect = lambda *a, **kw: fail(DummyException("bad"))
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', interval=5, timeout=20, clock=self.clock)
+                            'serverId', exp_start=2, max_retries=2, clock=self.clock)
         self.assertNoResult(d)
 
-        self.clock.pump([5] * 4)
+        self.clock.advance(2)
+        self.assertNoResult(d)
+        self.assertEqual(delete_and_verify.call_count, 2)
+
+        self.clock.advance(4)
+        self.failureResultOf(d, DummyException)
         self.assertEqual(
             delete_and_verify.mock_calls,
-            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
-                       'my-auth-token', 'serverId')] * 4)
-        self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
-                                             server_id='serverId')
+            [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
+                       'my-auth-token', 'serverId')] * 3)
 
         # the loop has stopped
-        self.clock.pump([5])
-        self.assertEqual(delete_and_verify.call_count, 4)
+        self.clock.pump([16, 32])
+        self.assertEqual(delete_and_verify.call_count, 3)
