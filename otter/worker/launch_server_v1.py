@@ -287,7 +287,7 @@ class CLBOrNodeDeleted(Exception):
 
 def check_deleted_clb(f, clb_id, node_id=None):
     """
-    Raise `CLBOrNodeDeleted` error based on information in `RequestError` in f.
+    Raise :class:`CLBOrNodeDeleted` error based on information in `RequestError` in f.
     Otherwise return f
 
     :param :class:`Failure` f: failure containing :class:`RequestError`
