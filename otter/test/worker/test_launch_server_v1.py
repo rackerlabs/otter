@@ -125,14 +125,16 @@ expected_headers = {
 error_body = '{"code": 500, "message": "Internal Server Error"}'
 
 
-class LoadBalancersTests(SynchronousTestCase):
+class LoadBalancersTestsMixin(object):
     """
     Test adding and removing nodes from load balancers
     """
+
     def setUp(self):
         """
         set up test dependencies for load balancers.
         """
+        super(LoadBalancersTestsMixin, self).setUp()
         self.log = mock_log()
         self.log.msg.return_value = None
 
@@ -150,7 +152,7 @@ class LoadBalancersTests(SynchronousTestCase):
             return_value=self.retry_interval)
 
 
-class AddNodeTests(LoadBalancersTests):
+class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
     """
     Tests for :func:`add_to_load_balancer`
     """
@@ -471,7 +473,7 @@ class AddNodeTests(LoadBalancersTests):
         self.assertEqual(self.successResultOf(d), [])
 
 
-class RemoveNodeTests(LoadBalancersTests):
+class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
     """
     :func:`remove_from_load_balancer` tests
     """
