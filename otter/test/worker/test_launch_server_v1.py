@@ -252,9 +252,9 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         codes = iter([422, 422, 422])
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
-        messages = ['bad', 'huh', 'The load balancer is deleted']
+        messages = iter(['bad', 'huh', 'The load balancer is deleted'])
         self.treq.content.side_effect = lambda *a: succeed(
-            json.dumps({"message": messages.pop(0)}))
+            json.dumps({"message": next(messages)}))
         clock = Clock()
 
         d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
@@ -328,9 +328,9 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         codes = iter([500, 503, 422, 422, 401, 200])
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
-        messages = ['bad'] * 3 + ['PENDING_UPDATE'] + ['hmm']
+        messages = iter(['bad'] * 3 + ['PENDING_UPDATE'] + ['hmm'])
         self.treq.content.side_effect = lambda *a: succeed(
-            json.dumps({"message": messages.pop(0)}))
+            json.dumps({"message": next(messages)}))
         bad_codes = [500, 503, 422, 401]
         clock = Clock()
 
