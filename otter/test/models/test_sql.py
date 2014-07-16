@@ -443,6 +443,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         groups.
         """
         groups = yield self._create_some_groups()
+        groups.sort(key=lambda g: g.uuid)
 
         tenant_id = groups[0].tenant_id
         itergroups = iter(groups)
