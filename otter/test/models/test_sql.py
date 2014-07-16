@@ -151,6 +151,40 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         d = group.create_policies(group_examples.policy())
         yield self.assertFailure(d, interface.PoliciesOverLimitError)
 
+    def test_update_policy_for_nonexistant_scaling_group(self):
+        """
+        When attempting to update a policy for a group that doesn't exist,
+        an exception is raised.
+        """
+        group = sql.SQLScalingGroup(self.engine, b"TENANT", b"BOGUS_GROUP")
+        d = group.update_policy(b"BOGUS_POLICY", {})
+        return self.assertFailure(d, interface.NoSuchScalingGroupError)
+
+    @inlineCallbacks
+    def test_update_policy_for_nonexistant_policy(self):
+        """
+        When attempting to update a policy when that policy doesn't exist,
+        an exception is raised.
+        """
+        group = yield self._create_group()
+        d = group.update_policy(b"BOGUS_POLICY", {})
+        yield self.assertFailure(d, interface.NoSuchPolicyError)
+
+    @inlineCallbacks
+    def test_update_policy(self):
+        """
+        A user can update a policy.
+        """
+        group = yield self._create_group()
+
+        policy_cfgs = group_examples.policy()[0]
+        policies = yield group.create_policies([policy_cfgs])
+
+        policy, = policies
+
+        old = yield group.get_policy(policy["id"])
+        # TODO: write a useful test here, once get_policy is implemented
+
     def test_list_policies_for_nonexistant_scaling_group(self):
         """
         When attempting to list policies for a group that doesn't exist,
