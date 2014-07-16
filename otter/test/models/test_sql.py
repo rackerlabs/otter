@@ -468,8 +468,8 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         second_amount = 100
         states = yield list_states(log, tenant_id, second_amount, marker)
 
-        remaining_groups = groups - first_amount
-        self.assertGreaterThan(second_amount, remaining_groups)
+        remaining_groups = len(groups) - first_amount
+        self.assertTrue(second_amount >= remaining_groups)
 
         self.assertEqual(len(states), remaining_groups)
         for state, group in zip(states, itergroups):
