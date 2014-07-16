@@ -261,7 +261,17 @@ class SQLScalingGroupCollection(object):
 
         @d.addCallback
         def format_result(rows):
-            return [iface.GroupState() for row in rows]
+            # REVIEW: clearly most of this GroupState is nonsense.
+            # What part of it can and can't be?
+            return [iface.GroupState(tenant_id=tenant_id,
+                                     group_id=row["id"],
+                                     group_name=row["name"],
+                                     active={},
+                                     pending=[],
+                                     policy_touched=None,
+                                     group_touched=None,
+                                     paused=False)
+                    for row in rows]
 
         return d
 
