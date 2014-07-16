@@ -80,10 +80,22 @@ class SQLScalingGroup(object):
 
         @d.addCallback
         def complain_if_no_rows_matched(result_proxy):
+            """
+            If no rows matched, the policy doesn't exist.
+
+            Check if the group exists, and raise
+            :class:`~iface.NoSuchPolicyError` or
+            :class:`~iface.NoSuchScalingGroupError` accordingly.
+            """
             if result_proxy.rowcount == 0:
-                raise iface.NoSuchPolicyError(self.tenant_id,
-                                              self.uuid,
-                                              policy_id)
+                d = _verify_group_exists(conn, self.tenant_id, self.uuid)
+
+                @d.addCallback
+                def okay_so_the_group_exists_but_policy_doesnt(res):
+                    raise iface.NoSuchPolicyError(self.tenant_id,
+                                                  self.uuid,
+                                                  policy_id)
+                return d
 
         return d
 
