@@ -242,11 +242,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         exception is raised.
         """
         group = yield self._create_group()
-
-        policy_cfgs = group_examples.policy()
-        policy, = yield group.create_policies([policy_cfgs[0]])
-
-        d = group.get_policy(policy["id"])
+        d = group.get_policy(b"BOGUS_POLICY")
 
         yield self.assertFailure(d, interface.NoSuchPolicyError)
 
