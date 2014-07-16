@@ -1,6 +1,7 @@
 """
 Mixins and utilities to be used for testing.
 """
+from functools import partial
 import json
 import mock
 import os
@@ -294,11 +295,38 @@ class StubTreq(object):
         """Return a result by looking up the arguments in the `reqs` dict."""
         if headers is not None:
             headers = tuple(sorted(headers.items()))
-        return self.reqs[(method, url, headers, data, log)]
+        return succeed(self.reqs[(method, url, headers, data, log)])
 
     def content(self, response):
         """Return a result by looking up the response in the `contents` dict."""
-        return self.contents[response]
+        return succeed(self.contents[response])
+
+    def json_content(self, response):
+        """Return :meth:`content` after json-decoding"""
+        return succeed(json.loads(self.contents[response]))
+
+    def put(self, url, data=None, **kwargs):
+        """
+        Syntactic sugar for making a PUT request, because the order of the
+        params are different than :meth:`request`
+        """
+        return self.request('PUT', url, data=data, **kwargs)
+
+    def post(self, url, data=None, **kwargs):
+        """
+        Syntactic sugar for making a POST request, because the order of the
+        params are different than :meth:`request`
+        """
+        return self.request('POST', url, data=data, **kwargs)
+
+    def __getattr__(self, method):
+        """
+        Syntactic sugar for making head/get/delete requests, because the order
+        of parameters is the same as :meth:`request`
+        """
+        if method in ('get', 'head', 'delete'):
+            return partial(self.request, method.upper())
+        raise AttributeError("StubTreq has no attribute '{0}'".format(method))
 
 
 def mock_treq(code=200, json_content={}, method='get', content='', treq_mock=None):
