@@ -167,7 +167,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         an exception is raised.
         """
         group = yield self._create_group()
-        d = group.update_policy(b"BOGUS_POLICY", {})
+        d = group.update_policy(b"BOGUS_POLICY", {"change": 300})
         yield self.assertFailure(d, interface.NoSuchPolicyError)
 
     @inlineCallbacks
