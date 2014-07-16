@@ -70,9 +70,6 @@ class SQLScalingGroup(object):
 
     @_with_transaction
     def list_policies(self, conn, limit=100, marker=None):
-        """
-        List up to *limit* policies, starting with id *marker*.
-        """
         # TODO: only for this tenant & group!
         query = _paginated(policies, limit, marker)
         d = conn.execute(query).addCallback(_fetchall)
