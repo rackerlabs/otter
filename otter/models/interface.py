@@ -362,6 +362,25 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
+    def modify_desired(modifier_callable, *args, **kwargs):
+        """
+        Updates the scaling group desiredCapacity replacing previous value. This
+        takes a callable which gets current desired, and then saves returned desired
+        value from the callable.
+        This method should handle its own locking, if necessary.  If the
+        callback is unsuccessful, does not save.
+
+        :param modifier_callable: a ``callable`` that takes as first two
+            arguments the :class:`IScalingGroup`, a desired as ``int``, and
+            returns updated desired as ``int``. Other arguments provided to
+            :func:`modify_desired` will be passed to the ``callable``.
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises NoSuchScalingGroupError: if this scaling group (one
+            with this uuid) does not exist
+        """
+
     def create_policies(data):
         """
         Create a set of new scaling policies.
@@ -562,6 +581,11 @@ class IScalingGroup(Interface):
         :raises NoSuchWebhookError: if the webhook id does not exist
         """
 
+    def get_servers_collection(log, tenant_id, scaling_group_id):
+        """
+        Get servers in scaling group model
+        """
+
 
 class IScalingScheduleCollection(Interface):
     """
@@ -723,6 +747,63 @@ class IScalingGroupCollection(Interface):
         :return: The health information in the form of a boolean and some
             additional free-form health data (possibly empty).
         :rtype: deferred :class:`tuple` of (:class:`bool`, :class:`dict`)
+        """
+
+
+class IScalingGroupServersCollection(Interface):
+    """
+    Collection of servers in a scaling group
+    """
+
+    def create_servers(log, status='pending'):
+        """
+        Create servers in scaling group with given status
+
+        :return: a list of server dicts with `id`s in it
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``list``
+        """
+
+    def create_server(log, nova_server_id=None, status='pending'):
+        """
+        Create server in scaling group based on the tenant id and group id
+
+        :param str nova_server_id: Nova ID of the server being added. This can be None
+        :param str status: status of the server. one of 'pending' or 'active'
+
+        :return: a dictionary of server with `id` in it
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
+        """
+
+    def update_server(log, server_id, nova_server_id, status):
+        """
+        Update server
+        """
+
+    def list_servers(log, status=None, limit=100, marker=None):
+        """
+        List the servers in a scaling group optionally filtered based on status
+        """
+
+    def get_server(log, server_id):
+        """
+        Get server from scaling group
+        """
+
+    def get_server_on_nova_id(log, nova_server_id):
+        """
+        Get server from scaling group based on its nova id
+        """
+
+    def delete_server(log, server_id):
+        """
+        Remove server from scaling group
+        """
+
+    def delete_servers(log, server_ids):
+        """
+        Remove servers from scaling group
+
+        :param list server_ids: List of server IDs to be deleted
         """
 
 
