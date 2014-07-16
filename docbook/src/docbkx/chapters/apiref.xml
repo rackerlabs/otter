@@ -23,6 +23,9 @@
             <wadl:method href="#showGroupManifestWebhook"/>
             <wadl:method href="#deleteGroup"/>
          </wadl:resource>
+         <wadl:resource href="../../wadl/autoscale.wadl#server">
+            <wadl:method href="#deleteGroupServer"/>
+         </wadl:resource>
          <wadl:resource href="../../wadl/autoscale.wadl#state">
             <wadl:method href="#getGroupState"/>
          </wadl:resource>
