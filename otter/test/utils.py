@@ -250,8 +250,8 @@ def mock_log(*args, **kwargs):
 
         log.msg.assert_called_with(mock.ANY, bound_value1="val", ...)
 
-    Since in all likelyhood, testing that certain values are bound would be more
-    important than testing the exact logged message.
+    Since in all likelyhood, testing that certain values are bound would be
+    more important than testing the exact logged message.
     """
     return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
 
