@@ -68,14 +68,36 @@ class SQLScalingGroup(object):
     def update_policy(self, policy_id, data):
         pass
 
-    @_with_transaction
-    def list_policies(self, conn, limit=100, marker=None):
+    def list_policies(self, limit=100, marker=None):
         # TODO: only for this tenant & group!
         query = _paginated(policies, limit, marker)
+        return self._get_policies(query)
+
+    def get_policy(self, policy_id, version=None):
+        # TODO: only for this tenant and group!
+        query = policies.select().where(policies.c.id == policy_id).limit(1)
+        d = self._get_policies(query)
+
+        @d.addCallback
+        def just_the_one_please(policies):
+            try:
+                policy, = policies
+                return policy
+            except ValueError:
+                raise iface.NoSuchPolicyError(self.tenant_id, self.uuid,
+                                              policy_id)
+
+        return d
+
+    @_with_transaction
+    def _get_policies(self, conn, query):
+        """
+        Gets and appropriately formats policies given by *query*.
+        """
         d = conn.execute(query).addCallback(_fetchall)
 
         @d.addCallback
-        def maybe_check_if_group_even_exists(policy_rows):
+        def _maybe_check_if_group_even_exists(policy_rows):
             """
             If there are no policies, maybe the group doesn't even exist. If
             that's the case, raise an exception instead.
@@ -122,20 +144,6 @@ class SQLScalingGroup(object):
                 policies.append(policy)
 
             return policies
-
-        return d
-
-    def get_policy(self, policy_id, version=None):
-        d = self.list_policies(marker=policy_id, limit=1)
-
-        @d.addCallback
-        def just_the_one_please(policies):
-            try:
-                return policies[0]
-            except IndexError:
-                raise iface.NoSuchPolicyError(self.tenant_id,
-                                              self.uuid,
-                                              policy_id)
 
         return d
 
