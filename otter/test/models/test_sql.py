@@ -222,6 +222,46 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         list_response = yield group.list_policies(limit=3, marker=last_id)
         self.assertEqual(list_response, policies[1:4])
 
+    def test_get_policy_for_nonexistent_group(self):
+        """
+        When attempting to get a policy for a group that doesn't exist, an
+        exception is raised.
+        """
+        group = sql.SQLScalingGroup(self.engine, b"TENANT", b"BOGUS_GROUP")
+
+        d = group.get_policy(b"SOME_POLICY")
+
+        validExceptions = (interface.NoSuchScalingGroupError,
+                           interface.NoSuchPolicyError)
+        return self.assertFailure(d, *validExceptions)
+
+    @inlineCallbacks
+    def test_get_policy_for_nonexistent_policy(self):
+        """
+        When attempting to get a policy and that policy doesn't exist, an
+        exception is raised.
+        """
+        group = yield self._create_group()
+
+        policy_cfgs = group_examples.policy()
+        policy, = yield group.create_policies([policy_cfgs[0]])
+
+        d = group.get_policy(policy["id"])
+
+        yield self.assertFailure(d, interface.NoSuchPolicyError)
+
+    @inlineCallbacks
+    def test_get_policy(self):
+        """
+        Getting a policy works.
+        """
+        group = yield self._create_group()
+
+        policy_cfgs = group_examples.policy()
+        policy, = yield group.create_policies([policy_cfgs[0]])
+
+        got_policy = yield group.get_policy(policy["id"])
+
     @inlineCallbacks
     def test_create_webhook_happy_case(self):
         """
