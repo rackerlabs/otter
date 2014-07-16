@@ -496,7 +496,6 @@ def create_tables(engine, tables=all_tables):
 _fetchall = methodcaller("fetchall")
 _fetchone = methodcaller("fetchone")
 
-
 def _paginated(table, limit, marker):
     """
     Builds a pagination query for the items in *table*.
