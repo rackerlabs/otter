@@ -280,6 +280,19 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         group = self.collection.get_scaling_group(log, tenant_id, res["id"])
         returnValue(group)
 
+    @inlineCallbacks
+    def _create_some_groups(self, tenant_id=b"TENANT"):
+        configs = group_examples.config()
+        launch_cfgs = group_examples.launch_server_config()
+
+        groups = []
+        for config, launch in zip(configs, launch_cfgs):
+            res = yield self.collection.create_scaling_group(log, tenant_id,
+                                                             config, launch)
+            group = self.collection.get_scaling_group(log, tenant_id, res["id"])
+            groups.append(group)
+
+        returnValue(groups)
 
     def test_interface(self):
         """
@@ -422,6 +435,46 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         d = self.collection.list_scaling_group_states(log, b"BOGUS")
         d.addCallback(self.assertEqual, [])
         return d
+
+    @inlineCallbacks
+    def test_scaling_group_states(self):
+        """
+        Getting scaling group states works when there are lots of scaling
+        groups.
+        """
+        groups = yield self._create_some_groups()
+
+        tenant_id = groups[0].tenant_id
+        itergroups = iter(groups)
+
+        list_states = self.collection.list_scaling_group_states
+
+        first_amount = 1
+        states = yield list_states(log, tenant_id, limit=first_amount)
+
+        def _assertStateCorrect(state, group):
+            # REVIEW: lots of the state here isn't being checked. What
+            # do we actually care about?
+            self.assertEqual(state.tenant_id, tenant_id)
+            self.assertEqual(state.group_id, group.uuid)
+            self.assertEqual(state.group_name, group.name)
+
+        self.assertEqual(len(states), first_amount)
+        for state, group in zip(states, itergroups):
+            _assertStateCorrect(state, group)
+
+        marker = states[-1].group_id
+        second_amount = 100
+        states = yield list_states(log, tenant_id, second_amount, marker)
+
+        # Sanity check to make sure our test doesn't spuriously fail
+        # because there are too many groups:
+        remaining_groups = groups - first_amount
+        self.assertGreaterThan(second_amount, remaining_groups)
+
+        self.assertEqual(len(states), remaining_groups)
+        for state, group in zip(states, itergroups):
+            _assertStateCorrect(state, group)
 
     def test_health_check(self):
         """
