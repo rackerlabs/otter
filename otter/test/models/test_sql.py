@@ -257,7 +257,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         policy, = yield group.create_policies([policy_cfgs[0]])
 
         got_policy = yield group.get_policy(policy["id"])
-        # TODO: do something useful here
+        self.assertEqual(policy, got_policy)
 
     @inlineCallbacks
     def test_create_webhook_happy_case(self):
