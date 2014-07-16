@@ -282,20 +282,35 @@ class StubTreq(object):
     """
     def __init__(self, reqs=None, contents=None):
         """
-        :param reqs: A dictionary specifying the values that the `request` method should return. Keys
-            are tuples of (method, url, headers, data, log). Since headers is usually passed as a dict,
-            here it should be specified as a tuple of two-tuples in sorted order.
-        :param contents: A dictionary specifying the values that the `content` method should return.
-            Keys should match up with the values of the `reqs` dict.
+        :param reqs: A dictionary specifying the values that the `request`
+            method should return. Keys are tuples of:
+            (method, url, headers, data, log, (<other key names>)).
+            Since headers is usually passed as a dict, here it should be
+            specified as a tuple of two-tuples in sorted order.
+
+        :param contents: A dictionary specifying the values that the `content`
+            method should return. Keys should match up with the values of the
+            `reqs` dict.
         """
         self.reqs = reqs
         self.contents = contents
 
-    def request(self, method, url, headers, data, log):
-        """Return a result by looking up the arguments in the `reqs` dict."""
+    def _headers_to_tuple(self, headers):
         if headers is not None:
-            headers = tuple(sorted(headers.items()))
-        return succeed(self.reqs[(method, url, headers, data, log)])
+            return tuple(sorted(headers.items()))
+        return headers
+
+    def request(self, method, url, **kwargs):
+        """
+        Return a result by looking up the arguments in the `reqs` dict.
+        The only kwargs we care about are 'headers', 'data', and 'log',
+        although if other kwargs are passed their keys count as part of the
+        request.
+        """
+        return succeed(self.reqs[
+            (method, url, self._headers_to_tuple(kwargs.pop('headers', None)),
+             kwargs.pop('data', None), kwargs.pop('log', None),
+             tuple(kwargs.keys()))])
 
     def content(self, response):
         """Return a result by looking up the response in the `contents` dict."""
