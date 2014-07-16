@@ -65,8 +65,27 @@ class SQLScalingGroup(object):
 
         return d
 
-    def update_policy(self, policy_id, data):
-        pass
+    @_with_transaction
+    def update_policy(self, conn, policy_id, data):
+        try:
+            adjustment_type = _get_adjustment_type(data)
+            data["adjustment_type"] = adjustment_type
+            data["adjustment_value"] = data.pop(adjustment_type)
+        except KeyError:
+            pass
+
+        d = conn.execute(policies.update()
+                         .where(policies.c.id == policy_id)
+                         .values(**data))
+
+        @d.addCallback
+        def complain_if_no_rows_matched(result_proxy):
+            if result_proxy.rowcount == 0:
+                raise iface.NoSuchPolicyError(self.tenant_id,
+                                              self.uuid,
+                                              policy_id)
+
+        return d
 
     def list_policies(self, limit=100, marker=None):
         # TODO: only for this tenant & group!
