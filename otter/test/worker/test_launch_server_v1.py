@@ -3,6 +3,8 @@ Unittests for the launch_server_v1 launch config.
 """
 import mock
 import json
+from urllib import urlencode
+from urlparse import urlunsplit
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import Deferred, fail, succeed
@@ -26,7 +28,10 @@ from otter.worker.launch_server_v1 import (
     ServerDeleted,
     delete_and_verify,
     verified_delete,
-    LB_MAX_RETRIES, LB_RETRY_INTERVAL_RANGE
+    LB_MAX_RETRIES,
+    LB_RETRY_INTERVAL_RANGE,
+    find_server,
+    ServerCreationRetryError
 )
 
 
@@ -649,6 +654,27 @@ class LoadBalancersTests(SynchronousTestCase):
     test_removelb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
 
 
+def _get_server_info(metadata=None, created=None):
+    """
+    Creates a fake server config to be used when testing creating servers
+    (either as the config to use when creating, or as the config to return as
+    a response).
+
+    :param ``dict`` metadata: metadata to include in the server config
+    :param ``created``: this is only used in server responses, but gives an
+        extra field to distinguish one server config from another
+    """
+    config = {
+        'name': 'abcd',
+        'imageRef': '123',
+        'flavorRef': 'xyz',
+        'metadata': metadata or {}
+    }
+    if created is not None:
+        config['created'] = created
+    return config
+
+
 class ServerTests(SynchronousTestCase):
     """
     Test server manipulation functions.
@@ -720,6 +746,125 @@ class ServerTests(SynchronousTestCase):
 
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
+
+    def test_find_server_tells_nova_to_filter_by_image_flavor_and_name(self):
+        """
+        :func:`find_server` makes a call to nova to list server details while
+        filtering on the image id, flavor id, and exact name in the server
+        config.
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({"servers": []})
+
+        find_server('http://url/', 'my-auth-token', server_config)
+
+        url = urlunsplit([
+            'http', 'url', 'servers/detail',
+            urlencode({"image": "123", "flavor": "xyz", "name": "^abcd$"}),
+            None])
+
+        self.treq.get.assert_called_once_with(url, headers=expected_headers,
+                                              log=mock.ANY)
+
+    def test_find_server_regex_escapes_server_name(self):
+        """
+        :func:`find_server` when giving the exact name of the server,
+        regex-escapes the name
+        """
+        server_config = {'server': _get_server_info()}
+        server_config['server']['name'] = r"this.is[]regex\dangerous()*"
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({"servers": []})
+
+        find_server('http://url/', 'my-auth-token', server_config)
+
+        url = urlunsplit([
+            'http', 'url', 'servers/detail',
+            urlencode({"image": "123", "flavor": "xyz",
+                       "name": r"^this\.is\[\]regex\\dangerous\(\)\*$"}),
+            None])
+
+        self.treq.get.assert_called_once_with(url, headers=expected_headers,
+                                              log=mock.ANY)
+
+    def test_find_server_propagates_api_errors(self):
+        """
+        :func:`find_server` propagates any errors from Nova
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=500))
+        self.treq.content.return_value = succeed(error_body)
+
+        d = find_server('http://url/', 'my-auth-token', server_config)
+        failure = self.failureResultOf(d, APIError)
+        self.assertEqual(failure.value.code, 500)
+
+    def test_find_server_returns_None_if_no_servers_from_nova(self):
+        """
+        :func:`find_server` will return None for servers if Nova returns no
+        matching servers
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({"servers": []})
+
+        d = find_server('http://url/', 'my-auth-token', server_config)
+        self.assertIsNone(self.successResultOf(d))
+
+    def test_find_server_raises_if_server_from_nova_has_wrong_metadata(self):
+        """
+        :func:`find_server` will fail if the server Nova returned does not have
+        matching metadata
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({
+            'servers': [_get_server_info(metadata={'hello': 'there'})]
+        })
+
+        d = find_server('http://url/', 'my-auth-token', server_config)
+        self.failureResultOf(d, ServerCreationRetryError)
+
+    def test_find_server_returns_match_from_nova(self):
+        """
+        :func:`find_server` will return a server returned from Nova if the
+        metadata match.
+        """
+        server_config = {'server': _get_server_info(metadata={'hey': 'there'})}
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed(
+            {'servers': [_get_server_info(metadata={'hey': 'there'})]})
+
+        d = find_server('http://url/', 'my-auth-token', server_config)
+
+        self.assertEqual(
+            self.successResultOf(d),
+            {'server': _get_server_info(metadata={'hey': 'there'})})
+
+    def test_find_server_raises_if_nova_returns_more_than_one_server(self):
+        """
+        :func:`find_server` will return a the first server returned from Nova
+        whose metadata match.  It logs if there more than 1 server from Nova.
+        """
+        server_config = {'server': _get_server_info()}
+        servers = [
+            _get_server_info(created='2014-04-04T04:04:04Z'),
+            _get_server_info(created='2014-04-04T04:04:05Z'),
+        ]
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({'servers': servers})
+
+        d = find_server('http://url/', 'my-auth-token', server_config,
+                        self.log)
+
+        self.failureResultOf(d, ServerCreationRetryError)
 
     def test_create_server(self):
         """
