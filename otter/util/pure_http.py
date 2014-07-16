@@ -51,25 +51,32 @@ def get_request(method, url, **kwargs):
     return Effect(Request(method=method, url=url, **kwargs))
 
 
-def request_with_reauth(get_request, method, url, auth=None,
-                        headers=None, reauth_codes=(401, 403),
-                        should_retry=None, **kwargs):
-    """Create a request which will reauthenticate upon 401 and optionally retry."""
+def request_with_auth(get_request, method, url, auth=None,
+                      headers=None, reauth_codes=(401, 403),
+                      **kwargs):
+    """
+    Create an authenticated request. If the request fails with an auth-related error,
+    a fresh token will be requested automatically.
+
+    The given 'auth' argument should be a function that returns an Effect of the
+    auth token to use. Before the request is made, the auth function will be called
+    with no arguments to get the auth token to be used (which may be cached). If
+    the application request fails with an auth-related error, the auth function will
+    be invoked again, with a refresh=True argument. In this case, a new token must
+    be retrieved from the authentication server.
+
+    If refreshing an auth token returns successfully, a NoResponseError exception
+    will be raised. If it results in an error, that error will be propagated to the
+    Effect that this function returns.
+    """
 
     def handle_reauth(result, retries):
         response, content = result
 
         if response.code in reauth_codes:
-            if retries == 0:
-                raise ReauthFailedError()
-            eff = auth(refresh=True)
-            if should_retry is not None:
-                eff = eff.on(success=lambda r: should_retry()).on(
-                    success=lambda should: try_request(retries=retries - 1)
-                                           if should else None)
-            else:
-                eff = eff.on(success=partial(try_request, retries=retries - 1))
-            return eff
+            def got_reauth(result):
+                raise NoResponseError()
+            return auth(refresh=True).on(success=got_reauth)
         else:
             return result
 
@@ -107,8 +114,32 @@ def content_request(result):
     return result.on(success=lambda r: r[1])
 
 
-_request = wrappers(get_request, request_with_reauth, request_with_status_check, json_request)
+def retry(func, retries=3, should_retry=None, **kwargs):
+    """
+    Call an effectful ``func`` with ``**kwargs``. If it fails, call it again,
+    up to ``retries`` times, as long as ``should_retry()`` returns an Effect of
+    True.
+
+    If ``should_retry`` returns an Effect of False, then None will be returned.
+    """
+
+    def _retry():
+        return retry(func, retries=retries - 1, should_retry=should_retry, **kwargs)
+
+    eff = func(**kwargs)
+
+    def maybe_retry(retry_allowed):
+        if retry_allowed:
+            return _retry()
+        else:
+            return None
+
+    if should_retry is not None:
+        eff = eff.on(error=lambda e: should_retry()).on(success=maybe_retry)
+
+_request = wrappers(get_request, request_with_auth, request_with_status_check, json_request)
 _request = compose(content_request, _request)
+_request = wrappers(_request, retry)
 
 
 def request(method, url, *args, **kwargs):
