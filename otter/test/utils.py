@@ -303,9 +303,13 @@ class StubTreq(object):
     def request(self, method, url, **kwargs):
         """
         Return a result by looking up the arguments in the `reqs` dict.
-        The only kwargs we care about are 'headers', 'data', and 'log',
+        The only kwargs we care about are 'headers' and 'data',
         although if other kwargs are passed their keys count as part of the
         request.
+
+        'log' would also be a useful kwarg to check, but since dictionary keys
+        should be immutable, and it's hard to get the exact instance of
+        BoundLog, that's being ignored for now.
         """
         return succeed(self.reqs[
             (method, url, self._headers_to_tuple(kwargs.pop('headers', None)),
