@@ -381,6 +381,14 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
+    def update_execution_time(exec_time=None):
+        """
+        Update the group's last execution time
+
+        :param :class:`datetime.datetime` exec_time: Execution time in UTC which if not given
+        will be taken from current system time
+        """
+
     def create_policies(data):
         """
         Create a set of new scaling policies.
@@ -415,6 +423,14 @@ class IScalingGroup(Interface):
         :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
         :raises NoSuchPolicyError: if the policy id does not exist
+        """
+
+    def update_policy_execution_time(policy_id, exec_time=None):
+        """
+        Update the policy's last execution time
+
+        :param :class:`datetime.datetime` exec_time: Execution time in UTC which if not given
+        will be taken from current system time
         """
 
     def list_policies(limit=100, marker=None):
