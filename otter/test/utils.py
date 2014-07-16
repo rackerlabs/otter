@@ -284,7 +284,7 @@ class StubTreq(object):
         """
         :param reqs: A dictionary specifying the values that the `request`
             method should return. Keys are tuples of:
-            (method, url, headers, data, log, (<other key names>)).
+            (method, url, headers, data, (<other key names>)).
             Since headers is usually passed as a dict, here it should be
             specified as a tuple of two-tuples in sorted order.
 
@@ -309,8 +309,7 @@ class StubTreq(object):
         """
         return succeed(self.reqs[
             (method, url, self._headers_to_tuple(kwargs.pop('headers', None)),
-             kwargs.pop('data', None), kwargs.pop('log', None),
-             tuple(kwargs.keys()))])
+             kwargs.pop('data', None), tuple(kwargs.keys()))])
 
     def content(self, response):
         """Return a result by looking up the response in the `contents` dict."""
