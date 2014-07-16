@@ -157,7 +157,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         an exception is raised.
         """
         group = sql.SQLScalingGroup(self.engine, b"TENANT", b"BOGUS_GROUP")
-        d = group.update_policy(b"BOGUS_POLICY", {})
+        d = group.update_policy(b"BOGUS_POLICY", {"change": 300})
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
 
     @inlineCallbacks
