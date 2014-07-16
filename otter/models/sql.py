@@ -98,7 +98,7 @@ class SQLScalingGroup(object):
                 policy args for the given policies.
             :rtype: deferred ``(policy_rows, args_by_policy)``
             """
-            policy_ids = [r[c.id] for r in policy_rows]
+            policy_ids = [r["id"] for r in policy_rows]
             d = _get_policy_args(conn, policy_ids)
             d.addCallback(lambda args_by_policy: (policy_rows, args_by_policy))
             return d
@@ -109,11 +109,11 @@ class SQLScalingGroup(object):
 
             policies = []
             for r in policy_rows:
-                policy = {"id": r[c.id],
-                          "name": r[c.name],
-                          "type": r[c.type],
-                          r[c.adjustment_type]: r[c.adjustment_value],
-                          "cooldown": r[c.cooldown]}
+                policy = {"id": r["id"],
+                          "name": r["name"],
+                          "type": r["type"],
+                          r["adjustment_type"]: r["adjustment_value"],
+                          "cooldown": r["cooldown"]}
 
                 args = args_by_policy.get(policy["id"])
                 if args is not None:
