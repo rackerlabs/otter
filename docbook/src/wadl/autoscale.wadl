@@ -884,10 +884,10 @@
 
     <method id="deleteGroupServer" name="DELETE">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
-            title="Delete scaling group server">
+            title="Delete server from scaling group">
             <para role="shortdesc">Deletes and replaces a specified server in a scaling group.</para>
             <para>Delete and replace a server in a scaling group with a new server in that scaling group. By default, the specified 
-                server is deleted and replaced. The replacement server will have the same launchConfiguration settings as the deleted one, but a different
+                server is deleted and replaced. The replacement server will have the current launchConfiguration settings and a different
             IP address. </para>
             <para>
                 <note>
