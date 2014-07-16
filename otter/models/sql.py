@@ -65,6 +65,9 @@ class SQLScalingGroup(object):
 
         return d
 
+    def update_policy(self, policy_id, data):
+        pass
+
     @_with_transaction
     def list_policies(self, conn, limit=100, marker=None):
         """
