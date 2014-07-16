@@ -444,6 +444,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         """
         groups = yield self._create_some_groups()
         groups.sort(key=lambda g: g.uuid)
+        # TODO: add some false flags
 
         tenant_id = groups[0].tenant_id
         itergroups = iter(groups)

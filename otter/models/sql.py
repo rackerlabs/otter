@@ -254,6 +254,9 @@ class SQLScalingGroupCollection(object):
         List the states of the scaling groups for this tenant.
         """
         query = _paginated(scaling_groups, limit, marker)
+        # TODO: keep in mind that this lists all groups, not just for
+        # this tenant. fix that in the test, then filter here.
+
         d = self.engine.execute(query).addCallback(_fetchall)
 
         @d.addCallback
