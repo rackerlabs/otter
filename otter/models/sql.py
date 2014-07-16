@@ -128,6 +128,20 @@ class SQLScalingGroup(object):
 
         return d
 
+    def get_policy(self, policy_id, version=None):
+        d = self.list_policies(marker=policy_id, limit=1)
+
+        @d.addCallback
+        def just_the_one_please(policies):
+            try:
+                return policies[0]
+            except IndexError:
+                raise iface.NoSuchPolicyError(self.tenant_id,
+                                              self.uuid,
+                                              policy_id)
+
+        return d
+
     @_with_transaction
     def create_webhooks(self, conn, policy_id, data):
         """
