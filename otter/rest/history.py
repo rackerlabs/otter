@@ -80,7 +80,7 @@ class OtterHistory(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, region, es_host=None):
+    def __init__(self, store, tenant_id, region, es_host=None, _treq=None):
         self.log = log.bind(system='otter.log.history',
                             tenant_id=tenant_id)
 
@@ -88,6 +88,7 @@ class OtterHistory(object):
         self.tenant_id = tenant_id
         self.region = region
         self.es_host = es_host
+        self.treq = _treq or treq
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -104,10 +105,10 @@ class OtterHistory(object):
 
         data = make_auditlog_query(self.tenant_id, self.region, **paginate)
 
-        d = treq.get(append_segments(self.es_host, '_search'),
-                     data=json.dumps(data), log=self.log)
+        d = self.treq.get(append_segments(self.es_host, '_search'),
+                          data=json.dumps(data), log=self.log)
         d.addCallback(check_success, [200])
-        d.addCallback(treq.json_content)
+        d.addCallback(self.treq.json_content)
 
         def build_response(body):
             events = []
