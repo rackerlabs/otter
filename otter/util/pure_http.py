@@ -8,6 +8,7 @@ from effect import Effect
 from characteristic import attributes
 from toolz.dicttoolz import merge
 from toolz.functoolz import compose
+from twisted.internet.defer import inlineCallbacks, returnValue
 
 from otter.util import logging_treq
 from otter.util.fp import wrappers
@@ -25,16 +26,17 @@ class Request(object):
 
     treq = logging_treq
 
+    @inlineCallbacks
     def perform_effect(self, dispatcher):
-        """Perform the request with treq."""
+        """
+        Perform the request with treq.
 
-        def got_response(response):
-            result = self.treq.content(response)
-            return result.addCallback(lambda content: (response, content))
-        result = self.treq.request(
-            self.method.upper(), self.url, headers=self.headers, data=self.data,
-            log=self.log)
-        return result.addCallback(got_response)
+        :return: A two-tuple of (HTTP Response, content as bytes)
+        """
+        response = yield self.treq.request(self.method.upper(), self.url, headers=self.headers,
+                                           data=self.data, log=self.log)
+        content = yield self.treq.content(response)
+        returnValue((response, content))
 
 
 class ReauthFailedError(Exception):
@@ -50,7 +52,8 @@ def get_request(method, url, **kwargs):
 
 
 def request_with_reauth(get_request, method, url, auth=None,
-                        headers=None, reauth_codes=(401, 403), **kwargs):
+                        headers=None, reauth_codes=(401, 403),
+                        should_retry=None, **kwargs):
     """Create a request which will reauthenticate upon 401 and optionally retry."""
 
     def handle_reauth(result, retries):
@@ -59,8 +62,14 @@ def request_with_reauth(get_request, method, url, auth=None,
         if response.code in reauth_codes:
             if retries == 0:
                 raise ReauthFailedError()
-            return auth(refresh=True).on(
-                success=partial(try_request, retries=retries - 1))
+            eff = auth(refresh=True)
+            if should_retry is not None:
+                eff = eff.on(success=lambda r: should_retry()).on(
+                    success=lambda should: try_request(retries=retries - 1)
+                                           if should else None)
+            else:
+                eff = eff.on(success=partial(try_request, retries=retries - 1))
+            return eff
         else:
             return result
 

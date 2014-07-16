@@ -34,10 +34,7 @@ class RequestEffectTests(SynchronousTestCase):
             (response, "content"))
 
     def test_post(self):
-        """
-        treq dispatches to the appropriate treq method based on the method
-        specified in the Request.
-        """
+        """The Request effect supports non-GET methods as well."""
         response = StubResponse(200, {})
         treq = StubTreq(
             reqs={('POST', 'http://google.com/', (('foo', 'bar'),), 'my data', None):
@@ -64,8 +61,8 @@ class RequestEffectTests(SynchronousTestCase):
                          (response, "content"))
 
 
-class OSHTTPClientTests(SynchronousTestCase):
-    """Tests for OSHTTPClient."""
+class PureHTTPClientTests(SynchronousTestCase):
+    """Tests for the pure HTTP client functions."""
 
     def _no_reauth_client(self):
         def auth(refresh=False):
@@ -103,6 +100,17 @@ class OSHTTPClientTests(SynchronousTestCase):
         req = eff.intent
         expected_headers = headers('my-token')
         expected_headers['x-mine'] = 'abc123'
+        self.assertEqual(req.headers, expected_headers)
+
+    def test_default_headers_win(self):
+        """
+        When merging headers together, the predefined set takes precedent
+        over any that are passed.
+        """
+        request_ = self._no_reauth_client()
+        eff = request_("get", "/foo", headers={"x-auth-token": "abc123"})
+        req = eff.intent
+        expected_headers = headers('my-token')
         self.assertEqual(req.headers, expected_headers)
 
     def test_data(self):
@@ -193,11 +201,11 @@ class OSHTTPClientTests(SynchronousTestCase):
                 return reauth_effect
             else:
                 return Effect(StubIntent("first-token"))
-        # First we try to make a simple request, but it returns 401:
+        # First we try to make a simple request.
         eff = request("get", "/foo", auth=auth)
         # The initial (cached) token is retrieved.
         eff = resolve_stub(eff)
-        # Reauthentication is then triggered:
+        # a 401 is returned, triggering refreshed reauthentication:
         stub_result = stub_pure_response("", code=401)
         reauth_effect_result = resolve_effect(eff, stub_result)
         self.assertIs(reauth_effect_result.intent, reauth_effect.intent)
@@ -207,3 +215,16 @@ class OSHTTPClientTests(SynchronousTestCase):
         stub_response = stub_pure_response("", code=401)
         self.assertRaises(ReauthFailedError,
                           resolve_effect, retry_eff, stub_response)
+
+    def test_should_retry_nope(self):
+        # ok, try this.
+
+        # request_with_reauth should NOT retry requests. It should,
+        # instead, just reauthenticate. If reauthentication fails, it
+        # should reraise the exception that it got. If reauthentication
+        # succeeds, it should raise NoResponseError.
+
+        # another function, request_with_retries, should be somehow
+        # combined with request. It can catch any exception (including
+        # NoResponseError), invoke a "should_retry" function, and then
+        # retry the request.
