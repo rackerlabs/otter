@@ -272,15 +272,6 @@ class DeleteServerTests(SupervisorTests):
             self.auth_token,
             (self.fake_server['id'], self.fake_server['lb_info']))
 
-    def test_execute_delete_added_to_pool(self):
-        """
-        `execute_delete_server` returned deferred is added to the pool
-        """
-        self.delete_server.return_value = Deferred()
-        d = self.supervisor.execute_delete_server(
-            self.log, 'transaction-id', self.group, self.fake_server)
-        self.assertIn(d, self.supervisor.deferred_pool._pool)
-
     def test_execute_delete_auths(self):
         """
         ``execute_delete_server`` asks the provided authentication function for
@@ -641,8 +632,9 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
             self.execute_config_deferreds.append(d)
             return succeed((str(len(self.execute_config_deferreds)), d))
 
-        self.supervisor = iMock(ISupervisor)
-        self.supervisor.execute_config.side_effect = fake_execute
+        #self.supervisor = iMock(ISupervisor)
+        self.supervisor = FakeSupervisor()
+        #self.supervisor.execute_config.side_effect = fake_execute
 
         patch(self, 'otter.supervisor.get_supervisor', return_value=self.supervisor)
         self.del_job = patch(self, 'otter.supervisor._DeleteJob')
@@ -679,7 +671,7 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
             return succeed((
                 str(len(self.execute_config_deferreds)), d))
 
-        self.supervisor.execute_config.side_effect = fake_execute
+        self.supervisor.execute_config = fake_execute
         d = supervisor.execute_launch_config(self.log, '1', self.fake_state,
                                              'launch', self.group, 3)
         failure = self.failureResultOf(d)

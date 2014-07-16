@@ -17,6 +17,7 @@ from twisted.application.service import Service
 
 from otter.log.bound import BoundLog
 from otter.supervisor import ISupervisor
+from otter.util.deferredutils import DeferredPool
 
 
 class matches(object):
@@ -283,6 +284,7 @@ class FakeSupervisor(object, Service):
 
     def __init__(self, *args):
         self.args = args
+        self.deferred_pool = DeferredPool()
         self.index = 0
         self.exec_calls = []
         self.exec_defs = []
