@@ -168,15 +168,15 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
 def maybe_execute_scaling_policy(
         log,
         transaction_id,
-        scaling_group,
-        state,
+        group,
+        desired,
         policy_id, version=None):
     """
     Checks whether and how much a scaling policy can be executed.
 
     :param log: A twiggy bound log for logging
     :param str transaction_id: the transaction id
-    :param scaling_group: an IScalingGroup provider
+    :param group: an IScalingGroup provider
     :param state: a :class:`otter.models.interface.GroupState` representing the
         state
     :param policy_id: the policy id to execute
@@ -192,16 +192,17 @@ def maybe_execute_scaling_policy(
     :raises: Some exception about why you don't want to execute the policy. This
         Exception should also have an audit log id
     """
-    bound_log = log.bind(scaling_group_id=scaling_group.uuid, policy_id=policy_id)
+    bound_log = log.bind(scaling_group_id=group.uuid, policy_id=policy_id)
     bound_log.msg("beginning to execute scaling policy")
 
     # make sure that the policy (and the group) exists before doing anything else
-    deferred = scaling_group.get_policy(policy_id, version)
+    deferred = group.get_policy(policy_id, version)
 
     def _do_get_configs(policy):
         deferred = defer.gatherResults([
-            scaling_group.view_config(),
-            scaling_group.view_launch_config()
+            group.view_config(),
+            group.view_launch_config(),
+            group.last_execution_time(),
         ])
         return deferred.addCallback(lambda results: results + [policy])
 
@@ -211,38 +212,38 @@ def maybe_execute_scaling_policy(
         """
         state_config_policy should be returned by ``check_cooldowns``
         """
-        config, launch, policy = config_launch_policy
+        config, launch, group_exec_time, policy = config_launch_policy
         error_msg = "Cooldowns not met."
 
-        def mark_executed(_):
-            state.mark_executed(policy_id)
-            return state  # propagate the fully updated state back
+        def update_exec_times(desired):
+            d = gatherResults([group.update_execution_time(),
+                               group.update_policy_execution_time(policy_id)])
+            return d.addCallback(lambda _: desired)
 
-        if check_cooldowns(bound_log, state, config, policy, policy_id):
-            d = converge(bound_log, transaction_id, config, scaling_group,
+        if check_cooldowns(bound_log, group_exec_time, config, policy, policy_id):
+            # converge returns new desired
+            d = converge(bound_log, transaction_id, config, group,
                          state, launch, policy)
             if d is None:
-                error_msg = "No change in servers"
-                raise CannotExecutePolicyError(scaling_group.tenant_id,
-                                               scaling_group.uuid, policy_id,
-                                               error_msg)
-            return d.addCallback(mark_executed)
+                raise CannotExecutePolicyError(group.tenant_id,
+                                               group.uuid, policy_id,
+                                               "No change in servers")
+            return d.addCallback(update_exec_times)
 
-        raise CannotExecutePolicyError(scaling_group.tenant_id,
-                                       scaling_group.uuid, policy_id,
+        raise CannotExecutePolicyError(group.tenant_id,
+                                       group.uuid, policy_id,
                                        error_msg)
 
     return deferred.addCallback(_do_maybe_execute)
 
 
-def check_cooldowns(log, state, config, policy, policy_id):
+def check_cooldowns(log, group_exec_time, config, policy, policy_id):
     """
     Check the global cooldowns (when was the last time any policy was executed?)
     and the policy specific cooldown (when was the last time THIS policy was
     executed?)
 
     :param log: A twiggy bound log for logging
-    :param dict state: the state dictionary
     :param dict config: the config dictionary
     :param dict policy: the policy dictionary
     :param str policy_id: the policy id that matches ``policy``
@@ -252,8 +253,8 @@ def check_cooldowns(log, state, config, policy, policy_id):
     this_now = datetime.now(iso8601.iso8601.UTC)
 
     timestamp_and_cooldowns = [
-        (state.policy_touched.get(policy_id), policy['cooldown'], 'policy'),
-        (state.group_touched, config['cooldown'], 'group'),
+        (policy['last_execution_time'], policy['cooldown'], 'policy'),
+        (group_exec_time, config['cooldown'], 'group'),
     ]
 
     for last_time, cooldown, cooldown_type in timestamp_and_cooldowns:
