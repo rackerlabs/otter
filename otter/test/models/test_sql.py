@@ -459,7 +459,6 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
             # do we actually care about?
             self.assertEqual(state.tenant_id, tenant_id)
             self.assertEqual(state.group_id, group.uuid)
-            self.assertEqual(state.group_name, group.name)
 
         self.assertEqual(len(states), first_amount)
         for state, group in zip(states, itergroups):
