@@ -467,8 +467,6 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         second_amount = 100
         states = yield list_states(log, tenant_id, second_amount, marker)
 
-        # Sanity check to make sure our test doesn't spuriously fail
-        # because there are too many groups:
         remaining_groups = groups - first_amount
         self.assertGreaterThan(second_amount, remaining_groups)
 
