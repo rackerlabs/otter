@@ -10,22 +10,22 @@ class GroupState(object):
     """
     Object that represents the state
 
-    :ivar str tenant_id: the tenant ID of the scaling group whose state this
+    :ivar bytes tenant_id: the tenant ID of the scaling group whose state this
         object represents
 
-    :ivar str group_id: the ID of the scaling group whose state this
+    :ivar bytes group_id: the ID of the scaling group whose state this
         object represents
-    :ivar str group_name: the name of the scaling group whose state this
+    :ivar bytes group_name: the name of the scaling group whose state this
         object represents
-    :ivar str desired: the desired capacity of the scaling group
+    :ivar bytes desired: the desired capacity of the scaling group
     :ivar dict active: the mapping of active server ids and their info
     :ivar dict pending: the list of pending job ids and their info
     :ivar bool paused: whether the scaling group is paused in scaling activities
     :ivar dict policy_touched: dictionary mapping policy ids to the last time
         they were executed, if ever.
-    :ivar str group_touched: timezone-aware timestamp that represents when the
+    :ivar bytes group_touched: timezone-aware timestamp that represents when the
         last time any policy was executed on the group.  Could be None.
-    :ivar callable now: callable that returns a ``str`` timestamp - used for
+    :ivar callable now: callable that returns a ``bytes`` timestamp - used for
         testing purposes.  Defaults to :func:`timestamp.now`
 
     TODO: ``remove_active``, ``pause`` and ``resume`` ?
@@ -70,7 +70,7 @@ class GroupState(object):
         Prints out a representation of self
         """
         return "GroupState({0})".format(", ".join([
-            str(getattr(self, attr)) for attr in self._attributes
+            bytes(getattr(self, attr)) for attr in self._attributes
         ]))
 
     def remove_job(self, job_id):
@@ -78,7 +78,7 @@ class GroupState(object):
         Removes a pending job from the pending list.  If the job is not in
         pending, raises an AssertionError.
 
-        :param str job_id:  the id of the job to complete
+        :param bytes job_id:  the id of the job to complete
         :returns: :data:`None`
         :raises AssertionError: if the job doesn't exist
         """
@@ -90,7 +90,7 @@ class GroupState(object):
         Adds a pending job to the pending collection.  If the job is already in
         pending, raises an AssertError.
 
-        :param str job_id:  the id of the job to complete
+        :param bytes job_id:  the id of the job to complete
         :returns: :data:`None`
         :raises AssertionError: if the job already exists
         """
@@ -102,7 +102,7 @@ class GroupState(object):
         Adds a server to the collection of active servers.  Adds a creation time
         if there isn't one.
 
-        :param str job_id:  the id of the job to complete
+        :param bytes job_id:  the id of the job to complete
         :param dict server_info: a dictionary containing relevant server info.
             TBD: What's in server_info ultimately - currently: name, url
         :returns: :data:`None`
@@ -116,7 +116,7 @@ class GroupState(object):
         """
         Removes a server to the collection of active servers.
 
-        :param str server_id:  the id of the server to delete
+        :param bytes server_id:  the id of the server to delete
         :raises AssertionError: if the server id does not exist
         """
         assert server_id in self.active, "Server does not exists: {}".format(server_id)
@@ -127,7 +127,7 @@ class GroupState(object):
         Record the execution time (now) of a particular policy.  This also
         updates the group touched time.
 
-        :param str policy_id:  the id of the policy that was executed
+        :param bytes policy_id:  the id of the policy that was executed
         :returns: :data:`None`
         """
         self.policy_touched[policy_id] = self.group_touched = self.now()
@@ -385,7 +385,7 @@ class IScalingGroup(Interface):
         Updates an existing policy with the data given.
 
         :param policy_id: the uuid of the entity to update
-        :type policy_id: ``str``
+        :type policy_id: ``bytes``
 
         :param data: the details of the scaling policy in JSON format
         :type data: :class:`dict`
@@ -403,7 +403,7 @@ class IScalingGroup(Interface):
 
         :param int limit: the maximum number of policies to return
             (for pagination purposes)
-        :param str marker: the policy ID of the last seen policy (for
+        :param bytes marker: the policy ID of the last seen policy (for
             pagination purposes - page offsets)
 
         :return: a list of the policies, as specified by
@@ -420,7 +420,7 @@ class IScalingGroup(Interface):
         Gets the specified policy on this particular scaling group.
 
         :param policy_id: the uuid of the policy
-        :type policy_id: ``str``
+        :type policy_id: ``bytes``
 
         :param version: version of policy to check as Type-1 UUID
         :type version: ``UUID``
@@ -442,7 +442,7 @@ class IScalingGroup(Interface):
         of its associated webhooks as well.
 
         :param policy_id: the uuid of the policy to be deleted
-        :type policy_id: ``str``
+        :type policy_id: ``bytes``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
@@ -457,11 +457,11 @@ class IScalingGroup(Interface):
 
         :param int limit: the maximum number of policies to return
             (for pagination purposes)
-        :param str marker: the policy ID of the last seen policy (for
+        :param bytes marker: the policy ID of the last seen policy (for
             pagination purposes - page offsets)
 
         :param policy_id: the uuid of the policy to be deleted
-        :type policy_id: ``str``
+        :type policy_id: ``bytes``
 
         :return: a list of the webhooks, as specified by
             :data:`otter.json_schema.model_schemas.webhook_list`
@@ -483,7 +483,7 @@ class IScalingGroup(Interface):
 
         :param policy_id: The UUID of the policy for which to create a
             new webhook.
-        :type policy_id: :class:`str`
+        :type policy_id: :class:`bytes`
 
         :param data: A list of details for each webhook, as specified by
             :data:`otter.json_schema.group_schemas.webhook`
@@ -504,10 +504,10 @@ class IScalingGroup(Interface):
         scaling group.
 
         :param policy_id: the uuid of the policy
-        :type policy_id: ``str``
+        :type policy_id: ``bytes``
 
         :param webhook_id: the uuid of the webhook
-        :type webhook_id: ``str``
+        :type webhook_id: ``bytes``
 
         :return: a webhook, as specified by
             :data:`otter.json_schema.model_schemas.webhook`
@@ -526,10 +526,10 @@ class IScalingGroup(Interface):
         scaling group.
 
         :param policy_id: the uuid of the policy
-        :type policy_id: ``str``
+        :type policy_id: ``bytes``
 
         :param webhook_id: the uuid of the webhook
-        :type webhook_id: ``str``
+        :type webhook_id: ``bytes``
 
         :param data: the details of the scaling policy in JSON format
         :type data: :class:`dict`
@@ -548,10 +548,10 @@ class IScalingGroup(Interface):
         scaling group.
 
         :param policy_id: the uuid of the policy
-        :type policy_id: ``str``
+        :type policy_id: ``bytes``
 
         :param webhook_id: the uuid of the webhook
-        :type webhook_id: ``str``
+        :type webhook_id: ``bytes``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
@@ -625,7 +625,7 @@ class IScalingGroupCollection(Interface):
 
         :param tenant_id: the tenant ID of the tenant the scaling group
             belongs to
-        :type tenant_id: ``str``
+        :type tenant_id: ``bytes``
 
         :param config: scaling group configuration options in JSON format, as
             specified by :data:`otter.json_schema.group_schemas.config`
@@ -652,11 +652,11 @@ class IScalingGroupCollection(Interface):
         List the scaling groups states for this tenant ID
 
         :param tenant_id: the tenant ID of the scaling group info to list
-        :type tenant_id: ``str``
+        :type tenant_id: ``bytes``
 
         :param int limit: the maximum number of scaling group states to return
             (for pagination purposes)
-        :param str marker: the group ID of the last seen group (for
+        :param bytes marker: the group ID of the last seen group (for
             pagination purposes - page offsets)
 
         :return: a list of scaling group states
@@ -673,7 +673,7 @@ class IScalingGroupCollection(Interface):
         with it.
 
         :param tenant_id: the tenant ID of the scaling groups
-        :type tenant_id: ``str``
+        :type tenant_id: ``bytes``
 
         :return: scaling group model object
         :rtype: :class:`IScalingGroup` provider (no
@@ -687,7 +687,7 @@ class IScalingGroupCollection(Interface):
 
         :param capability_hash: the capability hash associated with a particular
             scaling policy
-        :type capability_hash: ``str``
+        :type capability_hash: ``bytes``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with
             a 3-tuple of (tenant_id, group_id, policy_id).
@@ -708,7 +708,7 @@ class IScalingGroupCollection(Interface):
             }
 
         :param tenant_id: the tenant ID of the scaling groups
-        :type tenant_id: ``str``
+        :type tenant_id: ``bytes``
 
         :return: a :class:`twisted.internet.defer.Deferred` containing current
             count of tenants policies, webhooks and groups as :class:`dict`
