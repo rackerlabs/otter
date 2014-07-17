@@ -1,6 +1,7 @@
 """
 Mixins and utilities to be used for testing.
 """
+from functools import partial
 import json
 import mock
 import os
@@ -281,24 +282,69 @@ class StubTreq(object):
     """
     def __init__(self, reqs=None, contents=None):
         """
-        :param reqs: A dictionary specifying the values that the `request` method should return. Keys
-            are tuples of (method, url, headers, data, log). Since headers is usually passed as a dict,
-            here it should be specified as a tuple of two-tuples in sorted order.
-        :param contents: A dictionary specifying the values that the `content` method should return.
-            Keys should match up with the values of the `reqs` dict.
+        :param reqs: A dictionary specifying the values that the `request`
+            method should return. Keys are tuples of:
+            (method, url, headers, data, (<other key names>)).
+            Since headers is usually passed as a dict, here it should be
+            specified as a tuple of two-tuples in sorted order.
+
+        :param contents: A dictionary specifying the values that the `content`
+            method should return. Keys should match up with the values of the
+            `reqs` dict.
         """
         self.reqs = reqs
         self.contents = contents
 
-    def request(self, method, url, headers, data, log):
-        """Return a result by looking up the arguments in the `reqs` dict."""
+    def _headers_to_tuple(self, headers):
         if headers is not None:
-            headers = tuple(sorted(headers.items()))
-        return self.reqs[(method, url, headers, data, log)]
+            return tuple(sorted(headers.items()))
+        return headers
+
+    def request(self, method, url, **kwargs):
+        """
+        Return a result by looking up the arguments in the `reqs` dict.
+        The only kwargs we care about are 'headers' and 'data',
+        although if other kwargs are passed their keys count as part of the
+        request.
+
+        'log' would also be a useful kwarg to check, but since dictionary keys
+        should be immutable, and it's hard to get the exact instance of
+        BoundLog, that's being ignored for now.
+        """
+        return succeed(self.reqs[
+            (method, url, self._headers_to_tuple(kwargs.pop('headers', None)),
+             kwargs.pop('data', None), tuple(kwargs.keys()))])
 
     def content(self, response):
         """Return a result by looking up the response in the `contents` dict."""
-        return self.contents[response]
+        return succeed(self.contents[response])
+
+    def json_content(self, response):
+        """Return :meth:`content` after json-decoding"""
+        return succeed(json.loads(self.contents[response]))
+
+    def put(self, url, data=None, **kwargs):
+        """
+        Syntactic sugar for making a PUT request, because the order of the
+        params are different than :meth:`request`
+        """
+        return self.request('PUT', url, data=data, **kwargs)
+
+    def post(self, url, data=None, **kwargs):
+        """
+        Syntactic sugar for making a POST request, because the order of the
+        params are different than :meth:`request`
+        """
+        return self.request('POST', url, data=data, **kwargs)
+
+    def __getattr__(self, method):
+        """
+        Syntactic sugar for making head/get/delete requests, because the order
+        of parameters is the same as :meth:`request`
+        """
+        if method in ('get', 'head', 'delete'):
+            return partial(self.request, method.upper())
+        raise AttributeError("StubTreq has no attribute '{0}'".format(method))
 
 
 def mock_treq(code=200, json_content={}, method='get', content='', treq_mock=None):
