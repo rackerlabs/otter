@@ -243,7 +243,7 @@ class _NoCreatedServerFound(Exception):
 
 
 def create_server(server_endpoint, auth_token, server_config, log=None,
-                  clock=None, retries=3):
+                  clock=None, retries=3, _treq=None):
     """
     Create a new server.  If there is an error from Nova from this call,
     checks to see if the server was created anyway.  If not, will retry the
@@ -258,10 +258,19 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth Token.
     :param dict server_config: Nova server config.
+    :param: int retries: Number of tries to retry the create.
+
+    :param log: logger
+    :type log: :class:`otter.log.bound.BoundLog`
+
+    :param _treq: To be used for testing - what treq object to use
+    :type treq: something with the same api as :obj:`treq`
 
     :return: Deferred that fires with the CreateServer response as a dict.
     """
     path = append_segments(server_endpoint, 'servers')
+    if _treq is None:
+        _treq = treq
 
     def _check_results(result, propagated_f):
         """
@@ -307,11 +316,11 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
 
         If not, and if no further errors occur, server creation can be retried.
         """
-        d = create_server_sem.run(treq.post, path, headers=headers(auth_token),
+        d = create_server_sem.run(_treq.post, path, headers=headers(auth_token),
                                   data=json.dumps({'server': server_config}),
                                   log=log)
         d.addCallback(check_success, [202])
-        d.addCallback(treq.json_content)
+        d.addCallback(_treq.json_content)
         d.addErrback(_check_server_created)
         return d
 

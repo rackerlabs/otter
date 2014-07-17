@@ -37,8 +37,11 @@ from otter.worker.launch_server_v1 import (
 
 
 from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
-                              matches, DummyException, IsBoundWith)
+                              matches, DummyException, IsBoundWith,
+                              StubTreq, StubResponse, headers_to_hashable)
 from testtools.matchers import IsInstance, StartsWith
+
+from otter.auth import headers
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error, TimedOutError
@@ -914,21 +917,26 @@ class ServerTests(SynchronousTestCase):
         server endpoint and return the decoded json content.  It will not
         attempt to find a server in Nova if the create request succeeds.
         """
-        response = mock.Mock()
-        response.code = 202
-
-        self.treq.post.return_value = succeed(response)
-
         server_config = {
             'name': 'someServer',
             'imageRef': '1',
             'flavorRef': '3'
         }
 
-        d = create_server('http://url/', 'my-auth-token', server_config)
+        req = ('POST', 'http://url/servers',
+               headers_to_hashable(headers('my-auth-token')),
+               json.dumps({'server': server_config}), ("log",))
+        resp = StubResponse(202, {})
+
+        _treq = StubTreq(
+            {req: resp},
+            {resp: '{"server": "created"}'})
+
+        d = create_server('http://url/', 'my-auth-token', server_config,
+                          _treq=_treq)
 
         result = self.successResultOf(d)
-        self.assertEqual(result, self.treq.json_content.return_value)
+        self.assertEqual(result, {"server": "created"})
         self.assertEqual(len(fs.mock_calls), 0)
 
     def test_create_server_limits(self):
