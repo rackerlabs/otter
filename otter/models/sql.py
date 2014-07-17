@@ -41,6 +41,12 @@ class SQLScalingGroup(object):
         self.tenant_id = tenant_id
         self.uuid = uuid
 
+    @_with_transaction
+    def view_manifest(self, conn, with_webhooks=False):
+        manifest = {}
+        if with_webhooks:
+            manifest["webhooks"] =
+
     def _complain_if_missing_policy(self, result_proxy, conn, policy_id):
         """If no rows matched, the policy doesn't exist.
 
