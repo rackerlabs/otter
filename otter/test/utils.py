@@ -1,6 +1,7 @@
 """
 Mixins and utilities to be used for testing.
 """
+from functools import partial
 import json
 import mock
 import os
@@ -256,6 +257,96 @@ def mock_log(*args, **kwargs):
     return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
 
 
+class StubResponse(object):
+    """
+    A fake pre-built Twisted Web Response object.
+    """
+    def __init__(self, code, headers):
+        self.code = code
+        self.headers = headers
+
+
+def stub_pure_response(body, code=200, response_headers=None):
+    """
+    Return the type of two-tuple response that pure_http.Request returns.
+    """
+    if response_headers is None:
+        response_headers = {}
+    return (StubResponse(code, response_headers), body)
+
+
+class StubTreq(object):
+    """
+    A stub version of otter.utils.logging_treq that returns canned responses
+    from dictionaries.
+    """
+    def __init__(self, reqs=None, contents=None):
+        """
+        :param reqs: A dictionary specifying the values that the `request`
+            method should return. Keys are tuples of:
+            (method, url, headers, data, (<other key names>)).
+            Since headers is usually passed as a dict, here it should be
+            specified as a tuple of two-tuples in sorted order.
+
+        :param contents: A dictionary specifying the values that the `content`
+            method should return. Keys should match up with the values of the
+            `reqs` dict.
+        """
+        self.reqs = reqs
+        self.contents = contents
+
+    def _headers_to_tuple(self, headers):
+        if headers is not None:
+            return tuple(sorted(headers.items()))
+        return headers
+
+    def request(self, method, url, **kwargs):
+        """
+        Return a result by looking up the arguments in the `reqs` dict.
+        The only kwargs we care about are 'headers' and 'data',
+        although if other kwargs are passed their keys count as part of the
+        request.
+
+        'log' would also be a useful kwarg to check, but since dictionary keys
+        should be immutable, and it's hard to get the exact instance of
+        BoundLog, that's being ignored for now.
+        """
+        return succeed(self.reqs[
+            (method, url, self._headers_to_tuple(kwargs.pop('headers', None)),
+             kwargs.pop('data', None), tuple(kwargs.keys()))])
+
+    def content(self, response):
+        """Return a result by looking up the response in the `contents` dict."""
+        return succeed(self.contents[response])
+
+    def json_content(self, response):
+        """Return :meth:`content` after json-decoding"""
+        return succeed(json.loads(self.contents[response]))
+
+    def put(self, url, data=None, **kwargs):
+        """
+        Syntactic sugar for making a PUT request, because the order of the
+        params are different than :meth:`request`
+        """
+        return self.request('PUT', url, data=data, **kwargs)
+
+    def post(self, url, data=None, **kwargs):
+        """
+        Syntactic sugar for making a POST request, because the order of the
+        params are different than :meth:`request`
+        """
+        return self.request('POST', url, data=data, **kwargs)
+
+    def __getattr__(self, method):
+        """
+        Syntactic sugar for making head/get/delete requests, because the order
+        of parameters is the same as :meth:`request`
+        """
+        if method in ('get', 'head', 'delete'):
+            return partial(self.request, method.upper())
+        raise AttributeError("StubTreq has no attribute '{0}'".format(method))
+
+
 def mock_treq(code=200, json_content={}, method='get', content='', treq_mock=None):
     """
     Return mocked treq instance configured based on arguments given
@@ -269,8 +360,8 @@ def mock_treq(code=200, json_content={}, method='get', content='', treq_mock=Non
         treq_mock = mock.MagicMock(spec=treq)
     response = mock.MagicMock(code=code)
     treq_mock.configure_mock(**{method + '.return_value': defer.succeed(response)})
-    treq_mock.json_content.return_value = defer.succeed(json_content)
-    treq_mock.content.return_value = defer.succeed(content)
+    treq_mock.json_content.side_effect = lambda r: defer.succeed(json_content)
+    treq_mock.content.side_effect = lambda r: defer.succeed(content)
     return treq_mock
 
 

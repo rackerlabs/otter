@@ -277,12 +277,32 @@ def exec_scale_down(log, transaction_id, state, scaling_group, delta):
         state.remove_job(job_id)
 
     # delete active servers if pending jobs are not enough
-    remaining = delta - len(jobs_to_cancel)
-    if remaining > 0:
+    remaining_to_delete = delta - len(jobs_to_cancel)
+    if remaining_to_delete > 0:
         delete_active_servers(log, transaction_id,
-                              scaling_group, remaining, state)
+                              scaling_group, remaining_to_delete, state)
+
+    log.msg("Deleting {delta} servers.", delta=delta, **_log_capacity(state))
 
     return succeed(None)
+
+
+def _log_capacity(state):
+    """
+    Produces a dictionary containing the active capacity, pending capacity, and
+    desired capacity (which is what the user requested, not active + pending),
+    to be used for logging.
+
+    This exists because the current_desired presented to users is active +
+    pending, and we want these keywords to be filtered out of the audit logs
+    for now until desired capacity is consistent between the state API
+    response and the audit log/this.
+    """
+    return {
+        'current_active': len(state.active),
+        'current_pending': len(state.pending),
+        'current_desired': state.desired
+    }
 
 
 class _DeleteJob(object):
@@ -367,13 +387,12 @@ class _Job(object):
         """
         Job has failed. Remove the job, if it exists, and log the error.
         """
-        self.log.err(f, 'Launching server failed')
-
         def handle_failure(group, state):
             # if it is not in pending, then the job was probably deleted before
             # it got a chance to fail.
             if self.job_id in state.pending:
                 state.remove_job(self.job_id)
+            self.log.err(f, 'Launching server failed', **_log_capacity(state))
             return state
 
         d = self.scaling_group.modify_state(handle_failure)
@@ -401,7 +420,7 @@ class _Job(object):
                 audit(log).msg(
                     "A pending server that is no longer needed is now active, "
                     "and hence deletable.  Deleting said server.",
-                    event_type="server.deletable")
+                    event_type="server.deletable", **_log_capacity(state))
 
                 job = _DeleteJob(self.log, self.transaction_id,
                                  self.scaling_group, result, self.supervisor)
@@ -409,7 +428,8 @@ class _Job(object):
             else:
                 state.remove_job(self.job_id)
                 state.add_active(result['id'], result)
-                audit(log).msg("Server is active.", event_type="server.active")
+                audit(log).msg("Server is active.", event_type="server.active",
+                               **_log_capacity(state))
             return state
 
         d = self.scaling_group.modify_state(handle_success)

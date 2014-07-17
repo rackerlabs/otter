@@ -159,6 +159,28 @@
            '>
            
       <!--
+            Faults on Delete Scaling Group Server
+      -->
+     <!ENTITY deleteGroupServerFaults
+           '
+        <response status="403" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="CannotDeleteServerBelowMinError">The server cannot be deleted and not replaced because doing so would violate the configured "minEntities." Note that this error could only occur if the "replace=false" argument is used.</doc>
+            <representation mediaType="application/xml" element="identity:groupNotEmpty"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="ServerNotFoundError">The specified server was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+        <response status="404" xmlns="http://wadl.dev.java.net/2009/02">
+             <doc title="NoSuchScalingGroupError">The specified scaling group was not found.</doc>
+            <representation mediaType="application/xml" element="identity:noSuchGroup"/>
+            <representation mediaType="application/json"/>
+        </response>
+           '>
+
+      <!--
             Faults on Get Scaling Group State
       -->
      <!ENTITY getGroupStateFaults
