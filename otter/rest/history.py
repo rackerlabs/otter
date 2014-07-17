@@ -10,7 +10,7 @@ from otter.log.formatters import AUDIT_LOG_FIELDS
 from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import fails_with, paginatable, succeeds_with, with_transaction_id
 from otter.rest.errors import exception_codes
-from otter.util import logging_treq as treq
+from otter.util import logging_treq
 from otter.util.http import append_segments, check_success, get_collection_links
 
 
@@ -88,7 +88,7 @@ class OtterHistory(object):
         self.tenant_id = tenant_id
         self.region = region
         self.es_host = es_host
-        self.treq = _treq or treq
+        self.treq = _treq or logging_treq
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
