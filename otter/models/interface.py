@@ -79,7 +79,7 @@ class GroupState(object):
         pending, raises an AssertionError.
 
         :param str job_id:  the id of the job to complete
-        :returns: None
+        :returns: :data:`None`
         :raises AssertionError: if the job doesn't exist
         """
         assert job_id in self.pending, "Job doesn't exist: {0}".format(job_id)
@@ -91,7 +91,7 @@ class GroupState(object):
         pending, raises an AssertError.
 
         :param str job_id:  the id of the job to complete
-        :returns: None
+        :returns: :data:`None`
         :raises AssertionError: if the job already exists
         """
         assert job_id not in self.pending, "Job exists: {0}".format(job_id)
@@ -105,7 +105,7 @@ class GroupState(object):
         :param str job_id:  the id of the job to complete
         :param dict server_info: a dictionary containing relevant server info.
             TBD: What's in server_info ultimately - currently: name, url
-        :returns: None
+        :returns: :data:`None`
         :raises AssertionError: if the server id already exists
         """
         assert server_id not in self.active, "Server already exists: {}".format(server_id)
@@ -128,7 +128,7 @@ class GroupState(object):
         updates the group touched time.
 
         :param str policy_id:  the id of the policy that was executed
-        :returns: None
+        :returns: :data:`None`
         """
         self.policy_touched[policy_id] = self.group_touched = self.now()
 
