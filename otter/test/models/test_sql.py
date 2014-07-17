@@ -260,6 +260,39 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         got_policy = yield group.get_policy(policy["id"])
         self.assertEqual(policy, got_policy)
 
+    def test_delete_policy_for_nonexistent_group(self):
+        """
+        When attempting to delete a policy for a group that doesn't exist, an
+        exception is raised.
+        """
+        group = sql.SQLScalingGroup(self.engine, b"TENANT", b"BOGUS_GROUP")
+        d = group.delete_policy(b"POLICY")
+        self.assertFailure(d, interface.NoSuchScalingGroupError)
+        return d
+
+    @inlineCallbacks
+    def test_delete_nonexistant_policy(self):
+        """
+        When attempting to delete a policy and that policy doesn't exist, an
+        exception is raised.
+        """
+        group = yield self._create_group()
+        d = group.delete_policy(b"POLICY")
+        yield self.assertFailure(d, interface.NoSuchPolicyError)
+
+    @inlineCallbacks
+    def test_delete_policy(self):
+        """
+        Deleting a policy works.
+        """
+        group = yield self._create_group()
+        policy, = yield self._create_policies(group, n=1)
+
+        yield group.get_policy(policy["id"])
+        yield group.delete_policy(policy["id"])
+        d = group.get_policy(policy["id"])
+        yield self.assertFailure(d, interface.NoSuchPolicyError)
+
     @inlineCallbacks
     def test_create_webhook_happy_case(self):
         """
@@ -270,8 +303,6 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
 
         webhook_cfgs = _webhook_examples()
         webhooks = yield group.create_webhooks(policy["id"], webhook_cfgs)
-
-        # Inspect the result:
 
         # Webhooks have different ids and capability hashes:
         for getter in [lambda x: x["id"], lambda x: x["capability"]["hash"]]:
