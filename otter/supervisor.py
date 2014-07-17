@@ -5,13 +5,13 @@ This code is specific to the launch_server_v1 worker.
 """
 
 from twisted.application.service import Service
-from twisted.internet.defer import Deferred, succeed, gatherResults
+from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
 from otter.models.interface import NoSuchScalingGroupError
 from otter.log import audit
-from otter.util.deferredutils import DeferredPool, unwrap_first_error
+from otter.util.deferredutils import DeferredPool
 from otter.util.hashkey import generate_job_id
 from otter.util.timestamp import from_timestamp
 from otter.worker import launch_server_v1, validate_config
