@@ -256,7 +256,7 @@ class IScalingGroup(Interface):
         :type config: ``Bool``
 
         :return: a dictionary corresponding to the JSON schema at
-            :data:``otter.json_schema.model_schemas.view_manifest``
+            :data:`otter.json_schema.model_schemas.manifest`
         :rtype: ``dict``
 
         :raises NoSuchScalingGroupError: if this scaling group (one
@@ -643,7 +643,7 @@ class IScalingGroupCollection(Interface):
         :type data: ``list`` of ``dict``
 
         :return: a dictionary corresponding to the JSON schema at
-            :data:``otter.json_schema.model_schemas.view_manifest``, except that
+            :data:``otter.json_schema.model_schemas.manifest``, except that
             it also has the key `id`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
         """
