@@ -572,13 +572,13 @@ class IScalingScheduleCollection(Interface):
         Fetch and delete and batch of scheduled events in a bucket
 
         :param bucket: bucket whose events to be fetched
-        :type param: ``int``
+        :type param: :class:`int`
 
         :param now: the current time
         :type now: ``datetime``
 
         :param size: the size of the request
-        :type size: ``int``
+        :type size: :class:`int`
 
         :return: Deferred that fires with list of dict representing a row
         """
@@ -598,7 +598,7 @@ class IScalingScheduleCollection(Interface):
         Get oldest event from the bucket
 
         :param bucket: oldest event from this bucket
-        :type param: ``int``
+        :type param: :class:`int`
 
         :return: Deferred that fires with dict of oldest event
         """
