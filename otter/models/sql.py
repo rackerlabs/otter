@@ -179,6 +179,7 @@ class SQLScalingGroup(object):
 
     @_with_transaction
     def delete_policy(self, conn, policy_id):
+        # REVIEW: Add ON DELETE CASCADE to FKey constraint?
         query = policies.delete().where(policies.c.id == policy_id)
         d = conn.execute(query)
         d.addCallback(self._complain_if_missing_policy, conn, policy_id)
