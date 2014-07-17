@@ -43,9 +43,22 @@ class SQLScalingGroup(object):
 
     @_with_transaction
     def view_manifest(self, conn, with_webhooks=False):
-        manifest = {}
+        query = (scaling_groups.select()
+                 .where(scaling_groups.c.id == self.uuid)
+                 .limit(1))
+        d = conn.execute(query).addCallback(_fetchone)
+
+        @d.addCallback
+        def format_result(row):
+            pass
+
+        def add_webhooks(result):
+            pass
+
         if with_webhooks:
-            manifest["webhooks"] =
+            d.addCallback(add_webhooks)
+
+        return d
 
     def _complain_if_missing_policy(self, result_proxy, conn, policy_id):
         """If no rows matched, the policy doesn't exist.
@@ -551,3 +564,24 @@ def _paginated(table, limit, marker):
         query = query.where(table.c.id > marker)
 
     return query
+
+def _get_metadata(conn, metadata_table, item_id):
+    table_foreign_keys = metadata_table.foreign_keys
+    for column in metadata_table.columns.values():
+        if column.foreign_keys == table_foreign_keys:
+            break
+    else:
+        raise AssertionError("no foreign key in table {}"
+                             .format(metadata_table))
+
+    query = metadata_table.select().where(column == item_id)
+    d = conn.execute(query).addcallback(_fetchall)
+
+    @d.addCallback
+    def format(rows):
+        return {row["key"]: row["value"] for row in rows}
+
+    return d
+
+
+_get_group_metadata = partial(_get_metadata, metadata_table=group_metadata)
