@@ -319,7 +319,7 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
         d = create_server_sem.run(_treq.post, path, headers=headers(auth_token),
                                   data=json.dumps({'server': server_config}),
                                   log=log)
-        d.addCallback(check_success, [202])
+        d.addCallback(check_success, [202], _treq=_treq)
         d.addCallback(_treq.json_content)
         d.addErrback(_check_server_created)
         return d

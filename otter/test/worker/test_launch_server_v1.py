@@ -917,22 +917,14 @@ class ServerTests(SynchronousTestCase):
         server endpoint and return the decoded json content.  It will not
         attempt to find a server in Nova if the create request succeeds.
         """
-        server_config = {
-            'name': 'someServer',
-            'imageRef': '1',
-            'flavorRef': '3'
-        }
-
         req = ('POST', 'http://url/servers',
                headers_to_hashable(headers('my-auth-token')),
-               json.dumps({'server': server_config}), ("log",))
+               json.dumps({'server': {'some': 'stuff'}}), ("log",))
         resp = StubResponse(202, {})
 
-        _treq = StubTreq(
-            {req: resp},
-            {resp: '{"server": "created"}'})
+        _treq = StubTreq({req: resp}, {resp: '{"server": "created"}'})
 
-        d = create_server('http://url/', 'my-auth-token', server_config,
+        d = create_server('http://url/', 'my-auth-token', {'some': 'stuff'},
                           _treq=_treq)
 
         result = self.successResultOf(d)
@@ -978,12 +970,17 @@ class ServerTests(SynchronousTestCase):
         create the server, if :func:`find_server` also failed with an API
         failure.
         """
-        self.treq.post.return_value = succeed(mock.Mock(code=500))
-        self.treq.content.return_value = succeed(error_body)
+        req = ('POST', 'http://url/servers',
+               headers_to_hashable(headers('my-auth-token')),
+               json.dumps({'server': {}}), ("log",))
+        resp = StubResponse(500, {})
+
+        _treq = StubTreq({req: resp}, {resp: 'failure'})
+
         fs.return_value = fail(APIError(401, '', {}))
 
         d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
-                          retries=0)
+                          retries=0, _treq=_treq)
 
         failure = self.failureResultOf(d, RequestError)
         real_failure = failure.value.reason
