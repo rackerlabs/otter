@@ -256,7 +256,7 @@ class IScalingGroup(Interface):
 
         :return: a dictionary corresponding to the JSON schema at
             :data:`otter.json_schema.model_schemas.manifest`
-        :rtype: ``dict``
+        :rtype: :class:`dict`
 
         :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
@@ -267,7 +267,7 @@ class IScalingGroup(Interface):
         :return: a view of the config, as specified by
             :data:`otter.json_schema.group_schemas.config`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
+            :class:`dict`
 
         :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
@@ -278,7 +278,7 @@ class IScalingGroup(Interface):
         :return: a view of the launch config, as specified by
             :data:`otter.json_schema.group_schemas.launch_config`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
+            :class:`dict`
 
         :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
@@ -289,7 +289,7 @@ class IScalingGroup(Interface):
         :return: the state information as a :class:`GroupState`
 
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
+            :class:`dict`
 
         :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
@@ -318,7 +318,7 @@ class IScalingGroup(Interface):
 
         :param config: Configuration data in JSON format, as specified by
             :data:`otter.json_schema.group_schemas.config`
-        :type config: ``dict``
+        :type config: :class:`dict`
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
@@ -334,7 +334,7 @@ class IScalingGroup(Interface):
 
         :param launch_config: launch config data in JSON format, as specified
             by :data:`otter.json_schema.group_schemas.launch_config`
-        :type launch_config: ``dict``
+        :type launch_config: :class:`dict`
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
@@ -368,11 +368,11 @@ class IScalingGroup(Interface):
         :param data: a list of one or more scaling policies in JSON format,
             each of which is defined by
             :data:`otter.json_schema.group_schemas.policy`
-        :type data: :class:`list` of ``dict``
+        :type data: :class:`list` of :class:`dict`
 
         :return: list of newly created scaling policies and their ids, as
             specified by :data:`otter.json_schema.model_schemas.policy_list`
-        :rtype: :class:`list` of ``dict``
+        :rtype: :class:`list` of :class:`dict`
 
         :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
@@ -388,7 +388,7 @@ class IScalingGroup(Interface):
         :type policy_id: ``str``
 
         :param data: the details of the scaling policy in JSON format
-        :type data: ``dict``
+        :type data: :class:`dict`
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
@@ -428,7 +428,7 @@ class IScalingGroup(Interface):
         :return: a policy, as specified by
             :data:`otter.json_schema.group_schemas.policy`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
+            :class:`dict`
 
         :raises NoSuchPolicyError: if the policy id does not exist
         :raises NoSuchScalingGroupError: if this scaling group (one
@@ -512,7 +512,7 @@ class IScalingGroup(Interface):
         :return: a webhook, as specified by
             :data:`otter.json_schema.model_schemas.webhook`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
+            :class:`dict`
 
         :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
@@ -532,7 +532,7 @@ class IScalingGroup(Interface):
         :type webhook_id: ``str``
 
         :param data: the details of the scaling policy in JSON format
-        :type data: ``dict``
+        :type data: :class:`dict`
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
@@ -629,22 +629,22 @@ class IScalingGroupCollection(Interface):
 
         :param config: scaling group configuration options in JSON format, as
             specified by :data:`otter.json_schema.group_schemas.config`
-        :type data: ``dict``
+        :type data: :class:`dict`
 
         :param launch: scaling group launch configuration options in JSON
             format, as specified by
             :data:`otter.json_schema.group_schemas.launch_config`
-        :type data: ``dict``
+        :type data: :class:`dict`
 
         :param policies: list of scaling group policies, each one given as a
             JSON blob as specified by
             :data:`otter.json_schema.group_schemas.scaling_policy`
-        :type data: :class:`list` of ``dict``
+        :type data: :class:`list` of :class:`dict`
 
         :return: a dictionary corresponding to the JSON schema at
             :data:`otter.json_schema.model_schemas.manifest`, except that
             it also has the key `id`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with :class:`dict`
         """
 
     def list_scaling_group_states(log, tenant_id, limit=100, marker=None):
@@ -711,7 +711,7 @@ class IScalingGroupCollection(Interface):
         :type tenant_id: ``str``
 
         :return: a :class:`twisted.internet.defer.Deferred` containing current
-            count of tenants policies, webhooks and groups as ``dict``
+            count of tenants policies, webhooks and groups as :class:`dict`
         """
 
     def health_check():
@@ -742,5 +742,5 @@ class IAdmin(Interface):
             }
 
         :return: a :class:`twisted.internet.defer.Deferred` containing current
-            count of tenants policies, webhooks and groups as ``dict``
+            count of tenants policies, webhooks and groups as :class:`dict`
         """
