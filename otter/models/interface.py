@@ -25,7 +25,7 @@ class GroupState(object):
         they were executed, if ever.
     :ivar bytes group_touched: timezone-aware timestamp that represents when the
         last time any policy was executed on the group.  Could be None.
-    :ivar callable now: callable that returns a ``bytes`` timestamp - used for
+    :ivar callable now: callable that returns a :class:`bytes` timestamp - used for
         testing purposes.  Defaults to :func:`timestamp.now`
 
     TODO: ``remove_active``, ``pause`` and ``resume`` ?
@@ -385,7 +385,7 @@ class IScalingGroup(Interface):
         Updates an existing policy with the data given.
 
         :param policy_id: the uuid of the entity to update
-        :type policy_id: ``bytes``
+        :type policy_id: :class:`bytes`
 
         :param data: the details of the scaling policy in JSON format
         :type data: :class:`dict`
@@ -420,7 +420,7 @@ class IScalingGroup(Interface):
         Gets the specified policy on this particular scaling group.
 
         :param policy_id: the uuid of the policy
-        :type policy_id: ``bytes``
+        :type policy_id: :class:`bytes`
 
         :param version: version of policy to check as Type-1 UUID
         :type version: ``UUID``
@@ -442,7 +442,7 @@ class IScalingGroup(Interface):
         of its associated webhooks as well.
 
         :param policy_id: the uuid of the policy to be deleted
-        :type policy_id: ``bytes``
+        :type policy_id: :class:`bytes`
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
@@ -461,7 +461,7 @@ class IScalingGroup(Interface):
             pagination purposes - page offsets)
 
         :param policy_id: the uuid of the policy to be deleted
-        :type policy_id: ``bytes``
+        :type policy_id: :class:`bytes`
 
         :return: a list of the webhooks, as specified by
             :data:`otter.json_schema.model_schemas.webhook_list`
@@ -504,10 +504,10 @@ class IScalingGroup(Interface):
         scaling group.
 
         :param policy_id: the uuid of the policy
-        :type policy_id: ``bytes``
+        :type policy_id: :class:`bytes`
 
         :param webhook_id: the uuid of the webhook
-        :type webhook_id: ``bytes``
+        :type webhook_id: :class:`bytes`
 
         :return: a webhook, as specified by
             :data:`otter.json_schema.model_schemas.webhook`
@@ -526,10 +526,10 @@ class IScalingGroup(Interface):
         scaling group.
 
         :param policy_id: the uuid of the policy
-        :type policy_id: ``bytes``
+        :type policy_id: :class:`bytes`
 
         :param webhook_id: the uuid of the webhook
-        :type webhook_id: ``bytes``
+        :type webhook_id: :class:`bytes`
 
         :param data: the details of the scaling policy in JSON format
         :type data: :class:`dict`
@@ -548,10 +548,10 @@ class IScalingGroup(Interface):
         scaling group.
 
         :param policy_id: the uuid of the policy
-        :type policy_id: ``bytes``
+        :type policy_id: :class:`bytes`
 
         :param webhook_id: the uuid of the webhook
-        :type webhook_id: ``bytes``
+        :type webhook_id: :class:`bytes`
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
@@ -625,7 +625,7 @@ class IScalingGroupCollection(Interface):
 
         :param tenant_id: the tenant ID of the tenant the scaling group
             belongs to
-        :type tenant_id: ``bytes``
+        :type tenant_id: :class:`bytes`
 
         :param config: scaling group configuration options in JSON format, as
             specified by :data:`otter.json_schema.group_schemas.config`
@@ -652,7 +652,7 @@ class IScalingGroupCollection(Interface):
         List the scaling groups states for this tenant ID
 
         :param tenant_id: the tenant ID of the scaling group info to list
-        :type tenant_id: ``bytes``
+        :type tenant_id: :class:`bytes`
 
         :param int limit: the maximum number of scaling group states to return
             (for pagination purposes)
@@ -673,7 +673,7 @@ class IScalingGroupCollection(Interface):
         with it.
 
         :param tenant_id: the tenant ID of the scaling groups
-        :type tenant_id: ``bytes``
+        :type tenant_id: :class:`bytes`
 
         :return: scaling group model object
         :rtype: :class:`IScalingGroup` provider (no
@@ -687,7 +687,7 @@ class IScalingGroupCollection(Interface):
 
         :param capability_hash: the capability hash associated with a particular
             scaling policy
-        :type capability_hash: ``bytes``
+        :type capability_hash: :class:`bytes`
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with
             a 3-tuple of (tenant_id, group_id, policy_id).
@@ -708,7 +708,7 @@ class IScalingGroupCollection(Interface):
             }
 
         :param tenant_id: the tenant ID of the scaling groups
-        :type tenant_id: ``bytes``
+        :type tenant_id: :class:`bytes`
 
         :return: a :class:`twisted.internet.defer.Deferred` containing current
             count of tenants policies, webhooks and groups as :class:`dict`
