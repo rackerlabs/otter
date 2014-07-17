@@ -22,12 +22,14 @@ class Otter(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, region, health_check_function=None, es_host=None):
+    def __init__(self, store, region, health_check_function=None, es_host=None,
+                 _treq=None):
         self.store = store
         self.region = region
         self.health_check_function = health_check_function
         self.es_host = es_host
         self.scheduler = None
+        self.treq = _treq
 
     @app.route('/', methods=['GET'])
     def base(self, request):
@@ -79,7 +81,8 @@ class Otter(object):
         """
         return audit history
         """
-        history = OtterHistory(self.store, tenant_id, self.region, self.es_host)
+        history = OtterHistory(self.store, tenant_id, self.region, self.es_host,
+                               self.treq)
         return history.app.resource()
 
     @app.route('/health', methods=['GET'])

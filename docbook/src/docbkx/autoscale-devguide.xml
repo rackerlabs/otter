@@ -57,7 +57,7 @@
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate/>
+        <pubdate>2014-07-15</pubdate>
         <copyright>
             <year>2014</year>
             <holder>Rackspace US, Inc.</holder>
@@ -69,6 +69,19 @@
             </annotation>
         </legalnotice>
         <revhistory>
+            <revision
+                xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <date>2014-07-15</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Added the <parameter>deleteServer</parameter> endpoint. This endpoint allows you to delete a specified server from
+                            a specified scaling group. By default the server is replaced with a server of the same launchConfiguration, but with
+                            a different IP address. </para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
             <revision
                 xmlns:raxm="http://docs.rackspace.com/api/metadata">
                 <date>2014-06-11</date>

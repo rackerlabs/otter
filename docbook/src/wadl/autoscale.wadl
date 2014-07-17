@@ -7,7 +7,7 @@
 <!-- xmllint -noent autoscale.wadl -->
 <!--*******************************************************-->
 <!-- need xmlns:identity to use &commonFaults; &postPutFaults; &listGroupFaults; &createGroupFaults; 
-    &showGroupDetailsFaults; &deleteGroupFaults; &getGroupStateFaults; &getGroupConfigurationFaults; &updateGroupConfigurationFaults; 
+    &showGroupDetailsFaults; &deleteGroupFaults; &deleteGroupServerFaults; &getGroupStateFaults; &getGroupConfigurationFaults; &updateGroupConfigurationFaults; 
     &getLaunchConfigurationFaults; &updateLaunchConfigurationFaults; &listPoliciesFaults; &createPolicyFaults; &showPolicyDetailsFaults; 
     &updatePolicyFaults; &deletePolicyFaults; &executePolicyFaults; &executeWebhookFaults; &listWebhookFaults; &createWebhookFaults; 
     &createWebhookFaults; &showWebhookDetailsFaults; &updateWebhookFaults; &deleteWebhookFaults; in METHODS -->
@@ -59,17 +59,19 @@
                                 xmlns="http://docbook.org/ns/docbook"
                                 xml:lang="EN"><para>A scaling
                                    group.</para></wadl:doc>
-                        </param>
-                        
+                        </param>                        
                         <method href="#showGroupManifest"/>
-                        <resource id="webhook" path="webhook">
-                            <method href="#showGroupManifestWebhook"/>
-                        </resource>
+                        <method href="#showGroupManifestWebhook"/>                                                
+                        <method href="#deleteGroup"/>           
+                 
+
+                        <resource id="server" path="servers/{serverId}">
+                            <method href="#deleteGroupServer"/>
+                        </resource>  
                         
-                        <method href="#deleteGroup"/>
                         <resource id="state" path="state">
                             <method href="#getGroupState"/>
-                        </resource>
+                        </resource>                        
                         <resource id="config" path="config">
                             <method href="#getGroupConfig"/>
                             <method href="#putGroupConfig"/>
@@ -794,6 +796,7 @@
                 </wadl:doc>
             </representation>
         </response> &commonFaults; &listGroupFaults; </method>
+    
     <method id="showGroupManifest" name="GET"
         rax:roles="observer autoscale:observer">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
@@ -819,6 +822,7 @@
                 </wadl:doc>
             </representation>
         </response> &commonFaults; &showGroupDetailsFaults; </method>
+    
        <method id="showGroupManifestWebhook" name="GET"
                 rax:roles="observer autoscale:observer">
            <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
@@ -858,6 +862,7 @@
                    </wadl:doc>
                </representation>
            </response> &commonFaults; &showGroupDetailsFaults; </method>    
+    
     <method id="deleteGroup" name="DELETE">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Delete scaling group">
@@ -876,6 +881,54 @@
         </wadl:doc>
         <response status="204"><doc title="Success But No Content">The delete scaling group request succeeded.</doc>
         </response> &commonFaults; &deleteGroupFaults; </method>
+
+    <method id="deleteGroupServer" name="DELETE">
+        <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
+            title="Delete server from scaling group">
+            <para role="shortdesc">Deletes and replaces a specified server in a scaling group.</para>
+            <para>Delete and replace a server in a scaling group with a new server in that scaling group. By default, the specified 
+                server is deleted and replaced. The replacement server will have the current launchConfiguration settings and a different
+            IP address. </para>
+            <para>
+                <note>
+                    <para>The <code>replace={true/false}</code> parameter is optional for this method. Default is <code>replace=true</code>, even if not passed. 
+                        Use <code>replace=false</code> if you do not want the deleted server replaced. </para>
+                </note>
+            </para>
+            <para>This endpoint can be useful if you have deleted a server through a nova command or another method that
+                Auto Scale does not recognize. In those cases, even though the server is deleted, Auto Scale calculates that
+                the server still exists. You can use this endpoint to rectify this and bring Auto Scale in sync with the 
+                the out-of-band delete server operation.</para>
+            <para>
+                <note>
+                    <para>Deleting and replacing the server takes some time, how long depends mainly on the server image and complexity of the launchConfiguration settings
+                        of the replacement server. </para>
+                </note>
+            </para>
+        </wadl:doc>
+        <request>
+            <param name="serverId" style="plain" required="true" default="false"
+                type="xsd:string">
+                <wadl:doc xml:lang="EN"
+                    xmlns="http://docbook.org/ns/docbook">
+                    <para>Set the ID of the server you want to delete.</para></wadl:doc>
+            </param>
+            <param name="replace" style="query" required="false" default="true"
+                type="xsd:boolean">
+                <wadl:doc xml:lang="EN"
+                    xmlns="http://docbook.org/ns/docbook">
+                    <para>Defaults to <code>replace=true</code> if not passed. Set <code>replace=false</code> to delete the server without replacing it.</para></wadl:doc>
+            </param>
+        </request>
+        <response status="202"><doc title="Accepted">The request succeeded. No response body is returned.</doc>
+            <representation mediaType="application/json">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN">
+                </wadl:doc>
+            </representation>
+        </response> &commonFaults; &deleteGroupServerFaults; </method>    
+    
+
     <method id="getGroupState" name="GET"
         rax:roles="observer autoscale:observer">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"

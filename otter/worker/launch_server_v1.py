@@ -20,6 +20,8 @@ from functools import partial
 import json
 import itertools
 from copy import deepcopy
+import re
+from urllib import urlencode
 
 from twisted.internet.defer import gatherResults, maybeDeferred, DeferredSemaphore
 
@@ -32,7 +34,8 @@ from otter.util.http import (append_segments, headers, check_success,
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout, log_with_time
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
-                              TransientRetryError, random_interval, compose_retries)
+                              exponential_backoff_interval, TransientRetryError,
+                              random_interval, compose_retries)
 
 # Number of times to retry when adding/removing nodes from LB
 LB_MAX_RETRIES = 10
@@ -159,6 +162,73 @@ MAX_CREATE_SERVER = 2
 create_server_sem = DeferredSemaphore(MAX_CREATE_SERVER)
 
 
+class ServerCreationRetryError(Exception):
+    """
+    Exception to be raised when Nova behaves counter-intuitively, for instance
+    if there is more than one server of a certain name
+    """
+
+
+def find_server(server_endpoint, auth_token, server_config, log=None):
+    """
+    Given a server config, attempts to find a server created with that config.
+
+    Uses the Nova list server details endpoint to filter out any server that
+    does not have the exact server name (the filter is a regex, so can filter
+    by ``^<name>$``), image ID, and flavor ID (both of which are exact filters).
+
+    :param str server_endpoint: Server endpoint URI.
+    :param str auth_token: Keystone Auth Token.
+    :param dict server_config: Nova server config.
+    :param log: A bound logger
+
+    :return: Deferred that fires with a server (in the format of a server
+        detail response) that matches that server config and creation time, or
+        None if none matches
+    :raises: :class:`ServerCreationRetryError`
+    """
+    server_info = server_config['server']
+
+    query_params = {
+        'image': server_info['imageRef'],
+        'flavor': server_info['flavorRef'],
+        'name': '^{0}$'.format(re.escape(server_info['name']))
+    }
+    url = '{path}?{query}'.format(
+        path=append_segments(server_endpoint, 'servers', 'detail'),
+        query=urlencode(query_params))
+
+    def _check_if_server_exists(list_server_details):
+        nova_servers = list_server_details['servers']
+
+        if len(nova_servers) > 1:
+            raise ServerCreationRetryError(
+                "Nova returned {0} servers that match the same "
+                "image/flavor and name {1}.".format(
+                    len(nova_servers), server_info['name']))
+
+        elif len(nova_servers) == 1:
+            nova_server = list_server_details['servers'][0]
+
+            if nova_server['metadata'] != server_info['metadata']:
+                raise ServerCreationRetryError(
+                    "Nova found a server of the right name ({name}) but wrong "
+                    "metadata. Expected {expected_metadata} and got {nova_metadata}"
+                    .format(expected_metadata=server_info['metadata'],
+                            nova_metadata=nova_server['metadata'],
+                            name=server_info['name']))
+
+            return {'server': nova_server}
+
+        return None
+
+    d = treq.get(url, headers=headers(auth_token), log=log)
+    d.addCallback(check_success, [200])
+    d.addCallback(treq.json_content)
+    d.addCallback(_check_if_server_exists)
+    return d
+
+
 def create_server(server_endpoint, auth_token, server_config, log=None):
     """
     Create a new server.
@@ -186,21 +256,58 @@ def log_on_response_code(response, log, msg, code):
     return response
 
 
-def log_lb_unexpected_errors(f, path, log, msg):
+def log_lb_unexpected_errors(f, log, msg):
     """
     Log load-balancer unexpected errors
     """
     if not f.check(APIError):
         log.err(f, 'Unknown error while ' + msg)
-        return f
-    error = RequestError(f, path, msg)
-    log.msg('Got LB error while {m}: {e}', m=msg, e=error)
-    # TODO: Will do it after LB delete works fine
-    # 422 is PENDING_UPDATE
-    #if f.value.code != 422:
-    #    log.msg('Unexpected status {status} while {msg}: {error}',
-    #            msg=msg, status=f.value.code, error=error)
-    raise error
+    elif not (f.value.code == 404 or
+              f.value.code == 422 and 'PENDING_UPDATE' in f.value.body):
+        log.msg('Got unexpected LB status {status} while {msg}: {error}',
+                status=f.value.code, msg=msg, error=f.value)
+    return f
+
+
+class CLBOrNodeDeleted(Exception):
+    """
+    CLB or Node is deleted or in process of getting deleted
+
+    :param :class:`RequestError` error: Error that caused this exception
+    :param str clb_id: ID of deleted load balancer
+    :param str node_id: ID of deleted node in above load balancer
+    """
+    def __init__(self, error, clb_id, node_id=None):
+        super(CLBOrNodeDeleted, self).__init__(
+            'CLB {} or node {} deleted due to {}'.format(clb_id, node_id, error))
+        self.error = error
+        self.clb_id = clb_id
+        self.node_id = node_id
+
+
+def check_deleted_clb(f, clb_id, node_id=None):
+    """
+    Raise :class:`CLBOrNodeDeleted` error based on information in `RequestError` in f.
+    Otherwise return f
+
+    :param :class:`Failure` f: failure containing :class:`RequestError`
+                               from adding/removing node
+    :param str clb_id: ID of load balancer causing the error
+    :param str node_id: ID of node of above load balancer
+    """
+    # A LB being deleted sometimes results in a 422. This function
+    # unfortunately has to parse the body of the message to see if this is an
+    # acceptable 422 (if the LB has been deleted or in the process of being deleted)
+    f.trap(RequestError)
+    f.value.reason.trap(APIError)
+    error = f.value.reason.value
+    if error.code == 404:
+        raise CLBOrNodeDeleted(f.value, clb_id, node_id)
+    if error.code == 422:
+        message = json.loads(error.body)['message']
+        if ('load balancer is deleted' in message or 'PENDING_DELETE' in message):
+            raise CLBOrNodeDeleted(f.value, clb_id, node_id)
+    return f
 
 
 def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
@@ -223,7 +330,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
-    lb_log = log.bind(loadbalancer_id=lb_id)
+    lb_log = log.bind(loadbalancer_id=lb_id, ip_address=ip_address)
 
     def add():
         d = treq.post(path, headers=headers(auth_token),
@@ -233,18 +340,22 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
                                                   "type": "PRIMARY"}]}),
                       log=lb_log)
         d.addCallback(check_success, [200, 202])
-        d.addErrback(log_lb_unexpected_errors, path, lb_log, 'add_node')
+        d.addErrback(log_lb_unexpected_errors, lb_log, 'add_node')
+        d.addErrback(wrap_request_error, path, 'add_node')
+        d.addErrback(check_deleted_clb, lb_id)
         return d
 
     d = retry(
         add,
-        can_retry=retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES),
+        can_retry=compose_retries(
+            transient_errors_except(CLBOrNodeDeleted),
+            retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES)),
         next_interval=random_interval(
             *(config_value('worker.lb_retry_interval_range') or LB_RETRY_INTERVAL_RANGE)),
         clock=clock)
 
     def when_done(result):
-        lb_log.msg('Added to load balancer')
+        lb_log.msg('Added to load balancer', node_id=result['nodes'][0]['id'])
         undo.push(remove_from_load_balancer,
                   lb_log,
                   endpoint,
@@ -477,42 +588,26 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
     lb_log.msg('Removing from load balancer')
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
 
-    def check_422_deleted(failure):
-        # A LB being deleted sometimes results in a 422.  This function
-        # unfortunately has to parse the body of the message to see if this is an
-        # acceptable 422 (if the LB has been deleted or the node has already been
-        # removed, then 'removing from load balancer' as a task should be
-        # successful - if the LB is in ERROR, then nothing more can be done to
-        # it except resetting it - may as well remove the server.)
-        failure.trap(APIError)
-        error = failure.value
-        if error.code == 422:
-            message = json.loads(error.body)['message']
-            if ('load balancer is deleted' not in message and
-                    'PENDING_DELETE' not in message):
-                return failure
-            lb_log.msg(message)
-        else:
-            return failure
-
     def remove():
         d = treq.delete(path, headers=headers(auth_token), log=lb_log)
-
-        # Success is 200/202.  An LB not being found is 404.  A node not being
-        # found is a 404.  But a deleted LB sometimes results in a 422.
-        d.addCallback(log_on_response_code, lb_log, 'Node to delete does not exist', 404)
-        d.addCallback(check_success, [200, 202, 404])
+        d.addCallback(check_success, [200, 202])
         d.addCallback(treq.content)  # To avoid https://twistedmatrix.com/trac/ticket/6751
-        d.addErrback(check_422_deleted)
-        d.addErrback(log_lb_unexpected_errors, path, lb_log, 'remove_node')
+        d.addErrback(log_lb_unexpected_errors, lb_log, 'remove_node')
+        d.addErrback(wrap_request_error, path, 'remove_node')
+        d.addErrback(check_deleted_clb, loadbalancer_id, node_id)
         return d
 
     d = retry(
         remove,
-        can_retry=retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES),
+        can_retry=compose_retries(
+            transient_errors_except(CLBOrNodeDeleted),
+            retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES)),
         next_interval=random_interval(
             *(config_value('worker.lb_retry_interval_range') or LB_RETRY_INTERVAL_RANGE)),
         clock=clock)
+
+    # A node or CLB deleted is considered successful removal
+    d.addErrback(lambda f: f.trap(CLBOrNodeDeleted) and lb_log.msg(f.value.message))
     d.addCallback(lambda _: lb_log.msg('Removed from load balancer'))
     return d
 
@@ -609,8 +704,8 @@ def verified_delete(log,
                     server_endpoint,
                     auth_token,
                     server_id,
-                    interval=10,
-                    timeout=3660,
+                    exp_start=2,
+                    max_retries=10,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
@@ -626,12 +721,8 @@ def verified_delete(log,
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param int interval: Deletion interval in seconds - how long until
-        verifying a delete is retried. Default: 5.
-    :param int timeout: Seconds after which the deletion will be logged as a
-        failure, if Nova fails to return a 404.  Default is 3660, because if
-        the server is building, the delete will not happen until immediately
-        after it has finished building.
+    :param int exp_start: Exponential backoff interval start seconds. Default 2
+    :param int max_retries: Maximum number of retry attempts
 
     :return: Deferred that fires when the expected status has been seen.
     """
@@ -642,19 +733,13 @@ def verified_delete(log,
         from twisted.internet import reactor
         clock = reactor
 
-    timeout_description = (
-        "Waiting for Nova to actually delete server {0} (or acknowledge delete)"
-        .format(server_id))
-
-    d = retry_and_timeout(
+    d = retry(
         partial(delete_and_verify, serv_log, server_endpoint, auth_token, server_id),
-        timeout,
-        next_interval=repeating_interval(interval),
-        clock=clock,
-        deferred_description=timeout_description)
+        can_retry=retry_times(max_retries),
+        next_interval=exponential_backoff_interval(exp_start),
+        clock=clock)
 
     d.addCallback(log_with_time, clock, serv_log, clock.seconds(),
                   ('Server deleted successfully (or acknowledged by Nova as '
                    'to-be-deleted) : {time_delete} seconds.'), 'time_delete')
-    d.addErrback(serv_log.err)
     return d

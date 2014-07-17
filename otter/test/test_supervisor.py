@@ -829,10 +829,11 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
     def test_job_completion_success_audit_logged(self):
         """
         If the job succeeded, and the job ID is still in pending, it is audit
-        logged as a "server.active" event.
+        logged as a "server.active" event, and the new state after the server
+        has been moved to active is logged.
         """
         self.state = GroupState('tenant', 'group', 'name', {},
-                                {self.job_id: {}}, None, {}, False)
+                                {self.job_id: {}}, None, {}, False, desired=1)
         self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'yay'})
 
@@ -841,7 +842,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.log.msg.assert_called_once_with(
             "Server is active.", event_type="server.active", server_id='yay',
             job_id=self.job_id, audit_log=True, system="otter.job.launch",
-            image_ref="imageID", flavor_ref="1")
+            image_ref="imageID", flavor_ref="1", current_active=1,
+            current_pending=0, current_desired=1)
 
     def test_job_completion_success_job_deleted_pending(self):
         """
@@ -872,7 +874,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         audit logged as a "server.deletable" event.
         """
         self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
-                                {}, False)
+                                {}, False, desired=0)
         self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'yay'})
 
@@ -883,7 +885,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
              "and hence deletable.  Deleting said server."),
             event_type="server.deletable", server_id='yay', job_id=self.job_id,
             audit_log=True, system="otter.job.launch", image_ref="imageID",
-            flavor_ref="1")
+            flavor_ref="1", current_active=0, current_pending=0,
+            current_desired=0)
 
     def test_job_completion_failure_job_removed(self):
         """
@@ -891,7 +894,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         failure is logged.
         """
         self.state = GroupState('tenant', 'group', 'name', {}, {self.job_id: {}}, None,
-                                {}, False)
+                                {}, False, desired=0)
         self.job.start(self.mock_launch)
         self.completion_deferred.errback(DummyException('e'))
 
@@ -904,7 +907,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.log.err.assert_called_once_with(
             CheckFailure(DummyException), 'Launching server failed',
             system="otter.job.launch", image_ref="imageID", job_id=self.job_id,
-            flavor_ref="1")
+            flavor_ref="1", current_active=0, current_pending=0,
+            current_desired=0)
 
     def test_job_completion_failure_job_deleted_pending(self):
         """
@@ -913,7 +917,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         the failure. Nothing else in the state changes.
         """
         self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
-                                {}, False)
+                                {}, False, desired=0)
         self.job.start(self.mock_launch)
         self.completion_deferred.errback(DummyException('e'))
 
@@ -926,7 +930,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.log.err.assert_called_with(
             CheckFailure(DummyException), 'Launching server failed',
             system="otter.job.launch", image_ref="imageID", job_id=self.job_id,
-            flavor_ref="1")
+            flavor_ref="1", current_active=0, current_pending=0,
+            current_desired=0)
 
     def test_job_completion_success_NoSuchScalingGroupError(self):
         """

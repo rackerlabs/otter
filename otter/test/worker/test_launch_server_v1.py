@@ -3,6 +3,8 @@ Unittests for the launch_server_v1 launch config.
 """
 import mock
 import json
+from urllib import urlencode
+from urlparse import urlunsplit
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import Deferred, fail, succeed
@@ -26,11 +28,16 @@ from otter.worker.launch_server_v1 import (
     ServerDeleted,
     delete_and_verify,
     verified_delete,
-    LB_MAX_RETRIES, LB_RETRY_INTERVAL_RANGE
+    LB_MAX_RETRIES,
+    LB_RETRY_INTERVAL_RANGE,
+    find_server,
+    ServerCreationRetryError,
+    CLBOrNodeDeleted
 )
 
 
-from otter.test.utils import mock_log, patch, CheckFailure, mock_treq, matches
+from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
+                              matches, DummyException, IsBoundWith)
 from testtools.matchers import IsInstance, StartsWith
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
@@ -118,19 +125,16 @@ expected_headers = {
 error_body = '{"code": 500, "message": "Internal Server Error"}'
 
 
-class LoadBalancersTests(SynchronousTestCase):
+class LoadBalancersTestsMixin(object):
     """
-    Test adding to one or more load balancers.
+    Test adding and removing nodes from load balancers
     """
+
     def setUp(self):
         """
         set up test dependencies for load balancers.
         """
-        self.json_content = {'nodes': [{'id': 1}]}
-        self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
-                          new=mock_treq(code=200, json_content=self.json_content,
-                                        method='post'))
-        patch(self, 'otter.util.http.treq', new=self.treq)
+        super(LoadBalancersTestsMixin, self).setUp()
         self.log = mock_log()
         self.log.msg.return_value = None
 
@@ -146,6 +150,23 @@ class LoadBalancersTests(SynchronousTestCase):
         self.rand_interval = patch(self, 'otter.worker.launch_server_v1.random_interval')
         self.rand_interval.return_value = self.interval_func = mock.Mock(
             return_value=self.retry_interval)
+
+
+class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
+    """
+    Tests for :func:`add_to_load_balancer`
+    """
+
+    def setUp(self):
+        """
+        Mock treq.post for adding nodes
+        """
+        super(AddNodeTests, self).setUp()
+        self.json_content = {'nodes': [{'id': 1}]}
+        self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
+                          new=mock_treq(code=200, json_content=self.json_content,
+                                        content='{"message": "bad"}', method='post'))
+        patch(self, 'otter.util.http.treq', new=self.treq)
 
     def test_add_to_load_balancer(self):
         """
@@ -179,6 +200,10 @@ class LoadBalancersTests(SynchronousTestCase):
 
         self.treq.json_content.assert_called_once_with(mock.ANY)
 
+        self.log.msg.assert_called_with(
+            'Added to load balancer', loadbalancer_id=12345,
+            ip_address='192.168.1.1', node_id=1)
+
     def test_add_lb_retries(self):
         """
         add_to_load_balancer will retry again until it succeeds
@@ -200,6 +225,49 @@ class LoadBalancersTests(SynchronousTestCase):
                                     headers=expected_headers, data=mock.ANY,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
         self.rand_interval.assert_called_once_with(5, 7)
+
+    def test_add_lb_stops_retrying_on_404(self):
+        """
+        add_to_load_balancer will stop retrying if it encounters 404
+        """
+        codes = iter([422, 422, 404])
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
+        clock = Clock()
+
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo, clock=clock)
+        clock.advance(self.retry_interval)
+        self.assertNoResult(d)
+
+        clock.advance(self.retry_interval)
+        f = self.failureResultOf(d, CLBOrNodeDeleted)
+        self.assertEqual(f.value.clb_id, 12345)
+
+    def test_add_lb_stops_retrying_on_422_deleted_clb(self):
+        """
+        add_to_load_balancer will stop retrying if it encounters 422 with deleted CLB
+        """
+        codes = iter([422, 422, 422])
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
+        messages = iter(['bad', 'huh', 'The load balancer is deleted'])
+        self.treq.content.side_effect = lambda *a: succeed(
+            json.dumps({"message": next(messages)}))
+        clock = Clock()
+
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo, clock=clock)
+        clock.advance(self.retry_interval)
+        self.assertNoResult(d)
+
+        clock.advance(self.retry_interval)
+        f = self.failureResultOf(d, CLBOrNodeDeleted)
+        self.assertEqual(f.value.clb_id, 12345)
 
     def test_add_lb_defaults_retries_configs(self):
         """
@@ -253,13 +321,17 @@ class LoadBalancersTests(SynchronousTestCase):
                        headers=expected_headers, data=mock.ANY,
                        log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
 
-    def test_add_lb_retries_logs(self):
+    def test_add_lb_retries_logs_unexpected_failure(self):
         """
-        add_to_load_balancer will log all failures while it is trying
+        add_to_load_balancer will log all unexpected failures while it is trying. This
+        includes any failure other than "422 PENDING_UPDATE"
         """
-        self.codes = [500, 503, 422, 422, 401, 200]
-        bad_codes_len = len(self.codes) - 1
-        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        codes = iter([500, 503, 422, 422, 401, 200])
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
+        messages = iter(['bad'] * 3 + ['PENDING_UPDATE'] + ['hmm'])
+        self.treq.content.side_effect = lambda *a: succeed(
+            json.dumps({"message": next(messages)}))
+        bad_codes = [500, 503, 422, 401]
         clock = Clock()
 
         d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
@@ -269,33 +341,11 @@ class LoadBalancersTests(SynchronousTestCase):
                                  self.undo, clock=clock)
         clock.pump([self.retry_interval] * 6)
         self.successResultOf(d)
-        self.log.msg.assert_has_calls(
-            [mock.call('Got LB error while {m}: {e}', loadbalancer_id=12345,
-                       m='add_node', e=matches(IsInstance(RequestError)))] * bad_codes_len)
-
-    def test_add_lb_retries_logs_unexpected_errors(self):
-        """
-        add_to_load_balancer will log unexpeted failures while it is trying
-        """
-        self.codes = [500, 503, 422, 422, 401, 200]
-        bad_codes = [500, 503, 401]
-        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
-        clock = Clock()
-
-        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
-                                 {'loadBalancerId': 12345,
-                                  'port': 80},
-                                 '192.168.1.1',
-                                 self.undo, clock=clock)
-        clock.pump([self.retry_interval] * 6)
-        self.successResultOf(d)
-        self.log.msg.assert_has_calls(
-            [mock.call('Unexpected status {status} while {msg}: {error}',
-                       status=code, msg='add_node',
-                       error=matches(IsInstance(RequestError)), loadbalancer_id=12345)
-             for code in bad_codes])
-
-    test_add_lb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
+        self.assertEqual(
+            self.log.msg.mock_calls[:len(bad_codes)],
+            [mock.call('Got unexpected LB status {status} while {msg}: {error}',
+                       status=bad_code, loadbalancer_id=12345, ip_address='192.168.1.1', msg='add_node',
+                       error=matches(IsInstance(APIError))) for bad_code in bad_codes])
 
     def test_add_to_load_balancer_pushes_remove_onto_undo_stack(self):
         """
@@ -422,6 +472,21 @@ class LoadBalancersTests(SynchronousTestCase):
 
         self.assertEqual(self.successResultOf(d), [])
 
+
+class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
+    """
+    :func:`remove_from_load_balancer` tests
+    """
+
+    def setUp(self):
+        """
+        Mock treq.delete for deleting nodes
+        """
+        super(RemoveNodeTests, self).setUp()
+        self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
+                          new=mock_treq(code=200, content='{"message": "bad"}', method='delete'))
+        patch(self, 'otter.util.http.treq', new=self.treq)
+
     def test_remove_from_load_balancer(self):
         """
         remove_from_load_balancer makes a DELETE request against the
@@ -441,7 +506,7 @@ class LoadBalancersTests(SynchronousTestCase):
         """
         remove_from_load_balancer makes a DELETE request against the
         URL represting the load balancer node and ignores if it is already deleted
-        i.e. it returns 404. It also logs it
+        i.e. it returns 404.
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
         self.treq.content.return_value = succeed(json.dumps({'message': 'LB does not exist'}))
@@ -449,8 +514,6 @@ class LoadBalancersTests(SynchronousTestCase):
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
         self.assertEqual(self.successResultOf(d), None)
-        self.log.msg.assert_any_call(
-            'Node to delete does not exist', loadbalancer_id=12345, node_id=1)
 
     def test_remove_from_load_balancer_on_422_LB_deleted(self):
         """
@@ -466,7 +529,9 @@ class LoadBalancersTests(SynchronousTestCase):
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
         self.assertEqual(self.successResultOf(d), None)
-        self.log.msg.assert_any_call(message, loadbalancer_id=12345, node_id=1)
+        self.log.msg.assert_any_call(
+            matches(StartsWith('CLB 12345 or node 1 deleted due to RequestError')),
+            loadbalancer_id=12345, node_id=1)
 
     def test_remove_from_load_balancer_on_422_Pending_delete(self):
         """
@@ -483,7 +548,9 @@ class LoadBalancersTests(SynchronousTestCase):
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
         self.assertEqual(self.successResultOf(d), None)
-        self.log.msg.assert_any_call(message, loadbalancer_id=12345, node_id=1)
+        self.log.msg.assert_any_call(
+            matches(StartsWith('CLB 12345 or node 1 deleted due to RequestError')),
+            loadbalancer_id=12345, node_id=1)
 
     def test_remove_from_load_balancer_fails_on_422_LB_other(self):
         """
@@ -532,11 +599,6 @@ class LoadBalancersTests(SynchronousTestCase):
         self.assertEqual(self.log.msg.mock_calls[0],
                          mock.call('Removing from load balancer',
                                    loadbalancer_id=12345, node_id=1))
-        self.assertEqual(
-            self.log.msg.mock_calls[1:-1],
-            [mock.call('Got LB error while {m}: {e}', m='remove_node',
-                       e=matches(IsInstance(RequestError)),
-                       loadbalancer_id=12345, node_id=1)] * 10)
         self.assertEqual(self.log.msg.mock_calls[-1],
                          mock.call('Removed from load balancer',
                                    loadbalancer_id=12345, node_id=1))
@@ -571,11 +633,6 @@ class LoadBalancersTests(SynchronousTestCase):
         self.assertEqual(self.log.msg.mock_calls[0],
                          mock.call('Removing from load balancer',
                                    loadbalancer_id=12345, node_id=1))
-        self.assertEqual(
-            self.log.msg.mock_calls[1:],
-            [mock.call('Got LB error while {m}: {e}', m='remove_node',
-                       e=matches(IsInstance(RequestError)),
-                       loadbalancer_id=12345, node_id=1)] * (self.max_retries + 1))
         # Interval func call max times?
         self.rand_interval.assert_called_once_with(5, 7)
         self.interval_func.assert_has_calls(
@@ -609,11 +666,6 @@ class LoadBalancersTests(SynchronousTestCase):
         self.assertEqual(self.log.msg.mock_calls[0],
                          mock.call('Removing from load balancer',
                                    loadbalancer_id=12345, node_id=1))
-        self.assertEqual(
-            self.log.msg.mock_calls[1:],
-            [mock.call('Got LB error while {m}: {e}', m='remove_node',
-                       e=matches(IsInstance(RequestError)),
-                       loadbalancer_id=12345, node_id=1)] * (LB_MAX_RETRIES + 1))
         # Interval func call max times?
         self.rand_interval.assert_called_once_with(*LB_RETRY_INTERVAL_RANGE)
         self.interval_func.assert_has_calls(
@@ -626,6 +678,8 @@ class LoadBalancersTests(SynchronousTestCase):
         self.codes = [500, 503, 422, 422, 401, 200]
         bad_codes = [500, 503, 401]
         self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        self.treq.content.side_effect = lambda *a, **ka: succeed(
+            json.dumps({'message': 'PENDING_UPDATE'}))
         clock = Clock()
 
         d = remove_from_load_balancer(
@@ -634,13 +688,32 @@ class LoadBalancersTests(SynchronousTestCase):
         clock.pump([self.retry_interval] * 6)
         self.successResultOf(d)
         self.log.msg.assert_has_calls(
-            [mock.call('Unexpected status {status} while {msg}: {error}',
+            [mock.call('Got unexpected LB status {status} while {msg}: {error}',
                        status=code, msg='remove_node',
-                       error=matches(IsInstance(RequestError)), loadbalancer_id=12345,
+                       error=matches(IsInstance(APIError)), loadbalancer_id=12345,
                        node_id=1)
              for code in bad_codes])
 
-    test_removelb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
+
+def _get_server_info(metadata=None, created=None):
+    """
+    Creates a fake server config to be used when testing creating servers
+    (either as the config to use when creating, or as the config to return as
+    a response).
+
+    :param ``dict`` metadata: metadata to include in the server config
+    :param ``created``: this is only used in server responses, but gives an
+        extra field to distinguish one server config from another
+    """
+    config = {
+        'name': 'abcd',
+        'imageRef': '123',
+        'flavorRef': 'xyz',
+        'metadata': metadata or {}
+    }
+    if created is not None:
+        config['created'] = created
+    return config
 
 
 class ServerTests(SynchronousTestCase):
@@ -714,6 +787,125 @@ class ServerTests(SynchronousTestCase):
 
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
+
+    def test_find_server_tells_nova_to_filter_by_image_flavor_and_name(self):
+        """
+        :func:`find_server` makes a call to nova to list server details while
+        filtering on the image id, flavor id, and exact name in the server
+        config.
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({"servers": []})
+
+        find_server('http://url/', 'my-auth-token', server_config)
+
+        url = urlunsplit([
+            'http', 'url', 'servers/detail',
+            urlencode({"image": "123", "flavor": "xyz", "name": "^abcd$"}),
+            None])
+
+        self.treq.get.assert_called_once_with(url, headers=expected_headers,
+                                              log=mock.ANY)
+
+    def test_find_server_regex_escapes_server_name(self):
+        """
+        :func:`find_server` when giving the exact name of the server,
+        regex-escapes the name
+        """
+        server_config = {'server': _get_server_info()}
+        server_config['server']['name'] = r"this.is[]regex\dangerous()*"
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({"servers": []})
+
+        find_server('http://url/', 'my-auth-token', server_config)
+
+        url = urlunsplit([
+            'http', 'url', 'servers/detail',
+            urlencode({"image": "123", "flavor": "xyz",
+                       "name": r"^this\.is\[\]regex\\dangerous\(\)\*$"}),
+            None])
+
+        self.treq.get.assert_called_once_with(url, headers=expected_headers,
+                                              log=mock.ANY)
+
+    def test_find_server_propagates_api_errors(self):
+        """
+        :func:`find_server` propagates any errors from Nova
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=500))
+        self.treq.content.return_value = succeed(error_body)
+
+        d = find_server('http://url/', 'my-auth-token', server_config)
+        failure = self.failureResultOf(d, APIError)
+        self.assertEqual(failure.value.code, 500)
+
+    def test_find_server_returns_None_if_no_servers_from_nova(self):
+        """
+        :func:`find_server` will return None for servers if Nova returns no
+        matching servers
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({"servers": []})
+
+        d = find_server('http://url/', 'my-auth-token', server_config)
+        self.assertIsNone(self.successResultOf(d))
+
+    def test_find_server_raises_if_server_from_nova_has_wrong_metadata(self):
+        """
+        :func:`find_server` will fail if the server Nova returned does not have
+        matching metadata
+        """
+        server_config = {'server': _get_server_info()}
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({
+            'servers': [_get_server_info(metadata={'hello': 'there'})]
+        })
+
+        d = find_server('http://url/', 'my-auth-token', server_config)
+        self.failureResultOf(d, ServerCreationRetryError)
+
+    def test_find_server_returns_match_from_nova(self):
+        """
+        :func:`find_server` will return a server returned from Nova if the
+        metadata match.
+        """
+        server_config = {'server': _get_server_info(metadata={'hey': 'there'})}
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed(
+            {'servers': [_get_server_info(metadata={'hey': 'there'})]})
+
+        d = find_server('http://url/', 'my-auth-token', server_config)
+
+        self.assertEqual(
+            self.successResultOf(d),
+            {'server': _get_server_info(metadata={'hey': 'there'})})
+
+    def test_find_server_raises_if_nova_returns_more_than_one_server(self):
+        """
+        :func:`find_server` will return a the first server returned from Nova
+        whose metadata match.  It logs if there more than 1 server from Nova.
+        """
+        server_config = {'server': _get_server_info()}
+        servers = [
+            _get_server_info(created='2014-04-04T04:04:04Z'),
+            _get_server_info(created='2014-04-04T04:04:05Z'),
+        ]
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({'servers': servers})
+
+        d = find_server('http://url/', 'my-auth-token', server_config,
+                        self.log)
+
+        self.failureResultOf(d, ServerCreationRetryError)
 
     def test_create_server(self):
         """
@@ -1743,15 +1935,16 @@ class DeleteServerTests(SynchronousTestCase):
         delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', interval=5, clock=self.clock)
+                            'serverId', exp_start=2, max_retries=2, clock=self.clock)
         self.assertEqual(delete_and_verify.call_count, 1)
         self.assertNoResult(d)
 
         delete_and_verify.side_effect = lambda *a, **kw: None
-        self.clock.pump([5])
+
+        self.clock.advance(2)
         self.assertEqual(
             delete_and_verify.mock_calls,
-            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
+            [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
                        'my-auth-token', 'serverId')] * 2)
         self.successResultOf(d)
 
@@ -1762,7 +1955,7 @@ class DeleteServerTests(SynchronousTestCase):
         # success logged
         self.log.msg.assert_called_with(
             matches(StartsWith("Server deleted successfully")),
-            server_id='serverId', time_delete=5)
+            server_id='serverId', time_delete=2.0)
 
     def test_verified_delete_retries_verification_until_timeout(self):
         """
@@ -1771,20 +1964,23 @@ class DeleteServerTests(SynchronousTestCase):
         """
         delete_and_verify = patch(
             self, 'otter.worker.launch_server_v1.delete_and_verify')
-        delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
+        delete_and_verify.side_effect = lambda *a, **kw: fail(DummyException("bad"))
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', interval=5, timeout=20, clock=self.clock)
+                            'serverId', exp_start=2, max_retries=2, clock=self.clock)
         self.assertNoResult(d)
 
-        self.clock.pump([5] * 4)
+        self.clock.advance(2)
+        self.assertNoResult(d)
+        self.assertEqual(delete_and_verify.call_count, 2)
+
+        self.clock.advance(4)
+        self.failureResultOf(d, DummyException)
         self.assertEqual(
             delete_and_verify.mock_calls,
-            [mock.call(matches(IsInstance(self.log.__class__)), 'http://url/',
-                       'my-auth-token', 'serverId')] * 4)
-        self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
-                                             server_id='serverId')
+            [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
+                       'my-auth-token', 'serverId')] * 3)
 
         # the loop has stopped
-        self.clock.pump([5])
-        self.assertEqual(delete_and_verify.call_count, 4)
+        self.clock.pump([16, 32])
+        self.assertEqual(delete_and_verify.call_count, 3)
