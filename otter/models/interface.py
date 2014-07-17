@@ -252,8 +252,7 @@ class IScalingGroup(Interface):
         The manifest contains everything required to configure this scaling:
         the config, the launch config, and all the scaling policies.
 
-        :param with_webhooks: Should webhooks information be included?
-        :type config: :class:`bool`
+        :param bool with_webhooks: Should webhooks information be included?
 
         :return: a dictionary corresponding to the JSON schema at
             :data:`otter.json_schema.model_schemas.manifest`
