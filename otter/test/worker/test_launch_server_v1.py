@@ -1066,6 +1066,27 @@ class ServerTests(SynchronousTestCase):
         self.failureResultOf(d)
         self.assertEqual(len(fs.mock_calls), 4)
 
+    @mock.patch('otter.worker.launch_server_v1.find_server')
+    def test_create_server_does_not_retry_on_400_response(self, fs):
+        """
+        If attempting to create a server fails due to a Nova 400 error,
+        creation is not retried.  Server existence is not attempted.
+        """
+        req = ('POST', 'http://url/servers',
+               headers_to_hashable(headers('my-auth-token')),
+               json.dumps({'server': {}}), ("log",))
+        resp = StubResponse(400, {})
+
+        _treq = StubTreq({req: resp}, {resp: "User error!"})
+
+        clock = Clock()
+        d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
+                          clock=clock, _treq=_treq)
+        clock.advance(15)
+
+        self.failureResultOf(d)
+        self.assertFalse(fs.called)
+
     @mock.patch('otter.worker.launch_server_v1.server_details')
     def test_wait_for_active(self, server_details):
         """
