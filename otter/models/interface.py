@@ -369,11 +369,11 @@ class IScalingGroup(Interface):
         :param data: a list of one or more scaling policies in JSON format,
             each of which is defined by
             :data:`otter.json_schema.group_schemas.policy`
-        :type data: ``list`` of ``dict``
+        :type data: :class:`list` of ``dict``
 
         :return: list of newly created scaling policies and their ids, as
             specified by :data:`otter.json_schema.model_schemas.policy_list`
-        :rtype: ``list`` of ``dict``
+        :rtype: :class:`list` of ``dict``
 
         :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
@@ -410,7 +410,7 @@ class IScalingGroup(Interface):
         :return: a list of the policies, as specified by
             :data:`otter.json_schema.model_schemas.policy_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``list``
+            :class:`list`
 
         :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
@@ -589,7 +589,7 @@ class IScalingScheduleCollection(Interface):
         Add cron events equally distributed among the buckets
 
         :param cron_events: list of events (dict) to be added
-        :type cron_events: ``list``
+        :type cron_events: :class:`list`
 
         :return: None
         """
@@ -640,7 +640,7 @@ class IScalingGroupCollection(Interface):
         :param policies: list of scaling group policies, each one given as a
             JSON blob as specified by
             :data:`otter.json_schema.group_schemas.scaling_policy`
-        :type data: ``list`` of ``dict``
+        :type data: :class:`list` of ``dict``
 
         :return: a dictionary corresponding to the JSON schema at
             :data:`otter.json_schema.model_schemas.manifest`, except that
@@ -662,7 +662,7 @@ class IScalingGroupCollection(Interface):
 
         :return: a list of scaling group states
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with a
-            ``list`` of :class:`GroupState`
+            :class:`list` of :class:`GroupState`
         """
 
     def get_scaling_group(log, tenant_id, scaling_group_id):
