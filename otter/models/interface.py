@@ -17,7 +17,7 @@ class GroupState(object):
         object represents
     :ivar bytes group_name: the name of the scaling group whose state this
         object represents
-    :ivar bytes desired: the desired capacity of the scaling group
+    :ivar int desired: the desired capacity of the scaling group
     :ivar dict active: the mapping of active server ids and their info
     :ivar dict pending: the list of pending job ids and their info
     :ivar bool paused: whether the scaling group is paused in scaling activities
