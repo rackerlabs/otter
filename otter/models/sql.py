@@ -41,6 +41,24 @@ class SQLScalingGroup(object):
         self.tenant_id = tenant_id
         self.uuid = uuid
 
+    def _complain_if_missing_policy(self, result_proxy, conn, policy_id):
+        """If no rows matched, the policy doesn't exist.
+
+        That could be just because this policy doesn't exist, or because the
+        group doesn't even exist. Check if the group exists, and raise
+        :class:`~iface.NoSuchPolicyError` or
+        :class:`~iface.NoSuchScalingGroupError` accordingly.
+
+        """
+        if result_proxy.rowcount == 0:
+            d = _verify_group_exists(conn, self.tenant_id, self.uuid)
+            @d.addCallback
+            def okay_so_the_group_exists_but_policy_doesnt(res):
+                raise iface.NoSuchPolicyError(self.tenant_id, self.uuid, policy_id)
+            return d
+
+        return result_proxy
+
     @_with_transaction
     def create_policies(self, conn, policy_cfgs):
         """
@@ -77,26 +95,7 @@ class SQLScalingGroup(object):
         d = conn.execute(policies.update()
                          .where(policies.c.id == policy_id)
                          .values(**data))
-
-        @d.addCallback
-        def complain_if_no_rows_matched(result_proxy):
-            """
-            If no rows matched, the policy doesn't exist.
-
-            Check if the group exists, and raise
-            :class:`~iface.NoSuchPolicyError` or
-            :class:`~iface.NoSuchScalingGroupError` accordingly.
-            """
-            if result_proxy.rowcount == 0:
-                d = _verify_group_exists(conn, self.tenant_id, self.uuid)
-
-                @d.addCallback
-                def okay_so_the_group_exists_but_policy_doesnt(res):
-                    raise iface.NoSuchPolicyError(self.tenant_id,
-                                                  self.uuid,
-                                                  policy_id)
-                return d
-
+        d.addCallback(self._complain_if_missing_policy, conn, policy_id)
         return d
 
     def list_policies(self, limit=100, marker=None):
@@ -179,6 +178,13 @@ class SQLScalingGroup(object):
         return d
 
     @_with_transaction
+    def delete_policy(self, conn, policy_id):
+        query = policies.delete().where(policies.c.id == policy_id)
+        d = conn.execute(query)
+        d.addCallback(self._complain_if_missing_policy, conn, policy_id)
+        return d
+
+    @_with_transaction
     def create_webhooks(self, conn, policy_id, data):
         """
         Creates some webhooks.
@@ -223,7 +229,6 @@ class SQLScalingGroup(object):
                     for d in data_with_ids]
 
         return d
-
 
 def _verify_group_exists(conn, tenant_id, group_id):
     d = conn.execute(scaling_groups
