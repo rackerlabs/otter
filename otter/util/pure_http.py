@@ -70,21 +70,18 @@ def request_with_auth(get_request, method, url, auth=None,
     Effect that this function returns.
     """
 
-    def handle_reauth(result, retries):
+    def handle_reauth(result):
         response, content = result
-
         if response.code in reauth_codes:
-            def got_reauth(result):
-                raise NoResponseError()
-            return auth(refresh=True).on(success=got_reauth)
+            return auth(refresh=True).on(success=lambda ignored: result)
         else:
             return result
 
-    def try_request(token, retries=1):
+    def try_request(token):
         req_headers = {} if headers is None else headers
         req_headers = merge(req_headers, otter_headers(token))
         eff = get_request(method, url, headers=req_headers, **kwargs)
-        return eff.on(success=lambda r: handle_reauth(r, retries))
+        return eff.on(success=lambda r: handle_reauth(r))
 
     return auth().on(success=try_request)
 
@@ -114,19 +111,20 @@ def content_request(result):
     return result.on(success=lambda r: r[1])
 
 
-def retry(func, retries=3, should_retry=None, **kwargs):
+def retry(func, should_retry):
     """
-    Call an effectful ``func`` with ``**kwargs``. If it fails, call it again,
-    up to ``retries`` times, as long as ``should_retry()`` returns an Effect of
-    True.
+    Call an effectful ``func`` as long as it fails and as long as the should_retry
+    error handler returns (an Effect of) True.
 
-    If ``should_retry`` returns an Effect of False, then None will be returned.
+    If ``should_retry`` returns (an Effect of) False, then None will be returned.
     """
+    # TODO: delays between retries, though this could technically be done in
+    # should_retry...
+    # TODO: cancellation????
+    # TODO: try to merge this as much as possible with retry.py
 
     def _retry():
-        return retry(func, retries=retries - 1, should_retry=should_retry, **kwargs)
-
-    eff = func(**kwargs)
+        return retry(func, should_retry=should_retry)
 
     def maybe_retry(retry_allowed):
         if retry_allowed:
@@ -134,12 +132,10 @@ def retry(func, retries=3, should_retry=None, **kwargs):
         else:
             return None
 
-    if should_retry is not None:
-        eff = eff.on(error=lambda e: should_retry()).on(success=maybe_retry)
+    return func().on(error=should_retry).on(success=maybe_retry)
 
 _request = wrappers(get_request, request_with_auth, request_with_status_check, json_request)
 _request = compose(content_request, _request)
-_request = wrappers(_request, retry)
 
 
 def request(method, url, *args, **kwargs):

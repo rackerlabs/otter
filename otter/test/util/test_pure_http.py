@@ -174,47 +174,15 @@ class PureHTTPClientTests(SynchronousTestCase):
         eff = resolve_stub(eff)
 
         # Reauthentication is then triggered:
-        stub_result = stub_pure_response("", code=code)
+        stub_result = stub_pure_response("badauth!", code=code)
         reauth_effect_result = resolve_effect(eff, stub_result)
         self.assertIs(reauth_effect_result.intent, reauth_effect.intent)
-        # When retry succeeds, the original request is retried:
-        retry_eff = resolve_stub(reauth_effect_result)
-        retry_req = retry_eff.intent
-        # The x-auth-token header has been updated
-        self.assertEqual(retry_req.headers, headers('new-token'))
 
-        # The final request's result is returned as the ultimate result of the
-        # original effect
-        stub_response = stub_pure_response('{"result": 1}')
-        final_result = resolve_effect(retry_eff, stub_response)
-        self.assertEqual(final_result, {'result': 1})
-
-    def test_ineffectual_reauth(self):
-        """
-        When a 401 is returned even after reauthentication, ReauthIneffectualError is
-        raised.
-        """
-        reauth_effect = Effect(StubIntent("new-token"))
-
-        def auth(refresh=False):
-            if refresh:
-                return reauth_effect
-            else:
-                return Effect(StubIntent("first-token"))
-        # First we try to make a simple request.
-        eff = request("get", "/foo", auth=auth)
-        # The initial (cached) token is retrieved.
-        eff = resolve_stub(eff)
-        # a 401 is returned, triggering refreshed reauthentication:
-        stub_result = stub_pure_response("", code=401)
-        reauth_effect_result = resolve_effect(eff, stub_result)
-        self.assertIs(reauth_effect_result.intent, reauth_effect.intent)
-        # When retry succeeds, the original request is retried:
-        retry_eff = resolve_stub(reauth_effect_result)
-        # When 401 is returned *again*, we get the error.
-        stub_response = stub_pure_response("", code=401)
-        self.assertRaises(ReauthFailedError,
-                          resolve_effect, retry_eff, stub_response)
+        # And the original HTTP response (of whatever code) is returned.
+        api_error = self.assertRaises(APIError, resolve_stub, reauth_effect_result)
+        self.assertEqual(api_error.code, code)
+        self.assertEqual(api_error.body, "badauth!")
+        self.assertEqual(api_error.headers, {})
 
     def test_should_retry_nope(self):
         # ok, try this.
@@ -222,9 +190,9 @@ class PureHTTPClientTests(SynchronousTestCase):
         # request_with_reauth should NOT retry requests. It should,
         # instead, just reauthenticate. If reauthentication fails, it
         # should reraise the exception that it got. If reauthentication
-        # succeeds, it should raise NoResponseError.
+        # succeeds, it should return the original result.
 
-        # another function, request_with_retries, should be somehow
-        # combined with request. It can catch any exception (including
-        # NoResponseError), invoke a "should_retry" function, and then
-        # retry the request.
+        # another function, retry, should be
+        # combined with request. It can catch any exception (commonly APIError),
+        # invoke a "should_retry" function, and then retry the request.
+        pass
