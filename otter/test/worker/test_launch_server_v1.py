@@ -997,21 +997,20 @@ class ServerTests(SynchronousTestCase):
         error, but a server was indeed created and found, :func:`create_server`
         returns this found server successfully.  Creation is not retried.
         """
-        self.treq.post.return_value = succeed(mock.Mock(code=500))
-        self.treq.content.return_value = succeed(error_body)
+        req = ('POST', 'http://url/servers',
+               headers_to_hashable(headers('my-auth-token')),
+               json.dumps({'server': {'some': 'stuff'}}), ("log",))
+        resp = StubResponse(500, {})
+
+        _treq = StubTreq({req: resp}, {resp: 'failure'})
+
         fs.return_value = succeed("I'm a server!")
 
-        server_config = {
-            'name': 'someServer',
-            'imageRef': '1',
-            'flavorRef': '3'
-        }
-
-        d = create_server('http://url/', 'my-auth-token', server_config)
+        d = create_server('http://url/', 'my-auth-token', {'some': 'stuff'},
+                          _treq=_treq)
 
         result = self.successResultOf(d)
         self.assertEqual(result, "I'm a server!")
-        self.assertEqual(len(self.treq.post.mock_calls), 1)
 
     @mock.patch('otter.worker.launch_server_v1.find_server')
     def test_create_server_errors_if_no_server_found(self, fs):
@@ -1020,18 +1019,17 @@ class ServerTests(SynchronousTestCase):
         error, and a created server was not found, :func:`create_server`
         returns original error when on the last retry.
         """
-        self.treq.post.return_value = succeed(mock.Mock(code=500))
-        self.treq.content.return_value = succeed(error_body)
+        req = ('POST', 'http://url/servers',
+               headers_to_hashable(headers('my-auth-token')),
+               json.dumps({'server': {}}), ("log",))
+        resp = StubResponse(500, {})
+
+        _treq = StubTreq({req: resp}, {resp: 'failure'})
+
         fs.return_value = succeed(None)
 
-        server_config = {
-            'name': 'someServer',
-            'imageRef': '1',
-            'flavorRef': '3'
-        }
-
-        d = create_server('http://url/', 'my-auth-token', server_config,
-                          retries=0)
+        d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
+                          retries=0, _treq=_treq)
 
         failure = self.failureResultOf(d, RequestError)
         real_failure = failure.value.reason
@@ -1048,28 +1046,24 @@ class ServerTests(SynchronousTestCase):
         error, and no server was found to be created, :func:`create_server`
         reties the create up to 3 times by default
         """
-        self.treq.post.side_effect = lambda *a, **kw: succeed(mock.Mock(code=500))
-        self.treq.content.side_effect = lambda *a, **kw: succeed(error_body)
+        req = ('POST', 'http://url/servers',
+               headers_to_hashable(headers('my-auth-token')),
+               json.dumps({'server': {}}), ("log",))
+        resp = StubResponse(500, {})
+
+        _treq = StubTreq({req: resp}, {resp: error_body})
+
         fs.side_effect = lambda *a, **kw: succeed(None)
 
-        server_config = {
-            'name': 'someServer',
-            'imageRef': '1',
-            'flavorRef': '3'
-        }
-
         clock = Clock()
-
-        d = create_server('http://url/', 'my-auth-token', server_config,
-                          clock=clock)
+        d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
+                          clock=clock, _treq=_treq)
 
         for i in range(3):
-            self.assertEqual(len(self.treq.post.mock_calls), i + 1)
             self.assertEqual(len(fs.mock_calls), i + 1)
             clock.advance(15)
 
         self.failureResultOf(d)
-        self.assertEqual(len(self.treq.post.mock_calls), 4)
         self.assertEqual(len(fs.mock_calls), 4)
 
     @mock.patch('otter.worker.launch_server_v1.server_details')
