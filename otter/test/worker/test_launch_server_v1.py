@@ -929,7 +929,7 @@ class ServerTests(SynchronousTestCase):
 
         result = self.successResultOf(d)
         self.assertEqual(result, {"server": "created"})
-        self.assertEqual(len(fs.mock_calls), 0)
+        self.assertFalse(fs.called)
 
     def test_create_server_limits(self):
         """
