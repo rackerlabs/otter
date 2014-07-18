@@ -54,7 +54,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
             <releaseinfo>API v1.0</releaseinfo>
             <productname>&PRODNAME;</productname>
             <!-- enter the publication date of this document; in revhistory, explain what changed -->
-            <pubdate/>
+            <pubdate>2014-07-18</pubdate>
             <copyright>
             <year>2014</year>
             <holder>Rackspace US, Inc.</holder>
@@ -66,6 +66,17 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 </annotation>
             </legalnotice>
             <revhistory>
+                <revision
+                    xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                    <date>2014-07-18</date>
+                    <revdescription>
+                        <itemizedlist spacing="compact">
+                            <listitem>
+                                <para>Republished to incorporate new Rackspace logo. </para>
+                            </listitem>
+                        </itemizedlist>
+                    </revdescription>
+                </revision>
                 <revision>
                     <date>2014-05-14</date>
                     <revdescription>
