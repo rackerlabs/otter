@@ -206,8 +206,9 @@ def with_lock(reactor, lock, log, func, *args, **kwargs):
     """
     Context manager for any lock object that contains acquire() and release() methods
     """
-
     d = defer.maybeDeferred(lock.acquire)
+    # TODO: 150 seconds is assuming lock.acquire internally times out after 120 seconds
+    timeout_deferred(d, 150, reactor, 'Lock acquisition')
     d.addCallback(log_with_time, reactor, log, reactor.seconds(),
                   'Lock acquisition', 'acquire_time')
     d.addErrback(log_with_time, reactor, log, reactor.seconds(),
@@ -215,6 +216,7 @@ def with_lock(reactor, lock, log, func, *args, **kwargs):
 
     def release_lock(result):
         d = defer.maybeDeferred(lock.release)
+        timeout_deferred(d, 150, reactor, 'Lock release')
         d.addCallback(
             log_with_time, reactor, log, reactor.seconds(), 'Lock release', 'release_time')
         return d.addCallback(lambda _: result)
