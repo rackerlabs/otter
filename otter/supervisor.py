@@ -373,6 +373,7 @@ class _Job(object):
         d = self.supervisor.execute_config(
             self.log, self.transaction_id, self.scaling_group, launch_config)
         d.addCallbacks(self._job_succeeded, self._job_failed)
+        d.addErrback(self.log.err)
 
         return d
 
