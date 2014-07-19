@@ -1,6 +1,7 @@
 """
 Mixins and utilities to be used for testing.
 """
+from functools import partial
 import json
 import mock
 import os
@@ -11,12 +12,14 @@ from zope.interface import implementer, directlyProvides
 from testtools.matchers import Mismatch
 
 from twisted.internet import defer
-from twisted.internet.defer import succeed, Deferred
+from twisted.internet.defer import succeed, Deferred, maybeDeferred
 from twisted.python.failure import Failure
 from twisted.application.service import Service
 
 from otter.log.bound import BoundLog
 from otter.supervisor import ISupervisor
+from otter.models.interface import IScalingGroup
+from otter.util.deferredutils import DeferredPool
 
 
 class matches(object):
@@ -281,24 +284,69 @@ class StubTreq(object):
     """
     def __init__(self, reqs=None, contents=None):
         """
-        :param reqs: A dictionary specifying the values that the `request` method should return. Keys
-            are tuples of (method, url, headers, data, log). Since headers is usually passed as a dict,
-            here it should be specified as a tuple of two-tuples in sorted order.
-        :param contents: A dictionary specifying the values that the `content` method should return.
-            Keys should match up with the values of the `reqs` dict.
+        :param reqs: A dictionary specifying the values that the `request`
+            method should return. Keys are tuples of:
+            (method, url, headers, data, (<other key names>)).
+            Since headers is usually passed as a dict, here it should be
+            specified as a tuple of two-tuples in sorted order.
+
+        :param contents: A dictionary specifying the values that the `content`
+            method should return. Keys should match up with the values of the
+            `reqs` dict.
         """
         self.reqs = reqs
         self.contents = contents
 
-    def request(self, method, url, headers, data, log):
-        """Return a result by looking up the arguments in the `reqs` dict."""
+    def _headers_to_tuple(self, headers):
         if headers is not None:
-            headers = tuple(sorted(headers.items()))
-        return self.reqs[(method, url, headers, data, log)]
+            return tuple(sorted(headers.items()))
+        return headers
+
+    def request(self, method, url, **kwargs):
+        """
+        Return a result by looking up the arguments in the `reqs` dict.
+        The only kwargs we care about are 'headers' and 'data',
+        although if other kwargs are passed their keys count as part of the
+        request.
+
+        'log' would also be a useful kwarg to check, but since dictionary keys
+        should be immutable, and it's hard to get the exact instance of
+        BoundLog, that's being ignored for now.
+        """
+        return succeed(self.reqs[
+            (method, url, self._headers_to_tuple(kwargs.pop('headers', None)),
+             kwargs.pop('data', None), tuple(kwargs.keys()))])
 
     def content(self, response):
         """Return a result by looking up the response in the `contents` dict."""
-        return self.contents[response]
+        return succeed(self.contents[response])
+
+    def json_content(self, response):
+        """Return :meth:`content` after json-decoding"""
+        return succeed(json.loads(self.contents[response]))
+
+    def put(self, url, data=None, **kwargs):
+        """
+        Syntactic sugar for making a PUT request, because the order of the
+        params are different than :meth:`request`
+        """
+        return self.request('PUT', url, data=data, **kwargs)
+
+    def post(self, url, data=None, **kwargs):
+        """
+        Syntactic sugar for making a POST request, because the order of the
+        params are different than :meth:`request`
+        """
+        return self.request('POST', url, data=data, **kwargs)
+
+    def __getattr__(self, method):
+        """
+        Syntactic sugar for making head/get/delete requests, because the order
+        of parameters is the same as :meth:`request`
+        """
+        if method in ('get', 'head', 'delete'):
+            return partial(self.request, method.upper())
+        raise AttributeError("StubTreq has no attribute '{0}'".format(method))
 
 
 def mock_treq(code=200, json_content={}, method='get', content='', treq_mock=None):
@@ -314,8 +362,8 @@ def mock_treq(code=200, json_content={}, method='get', content='', treq_mock=Non
         treq_mock = mock.MagicMock(spec=treq)
     response = mock.MagicMock(code=code)
     treq_mock.configure_mock(**{method + '.return_value': defer.succeed(response)})
-    treq_mock.json_content.return_value = defer.succeed(json_content)
-    treq_mock.content.return_value = defer.succeed(content)
+    treq_mock.json_content.side_effect = lambda r: defer.succeed(json_content)
+    treq_mock.content.side_effect = lambda r: defer.succeed(content)
     return treq_mock
 
 
@@ -333,7 +381,7 @@ class FakeSupervisor(object, Service):
 
     def __init__(self, *args):
         self.args = args
-        self.index = 0
+        self.deferred_pool = DeferredPool()
         self.exec_calls = []
         self.exec_defs = []
         self.del_index = 0
@@ -343,11 +391,9 @@ class FakeSupervisor(object, Service):
         """
         Execute single launch config
         """
-        self.index += 1
         self.exec_calls.append((log, transaction_id, scaling_group, launch_config))
-        d = Deferred()
-        self.exec_defs.append(d)
-        return succeed((self.index, d))
+        self.exec_defs.append(Deferred())
+        return self.exec_defs[-1]
 
     def execute_delete_server(self, log, transaction_id, scaling_group, server):
         """
@@ -356,3 +402,26 @@ class FakeSupervisor(object, Service):
         self.del_index += 1
         self.del_calls.append((log, transaction_id, scaling_group, server))
         return succeed(self.del_index)
+
+
+def mock_group(state, tenant_id='tenant', group_id='group'):
+    """
+    Return mocked `IScalingGroup` that has tunable `modify_state` method
+
+    :param state: This will be passed to `modify_state` callable
+    """
+    group = iMock(IScalingGroup, tenant_id=tenant_id, uuid=group_id)
+    group.pause_modify_state = False
+    group.modify_state_values = []
+
+    def fake_modify_state(f, *args, **kwargs):
+        d = maybeDeferred(f, group, state, *args, **kwargs)
+        d.addCallback(lambda r: group.modify_state_values.append(r) or r)
+        if group.pause_modify_state:
+            group.modify_state_pause_d = Deferred()
+            return group.modify_state_pause_d.addCallback(lambda _: d)
+        else:
+            return d
+
+    group.modify_state.side_effect = fake_modify_state
+    return group
