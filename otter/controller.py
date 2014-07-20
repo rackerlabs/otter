@@ -70,7 +70,7 @@ def resume_scaling_group(log, transaction_id, scaling_group):
     raise NotImplementedError('Resume is not yet implemented')
 
 
-def _do_convergence_audit_log(_, log, delta, state):
+def _do_convergence_audit_log(_, log, delta):
     """
     Logs a convergence event to the audit log
     """
@@ -90,7 +90,6 @@ def _do_convergence_audit_log(_, log, delta, state):
                   # them from making it into the audit log
                   policy_id=None, webhook_id=None,
                   **state.get_capacity())
-    return state
 
 
 def obey_config_change(log, transaction_id, config, scaling_group, state,
@@ -165,7 +164,7 @@ def converge(log, transaction_id, config, scaling_group, desired, launch_config,
             # delta < 0 (scale down)
             execute_log.msg("scaling down")
             deferred = exec_scale_down(execute_log, transaction_id, scaling_group, -delta)
-        deferred.addCallback(_do_convergence_audit_log, log, delta, state)
+        deferred.addCallback(_do_convergence_audit_log, log, delta)
         return deferred.addCallback(lambda _: current + delta)
 
     # Start/stop servers
