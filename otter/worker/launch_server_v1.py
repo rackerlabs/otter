@@ -485,7 +485,7 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
 
 
 def launch_server(log, region, scaling_group, service_catalog, auth_token,
-                  launch_config, undo, clock=None):
+                  launch_config, server_id, undo, clock=None):
     """
     Launch a new server given the launch config auth tokens and service catalog.
     Possibly adding the newly launched server to a load balancer.
@@ -498,6 +498,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     :param str auth_token: The user's auth token.
     :param dict launch_config: A launch_config args structure as defined for
         the launch_server_v1 type.
+    :param str server_id: ID managed in otter db. This is NOT nova server id
     :param IUndoStack undo: The stack that will be rewound if undo fails.
 
     :return: Deferred that fires with a 2-tuple of server details and the
@@ -525,7 +526,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     ilog = [None]
 
     def wait_for_server(server):
-        server_id = server['server']['id']
+        nova_server_id = server['server']['id']
 
         # NOTE: If server create is retried, each server delete will be pushed
         # to undo stack even after it will be deleted in check_error which is fine
@@ -533,12 +534,16 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
         undo.push(
             verified_delete, log, server_endpoint, auth_token, server_id)
 
-        ilog[0] = log.bind(server_id=server_id)
+        ilog[0] = log.bind(nova_server_id=nova_server_id)
         return wait_for_active(
             ilog[0],
             server_endpoint,
             auth_token,
-            server_id)
+            nova_server_id)
+
+    def update_nova_id(server):
+        d = scaling_group.get_servers_collection().update_server(log, server_id, server['server']['id'])
+        return d.addCallback(lambda _: wait_for_server(server))
 
     def add_lb(server):
         ip_address = private_ip_addresses(server)[0]
@@ -549,6 +554,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
 
     def _create_server():
         d = create_server(server_endpoint, auth_token, server_config, log=log)
+        d.addCallback(update_nova_id)
         d.addCallback(wait_for_server)
         d.addCallback(add_lb)
         return d

@@ -80,12 +80,13 @@ class SupervisorService(object, Service):
         self.coiterate = coiterate
         self.deferred_pool = DeferredPool()
 
-    def execute_config(self, log, transaction_id, scaling_group, launch_config):
+    def execute_config(self, log, transaction_id, scaling_group, launch_config, server_id):
         """
         see :meth:`ISupervisor.execute_config`
         """
         log = log.bind(worker=launch_config['type'],
-                       tenant_id=scaling_group.tenant_id)
+                       tenant_id=scaling_group.tenant_id,
+                       server_id=server_id)
 
         assert launch_config['type'] == 'launch_server'
 
@@ -103,7 +104,7 @@ class SupervisorService(object, Service):
                 scaling_group,
                 service_catalog,
                 auth_token,
-                launch_config['args'], undo)
+                launch_config['args'], server_id, undo)
 
         d.addCallback(when_authenticated)
 
@@ -112,7 +113,7 @@ class SupervisorService(object, Service):
             # to pass to the controller to store in the active state is returned
             server_details, lb_info = result
             log.msg("Done executing launch config.",
-                    server_id=server_details['server']['id'])
+                    nova_server_id=server_details['server']['id'])
             return {
                 'id': server_details['server']['id'],
                 'links': server_details['server']['links'],
@@ -367,11 +368,18 @@ class _Job(object):
         except:
             flavor = 'Unable to pull flavor ref.'
 
-        self.job_id = generate_job_id(self.scaling_group.uuid)
-        self.log = self.log.bind(image_ref=image, flavor_ref=flavor, job_id=self.job_id)
+        self.log = self.log.bind(image_ref=image, flavor_ref=flavor) job_id=self.job_id)
+        self.servers_coll = self.scaling_group.get_servers_collection()
+        d = self.servers_coll.create_server(self.log)
 
-        d = self.supervisor.execute_config(
-            self.log, self.transaction_id, self.scaling_group, launch_config)
+        def exec_conf(server_id):
+            self.server_id = server_id
+            self.log = self.log.bind(server_id=server_id)
+            return self.supervisor.execute_config(
+                self.log, self.transaction_id, self.scaling_group,
+                launch_config, server_id)
+
+        d.addCallback(exec_conf)
         d.addCallbacks(self._job_succeeded, self._job_failed)
         d.addErrback(self.log.err)
 
@@ -379,17 +387,9 @@ class _Job(object):
 
     def _job_failed(self, f):
         """
-        Job has failed. Remove the job, if it exists, and log the error.
+        Job has failed. Remove the server_id, if it exists, and log the error.
         """
-        def handle_failure(group, state):
-            # if it is not in pending, then the job was probably deleted before
-            # it got a chance to fail.
-            if self.job_id in state.pending:
-                state.remove_job(self.job_id)
-            self.log.err(f, 'Launching server failed', **_log_capacity(state))
-            return state
-
-        d = self.scaling_group.modify_state(handle_failure)
+        d = self.servers_coll.delete_server(self.log, self.server_id)
 
         def ignore_error_if_group_deleted(f):
             f.trap(NoSuchScalingGroupError)
@@ -397,6 +397,7 @@ class _Job(object):
                          "Job failure logged and ignored.")
 
         d.addErrback(ignore_error_if_group_deleted)
+        d.addErrback(self.log.err, 'Lauching server failed', **_log_capacity(state))
         return d
 
     def _job_succeeded(self, result):
@@ -404,32 +405,36 @@ class _Job(object):
         Job succeeded. If the job exists, move the server from pending to active
         and log.  If not, then the job has been canceled, so delete the server.
         """
-        server_id = result['id']
-        log = self.log.bind(server_id=server_id)
+        nova_server_id = result['id']
+        log = self.log.bind(nova_server_id=nova_server_id)
 
-        def handle_success(group, state):
-            if self.job_id not in state.pending:
-                # server was slated to be deleted when it completed building.
-                # So, deleting it now
-                audit(log).msg(
-                    "A pending server that is no longer needed is now active, "
-                    "and hence deletable.  Deleting said server.",
-                    event_type="server.deletable", **_log_capacity(state))
+        def log_success(_):
+            audit(log).msg("Server is active.", event_type="server.active",
+                           **_log_capacity(state))
 
-                job = _DeleteJob(self.log, self.transaction_id,
-                                 self.scaling_group, result, self.supervisor)
-                d = job.start()
-                self.supervisor.deferred_pool.add(d)
-            else:
-                state.remove_job(self.job_id)
-                state.add_active(result['id'], result)
-                audit(log).msg("Server is active.", event_type="server.active",
-                               **_log_capacity(state))
-            return state
+        d = self.servers_coll.update_server(log, self.server_id, nova_server_id, 'active')
+        d.addCallback(log_success)
 
-        d = self.scaling_group.modify_state(handle_success)
+        def handle_server_deletion(f):
+            # TODO: Ideally, job should keep checking the server in db and delete
+            # the server from nova if it doesn't find it
+            f.trap(NoSuchServerError)
+            # server was slated to be deleted when it completed building.
+            # So, deleting it now
+            audit(log).msg(
+                "A pending server that is no longer needed is now active, "
+                "and hence deletable. Deleting said server.",
+                event_type="server.deletable", **_log_capacity(state))
+            job = _DeleteJob(self.log, self.transaction_id,
+                             self.scaling_group, result, self.supervisor)
+            d = job.start()
+            self.supervisor.deferred_pool.add(d)
+
+        d.addErrback(handle_server_deletion)
 
         def delete_if_group_deleted(f):
+            # TODO: This will work only if `update_server` raises below exception.
+            # Ideally, the server itself should get deleted and it shouldn't come here
             f.trap(NoSuchScalingGroupError)
             audit(log).msg(
                 "A pending server belonging to a deleted scaling group "
@@ -446,7 +451,7 @@ class _Job(object):
         return d
 
 
-def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
+def execute_launch_config(log, transaction_id, launch, scaling_group, delta):
     """
     Execute a launch config some number of times.
     """
