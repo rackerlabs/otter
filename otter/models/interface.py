@@ -779,18 +779,18 @@ class IScalingGroupServersCollection(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``list``
         """
 
-    def create_server(log, nova_server_id=None, status='pending'):
+    def create_server(log, nova_id=None, status='pending'):
         """
         Create server in scaling group based on the tenant id and group id
 
-        :param str nova_server_id: Nova ID of the server being added. This can be None
+        :param str nova_id: Nova ID of the server being added. This can be None
         :param str status: status of the server. one of 'pending' or 'active'
 
         :return: a dictionary of server with `id` in it
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
         """
 
-    def update_server(log, server_id, nova_server_id=None, status=None, clb_id=None, node_id=None):
+    def update_server(log, server_id, nova_id=None, status=None, lb_info=None):
         """
         Update existing server information
         TODO: Should it take dict returned from create_server as arg instead?
@@ -809,14 +809,14 @@ class IScalingGroupServersCollection(Interface):
         Get server from scaling group
         """
 
-    def get_server_on_nova_id(log, nova_server_id):
+    def get_server_on_nova_id(log, nova_id):
         """
         Get server from scaling group based on its nova id
         """
 
     def delete_server(log, server_id):
         """
-        Remove server from scaling group
+        Remove single server from scaling group
 
         :raises NoSuchScalingGroupError: if this scaling group does not exist
         :raises NoSuchServerError: if the server id does not exist
@@ -827,6 +827,8 @@ class IScalingGroupServersCollection(Interface):
         Remove servers from scaling group
 
         :param list server_ids: List of server IDs to be deleted
+        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        TODO: What about `NoSuchServerError`?
         """
 
 

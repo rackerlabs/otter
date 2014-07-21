@@ -113,7 +113,7 @@ class SupervisorService(object, Service):
             # to pass to the controller to store in the active state is returned
             server_details, lb_info = result
             log.msg("Done executing launch config.",
-                    nova_server_id=server_details['server']['id'])
+                    nova_id=server_details['server']['id'])
             return {
                 'id': server_details['server']['id'],
                 'links': server_details['server']['links'],
@@ -137,7 +137,7 @@ class SupervisorService(object, Service):
         """
         see :meth:`ISupervisor.execute_delete_server`
         """
-        log = log.bind(nova_server_id=server['nova_server_id'])
+        log = log.bind(nova_id=server['nova_id'])
 
         # authenticate for tenant
         def when_authenticated((auth_token, service_catalog)):
@@ -146,7 +146,7 @@ class SupervisorService(object, Service):
                 self.region,
                 service_catalog,
                 auth_token,
-                (server['nova_server_id'], server['lb_info']))
+                (server['nova_id'], server['lb_info']))
 
         d = self.auth_function(scaling_group.tenant_id, log=log)
         log.msg("Authenticating for tenant")
@@ -273,7 +273,7 @@ class _DeleteJob(object):
         :param dict server_info: a `dict` of server info
         """
         self.log = log.bind(system='otter.job.delete', server_id=server_info['id'],
-                            nova_server_id=server_info['nova_server_id'])
+                            nova_id=server_info['nova_id'])
         self.trans_id = transaction_id
         self.scaling_group = scaling_group
         self.server_info = server_info
@@ -369,13 +369,13 @@ class _Job(object):
         Job succeeded. If the job exists, move the server from pending to active
         and log.  If not, then the job has been canceled, so delete the server.
         """
-        nova_server_id = result['id']
-        log = self.log.bind(nova_server_id=nova_server_id)
+        nova_id = result['id']
+        log = self.log.bind(nova_id=nova_id)
 
         def log_success(_):
             audit(log).msg("Server is active.", event_type="server.active")
 
-        d = self.servers_coll.update_server(log, self.server_id, nova_server_id, 'active')
+        d = self.servers_coll.update_server(log, self.server_id, nova_id, 'active')
         d.addCallback(log_success)
 
         def handle_server_deletion(f):

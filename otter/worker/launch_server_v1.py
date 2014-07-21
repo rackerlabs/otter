@@ -526,7 +526,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     ilog = [None]
 
     def wait_for_server(server):
-        nova_server_id = server['server']['id']
+        nova_id = server['server']['id']
 
         # NOTE: If server create is retried, each server delete will be pushed
         # to undo stack even after it will be deleted in check_error which is fine
@@ -534,15 +534,16 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
         undo.push(
             verified_delete, log, server_endpoint, auth_token, server_id)
 
-        ilog[0] = log.bind(nova_server_id=nova_server_id)
+        ilog[0] = log.bind(nova_id=nova_id)
         return wait_for_active(
             ilog[0],
             server_endpoint,
             auth_token,
-            nova_server_id)
+            nova_id)
 
     def update_nova_id(server):
-        d = scaling_group.get_servers_collection().update_server(log, server_id, server['server']['id'])
+        d = scaling_group.get_servers_collection().update_server(
+            log, server_id, server['server']['id'])
         return d.addCallback(lambda _: wait_for_server(server))
 
     def add_lb(server):
