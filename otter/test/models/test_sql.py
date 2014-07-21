@@ -108,6 +108,17 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         verifyObject(interface.IScalingGroup, group)
 
     @inlineCallbacks
+    def test_view_manifest(self):
+        group = yield self._create_group()
+        policies = yield self._create_policies(group, n=2)
+
+        other_group = yield self._create_group(tenant_id=b"OTHER_TENANT")
+        yield self._create_policies(other_group)
+
+        manifest = yield group.view_manifest()
+        import pudb; pudb.set_trace()
+
+    @inlineCallbacks
     def test_create_policies_happy_case(self):
         """
         The user can create a policy.
