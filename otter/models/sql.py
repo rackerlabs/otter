@@ -593,23 +593,72 @@ def _paginated(table, limit, marker):
 
     return query
 
-def _get_metadata(conn, metadata_table, item_id):
-    table_foreign_keys = metadata_table.foreign_keys
-    for column in metadata_table.columns.values():
-        if column.foreign_keys == table_foreign_keys:
-            break
+def _get_pairs(table, conn, item_id, formatter):
+    """
+    Gets a bunch of pairs encoded in a key-value-ish schema.
+
+    :param table: A table with a foreign key, and some data cols.
+    :param conn: Current database connection.
+    :param item_id: The id of the item being referenced by the single foreign
+        key in the provided table.
+    :param formatter: A callable that will be called with the matched rows,
+        the table, and the foreign key column, and returns the formatted
+        result.
+    :returns: A deferred that will fire with the result of the formatter.
+
+    """
+    foreign_column = _get_foreign_key(table)
+    query = table.select().where(foreign_column == item_id)
+    d = conn.execute(query).addCallback(_fetchall)
+    return d.addCallback(formatter, table, foreign_column)
+
+
+def _format_key_value(rows, _table, _foreign_column):
+    """
+    Formats the given rows as a bunch of key-value pairs.
+
+    Assumes the rows have ``key`` and ``value`` columns.
+    """
+    return {row["key"]: row["value"] for row in rows}
+
+
+_get_metadata = partial(_get_pairs, formatter=_format_key_value)
+_get_group_metadata = partial(_get_metadata, group_metadata)
+_get_webhook_metadata = partial(_get_metadata, webhook_metadata)
+_get_server_payload = partial(_get_metadata, server_payloads)
+_get_server_metadata = partial(_get_metadata, server_metadata)
+
+def _format_array(rows, table, foreign_column):
+    """
+    Formats a bunch of rows as a sequence of dicts.
+
+    The sequence will look like this::
+
+        [{"a": 0, "b": 1}, {"a": 2, "b": 3}, ...]
+
+    So, a list of dicts, all with the same keys (the keys being the
+    non-foreign key of the table) and respective values.
+
+    """
+    # REVIEW: this is a terrible name
+    other_keys = [name for name, column in table.columns.items()
+                  if column is not foreign_column]
+    return [{col_name: row[col_name] for col_name in other_keys}
+            for row in rows]
+
+
+_get_array = partial(_get_pairs, formatter=_format_array)
+_get_personality = partial(_get_array, personalities)
+_get_networks = partial(_get_array, networks)
+_get_load_balancers = partial(_get_array, load_balancers)
+
+
+def _get_foreign_key(table):
+    """
+    Returns the name and column of the first foreign key in *table*.
+    """
+    for column in table.columns.values():
+        if column.foreign_keys == table.foreign_keys:
+            return column
     else:
-        raise AssertionError("no foreign key in table {}"
-                             .format(metadata_table))
-
-    query = metadata_table.select().where(column == item_id)
-    d = conn.execute(query).addcallback(_fetchall)
-
-    @d.addCallback
-    def format(rows):
-        return {row["key"]: row["value"] for row in rows}
-
-    return d
-
-
-_get_group_metadata = partial(_get_metadata, metadata_table=group_metadata)
+        raise AssertionError("no foreign key in table {}".format(table))
