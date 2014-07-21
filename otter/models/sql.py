@@ -63,14 +63,6 @@ class SQLScalingGroup(object):
     @_with_transaction
     @inlineCallbacks
     def view_manifest(self, conn, with_webhooks=False):
-        query = (scaling_groups.select()
-                 .where(scaling_groups.c.id == self.uuid)
-                 .limit(1))
-        row = yield conn.execute(query).addCallback(_fetchone)
-
-        keys = ['cooldown', 'maxEntities', 'minEntities', 'name']
-        group_configuration = {key: row[key] for key in keys}
-
         def in_context(f):
             """
             Calls the function in the current context.
@@ -85,6 +77,7 @@ class SQLScalingGroup(object):
             if result:
                 dest[key] = result
 
+        group_configuration = yield self._get_config(conn)
         get_and_maybe_add(group_configuration, "metadata", _get_group_metadata)
 
         server = yield in_context(_get_server_payload)
@@ -106,6 +99,35 @@ class SQLScalingGroup(object):
             "launchConfiguration": launch_configuration,
             "scalingPolicies": scaling_policies
         })
+
+    @_with_transaction
+    def view_config(self, conn):
+        return self._get_config(conn)
+
+    def _get_config(self, conn):
+        """
+        Gets the scaling group configuration for this scaling group.
+
+        This is separated from :meth:`view_config` so that other methods that
+        already have a transaction laying around can do it within that
+        transaction, using the database connection *conn*.
+
+        :param conn: The database connection to use.
+        """
+        query = (scaling_groups.select()
+                 .where(scaling_groups.c.id == self.uuid)
+                 .limit(1))
+        d = conn.execute(query).addCallback(_fetchone)
+
+        @d.addCallback
+        def format(row):
+            if row is None:
+                raise iface.NoSuchScalingGroupError(self.tenant_id, self.uuid)
+
+            keys = ['cooldown', 'maxEntities', 'minEntities', 'name']
+            return {key: row[key] for key in keys}
+
+        return d
 
     @_with_transaction
     def create_policies(self, conn, policy_cfgs):
