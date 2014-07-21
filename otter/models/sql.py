@@ -145,6 +145,10 @@ class SQLScalingGroup(object):
                 dest[key] = result
 
         server = yield in_context(_get_server_payload)
+
+        if not server:
+            raise iface.NoSuchScalingGroupError(self.tenant_id, self.uuid)
+
         metadata = yield in_context(_get_server_metadata)
         personality = yield in_context(_get_personality)
         networks = yield in_context(_get_networks)
