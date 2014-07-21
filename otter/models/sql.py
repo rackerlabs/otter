@@ -600,14 +600,16 @@ all_tables = (scaling_groups,
 
 
 def create_tables(engine, tables=all_tables):
-    """Creates all the given tables on the given engine.
-
+    """
+    Creates all the given tables on the given engine.
     """
     return gatherResults(engine.execute(CreateTable(table))
                          for table in tables)
 
+
 _fetchall = methodcaller("fetchall")
 _fetchone = methodcaller("fetchone")
+
 
 def _paginated(table, limit, marker):
     """
@@ -656,6 +658,7 @@ _get_group_metadata = partial(_get_metadata, group_metadata)
 _get_webhook_metadata = partial(_get_metadata, webhook_metadata)
 _get_server_payload = partial(_get_metadata, server_payloads)
 _get_server_metadata = partial(_get_metadata, server_metadata)
+
 
 def _format_array(rows, table, foreign_column):
     """
