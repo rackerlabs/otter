@@ -139,6 +139,15 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
 
     @inlineCallbacks
+    def test_view_launch_config_happy_case(self):
+        """
+        Viewing a launch config works correctly.
+        """
+        group = yield self._create_group()
+        launch_cfg = yield group.view_launch_config()
+        self.assertEqual(launch_cfg, self._launch)
+
+    @inlineCallbacks
     def test_create_policies_happy_case(self):
         """
         The user can create a policy.
