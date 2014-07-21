@@ -82,8 +82,8 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         """
         coll = sql.SQLScalingGroupCollection(self.engine)
 
-        cfg = group_examples.config()[0]
-        launch = group_examples.launch_server_config()[0]
+        cfg = self._config = group_examples.config()[0]
+        launch = self._launch = group_examples.launch_server_config()[0]
         d = coll.create_scaling_group(log, tenant_id, cfg, launch, policies)
 
         d.addCallback(lambda r: coll.get_scaling_group(log, tenant_id, r["id"]))
