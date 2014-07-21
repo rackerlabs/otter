@@ -126,7 +126,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         When attempting to view the configuration for a group that doesn't
         doesn't exist, an exception is raised.
         """
-        group = sql.SQLSCalingGroup(self.engine, b"TENANT", b"BOGUS")
+        group = sql.SQLScalingGroup(self.engine, b"TENANT", b"BOGUS")
         d = group.view_config()
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
 
@@ -143,7 +143,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         When attempting to view the launch configuration for a group that
         doesn't exist, an exception is raised.
         """
-        group = sql.SQLSCalingGroup(self.engine, b"TENANT", b"BOGUS")
+        group = sql.SQLScalingGroup(self.engine, b"TENANT", b"BOGUS")
         d = group.view_launch_config()
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
 
