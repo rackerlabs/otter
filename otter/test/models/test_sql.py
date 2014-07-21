@@ -109,6 +109,9 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
 
     @inlineCallbacks
     def test_view_manifest(self):
+        """
+        Viewing an entire manifest works correctly.
+        """
         group = yield self._create_group()
         policies = yield self._create_policies(group, n=2)
 
