@@ -130,6 +130,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         d = group.view_config()
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
 
+    @inlineCallbacks
     def test_view_config_happy_case(self):
         """
         Viewing a config works correctly.
