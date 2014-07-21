@@ -92,7 +92,7 @@ def _do_convergence_audit_log(_, log, delta):
                   **state.get_capacity())
 
 
-def obey_config_change(log, transaction_id, config, scaling_group, state,
+def obey_config_change(log, transaction_id, config, scaling_group, desired,
                        launch_config):
     """
     Given the config change, do servers need to be started or deleted
@@ -104,8 +104,7 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
     :param dict config: the scaling group config
     :param dict launch_config: the scaling group launch config
     :param scaling_group: an IScalingGroup provider
-    :param state: a :class:`otter.models.interface.GroupState` representing the
-        state
+    :param int desired: current desired value
 
     :return: a ``Deferred`` that fires with the updated (or not)
         :class:`otter.models.interface.GroupState` if successful
@@ -114,10 +113,10 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
 
     # XXX: {'change': 0} is a hack to create an internal zero-change policy so
     # calculate delta will work
-    d = converge(log, transaction_id, config, scaling_group, state,
+    d = converge(log, transaction_id, config, scaling_group, desired,
                  launch_config, {'change': 0})
     if d is None:
-        return defer.succeed(state)
+        return defer.succeed(desired)
     return d
 
 
