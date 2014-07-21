@@ -138,8 +138,15 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         Viewing a config works correctly.
         """
         group = yield self._create_group()
+
         cfg = yield group.view_config()
-        self.assertEqual(cfg, self._config)
+        metadata = cfg.pop("metadata", {})
+
+        expected_cfg = dict(self._config)
+        expected_metadata = expected_cfg.pop("metadata", {})
+
+        self.assertEqual(cfg, expected_cfg)
+        self.assertEqual(metadata, expected_metadata)
 
     def test_view_launch_config_for_nonexistent_group(self):
         """
