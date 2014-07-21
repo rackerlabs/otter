@@ -129,6 +129,15 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         group = sql.SQLSCalingGroup(self.engine, b"TENANT", b"BOGUS")
         d = group.view_config()
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
+
+    def test_view_config_happy_case(self):
+        """
+        Viewing a config works correctly.
+        """
+        group = yield self._create_group()
+        cfg = yield group.view_launch_config()
+        self.assertEqual(cfg, self._config)
+
     def test_view_launch_config_for_nonexistent_group(self):
         """
         When attempting to view the launch configuration for a group that
