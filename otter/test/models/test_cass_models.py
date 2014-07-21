@@ -398,9 +398,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, Synchronou
         self.policies = []
         self.mock_log = mock.MagicMock()
 
-        self.kz_lock = mock.Mock()
+        self.kz_client = mock.Mock()
         self.lock = self.mock_lock()
-        self.kz_lock.Lock.return_value = self.lock
+        self.kz_client.Lock.return_value = self.lock
 
         self.clock = Clock()
         locks = WeakLocks()
@@ -411,7 +411,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, Synchronou
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
                                       self.connection, itertools.cycle(range(2, 10)),
-                                      self.kz_lock, self.clock, locks,
+                                      self.kz_client, self.clock, locks,
                                       self.get_consistency)
         self.assertIs(self.group.local_locks, locks)
         self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
@@ -630,7 +630,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                                         expectedData,
                                                         ConsistencyLevel.QUORUM)
 
-        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
+        self.kz_client.Lock.assert_called_once_with('/locks/' + self.group.uuid)
 
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
@@ -691,7 +691,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(d, ValueError)
 
         self.assertEqual(self.connection.execute.call_count, 0)
-        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
+        self.kz_client.Lock.assert_called_once_with('/locks/' + self.group.uuid)
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.assertEqual(self.lock.release.call_count, 0)
 
@@ -1866,7 +1866,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
-        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
+        self.kz_client.Lock.assert_called_once_with('/locks/' + self.group.uuid)
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
 
@@ -1904,7 +1904,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
-        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
+        self.kz_client.Lock.assert_called_once_with('/locks/' + self.group.uuid)
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
 
@@ -1922,7 +1922,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(d, ValueError)
 
         self.assertFalse(self.connection.execute.called)
-        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
+        self.kz_client.Lock.assert_called_once_with('/locks/' + self.group.uuid)
         self.lock._acquire.assert_called_once_with(timeout=120)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
