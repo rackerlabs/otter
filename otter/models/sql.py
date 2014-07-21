@@ -63,33 +63,8 @@ class SQLScalingGroup(object):
     @_with_transaction
     @inlineCallbacks
     def view_manifest(self, conn, with_webhooks=False):
-        def in_context(f):
-            """
-            Calls the function in the current context.
-
-            Specifically, calls it with the current database connection and
-            this group's UUID.
-            """
-            return f(conn, self.uuid)
-
-        def get_and_maybe_add(dest, key, getter):
-            result = yield in_context(getter)
-            if result:
-                dest[key] = result
-
         group_configuration = yield self._get_config(conn)
-        get_and_maybe_add(group_configuration, "metadata", _get_group_metadata)
-
-        server = yield in_context(_get_server_payload)
-        for key, getter in [("metadata", _get_server_metadata),
-                            ("personality", _get_personality),
-                            ("networks", _get_networks)]:
-            get_and_maybe_add(server, key, getter)
-
-        launch_configuration = {"server": server}
-        get_and_maybe_add(launch_configuration, "loadBalancers",
-                          _get_load_balancers)
-
+        launch_configuration = yield self._get_launch_config(conn)
         scaling_policies = yield self.list_policies() # REVIEW: limit?
 
         returnValue({
@@ -127,7 +102,63 @@ class SQLScalingGroup(object):
             keys = ['cooldown', 'maxEntities', 'minEntities', 'name']
             return {key: row[key] for key in keys}
 
+        @d.addCallback
+        def add_metadata(result):
+            d = _get_group_metadata(conn, self.uuid)
+
+            def format_metadata(metadata, result):
+                result["metadata"] = metadata
+                return result
+            d.addCallback(format_metadata, result)
+
+            return d
+
         return d
+
+    @_with_transaction
+    def view_launch_config(self, conn):
+        return self._get_launch_config(conn)
+
+    @inlineCallbacks
+    def _get_launch_config(self, conn):
+        """
+        Gets the launch configuration for this scaling group.
+
+        This is separated from :meth:`view_launch_config` so that other
+        methods that already have a transaction laying around can do it within
+        that transaction, using the database connection *conn*.
+
+        :param conn: The database connection to use.
+        """
+        def in_context(f):
+            """
+            Calls the function in the current context.
+
+            Specifically, calls it with the current database connection and
+            this group's UUID.
+            """
+            return f(conn, self.uuid)
+
+        def get_and_maybe_add(dest, key, getter):
+            result = yield in_context(getter)
+            if result:
+                dest[key] = result
+
+        server = yield in_context(_get_server_payload)
+        metadata = yield in_context(_get_server_metadata)
+        personality = yield in_context(_get_personality)
+        networks = yield in_context(_get_networks)
+        load_balancers = yield in_context(_get_load_balancers)
+
+        result = {
+            "server": dict({"metadata": metadata,
+                            "personality": personality,
+                            "networks": networks},
+                           **server),
+            "loadBalancers": load_balancers
+        }
+        returnValue(result)
+
 
     @_with_transaction
     def create_policies(self, conn, policy_cfgs):
