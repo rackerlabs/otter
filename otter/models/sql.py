@@ -89,8 +89,8 @@ class SQLScalingGroup(object):
 
         server = yield in_context(_get_server_payload)
         for key, getter in [("metadata", _get_server_metadata),
-                       ("personality", _get_personality),
-                       ("networks", _get_networks)]:
+                            ("personality", _get_personality),
+                            ("networks", _get_networks)]:
             get_and_maybe_add(server, key, getter)
 
         launch_configuration = {"server": server}
