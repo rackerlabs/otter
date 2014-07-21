@@ -70,7 +70,6 @@ class SQLScalingGroup(object):
 
         keys = ['cooldown', 'maxEntities', 'minEntities', 'name']
         group_configuration = {key: row[key] for key in keys}
-        group_configuration['metadata'] = _get_group_metadata(conn, self.uuid)
 
         def in_context(f):
             """
@@ -85,6 +84,8 @@ class SQLScalingGroup(object):
             result = yield in_context(getter)
             if result:
                 dest[key] = result
+
+        get_and_maybe_add(group_configuration, "metadata", _get_group_metadata)
 
         server = yield in_context(_get_server_payload)
         for key, getter in [("metadata", _get_server_metadata),
