@@ -129,6 +129,15 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         group = sql.SQLSCalingGroup(self.engine, b"TENANT", b"BOGUS")
         d = group.view_config()
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
+    def test_view_launch_config_for_nonexistent_group(self):
+        """
+        When attempting to view the launch configuration for a group that
+        doesn't exist, an exception is raised.
+        """
+        group = sql.SQLSCalingGroup(self.engine, b"TENANT", b"BOGUS")
+        d = group.view_launch_config()
+        return self.assertFailure(d, interface.NoSuchScalingGroupError)
+
     @inlineCallbacks
     def test_create_policies_happy_case(self):
         """
