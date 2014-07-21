@@ -558,8 +558,37 @@ webhook_metadata = Table("webhook_metadata", metadata,
                          Column("key", String(), primary_key=True),
                          Column("value", String(), nullable=False))
 
+server_payloads = Table("server_payloads", metadata,
+                        Column("scaling_group_id",
+                               ForeignKey("scaling_groups.id"),
+                               primary_key=True),
+                        Column("key", String(), primary_key=True),
+                        Column("value", String(), nullable=False))
+
+server_metadata = Table("server_metadata", metadata,
+                        Column("scaling_group_id",
+                               ForeignKey("scaling_groups.id"),
+                               primary_key=True),
+                        Column("key", String(), primary_key=True),
+                        Column("value", String(), nullable=False))
+
+personalities = Table("personalities", metadata,
+                      Column("scaling_group_id", ForeignKey("scaling_groups.id"),
+                             primary_key=True),
+                      Column("path", String(),
+                             nullable=False, primary_key=True),
+                      Column("contents", String(), nullable=False))
+
+networks = Table("networks", metadata,
+                 Column("scaling_group_id",
+                        ForeignKey("scaling_groups.id"),
+                        primary_key=True),
+                 Column("uuid", String(), primary_key=True))
+
 load_balancers = Table("load_balancers", metadata,
-                       Column("id", Integer(), primary_key=True),
+                       Column("scaling_group_id", ForeignKey("scaling_groups.id"),
+                              primary_key=True),
+                       Column("loadBalancerId", Integer(), primary_key=True),
                        Column("port", Integer()))
 
 all_tables = (scaling_groups,
