@@ -591,17 +591,12 @@ load_balancers = Table("load_balancers", metadata,
                        Column("loadBalancerId", Integer(), primary_key=True),
                        Column("port", Integer()))
 
-all_tables = (scaling_groups,
-              policies,
-              policy_args,
-              webhooks,
-              webhook_metadata,
-              load_balancers)
 
-
-def create_tables(engine, tables=all_tables):
+def create_tables(engine, tables=metadata.tables.values()):
     """
     Creates all the given tables on the given engine.
+
+    :param tables: The tables to create. If unspecified, creates all tables.
     """
     return gatherResults(engine.execute(CreateTable(table))
                          for table in tables)
