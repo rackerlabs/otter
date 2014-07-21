@@ -597,6 +597,9 @@ def create_tables(engine, tables=metadata.tables.values()):
     Creates all the given tables on the given engine.
 
     :param tables: The tables to create. If unspecified, creates all tables.
+
+    Please note that this function, by default, will only create tables that
+    were defined when it was. No dynamic table creation!
     """
     return gatherResults(engine.execute(CreateTable(table))
                          for table in tables)
