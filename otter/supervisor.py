@@ -225,27 +225,19 @@ def exec_scale_down(log, transaction_id, scaling_group, delta):
 
     d.addCallback(oldest)
 
-    def delete_pending(servers):
-        servers = sorted(servers, lambda s: s['status'])
-        groups = itertools.groupby(servers, lambda s: s['status'])
-        # groups will be [('active', active servers iterator),
-        #                 ('pending', pending servers iterator)]
-        _, active = next(groups)
-        _, pending = next(groups)
-        d = servers_coll.delete_servers(log, [s['id'] for s in pending])
-        return d.addCallback(lambda _: active)
-
-    d.addCallback(delete_pending)
-
-    def delete_active(active):
+    def delete_servers(servers):
         server_ids = []
-        for server in active:
-            job = _DeleteJob(log, transaction_id, scaling_group, server, supervisor)
-            supervisor.deferred_pool.add(job.start())
+        for server in servers:
+            # delete active servers from nova
+            if server['status'] == 'active':
+                job = _DeleteJob(log, transaction_id, scaling_group, server, supervisor)
+                supervisor.deferred_pool.add(job.start())
+            # and remove pending (and active) servers from DB. They will be deleted
+            # when they become active
             server_ids.append(server['id'])
         return servers_coll.delete_servers(log, server_ids)
 
-    d.addCallback(delete_active)
+    d.addCallback(delete_servers)
     return d
 
 
