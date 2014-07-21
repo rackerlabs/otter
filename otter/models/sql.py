@@ -1,4 +1,5 @@
 from collections import defaultdict
+from functools import partial
 from operator import methodcaller
 from otter.models import interface as iface
 from sqlalchemy import Column, ForeignKey, MetaData, Table
@@ -42,23 +43,50 @@ class SQLScalingGroup(object):
         self.uuid = uuid
 
     @_with_transaction
+    @inlineCallbacks
     def view_manifest(self, conn, with_webhooks=False):
         query = (scaling_groups.select()
                  .where(scaling_groups.c.id == self.uuid)
                  .limit(1))
-        d = conn.execute(query).addCallback(_fetchone)
+        row = yield conn.execute(query).addCallback(_fetchone)
 
-        @d.addCallback
-        def format_result(row):
-            pass
+        keys = ['cooldown', 'maxEntities', 'minEntities', 'name']
+        group_configuration = {key: row[key] for key in keys}
+        group_configuration['metadata'] = _get_group_metadata(conn, self.uuid)
 
-        def add_webhooks(result):
-            pass
+        def in_context(f):
+            """
+            Calls the function in the current context.
 
-        if with_webhooks:
-            d.addCallback(add_webhooks)
+            Specifically, calls it with the current database connection and
+            this group's UUID.
+            """
+            return f(conn, self.uuid)
 
-        return d
+        def get_and_maybe_add(dest, key, getter):
+            result = yield in_context(getter)
+            if result:
+                dest[key] = result
+
+        server = yield in_context(_get_server_payload)
+        for key, getter in [("metadata", _get_server_metadata),
+                       ("personality", _get_personality),
+                       ("networks", _get_networks)]:
+            get_and_maybe_add(server, key, getter)
+
+        launch_configuration = {"server": server}
+        get_and_maybe_add(launch_configuration, "loadBalancers",
+                          _get_load_balancers)
+
+        scaling_policies = yield self.list_policies() # REVIEW: limit?
+
+        returnValue({
+            "id": self.uuid,
+            "state": None, # REVIEW: welp I can pretty much put whatever I want here right
+            "groupConfiguration": group_configuration,
+            "launchConfiguration": launch_configuration,
+            "scalingPolicies": scaling_policies
+        })
 
     def _complain_if_missing_policy(self, result_proxy, conn, policy_id):
         """If no rows matched, the policy doesn't exist.
