@@ -1932,7 +1932,6 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         # locks znode is not deleted
         self.assertFalse(self.kz_client.delete.called)
 
-
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     def test_delete_lock_with_log_category_locking(self, mock_view_state):
         """

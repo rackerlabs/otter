@@ -1114,7 +1114,6 @@ class CassScalingGroup(object):
         return d
 
 
-
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
 class CassScalingGroupCollection:
     """
