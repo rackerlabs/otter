@@ -1109,7 +1109,9 @@ class CassScalingGroup(object):
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         d = with_lock(self.reactor, lock, log.bind(category='locking'), _delete_group)
-        return d.addCallback(_delete_lock_znode)
+        # Cleanup /locks/<groupID> znode as it will not be required anymore
+        d.addCallback(_delete_lock_znode)
+        return d
 
 
 
