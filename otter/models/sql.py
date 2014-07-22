@@ -392,7 +392,10 @@ class SQLScalingGroupCollection(object):
         d = conn.execute(scaling_groups.insert()
                          .values(id=group_id,
                                  tenant_id=tenant_id,
-                                 name=config["name"]))
+                                 name=config["name"],
+                                 cooldown=config["cooldown"],
+                                 minEntities=config["minEntities"],
+                                 maxEntities=config.get("maxEntities")))
 
         @d.addCallback
         def build_response(result):
