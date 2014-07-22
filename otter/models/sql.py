@@ -177,16 +177,25 @@ class SQLScalingGroup(object):
             return [dict(id=policy_id, **policy_cfg)
                     for policy_id, policy_cfg in zip(policy_ids, policy_cfgs)]
 
-        @d.addErrback
-        def check_if_group_exists(f):
-            f.trap(FirstError)
+        return d.addErrback(self._check_if_group_exists_if_batch_failed)
 
-            subFailure = f.value.subFailure
-            subFailure.trap(IntegrityError)
+    def _check_if_group_exists_if_batch_failed(self, f):
+        """
+        This bunch of deferreds failed; if it failed because of an
+        integrity error, that's because the scaling group referred to
+        doesn't exist. Raise the appropriate exception.
 
-            raise iface.NoSuchScalingGroupError(self.tenant_id, self.uuid)
+        :returns: Never.
+        :raises iface.NoSuchScalingGroupError: If this is a :class:`FirstError`
+            wrapping an :class:`IntegrityError`.
+        :raises: The passed failure in every other case.
+        """
+        f.trap(FirstError)
 
-        return d
+        subFailure = f.value.subFailure
+        subFailure.trap(IntegrityError)
+
+        raise iface.NoSuchScalingGroupError(self.tenant_id, self.uuid)
 
     @_with_transaction
     def update_policy(self, conn, policy_id, data):
