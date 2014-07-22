@@ -375,7 +375,8 @@ class _Job(object):
         def log_success(_):
             audit(log).msg("Server is active.", event_type="server.active")
 
-        d = self.servers_coll.update_server(log, self.server_id, nova_id, 'active')
+        d = self.servers_coll.update_server(log, self.server_id,
+                                            nova_id, 'active', result['lb_info'])
         d.addCallback(log_success)
 
         def handle_server_deletion(f):
