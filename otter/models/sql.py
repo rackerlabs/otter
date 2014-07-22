@@ -336,6 +336,7 @@ class SQLScalingGroup(object):
 
         return d
 
+
 def _verify_group_exists(conn, tenant_id, group_id):
     d = conn.execute(scaling_groups
                      .select(scaling_groups.c.id == group_id)
@@ -346,6 +347,7 @@ def _verify_group_exists(conn, tenant_id, group_id):
         if row[0] == 0:
             raise iface.NoSuchScalingGroupError(tenant_id, group_id)
     return d
+
 
 def _get_policy_args(conn, policy_ids):
     """
