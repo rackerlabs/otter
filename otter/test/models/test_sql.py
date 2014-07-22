@@ -30,8 +30,8 @@ This code chooses the former, because it means not having to mess with
 the real reactor, while keeping the benefit of testing the alchimia
 code paths.
 """
-
 from alchimia import TWISTED_STRATEGY as STRATEGY
+from copy import deepcopy
 from itertools import product
 from otter.json_schema import group_examples, model_schemas, validate
 from otter.models import interface, sql
@@ -175,6 +175,26 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         group = sql.SQLScalingGroup(self.engine, b"TENANT", b"BOGUS")
         d = group.update_launch_config({})
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
+
+    @inlineCallbacks
+    def test_update_launch_config_happy_case(self):
+        """
+        Updating a launch config works.
+        """
+        group = yield self._create_group()
+
+        old_launch_cfg = yield group.view_launch_config()
+        self.assertEqual(old_launch_cfg, self._launch)
+
+        new_launch_cfg = deepcopy(old_launch_cfg)
+        old_flavor = old_launch_cfg["args"]["server"]["flavorRef"]
+        new_flavor = unicode(int(old_flavor) + 1)
+        new_launch_cfg["args"]["server"]["flavorRef"] = new_flavor
+
+        yield group.update_launch_config(deepcopy(new_launch_cfg))
+        got_launch_cfg = yield group.view_launch_config()
+        self.assertEqual(got_launch_cfg, new_launch_cfg)
+
     @inlineCallbacks
     def test_create_policies_happy_case(self):
         """
