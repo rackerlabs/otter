@@ -535,25 +535,27 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
 
         group_cfgs = group_examples.config()
         launch_cfgs = group_examples.launch_server_config()
-        policies = group_examples.policy() + [None]
+
+        policies = group_examples.policy()
+        policy_collections = [[policies[0]], policies[1:], None]
 
         ds = []
         expected_groups = []
-        for args in product(group_cfgs, launch_cfgs, policies):
+        for args in product(group_cfgs, launch_cfgs, policy_collections):
             ds.append(coll.create_scaling_group(log, b"tenant", *args))
 
-            group_cfg, launch_cfg, policy_cfg = args
+            group_cfg, launch_cfg, policy_cfgs = args
             expected_groups.append({"groupConfiguration": group_cfg,
                                     "launchConfiguration": launch_cfg,
-                                    "scalingPolicies": policy_cfg or []})
+                                    "scalingPolicies": policy_cfgs or []})
 
         d = gatherResults(ds)
 
         @d.addCallback
         def check_groups(groups):
-            n_products = len(group_cfgs) * len(launch_cfgs) * len(policies)
-            self.assertEqual(len(groups), n_products)
-            self.assertEqual(len(expected_groups), n_products)
+            n = len(group_cfgs) * len(launch_cfgs) * len(policy_collections)
+            self.assertEqual(len(groups), n)
+            self.assertEqual(len(expected_groups), n)
 
             seen_ids = set()
             for manifest, expected in zip(groups, expected_groups):
@@ -565,8 +567,7 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
 
                 self.assertEqual(manifest, expected)
 
-            self.assertEqual(len(seen_ids), n_products,
-                             "group ids must be unique")
+            self.assertEqual(len(seen_ids), n, "group ids must be unique")
 
         return d
 
