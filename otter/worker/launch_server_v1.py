@@ -48,14 +48,14 @@ class UnexpectedServerStatus(Exception):
     """
     An exception to be raised when a server is found in an unexpected state.
     """
-    def __init__(self, server_id, status, expected_status):
+    def __init__(self, nova_id, status, expected_status):
         super(UnexpectedServerStatus, self).__init__(
-            'Expected {server_id} to have {expected_status}, '
-            'has {status}'.format(server_id=server_id,
+            'Expected {nova_id} to have {expected_status}, '
+            'has {status}'.format(nova_id=nova_id,
                                   status=status,
                                   expected_status=expected_status)
         )
-        self.server_id = server_id
+        self.nova_id = nova_id
         self.status = status
         self.expected_status = expected_status
 
@@ -64,14 +64,14 @@ class ServerDeleted(Exception):
     """
     An exception to be raised when a server was deleted unexpectedly.
     """
-    def __init__(self, server_id):
+    def __init__(self, nova_id):
         super(ServerDeleted, self).__init__(
-            'Server {server_id} has been deleted unexpectedly.'.format(
-                server_id=server_id))
-        self.server_id = server_id
+            'Server {nova_id} has been deleted unexpectedly.'.format(
+                nova_id=nova_id))
+        self.nova_id = nova_id
 
 
-def server_details(server_endpoint, auth_token, server_id, log=None):
+def server_details(server_endpoint, auth_token, nova_id, log=None):
     """
     Fetch the details of a server as specified by id.
 
@@ -79,14 +79,14 @@ def server_details(server_endpoint, auth_token, server_id, log=None):
         catalog.
 
     :param str auth_token: The auth token.
-    :param str server_id: The opaque ID of a server.
+    :param str nova_id: The opaque ID of a server.
 
     :return: A dict of the server details.
     """
-    path = append_segments(server_endpoint, 'servers', server_id)
+    path = append_segments(server_endpoint, 'servers', nova_id)
     d = treq.get(path, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(raise_error_on_code, 404, ServerDeleted(server_id),
+    d.addErrback(raise_error_on_code, 404, ServerDeleted(nova_id),
                  path, 'server_details')
     return d.addCallback(treq.json_content)
 
@@ -94,17 +94,17 @@ def server_details(server_endpoint, auth_token, server_id, log=None):
 def wait_for_active(log,
                     server_endpoint,
                     auth_token,
-                    server_id,
+                    nova_id,
                     interval=20,
                     timeout=3600,
                     clock=None):
     """
-    Wait until the server specified by server_id's status is 'ACTIVE'
+    Wait until the server specified by nova_id's status is 'ACTIVE'
 
     :param log: A bound logger.
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
-    :param str server_id: Opaque nova server id.
+    :param str nova_id: Opaque nova server id.
     :param int interval: Polling interval in seconds.  Default: 5.
     :param int timeout: timeout to poll for the server status in seconds.
         Default 3600 (1 hour)
@@ -135,19 +135,19 @@ def wait_for_active(log,
                 log.msg("Server changed to '{status}' in {time_building} seconds",
                         time_building=time_building, status=status)
                 raise UnexpectedServerStatus(
-                    server_id,
+                    nova_id,
                     status,
                     'ACTIVE')
 
             else:
                 raise TransientRetryError()  # just poll again
 
-        sd = server_details(server_endpoint, auth_token, server_id, log=log)
+        sd = server_details(server_endpoint, auth_token, nova_id, log=log)
         sd.addCallback(check_status)
         return sd
 
     timeout_description = ("Waiting for server <{0}> to change from BUILD "
-                           "state to ACTIVE state").format(server_id)
+                           "state to ACTIVE state").format(nova_id)
 
     return retry_and_timeout(
         poll, timeout,
@@ -532,7 +532,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
         # to undo stack even after it will be deleted in check_error which is fine
         # since verified_delete succeeds on deleted server
         undo.push(
-            verified_delete, log, server_endpoint, auth_token, server_id)
+            verified_delete, log, server_endpoint, auth_token, nova_id)
 
         ilog[0] = log.bind(nova_id=nova_id)
         return wait_for_active(
@@ -563,10 +563,10 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     def check_error(f):
         f.trap(UnexpectedServerStatus)
         if f.value.status == 'ERROR':
-            log.msg('{server_id} errored, deleting and creating new server instead',
-                    server_id=f.value.server_id)
+            log.msg('{nova_id} errored, deleting and creating new server instead',
+                    nova_id=f.value.nova_id)
             # trigger server delete and return True to allow retry
-            verified_delete(log, server_endpoint, auth_token, f.value.server_id)
+            verified_delete(log, server_endpoint, auth_token, f.value.nova_id)
             return True
         else:
             return False
@@ -628,7 +628,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     :param str region: A rackspace region as found in the service catalog.
     :param list service_catalog: A list of services as returned by the auth apis.
     :param str auth_token: The user's auth token.
-    :param tuple instance_details: A 2-tuple of server_id and a list of
+    :param tuple instance_details: A 2-tuple of nova_id and a list of
         load balancer Add Node responses.
 
         Example::
@@ -653,7 +653,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
                                           cloudServersOpenStack,
                                           region)
 
-    (server_id, loadbalancer_details) = instance_details
+    (nova_id, loadbalancer_details) = instance_details
 
     node_info = itertools.chain(
         *[[(loadbalancer_id, node['id']) for node in node_details['nodes']]
@@ -664,13 +664,13 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
-        return verified_delete(log, server_endpoint, auth_token, server_id)
+        return verified_delete(log, server_endpoint, auth_token, nova_id)
 
     d.addCallback(when_removed_from_loadbalancers)
     return d
 
 
-def delete_and_verify(log, server_endpoint, auth_token, server_id):
+def delete_and_verify(log, server_endpoint, auth_token, nova_id):
     """
     Check the status of the server to see if it's actually been deleted.
     Succeeds only if it has been either deleted (404) or acknowledged by Nova
@@ -680,7 +680,7 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
     ``OS-EXT-STS:task_state``, which is supported by Openstack but available
     only when looking at the extended status of a server.
     """
-    path = append_segments(server_endpoint, 'servers', server_id)
+    path = append_segments(server_endpoint, 'servers', nova_id)
 
     def delete():
         del_d = treq.delete(path, headers=headers(auth_token), log=log)
@@ -692,14 +692,14 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
         server_details = json_blob['server']
         is_deleting = server_details.get("OS-EXT-STS:task_state", "")
         if is_deleting.strip().lower() != "deleting":
-            raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
+            raise UnexpectedServerStatus(nova_id, is_deleting, "deleting")
 
     def verify(f):
         f.trap(APIError)
         if f.value.code != 204:
             return wrap_request_error(f, path, 'delete_server')
 
-        ver_d = server_details(server_endpoint, auth_token, server_id, log=log)
+        ver_d = server_details(server_endpoint, auth_token, nova_id, log=log)
         ver_d.addCallback(check_task_state)
         ver_d.addErrback(lambda f: f.trap(ServerDeleted))
         return ver_d
@@ -710,7 +710,7 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
 def verified_delete(log,
                     server_endpoint,
                     auth_token,
-                    server_id,
+                    nova_id,
                     exp_start=2,
                     max_retries=10,
                     clock=None):
@@ -727,13 +727,13 @@ def verified_delete(log,
     :param log: A bound logger.
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
-    :param str server_id: Opaque nova server id.
+    :param str nova_id: Opaque nova server id.
     :param int exp_start: Exponential backoff interval start seconds. Default 2
     :param int max_retries: Maximum number of retry attempts
 
     :return: Deferred that fires when the expected status has been seen.
     """
-    serv_log = log.bind(server_id=server_id)
+    serv_log = log.bind(nova_id=nova_id)
     serv_log.msg('Deleting server')
 
     if clock is None:  # pragma: no cover
@@ -741,7 +741,7 @@ def verified_delete(log,
         clock = reactor
 
     d = retry(
-        partial(delete_and_verify, serv_log, server_endpoint, auth_token, server_id),
+        partial(delete_and_verify, serv_log, server_endpoint, auth_token, nova_id),
         can_retry=retry_times(max_retries),
         next_interval=exponential_backoff_interval(exp_start),
         clock=clock)
