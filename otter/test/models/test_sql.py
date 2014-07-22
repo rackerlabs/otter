@@ -143,6 +143,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         metadata = cfg.pop("metadata", {})
 
         expected_cfg = dict(self._config)
+        expected_cfg.setdefault("maxEntities", None)
         expected_metadata = expected_cfg.pop("metadata", {})
 
         self.assertEqual(cfg, expected_cfg)
