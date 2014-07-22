@@ -155,14 +155,16 @@ class SQLScalingGroup(object):
         load_balancers = yield in_context(_get_load_balancers)
 
         result = {
-            "server": dict({"metadata": metadata,
-                            "personality": personality,
-                            "networks": networks},
-                           **server),
-            "loadBalancers": load_balancers
+            "type": "launch_server",
+            "args": {
+                "server": dict({"metadata": metadata,
+                                "personality": personality,
+                                "networks": networks},
+                               **server),
+                "loadBalancers": load_balancers
+            }
         }
         returnValue(result)
-
 
     @_with_transaction
     def create_policies(self, conn, policy_cfgs):
@@ -211,6 +213,48 @@ class SQLScalingGroup(object):
                          .values(**data))
         d.addCallback(self._complain_if_missing_policy, conn, policy_id)
         return d
+
+    @_with_transaction
+    def update_launch_config(self, conn, data):
+        args = data["args"]
+        server = args["server"]
+
+        ds = []
+        for table in [server_payloads, server_metadata, personalities,
+                      networks, load_balancers]:
+            q = table.delete().where(table.c.scaling_group_id == self.uuid)
+            ds.append(conn.execute(q))
+        d = gatherResults(ds)
+
+        @d.addCallback
+        def insert(result):
+            ds = []
+
+            for src, key, table in [(args, "loadBalancers", load_balancers),
+                                    (server, "personality", personalities),
+                                    (server, "networks", networks)]:
+                values = [dict(scaling_group_id=self.uuid, **part)
+                          for part in src.get(key, [])]
+                if values:
+                    ds.append(conn.execute(table.insert(), values))
+
+            metadata_vals = [dict(scaling_group_id=self.uuid, key=k, value=v)
+                             for k, v in server.get("metadata", {}).items()]
+            if metadata_vals:
+                ds.append(conn.execute(server_metadata.insert(),
+                                       metadata_vals))
+
+            payload_vals = [dict(scaling_group_id=self.uuid, key=k, value=v)
+                            for k, v in server.iteritems()
+                            if k not in ["metadata", "personality", "networks"]]
+            if payload_vals:
+                ds.append(conn.execute(server_payloads.insert(),
+                                       payload_vals))
+
+            return gatherResults(ds, consumeErrors=True)
+
+        d.addErrback(self._check_if_group_exists_if_batch_failed)
+        return d.addCallback(lambda _result: None)
 
     def list_policies(self, limit=100, marker=None):
         # TODO: only for this tenant & group!
