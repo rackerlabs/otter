@@ -97,6 +97,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         if n is not None:
             assert n <= len(policy_cfgs)
             policy_cfgs = policy_cfgs[:n]
+        self._policy_cfgs = policy_cfgs
         return group.create_policies(policy_cfgs)
 
     def test_interface(self):
@@ -121,7 +122,36 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         yield self._create_policies(other_group)
 
         manifest = yield group.view_manifest()
-        import pudb; pudb.set_trace()
+        self.assertEqual(manifest["groupConfiguration"],
+                         {'cooldown': 30,
+                          'maxEntities': None,
+                          'metadata': {},
+                          'minEntities': 1,
+                          'name': u'webheads'})
+
+        self.assertIn("state", manifest)
+        self.assertIn("id", manifest)
+
+        launch = manifest["launchConfiguration"]
+        self.assertEqual(launch["args"]["loadBalancers"],
+                         [{'loadBalancerId': 2200, 'port': 8081}])
+        self.assertEqual(launch["args"]["server"],
+                         {u'OS-DCF:diskConfig': u'AUTO',
+                          u'flavorRef': u'3',
+                          u'imageRef': u'0d589460-f177-4b0f-81c1-8ab8903ac7d8',
+                          'metadata': {u'mykey': u'myvalue'},
+                          u'name': u'webhead',
+                          'networks': [{'uuid': u'11111111-1111-1111-1111-111111111111'}],
+                          'personality': [
+                              {'contents': u'ICAgICAgDQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp',
+                               'path': u'/root/.ssh/authorized_keys'}]})
+
+        policies = manifest["scalingPolicies"]
+
+        for policy in policies:
+            policy_without_id = dict((key, value) for (key, value)
+                                     in policy.iteritems() if key != "id")
+            self.assertIn(policy_without_id, self._policy_cfgs)
 
     def test_view_config_for_nonexistent_group(self):
         """
