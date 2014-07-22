@@ -772,6 +772,9 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         If the job succeeded, but the job ID is no longer in pending, the
         server is deleted and the state not changed.  No error is logged.
         """
+        d = Deferred()
+        self.del_job.return_value.start.return_value = d
+
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
 
@@ -784,8 +787,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.del_job.assert_called_once_with(
             matches(IsInstance(self.log.__class__)), self.transaction_id,
             self.group, {'id': 'active'}, self.supervisor)
-        self.del_job.return_value.start.assert_called_once_with()
-        # TODO: Check del job def added to pool
+        self.assertIn(d, self.supervisor.deferred_pool)
 
         self.assertEqual(self.log.err.call_count, 0)
 
@@ -859,6 +861,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         """
         self.group.modify_state.side_effect = (
             lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
+        d = Deferred()
+        self.del_job.return_value.start.return_value = d
 
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
@@ -867,7 +871,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
             matches(IsInstance(self.log.__class__)), self.transaction_id,
             self.group, {'id': 'active'}, self.supervisor)
         self.del_job.return_value.start.assert_called_once_with()
-        # TODO: Check del job def added to pool
+        self.assertIn(d, self.supervisor.deferred_pool)
 
     def test_job_completion_success_NoSuchScalingGroupError_audit_logged(self):
         """
