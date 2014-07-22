@@ -716,6 +716,30 @@ class CassScalingGroup(object):
         return local_lock.run(with_lock, self.reactor, lock,
                               log.bind(category='locking'), _modify_state)
 
+    def modify_desired(self, modifier_callable, *args, **kwargs):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.modify_desired`
+        """
+        log = self.log.bind(system='CassScalingGroup.modify_desired')
+        consistency = self.get_consistency('update', 'desired')
+
+        @self.with_timestamp
+        def _write_desired(timestamp, new_state):
+            return self.connection.execute(
+                _cql_update_desired.format(cf=self.group_table),
+                params, consistency)
+
+        def _modify_desired():
+            d = self.view_state(consistency)
+            d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
+            return d.addCallback(_write_state)
+
+        lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
+        lock.acquire = functools.partial(lock.acquire, timeout=120)
+        local_lock = self.local_locks.get_lock(self.uuid)
+        return local_lock.run(with_lock, self.reactor, lock,
+                              log.bind(category='locking'), _modify_state)
+
     def update_config(self, data):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_config`
@@ -1104,6 +1128,62 @@ class CassScalingGroup(object):
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         return with_lock(self.reactor, lock, log.bind(category='locking'), _delete_group)
+
+    def get_servers_collection(self, tenant_id, group_id):
+        """
+        see :meth:`otter.models.interface.IScalingGroupCollection.get_servers_collection`
+        """
+        return CassScalingGroupServers(self)
+
+
+@implementer(IScalingGroupServersCollection)
+class CassScalingGroupServers(object):
+
+    def __init__(self, scaling_group):
+        self.scaling_group = scaling_group
+        self.tenant_id = scaling_group.tenant_id
+        self.group_id = scaling_group.uuid
+        self.connection = scaling_group.connection
+        self.get_consistency = scaling_group.get_consistency
+        self.servers_table = 'servers'
+        self.log = log.bind(system='CassScalingGroupServers', tenant_id=self.tenant_id,
+                            scaling_group_id=self.group_id)
+
+    def _prepare_params(self):
+        return {'tenantId': self.tenant_id, 'groupId': self.group_id}
+
+    def _check_group(self, func):
+        """
+        Decorator that checks if group exists
+        """
+        @functools.wraps(func)
+        def wrapper(*args):
+            d = self.scaling_group.view_config()
+            d.addCallback(lambda _: func(*args))
+            return d
+        return wrapper
+
+    def create_servers(self, log, num_servers, status='pending'):
+        raise NotImplementedError
+
+    @self._check_group
+    def create_server(self, log, nova_id=None, status='pending'):
+        cql = ('INSERT INTO {cf}("tenantId", "groupId", id, nova_id, status, created) '
+               'VALUES(:tenantId, :groupId, :id, :nova_id, :status, :created);')
+        server_id = str(uuid.uuid4())
+        params = {'id': server_id,
+                  'nova_id': nova_id,
+                  'status': status,
+                  'created': datetime.utcnow()}
+        params.update(self._prepare_params())
+        d = self.connection.execute(
+            cql.format(cf=self.servers_table), params,
+            self.get_consistency_level('insert', 'server'))
+        d.addCallback(lambda _: merge(params, {'lb_info': None}))
+        return d
+
+    def update_server(self, log, server_id, nova_id=None, status=None, lb_info=None):
+        pass
 
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
