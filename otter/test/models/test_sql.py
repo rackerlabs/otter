@@ -485,8 +485,6 @@ class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
         """
         verifyObject(interface.IScalingGroupCollection, self.collection)
 
-    test_interface.todo = "interface not fully implemented yet"
-
     def test_empty_count(self):
         """
         A scaling group collection has no groups, policies or webhooks.
