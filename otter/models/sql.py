@@ -388,6 +388,7 @@ class SQLScalingGroupCollection(object):
         Creates a scaling group backed by a SQL store.
         """
         group_id = bytes(uuid4())
+        group = SQLScalingGroup(self.engine, tenant_id, group_id)
 
         d = conn.execute(scaling_groups.insert()
                          .values(id=group_id,
@@ -398,7 +399,15 @@ class SQLScalingGroupCollection(object):
                                  maxEntities=config.get("maxEntities")))
 
         @d.addCallback
-        def build_response(result):
+        def add_launch_config_and_policies(_result_proxy):
+            launch_d = group.update_launch_config(launch)
+            if policies:
+                policy_d = group.create_policies(policies)
+                return gatherResults([launch_d, policy_d])
+            return launch_d
+
+        @d.addCallback
+        def build_response(_result):
             return {
                 "id": group_id,
                 "state": iface.GroupState(tenant_id=tenant_id,
