@@ -122,10 +122,6 @@ def retry(effect, should_retry):
     If ``should_retry`` returns an Effect of False, then the returned effect
     will fail with the most recent error from func.
     """
-    # TODO: delays between retries, though this could technically be done in
-    #       should_retry...
-    # TODO: cancellation????
-    # TODO: try to merge this as much as possible with retry.py
 
     def maybe_retry(error, retry_allowed):
         if retry_allowed:
