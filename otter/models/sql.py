@@ -310,11 +310,7 @@ class SQLScalingGroup(object):
                                       **d))
 
         d = conn.execute(webhooks.insert(), data_with_ids)
-
-        @d.addErrback
-        def check_if_policy_even_exists(f):
-            f.trap(IntegrityError)
-            raise iface.NoSuchPolicyError(self.tenant_id, self.uuid, policy_id)
+        d.addErrback(self._report_missing_foreign_policy, policy_id)
 
         @d.addCallback
         def insert_metadata(_result):
@@ -335,6 +331,22 @@ class SQLScalingGroup(object):
                     for d in data_with_ids]
 
         return d
+
+    def _report_missing_foreign_policy(self, f, policy_id):
+        """
+        If this deferred failed because of an integrity constraint, that
+        is because the policy being referred to doesn't actually
+        exist. Raises the appropriate exception.
+
+        :returns: Never.
+        :raises: The original exception if this failure is not a
+            :class:`IntegrityError`.
+        :raises: :class:`~iface.NoSuchPolicyError` if this failure is
+            a :class:`IntegrityError`.
+        """
+        # REVIEW: I want to make a political joke here so bad.
+        f.trap(IntegrityError)
+        raise iface.NoSuchPolicyError(self.tenant_id, self.uuid, policy_id)
 
 
 def _verify_group_exists(conn, tenant_id, group_id):
