@@ -173,7 +173,8 @@ class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
         doesn't exist, an exception is raised.
         """
         group = sql.SQLScalingGroup(self.engine, b"TENANT", b"BOGUS")
-        d = group.update_launch_config({})
+        launch = group_examples.launch_server_config()[0]
+        d = group.update_launch_config(launch)
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
 
     @inlineCallbacks
