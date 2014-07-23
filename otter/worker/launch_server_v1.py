@@ -544,7 +544,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     def update_nova_id(server):
         d = scaling_group.get_servers_collection().update_server(
             log, server_id, server['server']['id'])
-        return d.addCallback(lambda _: wait_for_server(server))
+        return d.addCallback(lambda _: server)
 
     def add_lb(server):
         ip_address = private_ip_addresses(server)[0]
@@ -555,7 +555,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
 
     def _create_server():
         d = create_server(server_endpoint, auth_token, server_config, log=log)
-        d.addCallback(update_nova_id)
+        #d.addCallback(update_nova_id)
         d.addCallback(wait_for_server)
         d.addCallback(add_lb)
         return d
