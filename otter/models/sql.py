@@ -65,7 +65,7 @@ class SQLScalingGroup(object):
     def view_manifest(self, conn, with_webhooks=False):
         group_configuration = yield self._get_config(conn)
         launch_configuration = yield self._get_launch_config(conn)
-        scaling_policies = yield self.list_policies() # REVIEW: limit?
+        scaling_policies = yield self.list_policies()
 
         returnValue({
             "id": self.uuid,
