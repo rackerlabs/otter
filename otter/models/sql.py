@@ -2,6 +2,7 @@ from collections import defaultdict
 from functools import partial
 from operator import methodcaller
 from otter.models import interface as iface
+from otter.util.config import config_value
 from sqlalchemy import Column, ForeignKey, MetaData, Table
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.types import Enum, Integer, String
@@ -171,8 +172,22 @@ class SQLScalingGroup(object):
         """
         Create some policies.
         """
-        ds = [_create_policy(conn, self.uuid, cfg) for cfg in policy_cfgs]
-        d = gatherResults(ds, consumeErrors=True)
+        limit_d = _get_limit(conn, self.tenant_id, "maxPoliciesPerGroup")
+        count_d = _count_policies(conn, self.uuid)
+        d = gatherResults([limit_d, count_d])
+
+        @d.addCallback
+        def check_limit(result):
+            limit, current = result
+            new = len(policy_cfgs)
+            if current + new > limit:
+                raise iface.PoliciesOverLimitError(self.tenant_id, self.uuid,
+                                                   limit, current, new)
+
+        @d.addCallback
+        def create_policies(_result):
+            ds = [_create_policy(conn, self.uuid, cfg) for cfg in policy_cfgs]
+            return gatherResults(ds, consumeErrors=True)
 
         @d.addCallback
         def created_policies(policy_ids):
@@ -695,6 +710,13 @@ webhook_metadata = Table("webhook_metadata", metadata,
                          Column("key", String(), primary_key=True),
                          Column("value", String(), nullable=False))
 
+limit_types = "maxWebhooksPerPolicy", "maxPoliciesPerGroup"
+
+limits = Table("limits", metadata,
+               Column("tenant_id", String(), primary_key=True),
+               Column("limit_type", Enum(*limit_types), primary_key=True),
+               Column("value", Integer(), nullable=False))
+
 server_payloads = Table("server_payloads", metadata,
                         Column("scaling_group_id",
                                ForeignKey("scaling_groups.id"),
@@ -829,3 +851,65 @@ def _get_foreign_key(table):
             return column
     else:
         raise AssertionError("no foreign key in table {}".format(table))
+
+def _get_limit(conn, tenant_id, limit_type):
+    """
+    Get the limit for the tenant.
+
+    :param conn: The database connection to use.
+    :param bytes tenant_id: The tenant id of the tenant to get the limit for.
+    :param limit_type: The entity type to get the limit for.
+    :type limit_type: one of the :data:`limit_types`
+    """
+    d = conn.execute(_for_tenant_and_limit_type(limits.select(),
+                                                tenant_id, limit_type))
+    d.addCallback(_fetchone)
+
+    @d.addCallback
+    def maybe_return_default(row):
+        if row is not None:
+            return row["value"]
+        else:
+            return config_value('limits.absolute.' + limit_type)
+
+    return d
+
+def _set_limit(conn, tenant_id, limit_type, value):
+    """
+    Sets the limit for a group id.
+
+    :param conn: The database connection to use.
+    :param bytes tenant_id: The tenant id of the tenant to set the limit for.
+    :param limit_type: The entity type to set the limit for.
+    :type limit_type: one of the :data:`limit_types`
+    :param int value: The value to set the limit to.
+    """
+    d = conn.execute(limits.insert().values(tenant_id=tenant_id,
+                                            limit_type=limit_type,
+                                            value=value))
+    @d.addErrback
+    def maybe_already_has_a_limit(f):
+        f.trap(IntegrityError)
+        query = _for_tenant_and_limit_type(limits.update(),
+                                            tenant_id, limit_type)
+        return conn.execute(query.values(value=value))
+
+    return d
+
+def _for_tenant_and_limit_type(query, tenant_id, limit_type):
+    q = query.where(and_(limits.c.tenant_id == tenant_id,
+                         limits.c.limit_type == limit_type))
+    return q
+
+def _count_webhooks(conn, policy_id):
+    return _count(conn, webhooks, policy_id=policy_id)
+
+def _count_policies(conn, group_id):
+    return _count(conn, policies, group_id=group_id)
+
+def _count(conn, table, **kwargs):
+    d = conn.execute(table.select()
+                     .where(and_(*[getattr(table.columns, col_name) == value
+                                    for (col_name, value) in kwargs.items()]))
+                     .count())
+    return d.addCallback(_fetchone).addCallback(lambda row: row[0])
