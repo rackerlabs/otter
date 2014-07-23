@@ -468,7 +468,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         yield self.assertFailure(d, interface.NoSuchPolicyError)
 
     @inlineCallbacks
-    def test_create_webhook_at_limit(self):
+    def test_create_webhooks_at_limit(self):
         """
         When attempting to create a webhook for an extant policy, but there
         are already too many webhooks for that policy, an exception is
@@ -477,11 +477,14 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         group = yield self._create_group()
         policy, = yield self._create_policies(group, n=1)
 
-        # TODO: Figure out a way to put us at the limit
+        yield sql._set_limit(self.engine, group.tenant_id,
+                             "maxWebhooksPerPolicy", 1)
+
+        yield group.create_webhooks(policy["id"], [_webhook_examples()[0]])
 
         # Attempt to create a webhook
-        d = group.create_webhooks(policy["id"], _webhook_examples())
-        yield self.assertFailure(d, interface.NoSuchPolicyError)
+        d = group.create_webhooks(policy["id"], _webhook_examples()[1:])
+        yield self.assertFailure(d, interface.WebhooksOverLimitError)
 
 
 class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
