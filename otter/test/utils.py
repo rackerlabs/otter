@@ -387,11 +387,11 @@ class FakeSupervisor(object, Service):
         self.del_index = 0
         self.del_calls = []
 
-    def execute_config(self, log, transaction_id, scaling_group, launch_config):
+    def execute_config(self, log, transaction_id, scaling_group, launch_config, server_id):
         """
         Execute single launch config
         """
-        self.exec_calls.append((log, transaction_id, scaling_group, launch_config))
+        self.exec_calls.append((log, transaction_id, scaling_group, launch_config, server_id))
         self.exec_defs.append(Deferred())
         return self.exec_defs[-1]
 
