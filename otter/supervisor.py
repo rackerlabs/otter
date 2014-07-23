@@ -9,7 +9,7 @@ from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
-from otter.models.interface import NoSuchScalingGroupError
+from otter.models.interface import NoSuchScalingGroupError, NoSuchServerError
 from otter.log import audit
 from otter.util.deferredutils import DeferredPool
 from otter.util.hashkey import generate_job_id
@@ -36,8 +36,7 @@ class ISupervisor(Interface):
         :param IScalingGroup scaling_group: Scaling Group.
         :param dict launch_config: The launch config for the scaling group.
 
-        :returns: A deferred that fires with a 3-tuple of job_id, completion deferred,
-            and job_info (a dict)
+        :returns: A deferred that fires with a 2-tuple of (nova_id, lb_info)
         :rtype: ``Deferred``
         """
 
@@ -316,7 +315,6 @@ class _Job(object):
         self.transaction_id = transaction_id
         self.scaling_group = scaling_group
         self.supervisor = supervisor
-        self.job_id = None
 
     def start(self, launch_config):
         """
@@ -332,16 +330,18 @@ class _Job(object):
         except:
             flavor = 'Unable to pull flavor ref.'
 
-        self.log = self.log.bind(image_ref=image, flavor_ref=flavor, job_id=self.job_id)
+        self.log = self.log.bind(image_ref=image, flavor_ref=flavor)
         self.servers_coll = self.scaling_group.get_servers_collection()
+        self.log.msg('Creating server in DB')
         d = self.servers_coll.create_server(self.log)
 
-        def exec_conf(server_id):
-            self.server_id = server_id
-            self.log = self.log.bind(server_id=server_id)
+        def exec_conf(server):
+            self.server_id = server['id']
+            self.log = self.log.bind(server_id=self.server_id)
+            self.log.msg('Created server {server_id}. Executing config')
             return self.supervisor.execute_config(
                 self.log, self.transaction_id, self.scaling_group,
-                launch_config, server_id)
+                launch_config, self.server_id)
 
         d.addCallback(exec_conf)
         d.addCallbacks(self._job_succeeded, self._job_failed)
@@ -353,6 +353,7 @@ class _Job(object):
         """
         Job has failed. Remove the server_id, if it exists, and log the error.
         """
+        self.log.err(f, 'Lauching server failed')
         d = self.servers_coll.delete_server(self.log, self.server_id)
 
         def ignore_error_if_group_deleted(f):
@@ -361,7 +362,6 @@ class _Job(object):
                          "Job failure logged and ignored.")
 
         d.addErrback(ignore_error_if_group_deleted)
-        d.addErrback(self.log.err, 'Lauching server failed')
         return d
 
     def _job_succeeded(self, result):
@@ -424,7 +424,6 @@ def execute_launch_config(log, transaction_id, launch, scaling_group, delta):
     for i in range(delta):
         job = _Job(log, transaction_id, scaling_group, supervisor)
         d = job.start(launch)
-        state.add_job(job.job_id)
         # Add the job to the pool to ensure otter does not shut down until job is completed
         supervisor.deferred_pool.add(d)
 

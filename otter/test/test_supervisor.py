@@ -13,13 +13,13 @@ from zope.interface.verify import verifyObject
 
 from otter import supervisor
 from otter.models.interface import (
-    IScalingGroup, GroupState, NoSuchScalingGroupError)
+    IScalingGroup, GroupState, NoSuchScalingGroupError, NoSuchServerError)
 from otter.supervisor import (
     ISupervisor, SupervisorService, set_supervisor, remove_server_from_group,
     execute_launch_config, CannotDeleteServerBelowMinError, ServerNotFoundError)
 from otter.test.utils import (
     iMock, patch, mock_log, CheckFailure, matches, FakeSupervisor, IsBoundWith,
-    DummyException, mock_group)
+    DummyException, mock_group, StubServersCollection)
 from otter.util.deferredutils import DeferredPool
 
 
@@ -616,13 +616,12 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
                 return jself.d
 
         patch(self, 'otter.supervisor._Job', new=FakeJob)
-        self.state = GroupState('t', 'g', 'n', {}, {}, *range(3))
 
     def test_no_jobs_started(self):
         """
         If delta == 0, ``execute_launch_config`` does not create any job. It also logs
         """
-        d = execute_launch_config(self.log, 'tid', self.state, 'launch', 'group', 0)
+        d = execute_launch_config(self.log, 'tid', 'launch', 'group', 0)
         self.assertIsNone(self.successResultOf(d))
 
         self.log.msg.assert_called_once_with('Launching {delta} servers.', delta=0)
@@ -634,7 +633,7 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
         It adds the jobs to the state and its completion deferreds to supervisor's pool.
         It also logs
         """
-        d = execute_launch_config(self.log, 'tid', self.state, 'launch', 'group', 3)
+        d = execute_launch_config(self.log, 'tid', 'launch', 'group', 3)
         self.assertIsNone(self.successResultOf(d))
 
         self.log.msg.assert_called_once_with('Launching {delta} servers.', delta=3)
@@ -643,7 +642,6 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
         for job in self.jobs:
             self.assertEqual(job.args, (self.log, 'tid', 'group', self.supervisor))
             self.assertEqual(job.launch, 'launch')
-            self.assertIn(job.job_id, self.state.pending)
             self.assertIn(job.d, self.supervisor.deferred_pool)
 
 
@@ -655,269 +653,44 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         """
         Mock a fake supervisor, and also a fake log and group.
         """
-        self.transaction_id = 'transaction_id'
-        self.job_id = 'job_id'
-        patch(self, 'otter.supervisor.generate_job_id', return_value=self.job_id)
-        self.state = GroupState('tenant', 'group', 'name', {}, {}, None, {}, False)
-        self.group = mock_group(self.state, 'tenant', 'group')
+        self.tid = 'transaction_id'
+        self.group = mock_group(None, 'tenant', 'group')
 
-        self.supervisor = iMock(ISupervisor)
-        self.supervisor.deferred_pool = DeferredPool()
-        self.completion_deferred = Deferred()
-        self.supervisor.execute_config.return_value = self.completion_deferred
+        self.servers_coll = StubServersCollection()
+        self.group.get_servers_collection.return_value = self.servers_coll
+
+        self.supervisor = FakeSupervisor()
 
         self.log = mock_log()
-        self.job = supervisor._Job(self.log, self.transaction_id, self.group,
-                                   self.supervisor)
+        self.job = supervisor._Job(self.log, self.tid, self.group, self.supervisor)
 
         self.del_job = patch(self, 'otter.supervisor._DeleteJob')
         self.mock_launch = {'type': 'launch_server',
                             'args': {'server': {'imageRef': 'imageID',
                                                 'flavorRef': '1'}}}
 
-    def test_start_binds_invalid_image_ref_to_log(self):
-        """
-        `start` binds the image ID to a string that says that we were unable
-        to find the image id in the logs, if the image ref could not be found
-        """
-        del self.mock_launch['args']['server']['imageRef']
-        self.job.start(self.mock_launch)
-        self.assertEqual(
-            self.job.log,
-            matches(IsBoundWith(system='otter.job.launch',
-                                image_ref="Unable to pull image ref.",
-                                flavor_ref='1', job_id='job_id')))
+    def test_success_server_updated(self):
+        d = self.job.start(self.mock_launch)
+        self.supervisor.exec_defs[-1].callback({'id': 'n2', 'lb_info': 'lb'})
+        print self.log.msg.mock_calls
 
-    def test_start_binds_invalid_flavor_ref_to_log(self):
-        """
-        `start` binds the flavor ID to a string that says that we were unable
-        to find the flavor id in the logs, if the flavor ref could not be found
-        """
-        del self.mock_launch['args']['server']['flavorRef']
-        self.job.start(self.mock_launch)
-        self.assertEqual(
-            self.job.log,
-            matches(IsBoundWith(system='otter.job.launch', image_ref="imageID",
-                                flavor_ref="Unable to pull flavor ref.",
-                                job_id='job_id')))
+    def test_success_server_deleted(self):
+        d = self.job.start(self.mock_launch)
+        self.servers_coll.update_server = lambda *a: fail(NoSuchServerError('t', 'g', 's'))
+        self.supervisor.exec_defs[-1].callback({'id': 'n2', 'lb_info': 'lb'})
+        print self.supervisor.deferred_pool._pool
 
-    def test_start_calls_supervisor(self):
-        """
-        `start` calls the supervisor's `execute_config` method with
-        log bound with imageRef and flavorRef from launch config
-        """
-        self.job.start(self.mock_launch)
-        self.supervisor.execute_config.assert_called_once_with(
-            matches(IsBoundWith(system='otter.job.launch', image_ref="imageID",
-                                flavor_ref='1', job_id='job_id')),
-            self.transaction_id,
-            self.group, self.mock_launch)
+    def test_success_group_deleted(self):
+        d = self.job.start(self.mock_launch)
+        self.servers_coll.update_server = lambda *a: fail(NoSuchScalingGroupError('t', 'g'))
+        self.supervisor.exec_defs[-1].callback({'id': 'n2', 'lb_info': 'lb'})
+        print self.log.msg.mock_calls
+        print self.supervisor.deferred_pool._pool
 
-    def test_modify_state_called_on_job_completion_success(self):
-        """
-        If the job succeeded, and modify_state is called
-        """
-        self.job.start('launch')
-        self.assertEqual(self.group.modify_state.call_count, 0)
-        self.completion_deferred.callback({'id': 'blob'})
-        self.assertEqual(self.group.modify_state.call_count, 1)
-
-    def test_modify_state_called_on_job_completion_failure(self):
-        """
-        If the job failed, modify_state is called
-        """
-        self.job.start('launch')
-        self.assertEqual(self.group.modify_state.call_count, 0)
-        self.completion_deferred.errback(Exception('e'))
-        self.assertEqual(self.group.modify_state.call_count, 1)
-
-    def test_job_completion_success_job_marked_as_active(self):
-        """
-        If the job succeeded, and the job ID is still in pending, it is removed
-        and added to active.
-        """
-        self.state.add_job(self.job_id)
-        self.job.start('launch')
-        self.completion_deferred.callback({'id': 'active'})
-
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
-
-        self.assertEqual(self.state.pending, {})
-        self.assertEqual(
-            self.state.active,
-            {'active': matches(ContainsDict({'id': Equals('active')}))})
-
-    def test_job_completion_success_audit_logged(self):
-        """
-        If the job succeeded, and the job ID is still in pending, it is audit
-        logged as a "server.active" event, and the new state after the server
-        has been moved to active is logged.
-        """
-        self.state.add_job(self.job_id)
-        self.state.desired = 1
-        self.job.start(self.mock_launch)
-        self.completion_deferred.callback({'id': 'yay'})
-
-        self.successResultOf(self.completion_deferred)
-
-        self.log.msg.assert_called_once_with(
-            "Server is active.", event_type="server.active", server_id='yay',
-            job_id=self.job_id, audit_log=True, system="otter.job.launch",
-            image_ref="imageID", flavor_ref="1", current_active=1,
-            current_pending=0, current_desired=1)
-
-    def test_job_completion_success_job_deleted_pending(self):
-        """
-        If the job succeeded, but the job ID is no longer in pending, the
-        server is deleted and the state not changed.  No error is logged.
-        """
-        self.job.start('launch')
-        self.completion_deferred.callback({'id': 'active'})
-
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
-
-        self.assertEqual(self.state.pending, {})
-        self.assertEqual(self.state.active, {})
-
-        self.del_job.assert_called_once_with(
-            matches(IsInstance(self.log.__class__)), self.transaction_id,
-            self.group, {'id': 'active'}, self.supervisor)
-        self.del_job.return_value.start.assert_called_once_with()
-        # TODO: Check del job def added to pool
-
-        self.assertEqual(self.log.err.call_count, 0)
-
-    def test_job_completion_success_job_deleted_audit_logged(self):
-        """
-        If the job succeeded, but the job ID is no longer in pending, it is
-        audit logged as a "server.deletable" event.
-        """
-        self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
-                                {}, False, desired=0)
-        self.job.start(self.mock_launch)
-        self.completion_deferred.callback({'id': 'yay'})
-
-        self.successResultOf(self.completion_deferred)
-
-        self.log.msg.assert_called_once_with(
-            ("A pending server that is no longer needed is now active, "
-             "and hence deletable.  Deleting said server."),
-            event_type="server.deletable", server_id='yay', job_id=self.job_id,
-            audit_log=True, system="otter.job.launch", image_ref="imageID",
-            flavor_ref="1", current_active=0, current_pending=0,
-            current_desired=0)
-
-    def test_job_completion_failure_job_removed(self):
-        """
-        If the job failed, the job ID is removed from the pending state.  The
-        failure is logged.
-        """
-        self.state.add_job(self.job_id)
-        self.job.start(self.mock_launch)
-        self.completion_deferred.errback(DummyException('e'))
-
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
-
-        self.assertEqual(self.state.pending, {})
-        self.assertEqual(self.state.active, {})
-
-        self.log.err.assert_called_once_with(
-            CheckFailure(DummyException), 'Launching server failed',
-            system="otter.job.launch", image_ref="imageID", job_id=self.job_id,
-            flavor_ref="1", current_active=0, current_pending=0,
-            current_desired=0)
-
-    def test_job_completion_failure_job_deleted_pending(self):
-        """
-        If the job failed, but the job ID is no longer in pending, the job id
-        is not removed (and hence no error occurs).  The only error logged is
-        the failure. Nothing else in the state changes.
-        """
-        self.job.start(self.mock_launch)
-        self.completion_deferred.errback(DummyException('e'))
-
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
-
-        self.assertEqual(self.state.pending, {})
-        self.assertEqual(self.state.active, {})
-
-        self.log.err.assert_called_with(
-            CheckFailure(DummyException), 'Launching server failed',
-            system="otter.job.launch", image_ref="imageID", job_id=self.job_id,
-            flavor_ref="1", current_active=0, current_pending=0,
-            current_desired=0)
-
-    def test_job_completion_success_NoSuchScalingGroupError(self):
-        """
-        If a job is completed successfully, but `modify_state` fails with a
-        `NoSuchScalingGroupError`, then the group has been deleted and so the
-        server is deleted
-        """
-        self.group.modify_state.side_effect = (
-            lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
-
-        self.job.start('launch')
-        self.completion_deferred.callback({'id': 'active'})
-
-        self.del_job.assert_called_once_with(
-            matches(IsInstance(self.log.__class__)), self.transaction_id,
-            self.group, {'id': 'active'}, self.supervisor)
-        self.del_job.return_value.start.assert_called_once_with()
-        # TODO: Check del job def added to pool
-
-    def test_job_completion_success_NoSuchScalingGroupError_audit_logged(self):
-        """
-        If the job succeeded, but the job ID is no longer in pending, it is
-        audit logged as a "server.deletable" event.
-        """
-        self.group.modify_state.side_effect = (
-            lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
-
-        self.job.start(self.mock_launch)
-        self.completion_deferred.callback({'id': 'yay'})
-
-        self.successResultOf(self.completion_deferred)
-
-        self.log.msg.assert_called_once_with(
-            ("A pending server belonging to a deleted scaling group "
-             "({scaling_group_id}) is now active, and hence deletable. "
-             "Deleting said server."),
-            event_type="server.deletable", server_id='yay', job_id=self.job_id,
-            audit_log=True, system="otter.job.launch", image_ref="imageID",
-            flavor_ref="1")
-
-    def test_job_completion_failure_NoSuchScalingGroupError(self):
-        """
-        If a job fails, but `modify_state` fails with a
-        `NoSuchScalingGroupError`, then the group has been deleted and the
-        failure can be ignored (not logged)
-        """
-        self.group.modify_state.side_effect = (
-            lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
-
-        self.job.start('launch')
-        self.completion_deferred.callback({'id': 'active'})
-        self.assertEqual(self.log.err.call_count, 0)
-
-    def test_modify_state_failure_logged(self):
-        """
-        If `modify_state` fails with a non-`NoSuchScalingGroupError`, the error
-        is logged
-        """
-        self.group.modify_state.side_effect = (
-            lambda *args: fail(DummyException('e')))
-
-        self.job.start(self.mock_launch)
-        self.completion_deferred.callback({'id': 'active'})
-
-        self.log.err.assert_called_once_with(CheckFailure(DummyException),
-                                             system="otter.job.launch",
-                                             image_ref="imageID", flavor_ref="1",
-                                             job_id=self.job_id)
+    def test_failed(self):
+        d = self.job.start(self.mock_launch)
+        self.supervisor.exec_defs[-1].errback(ValueError('prob'))
+        print self.log.err.mock_calls
 
 
 class RemoveServerTests(SynchronousTestCase):
