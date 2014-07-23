@@ -285,9 +285,11 @@ class ConfigTestMixin(object):
         """
         group = yield self._create_group()
 
-        # TODO: figure out a way to put us at the limit
+        yield sql._set_limit(self.engine, group.tenant_id,
+                             "maxPoliciesPerGroup", 1)
 
-        # Create a policy
+        yield self._create_policies(group, n=1)
+
         d = self._create_policies(group)
         yield self.assertFailure(d, interface.PoliciesOverLimitError)
 
