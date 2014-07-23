@@ -269,6 +269,8 @@ def stub_pure_response(body, code=200, response_headers=None):
     """
     Return the type of two-tuple response that pure_http.Request returns.
     """
+    if isinstance(body, dict):
+        body = json.dumps(body)
     if response_headers is None:
         response_headers = {}
     return (StubResponse(code, response_headers), body)

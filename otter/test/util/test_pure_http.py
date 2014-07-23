@@ -1,18 +1,15 @@
 """Tests for otter.util.pure_http"""
 
-import json
-
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from testtools import TestCase
-from testtools.matchers import raises
 
-from effect.testing import StubIntent, resolve_effect, resolve_stub, fail_effect, resolve_stubs, StubErrorIntent, FuncIntent
+from effect.testing import StubIntent, resolve_effect, resolve_stubs
 from effect.twisted import perform
 from effect import Effect
 
-from otter.util.pure_http import request, Request, ReauthFailedError, retry
+from otter.util.pure_http import request, Request
 from otter.util.http import APIError, headers
 from otter.test.utils import stub_pure_response, StubResponse, StubTreq
 
@@ -71,7 +68,7 @@ class PureHTTPClientTests(TestCase):
         def auth(refresh=False):
             assert not refresh
             return Effect(StubIntent("my-token"))
-        return lambda *args, **kwargs: resolve_stub(request(*args, auth=auth, **kwargs))
+        return lambda *args, **kwargs: resolve_stubs(request(*args, auth=auth, **kwargs))
 
     def test_json_request(self):
         """
@@ -89,9 +86,9 @@ class PureHTTPClientTests(TestCase):
         """The JSON response is decoded into Python objects."""
         request_ = self._no_reauth_client()
         eff = request_("get", "/foo")
-        stub_result = stub_pure_response(json.dumps({"foo": "bar"}))
-        result = resolve_effect(eff, stub_result)
-        self.assertEqual(result, {"foo": "bar"})
+        self.assertEqual(
+            resolve_effect(eff, stub_pure_response({"foo": "bar"})),
+            {'foo': 'bar'})
 
     def test_header_merging(self):
         """
@@ -129,14 +126,16 @@ class PureHTTPClientTests(TestCase):
         """
         request_ = self._no_reauth_client()
         eff = request_("get", "/foo")
-        stub_result = stub_pure_response(json.dumps({"foo": "bar"}), code=404)
-        self.assertRaises(APIError, resolve_effect, eff, stub_result)
+        self.assertRaises(
+            APIError,
+            resolve_effect, eff,
+            stub_pure_response({"foo": "bar"}, code=404))
 
     def test_api_error_specified(self):
         """Any HTTP response code can be specified as being successful."""
         request_ = self._no_reauth_client()
         eff = request_("get", url="/foo", success_codes=[404])
-        stub_result = stub_pure_response(json.dumps({"foo": "bar"}), code=404)
+        stub_result = stub_pure_response({"foo": "bar"}, code=404)
         self.assertEqual(resolve_effect(eff, stub_result), {"foo": "bar"})
 
     def test_reauth_successful(self):
@@ -174,7 +173,7 @@ class PureHTTPClientTests(TestCase):
             kwargs['reauth_codes'] = reauth_codes
         eff = request("get", "/foo", auth=auth, **kwargs)
         # The initial (cached) token is retrieved.
-        eff = resolve_stub(eff)
+        eff = resolve_stubs(eff)
 
         # Reauthentication is then triggered:
         stub_result = stub_pure_response("badauth!", code=code)
@@ -182,65 +181,7 @@ class PureHTTPClientTests(TestCase):
         self.assertIs(reauth_effect_result.intent, reauth_effect.intent)
 
         # And the original HTTP response (of whatever code) is returned.
-        api_error = self.assertRaises(APIError, resolve_stub, reauth_effect_result)
+        api_error = self.assertRaises(APIError, resolve_stubs, reauth_effect_result)
         self.assertEqual(api_error.code, code)
         self.assertEqual(api_error.body, "badauth!")
         self.assertEqual(api_error.headers, {})
-
-
-class RetryTests(TestCase):
-
-    def test_should_not_retry(self):
-        """retry raises the last error if should_retry returns False."""
-        result = retry(Effect(StubErrorIntent(RuntimeError("oh no!"))),
-                       lambda e: Effect(StubIntent(False)))
-        self.assertThat(lambda: resolve_stubs(result),
-                        raises(RuntimeError("oh no!")))
-
-
-    def _repeated_effect_func(self, *funcs):
-        """
-        Return an (impure) function which does different things based on the
-        number of times it's been called.
-        """
-        counter = [0]
-        def func():
-            count = counter[0]
-            counter[0] += 1
-            return funcs[count]()
-        return func
-
-
-    def test_retry(self):
-        """
-        When should_retry returns an Effect of True, the func will be called
-        again.
-        """
-        func = self._repeated_effect_func(
-          lambda: raise_(RuntimeError("foo")),
-          lambda: "final")
-        result = retry(Effect(FuncIntent(func)),
-                       lambda e: Effect(StubIntent(True)))
-        self.assertEqual(resolve_stubs(result), "final")
-
-    def test_continue_retrying(self):
-        """
-        should_retry is passed the exception information, and will be
-        called until it returns False.
-        """
-
-        func = self._repeated_effect_func(
-            lambda: raise_(RuntimeError("1")),
-            lambda: raise_(RuntimeError("2")),
-            lambda: raise_(RuntimeError("3")))
-
-        def should_retry(e):
-            return Effect(StubIntent(str(e[1]) != "3"))
-
-        result = retry(Effect(FuncIntent(func)), should_retry)
-        self.assertThat(lambda: resolve_stubs(result),
-                        raises(RuntimeError("3")))
-
-
-def raise_(exc):
-    raise exc

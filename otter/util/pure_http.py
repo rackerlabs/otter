@@ -3,8 +3,6 @@ Pure HTTP utilities.
 """
 import json
 
-import six
-
 from functools import partial
 
 from effect import Effect
@@ -40,13 +38,6 @@ class Request(object):
                                            data=self.data, log=self.log)
         content = yield self.treq.content(response)
         returnValue((response, content))
-
-
-class ReauthFailedError(Exception):
-    """
-    Raised when an HTTP request returned 401 even after successful
-    reauthentication was performed.
-    """
 
 
 def get_request(method, url, **kwargs):
@@ -112,28 +103,6 @@ def json_request(get_request, method, url, data=None, **kwargs):
 def content_request(result):
     """Only return the content part of a response."""
     return result.on(success=lambda r: r[1])
-
-
-def retry(effect, should_retry):
-    """
-    Retry an effect as long as it fails and as long as the ``should_retry``
-    error handler returns an Effect of True.
-
-    If ``should_retry`` returns an Effect of False, then the returned effect
-    will fail with the most recent error from func.
-    """
-
-    def maybe_retry(error, retry_allowed):
-        if retry_allowed:
-            return try_()
-        else:
-            six.reraise(*error)
-
-    def try_():
-        return effect.on(
-            error=lambda e: should_retry(e).on(success=partial(maybe_retry, e)))
-
-    return try_()
 
 
 _request = wrappers(get_request, request_with_auth, request_with_status_check, json_request)
