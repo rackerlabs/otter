@@ -76,7 +76,6 @@ class SQLiteTestMixin(object):
         yield sql.create_tables(self.engine)
 
 
-class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
 class ConfigTestMixin(object):
     """
     A test mixin that sets some configuration values for every test.
@@ -86,6 +85,11 @@ class ConfigTestMixin(object):
                                                  'maxPoliciesPerGroup': 10}}})
         self.addCleanup(set_config_data, {})
 
+
+class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
+    def setUp(self):
+        SQLiteTestMixin.setUp(self)
+        ConfigTestMixin.setUp(self)
 
     def _create_group(self, tenant_id=b"TENANT", policies=None):
         """Creates a group within a test collection.
