@@ -1051,7 +1051,7 @@ class ServerTests(SynchronousTestCase):
             "Server changed to '{status}' in {time_building} seconds",
             time_building=5.0, status='ERROR')
 
-        self.assertEqual(failure.value.server_id, 'serverId')
+        self.assertEqual(failure.value.nova_id, 'serverId')
         self.assertEqual(failure.value.status, 'ERROR')
         self.assertEqual(failure.value.expected_status, 'ACTIVE')
 
@@ -1237,6 +1237,7 @@ class ServerTests(SynchronousTestCase):
                           fake_service_catalog,
                           'my-auth-token',
                           launch_config,
+                          'serverid',
                           self.undo)
 
         result = self.successResultOf(d)
@@ -1258,7 +1259,7 @@ class ServerTests(SynchronousTestCase):
 
         log.bind.assert_called_once_with(server_name='as000000')
         log = log.bind.return_value
-        log.bind.assert_called_once_with(server_id='1')
+        log.bind.assert_called_once_with(nova_id='1')
         add_to_load_balancers.assert_called_once_with(
             log.bind.return_value, 'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
             '10.0.0.1', self.undo)
@@ -1280,6 +1281,7 @@ class ServerTests(SynchronousTestCase):
                           fake_service_catalog,
                           'my-auth-token',
                           {'server': {}},
+                          'serverid',
                           self.undo)
 
         failure = self.failureResultOf(d)
@@ -1318,6 +1320,7 @@ class ServerTests(SynchronousTestCase):
                           fake_service_catalog,
                           'my-auth-token',
                           launch_config,
+                          'serverid',
                           self.undo)
 
         failure = self.failureResultOf(d)
@@ -1358,6 +1361,7 @@ class ServerTests(SynchronousTestCase):
                           fake_service_catalog,
                           'my-auth-token',
                           launch_config,
+                          'serverid',
                           self.undo)
 
         failure = self.failureResultOf(d)
@@ -1404,6 +1408,7 @@ class ServerTests(SynchronousTestCase):
                           fake_service_catalog,
                           'my-auth-token',
                           launch_config,
+                          'serverid',
                           self.undo)
 
         # Check that the push hasn't happened because create_server hasn't
@@ -1439,6 +1444,7 @@ class ServerTests(SynchronousTestCase):
                           fake_service_catalog,
                           'my-auth-token',
                           launch_config,
+                          'serverid',
                           self.undo)
 
         self.failureResultOf(d, APIError)
@@ -1481,6 +1487,7 @@ class ServerTests(SynchronousTestCase):
                           fake_service_catalog,
                           'my-auth-token',
                           launch_config,
+                          'serverid',
                           self.undo, clock=clock)
 
         # No result, create_server and wait_for_active called once, server deletion
@@ -1492,8 +1499,8 @@ class ServerTests(SynchronousTestCase):
             matches(IsInstance(self.log.__class__)), 'http://dfw.openstack/',
             'my-auth-token', '1')
         self.log.msg.assert_called_once_with(
-            '{server_id} errored, deleting and creating new server instead',
-            server_name='as000000', server_id='1')
+            '{nova_id} errored, deleting and creating new server instead',
+            server_name='as000000', nova_id='1')
 
         self.assertFalse(mock_addlb.called)
 
@@ -1509,8 +1516,8 @@ class ServerTests(SynchronousTestCase):
                        'my-auth-token', '1')] * 2)
         self.assertEqual(
             self.log.msg.mock_calls,
-            [mock.call('{server_id} errored, deleting and creating new server instead',
-                       server_name='as000000', server_id='1')] * 2)
+            [mock.call('{nova_id} errored, deleting and creating new server instead',
+                       server_name='as000000', nova_id='1')] * 2)
         self.assertFalse(mock_addlb.called)
 
         # next time server creation succeeds
@@ -1555,6 +1562,7 @@ class ServerTests(SynchronousTestCase):
                           fake_service_catalog,
                           'my-auth-token',
                           launch_config,
+                          'serverid',
                           self.undo, clock=clock)
 
         self.failureResultOf(d, UnexpectedServerStatus)
@@ -1597,6 +1605,7 @@ class ServerTests(SynchronousTestCase):
                           fake_service_catalog,
                           'my-auth-token',
                           launch_config,
+                          'serverid',
                           self.undo, clock=clock)
 
         clock.pump([15] * 3)
@@ -1944,7 +1953,7 @@ class DeleteServerTests(SynchronousTestCase):
         self.clock.advance(2)
         self.assertEqual(
             delete_and_verify.mock_calls,
-            [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
+            [mock.call(matches(IsBoundWith(nova_id='serverId')), 'http://url/',
                        'my-auth-token', 'serverId')] * 2)
         self.successResultOf(d)
 
@@ -1955,7 +1964,7 @@ class DeleteServerTests(SynchronousTestCase):
         # success logged
         self.log.msg.assert_called_with(
             matches(StartsWith("Server deleted successfully")),
-            server_id='serverId', time_delete=2.0)
+            nova_id='serverId', time_delete=2.0)
 
     def test_verified_delete_retries_verification_until_timeout(self):
         """
@@ -1978,7 +1987,7 @@ class DeleteServerTests(SynchronousTestCase):
         self.failureResultOf(d, DummyException)
         self.assertEqual(
             delete_and_verify.mock_calls,
-            [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
+            [mock.call(matches(IsBoundWith(nova_id='serverId')), 'http://url/',
                        'my-auth-token', 'serverId')] * 3)
 
         # the loop has stopped
