@@ -188,6 +188,17 @@ class NoSuchWebhookError(Exception):
             .format(t=tenant_id, g=group_id, p=policy_id, w=webhook_id))
 
 
+class NoSuchServerError(Exception):
+    """
+    Error to be raised when attempting operations on a server that does not
+    exist.
+    """
+    def __init__(self, tenant_id, group_id, server_id):
+        super(NoSuchServerError, self).__init__(
+            "No such server {s} in group {g} for tenant {t}"
+            .format(t=tenant_id, g=group_id, s=server_id))
+
+
 class GroupNotEmptyError(Exception):
     """
     Error to be raised when attempting to delete group that still has entities
