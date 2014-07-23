@@ -36,6 +36,7 @@ from itertools import product
 from otter.json_schema import group_examples, model_schemas, validate
 from otter.models import interface, sql
 from otter.test.utils import FakeReactorThreads
+from otter.util.config import set_config_data
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from twisted.internet.defer import gatherResults
@@ -76,6 +77,16 @@ class SQLiteTestMixin(object):
 
 
 class SQLScalingGroupTests(SQLiteTestMixin, TestCase):
+class ConfigTestMixin(object):
+    """
+    A test mixin that sets some configuration values for every test.
+    """
+    def setUp(self):
+        set_config_data({'limits': {'absolute': {'maxWebhooksPerPolicy': 10,
+                                                 'maxPoliciesPerGroup': 10}}})
+        self.addCleanup(set_config_data, {})
+
+
     def _create_group(self, tenant_id=b"TENANT", policies=None):
         """Creates a group within a test collection.
 
