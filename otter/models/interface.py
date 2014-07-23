@@ -612,7 +612,7 @@ class IScalingGroup(Interface):
         :raises NoSuchWebhookError: if the webhook id does not exist
         """
 
-    def get_servers_collection(log, tenant_id, scaling_group_id):
+    def get_servers_collection():
         """
         Get servers in the scaling group as :class:`IScalingGroupServersCollection`
         """

@@ -1129,9 +1129,9 @@ class CassScalingGroup(object):
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         return with_lock(self.reactor, lock, log.bind(category='locking'), _delete_group)
 
-    def get_servers_collection(self, tenant_id, group_id):
+    def get_servers_collection(self):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.get_servers_collection`
+        see :meth:`otter.models.interface.IScalingGroup.get_servers_collection`
         """
         return CassScalingGroupServers(self)
 
@@ -1149,8 +1149,8 @@ class CassScalingGroupServers(object):
         self.log = log.bind(system='CassScalingGroupServers', tenant_id=self.tenant_id,
                             scaling_group_id=self.group_id)
 
-    def _prepare_params(self):
-        return {'tenantId': self.tenant_id, 'groupId': self.group_id}
+    def _prepare_params(self, **kwargs):
+        return dict(tenantId=self.tenant_id, groupId=self.group_id, **kwargs)
 
     def _check_group(self, func):
         """
@@ -1163,6 +1163,11 @@ class CassScalingGroupServers(object):
             return d
         return wrapper
 
+    def list_servers(self, log, status=None, limit=100, marker=None):
+        return self.connection.execute(
+            _cql_list_all_in_group.format(cf=self.servers_table, order_by=''),
+            self._prepare_params(), self.get_consistency('list', 'server'))
+
     def create_servers(self, log, num_servers, status='pending'):
         raise NotImplementedError
 
@@ -1171,19 +1176,35 @@ class CassScalingGroupServers(object):
         cql = ('INSERT INTO {cf}("tenantId", "groupId", id, nova_id, status, created) '
                'VALUES(:tenantId, :groupId, :id, :nova_id, :status, :created);')
         server_id = str(uuid.uuid4())
-        params = {'id': server_id,
-                  'nova_id': nova_id,
-                  'status': status,
-                  'created': datetime.utcnow()}
-        params.update(self._prepare_params())
         d = self.connection.execute(
-            cql.format(cf=self.servers_table), params,
+            cql.format(cf=self.servers_table),
+            self._prepare_params(id=server_id, status=status, created=datetime.utcnow()),
             self.get_consistency_level('insert', 'server'))
-        d.addCallback(lambda _: merge(params, {'lb_info': None}))
+        d.addCallback(lambda _: dict(lb_info=None, **params))
         return d
 
+    @self._check_group
     def update_server(self, log, server_id, nova_id=None, status=None, lb_info=None):
-        pass
+        cql = ('UPDATE {cf} SET nova_id=:nova_id, status=:status, lb_info=:lb_info '
+               'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND id=:id;')
+        d = self.connection.execute(
+            cql.format(cf=self.servers_table),
+            self._prepare_params(id=server_id, nova_id=nova_id, status=status,
+                                 lb_info=lb_info),
+            self.get_consistency_level('update', 'server'))
+        return d
+
+    @self._check_group
+    def delete_servers(self, log, server_ids):
+        cql = ('DELETE FROM {cf} WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
+               'AND id IN ({ids});')
+        query_ids = ','.join([':id{}'.format(i) for i in range(len(server_ids))])
+        params = {'id{}'.format(i): server_id for i, server_id in enumerate(server_ids)}
+        d = self.connection.execute(
+            cql.format(cf=self.servers_table, ids=query_ids),
+            self._prepare_params(**params),
+            self.get_consistency_level('delete', 'server'))
+        return d
 
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
