@@ -167,22 +167,41 @@ class SQLScalingGroup(object):
         }
         returnValue(result)
 
-    @_with_transaction
-    def create_policies(self, conn, policy_cfgs):
-        """
-        Create some policies.
-        """
-        limit_d = _get_limit(conn, self.tenant_id, "maxPoliciesPerGroup")
-        count_d = _count_policies(conn, self.uuid)
+    def _check_limit(self, conn, entity_type, new_items, policy_id=None):
+        if entity_type == "policies":
+            limit_type = "maxPoliciesPerGroup"
+            count_d = _count_policies(conn, self.uuid)
+            def make_exception(limit, current):
+                return iface.PoliciesOverLimitError(self.tenant_id, self.uuid,
+                                                    limit, current, new_items)
+        elif entity_type == "webhooks":
+            limit_type = "maxWebhooksPerPolicy"
+            count_d = _count_webhooks(conn, policy_id)
+            def make_exception(limit, current):
+                return iface.WebhooksOverLimitError(self.tenant_id, self.uuid,
+                                                    policy_id,
+                                                    limit, current, new_items)
+        else:
+            raise RuntimeError("Unknown limited entity type {}"
+                               .format(entity_type))
+
+        limit_d = _get_limit(conn, self.tenant_id, limit_type)
         d = gatherResults([limit_d, count_d])
 
         @d.addCallback
         def check_limit(result):
             limit, current = result
-            new = len(policy_cfgs)
-            if current + new > limit:
-                raise iface.PoliciesOverLimitError(self.tenant_id, self.uuid,
-                                                   limit, current, new)
+            if current + new_items > limit:
+                raise make_exception(limit, current)
+
+        return d
+
+    @_with_transaction
+    def create_policies(self, conn, policy_cfgs):
+        """
+        Create some policies.
+        """
+        d = self._check_limit(conn, "policies", len(policy_cfgs))
 
         @d.addCallback
         def create_policies(_result):
@@ -377,7 +396,12 @@ class SQLScalingGroup(object):
                                       capability_hash=capability_hash,
                                       **d))
 
-        d = conn.execute(webhooks.insert(), data_with_ids)
+        d = self._check_limit(conn, "webhooks", len(data), policy_id)
+
+        @d.addCallback
+        def insert_webhooks(_result):
+            return conn.execute(webhooks.insert(), data_with_ids)
+
         d.addErrback(self._report_missing_foreign_policy, policy_id)
 
         @d.addCallback
