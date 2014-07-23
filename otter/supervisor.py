@@ -332,7 +332,7 @@ class _Job(object):
         except:
             flavor = 'Unable to pull flavor ref.'
 
-        self.log = self.log.bind(image_ref=image, flavor_ref=flavor) job_id=self.job_id)
+        self.log = self.log.bind(image_ref=image, flavor_ref=flavor, job_id=self.job_id)
         self.servers_coll = self.scaling_group.get_servers_collection()
         d = self.servers_coll.create_server(self.log)
 
