@@ -425,3 +425,24 @@ def mock_group(state, tenant_id='tenant', group_id='group'):
 
     group.modify_state.side_effect = fake_modify_state
     return group
+
+
+class StubServersCollection(object):
+
+    def __init__(self):
+        self.servers = {}
+        self.index = 10
+
+    def create_server(self, log, nova_id=None, status='pending'):
+        self.servers[self.index] = {'id': self.index, 'nova_id': nova_id, 'status': status}
+        self.index += 1
+        return succeed(self.servers[self.index - 1])
+
+    def update_server(self, log, server_id, nova_id=None, status=None, lb_info=None):
+        self.servers[server_id].update({'nova_id': nova_id, 'status': status,
+                                        'lb_info': lb_info})
+        return succeed(None)
+
+    def delete_server(self, log, server_id):
+        del self.servers[server_id]
+        return succeed(None)
