@@ -327,7 +327,18 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         policy, = yield self._create_policies(group, n=1)
 
         old = yield group.get_policy(policy["id"])
-        # TODO: write a useful test here, once get_policy is implemented
+        new = {"change": old["change"] * 2,
+               "cooldown": old["cooldown"] * 2,
+               "name": "times two",
+               "type": "webhook"}
+        self.assertNotEqual(old, new)
+
+        yield group.update_policy(policy["id"], dict(new))
+        got = yield group.get_policy(policy["id"])
+        matched_keys = new.viewkeys() & got.viewkeys()
+        self.assertEqual(len(matched_keys), len(new))
+        for key in matched_keys:
+            self.assertEqual(new[key], got[key])
 
     def test_list_policies_for_nonexistant_scaling_group(self):
         """
