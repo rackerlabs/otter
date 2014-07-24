@@ -215,6 +215,13 @@ class SQLScalingGroup(object):
 
         return d
 
+    def modify_state(self, modifier_callable, *args, **kwargs):
+        """
+        See :meth:`~iface.IScalingGroup.modify_state`.
+        """
+        # TODO: actually implement
+        raise RuntimeError("ACTUALLY IMPLEMENT THIS")
+
     @_with_transaction
     def create_policies(self, conn, policy_cfgs):
         """
