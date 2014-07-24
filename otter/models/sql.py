@@ -1206,6 +1206,6 @@ def _count_policies(conn, group_id):
 def _count(conn, table, **kwargs):
     d = conn.execute(table.select()
                      .where(and_(*[getattr(table.columns, col_name) == value
-                                    for (col_name, value) in kwargs.items()]))
+                                   for (col_name, value) in kwargs.items()]))
                      .count())
     return d.addCallback(_fetchone).addCallback(lambda row: row[0])
