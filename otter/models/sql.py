@@ -74,6 +74,9 @@ class SQLScalingGroup(object):
     @_with_transaction
     @inlineCallbacks
     def view_manifest(self, conn, with_webhooks=False):
+        """
+        See :meth:`~iface.IScalingGroup.view_manifest`.
+        """
         group_configuration = yield self._get_config(conn)
         launch_configuration = yield self._get_launch_config(conn)
         scaling_policies = yield self.list_policies()
@@ -88,6 +91,9 @@ class SQLScalingGroup(object):
 
     @_with_transaction
     def view_config(self, conn):
+        """
+        See :meth:`~iface.IScalingGroup.view_config`.
+        """
         return self._get_config(conn)
 
     def _get_config(self, conn):
@@ -128,6 +134,9 @@ class SQLScalingGroup(object):
 
     @_with_transaction
     def view_launch_config(self, conn):
+        """
+        See :meth:`~iface.IScalingGroup.view_launch_config`.
+        """
         return self._get_launch_config(conn)
 
     @inlineCallbacks
@@ -206,7 +215,7 @@ class SQLScalingGroup(object):
     @_with_transaction
     def create_policies(self, conn, policy_cfgs):
         """
-        Create some policies.
+        See :meth:`~iface.IScalingGroup.create_policies`.
         """
         d = self._check_limit(conn, "policies", len(policy_cfgs))
 
@@ -242,6 +251,9 @@ class SQLScalingGroup(object):
 
     @_with_transaction
     def update_policy(self, conn, policy_id, data):
+        """
+        See :meth:`~iface.IScalingGroup.update_policy`.
+        """
         try:
             adjustment_type = _get_adjustment_type(data)
             data["adjustment_type"] = adjustment_type
@@ -257,6 +269,9 @@ class SQLScalingGroup(object):
 
     @_with_transaction
     def update_launch_config(self, conn, data):
+        """
+        See :meth:`~iface.IScalingGroup.update_launch_config`.
+        """
         args = data["args"]
         server = args["server"]
 
@@ -298,11 +313,17 @@ class SQLScalingGroup(object):
         return d.addCallback(lambda _result: None)
 
     def list_policies(self, limit=100, marker=None):
+        """
+        See :meth:`~iface.IScalingGroup.list_policies`.
+        """
         # TODO: only for this tenant & group!
         query = _paginated(policies, limit, marker)
         return self._get_policies(query)
 
     def get_policy(self, policy_id, version=None):
+        """
+        See :meth:`~iface.IScalingGroup.get_policy`.
+        """
         # TODO: only for this tenant and group!
         query = policies.select().where(policies.c.id == policy_id).limit(1)
         d = self._get_policies(query)
@@ -378,6 +399,9 @@ class SQLScalingGroup(object):
 
     @_with_transaction
     def delete_policy(self, conn, policy_id):
+        """
+        See :meth:`~iface.IScalingGroup.delete_policy`.
+        """
         # REVIEW: Add ON DELETE CASCADE to FKey constraint?
         query = policies.delete().where(policies.c.id == policy_id)
         d = conn.execute(query)
@@ -387,7 +411,7 @@ class SQLScalingGroup(object):
     @_with_transaction
     def create_webhooks(self, conn, policy_id, data):
         """
-        Creates some webhooks.
+        See :meth:`~iface.IScalingGroup.create_webhooks`.
         """
         data_with_ids = []
         metadata_by_id = {}
@@ -449,6 +473,9 @@ class SQLScalingGroup(object):
 
     @_with_transaction
     def get_webhook(self, conn, policy_id, webhook_id):
+        """
+        See :meth:`~iface.IScalingGroup.get_webhook`.
+        """
         d = conn.execute(webhooks.select(webhooks.c.id == webhook_id))
         d.addCallback(_fetchone)
 
