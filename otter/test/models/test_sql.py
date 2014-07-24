@@ -940,7 +940,12 @@ class SQLScalingGroupCollectionTests(ConfigTestMixin, SQLiteTestMixin, TestCase)
         return d
 
 
-class SQLAdminTests(SQLiteTestMixin, TestCase):
+class SQLAdminTests(ConfigTestMixin, SQLiteTestMixin, TestCase):
+    def setUp(self):
+        TestCase.setUp(self)
+        SQLiteTestMixin.setUp(self)
+        ConfigTestMixin.setUp(self)
+
     def test_interface(self):
         """
         The SQL admin interface implementation implements the
@@ -950,6 +955,48 @@ class SQLAdminTests(SQLiteTestMixin, TestCase):
         verifyObject(interface.IAdmin, admin)
 
     test_interface.todo = "interface not fully implemented yet"
+
+    @inlineCallbacks
+    def test_get_metrics(self):
+        """
+        Getting metrics works.
+        """
+        coll = sql.SQLScalingGroupCollection(self.engine)
+
+        config = group_examples.config()[0]
+        launch = group_examples.launch_server_config()[0]
+        groups = []
+        for idx in xrange(3):
+            tenant_id = b"TENANT {}".format(bytes(idx))
+            group_data = yield coll.create_scaling_group(log,
+                                                         tenant_id,
+                                                         config,
+                                                         launch)
+            group = sql.SQLScalingGroup(self.engine,
+                                        tenant_id,
+                                        group_data["id"])
+            groups.append(group)
+
+        policy_cfgs = group_examples.policy()
+        all_policies = []
+        for group in groups:
+            new_policies = yield group.create_policies(policy_cfgs)
+            all_policies.extend(new_policies)
+
+        webhook_cfgs = _webhook_examples()
+        all_webhooks = []
+        for group in groups:
+            for policy in all_policies:
+                new_webhooks = yield group.create_webhooks(policy["id"],
+                                                           webhook_cfgs)
+                all_webhooks.extend(new_webhooks)
+
+        admin = sql.SQLAdmin(self.engine)
+        metrics = yield admin.get_metrics()
+
+        self.assertEqual(metrics, {"groups": len(groups),
+                                   "policies": len(all_policies),
+                                   "webhooks": len(all_webhooks)})
 
 
 def _webhook_examples():
