@@ -172,6 +172,7 @@ class PureHTTPClientTests(TestCase):
         if reauth_codes is not None:
             kwargs['reauth_codes'] = reauth_codes
         eff = request("get", "/foo", auth=auth, **kwargs)
+
         # The initial (cached) token is retrieved.
         eff = resolve_stubs(eff)
 

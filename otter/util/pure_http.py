@@ -34,7 +34,8 @@ class Request(object):
 
         :return: A two-tuple of (HTTP Response, content as bytes)
         """
-        response = yield self.treq.request(self.method.upper(), self.url, headers=self.headers,
+        response = yield self.treq.request(self.method.upper(), self.url,
+                                           headers=self.headers,
                                            data=self.data, log=self.log)
         content = yield self.treq.content(response)
         returnValue((response, content))
@@ -49,19 +50,19 @@ def request_with_auth(get_request, method, url, auth=None,
                       headers=None, reauth_codes=(401, 403),
                       **kwargs):
     """
-    Create an authenticated request. If the request fails with an auth-related error,
-    a fresh token will be requested automatically.
+    Create an authenticated request. If the request fails with an auth-related
+    error, a fresh token will be requested automatically.
 
-    The given 'auth' argument should be a function that returns an Effect of the
-    auth token to use. Before the request is made, the auth function will be called
-    with no arguments to get the auth token to be used (which may be cached). If
-    the application request fails with an auth-related error, the auth function will
-    be invoked again, with a refresh=True argument. In this case, a new token must
-    be retrieved from the authentication server.
+    The given 'auth' argument should be a function that returns an Effect of
+    the auth token to use. Before the request is made, the auth function will
+    be called with no arguments to get the auth token to be used (which may be
+    cached). If the application request fails with an auth-related error, the
+    auth function will be invoked again, with a refresh=True argument. In this
+    case, a new token must be retrieved from the authentication server.
 
-    If refreshing an auth token returns successfully, a NoResponseError exception
-    will be raised. If it results in an error, that error will be propagated to the
-    Effect that this function returns.
+    If refreshing an auth token returns successfully, a NoResponseError
+    exception will be raised. If it results in an error, that error will be
+    propagated to the Effect that this function returns.
     """
 
     def handle_reauth(result):
@@ -80,19 +81,22 @@ def request_with_auth(get_request, method, url, auth=None,
     return auth().on(success=try_request)
 
 
-def request_with_status_check(get_request, method, url, success_codes=(200,), **kwargs):
+def status_check(success_codes, result):
     """Ensure that the response code is acceptable. If not, raise APIError."""
-
-    def check_success(result):
-        (response, content) = result
-        if response.code not in success_codes:
-            raise APIError(response.code, content, response.headers)
-        return result
-    eff = get_request(method, url, **kwargs)
-    return eff.on(success=partial(check_success))
+    (response, content) = result
+    if response.code not in success_codes:
+        raise APIError(response.code, content, response.headers)
+    return result
 
 
-def json_request(get_request, method, url, data=None, **kwargs):
+def request_with_status_check(get_request, method, url, success_codes=(200,),
+                              **kwargs):
+    """Make a request and perform a status check on the response."""
+    return get_request(method, url, **kwargs).on(
+        success=partial(status_check, success_codes))
+
+
+def request_with_json(get_request, method, url, data=None, **kwargs):
     """Convert the request body to JSON, and parse the response as JSON."""
     if data is not None:
         data = json.dumps(data)
@@ -100,12 +104,16 @@ def json_request(get_request, method, url, data=None, **kwargs):
         success=lambda r: (r[0], json.loads(r[1])))
 
 
-def content_request(result):
+def content_request(effect):
     """Only return the content part of a response."""
-    return result.on(success=lambda r: r[1])
+    return effect.on(success=lambda r: r[1])
 
 
-_request = wrappers(get_request, request_with_auth, request_with_status_check, json_request)
+_request = wrappers(
+    get_request,
+    request_with_auth,
+    request_with_status_check,
+    request_with_json)
 _request = compose(content_request, _request)
 
 
@@ -113,8 +121,8 @@ def request(method, url, *args, **kwargs):
     """
     Make an HTTP request, with a number of conveniences:
 
-    :param success_codes: HTTP codes to accept as successful.
+    :param success_codes: HTTP codes to accept as successful
     :param data: python object, to be encoded with json
-    :param auth: a function to be used to retrieve auth tokens.
+    :param auth: a function to be used to retrieve auth tokens
     """
     return _request(method, url, *args, **kwargs)
