@@ -391,6 +391,11 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
+    def last_execution_time():
+        """
+        Return group's last execution time
+        """
+
     def update_execution_time(exec_time=None):
         """
         Update the group's last execution time
