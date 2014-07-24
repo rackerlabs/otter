@@ -638,8 +638,12 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         exception is raised.
         """
         d = self._create_group()
-        d.addCallback(lambda g: g.update_webhook(b"BOGUS_POLICY", b"BOGUS_WEBHOOK",
-                                            _webhook_examples()[0]))
+
+        @d.addCallback
+        def update_webhook(group):
+            return group.update_webhook(b"BOGUS_POLICY", b"BOGUS_WEBHOOK",
+                                        _webhook_examples()[0])
+
         return self.assertFailure(d, interface.NoSuchPolicyError)
 
     @inlineCallbacks
