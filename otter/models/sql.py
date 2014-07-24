@@ -232,15 +232,13 @@ class SQLScalingGroup(object):
         """
         See :meth:`~iface.IScalingGroupCollection.update_config`.
         """
-        d = conn.execute(scaling_groups.delete()
-                         .where(scaling_groups.c.id == self.uuid))
+        d = conn.execute(group_metadata.delete()
+                         .where(group_metadata.c.group_id == self.uuid))
 
         @d.addCallback
-        def maybe_complain(result_proxy):
-            if result_proxy.rowcount == 0:
-                raise iface.NoSuchScalingGroupError(self.tenant_id, self.uuid)
-
-            return conn.execute(scaling_groups.insert()
+        def update_config(_result_proxy):
+            return conn.execute(scaling_groups.update()
+                                .where(scaling_groups.c.id == self.uuid)
                                 .values(id=self.uuid,
                                         name=config["name"],
                                         tenant_id=self.tenant_id,
@@ -249,7 +247,13 @@ class SQLScalingGroup(object):
                                         maxEntities=config.get("maxEntities")))
 
         @d.addCallback
-        def insert_metdata(_result_proxy):
+        def maybe_complain_otherwise_insert_metdata(result_proxy):
+            """
+            If the result_proxy shows that no rows were affected, this scaling group doesn't exist.
+            """
+            if result_proxy.rowcount == 0:
+                raise iface.NoSuchScalingGroupError(self.tenant_id, self.uuid)
+
             return conn.execute(group_metadata.insert(),
                                 [{"group_id": self.uuid,
                                   "key": key, "value": value}
