@@ -32,7 +32,9 @@ code paths.
 """
 from alchimia import TWISTED_STRATEGY as STRATEGY
 from copy import deepcopy
+from functools import partial
 from itertools import product
+from operator import itemgetter
 from otter.json_schema import group_examples, model_schemas, validate
 from otter.models import interface, sql
 from otter.test.utils import FakeReactorThreads
@@ -442,6 +444,38 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         yield self.assertFailure(d, interface.NoSuchPolicyError)
 
     @inlineCallbacks
+    def test_list_webhooks_happy_case(self):
+        """
+        Listing webhooks works.
+        """
+        group = yield self._create_group()
+        policy, = yield self._create_policies(group, n=1)
+
+        webhook_cfgs = _webhook_examples()
+        webhooks = yield group.create_webhooks(policy["id"], webhook_cfgs)
+        webhooks.sort(key=itemgetter("id"))
+        iterwebhooks = iter(webhooks)
+        # TODO: add some false flags
+
+        list_webhooks = partial(group.list_webhooks, policy["id"])
+        first_amount = 1
+        some_webhooks = yield list_webhooks(limit=first_amount)
+        self.assertEqual(len(some_webhooks), first_amount)
+
+        for got_webhook, expected_webhook in zip(some_webhooks, iterwebhooks):
+            self.assertEqual(got_webhook, expected_webhook)
+
+        second_amount = 100
+        more_webhooks = yield list_webhooks(marker=some_webhooks[-1]["id"],
+                                            limit=second_amount)
+
+        remaining_webhooks = len(webhook_cfgs) - first_amount
+        self.asserTrue(second_amount >= remaining_webhooks)
+        self.assertEqual(len(more_webhooks), remaining_webhooks)
+
+        for got_webhook, expected_webhook in zip(more_webhooks, iterwebhooks):
+            self.assertEqual(got_webhook, expected_webhook)
+
     def test_list_webhooks_for_nonexistent_policy(self):
         """
         When attempting to list webhooks for a policy that doesn't exist,
@@ -451,6 +485,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         d.addCallback(lambda g: g.list_webhooks(b"BOGUS"))
         return self.assertFailure(d, interface.NoSuchPolicyError)
 
+    @inlineCallbacks
     def test_create_webhooks_happy_case(self):
         """
         The user can create a webhook for an extant policy.
