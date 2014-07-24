@@ -488,25 +488,7 @@ class SQLScalingGroup(object):
         """
         d = conn.execute(webhooks.select(webhooks.c.id == webhook_id))
         d.addCallback(_fetchone)
-
-        @d.addCallback
-        def check_result(row):
-            if row is not None:
-                return row
-
-            # REVIEW: So, I think this is silly because this method can
-            # return all three exceptions; why doesn't it just
-            # complain about a missing webhook as soon as it can't
-            # find a webhook? I guess it's too late to change that
-            # interface :)
-            d = self._verify_group_exists(conn)
-            d.addCallback(lambda _result: self._verify_policy_exists(conn,
-                                                                policy_id))
-            @d.addCallback
-            def okay_so_the_webhook_doesnt_exist(_result):
-                raise iface.NoSuchWebhookError(self.tenant_id, self.uuid,
-                                                   policy_id, webhook_id)
-            return d
+        d.addCallback(self._maybe_verify_why_we_cant_find_webhook)
 
         @d.addCallback
         def _get_metadata(row):
@@ -524,6 +506,24 @@ class SQLScalingGroup(object):
                     "metadata": metadata}
 
         return d
+
+    @inlineCallbacks
+    def _maybe_verify_why_we_cant_find_webhook(self, row):
+        """
+        If necessary, check why we can't find anything about this webhook.
+        Checks, in order, if the groups exists, the policy exists, and
+        if both of those exist, conclude it's just the webhook that
+        doesn't exist.
+
+        If a row was found, just return the row.
+        """
+        if row is not None:
+            returnValue(row)
+
+        yield self._verify_group_exists(conn)
+        yield self._verify_policy_exists(conn, policy_id))
+        raise iface.NoSuchWebhookError(self.tenant_id, self.uuid,
+                                       policy_id, webhook_id)
 
 
 def _verify_group_exists(conn, tenant_id, group_id):
