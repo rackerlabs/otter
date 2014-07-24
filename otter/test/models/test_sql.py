@@ -222,7 +222,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         """
         group = sql.SQLScalingGroup(self.engine, b"TENANT", b"BOGUS")
         cfg = group_examples.config()[1]
-        d = group.view_launch_config(cfg)
+        d = group.update_config(cfg)
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
 
     @inlineCallbacks
