@@ -619,7 +619,6 @@ class SQLScalingGroup(object):
 
         return d
 
-
     @_with_transaction
     def delete_webhook(self, conn, policy_id, webhook_id):
         """
