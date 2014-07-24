@@ -652,6 +652,13 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         first, second = _webhook_examples()[:2]
         old, = yield group.create_webhooks(policy["id"], [first])
 
+        yield group.update_webhook(policy["id"], old["id"], second)
+        new = yield group.get_webhook(policy["id"], old["id"])
+
+        self.assertNotEqual(new, old)
+        for key, value in second.iteritems():
+            self.assertEqual(new[key], value)
+
     def test_delete_webhook_for_nonexistant_scaling_group(self):
         """
         When attempting to delete a webhook for a nonexistant group, an
