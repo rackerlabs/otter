@@ -676,10 +676,12 @@ def _verify_policy_exists(conn, tenant_id, group_id, policy_id):
                      .select(policies.c.id == policy_id)
                      .limit(1).count())
     d.addCallback(_fetchone)
+
     @d.addCallback
     def raise_if_count_is_zero(row):
         if row[0] == 0:
             raise iface.NoSuchPolicyError(tenant_id, group_id, policy_id)
+
     return d
 
 
