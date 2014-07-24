@@ -614,6 +614,9 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
 
     @inlineCallbacks
     def test_get_webhook_happy_case(self):
+        """
+        Getting a webhook works.
+        """
         group = yield self._create_group()
         policy, = yield self._create_policies(group, n=1)
         webhook_cfgs = [_webhook_examples()[0]]
