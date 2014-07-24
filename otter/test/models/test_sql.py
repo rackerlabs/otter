@@ -516,6 +516,16 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         d = group.get_webhook(policy["id"], b"BOGUS_WEBHOOK")
         yield self.assertFailure(d, interface.NoSuchWebhookError)
 
+    @inlineCallbacks
+    def test_get_webhook_happy_case(self):
+        group = yield self._create_group()
+        policy, = self._create_policies(group, n=1)
+        webhook_cfgs = [_webhook_examples()[0]]
+        webhook, = yield group.create_webhooks(policy["id"], webhook_cfgs)
+
+        got_webhook = yield group.get_webhook(policy["id"], webhook["id"])
+        self.assertEqual(webhook, got_webhook)
+
 
 class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
     def test_interface(self):
