@@ -88,6 +88,10 @@ class ConfigTestMixin(object):
     A test mixin that sets some configuration values for every test.
     """
     def setUp(self):
+        """
+        Sets some configuration values and schedules them to be cleaned
+        up.
+        """
         set_config_data({'limits': {'absolute': {'maxWebhooksPerPolicy': 10,
                                                  'maxPoliciesPerGroup': 10}}})
         self.addCleanup(set_config_data, {})
