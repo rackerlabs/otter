@@ -1179,6 +1179,7 @@ def _set_limit(conn, tenant_id, limit_type, value):
     d = conn.execute(limits.insert().values(tenant_id=tenant_id,
                                             limit_type=limit_type,
                                             value=value))
+
     @d.addErrback
     def maybe_already_has_a_limit(f):
         f.trap(IntegrityError)
