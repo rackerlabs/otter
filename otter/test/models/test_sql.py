@@ -442,6 +442,15 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         yield self.assertFailure(d, interface.NoSuchPolicyError)
 
     @inlineCallbacks
+    def test_list_webhooks_for_nonexistent_policy(self):
+        """
+        When attempting to list webhooks for a policy that doesn't exist,
+        an exception is raised.
+        """
+        d = self._create_group()
+        d.addCallback(lambda g: g.list_webhooks(b"BOGUS"))
+        return self.assertFailure(d, interface.NoSuchPolicyError)
+
     def test_create_webhooks_happy_case(self):
         """
         The user can create a webhook for an extant policy.
