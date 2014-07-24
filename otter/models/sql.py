@@ -672,6 +672,7 @@ def _verify_group_exists(conn, tenant_id, group_id):
 
 
 def _verify_policy_exists(conn, tenant_id, group_id, policy_id):
+    # TODO: Refactor this with _verify_group_exists
     d = conn.execute(policies
                      .select(policies.c.id == policy_id)
                      .limit(1).count())
