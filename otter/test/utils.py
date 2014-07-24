@@ -433,6 +433,9 @@ class StubServersCollection(object):
         self.servers = {}
         self.index = 10
 
+    def list_servers(self, log, status=None, limit=100, marker=None):
+        return succeed(self.servers.values())
+
     def create_server(self, log, nova_id=None, status='pending'):
         self.servers[self.index] = {'id': self.index, 'nova_id': nova_id, 'status': status}
         self.index += 1
