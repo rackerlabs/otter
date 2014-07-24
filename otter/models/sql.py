@@ -773,17 +773,19 @@ def _get_adjustment_type(policy_cfg):
 metadata = MetaData()
 
 scaling_groups = Table("scaling_groups", metadata,
-                       Column("id", String(32), primary_key=True),
-                       Column("name", String()),
-                       Column("tenant_id", String()),
-                       Column("cooldown", Integer()),
-                       Column("minEntities", Integer()),
+                       Column("id", String(32),
+                              nullable=False, primary_key=True),
+                       Column("name", String(), nullable=False),
+                       Column("tenant_id", String(), nullable=False),
+                       Column("cooldown", Integer(), nullable=False),
+                       Column("minEntities", Integer(), nullable=False),
                        Column("maxEntities", Integer()))
 
 group_metadata = Table("group_metadata", metadata,
                        Column("group_id", ForeignKey("scaling_groups.id"),
-                              primary_key=True),
-                       Column("key", String(), primary_key=True),
+                              nullable=False, primary_key=True),
+                       Column("key", String(),
+                              nullable=False, primary_key=True),
                        Column("value", String()))
 
 policies = Table("policies", metadata,
@@ -803,8 +805,9 @@ policies = Table("policies", metadata,
 
 policy_args = Table("policy_args", metadata,
                     Column("policy_id", ForeignKey("policies.id"),
-                           primary_key=True),
-                    Column("key", String(), primary_key=True),
+                           nullable=False, primary_key=True),
+                    Column("key", String(),
+                           nullable=False, primary_key=True),
                     Column("value", String(), nullable=False))
 
 webhooks = Table("webhooks", metadata,
@@ -817,8 +820,9 @@ webhooks = Table("webhooks", metadata,
 
 webhook_metadata = Table("webhook_metadata", metadata,
                          Column("webhook_id", ForeignKey("webhooks.id"),
-                              primary_key=True),
-                         Column("key", String(), primary_key=True),
+                                nullable=False, primary_key=True),
+                         Column("key", String(),
+                                nullable=False, primary_key=True),
                          Column("value", String(), nullable=False))
 
 limit_types = "maxWebhooksPerPolicy", "maxPoliciesPerGroup"
@@ -838,13 +842,14 @@ server_payloads = Table("server_payloads", metadata,
 server_metadata = Table("server_metadata", metadata,
                         Column("scaling_group_id",
                                ForeignKey("scaling_groups.id"),
-                               primary_key=True),
-                        Column("key", String(), primary_key=True),
+                               nullable=False, primary_key=True),
+                        Column("key", String(),
+                               nullable=False, primary_key=True),
                         Column("value", String(), nullable=False))
 
 personalities = Table("personalities", metadata,
                       Column("scaling_group_id", ForeignKey("scaling_groups.id"),
-                             primary_key=True),
+                             nullable=False, primary_key=True),
                       Column("path", String(),
                              nullable=False, primary_key=True),
                       Column("contents", String(), nullable=False))
@@ -852,14 +857,16 @@ personalities = Table("personalities", metadata,
 networks = Table("networks", metadata,
                  Column("scaling_group_id",
                         ForeignKey("scaling_groups.id"),
-                        primary_key=True),
-                 Column("uuid", String(), primary_key=True))
+                        nullable=False, primary_key=True),
+                 Column("uuid", String(), nullable=False, primary_key=True))
 
 load_balancers = Table("load_balancers", metadata,
                        Column("scaling_group_id", ForeignKey("scaling_groups.id"),
-                              primary_key=True),
-                       Column("loadBalancerId", Integer(), primary_key=True),
-                       Column("port", Integer()))
+                              nullable=False, primary_key=True),
+                       Column("loadBalancerId", Integer(),
+                              nullable=False, primary_key=True),
+                       Column("port", Integer(),
+                              nullable=False))
 
 
 def create_tables(engine, tables=metadata.tables.values()):
