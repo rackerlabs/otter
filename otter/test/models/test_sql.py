@@ -709,6 +709,9 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
 
 
 class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
+    """
+    Unit tests for :class:`~sql.SQLScalingScheduleCollection`.
+    """
     def test_interface(self):
         """
         The SQL scaling schedule collection implementation implements the
