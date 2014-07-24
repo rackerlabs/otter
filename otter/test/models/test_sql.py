@@ -470,7 +470,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
                                             limit=second_amount)
 
         remaining_webhooks = len(webhook_cfgs) - first_amount
-        self.asserTrue(second_amount >= remaining_webhooks)
+        self.assertTrue(second_amount >= remaining_webhooks)
         self.assertEqual(len(more_webhooks), remaining_webhooks)
 
         for got_webhook, expected_webhook in zip(more_webhooks, iterwebhooks):
