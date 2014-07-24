@@ -86,7 +86,7 @@ class SQLScalingGroup(object):
 
         returnValue({
             "id": self.uuid,
-            "state": None, # REVIEW: welp I can pretty much put whatever I want here right
+            "state": None,  # REVIEW: welp I can pretty much put whatever I want here right
             "groupConfiguration": group_configuration,
             "launchConfiguration": launch_configuration,
             "scalingPolicies": scaling_policies
