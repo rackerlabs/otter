@@ -722,6 +722,9 @@ class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
 
 class SQLScalingGroupCollectionTests(ConfigTestMixin, SQLiteTestMixin, TestCase):
     def setUp(self):
+        """
+        Do set up for a :class:`~sql.SQLScalingGroupCollection` test.
+        """
         TestCase.setUp(self)
         ConfigTestMixin.setUp(self)
         SQLiteTestMixin.setUp(self)
