@@ -865,6 +865,7 @@ def _paginated(table, limit, marker):
 
     return query
 
+
 def _get_pairs(table, conn, item_id, formatter):
     """
     Gets a bunch of pairs encoded in a key-value-ish schema.
@@ -936,6 +937,7 @@ def _get_foreign_key(table):
     else:
         raise AssertionError("no foreign key in table {}".format(table))
 
+
 def _get_limit(conn, tenant_id, limit_type):
     """
     Get the limit for the tenant.
@@ -957,6 +959,7 @@ def _get_limit(conn, tenant_id, limit_type):
             return config_value('limits.absolute.' + limit_type)
 
     return d
+
 
 def _set_limit(conn, tenant_id, limit_type, value):
     """
@@ -980,16 +983,20 @@ def _set_limit(conn, tenant_id, limit_type, value):
 
     return d
 
+
 def _for_tenant_and_limit_type(query, tenant_id, limit_type):
     q = query.where(and_(limits.c.tenant_id == tenant_id,
                          limits.c.limit_type == limit_type))
     return q
 
+
 def _count_webhooks(conn, policy_id):
     return _count(conn, webhooks, policy_id=policy_id)
 
+
 def _count_policies(conn, group_id):
     return _count(conn, policies, group_id=group_id)
+
 
 def _count(conn, table, **kwargs):
     d = conn.execute(table.select()
