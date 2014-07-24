@@ -55,7 +55,7 @@ def log(*a, **kw):
 
 
 @event.listens_for(Engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
+def _set_sqlite_pragma(dbapi_connection, connection_record):
     """
     Turns on the SQLite ``foreign_keys`` pargma.
 
