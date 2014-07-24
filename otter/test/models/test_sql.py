@@ -537,6 +537,15 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         got_webhook = yield group.get_webhook(policy["id"], webhook["id"])
         self.assertEqual(webhook, got_webhook)
 
+    def test_delete_webhook_for_nonexistant_scaling_group(self):
+        """
+        When attempting to delete a webhook for a nonexistant group, an
+        exception is raised.
+        """
+        group = sql.SQLScalingGroup(self.engine, b"TENANT", b"BOGUS_GROUP")
+        d = group.delete_webhook(b"BOGUS_POLICY", b"BOGUS_WEBHOOK")
+        return self.assertFailure(d, interface.NoSuchScalingGroupError)
+
     @inlineCallbacks
     def test_delete_webhook_happy_case(self):
         """
