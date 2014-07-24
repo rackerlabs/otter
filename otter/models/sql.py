@@ -868,6 +868,24 @@ class SQLAdmin(object):
     def __init__(self, engine):
         self.engine = engine
 
+    @_with_transaction
+    def get_metrics(self, conn):
+        """
+        See :meth:`~iface.IAdmin.get_metrics`.
+        """
+        queries = [t.count() for t in [scaling_groups, policies, webhooks]]
+        d = gatherResults([conn.execute(q).addCallback(_fetchone)
+                           for q in queries])
+
+        @d.addCallback
+        def format(result):
+            (groups,), (policies,), (webhooks,) = result
+            return  {"groups": groups,
+                     "policies": policies,
+                     "webhooks": webhooks}
+
+        return d
+
 
 def _create_policy(conn, group_id, policy_cfg):
     """
