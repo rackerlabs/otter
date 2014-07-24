@@ -566,41 +566,33 @@ class IScalingScheduleCollection(Interface):
     """
     A list of scaling events in the future
     """
-
     def fetch_and_delete(bucket, now, size=100):
         """
-        Fetch and delete and batch of scheduled events in a bucket
+        Fetch and delete a batch of scheduled events in a bucket.
 
-        :param bucket: bucket whose events to be fetched
-        :type param: :class:`int`
-
-        :param now: the current time
-        :type now: ``datetime``
-
-        :param size: the size of the request
-        :type size: :class:`int`
-
-        :return: Deferred that fires with list of dict representing a row
+        :param int bucket: Index of bucket from which to fetch events.
+        :param datetime now: The current time.
+        :param int size: The maximum number of events to fetch.
+        :return: Deferred that fires with a sequence of events.
+        :rtype: deferred :class:`list` of :class:`dict`
         """
 
     def add_cron_events(cron_events):
         """
-        Add cron events equally distributed among the buckets
+        Add cron events equally distributed among the buckets.
 
-        :param cron_events: list of events (dict) to be added
-        :type cron_events: :class:`list`
-
-        :return: None
+        :param cron_events: List of events to be added.
+        :type cron_events: :class:`list` of :class:`dict`
+        :return: :data:`None`
         """
 
     def get_oldest_event(bucket):
         """
-        Get oldest event from the bucket
+        Get the oldest event from a bucket.
 
-        :param bucket: oldest event from this bucket
-        :type param: :class:`int`
-
+        :param int bucket: Index of bucket from which to get the oldest event.
         :return: Deferred that fires with dict of oldest event
+        :rtype: :class:`dict`
         """
 
 
