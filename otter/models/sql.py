@@ -239,8 +239,7 @@ class SQLScalingGroup(object):
         def actually_update_config(_result_proxy):
             return conn.execute(scaling_groups.update()
                                 .where(scaling_groups.c.id == self.uuid)
-                                .values(id=self.uuid,
-                                        name=config["name"],
+                                .values(name=config["name"],
                                         tenant_id=self.tenant_id,
                                         cooldown=config["cooldown"],
                                         minEntities=config["minEntities"],
