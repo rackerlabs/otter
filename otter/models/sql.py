@@ -860,7 +860,8 @@ webhooks = Table("webhooks", metadata,
                         unique=True))
 
 webhook_metadata = Table("webhook_metadata", metadata,
-                         Column("webhook_id", ForeignKey("webhooks.id"),
+                         Column("webhook_id",
+                                ForeignKey("webhooks.id", ondelete="CASCADE"),
                                 nullable=False, primary_key=True),
                          Column("key", String(),
                                 nullable=False, primary_key=True),
