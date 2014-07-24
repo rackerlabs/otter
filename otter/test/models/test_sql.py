@@ -777,7 +777,7 @@ class SQLScalingGroupCollectionTests(ConfigTestMixin, SQLiteTestMixin, TestCase)
         return d
 
     @inlineCallbacks
-    def test_scaling_group_states(self):
+    def test_list_scaling_group_states(self):
         """
         Getting scaling group states works when there are lots of scaling
         groups.
