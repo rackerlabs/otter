@@ -62,9 +62,11 @@ class SQLScalingGroup(object):
         """
         if result_proxy.rowcount == 0:
             d = self._verify_group_exists(conn)
+
             @d.addCallback
             def okay_so_the_group_exists_but_policy_doesnt(res):
                 raise iface.NoSuchPolicyError(self.tenant_id, self.uuid, policy_id)
+
             return d
 
         return result_proxy
