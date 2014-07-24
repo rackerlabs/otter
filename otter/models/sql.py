@@ -1183,7 +1183,7 @@ def _set_limit(conn, tenant_id, limit_type, value):
     def maybe_already_has_a_limit(f):
         f.trap(IntegrityError)
         query = _for_tenant_and_limit_type(limits.update(),
-                                            tenant_id, limit_type)
+                                           tenant_id, limit_type)
         return conn.execute(query.values(value=value))
 
     return d
