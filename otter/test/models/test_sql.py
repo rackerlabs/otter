@@ -56,6 +56,11 @@ def log(*a, **kw):
 
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
+    """
+    Turns on the SQLite ``foreign_keys`` pargma.
+
+    This is necessary for foreign key constraints to work.
+    """
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
