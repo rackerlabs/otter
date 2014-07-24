@@ -215,6 +215,12 @@ class SQLScalingGroup(object):
 
         return d
 
+    def delete_group(self):
+        """
+        See :meth:`~iface.IScalingGroupCollection.delete_group`.
+        """
+        raise RuntimeError("TODO: actually implement")
+
     def modify_state(self, modifier_callable, *args, **kwargs):
         """
         See :meth:`~iface.IScalingGroup.modify_state`.
