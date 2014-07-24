@@ -563,6 +563,7 @@ class SQLScalingGroup(object):
         """
         d = conn.execute(webhooks.select(webhooks.c.id == webhook_id))
         d.addCallback(_fetchone)
+
         @d.addCallback
         def cant_find_webhook_maybe(row):
             """
