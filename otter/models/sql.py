@@ -1,3 +1,6 @@
+"""
+A data store for otter, backed by a SQL database.
+"""
 from collections import defaultdict
 from functools import partial
 from operator import methodcaller
