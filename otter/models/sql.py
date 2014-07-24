@@ -529,9 +529,8 @@ class SQLScalingGroup(object):
             if result_proxy.rowcount == 0:
                 return self._verify_webhook_exists(conn, policy_id, webhook_id)
 
-            return result_proxy.fetchone()
+            return None
 
-        d.addCallback(self._verify_webhook_exists, conn, policy_id, webhook_id)
         return d
 
     @inlineCallbacks
