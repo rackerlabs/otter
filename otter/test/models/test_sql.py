@@ -500,10 +500,11 @@ class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
     test_interface.todo = "interface not fully implemented yet"
 
 
-class SQLScalingGroupCollectionTests(SQLiteTestMixin, TestCase):
+class SQLScalingGroupCollectionTests(ConfigTestMixin, SQLiteTestMixin, TestCase):
     def setUp(self):
-        SQLiteTestMixin.setUp(self)
         TestCase.setUp(self)
+        ConfigTestMixin.setUp(self)
+        SQLiteTestMixin.setUp(self)
         self.collection = sql.SQLScalingGroupCollection(self.engine)
 
     @inlineCallbacks
