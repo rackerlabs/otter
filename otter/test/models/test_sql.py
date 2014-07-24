@@ -629,6 +629,18 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
                                             _webhook_examples()[0]))
         return self.assertFailure(d, interface.NoSuchPolicyError)
 
+    @inlineCallbacks
+    def test_update_webhook_for_nonexistant_webhook(self):
+        """
+        When attempting to update a webhook that doesn't exist, an exception
+        is raised.
+        """
+        group = yield self._create_group()
+        policy, = yield self._create_policies(group, n=1)
+        d = group.update_webhook(policy["id"], b"BOGUS_WEBHOOK",
+                                 _webhook_examples()[0])
+        yield self.assertFailure(d, interface.NoSuchWebhookError)
+
     def test_delete_webhook_for_nonexistant_scaling_group(self):
         """
         When attempting to delete a webhook for a nonexistant group, an
