@@ -419,6 +419,31 @@ class SQLScalingGroup(object):
         return d
 
     @_with_transaction
+    def list_webhooks(self, conn, policy_id, limit=100, marker=None):
+        """
+        See :meth:`~iface.IScalingGroup.list_webhooks`.
+        """
+        d = conn.execute(_paginated(webhooks, limit, marker))
+        d.addCallback(_fetchall)
+
+        @d.addCallback
+        def get_metadata(rows):
+            ds = [_get_webhook_metadata(conn, r["id"]) for r in rows]
+            return gatherResults(ds).addCallback(lambda meta: (rows, meta))
+
+        @d.addCallback
+        def format(result):
+            rows, metadatae = result
+            return [{"id": row["id"],
+                     "name": row["name"],
+                     "capability": {"hash": row["capability_hash"],
+                                    "version": "1"},
+                     "metadata": metadata}
+                    for row, metadata in zip(rows, metadatae)]
+
+        return d
+
+    @_with_transaction
     def create_webhooks(self, conn, policy_id, data):
         """
         See :meth:`~iface.IScalingGroup.create_webhooks`.
