@@ -71,7 +71,7 @@ def _create_sqlite():
     return create_engine("sqlite://", reactor=reactor, strategy=STRATEGY)
 
 
-class SQLiteTestMixin(object):
+class _SQLiteTestMixin(object):
     """
     A test mixin that sets up an asynchronous, in-memory SQLite
     database, with some alchimia + SQLAlchemy chrome plating.
@@ -100,7 +100,7 @@ class ConfigTestMixin(object):
         self.addCleanup(set_config_data, {})
 
 
-class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
+class SQLScalingGroupTests(_SQLiteTestMixin, ConfigTestMixin, TestCase):
     """
     Unit tests for :class:`~sql.SQLScalingGroup`.
     """
@@ -109,7 +109,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         Do set up for a :class:`~sql.SQLScalingGroup` test.
         """
         TestCase.setUp(self)
-        SQLiteTestMixin.setUp(self)
+        _SQLiteTestMixin.setUp(self)
         ConfigTestMixin.setUp(self)
 
     def _create_group(self, tenant_id=b"TENANT", policies=None):
@@ -728,7 +728,7 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         yield self.assertFailure(d, interface.NoSuchWebhookError)
 
 
-class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
+class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, TestCase):
     """
     Unit tests for :class:`~sql.SQLScalingScheduleCollection`.
     """
@@ -743,7 +743,7 @@ class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
     test_interface.todo = "interface not fully implemented yet"
 
 
-class SQLScalingGroupCollectionTests(ConfigTestMixin, SQLiteTestMixin, TestCase):
+class SQLScalingGroupCollectionTests(ConfigTestMixin, _SQLiteTestMixin, TestCase):
     """
     Unit tests for :class:`~sql.SQLScalingGroupCollection`.
     """
@@ -753,7 +753,7 @@ class SQLScalingGroupCollectionTests(ConfigTestMixin, SQLiteTestMixin, TestCase)
         """
         TestCase.setUp(self)
         ConfigTestMixin.setUp(self)
-        SQLiteTestMixin.setUp(self)
+        _SQLiteTestMixin.setUp(self)
         self.collection = sql.SQLScalingGroupCollection(self.engine)
 
     @inlineCallbacks
@@ -974,7 +974,7 @@ class SQLScalingGroupCollectionTests(ConfigTestMixin, SQLiteTestMixin, TestCase)
         return d
 
 
-class SQLAdminTests(ConfigTestMixin, SQLiteTestMixin, TestCase):
+class SQLAdminTests(ConfigTestMixin, _SQLiteTestMixin, TestCase):
     """
     Tests for :class:`~sql.SQLAdmin`.
     """
@@ -983,7 +983,7 @@ class SQLAdminTests(ConfigTestMixin, SQLiteTestMixin, TestCase):
         Do set up for a :class:`~sql.SQLAdmin` test.
         """
         TestCase.setUp(self)
-        SQLiteTestMixin.setUp(self)
+        _SQLiteTestMixin.setUp(self)
         ConfigTestMixin.setUp(self)
 
     def test_interface(self):
