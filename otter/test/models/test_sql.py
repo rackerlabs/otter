@@ -86,7 +86,7 @@ class _SQLiteTestMixin(object):
         yield sql.create_tables(self.engine)
 
 
-class ConfigTestMixin(object):
+class _ConfigTestMixin(object):
     """
     A test mixin that sets some configuration values for every test.
     """
@@ -100,7 +100,7 @@ class ConfigTestMixin(object):
         self.addCleanup(set_config_data, {})
 
 
-class SQLScalingGroupTests(_SQLiteTestMixin, ConfigTestMixin, TestCase):
+class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
     """
     Unit tests for :class:`~sql.SQLScalingGroup`.
     """
@@ -110,7 +110,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, ConfigTestMixin, TestCase):
         """
         TestCase.setUp(self)
         _SQLiteTestMixin.setUp(self)
-        ConfigTestMixin.setUp(self)
+        _ConfigTestMixin.setUp(self)
 
     def _create_group(self, tenant_id=b"TENANT", policies=None):
         """
@@ -743,7 +743,7 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, TestCase):
     test_interface.todo = "interface not fully implemented yet"
 
 
-class SQLScalingGroupCollectionTests(ConfigTestMixin, _SQLiteTestMixin, TestCase):
+class SQLScalingGroupCollectionTests(_ConfigTestMixin, _SQLiteTestMixin, TestCase):
     """
     Unit tests for :class:`~sql.SQLScalingGroupCollection`.
     """
@@ -752,7 +752,7 @@ class SQLScalingGroupCollectionTests(ConfigTestMixin, _SQLiteTestMixin, TestCase
         Do set up for a :class:`~sql.SQLScalingGroupCollection` test.
         """
         TestCase.setUp(self)
-        ConfigTestMixin.setUp(self)
+        _ConfigTestMixin.setUp(self)
         _SQLiteTestMixin.setUp(self)
         self.collection = sql.SQLScalingGroupCollection(self.engine)
 
@@ -974,7 +974,7 @@ class SQLScalingGroupCollectionTests(ConfigTestMixin, _SQLiteTestMixin, TestCase
         return d
 
 
-class SQLAdminTests(ConfigTestMixin, _SQLiteTestMixin, TestCase):
+class SQLAdminTests(_ConfigTestMixin, _SQLiteTestMixin, TestCase):
     """
     Tests for :class:`~sql.SQLAdmin`.
     """
@@ -984,7 +984,7 @@ class SQLAdminTests(ConfigTestMixin, _SQLiteTestMixin, TestCase):
         """
         TestCase.setUp(self)
         _SQLiteTestMixin.setUp(self)
-        ConfigTestMixin.setUp(self)
+        _ConfigTestMixin.setUp(self)
 
     def test_interface(self):
         """
