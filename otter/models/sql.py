@@ -578,7 +578,7 @@ class SQLScalingGroupCollection(object):
     def create_scaling_group(self, conn, log, tenant_id, config, launch,
                              policies=None):
         """
-        Creates a scaling group backed by a SQL store.
+        See :meth:`~iface.IScalingGroupCollection.create_scaling_group`.
         """
         group_id = bytes(uuid4())
         group = SQLScalingGroup(self.engine, tenant_id, group_id)
@@ -620,7 +620,7 @@ class SQLScalingGroupCollection(object):
 
     def list_scaling_group_states(self, log, tenant_id, limit=100, marker=None):
         """
-        List the states of the scaling groups for this tenant.
+        See :meth:`~iface.IScalingGroupCollection.list_scaling_group_states`.
         """
         query = _paginated(scaling_groups, limit, marker)
         # TODO: keep in mind that this lists all groups, not just for
@@ -645,9 +645,15 @@ class SQLScalingGroupCollection(object):
         return d
 
     def get_scaling_group(self, log, tenant_id, scaling_group_id):
+        """
+        See :meth:`~iface.IScalingGroupCollection.get_scaling_group`.
+        """
         return SQLScalingGroup(self.engine, tenant_id, scaling_group_id)
 
     def get_counts(self, log, tenant_id):
+        """
+        See :meth:`~iface.IScalingGroupCollection.get_counts`.
+        """
         # REVIEW: I certainly hope that the query planner knows how to
         # do this sanely. It may be easier to read, albeit with more
         # database roundtrips, to do the right thing manually.
@@ -674,6 +680,9 @@ class SQLScalingGroupCollection(object):
         return d.addCallback(dict)
 
     def webhook_info_by_hash(self, log, capability_hash):
+        """
+        See :meth:`~iface.IScalingGroupCollection.webhook_info_by_hash`.
+        """
         query = select([scaling_groups.c.tenant_id,
                         scaling_groups.c.id,
                         policies.c.id],
@@ -696,7 +705,7 @@ class SQLScalingGroupCollection(object):
 
     def health_check(self):
         """
-        Performs a health check.
+        See :meth:`~iface.IScalingGroupCollection.health_check`.
         """
         return succeed((True, {}))
 
