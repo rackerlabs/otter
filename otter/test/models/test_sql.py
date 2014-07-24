@@ -947,6 +947,9 @@ class SQLScalingGroupCollectionTests(ConfigTestMixin, SQLiteTestMixin, TestCase)
 
 class SQLAdminTests(ConfigTestMixin, SQLiteTestMixin, TestCase):
     def setUp(self):
+        """
+        Do set up for a :class:`~sql.SQLAdmin` test.
+        """
         TestCase.setUp(self)
         SQLiteTestMixin.setUp(self)
         ConfigTestMixin.setUp(self)
