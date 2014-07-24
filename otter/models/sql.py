@@ -893,7 +893,8 @@ scaling_groups = Table("scaling_groups", metadata,
                        Column("maxEntities", Integer()))
 
 group_metadata = Table("group_metadata", metadata,
-                       Column("group_id", ForeignKey("scaling_groups.id"),
+                       Column("group_id", ForeignKey("scaling_groups.id",
+                                                     ondelete="CASCADE"),
                               nullable=False, primary_key=True),
                        Column("key", String(),
                               nullable=False, primary_key=True),
