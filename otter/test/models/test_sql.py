@@ -954,8 +954,6 @@ class SQLAdminTests(ConfigTestMixin, SQLiteTestMixin, TestCase):
         admin = sql.SQLAdmin(self.engine)
         verifyObject(interface.IAdmin, admin)
 
-    test_interface.todo = "interface not fully implemented yet"
-
     @inlineCallbacks
     def test_get_metrics(self):
         """
