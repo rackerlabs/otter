@@ -249,7 +249,8 @@ class SQLScalingGroup(object):
         @d.addCallback
         def maybe_complain_otherwise_insert_metdata(result_proxy):
             """
-            If the result_proxy shows that no rows were affected, this scaling group doesn't exist.
+            If the result_proxy shows that no rows were affected, this scaling
+            group doesn't exist.
             """
             if result_proxy.rowcount == 0:
                 raise iface.NoSuchScalingGroupError(self.tenant_id, self.uuid)
