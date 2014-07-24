@@ -88,6 +88,7 @@ class ConfigTestMixin(object):
 
 class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
     def setUp(self):
+        TestCase.setUp(self)
         SQLiteTestMixin.setUp(self)
         ConfigTestMixin.setUp(self)
 
