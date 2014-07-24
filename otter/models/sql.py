@@ -427,7 +427,10 @@ class SQLScalingGroup(object):
         d.addCallback(_fetchall)
 
         @d.addCallback
-        def get_metadata(rows):
+        def maybe_check_if_policy_exists_else_get_metadata(rows):
+            if not rows:
+                return self._verify_policy_exists(conn, policy_id)
+
             ds = [_get_webhook_metadata(conn, r["id"]) for r in rows]
             return gatherResults(ds).addCallback(lambda meta: (rows, meta))
 
