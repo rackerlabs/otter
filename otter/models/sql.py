@@ -43,6 +43,14 @@ class SQLScalingGroup(object):
         self.tenant_id = tenant_id
         self.uuid = uuid
 
+    def _verify_group_exists(self, conn):
+        d = _verify_group_exists(conn, self.tenant_id, self.uuid)
+        return d
+
+    def _verify_policy_exists(self, conn, policy_id):
+        d = _verify_policy_exists(conn, self.tenant_id, self.uuid, policy_id)
+        return d
+
     def _complain_if_missing_policy(self, result_proxy, conn, policy_id):
         """If no rows matched, the policy doesn't exist.
 
@@ -440,6 +448,47 @@ class SQLScalingGroup(object):
         f.trap(IntegrityError)
         raise iface.NoSuchPolicyError(self.tenant_id, self.uuid, policy_id)
 
+    @_with_transaction
+    def get_webhook(self, conn, policy_id, webhook_id):
+        d = conn.execute(webhooks.select(webhooks.c.id == webhook_id))
+        d.addCallback(_fetchone)
+
+        @d.addCallback
+        def check_result(row):
+            if row is not None:
+                return row
+
+            # REVIEW: So, I think this is silly because this method can
+            # return all three exceptions; why doesn't it just
+            # complain about a missing webhook as soon as it can't
+            # find a webhook? I guess it's too late to change that
+            # interface :)
+            d = self._verify_group_exists(conn)
+            d.addCallback(lambda _result: self._verify_policy_exists(conn,
+                                                                policy_id))
+            @d.addCallback
+            def okay_so_the_webhook_doesnt_exist(_result):
+                raise iface.NoSuchWebhookError(self.tenant_id, self.uuid,
+                                                   policy_id, webhook_id)
+            return d
+
+        @d.addCallback
+        def _get_metadata(row):
+            d = _get_webhook_metadata(conn, webhook_id)
+            d.addCallback(lambda metadata: (row, metadata))
+            return d
+
+        @d.addCallback
+        def format(result):
+            row, metadata = result
+            return {"id": row["id"],
+                    "name": row["name"],
+                    "capability": {"hash": row["capability_hash"],
+                                   "version": "1"},
+                    "metadata": metadata}
+
+        return d
+
 
 def _verify_group_exists(conn, tenant_id, group_id):
     d = conn.execute(scaling_groups
@@ -450,6 +499,18 @@ def _verify_group_exists(conn, tenant_id, group_id):
     def raise_if_count_is_zero(row):
         if row[0] == 0:
             raise iface.NoSuchScalingGroupError(tenant_id, group_id)
+    return d
+
+
+def _verify_policy_exists(conn, tenant_id, group_id, policy_id):
+    d = conn.execute(policies
+                     .select(policies.c.id == policy_id)
+                     .limit(1).count())
+    d.addCallback(_fetchone)
+    @d.addCallback
+    def raise_if_count_is_zero(row):
+        if row[0] == 0:
+            raise iface.NoSuchPolicyError(tenant_id, group_id, policy_id)
     return d
 
 
