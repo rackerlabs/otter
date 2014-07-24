@@ -236,7 +236,7 @@ class SQLScalingGroup(object):
                          .where(group_metadata.c.group_id == self.uuid))
 
         @d.addCallback
-        def update_config(_result_proxy):
+        def actually_update_config(_result_proxy):
             return conn.execute(scaling_groups.update()
                                 .where(scaling_groups.c.id == self.uuid)
                                 .values(id=self.uuid,
