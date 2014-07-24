@@ -805,14 +805,14 @@ class SQLScalingGroupCollection(object):
             "groups": (sg.select()
                          .where(sg.c.tenant_id == tenant_id)),
             "policies": (p.select()
-                           .where(exists([sg.c.id],
-                                         and_((sg.c.tenant_id == tenant_id),
-                                              (p.c.group_id == sg.c.id))))),
+                         .where(exists([sg.c.id],
+                                       and_((sg.c.tenant_id == tenant_id),
+                                            (p.c.group_id == sg.c.id))))),
             "webhooks": (wh.select()
-                           .where(exists([sg.c.id],
-                                         and_((sg.c.tenant_id == tenant_id),
-                                              (p.c.group_id == sg.c.id),
-                                              (wh.c.policy_id == p.c.id)))))
+                         .where(exists([sg.c.id],
+                                       and_((sg.c.tenant_id == tenant_id),
+                                            (p.c.group_id == sg.c.id),
+                                            (wh.c.policy_id == p.c.id)))))
         }
 
         query = select([query.count().label(name)
