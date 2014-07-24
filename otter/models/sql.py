@@ -512,18 +512,27 @@ class SQLScalingGroup(object):
 
         return d
 
-    @inlineCallbacks
-    def _verify_webhook_exists(self, result_proxy, conn, policy_id, webhook_id):
+    @_with_transaction
+    def delete_webhook(self, conn, policy_id, webhook_id):
         """
-        If necessary, check why we can't find anything about this webhook.
-        Checks, in order, if the groups exists, the policy exists, and
-        if both of those exist, conclude it's just the webhook that
-        doesn't exist.
+        See :meth:`~iface.IScalingGroup.delete_webhook`.
+        """
+        d = conn.execute(webhooks.delete().where(webhooks.c.id == webhook_id))
 
-        If a row was found, just return the row of this result proxy.
-        """
-        if result_proxy.rowcount != 0:
-            returnValue(result_proxy.fetchone())
+        @d.addCallback
+        def cant_find_webhook_maybe(result_proxy):
+            # Note that this can't be refactored with the stuff from
+            # get_webhook. The select() result proxy doesn't know how
+            # many rows it has, you have to fetchone() and see if it's
+            # None. call fetchone() on a delete query, and you get an
+            # exception :/
+            if result_proxy.rowcount == 0:
+                return self._verify_webhook_exists(conn, policy_id, webhook_id)
+
+            return result_proxy.fetchone()
+
+        d.addCallback(self._verify_webhook_exists, conn, policy_id, webhook_id)
+        return d
 
     @inlineCallbacks
     def _verify_webhook_exists(self, conn, policy_id, webhook_id):
