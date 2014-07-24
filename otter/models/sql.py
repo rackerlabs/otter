@@ -175,20 +175,17 @@ class SQLScalingGroup(object):
         }
         returnValue(result)
 
-    def _check_limit(self, conn, entity_type, new_items, policy_id=None):
+    def _check_limit(self, conn, entity_type, new, policy_id=None):
         if entity_type == "policies":
             limit_type = "maxPoliciesPerGroup"
             count_d = _count_policies(conn, self.uuid)
-            def make_exception(limit, current):
-                return iface.PoliciesOverLimitError(self.tenant_id, self.uuid,
-                                                    limit, current, new_items)
+            e_cls = iface.PoliciesOverLimitError
+            e_args = self.tenant_id, self.uuid
         elif entity_type == "webhooks":
             limit_type = "maxWebhooksPerPolicy"
             count_d = _count_webhooks(conn, policy_id)
-            def make_exception(limit, current):
-                return iface.WebhooksOverLimitError(self.tenant_id, self.uuid,
-                                                    policy_id,
-                                                    limit, current, new_items)
+            e_cls = iface.WebhooksOverLimitError
+            e_args = self.tenant_id, self.uuid, policy_id
         else:
             raise RuntimeError("Unknown limited entity type {}"
                                .format(entity_type))
@@ -199,8 +196,8 @@ class SQLScalingGroup(object):
         @d.addCallback
         def check_limit(result):
             limit, current = result
-            if current + new_items > limit:
-                raise make_exception(limit, current)
+            if current + new > limit:
+                raise e_cls(*(e_args + (limit, current, new)))
 
         return d
 
