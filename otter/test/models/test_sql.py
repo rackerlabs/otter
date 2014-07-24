@@ -537,6 +537,22 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         got_webhook = yield group.get_webhook(policy["id"], webhook["id"])
         self.assertEqual(webhook, got_webhook)
 
+    @inlineCallbacks
+    def test_delete_webhook_happy_case(self):
+        """
+        Deleting a webhook works.
+        """
+        group = yield self._create_group()
+        policy, = yield self._create_policies(group, n=1)
+        webhook_cfgs = [_webhook_examples()[0]]
+        webhook, = yield group.create_webhooks(policy["id"], webhook_cfgs)
+
+        yield group.get_webhook(policy["id"], webhook["id"])
+
+        yield group.delete_webhook(policy["id"], webhook["id"])
+        d = group.get_webhook(policy["id"], webhook["id"])
+        yield self.assertFailure(d, interface.NoSuchWebhookError)
+
 
 class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
     def test_interface(self):
