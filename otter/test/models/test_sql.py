@@ -126,8 +126,6 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         group = sql.SQLScalingGroup(self.engine, b"TENANT", b"GROUP")
         verifyObject(interface.IScalingGroup, group)
 
-    test_interface.todo = "interface not fully implemented yet"
-
     @inlineCallbacks
     def test_view_manifest(self):
         """
