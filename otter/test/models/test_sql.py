@@ -98,6 +98,9 @@ class ConfigTestMixin(object):
 
 
 class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
+    """
+    Unit tests for :class:`~sql.SQLScalingGroup`.
+    """
     def setUp(self):
         TestCase.setUp(self)
         SQLiteTestMixin.setUp(self)
