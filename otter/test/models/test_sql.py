@@ -225,6 +225,24 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         d = group.view_launch_config(cfg)
         return self.assertFailure(d, interface.NoSuchScalingGroupError)
 
+    @inlineCallbacks
+    def test_update_config_happy_case(self):
+        """
+        Updating a launch config works.
+        """
+        group = yield self._create_group()
+        first, second = group_examples.config()[:2]
+        for d in first, second:
+            d.setdefault("metadata", {})
+            d.setdefault("maxEntities", None)
+
+        cfg = yield group.view_config()
+        self.assertEqual(cfg, first)
+
+        yield group.update_config(second)
+        cfg = yield group.view_config()
+        self.assertEqual(cfg, second)
+
     def test_update_launch_config_for_nonexistent_group(self):
         """
         When attempting to update the launch configuration for a group that
