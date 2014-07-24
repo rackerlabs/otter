@@ -487,10 +487,16 @@ class SQLScalingGroup(object):
         See :meth:`~iface.IScalingGroup.get_webhook`.
         """
         d = conn.execute(webhooks.select(webhooks.c.id == webhook_id))
-        d.addCallback(self._verify_webhook_exists, conn, policy_id, webhook_id)
-
+        d.addCallback(_fetchone)
         @d.addCallback
-        def _get_metadata(row):
+        def cant_find_webhook_maybe(row):
+            """
+            If we couldn't get a row, figure out why. Otherwise, get the
+            webhook's metadata.
+            """
+            if row is None:
+                return self._verify_webhook_exists(conn, policy_id, webhook_id)
+
             d = _get_webhook_metadata(conn, webhook_id)
             d.addCallback(lambda metadata: (row, metadata))
             return d
@@ -519,6 +525,14 @@ class SQLScalingGroup(object):
         if result_proxy.rowcount != 0:
             returnValue(result_proxy.fetchone())
 
+    @inlineCallbacks
+    def _verify_webhook_exists(self, conn, policy_id, webhook_id):
+        """
+        Check why we can't find anything about this webhook. Checks, in
+        order, if the groups exists, the policy exists, and if both of
+        those exist, conclude it's just the webhook that doesn't
+        exist.
+        """
         yield self._verify_group_exists(conn)
         yield self._verify_policy_exists(conn, policy_id)
         raise iface.NoSuchWebhookError(self.tenant_id, self.uuid,
