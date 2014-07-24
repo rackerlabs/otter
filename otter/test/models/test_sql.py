@@ -104,8 +104,8 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         ConfigTestMixin.setUp(self)
 
     def _create_group(self, tenant_id=b"TENANT", policies=None):
-        """Creates a group within a test collection.
-
+        """
+        Creates a group within a test collection.
         """
         coll = sql.SQLScalingGroupCollection(self.engine)
 
