@@ -570,7 +570,9 @@ class SQLScalingGroup(object):
             webhook's metadata.
             """
             if row is None:
-                return self._verify_webhook_exists(conn, policy_id, webhook_id)
+                return self._find_reason_for_missing_webhook(conn,
+                                                             policy_id,
+                                                             webhook_id)
 
             d = _get_webhook_metadata(conn, webhook_id)
             d.addCallback(lambda metadata: (row, metadata))
@@ -602,14 +604,16 @@ class SQLScalingGroup(object):
             # None. call fetchone() on a delete query, and you get an
             # exception :/
             if result_proxy.rowcount == 0:
-                return self._verify_webhook_exists(conn, policy_id, webhook_id)
+                return self._find_reason_for_missing_webhook(conn,
+                                                             policy_id,
+                                                             webhook_id)
 
             return None
 
         return d
 
     @inlineCallbacks
-    def _verify_webhook_exists(self, conn, policy_id, webhook_id):
+    def _find_reason_for_missing_webhook(self, conn, policy_id, webhook_id):
         """
         Check why we can't find anything about this webhook. Checks, in
         order, if the groups exists, the policy exists, and if both of
