@@ -227,6 +227,37 @@ class SQLScalingGroup(object):
         """
         raise RuntimeError("TODO: actually implement")
 
+    @_with_transaction
+    def update_config(self, conn, config):
+        """
+        See :meth:`~iface.IScalingGroupCollection.update_config`.
+        """
+        d = conn.execute(scaling_groups.delete()
+                         .where(scaling_groups.c.id == self.uuid))
+
+        @d.addCallback
+        def maybe_complain(result_proxy):
+            if result_proxy.rowcount == 0:
+                raise iface.NoSuchScalingGroupError(self.tenant_id, self.uuid)
+
+            return conn.execute(scaling_groups.insert()
+                                .values(id=self.uuid,
+                                        name=config["name"],
+                                        tenant_id=self.tenant_id,
+                                        cooldown=config["cooldown"],
+                                        minEntities=config["minEntities"],
+                                        maxEntities=config.get("maxEntities")))
+
+        @d.addCallback
+        def insert_metdata(_result_proxy):
+            return conn.execute(group_metadata.insert(),
+                                [{"group_id": self.uuid,
+                                  "key": key, "value": value}
+                                 for key, value
+                                 in config["metadata"].iteritems()])
+
+        return d
+
     def modify_state(self, modifier_callable, *args, **kwargs):
         """
         See :meth:`~iface.IScalingGroup.modify_state`.
