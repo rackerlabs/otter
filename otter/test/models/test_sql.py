@@ -78,6 +78,9 @@ class SQLiteTestMixin(object):
     """
     @inlineCallbacks
     def setUp(self):
+        """
+        Set up a SQLite engine and create all tables on it.
+        """
         self.engine = _create_sqlite()
         yield self.engine
         yield sql.create_tables(self.engine)
