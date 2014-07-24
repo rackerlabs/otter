@@ -504,6 +504,19 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         d = self._create_group()
         d.addCallback(lambda g: g.get_webhook(b"BOGUS_POLICY", b"BOGUS_WEBHOOK"))
         return self.assertFailure(d, interface.NoSuchPolicyError)
+
+    @inlineCallbacks
+    def test_get_webhook_for_nonexistant_webhook(self):
+        """
+        When attempting to get a webhook that doesn't exist, an exception
+        is raised.
+        """
+        group = yield self._create_group()
+        policy, = self._create_policies(group, n=1)
+        d = group.get_webhook(policy["id"], b"BOGUS_WEBHOOK")
+        yield self.assertFailure(d, interface.NoSuchWebhookError)
+
+
 class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
     def test_interface(self):
         """
