@@ -88,8 +88,7 @@ def _do_convergence_audit_log(_, log, delta):
     audit_log.msg(msg, event_type=event_type, convergence_delta=delta,
                   # setting policy_id/webhook_id to None is a hack to prevent
                   # them from making it into the audit log
-                  policy_id=None, webhook_id=None,
-                  **state.get_capacity())
+                  policy_id=None, webhook_id=None)
 
 
 def obey_config_change(log, transaction_id, config, scaling_group, desired,
@@ -115,8 +114,7 @@ def obey_config_change(log, transaction_id, config, scaling_group, desired,
     # calculate delta will work
     d = converge(log, transaction_id, config, scaling_group, desired,
                  launch_config, {'change': 0})
-    if d is None:
-        return defer.succeed(desired)
+    d.addCallback(lambda d: desired if d is None else d)
     return d
 
 
@@ -140,11 +138,11 @@ def converge(log, transaction_id, config, scaling_group, desired, launch_config,
     :param dict policy: the policy configuration dictionary
 
     :return: a ``Deferred`` that fires with the updated desired value if successful.
-             If no changes are to be made to the group, None will synchronously be returned.
+             Otherwise, it will be fired with None
     """
     # Get number of pending and active servers
     # TODO: Handle pagination
-    d = scaling_group.get_servers_collection().list_servers()
+    d = scaling_group.get_servers_collection().list_servers(log)
 
     # Calculate delta
     d.addCallback(lambda servers: (len(servers),
@@ -219,26 +217,29 @@ def maybe_execute_scaling_policy(
         state_config_policy should be returned by ``check_cooldowns``
         """
         config, launch, group_exec_time, policy = config_launch_policy
-        error_msg = "Cooldowns not met."
 
         def update_exec_times(updated_desired):
-            d = gatherResults([group.update_execution_time(),
-                               group.update_policy_execution_time(policy_id)])
+            d = defer.gatherResults([group.update_execution_time(),
+                                     group.update_policy_execution_time(policy_id)])
             return d.addCallback(lambda _: updated_desired)
+
+        def check_no_change(result):
+            if result is None:
+                raise CannotExecutePolicyError(group.tenant_id,
+                                               group.uuid, policy_id,
+                                               "No change in servers")
+            return result
 
         if check_cooldowns(bound_log, group_exec_time, config, policy, policy_id):
             # converge returns new desired
             d = converge(bound_log, transaction_id, config, group,
                          desired, policy)
-            if d is None:
-                raise CannotExecutePolicyError(group.tenant_id,
-                                               group.uuid, policy_id,
-                                               "No change in servers")
-            return d.addCallback(update_exec_times)
-
-        raise CannotExecutePolicyError(group.tenant_id,
-                                       group.uuid, policy_id,
-                                       error_msg)
+            d.addCallback(check_no_change)
+            d.addCallback(update_exec_times)
+            return d
+        else:
+            raise CannotExecutePolicyError(group.tenant_id, group.uuid, policy_id,
+                                           "Cooldowns not met")
 
     return deferred.addCallback(_do_maybe_execute)
 
@@ -304,14 +305,13 @@ def calculate_delta(log, current, config, policy):
     max_entities = config['maxEntities']
     if max_entities is None:
         max_entities = MAX_ENTITIES
-    state.desired = max(min(desired, max_entities), config['minEntities'])
-    delta = state.desired - current
+    constrained_desired = max(min(desired, max_entities), config['minEntities'])
+    delta = constrained_desired - current
 
     log.msg(("calculating delta "
-             "{current_active} + {current_pending} -> {constrained_desired_capacity}"),
+             "{current} -> {constrained_desired_capacity}"),
             unconstrained_desired_capacity=desired,
-            constrained_desired_capacity=state.desired,
+            constrained_desired_capacity=constrained_desired,
             max_entities=max_entities, min_entities=config['minEntities'],
-            server_delta=delta, current_active=len(state.active),
-            current_pending=len(state.pending))
+            server_delta=delta, current=current)
     return delta
