@@ -487,6 +487,14 @@ class SQLScalingGroupTests(SQLiteTestMixin, ConfigTestMixin, TestCase):
         d = group.create_webhooks(policy["id"], _webhook_examples()[1:])
         yield self.assertFailure(d, interface.WebhooksOverLimitError)
 
+    def test_get_webhook_for_nonexistant_scaling_group(self):
+        """
+        When attempting to get a webhook for a nonexistant group, an
+        exception is raised.
+        """
+        group = sql.SQLScalingGroup(self.engine, b"TENANT", b"BOGUS_GROUP")
+        d = group.get_webhook(b"BOGUS_POLICY", b"BOGUS_WEBHOOK")
+        return self.assertFailure(d, interface.NoSuchScalingGroupError)
 
 class SQLScalingScheduleCollectionTests(SQLiteTestMixin, TestCase):
     def test_interface(self):
