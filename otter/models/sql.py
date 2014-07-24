@@ -590,6 +590,37 @@ class SQLScalingGroup(object):
         return d
 
     @_with_transaction
+    def update_webhook(self, conn, policy_id, webhook_id, data):
+        """
+        See :meth:`~iface.IScalingGroup.update_webhook`.
+        """
+        # TODO: partially refactor with update_config?
+        d = conn.execute(webhook_metadata.delete()
+                         .where(webhook_metadata.c.webhook_id == webhook_id))
+
+        @d.addCallback
+        def actually_update_webhook(_result_proxy):
+            return conn.execute(webhooks.update()
+                                .where(webhooks.c.id == webhook_id)
+                                .values(name=data["name"]))
+
+        @d.addCallback
+        def update_metdata(result_proxy):
+            if result_proxy.rowcount == 0:
+                return self._find_reason_for_missing_webhook(conn,
+                                                             policy_id,
+                                                             webhook_id)
+
+            return conn.execute(webhook_metadata.insert(),
+                                [{"webhook_id": webhook_id,
+                                  "key": key, "value": value}
+                                 for key, value
+                                 in data["metadata"].iteritems()])
+
+        return d
+
+
+    @_with_transaction
     def delete_webhook(self, conn, policy_id, webhook_id):
         """
         See :meth:`~iface.IScalingGroup.delete_webhook`.
