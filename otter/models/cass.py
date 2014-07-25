@@ -16,8 +16,9 @@ from otter.models.interface import (
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError,
     IScalingScheduleCollection, IAdmin, ScalingGroupOverLimitError,
-    WebhooksOverLimitError, PoliciesOverLimitError)
-from otter.util.cqlbatch import Batch
+    WebhooksOverLimitError, PoliciesOverLimitError, IScalingGroupServersCollection,
+    NoSuchServerError)
+from otter.util.cqlbatch import Batch, batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
 from otter.util.config import config_value
@@ -1136,6 +1137,18 @@ class CassScalingGroup(object):
         return CassScalingGroupServers(self)
 
 
+def _check_group(func):
+    """
+    Decorator that checks if group exists
+    """
+    @functools.wraps(func)
+    def wrapper(self, *args):
+        d = self.scaling_group.view_config()
+        d.addCallback(lambda _: func(*args))
+        return d
+    return wrapper
+
+
 @implementer(IScalingGroupServersCollection)
 class CassScalingGroupServers(object):
 
@@ -1144,64 +1157,70 @@ class CassScalingGroupServers(object):
         self.tenant_id = scaling_group.tenant_id
         self.group_id = scaling_group.uuid
         self.connection = scaling_group.connection
-        self.get_consistency = scaling_group.get_consistency
+        self.get_consistency_level = scaling_group.get_consistency
         self.servers_table = 'servers'
-        self.log = log.bind(system='CassScalingGroupServers', tenant_id=self.tenant_id,
-                            scaling_group_id=self.group_id)
+        self.log = self.scaling_group.log.bind(system='CassScalingGroupServers')
 
     def _prepare_params(self, **kwargs):
         return dict(tenantId=self.tenant_id, groupId=self.group_id, **kwargs)
 
-    def _check_group(self, func):
-        """
-        Decorator that checks if group exists
-        """
-        @functools.wraps(func)
-        def wrapper(*args):
-            d = self.scaling_group.view_config()
-            d.addCallback(lambda _: func(*args))
-            return d
-        return wrapper
-
-    def list_servers(self, log, status=None, limit=100, marker=None):
-        return self.connection.execute(
-            _cql_list_all_in_group.format(cf=self.servers_table, order_by=''),
-            self._prepare_params(), self.get_consistency('list', 'server'))
-
-    def create_servers(self, log, num_servers, status='pending'):
-        raise NotImplementedError
-
-    @self._check_group
-    def create_server(self, log, nova_id=None, status='pending'):
-        cql = ('INSERT INTO {cf}("tenantId", "groupId", id, nova_id, status, created) '
-               'VALUES(:tenantId, :groupId, :id, :nova_id, :status, :created);')
-        server_id = str(uuid.uuid4())
-        d = self.connection.execute(
-            cql.format(cf=self.servers_table),
-            self._prepare_params(id=server_id, status=status, created=datetime.utcnow()),
-            self.get_consistency_level('insert', 'server'))
-        d.addCallback(lambda _: dict(lb_info=None, **params))
-        return d
-
-    @self._check_group
-    def update_server(self, log, server_id, nova_id=None, status=None, lb_info=None):
-        cql = ('UPDATE {cf} SET nova_id=:nova_id, status=:status, lb_info=:lb_info '
+    @_check_group
+    def get_server(self, log, server_id):
+        cql = ('SELECT * FROM {cf} '
                'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND id=:id;')
         d = self.connection.execute(
             cql.format(cf=self.servers_table),
-            self._prepare_params(id=server_id, nova_id=nova_id, status=status,
-                                 lb_info=lb_info),
-            self.get_consistency_level('update', 'server'))
+            self._prepare_params(id=server_id),
+            self.get_consistency_level('list', 'server'))
+
+        def check_server(rows):
+            if len(rows) > 0:
+                return rows[0]
+            else:
+                raise NoSuchServerError(self.tenant_id, self.group_id, server_id)
+
+        return d.addCallback(check_server)
+
+    @_check_group
+    def list_servers(self, log, status=None, limit=100, marker=None):
+        return self.connection.execute(
+            _cql_list_all_in_group.format(cf=self.servers_table, order_by=''),
+            self._prepare_params(), self.get_consistency_level('list', 'server'))
+
+    @_check_group
+    def create_server(self, log, status):
+        cql = ('INSERT INTO {cf}("tenantId", "groupId", id, status, created) '
+               'VALUES(:tenantId, :groupId, :id, :status, :created);')
+        server_id = str(uuid.uuid4())
+        params = self._prepare_params(id=server_id, status=status, created=datetime.utcnow())
+        d = self.connection.execute(
+            cql.format(cf=self.servers_table),
+            params, self.get_consistency_level('insert', 'server'))
+        d.addCallback(lambda _: dict(nova_id=None, lb_info=None, **params))
         return d
 
-    @self._check_group
+    @_check_group
+    def update_server(self, log, server_id, nova_id, status, lb_info):
+        d = self.get_server(log, server_id)
+        cql = ('UPDATE {cf} SET nova_id=:nova_id, status=:status, lb_info=:lb_info '
+               'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND id=:id;')
+        d.addCallback(lambda _: self.connection.execute(
+            cql.format(cf=self.servers_table),
+            self._prepare_params(id=server_id, nova_id=nova_id, status=status,
+                                 lb_info=lb_info),
+            self.get_consistency_level('update', 'server')))
+        return d
+
+    @_check_group
     def delete_servers(self, log, server_ids):
         cql = ('DELETE FROM {cf} WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
-               'AND id IN ({ids});')
-        query_ids = ','.join([':id{}'.format(i) for i in range(len(server_ids))])
-        params = {'id{}'.format(i): server_id for i, server_id in enumerate(server_ids)}
+               'AND id={id};')
+        queries, params = [], {}
+        for i, server_id in enumerate(server_ids):
+            queries.append(cql.format(cf=self.servers_table, id=':id{}'.format(i)))
+            params['id{}'.format(i)] = server_id
         d = self.connection.execute(
-            cql.format(cf=self.servers_table, ids=query_ids),
+            batch(queries),
             self._prepare_params(**params),
             self.get_consistency_level('delete', 'server'))
         return d
