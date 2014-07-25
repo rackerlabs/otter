@@ -747,6 +747,18 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, TestCase):
 
     test_interface.todo = "interface not fully implemented yet"
 
+    def _add_some_events(self):
+        events = _scheduled_event_examples()
+        d = self.sched.add_cron_events(events)
+        d.addCallback(lambda _result: events)
+        return d
+
+    def test_add_cron_events(self):
+        """
+        Adding some cron events works.
+        """
+        d = self._add_some_events()
+        d.addCallback(self.assertIdentical, None)
 
 class SQLScalingGroupCollectionTests(_ConfigTestMixin, _SQLiteTestMixin, TestCase):
     """
@@ -1048,5 +1060,19 @@ def _webhook_examples():
 
 # REVIEW: is a webhook without metadata property allowed? if so add
 # some examples because I'm pretty sure the code doesn't handle that
+
+def _scheduled_event_examples():
+    return [{'tenantId': 'lvh',
+             'groupId': 'cabal',
+             'policyId': 'destroy the sun',
+             'trigger': 100,
+             'cron': 'c1',
+             'version': '1'},
+            {'tenantId': 'lvh',
+             'groupId': 'cabal',
+             'policyId': 'destroy the sun some more for good measure',
+             'trigger': 122,
+             'cron': 'c2',
+             'version': '1'}]
 
 # REVIEW: Should these examples live here?
