@@ -32,6 +32,7 @@ code paths.
 """
 from alchimia import TWISTED_STRATEGY as STRATEGY
 from copy import deepcopy
+from datetime import datetime
 from functools import partial
 from itertools import product
 from operator import itemgetter
@@ -40,6 +41,7 @@ from otter.models import interface, sql
 from otter.test.utils import FakeReactorThreads
 from otter.util.config import set_config_data
 from sqlalchemy import create_engine, event
+from random import randrange
 from sqlalchemy.engine import Engine
 from twisted.internet.defer import gatherResults
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -759,6 +761,22 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, TestCase):
         """
         d = self._add_some_events()
         d.addCallback(self.assertIdentical, None)
+
+    @inlineCallbacks
+    def test_fetch_and_delete(self):
+        """
+        Fetching and then deleting some scheduled events works.
+        """
+        event_specs = yield self._add_some_events()
+        first, second = event_specs[0], event_specs[1]
+
+        trigger = randrange(first["trigger"], second["trigger"])
+        now = datetime.fromtimestamp(trigger)
+
+        result, = yield self.sched.fetch_and_delete(0, now, limit=2)
+        expected = dict((k, v) for (k, v) in first.items() if k != "trigger")
+        self.assertEqual(result, expected)
+        # REVIEW: Could probably write a few more different tests.
 
     @inlineCallbacks
     def test_get_oldest_event(self):
