@@ -1101,9 +1101,17 @@ class CassScalingGroup(object):
             d.addCallback(_maybe_delete)
             return d
 
+        def _delete_lock_znode(result):
+            d = self.kz_client.delete(LOCK_PATH + '/' + self.uuid, recursive=True)
+            d.addCallback(lambda _: result)
+            return d
+
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
-        return with_lock(self.reactor, lock, log.bind(category='locking'), _delete_group)
+        d = with_lock(self.reactor, lock, log.bind(category='locking'), _delete_group)
+        # Cleanup /locks/<groupID> znode as it will not be required anymore
+        d.addCallback(_delete_lock_znode)
+        return d
 
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)

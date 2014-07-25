@@ -202,7 +202,7 @@ class ValidateImageTests(SynchronousTestCase):
         """
         `InactiveImage` is raised if given image is inactive
         """
-        self.treq.json_content.return_value = defer.succeed({'image': {'status': 'INACTIVE'}})
+        self.treq.json_content.side_effect = lambda r: defer.succeed({'image': {'status': 'INACTIVE'}})
         d = validate_image(self.log, 'token', 'endpoint', 'image_ref')
         self.failureResultOf(d, InactiveImage)
 
