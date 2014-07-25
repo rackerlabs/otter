@@ -25,26 +25,13 @@ class RequestEffectTests(SynchronousTestCase):
         """
         response = StubResponse(200, {})
         treq = StubTreq(
-            reqs={('GET', 'http://google.com/', None, None, None): succeed(response)},
-            contents={response: succeed("content")})
+            reqs={('GET', 'http://google.com/', None, None,  ('log',)): response},
+            contents={response: "content"})
         req = Request(method="get", url="http://google.com/")
         req.treq = treq
         self.assertEqual(
             self.successResultOf(perform(Effect(req))),
             (response, "content"))
-
-    def test_post(self):
-        """The Request effect supports non-GET methods as well."""
-        response = StubResponse(200, {})
-        treq = StubTreq(
-            reqs={('POST', 'http://google.com/', (('foo', 'bar'),), 'my data', None):
-                  succeed(response)},
-            contents={response: succeed("content")})
-        req = Request(method="post", url="http://google.com/", headers={'foo': 'bar'},
-                      data='my data')
-        req.treq = treq
-        self.assertEqual(self.successResultOf(perform(Effect(req))),
-                         (response, "content"))
 
     def test_log(self):
         """
@@ -53,8 +40,8 @@ class RequestEffectTests(SynchronousTestCase):
         response = StubResponse(200, {})
         log = object()
         treq = StubTreq(
-            reqs={('GET', 'http://google.com/', None, None, log): succeed(response)},
-            contents={response: succeed("content")})
+            reqs={('GET', 'http://google.com/', None, None, ('log',)): response},
+            contents={response: "content"})
         req = Request(method="get", url="http://google.com/", log=log)
         req.treq = treq
         self.assertEqual(self.successResultOf(perform(Effect(req))),
