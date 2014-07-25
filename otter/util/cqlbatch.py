@@ -29,6 +29,16 @@ class Batch(object):
         return client.execute(self._generate(), self.params, self.consistency)
 
 
+def batch(statements, timestamp=None):
+    """
+    Generate single batch statement from given statements.
+
+    Note: This has same functionality as above :class:`Batch` but its scope is
+    to just return the statement
+    """
+    return Batch(statements, timestamp)._generate()
+
+
 # TODO: This should ideally goto silverberg but is here due to `timeout_deferred`
 # implementation. It should be coming out in Twisted itself.
 # See http://twistedmatrix.com/trac/changeset/42627
