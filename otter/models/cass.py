@@ -756,6 +756,20 @@ class CassScalingGroup(object):
         return local_lock.run(with_lock, self.reactor, lock,
                               log.bind(category='locking'), _modify_desired)
 
+    def last_execution_time():
+        """
+        see :meth:`otter.models.interface.IScalingGroup.last_execution_time`
+        """
+        # TEMP
+        return defer.succeed(None)
+
+    def update_execution_time(exec_time=None):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.update_execution_time`
+        """
+        # TEMP
+        return defer.suceed(None)
+
     def update_config(self, data):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_config`
