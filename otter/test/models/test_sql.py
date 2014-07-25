@@ -733,17 +733,17 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, TestCase):
     Unit tests for :class:`~sql.SQLScalingScheduleCollection`.
     """
     def setUp(self):
-        self.sched_coll = sql.SQLScalingScheduleCollection(self.engine)
         """
         Do set up for a :class:`~sql.SQLScalingScheduleCollection` test.
         """
+        self.sched = sql.SQLScalingScheduleCollection(self.engine)
 
     def test_interface(self):
         """
         The SQL scaling schedule collection implementation implements the
         :class:`interface.IScalingScheduleCollection` interface.
         """
-        verifyObject(interface.IScalingScheduleCollection, self.sched_coll)
+        verifyObject(interface.IScalingScheduleCollection, self.sched)
 
     test_interface.todo = "interface not fully implemented yet"
 
