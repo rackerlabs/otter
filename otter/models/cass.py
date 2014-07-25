@@ -723,23 +723,38 @@ class CassScalingGroup(object):
         """
         log = self.log.bind(system='CassScalingGroup.modify_desired')
         consistency = self.get_consistency('update', 'desired')
+        params = {'tenantId': self.tenant_id, 'groupId': self.uuid}
+
+        def view_desired():
+            # TODO: verified_view should not be required anymore since there
+            # is no state continuously getting updated
+            d = verified_view(
+                self.connection,
+                _cql_view.format(cf=self.group_table, column='desired'),
+                _cql_delete_all_in_group.format(cf=self.group_table, name=''),
+                params, self.get_consistency('view', 'desired'),
+                NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
+            d.addCallback(lambda r: r['desired'])
+            return d
 
         @self.with_timestamp
-        def _write_desired(timestamp, new_state):
+        def _write_desired(timestamp, new_desired):
+            cql = ('UPDATE {cf} USING TIMESTAMP {ts} SET desired=:desired '
+                   'WHERE "tenantId"=:tenantId AND "groupId"=:groupId;')
             return self.connection.execute(
-                _cql_update_desired.format(cf=self.group_table),
-                params, consistency)
+                cql.format(cf=self.group_table, ts=timestamp),
+                dict(desired=new_desired, **params), consistency)
 
         def _modify_desired():
-            d = self.view_state(consistency)
-            d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
-            return d.addCallback(_write_state)
+            d = view_desired()
+            d.addCallback(lambda desired: modifier_callable(self, desired, *args, **kwargs))
+            return d.addCallback(_write_desired)
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         local_lock = self.local_locks.get_lock(self.uuid)
         return local_lock.run(with_lock, self.reactor, lock,
-                              log.bind(category='locking'), _modify_state)
+                              log.bind(category='locking'), _modify_desired)
 
     def update_config(self, data):
         """
