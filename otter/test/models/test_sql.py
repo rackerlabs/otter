@@ -760,6 +760,13 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, TestCase):
         d = self._add_some_events()
         d.addCallback(self.assertIdentical, None)
 
+    @inlineCallbacks
+    def test_get_oldest_event(self):
+        event_specs = yield self._add_some_events()
+        event = yield self.sched.get_oldest_event(0)
+        self.assertEqual(event, event_specs[0])
+
+
 class SQLScalingGroupCollectionTests(_ConfigTestMixin, _SQLiteTestMixin, TestCase):
     """
     Unit tests for :class:`~sql.SQLScalingGroupCollection`.
