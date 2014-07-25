@@ -27,10 +27,10 @@ def _with_transaction(f):
         try:
             result = yield f(self, conn, *args, **kwargs)
         except:
-            txn.rollback()
+            yield txn.rollback()
             raise
         else:
-            txn.commit()
+            yield txn.commit()
             returnValue(result)
 
     return decorated
