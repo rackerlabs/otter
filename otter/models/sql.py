@@ -2,13 +2,14 @@
 A data store for otter, backed by a SQL database.
 """
 from collections import defaultdict
+from datetime import datetime
 from functools import partial
 from operator import methodcaller
 from otter.models import interface as iface
 from otter.util.config import config_value
 from sqlalchemy import Column, ForeignKey, MetaData, Table
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.types import Enum, Integer, String
+from sqlalchemy.types import DateTime, Enum, Integer, String
 from sqlalchemy.schema import CreateTable
 from sqlalchemy.sql import and_, exists, select
 from twisted.internet.defer import succeed
@@ -865,6 +866,60 @@ class SQLScalingScheduleCollection(object):
     def __init__(self, engine):
         self.engine = engine
 
+    @_with_transaction
+    def add_cron_events(self, conn, events):
+        timestamp_to_datetime = datetime.fromtimestamp
+        d = conn.execute(scheduled_events.insert(),
+                         [dict(e, trigger=timestamp_to_datetime(e["trigger"]))
+                          for e in events])
+        return d
+
+    @_with_transaction
+    def fetch_and_delete(self, conn, bucket, now, size=100):
+        """
+        See :meth:`~iface.IScalingScheduleCollection.fetch_and_delete`.
+        """
+        assert bucket == 0  # REVIEW
+        d = conn.execute(scheduled_events.select()
+                         .where(scheduled_events.c.happens_on <= now)
+                         .order_by(scheduled_events.c.happens_on)
+                         .limit(size))
+        d.addCallback(_fetchall)
+
+        @d.addCallback
+        def delete_matched(rows):
+            ids = [row["id"] for row in rows]
+            query = (scheduled_events.delete()
+                     .where(scheduled_events.c.id.in_(ids)))
+            d = conn.execute(query)
+            return d.addCallback(lambda _result: rows)
+
+        d.addCallback(partial(map, _format_event_row))
+        return d
+
+    def get_oldest_event(self, conn, bucket):
+        """
+        See :meth:`~iface.IScalingScheduleCollection.get_oldest_event`.
+        """
+        assert bucket == 0  # REVIEW
+        d = conn.execute(scheduled_events.select()
+                         .order_by(scheduled_events.c.happens_at)
+                         .limit(1))
+        d.addCallback(_fetchone)
+        d.addCallback(_format_event_row)
+        return d
+
+
+def _format_event_row(row):
+    """
+    Formats a row for a scheduled event.
+    """
+    return {"tenantId": row["tenant_id"],
+            "groupId": row["group_id"],
+            "policyId": row["policy_id"],
+            "cron": row["cron"],
+            "version": row["version"]}
+
 
 @implementer(iface.IAdmin)
 class SQLAdmin(object):
@@ -1044,6 +1099,15 @@ load_balancers = Table("load_balancers", metadata,
                               nullable=False, primary_key=True),
                        Column("port", Integer(),
                               nullable=False))
+
+scheduled_events = Table("scheduled_events", metadata,
+                         Column("id", Integer(), primary_key=True),
+                         Column("tenant_id", String(), nullable=False),
+                         Column("group_id", ForeignKey("scaling_groups.id"),
+                               primary_key=True),
+                         Column("happens_at", DateTime(), nullable=False),
+                         Column("cron", String()),
+                         Column("version", String()))
 
 
 def create_tables(engine, tables=metadata.tables.values()):
