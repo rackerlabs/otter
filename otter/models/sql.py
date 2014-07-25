@@ -28,6 +28,7 @@ def _with_transaction(f):
             result = yield f(self, conn, *args, **kwargs)
         except:
             yield txn.rollback()
+            # REVIEW: who should own the retry logic here?
             raise
         else:
             yield txn.commit()
