@@ -40,7 +40,7 @@ def format_state_dict(state):
     return {
         'activeCapacity': len(state.active),
         'pendingCapacity': len(state.pending),
-        'desiredCapacity': len(state.active) + len(state.pending),
+        'desiredCapacity': state.desired,
         'name': state.group_name,
         'paused': state.paused,
         'active': [
@@ -349,7 +349,7 @@ class OtterGroups(object):
             config = result['groupConfiguration']
             launch = result['launchConfiguration']
             group = self.store.get_scaling_group(self.log, self.tenant_id, group_id)
-            d = group.modify_state(partial(
+            d = group.modify_desired(partial(
                 controller.obey_config_change, self.log,
                 transaction_id(request), config, launch_config=launch))
             return d.addCallback(lambda _: result)

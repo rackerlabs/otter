@@ -188,6 +188,17 @@ class NoSuchWebhookError(Exception):
             .format(t=tenant_id, g=group_id, p=policy_id, w=webhook_id))
 
 
+class NoSuchServerError(Exception):
+    """
+    Error to be raised when attempting operations on a server that does not
+    exist.
+    """
+    def __init__(self, tenant_id, group_id, server_id):
+        super(NoSuchServerError, self).__init__(
+            "No such server {s} in group {g} for tenant {t}"
+            .format(t=tenant_id, g=group_id, s=server_id))
+
+
 class GroupNotEmptyError(Exception):
     """
     Error to be raised when attempting to delete group that still has entities
@@ -361,6 +372,38 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
+    def modify_desired(modifier_callable, *args, **kwargs):
+        """
+        Updates the scaling group desiredCapacity replacing previous value. This
+        takes a callable which gets current desired, and then saves returned desired
+        value from the callable.
+        This method should handle its own locking, if necessary.  If the
+        callback is unsuccessful, does not save.
+
+        :param modifier_callable: a ``callable`` that takes as first two
+            arguments the :class:`IScalingGroup`, a desired as ``int``, and
+            returns updated desired as ``int``. Other arguments provided to
+            :func:`modify_desired` will be passed to the ``callable``.
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises NoSuchScalingGroupError: if this scaling group (one
+            with this uuid) does not exist
+        """
+
+    def last_execution_time():
+        """
+        Return group's last execution time
+        """
+
+    def update_execution_time(exec_time=None):
+        """
+        Update the group's last execution time
+
+        :param :class:`datetime.datetime` exec_time: Execution time in UTC which if not given
+        will be taken from current system time
+        """
+
     def create_policies(data):
         """
         Create a set of new scaling policies.
@@ -395,6 +438,14 @@ class IScalingGroup(Interface):
         :raises NoSuchScalingGroupError: if this scaling group (one
             with this uuid) does not exist
         :raises NoSuchPolicyError: if the policy id does not exist
+        """
+
+    def update_policy_execution_time(policy_id, exec_time=None):
+        """
+        Update the policy's last execution time
+
+        :param :class:`datetime.datetime` exec_time: Execution time in UTC which if not given
+        will be taken from current system time
         """
 
     def list_policies(limit=100, marker=None):
@@ -561,6 +612,11 @@ class IScalingGroup(Interface):
         :raises NoSuchWebhookError: if the webhook id does not exist
         """
 
+    def get_servers_collection():
+        """
+        Get servers in the scaling group as :class:`IScalingGroupServersCollection`
+        """
+
 
 class IScalingScheduleCollection(Interface):
     """
@@ -714,6 +770,72 @@ class IScalingGroupCollection(Interface):
         :return: The health information in the form of a boolean and some
             additional free-form health data (possibly empty).
         :rtype: deferred :class:`tuple` of (:class:`bool`, :class:`dict`)
+        """
+
+
+class IScalingGroupServersCollection(Interface):
+    """
+    Collection of servers in a scaling group
+    """
+
+    def create_servers(log, num_servers, status='pending'):
+        """
+        Create servers in scaling group with given status
+
+        :param int num_servers: Number of servers to create
+        :return: a list of server dicts with `id`s in it
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``list``
+        """
+
+    def create_server(log, status='pending'):
+        """
+        Create server in scaling group based on the tenant id and group id
+
+        :param str status: status of the server. one of 'pending' or 'active'
+
+        :return: a dictionary of server with `id` in it
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
+        """
+
+    def update_server(log, server_id, nova_id, status, lb_info):
+        """
+        Update existing server information
+        TODO: Should it take dict returned from create_server as arg instead?
+
+        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        :raises NoSuchServerError: if the server id does not exist
+        """
+
+    def list_servers(log, status=None, limit=100, marker=None):
+        """
+        List the servers in a scaling group optionally filtered based on status
+        """
+
+    def get_server(log, server_id):
+        """
+        Get server from scaling group
+        """
+
+    def get_server_on_nova_id(log, nova_id):
+        """
+        Get server from scaling group based on its nova id
+        """
+
+    def delete_server(log, server_id):
+        """
+        Remove single server from scaling group
+
+        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        :raises NoSuchServerError: if the server id does not exist
+        """
+
+    def delete_servers(log, server_ids):
+        """
+        Remove servers from scaling group
+
+        :param list server_ids: List of server IDs to be deleted
+        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        TODO: What about `NoSuchServerError`?
         """
 
 

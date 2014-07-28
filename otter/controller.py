@@ -70,7 +70,7 @@ def resume_scaling_group(log, transaction_id, scaling_group):
     raise NotImplementedError('Resume is not yet implemented')
 
 
-def _do_convergence_audit_log(_, log, delta, state):
+def _do_convergence_audit_log(_, log, delta):
     """
     Logs a convergence event to the audit log
     """
@@ -88,12 +88,10 @@ def _do_convergence_audit_log(_, log, delta, state):
     audit_log.msg(msg, event_type=event_type, convergence_delta=delta,
                   # setting policy_id/webhook_id to None is a hack to prevent
                   # them from making it into the audit log
-                  policy_id=None, webhook_id=None,
-                  **state.get_capacity())
-    return state
+                  policy_id=None, webhook_id=None)
 
 
-def obey_config_change(log, transaction_id, config, scaling_group, state,
+def obey_config_change(log, transaction_id, config, scaling_group, desired,
                        launch_config):
     """
     Given the config change, do servers need to be started or deleted
@@ -105,24 +103,21 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
     :param dict config: the scaling group config
     :param dict launch_config: the scaling group launch config
     :param scaling_group: an IScalingGroup provider
-    :param state: a :class:`otter.models.interface.GroupState` representing the
-        state
+    :param int desired: current desired value
 
-    :return: a ``Deferred`` that fires with the updated (or not)
-        :class:`otter.models.interface.GroupState` if successful
+    :return: a ``Deferred`` that fires with the updated (or not) desired if successful
     """
     log = log.bind(scaling_group_id=scaling_group.uuid)
 
     # XXX: {'change': 0} is a hack to create an internal zero-change policy so
     # calculate delta will work
-    d = converge(log, transaction_id, config, scaling_group, state,
+    d = converge(log, transaction_id, config, scaling_group, desired,
                  launch_config, {'change': 0})
-    if d is None:
-        return defer.succeed(state)
+    d.addCallback(lambda d: desired if d is None else d)
     return d
 
 
-def converge(log, transaction_id, config, scaling_group, state, launch_config,
+def converge(log, transaction_id, config, scaling_group, desired, launch_config,
              policy):
     """
     Apply a policy's change to a scaling group, and attempt to make the
@@ -136,47 +131,55 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
     :param dict config: the scaling group config
     :param otter.models.interface.IScalingGroup scaling_group: the scaling
         group object
+    :param int desired: Current desired value
     :param otter.models.interface.GroupState state: the group state
     :param dict launch_config: the scaling group launch config
     :param dict policy: the policy configuration dictionary
 
-    :return: a ``Deferred`` that fires with the updated
-        :class:`otter.models.interface.GroupState` if successful. If no changes
-        are to be made to the group, None will synchronously be returned.
+    :return: a ``Deferred`` that fires with the updated desired value if successful.
+             Otherwise, it will be fired with None
     """
-    delta = calculate_delta(log, state, config, policy)
-    execute_log = log.bind(server_delta=delta)
+    # Get number of pending and active servers
+    # TODO: Handle pagination
+    d = scaling_group.get_servers_collection().list_servers(log)
 
-    if delta == 0:
-        execute_log.msg("no change in servers")
-        return None
-    elif delta > 0:
-        execute_log.msg("executing launch configs")
-        deferred = execute_launch_config(execute_log, transaction_id, state,
-                                         launch_config, scaling_group,
-                                         delta)
-    else:
-        # delta < 0 (scale down)
-        execute_log.msg("scaling down")
-        deferred = exec_scale_down(execute_log, transaction_id, state,
-                                   scaling_group, -delta)
+    # Calculate delta
+    d.addCallback(lambda servers: (len(servers),
+                                   calculate_delta(log, len(servers), config, policy)))
 
-    deferred.addCallback(_do_convergence_audit_log, log, delta, state)
-    return deferred
+    def _start_scaling((current, delta)):
+        execute_log = log.bind(server_delta=delta)
+        if delta == 0:
+            execute_log.msg("no change in servers")
+            return None
+        elif delta > 0:
+            execute_log.msg("executing launch configs")
+            deferred = execute_launch_config(execute_log, transaction_id,
+                                             launch_config, scaling_group, delta)
+        else:
+            # delta < 0 (scale down)
+            execute_log.msg("scaling down")
+            deferred = exec_scale_down(execute_log, transaction_id, scaling_group, -delta)
+        deferred.addCallback(_do_convergence_audit_log, log, delta)
+        return deferred.addCallback(lambda _: current + delta)
+
+    # Start/stop servers
+    d.addCallback(_start_scaling)
+    return d
 
 
 def maybe_execute_scaling_policy(
         log,
         transaction_id,
-        scaling_group,
-        state,
+        group,
+        desired,
         policy_id, version=None):
     """
     Checks whether and how much a scaling policy can be executed.
 
     :param log: A twiggy bound log for logging
     :param str transaction_id: the transaction id
-    :param scaling_group: an IScalingGroup provider
+    :param group: an IScalingGroup provider
     :param state: a :class:`otter.models.interface.GroupState` representing the
         state
     :param policy_id: the policy id to execute
@@ -192,16 +195,17 @@ def maybe_execute_scaling_policy(
     :raises: Some exception about why you don't want to execute the policy. This
         Exception should also have an audit log id
     """
-    bound_log = log.bind(scaling_group_id=scaling_group.uuid, policy_id=policy_id)
+    bound_log = log.bind(scaling_group_id=group.uuid, policy_id=policy_id)
     bound_log.msg("beginning to execute scaling policy")
 
     # make sure that the policy (and the group) exists before doing anything else
-    deferred = scaling_group.get_policy(policy_id, version)
+    deferred = group.get_policy(policy_id, version)
 
     def _do_get_configs(policy):
         deferred = defer.gatherResults([
-            scaling_group.view_config(),
-            scaling_group.view_launch_config()
+            group.view_config(),
+            group.view_launch_config(),
+            group.last_execution_time(),
         ])
         return deferred.addCallback(lambda results: results + [policy])
 
@@ -211,49 +215,54 @@ def maybe_execute_scaling_policy(
         """
         state_config_policy should be returned by ``check_cooldowns``
         """
-        config, launch, policy = config_launch_policy
-        error_msg = "Cooldowns not met."
+        config, launch, group_exec_time, policy = config_launch_policy
 
-        def mark_executed(_):
-            state.mark_executed(policy_id)
-            return state  # propagate the fully updated state back
+        def update_exec_times(updated_desired):
+            d = defer.gatherResults([group.update_execution_time(),
+                                     group.update_policy_execution_time(policy_id)])
+            return d.addCallback(lambda _: updated_desired)
 
-        if check_cooldowns(bound_log, state, config, policy, policy_id):
-            d = converge(bound_log, transaction_id, config, scaling_group,
-                         state, launch, policy)
-            if d is None:
-                error_msg = "No change in servers"
-                raise CannotExecutePolicyError(scaling_group.tenant_id,
-                                               scaling_group.uuid, policy_id,
-                                               error_msg)
-            return d.addCallback(mark_executed)
+        def check_no_change(result):
+            if result is None:
+                raise CannotExecutePolicyError(group.tenant_id,
+                                               group.uuid, policy_id,
+                                               "No change in servers")
+            return result
 
-        raise CannotExecutePolicyError(scaling_group.tenant_id,
-                                       scaling_group.uuid, policy_id,
-                                       error_msg)
+        if check_cooldowns(bound_log, group_exec_time, config, policy, policy_id):
+            # converge returns new desired
+            d = converge(bound_log, transaction_id, config, group, desired, launch, policy)
+            d.addCallback(check_no_change)
+            d.addCallback(update_exec_times)
+            return d
+        else:
+            raise CannotExecutePolicyError(group.tenant_id, group.uuid, policy_id,
+                                           "Cooldowns not met")
 
     return deferred.addCallback(_do_maybe_execute)
 
 
-def check_cooldowns(log, state, config, policy, policy_id):
+def check_cooldowns(log, group_exec_time, config, policy, policy_id):
     """
     Check the global cooldowns (when was the last time any policy was executed?)
     and the policy specific cooldown (when was the last time THIS policy was
     executed?)
 
     :param log: A twiggy bound log for logging
-    :param dict state: the state dictionary
     :param dict config: the config dictionary
     :param dict policy: the policy dictionary
     :param str policy_id: the policy id that matches ``policy``
 
     :return: C{int}
     """
+    # TEMP
+    return True
+
     this_now = datetime.now(iso8601.iso8601.UTC)
 
     timestamp_and_cooldowns = [
-        (state.policy_touched.get(policy_id), policy['cooldown'], 'policy'),
-        (state.group_touched, config['cooldown'], 'group'),
+        (policy['last_execution_time'], policy['cooldown'], 'policy'),
+        (group_exec_time, config['cooldown'], 'group'),
     ]
 
     for last_time, cooldown, cooldown_type in timestamp_and_cooldowns:
@@ -268,19 +277,18 @@ def check_cooldowns(log, state, config, policy, policy_id):
     return True
 
 
-def calculate_delta(log, state, config, policy):
+def calculate_delta(log, current, config, policy):
     """
     Calculate the desired change in the number of servers, keeping in mind the
     minimum and maximum constraints.
 
     :param log: A twiggy bound log for logging
-    :param dict state: the state dictionary
+    :param int current: Current number of servers
     :param dict config: the config dictionary
     :param dict policy: the policy dictionary
 
     :return: C{int} representing the desired change - can be 0
     """
-    current = len(state.active) + len(state.pending)
     if "change" in policy:
         desired = current + policy['change']
     elif "changePercent" in policy:
@@ -298,14 +306,13 @@ def calculate_delta(log, state, config, policy):
     max_entities = config['maxEntities']
     if max_entities is None:
         max_entities = MAX_ENTITIES
-    state.desired = max(min(desired, max_entities), config['minEntities'])
-    delta = state.desired - current
+    constrained_desired = max(min(desired, max_entities), config['minEntities'])
+    delta = constrained_desired - current
 
     log.msg(("calculating delta "
-             "{current_active} + {current_pending} -> {constrained_desired_capacity}"),
+             "{current} -> {constrained_desired_capacity}"),
             unconstrained_desired_capacity=desired,
-            constrained_desired_capacity=state.desired,
+            constrained_desired_capacity=constrained_desired,
             max_entities=max_entities, min_entities=config['minEntities'],
-            server_delta=delta, current_active=len(state.active),
-            current_pending=len(state.pending))
+            server_delta=delta, current=current)
     return delta

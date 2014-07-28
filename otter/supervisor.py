@@ -4,14 +4,16 @@ The Otter Supervisor manages a number of workers to execute a launch config.
 This code is specific to the launch_server_v1 worker.
 """
 
+import json
+
 from twisted.application.service import Service
-from twisted.internet.defer import Deferred, succeed, gatherResults
+from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
-from otter.models.interface import NoSuchScalingGroupError
+from otter.models.interface import NoSuchScalingGroupError, NoSuchServerError
 from otter.log import audit
-from otter.util.deferredutils import DeferredPool, unwrap_first_error
+from otter.util.deferredutils import DeferredPool
 from otter.util.hashkey import generate_job_id
 from otter.util.timestamp import from_timestamp
 from otter.worker import launch_server_v1, validate_config
@@ -36,8 +38,7 @@ class ISupervisor(Interface):
         :param IScalingGroup scaling_group: Scaling Group.
         :param dict launch_config: The launch config for the scaling group.
 
-        :returns: A deferred that fires with a 3-tuple of job_id, completion deferred,
-            and job_info (a dict)
+        :returns: A deferred that fires with a 2-tuple of (nova_id, lb_info)
         :rtype: ``Deferred``
         """
 
@@ -80,29 +81,17 @@ class SupervisorService(object, Service):
         self.coiterate = coiterate
         self.deferred_pool = DeferredPool()
 
-    def execute_config(self, log, transaction_id, scaling_group, launch_config):
+    def execute_config(self, log, transaction_id, scaling_group, launch_config, server_id):
         """
         see :meth:`ISupervisor.execute_config`
         """
-        job_id = generate_job_id(scaling_group.uuid)
-        completion_d = Deferred()
-
-        log = log.bind(job_id=job_id,
-                       worker=launch_config['type'],
-                       tenant_id=scaling_group.tenant_id)
+        log = log.bind(worker=launch_config['type'],
+                       tenant_id=scaling_group.tenant_id,
+                       server_id=server_id)
 
         assert launch_config['type'] == 'launch_server'
 
         undo = InMemoryUndoStack(self.coiterate)
-
-        def when_fails(result):
-            log.msg("Encountered an error, rewinding {worker!r} job undo stack.",
-                    exc=result.value)
-            ud = undo.rewind()
-            ud.addCallback(lambda _: result)
-            return ud
-
-        completion_d.addErrback(when_fails)
 
         log.msg("Authenticating for tenant")
 
@@ -116,7 +105,7 @@ class SupervisorService(object, Service):
                 scaling_group,
                 service_catalog,
                 auth_token,
-                launch_config['args'], undo)
+                launch_config['args'], server_id, undo)
 
         d.addCallback(when_authenticated)
 
@@ -125,7 +114,7 @@ class SupervisorService(object, Service):
             # to pass to the controller to store in the active state is returned
             server_details, lb_info = result
             log.msg("Done executing launch config.",
-                    server_id=server_details['server']['id'])
+                    nova_id=server_details['server']['id'])
             return {
                 'id': server_details['server']['id'],
                 'links': server_details['server']['links'],
@@ -135,17 +124,21 @@ class SupervisorService(object, Service):
 
         d.addCallback(when_launch_server_completed)
 
-        self.deferred_pool.add(d)
+        def when_fails(result):
+            log.msg("Encountered an error, rewinding {worker!r} job undo stack.",
+                    exc=result.value)
+            ud = undo.rewind()
+            ud.addCallback(lambda _: result)
+            return ud
 
-        d.chainDeferred(completion_d)
-
-        return succeed((job_id, completion_d))
+        d.addErrback(when_fails)
+        return d
 
     def execute_delete_server(self, log, transaction_id, scaling_group, server):
         """
         see :meth:`ISupervisor.execute_delete_server`
         """
-        log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
+        log = log.bind(nova_id=server['nova_id'])
 
         # authenticate for tenant
         def when_authenticated((auth_token, service_catalog)):
@@ -154,12 +147,12 @@ class SupervisorService(object, Service):
                 self.region,
                 service_catalog,
                 auth_token,
-                (server['id'], server['lb_info']))
+                # TODO: I do not like json.loads() here
+                (server['nova_id'], json.loads(server['lb_info'])))
 
         d = self.auth_function(scaling_group.tenant_id, log=log)
         log.msg("Authenticating for tenant")
         d.addCallback(when_authenticated)
-        self.deferred_pool.add(d)
 
         return d
 
@@ -219,72 +212,36 @@ def set_supervisor(supervisor):
     _supervisor = supervisor
 
 
-def find_pending_jobs_to_cancel(log, state, delta):
-    """
-    Identify some pending jobs to cancel (usually for a scale down event)
-    """
-    if delta >= len(state.pending):  # don't bother sorting - return everything
-        return state.pending.keys()
-
-    sorted_jobs = sorted(state.pending.items(), key=lambda (_id, s): from_timestamp(s['created']),
-                         reverse=True)
-    return [job_id for job_id, _job_info in sorted_jobs[:delta]]
-
-
-def find_servers_to_evict(log, state, delta):
-    """
-    Find the servers most appropriate to evict from the scaling group
-
-    Returns list of server ``dict``
-    """
-    if delta >= len(state.active):  # don't bother sorting - return everything
-        return state.active.values()
-
-    # return delta number of oldest server
-    sorted_servers = sorted(state.active.values(), key=lambda s: from_timestamp(s['created']))
-    return sorted_servers[:delta]
-
-
-def delete_active_servers(log, transaction_id, scaling_group,
-                          delta, state):
-    """
-    Start deleting active servers jobs
-    """
-
-    # find servers to evict
-    servers_to_evict = find_servers_to_evict(log, state, delta)
-
-    # remove all the active servers to be deleted
-    for server in servers_to_evict:
-        state.remove_active(server['id'])
-
-    # then start deleting those servers
-    supervisor = get_supervisor()
-    for i, server_info in enumerate(servers_to_evict):
-        job = _DeleteJob(log, transaction_id, scaling_group, server_info, supervisor)
-        job.start()
-
-
-def exec_scale_down(log, transaction_id, state, scaling_group, delta):
+def exec_scale_down(log, transaction_id, scaling_group, delta):
     """
     Execute a scale down policy
     """
+    # NOTE: This is temporarily a simpler different implementation than earlier.
+    # This one just takes x oldest servers and deletes them whether pending or active
+    log.msg("Deleting {delta} servers.", delta=delta)
+    servers_coll = scaling_group.get_servers_collection()
+    d = servers_coll.list_servers(log)
 
-    # cancel pending jobs by removing them from the state. The servers will get
-    # deleted when they are finished building and their id is not found in pending
-    jobs_to_cancel = find_pending_jobs_to_cancel(log, state, delta)
-    for job_id in jobs_to_cancel:
-        state.remove_job(job_id)
+    def oldest(servers):
+        return sorted(servers, key=lambda s: s['created'], reverse=True)[:delta]
 
-    # delete active servers if pending jobs are not enough
-    remaining_to_delete = delta - len(jobs_to_cancel)
-    if remaining_to_delete > 0:
-        delete_active_servers(log, transaction_id,
-                              scaling_group, remaining_to_delete, state)
+    d.addCallback(oldest)
 
-    log.msg("Deleting {delta} servers.", delta=delta, **_log_capacity(state))
+    def delete_servers(servers):
+        supervisor = get_supervisor()
+        server_ids = []
+        for server in servers:
+            # delete active servers from nova
+            if server['status'] == 'active':
+                job = _DeleteJob(log, transaction_id, scaling_group, server, supervisor)
+                supervisor.deferred_pool.add(job.start())
+            # and remove pending (and active) servers from DB. They will be deleted
+            # when they become active
+            server_ids.append(server['id'])
+        return servers_coll.delete_servers(log, server_ids)
 
-    return succeed(None)
+    d.addCallback(delete_servers)
+    return d
 
 
 def _log_capacity(state):
@@ -318,7 +275,8 @@ class _DeleteJob(object):
                     is deleted
         :param dict server_info: a `dict` of server info
         """
-        self.log = log.bind(system='otter.job.delete', server_id=server_info['id'])
+        self.log = log.bind(system='otter.job.delete', server_id=server_info['id'],
+                            nova_id=server_info['nova_id'])
         self.trans_id = transaction_id
         self.scaling_group = scaling_group
         self.server_info = server_info
@@ -333,6 +291,7 @@ class _DeleteJob(object):
         d.addCallback(self._job_completed)
         d.addErrback(self._job_failed)
         self.log.msg('Started server deletion job')
+        return d
 
     def _job_completed(self, _):
         audit(self.log).msg('Server deleted.', event_type="server.delete")
@@ -360,7 +319,6 @@ class _Job(object):
         self.transaction_id = transaction_id
         self.scaling_group = scaling_group
         self.supervisor = supervisor
-        self.job_id = None
 
     def start(self, launch_config):
         """
@@ -377,25 +335,30 @@ class _Job(object):
             flavor = 'Unable to pull flavor ref.'
 
         self.log = self.log.bind(image_ref=image, flavor_ref=flavor)
+        self.servers_coll = self.scaling_group.get_servers_collection()
+        self.log.msg('Creating server in DB')
+        d = self.servers_coll.create_server(self.log, 'pending')
 
-        deferred = self.supervisor.execute_config(
-            self.log, self.transaction_id, self.scaling_group, launch_config)
-        deferred.addCallback(self.job_started)
-        return deferred
+        def exec_conf(server):
+            self.server_id = server['id']
+            self.log = self.log.bind(server_id=self.server_id)
+            self.log.msg('Created server {server_id}. Executing config')
+            return self.supervisor.execute_config(
+                self.log, self.transaction_id, self.scaling_group,
+                launch_config, self.server_id)
+
+        d.addCallback(exec_conf)
+        d.addCallbacks(self._job_succeeded, self._job_failed)
+        d.addErrback(self.log.err)
+
+        return d
 
     def _job_failed(self, f):
         """
-        Job has failed. Remove the job, if it exists, and log the error.
+        Job has failed. Remove the server_id, if it exists, and log the error.
         """
-        def handle_failure(group, state):
-            # if it is not in pending, then the job was probably deleted before
-            # it got a chance to fail.
-            if self.job_id in state.pending:
-                state.remove_job(self.job_id)
-            self.log.err(f, 'Launching server failed', **_log_capacity(state))
-            return state
-
-        d = self.scaling_group.modify_state(handle_failure)
+        self.log.err(f, 'Lauching server failed')
+        d = self.servers_coll.delete_server(self.log, self.server_id)
 
         def ignore_error_if_group_deleted(f):
             f.trap(NoSuchScalingGroupError)
@@ -410,31 +373,37 @@ class _Job(object):
         Job succeeded. If the job exists, move the server from pending to active
         and log.  If not, then the job has been canceled, so delete the server.
         """
-        server_id = result['id']
-        log = self.log.bind(server_id=server_id)
+        nova_id = result['id']
+        log = self.log.bind(nova_id=nova_id)
 
-        def handle_success(group, state):
-            if self.job_id not in state.pending:
-                # server was slated to be deleted when it completed building.
-                # So, deleting it now
-                audit(log).msg(
-                    "A pending server that is no longer needed is now active, "
-                    "and hence deletable.  Deleting said server.",
-                    event_type="server.deletable", **_log_capacity(state))
+        def log_success(_):
+            audit(log).msg("Server is active.", event_type="server.active")
 
-                job = _DeleteJob(self.log, self.transaction_id,
-                                 self.scaling_group, result, self.supervisor)
-                job.start()
-            else:
-                state.remove_job(self.job_id)
-                state.add_active(result['id'], result)
-                audit(log).msg("Server is active.", event_type="server.active",
-                               **_log_capacity(state))
-            return state
+        d = self.servers_coll.update_server(log, self.server_id,
+                                            nova_id, 'active',
+                                            json.dumps(result['lb_info']))
+        d.addCallback(log_success)
 
-        d = self.scaling_group.modify_state(handle_success)
+        def handle_server_deletion(f):
+            # TODO: Ideally, job should keep checking the server in db and delete
+            # the server from nova if it doesn't find it
+            f.trap(NoSuchServerError)
+            # server was slated to be deleted when it completed building.
+            # So, deleting it now
+            audit(log).msg(
+                "A pending server that is no longer needed is now active, "
+                "and hence deletable. Deleting said server.",
+                event_type="server.deletable")
+            job = _DeleteJob(self.log, self.transaction_id,
+                             self.scaling_group, result, self.supervisor)
+            d = job.start()
+            self.supervisor.deferred_pool.add(d)
+
+        d.addErrback(handle_server_deletion)
 
         def delete_if_group_deleted(f):
+            # TODO: This will work only if `update_server` raises below exception.
+            # Ideally, the server itself should get deleted and it shouldn't come here
             f.trap(NoSuchScalingGroupError)
             audit(log).msg(
                 "A pending server belonging to a deleted scaling group "
@@ -444,56 +413,27 @@ class _Job(object):
 
             job = _DeleteJob(self.log, self.transaction_id,
                              self.scaling_group, result, self.supervisor)
-            job.start()
+            d = job.start()
+            self.supervisor.deferred_pool.add(d)
 
         d.addErrback(delete_if_group_deleted)
         return d
 
-    def job_started(self, result):
-        """
-        Takes a tuple of (job_id, completion deferred), which will fire when a
-        job has been completed, and marks said job as completed by removing it
-        from pending.
-        """
-        self.job_id, completion_deferred = result
-        self.log = self.log.bind(job_id=self.job_id)
 
-        completion_deferred.addCallbacks(
-            self._job_succeeded, self._job_failed)
-        completion_deferred.addErrback(self.log.err)
-
-        return self.job_id
-
-
-def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
+def execute_launch_config(log, transaction_id, launch, scaling_group, delta):
     """
     Execute a launch config some number of times.
-
-    :return: Deferred
     """
+    log.msg("Launching {delta} servers.", delta=delta)
+    supervisor = get_supervisor()
+    for i in range(delta):
+        job = _Job(log, transaction_id, scaling_group, supervisor)
+        d = job.start(launch)
+        # Add the job to the pool to ensure otter does not shut down until job is completed
+        supervisor.deferred_pool.add(d)
 
-    def _update_state(pending_results):
-        """
-        :param pending_results: ``list`` of tuples of
-        ``(job_id, {'created': <job creation time>, 'jobType': [create/delete]})``
-        """
-        log.msg('updating state')
-
-        for job_id in pending_results:
-            state.add_job(job_id)
-
-    if delta > 0:
-        log.msg("Launching some servers.")
-        supervisor = get_supervisor()
-        deferreds = [
-            _Job(log, transaction_id, scaling_group, supervisor).start(launch)
-            for i in range(delta)
-        ]
-
-    pendings_deferred = gatherResults(deferreds, consumeErrors=True)
-    pendings_deferred.addCallback(_update_state)
-    pendings_deferred.addErrback(unwrap_first_error)
-    return pendings_deferred
+    #TODO: Doing this to not cause change in controller but would be nice to remove it
+    return succeed(None)
 
 
 class ServerNotFoundError(Exception):
@@ -551,7 +491,9 @@ def remove_server_from_group(log, trans_id, server_id, replace, group, state):
     def remove_server(_):
         server_info = state.active[server_id]
         state.remove_active(server_id)
-        _DeleteJob(log, trans_id, group, server_info, get_supervisor()).start()
+        supervisor = get_supervisor()
+        d = _DeleteJob(log, trans_id, group, server_info, supervisor).start()
+        supervisor.deferred_pool.add(d)
         return state
 
     if server_id in state.active:

@@ -16,8 +16,9 @@ from otter.models.interface import (
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError,
     IScalingScheduleCollection, IAdmin, ScalingGroupOverLimitError,
-    WebhooksOverLimitError, PoliciesOverLimitError)
-from otter.util.cqlbatch import Batch
+    WebhooksOverLimitError, PoliciesOverLimitError, IScalingGroupServersCollection,
+    NoSuchServerError)
+from otter.util.cqlbatch import Batch, batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
 from otter.util.config import config_value
@@ -413,10 +414,10 @@ def _unmarshal_state(state_dict):
     return GroupState(
         state_dict["tenantId"], state_dict["groupId"],
         _jsonloads_data(state_dict["group_config"])["name"],
-        _jsonloads_data(state_dict["active"]),
-        _jsonloads_data(state_dict["pending"]),
-        state_dict["groupTouched"],
-        _jsonloads_data(state_dict["policyTouched"]),
+        {}, #_jsonloads_data(state_dict["active"]),
+        {}, #_jsonloads_data(state_dict["pending"]),
+        None, #state_dict["groupTouched"],
+        {},# _jsonloads_data(state_dict["policyTouched"]),
         bool(ord(state_dict["paused"])),
         desired=desired_capacity
     )
@@ -716,6 +717,59 @@ class CassScalingGroup(object):
         return local_lock.run(with_lock, self.reactor, lock,
                               log.bind(category='locking'), _modify_state)
 
+    def modify_desired(self, modifier_callable, *args, **kwargs):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.modify_desired`
+        """
+        log = self.log.bind(system='CassScalingGroup.modify_desired')
+        consistency = self.get_consistency('update', 'desired')
+        params = {'tenantId': self.tenant_id, 'groupId': self.uuid}
+
+        def view_desired():
+            # TODO: verified_view should not be required anymore since there
+            # is no state continuously getting updated
+            d = verified_view(
+                self.connection,
+                _cql_view.format(cf=self.group_table, column='desired'),
+                _cql_delete_all_in_group.format(cf=self.group_table, name=''),
+                params, self.get_consistency('view', 'desired'),
+                NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
+            d.addCallback(lambda r: r['desired'])
+            return d
+
+        @self.with_timestamp
+        def _write_desired(timestamp, new_desired):
+            cql = ('UPDATE {cf} USING TIMESTAMP {ts} SET desired=:desired '
+                   'WHERE "tenantId"=:tenantId AND "groupId"=:groupId;')
+            return self.connection.execute(
+                cql.format(cf=self.group_table, ts=timestamp),
+                dict(desired=new_desired, **params), consistency)
+
+        def _modify_desired():
+            d = view_desired()
+            d.addCallback(lambda desired: modifier_callable(self, desired, *args, **kwargs))
+            return d.addCallback(_write_desired)
+
+        lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
+        lock.acquire = functools.partial(lock.acquire, timeout=120)
+        local_lock = self.local_locks.get_lock(self.uuid)
+        return local_lock.run(with_lock, self.reactor, lock,
+                              log.bind(category='locking'), _modify_desired)
+
+    def last_execution_time(self):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.last_execution_time`
+        """
+        # TEMP
+        return defer.succeed(None)
+
+    def update_execution_time(self, exec_time=None):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.update_execution_time`
+        """
+        # TEMP
+        return defer.succeed(None)
+
     def update_config(self, data):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_config`
@@ -890,6 +944,12 @@ class CassScalingGroup(object):
         d.addCallback(_do_update_schedule)
         d.addCallback(_do_update_policy)
         return d
+
+    def update_policy_execution_time(self, policy_id, exec_time=None):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.update_policy_execution_time`
+        """
+        return defer.succeed(None)
 
     def delete_policy(self, policy_id):
         """
@@ -1112,6 +1172,104 @@ class CassScalingGroup(object):
         # Cleanup /locks/<groupID> znode as it will not be required anymore
         d.addCallback(_delete_lock_znode)
         return d
+
+    def get_servers_collection(self):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.get_servers_collection`
+        """
+        return CassScalingGroupServers(self)
+
+
+def _check_group(func):
+    """
+    Decorator that checks if group exists
+    """
+    @functools.wraps(func)
+    def wrapper(self, *args):
+        d = self.scaling_group.view_config()
+        d.addCallback(lambda _: func(self, *args))
+        return d
+    return wrapper
+
+
+@implementer(IScalingGroupServersCollection)
+class CassScalingGroupServers(object):
+
+    def __init__(self, scaling_group):
+        self.scaling_group = scaling_group
+        self.tenant_id = scaling_group.tenant_id
+        self.group_id = scaling_group.uuid
+        self.connection = scaling_group.connection
+        self.get_consistency_level = scaling_group.get_consistency
+        self.servers_table = 'servers'
+        self.log = self.scaling_group.log.bind(system='CassScalingGroupServers')
+
+    def _prepare_params(self, **kwargs):
+        return dict(tenantId=self.tenant_id, groupId=self.group_id, **kwargs)
+
+    @_check_group
+    def get_server(self, log, server_id):
+        cql = ('SELECT * FROM {cf} '
+               'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND id=:id;')
+        d = self.connection.execute(
+            cql.format(cf=self.servers_table),
+            self._prepare_params(id=server_id),
+            self.get_consistency_level('list', 'server'))
+
+        def check_server(rows):
+            if len(rows) > 0:
+                return rows[0]
+            else:
+                raise NoSuchServerError(self.tenant_id, self.group_id, server_id)
+
+        return d.addCallback(check_server)
+
+    @_check_group
+    def list_servers(self, log, status=None, limit=100, marker=None):
+        return self.connection.execute(
+            _cql_list_all_in_group.format(cf=self.servers_table, order_by=''),
+            self._prepare_params(), self.get_consistency_level('list', 'server'))
+
+    @_check_group
+    def create_server(self, log, status):
+        cql = ('INSERT INTO {cf}("tenantId", "groupId", id, status, created) '
+               'VALUES(:tenantId, :groupId, :id, :status, :created);')
+        server_id = str(uuid.uuid4())
+        params = self._prepare_params(id=server_id, status=status, created=datetime.utcnow())
+        d = self.connection.execute(
+            cql.format(cf=self.servers_table),
+            params, self.get_consistency_level('insert', 'server'))
+        d.addCallback(lambda _: dict(nova_id=None, lb_info=None, **params))
+        return d
+
+    @_check_group
+    def update_server(self, log, server_id, nova_id, status, lb_info):
+        d = self.get_server(log, server_id)
+        cql = ('UPDATE {cf} SET nova_id=:nova_id, status=:status, lb_info=:lb_info '
+               'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND id=:id;')
+        d.addCallback(lambda _: self.connection.execute(
+            cql.format(cf=self.servers_table),
+            self._prepare_params(id=server_id, nova_id=nova_id, status=status,
+                                 lb_info=lb_info),
+            self.get_consistency_level('update', 'server')))
+        return d
+
+    @_check_group
+    def delete_servers(self, log, server_ids):
+        cql = ('DELETE FROM {cf} WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
+               'AND id={id};')
+        queries, params = [], {}
+        for i, server_id in enumerate(server_ids):
+            queries.append(cql.format(cf=self.servers_table, id=':id{}'.format(i)))
+            params['id{}'.format(i)] = server_id
+        d = self.connection.execute(
+            batch(queries),
+            self._prepare_params(**params),
+            self.get_consistency_level('delete', 'server'))
+        return d
+
+    def delete_server(self, log, server_id):
+        return self.delete_servers(log, [server_id])
 
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
