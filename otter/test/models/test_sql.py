@@ -748,8 +748,6 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, TestCase):
         """
         verifyObject(interface.IScalingScheduleCollection, self.sched)
 
-    test_interface.todo = "interface not fully implemented yet"
-
     def _add_some_events(self):
         events = _scheduled_event_examples()
         d = self.sched.add_cron_events(events)
