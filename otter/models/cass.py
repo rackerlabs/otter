@@ -1179,7 +1179,7 @@ def _check_group(func):
     @functools.wraps(func)
     def wrapper(self, *args):
         d = self.scaling_group.view_config()
-        d.addCallback(lambda _: func(*args))
+        d.addCallback(lambda _: func(self, *args))
         return d
     return wrapper
 
