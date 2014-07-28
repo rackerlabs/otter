@@ -1108,7 +1108,8 @@ load_balancers = Table("load_balancers", metadata,
                               nullable=False))
 
 scheduled_events = Table("scheduled_events", metadata,
-                         Column("id", Integer(), primary_key=True),
+                         Column("id", Integer(), primary_key=True,
+                                autoincrement=True),
                          Column("tenant_id", String(), nullable=False),
                          Column("group_id", ForeignKey("scaling_groups.id"),
                                primary_key=True),
