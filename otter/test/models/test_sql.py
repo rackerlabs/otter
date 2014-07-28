@@ -196,9 +196,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
                               {'contents': u'ICAgICAgDQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp',
                                'path': u'/root/.ssh/authorized_keys'}]})
 
-        policies = manifest["scalingPolicies"]
-
-        for policy in policies:
+        for policy in manifest["scalingPolicies"]:
             policy_without_id = dict((key, value) for (key, value)
                                      in policy.iteritems() if key != "id")
             self.assertIn(policy_without_id, policy_cfgs)
