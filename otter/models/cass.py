@@ -414,10 +414,10 @@ def _unmarshal_state(state_dict):
     return GroupState(
         state_dict["tenantId"], state_dict["groupId"],
         _jsonloads_data(state_dict["group_config"])["name"],
-        _jsonloads_data(state_dict["active"]),
-        _jsonloads_data(state_dict["pending"]),
-        state_dict["groupTouched"],
-        _jsonloads_data(state_dict["policyTouched"]),
+        {}, #_jsonloads_data(state_dict["active"]),
+        {}, #_jsonloads_data(state_dict["pending"]),
+        None, #state_dict["groupTouched"],
+        {},# _jsonloads_data(state_dict["policyTouched"]),
         bool(ord(state_dict["paused"])),
         desired=desired_capacity
     )
@@ -756,19 +756,19 @@ class CassScalingGroup(object):
         return local_lock.run(with_lock, self.reactor, lock,
                               log.bind(category='locking'), _modify_desired)
 
-    def last_execution_time():
+    def last_execution_time(self):
         """
         see :meth:`otter.models.interface.IScalingGroup.last_execution_time`
         """
         # TEMP
         return defer.succeed(None)
 
-    def update_execution_time(exec_time=None):
+    def update_execution_time(self, exec_time=None):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_execution_time`
         """
         # TEMP
-        return defer.suceed(None)
+        return defer.succeed(None)
 
     def update_config(self, data):
         """
@@ -944,6 +944,12 @@ class CassScalingGroup(object):
         d.addCallback(_do_update_schedule)
         d.addCallback(_do_update_policy)
         return d
+
+    def update_policy_execution_time(self, policy_id, exec_time=None):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.update_policy_execution_time`
+        """
+        return defer.succeed(None)
 
     def delete_policy(self, policy_id):
         """
