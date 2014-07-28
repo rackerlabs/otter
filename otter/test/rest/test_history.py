@@ -9,7 +9,7 @@ from testtools.matchers import IsInstance
 
 from otter.test.rest.request import RestAPITestMixin, request
 from otter.util.config import set_config_data
-from otter.test.utils import mock_log, patch, mock_treq, matches
+from otter.test.utils import mock_log, patch, StubTreq, StubResponse, matches
 
 from otter.rest.application import Otter
 from otter.rest.history import make_auditlog_query, next_marker_by_timestamp
@@ -128,21 +128,18 @@ class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
 
     def setUp(self):
         """Set an elastic search config var."""
-        super(OtterHistoryTestCase, self).setUp()
-        self.root = Otter(None, 'ord', es_host='http://dummy').app.resource()
-        set_config_data({
-            'limits': {'pagination': 20},
-            'url_root': 'http://localhost'})
-
-        self.addCleanup(set_config_data, {})
-
         self.log = patch(self, 'otter.rest.history.log', new=mock_log())
         self.make_auditlog_query = patch(
             self, 'otter.rest.history.make_auditlog_query',
             return_value={'tenant_id': 101010})
 
-        self.treq = patch(self, 'otter.rest.history.treq', new=mock_treq(
-            code=200, method='get', json_content={
+        req = ('GET', 'http://dummy/_search', None,
+               '{"tenant_id": 101010}', ("log",))
+        resp = StubResponse(200, {})
+
+        self.treq = StubTreq(
+            {req: resp},
+            {resp: json.dumps({
                 'hits': {
                     'hits': [{
                         '_source': {
@@ -156,7 +153,17 @@ class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
                         }
                     }]
                 }
-            }))
+            })}
+        )
+
+        super(OtterHistoryTestCase, self).setUp()
+        self.root = Otter(None, 'ord', es_host='http://dummy',
+                          _treq=self.treq).app.resource()
+        set_config_data({
+            'limits': {'pagination': 20},
+            'url_root': 'http://localhost'})
+
+        self.addCleanup(set_config_data, {})
 
     def test_history_not_implemented_if_not_configured(self):
         """
@@ -188,11 +195,6 @@ class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(200, result.response.code)
         self.assertEqual(expected, json.loads(result.content))
 
-        self.treq.get.assert_called_once_with(
-            'http://dummy/_search', data='{"tenant_id": 101010}',
-            log=matches(IsInstance(self.log.__class__)))
-        self.assertTrue(self.treq.json_content.called)
-
         self.make_auditlog_query.assert_called_once_with('101010', 'ord', limit=20)
 
     def test_history_with_one_page_pagination(self):
@@ -222,10 +224,5 @@ class OtterHistoryTestCase(RestAPITestMixin, SynchronousTestCase):
 
         self.assertEqual(200, result.response.code)
         self.assertEqual(expected, json.loads(result.content))
-
-        self.treq.get.assert_called_once_with(
-            'http://dummy/_search', data='{"tenant_id": 101010}',
-            log=matches(IsInstance(self.log.__class__)))
-        self.assertTrue(self.treq.json_content.called)
 
         self.make_auditlog_query.assert_called_once_with('101010', 'ord', limit=1)

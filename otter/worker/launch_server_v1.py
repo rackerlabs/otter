@@ -256,21 +256,58 @@ def log_on_response_code(response, log, msg, code):
     return response
 
 
-def log_lb_unexpected_errors(f, path, log, msg):
+def log_lb_unexpected_errors(f, log, msg):
     """
     Log load-balancer unexpected errors
     """
     if not f.check(APIError):
         log.err(f, 'Unknown error while ' + msg)
-        return f
-    error = RequestError(f, path, msg)
-    log.msg('Got LB error while {m}: {e}', m=msg, e=error)
-    # TODO: Will do it after LB delete works fine
-    # 422 is PENDING_UPDATE
-    #if f.value.code != 422:
-    #    log.msg('Unexpected status {status} while {msg}: {error}',
-    #            msg=msg, status=f.value.code, error=error)
-    raise error
+    elif not (f.value.code == 404 or
+              f.value.code == 422 and 'PENDING_UPDATE' in f.value.body):
+        log.msg('Got unexpected LB status {status} while {msg}: {error}',
+                status=f.value.code, msg=msg, error=f.value)
+    return f
+
+
+class CLBOrNodeDeleted(Exception):
+    """
+    CLB or Node is deleted or in process of getting deleted
+
+    :param :class:`RequestError` error: Error that caused this exception
+    :param str clb_id: ID of deleted load balancer
+    :param str node_id: ID of deleted node in above load balancer
+    """
+    def __init__(self, error, clb_id, node_id=None):
+        super(CLBOrNodeDeleted, self).__init__(
+            'CLB {} or node {} deleted due to {}'.format(clb_id, node_id, error))
+        self.error = error
+        self.clb_id = clb_id
+        self.node_id = node_id
+
+
+def check_deleted_clb(f, clb_id, node_id=None):
+    """
+    Raise :class:`CLBOrNodeDeleted` error based on information in `RequestError` in f.
+    Otherwise return f
+
+    :param :class:`Failure` f: failure containing :class:`RequestError`
+                               from adding/removing node
+    :param str clb_id: ID of load balancer causing the error
+    :param str node_id: ID of node of above load balancer
+    """
+    # A LB being deleted sometimes results in a 422. This function
+    # unfortunately has to parse the body of the message to see if this is an
+    # acceptable 422 (if the LB has been deleted or in the process of being deleted)
+    f.trap(RequestError)
+    f.value.reason.trap(APIError)
+    error = f.value.reason.value
+    if error.code == 404:
+        raise CLBOrNodeDeleted(f.value, clb_id, node_id)
+    if error.code == 422:
+        message = json.loads(error.body)['message']
+        if ('load balancer is deleted' in message or 'PENDING_DELETE' in message):
+            raise CLBOrNodeDeleted(f.value, clb_id, node_id)
+    return f
 
 
 def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
@@ -303,12 +340,16 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
                                                   "type": "PRIMARY"}]}),
                       log=lb_log)
         d.addCallback(check_success, [200, 202])
-        d.addErrback(log_lb_unexpected_errors, path, lb_log, 'add_node')
+        d.addErrback(log_lb_unexpected_errors, lb_log, 'add_node')
+        d.addErrback(wrap_request_error, path, 'add_node')
+        d.addErrback(check_deleted_clb, lb_id)
         return d
 
     d = retry(
         add,
-        can_retry=retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES),
+        can_retry=compose_retries(
+            transient_errors_except(CLBOrNodeDeleted),
+            retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES)),
         next_interval=random_interval(
             *(config_value('worker.lb_retry_interval_range') or LB_RETRY_INTERVAL_RANGE)),
         clock=clock)
@@ -547,42 +588,26 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
     lb_log.msg('Removing from load balancer')
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
 
-    def check_422_deleted(failure):
-        # A LB being deleted sometimes results in a 422.  This function
-        # unfortunately has to parse the body of the message to see if this is an
-        # acceptable 422 (if the LB has been deleted or the node has already been
-        # removed, then 'removing from load balancer' as a task should be
-        # successful - if the LB is in ERROR, then nothing more can be done to
-        # it except resetting it - may as well remove the server.)
-        failure.trap(APIError)
-        error = failure.value
-        if error.code == 422:
-            message = json.loads(error.body)['message']
-            if ('load balancer is deleted' not in message and
-                    'PENDING_DELETE' not in message):
-                return failure
-            lb_log.msg(message)
-        else:
-            return failure
-
     def remove():
         d = treq.delete(path, headers=headers(auth_token), log=lb_log)
-
-        # Success is 200/202.  An LB not being found is 404.  A node not being
-        # found is a 404.  But a deleted LB sometimes results in a 422.
-        d.addCallback(log_on_response_code, lb_log, 'Node to delete does not exist', 404)
-        d.addCallback(check_success, [200, 202, 404])
+        d.addCallback(check_success, [200, 202])
         d.addCallback(treq.content)  # To avoid https://twistedmatrix.com/trac/ticket/6751
-        d.addErrback(check_422_deleted)
-        d.addErrback(log_lb_unexpected_errors, path, lb_log, 'remove_node')
+        d.addErrback(log_lb_unexpected_errors, lb_log, 'remove_node')
+        d.addErrback(wrap_request_error, path, 'remove_node')
+        d.addErrback(check_deleted_clb, loadbalancer_id, node_id)
         return d
 
     d = retry(
         remove,
-        can_retry=retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES),
+        can_retry=compose_retries(
+            transient_errors_except(CLBOrNodeDeleted),
+            retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES)),
         next_interval=random_interval(
             *(config_value('worker.lb_retry_interval_range') or LB_RETRY_INTERVAL_RANGE)),
         clock=clock)
+
+    # A node or CLB deleted is considered successful removal
+    d.addErrback(lambda f: f.trap(CLBOrNodeDeleted) and lb_log.msg(f.value.message))
     d.addCallback(lambda _: lb_log.msg('Removed from load balancer'))
     return d
 
