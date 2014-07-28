@@ -4,6 +4,8 @@ The Otter Supervisor manages a number of workers to execute a launch config.
 This code is specific to the launch_server_v1 worker.
 """
 
+import json
+
 from twisted.application.service import Service
 from twisted.internet.defer import succeed
 
@@ -145,7 +147,8 @@ class SupervisorService(object, Service):
                 self.region,
                 service_catalog,
                 auth_token,
-                (server['nova_id'], server['lb_info']))
+                # TODO: I do not like json.loads() here
+                (server['nova_id'], json.loads(server['lb_info'])))
 
         d = self.auth_function(scaling_group.tenant_id, log=log)
         log.msg("Authenticating for tenant")
@@ -225,6 +228,7 @@ def exec_scale_down(log, transaction_id, scaling_group, delta):
     d.addCallback(oldest)
 
     def delete_servers(servers):
+        supervisor = get_supervisor()
         server_ids = []
         for server in servers:
             # delete active servers from nova
@@ -333,7 +337,7 @@ class _Job(object):
         self.log = self.log.bind(image_ref=image, flavor_ref=flavor)
         self.servers_coll = self.scaling_group.get_servers_collection()
         self.log.msg('Creating server in DB')
-        d = self.servers_coll.create_server(self.log)
+        d = self.servers_coll.create_server(self.log, 'pending')
 
         def exec_conf(server):
             self.server_id = server['id']
@@ -376,7 +380,8 @@ class _Job(object):
             audit(log).msg("Server is active.", event_type="server.active")
 
         d = self.servers_coll.update_server(log, self.server_id,
-                                            nova_id, 'active', result['lb_info'])
+                                            nova_id, 'active',
+                                            json.dumps(result['lb_info']))
         d.addCallback(log_success)
 
         def handle_server_deletion(f):
