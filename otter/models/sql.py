@@ -1290,14 +1290,6 @@ def _for_tenant_and_limit_type(query, tenant_id, limit_type):
     return q
 
 
-def _count_webhooks(conn, policy_id):
-    return _count(conn, webhooks, policy_id=policy_id)
-
-
-def _count_policies(conn, group_id):
-    return _count(conn, policies, group_id=group_id)
-
-
 def _count(conn, table, **kwargs):
     """
     Counts all the row in *table* with the exact pairs of column name
@@ -1313,3 +1305,11 @@ def _count(conn, table, **kwargs):
                                    for (col_name, value) in kwargs.items()]))
                      .count())
     return d.addCallback(_fetchone).addCallback(lambda row: row[0])
+
+
+def _count_webhooks(conn, policy_id):
+    return _count(conn, webhooks, policy_id=policy_id)
+
+
+def _count_policies(conn, group_id):
+    return _count(conn, policies, group_id=group_id)
