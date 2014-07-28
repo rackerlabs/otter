@@ -738,6 +738,7 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, TestCase):
         """
         Do set up for a :class:`~sql.SQLScalingScheduleCollection` test.
         """
+        _SQLiteTestMixin.setUp(self)
         self.sched = sql.SQLScalingScheduleCollection(self.engine)
 
     def test_interface(self):
