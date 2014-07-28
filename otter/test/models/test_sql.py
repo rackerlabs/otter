@@ -1137,6 +1137,7 @@ def _webhook_examples():
 # REVIEW: is a webhook without metadata property allowed? if so add
 # some examples because I'm pretty sure the code doesn't handle that
 
+
 def _scheduled_event_examples():
     examples = ({'tenantId': 'lvh',
                  'groupId': 'cabal',
