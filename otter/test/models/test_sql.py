@@ -757,7 +757,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         yield self.assertFailure(d, interface.NoSuchWebhookError)
 
 
-class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, TestCase):
+class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
     """
     Unit tests for :class:`~sql.SQLScalingScheduleCollection`.
     """
@@ -766,6 +766,8 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, TestCase):
         Do set up for a :class:`~sql.SQLScalingScheduleCollection` test.
         """
         _SQLiteTestMixin.setUp(self)
+        _ConfigTestMixin.setUp(self)
+        TestCase.setUp(self)
         self.sched = sql.SQLScalingScheduleCollection(self.engine)
 
     def test_interface(self):
