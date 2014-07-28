@@ -1016,7 +1016,10 @@ class SQLScalingGroupCollectionTests(_ConfigTestMixin, _SQLiteTestMixin, TestCas
         """
         groups = yield self._create_some_groups()
         groups.sort(key=lambda g: g.uuid)
-        # TODO: add some false flags
+
+        for _ in xrange(3):
+            other_group, _, _ = yield self._create_group(tenant_id="TENANT_2")
+            yield _create_policies(other_group)
 
         tenant_id = groups[0].tenant_id
         itergroups = iter(groups)
