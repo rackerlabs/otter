@@ -770,6 +770,12 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, _ConfigTestMixin, Test
         TestCase.setUp(self)
         self.sched = sql.SQLScalingScheduleCollection(self.engine)
 
+    def _create_group(self, **kw):
+        """
+        Creates a group.
+        """
+        return _create_group(self.engine, **kw)
+
     def test_interface(self):
         """
         The SQL scaling schedule collection implementation implements the
@@ -777,18 +783,13 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, _ConfigTestMixin, Test
         """
         verifyObject(interface.IScalingScheduleCollection, self.sched)
 
-    def _add_some_events(self):
-        d = _create_group(self.engine)
-
-        @d.addCallback
-        def add_events(result):
-            group, _cfg, _launch_cfg = result
-            events_for_group = [dict(e, groupId=group.uuid)
-                                for e in _scheduled_event_examples()]
-            d = self.sched.add_cron_events(events_for_group)
-            d.addCallback(lambda _result: events_for_group)
-            return d
-
+    def _add_some_events(self, group_id, policy_id):
+        events_for_group = [dict(event,
+                                 groupId=group_id,
+                                 policyId=policy_id)
+                                for event in _scheduled_event_examples()]
+        d = self.sched.add_cron_events(events_for_group)
+        d.addCallback(lambda _result: events_for_group)
         return d
 
     def test_add_cron_events(self):
