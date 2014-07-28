@@ -771,10 +771,8 @@ class SQLScalingGroupCollection(object):
         """
         See :meth:`~iface.IScalingGroupCollection.list_scaling_group_states`.
         """
-        query = _paginated(scaling_groups, limit, marker)
-        # TODO: keep in mind that this lists all groups, not just for
-        # this tenant. fix that in the test, then filter here.
-
+        query = (_paginated(scaling_groups, limit, marker)
+                 .where(scaling_groups.c.tenant_id == tenant_id))
         d = self.engine.execute(query).addCallback(_fetchall)
 
         @d.addCallback
