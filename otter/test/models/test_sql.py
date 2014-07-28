@@ -875,10 +875,7 @@ class SQLScalingGroupCollectionTests(_ConfigTestMixin, _SQLiteTestMixin, TestCas
         """
         # create a scaling group
         group, _cfg, _launch_cfg = yield self._create_group()
-
-        # add some policies
-        policy_cfgs = group_examples.policy()
-        policies = yield group.create_policies(policy_cfgs)
+        policies, policy_cfgs = yield _create_policies(group)
 
         # add some webhooks for the first policy
         first_webhook_policy_id = next(policy["id"] for policy in policies
