@@ -776,17 +776,24 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, TestCase):
         verifyObject(interface.IScalingScheduleCollection, self.sched)
 
     def _add_some_events(self):
-        events = _scheduled_event_examples()
-        d = self.sched.add_cron_events(events)
-        d.addCallback(lambda _result: events)
+        d = _create_group(self.engine)
+
+        @d.addCallback
+        def add_events(result):
+            group, _cfg, _launch_cfg = result
+            events_for_group = [dict(e, groupId=group.uuid)
+                                for e in _scheduled_event_examples()]
+            d = self.sched.add_cron_events(events_for_group)
+            d.addCallback(lambda _result: events_for_group)
+            return d
+
         return d
 
     def test_add_cron_events(self):
         """
         Adding some cron events works.
         """
-        d = self._add_some_events()
-        d.addCallback(self.assertIdentical, None)
+        return self._add_some_events()
 
     @inlineCallbacks
     def test_fetch_and_delete(self):
