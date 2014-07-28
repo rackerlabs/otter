@@ -660,33 +660,28 @@ class SQLScalingGroup(object):
                                        policy_id, webhook_id)
 
 
-def _verify_group_exists(conn, tenant_id, group_id):
+def _verify_exists(conn, table, id, exc):
     d = conn.execute(scaling_groups
-                     .select(scaling_groups.c.id == group_id)
+                     .select(table.c.id == id)
                      .limit(1).count())
     d.addCallback(_fetchone)
 
     @d.addCallback
     def raise_if_count_is_zero(row):
         if row[0] == 0:
-            raise iface.NoSuchScalingGroupError(tenant_id, group_id)
+            raise exc
 
     return d
+
+
+def _verify_group_exists(conn, tenant_id, group_id):
+    exc = iface.NoSuchScalingGroupError(tenant_id, group_id)
+    return _verify_exists(conn, scaling_groups, group_id, exc)
 
 
 def _verify_policy_exists(conn, tenant_id, group_id, policy_id):
-    # TODO: Refactor this with _verify_group_exists
-    d = conn.execute(policies
-                     .select(policies.c.id == policy_id)
-                     .limit(1).count())
-    d.addCallback(_fetchone)
-
-    @d.addCallback
-    def raise_if_count_is_zero(row):
-        if row[0] == 0:
-            raise iface.NoSuchPolicyError(tenant_id, group_id, policy_id)
-
-    return d
+    exc = iface.NoSuchPolicyError(tenant_id, group_id, policy_id)
+    return _verify_exists(conn, policies, policy_id, exc)
 
 
 def _get_policy_args(conn, policy_ids):
