@@ -75,8 +75,8 @@ def _create_sqlite():
 
 class _SQLiteTestMixin(object):
     """
-    A test mixin that sets up an asynchronous, in-memory SQLite
-    database, with some alchimia + SQLAlchemy chrome plating.
+    A test mixin that sets up an in-memory SQLite database, with some
+    alchimia and SQLAlchemy chrome plating.
     """
     @inlineCallbacks
     def setUp(self):
