@@ -27,10 +27,11 @@ def _with_transaction(f):
 
         try:
             result = yield f(self, conn, *args, **kwargs)
-        except:
+        except BaseException as e:
             yield txn.rollback()
             # REVIEW: who should own the retry logic here?
-            raise
+            # You can't do a bare re-raise here because of inlineCallbacks.
+            raise e
         else:
             yield txn.commit()
             returnValue(result)
