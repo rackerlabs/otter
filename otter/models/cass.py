@@ -1260,6 +1260,9 @@ class CassScalingGroupServers(object):
             self.get_consistency_level('delete', 'server'))
         return d
 
+    def delete_server(self, log, server_id):
+        return self.delete_servers(log, [server_id])
+
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
 class CassScalingGroupCollection:
