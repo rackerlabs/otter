@@ -255,6 +255,9 @@ def check_cooldowns(log, group_exec_time, config, policy, policy_id):
 
     :return: C{int}
     """
+    # TEMP
+    return True
+
     this_now = datetime.now(iso8601.iso8601.UTC)
 
     timestamp_and_cooldowns = [
