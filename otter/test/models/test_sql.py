@@ -806,7 +806,7 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, TestCase):
         trigger = randrange(first["trigger"], second["trigger"])
         now = datetime.fromtimestamp(trigger)
 
-        result, = yield self.sched.fetch_and_delete(0, now, limit=2)
+        result, = yield self.sched.fetch_and_delete(0, now, size=2)
         expected = dict((k, v) for (k, v) in first.items() if k != "trigger")
         self.assertEqual(result, expected)
         # REVIEW: Could probably write a few more different tests.
