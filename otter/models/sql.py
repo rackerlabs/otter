@@ -1117,6 +1117,10 @@ scheduled_events = Table("scheduled_events", metadata,
                          Column("cron", String()),
                          Column("version", String()))
 
+# REVIEW: scheduled_events has both a policy_id and a group_id; since
+# policy_id uniquely defines a group_id, this is a denormalization. It
+# may be worth getting rid of it, although that requires a bunch of
+# extra code.
 
 def create_tables(engine, tables=metadata.tables.values()):
     """
