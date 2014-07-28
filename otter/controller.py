@@ -105,8 +105,7 @@ def obey_config_change(log, transaction_id, config, scaling_group, desired,
     :param scaling_group: an IScalingGroup provider
     :param int desired: current desired value
 
-    :return: a ``Deferred`` that fires with the updated (or not)
-        :class:`otter.models.interface.GroupState` if successful
+    :return: a ``Deferred`` that fires with the updated (or not) desired if successful
     """
     log = log.bind(scaling_group_id=scaling_group.uuid)
 
@@ -232,8 +231,7 @@ def maybe_execute_scaling_policy(
 
         if check_cooldowns(bound_log, group_exec_time, config, policy, policy_id):
             # converge returns new desired
-            d = converge(bound_log, transaction_id, config, group,
-                         desired, policy)
+            d = converge(bound_log, transaction_id, config, group, desired, launch, policy)
             d.addCallback(check_no_change)
             d.addCallback(update_exec_times)
             return d
