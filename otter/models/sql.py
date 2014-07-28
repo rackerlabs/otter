@@ -1112,6 +1112,7 @@ scheduled_events = Table("scheduled_events", metadata,
                                 autoincrement=True),
                          Column("tenant_id", String(), nullable=False),
                          Column("group_id", ForeignKey("scaling_groups.id")),
+                         Column("policy_id", ForeignKey("policies.id")),
                          Column("happens_at", DateTime(), nullable=False),
                          Column("cron", String()),
                          Column("version", String()))
