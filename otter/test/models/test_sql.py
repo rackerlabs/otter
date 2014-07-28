@@ -1138,17 +1138,18 @@ def _webhook_examples():
 # some examples because I'm pretty sure the code doesn't handle that
 
 def _scheduled_event_examples():
-    return [{'tenantId': 'lvh',
-             'groupId': 'cabal',
-             'policyId': 'destroy the sun',
-             'trigger': 100,
-             'cron': 'c1',
-             'version': '1'},
-            {'tenantId': 'lvh',
-             'groupId': 'cabal',
-             'policyId': 'destroy the sun some more for good measure',
-             'trigger': 122,
-             'cron': 'c2',
-             'version': '1'}]
+    examples = ({'tenantId': 'lvh',
+                 'groupId': 'cabal',
+                 'policyId': 'destroy the sun',
+                 'trigger': 100,
+                 'cron': 'c1',
+                 'version': '1'},
+                {'tenantId': 'lvh',
+                 'groupId': 'cabal',
+                 'policyId': 'destroy the sun some more for good measure',
+                 'trigger': 122,
+                 'cron': 'c2',
+                 'version': '1'})
+    return examples
 
 # REVIEW: Should these examples live here?
