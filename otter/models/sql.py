@@ -1137,6 +1137,7 @@ scheduled_events = Table("scheduled_events", metadata,
 # may be worth getting rid of it, although that requires a bunch of
 # extra code.
 
+
 def create_tables(engine, tables=metadata.tables.values()):
     """
     Creates all the given tables on the given engine.
