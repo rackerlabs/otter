@@ -792,11 +792,14 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, _ConfigTestMixin, Test
         d.addCallback(lambda _result: events_for_group)
         return d
 
+    @inlineCallbacks
     def test_add_cron_events(self):
         """
         Adding some cron events works.
         """
-        return self._add_some_events()
+        group, _cfg, _launch_cfg = yield self._create_group()
+        policies, policy_cfgs = yield _create_policies(group, n=2)
+        yield self._add_some_events(group.uuid, policies[0]["id"])
 
     @inlineCallbacks
     def test_fetch_and_delete(self):
