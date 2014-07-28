@@ -881,6 +881,9 @@ class SQLScalingScheduleCollection(object):
 
     @_with_transaction
     def add_cron_events(self, conn, events):
+        """
+        See :meth:`~iface.IScalingScheduleCollection.add_cron_events`.
+        """
         timestamp_to_datetime = datetime.fromtimestamp
         d = conn.execute(scheduled_events.insert(),
                          [{"tenant_id": e["tenantId"],
