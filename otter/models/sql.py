@@ -899,6 +899,7 @@ class SQLScalingScheduleCollection(object):
         d.addCallback(partial(map, _format_event_row))
         return d
 
+    @_with_transaction
     def get_oldest_event(self, conn, bucket):
         """
         See :meth:`~iface.IScalingScheduleCollection.get_oldest_event`.
