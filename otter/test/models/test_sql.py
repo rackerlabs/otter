@@ -461,9 +461,16 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
     def test_get_policy(self):
         """
         Getting a policy works.
+
+        It is not distracted by other policies for other groups.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
         (policy,), _policy_cfgs = yield _create_policies(group, n=1)
+
+        for _ in xrange(3):
+            other_group, _, _ = yield self._create_group()
+            yield _create_policies(other_group)
+
         got_policy = yield group.get_policy(policy["id"])
         self.assertEqual(policy, got_policy)
 
