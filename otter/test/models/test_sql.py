@@ -794,7 +794,7 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, _ConfigTestMixin, Test
         events_for_group = [dict(event,
                                  groupId=group_id,
                                  policyId=policy_id)
-                                for event in _scheduled_event_examples()]
+                            for event in _scheduled_event_examples()]
         d = self.sched.add_cron_events(events_for_group)
         d.addCallback(lambda _result: events_for_group)
         return d
