@@ -831,6 +831,9 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, _ConfigTestMixin, Test
 
     @inlineCallbacks
     def test_get_oldest_event(self):
+        """
+        Getting the oldest scheduled event works.
+        """
         group, _cfg, _launch_cfg = yield self._create_group()
         policies, policy_cfgs = yield _create_policies(group, n=2)
 
