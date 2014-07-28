@@ -385,7 +385,6 @@ class SQLScalingGroup(object):
         """
         See :meth:`~iface.IScalingGroup.get_policy`.
         """
-        # TODO: only for this tenant and group!
         query = policies.select().where(policies.c.id == policy_id).limit(1)
         d = self._get_policies(query)
 
