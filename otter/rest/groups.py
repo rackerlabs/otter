@@ -40,7 +40,7 @@ def format_state_dict(state):
     return {
         'activeCapacity': len(state.active),
         'pendingCapacity': len(state.pending),
-        'desiredCapacity': len(state.active) + len(state.pending),
+        'desiredCapacity': state.desired,
         'name': state.group_name,
         'paused': state.paused,
         'active': [
