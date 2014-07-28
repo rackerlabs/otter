@@ -872,7 +872,11 @@ class SQLScalingScheduleCollection(object):
     def add_cron_events(self, conn, events):
         timestamp_to_datetime = datetime.fromtimestamp
         d = conn.execute(scheduled_events.insert(),
-                         [dict(e, trigger=timestamp_to_datetime(e["trigger"]))
+                         [{"tenant_id": e["tenantId"],
+                           "group_id": e["groupId"],
+                           "happens_at": timestamp_to_datetime(e["trigger"]),
+                           "cron": e["cron"],
+                           "version": e["version"]}
                           for e in events])
         return d
 
