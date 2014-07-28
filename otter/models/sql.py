@@ -887,8 +887,8 @@ class SQLScalingScheduleCollection(object):
         """
         assert bucket == 0  # REVIEW
         d = conn.execute(scheduled_events.select()
-                         .where(scheduled_events.c.happens_on <= now)
-                         .order_by(scheduled_events.c.happens_on)
+                         .where(scheduled_events.c.happens_at <= now)
+                         .order_by(scheduled_events.c.happens_at)
                          .limit(size))
         d.addCallback(_fetchall)
 
