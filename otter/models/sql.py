@@ -30,6 +30,7 @@ def _with_transaction(f):
         except BaseException as e:
             yield txn.rollback()
             # REVIEW: who should own the retry logic here?
+            # REVIEW: do we actually want to sync with the rollback?
             # You can't do a bare re-raise here because of inlineCallbacks.
             raise e
         else:
