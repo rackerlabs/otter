@@ -803,7 +803,11 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, _ConfigTestMixin, Test
         """
         Fetching and then deleting some scheduled events works.
         """
-        event_specs = yield self._add_some_events()
+        group, _cfg, _launch_cfg = yield self._create_group()
+        policies, policy_cfgs = yield _create_policies(group, n=2)
+
+        event_specs = yield self._add_some_events(group.uuid,
+                                                  policies[0]["id"])
         first, second = event_specs[0], event_specs[1]
 
         trigger = randrange(first["trigger"], second["trigger"])
