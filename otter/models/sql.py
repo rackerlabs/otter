@@ -675,11 +675,30 @@ def _verify_exists(conn, table, id, exc):
 
 
 def _verify_group_exists(conn, tenant_id, group_id):
+    """
+    Verifies that a group with given id exists.
+
+    :param conn: The database connection to use.
+    :param bytes tenant_id: The id of the tenant. Used for error reporting.
+    :param bytes group_id: The id of the group.
+    :returns: (Deferred) :data:`None`, if the group exists.
+    :raises NoSuchGroupError: (Deferred), if the group doesn't exist.
+    """
     exc = iface.NoSuchScalingGroupError(tenant_id, group_id)
     return _verify_exists(conn, scaling_groups, group_id, exc)
 
 
 def _verify_policy_exists(conn, tenant_id, group_id, policy_id):
+    """
+    Verifies that a policy with given id exists.
+
+    :param conn: The database connection to use.
+    :param bytes tenant_id: The id of the tenant. Used for error reporting.
+    :param bytes group_id: The id of the group. Used for error reporting.
+    :param bytes policy_id: The id of the policy.
+    :returns: (Deferred) :data:`None`, if the policy exists.
+    :raises NoSuchPolicyError: (Deferred), if the policy doesn't exist.
+    """
     exc = iface.NoSuchPolicyError(tenant_id, group_id, policy_id)
     return _verify_exists(conn, policies, policy_id, exc)
 
