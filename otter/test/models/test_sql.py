@@ -824,9 +824,17 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, _ConfigTestMixin, Test
 
     @inlineCallbacks
     def test_get_oldest_event(self):
-        event_specs = yield self._add_some_events()
+        group, _cfg, _launch_cfg = yield self._create_group()
+        policies, policy_cfgs = yield _create_policies(group, n=2)
+
+        event_specs = yield self._add_some_events(group.uuid,
+                                                  policies[0]["id"])
+
         event = yield self.sched.get_oldest_event(0)
-        self.assertEqual(event, event_specs[0])
+        # REVIEW: should this actually include the trigger?
+        expected = dict((k, v) for (k, v) in event_specs[0].items()
+                        if k != "trigger")
+        self.assertEqual(event, expected)
 
 
 class SQLScalingGroupCollectionTests(_ConfigTestMixin, _SQLiteTestMixin, TestCase):
