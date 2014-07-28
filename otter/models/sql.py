@@ -377,8 +377,8 @@ class SQLScalingGroup(object):
         """
         See :meth:`~iface.IScalingGroup.list_policies`.
         """
-        # TODO: only for this tenant & group!
-        query = _paginated(policies, limit, marker)
+        query = (_paginated(policies, limit, marker)
+                 .where(and_(policies.c.group_id == self.uuid)))
         return self._get_policies(query)
 
     def get_policy(self, policy_id, version=None):
