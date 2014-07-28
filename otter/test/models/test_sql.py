@@ -953,22 +953,17 @@ class SQLScalingGroupCollectionTests(_ConfigTestMixin, _SQLiteTestMixin, TestCas
         Getting the webhook info by capability hash works.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-
-        # Set up a policy
-        # TODO: refactor creating a policy
-        policy_cfgs = group_examples.policy()
-        response = yield group.create_policies([policy_cfgs[0]])
-        policy_id = response[0]["id"]
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
 
         # Set up a webhook for the policy
         # TODO: refactor creating a webhook
         webhook_cfg = _webhook_examples()[0]
-        response = yield group.create_webhooks(policy_id, [webhook_cfg])
+        response = yield group.create_webhooks(policy["id"], [webhook_cfg])
         capa_hash = response[0]["capability"]["hash"]
 
         # Try to get the webhook back
         response = yield self.collection.webhook_info_by_hash(log, capa_hash)
-        self.assertEqual(response, (group.tenant_id, group.uuid, policy_id))
+        self.assertEqual(response, (group.tenant_id, group.uuid, policy["id"]))
 
     def test_webhook_info_by_hash_for_nonexistent_webhook(self):
         """
