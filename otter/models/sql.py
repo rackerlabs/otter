@@ -874,6 +874,7 @@ class SQLScalingScheduleCollection(object):
         d = conn.execute(scheduled_events.insert(),
                          [{"tenant_id": e["tenantId"],
                            "group_id": e["groupId"],
+                           "policy_id": e["policyId"],
                            "happens_at": timestamp_to_datetime(e["trigger"]),
                            "cron": e["cron"],
                            "version": e["version"]}
