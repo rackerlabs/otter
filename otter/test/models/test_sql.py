@@ -120,6 +120,20 @@ def _create_group(engine, tenant_id=b"TENANT", policies=None):
     return d
 
 
+def _create_policies(group, n=None):
+    """
+    Creates *n* (default: all) example policies for the group.
+    """
+    policy_cfgs = group_examples.policy()
+    if n is not None:
+        assert n <= len(policy_cfgs)
+        policy_cfgs = policy_cfgs[:n]
+
+    d = group.create_policies(policy_cfgs)
+    d.addCallback(lambda policies: (policies, policy_cfgs))
+    return d
+
+
 class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
     """
     Unit tests for :class:`~sql.SQLScalingGroup`.
@@ -138,17 +152,6 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         """
         return _create_group(self.engine, **kw)
 
-    def _create_policies(self, group, n=None):
-        """
-        Creates *n* (default: all) example policies for the group.
-        """
-        policy_cfgs = group_examples.policy()
-        if n is not None:
-            assert n <= len(policy_cfgs)
-            policy_cfgs = policy_cfgs[:n]
-        self._policy_cfgs = policy_cfgs
-        return group.create_policies(policy_cfgs)
-
     def test_interface(self):
         """
         The SQL scaling group implementation implements the
@@ -163,10 +166,10 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         Viewing an entire manifest works correctly.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-        policies = yield self._create_policies(group, n=2)
+        policies, policy_cfgs = yield _create_policies(group, n=2)
 
-        other_group, _, _ = yield self._create_group(tenant_id=b"TENANT_2")
-        yield self._create_policies(other_group)
+        group2, _, _ = yield self._create_group(tenant_id=b"TENANT_2")
+        _other_policies, _other_policy_cfgs = yield _create_policies(group2)
 
         manifest = yield group.view_manifest()
         self.assertEqual(manifest["groupConfiguration"],
@@ -198,7 +201,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         for policy in policies:
             policy_without_id = dict((key, value) for (key, value)
                                      in policy.iteritems() if key != "id")
-            self.assertIn(policy_without_id, self._policy_cfgs)
+            self.assertIn(policy_without_id, policy_cfgs)
 
     def test_view_config_for_nonexistent_group(self):
         """
@@ -330,7 +333,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         doesn't exist, an exception is raised.
         """
         group = sql.SQLScalingGroup(self.engine, b"TENANT", b"BOGUS_GROUP")
-        d = self._create_policies(group)
+        d = _create_policies(group)
 
         self.assertFailure(d, interface.NoSuchScalingGroupError)
 
@@ -352,9 +355,9 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         yield sql._set_limit(self.engine, group.tenant_id,
                              "maxPoliciesPerGroup", 1)
 
-        yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
 
-        d = self._create_policies(group)
+        d = _create_policies(group)
         yield self.assertFailure(d, interface.PoliciesOverLimitError)
 
     def test_update_policy_for_nonexistant_scaling_group(self):
@@ -382,8 +385,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         A user can update a policy.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-
-        policy, = yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
 
         old = yield group.get_policy(policy["id"])
         new = {"change": old["change"] * 2,
@@ -424,7 +426,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         """
         group, _cfg, _launch_cfg = yield self._create_group()
 
-        policies = yield self._create_policies(group)
+        policies, _policy_cfgs = yield _create_policies(group)
         policies.sort(key=lambda policy: policy["id"])
 
         list_response = yield group.list_policies(limit=1)
@@ -463,7 +465,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         Getting a policy works.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-        policy, = yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
         got_policy = yield group.get_policy(policy["id"])
         self.assertEqual(policy, got_policy)
 
@@ -493,7 +495,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         Deleting a policy works.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-        policy, = yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
 
         yield group.get_policy(policy["id"])
         yield group.delete_policy(policy["id"])
@@ -506,7 +508,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         Listing webhooks works.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-        policy, = yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
 
         webhook_cfgs = _webhook_examples()
         webhooks = yield group.create_webhooks(policy["id"], webhook_cfgs)
@@ -553,7 +555,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         The user can create a webhook for an extant policy.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-        policy, = yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
 
         webhook_cfgs = _webhook_examples()
         webhooks = yield group.create_webhooks(policy["id"], webhook_cfgs)
@@ -593,7 +595,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         raised.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-        policy, = yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
 
         yield sql._set_limit(self.engine, group.tenant_id,
                              "maxWebhooksPerPolicy", 1)
@@ -634,7 +636,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         is raised.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-        policy, = yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
         d = group.get_webhook(policy["id"], b"BOGUS_WEBHOOK")
         yield self.assertFailure(d, interface.NoSuchWebhookError)
 
@@ -644,7 +646,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         Getting a webhook works.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-        policy, = yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
         webhook_cfgs = [_webhook_examples()[0]]
         webhook, = yield group.create_webhooks(policy["id"], webhook_cfgs)
 
@@ -683,7 +685,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         is raised.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-        policy, = yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
         d = group.update_webhook(policy["id"], b"BOGUS_WEBHOOK",
                                  _webhook_examples()[0])
         yield self.assertFailure(d, interface.NoSuchWebhookError)
@@ -694,7 +696,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         Updating a webhook works.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-        policy, = yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
 
         first, second = _webhook_examples()[:2]
         old, = yield group.create_webhooks(policy["id"], [first])
@@ -736,7 +738,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         is raised.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-        policy, = yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
         d = group.delete_webhook(policy["id"], b"BOGUS_WEBHOOK")
         yield self.assertFailure(d, interface.NoSuchWebhookError)
 
@@ -746,7 +748,7 @@ class SQLScalingGroupTests(_SQLiteTestMixin, _ConfigTestMixin, TestCase):
         Deleting a webhook works.
         """
         group, _cfg, _launch_cfg = yield self._create_group()
-        policy, = yield self._create_policies(group, n=1)
+        (policy,), _policy_cfgs = yield _create_policies(group, n=1)
         webhook_cfgs = [_webhook_examples()[0]]
         webhook, = yield group.create_webhooks(policy["id"], webhook_cfgs)
 
