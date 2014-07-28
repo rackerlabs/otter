@@ -1299,6 +1299,15 @@ def _count_policies(conn, group_id):
 
 
 def _count(conn, table, **kwargs):
+    """
+    Counts all the row in *table* with the exact pairs of column name
+    and values specified by *kwargs*.
+
+    :param conn: The database connection to use.
+    :param table: The table to count rows in.
+    :param kwargs: The names and values to match.
+    :return: (Deferred) count of the matched rows.
+    """
     d = conn.execute(table.select()
                      .where(and_(*[getattr(table.columns, col_name) == value
                                    for (col_name, value) in kwargs.items()]))
