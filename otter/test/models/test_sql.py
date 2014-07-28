@@ -817,6 +817,7 @@ class SQLScalingScheduleCollectionTests(_SQLiteTestMixin, _ConfigTestMixin, Test
         now = datetime.fromtimestamp(trigger)
 
         result, = yield self.sched.fetch_and_delete(0, now, size=2)
+        # REVIEW: should this actually include the trigger?
         expected = dict((k, v) for (k, v) in first.items() if k != "trigger")
         self.assertEqual(result, expected)
         # REVIEW: Could probably write a few more different tests.
