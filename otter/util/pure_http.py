@@ -13,7 +13,7 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 from otter.util import logging_treq
 from otter.util.fp import wrappers
-from otter.util.http import APIError, headers as otter_headers
+from otter.util.http import APIError
 
 
 @attributes(['method', 'url', 'headers', 'data', 'log'],
@@ -54,27 +54,28 @@ def request_with_auth(get_request, method, url, auth=None,
     error, a fresh token will be requested automatically.
 
     The given 'auth' argument should be a function that returns an Effect of
-    the auth token to use. Before the request is made, the auth function will
-    be called with no arguments to get the auth token to be used (which may be
-    cached). If the application request fails with an auth-related error, the
-    auth function will be invoked again, with a refresh=True argument. In this
-    case, a new token must be retrieved from the authentication server.
+    authentication headers to add to the request. Before the request is made,
+    the auth function will be called with no arguments to get the auth token to
+    be used (which may be cached). If the application request fails with an
+    auth-related error, the auth function will be invoked again, with a
+    refresh=True argument. In this case, new authentication information should
+    be retrieved from the authentication service, if necessary.
 
-    If refreshing an auth token returns successfully, a NoResponseError
-    exception will be raised. If it results in an error, that error will be
-    propagated to the Effect that this function returns.
+    If refreshing auth information returns successfully, the original response
+    will be returned. If it results in an error, that error will be
+    propagated.
     """
 
     def handle_reauth(result):
         response, content = result
         if response.code in reauth_codes:
-            return auth(refresh=True).on(success=lambda ignored: result)
+            return auth(refresh=True).on(success=lambda headers: result)
         else:
             return result
 
-    def try_request(token):
+    def try_request(auth_headers):
         req_headers = {} if headers is None else headers
-        req_headers = merge(req_headers, otter_headers(token))
+        req_headers = merge(req_headers, auth_headers)
         eff = get_request(method, url, headers=req_headers, **kwargs)
         return eff.on(success=lambda r: handle_reauth(r))
 

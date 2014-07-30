@@ -54,7 +54,7 @@ class PureHTTPClientTests(TestCase):
     def _no_reauth_client(self):
         def auth(refresh=False):
             assert not refresh
-            return Effect(StubIntent("my-token"))
+            return Effect(StubIntent(headers("my-token")))
         return lambda *args, **kwargs: resolve_stubs(request(*args, auth=auth, **kwargs))
 
     def test_json_request(self):
@@ -147,13 +147,13 @@ class PureHTTPClientTests(TestCase):
         return self._test_reauth(500, reauth_codes=(401, 403, 500))
 
     def _test_reauth(self, code, reauth_codes=None):
-        reauth_effect = Effect(StubIntent("new-token"))
+        reauth_effect = Effect(StubIntent(headers("new-token")))
 
         def auth(refresh=False):
             if refresh:
                 return reauth_effect
             else:
-                return Effect(StubIntent("first-token"))
+                return Effect(StubIntent(headers("first-token")))
         # First we try to make a simple request.
         kwargs = {}
         if reauth_codes is not None:
