@@ -1,6 +1,5 @@
 """Tests for otter.util.pure_http"""
 
-from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from testtools import TestCase
