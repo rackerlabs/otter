@@ -16,7 +16,7 @@ from otter.util.http import (
     raise_error_on_code, wrap_request_error, RequestError, UpstreamError)
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
-from otter.util.deferredutils import with_lock, delay
+from otter.util.deferredutils import with_lock, delay, TimedOutError
 
 from otter.test.utils import (
     patch, LockMixin, mock_log, DummyException, IsBoundWith, matches)
@@ -416,7 +416,13 @@ class WithLockTests(SynchronousTestCase):
         Mock reactor, log and method
         """
         self.lock = LockMixin().mock_lock()
-        self.method = mock.Mock(return_value=succeed('result'))
+        self.acquire_d, self.release_d = Deferred(), Deferred()
+        self.lock.acquire.side_effect = lambda: self.acquire_d
+        self.lock.release.side_effect = lambda: self.release_d
+
+        self.method_d = Deferred()
+        self.method = mock.Mock(return_value=self.method_d)
+
         self.reactor = Clock()
         self.log = mock_log()
 
@@ -424,24 +430,39 @@ class WithLockTests(SynchronousTestCase):
         """
         Acquires, calls method, releases and returns method's result. Logs time taken
         """
-        acquire_d, release_d = Deferred(), Deferred()
-        self.lock.acquire.side_effect = lambda: acquire_d
-        self.lock.release.side_effect = lambda: release_d
+        d = with_lock(self.reactor, self.lock, self.method, self.log)
+        self.assertNoResult(d)
+        self.log.msg.assert_called_once_with('Starting lock acquisition')
 
-        d = with_lock(self.reactor, self.lock, self.log, self.method, 2, a=3)
+        self.reactor.advance(10)
+        self.acquire_d.callback(None)
+        self.log.msg.assert_called_with('Lock acquisition in 10.0 seconds',
+                                        acquire_time=10.0)
+        self.method.assert_called_once_with()
+        self.method_d.callback('result')
+
+        self.log.msg.assert_called_with('Starting lock release')
+        self.reactor.advance(3)
+        self.release_d.callback(None)
+        self.log.msg.assert_called_with('Lock release in 3.0 seconds',
+                                        release_time=3.0)
+
+        self.assertEqual(self.successResultOf(d), 'result')
+
+    def test_acquire_release_no_log(self):
+        """
+        Acquires, calls method and releases even if log is None
+        """
+        d = with_lock(self.reactor, self.lock, self.method)
         self.assertNoResult(d)
 
         self.reactor.advance(10)
-        acquire_d.callback(None)
-        self.log.msg.assert_called_once_with('Lock acquisition in 10.0 seconds',
-                                             acquire_time=10.0)
-        self.method.assert_called_once_with(2, a=3)
+        self.acquire_d.callback(None)
+        self.method.assert_called_once_with()
+        self.method_d.callback('result')
 
         self.reactor.advance(3)
-        release_d.callback(None)
-        self.log.msg.assert_called_with('Lock release in 3.0 seconds',
-                                        release_time=3.0)
-        self.assertEqual(self.log.msg.call_count, 2)
+        self.release_d.callback(None)
 
         self.assertEqual(self.successResultOf(d), 'result')
 
@@ -449,44 +470,74 @@ class WithLockTests(SynchronousTestCase):
         """
         If acquire fails, method and release is not called. Acquisition failed is logged
         """
-        acquire_d = Deferred()
-        self.lock.acquire.side_effect = lambda: acquire_d
-
-        d = with_lock(self.reactor, self.lock, self.log, self.method, 2, a=3)
+        d = with_lock(self.reactor, self.lock, self.method, self.log)
         self.assertNoResult(d)
+        self.log.msg.assert_called_once_with('Starting lock acquisition')
 
         self.reactor.advance(10)
-        acquire_d.errback(ValueError(None))
-        self.log.msg.assert_called_once_with('Lock acquisition failed in 10.0 seconds')
+        self.acquire_d.errback(ValueError(None))
+        self.log.msg.assert_called_with('Lock acquisition failed in 10.0 seconds')
         self.assertFalse(self.method.called)
         self.failureResultOf(d, ValueError)
 
-    def test_methods_failure(self):
+    def test_method_failure(self):
         """
         If method fails, lock is released and failure is propogated
         Acquisition and release is logged with time taken
         """
-        acquire_d, release_d = Deferred(), Deferred()
-        self.lock.acquire.side_effect = lambda: acquire_d
-        self.lock.release.side_effect = lambda: release_d
         self.method.return_value = fail(ValueError('a'))
 
-        d = with_lock(self.reactor, self.lock, self.log, self.method, 2, a=3)
+        d = with_lock(self.reactor, self.lock, self.method, self.log)
         self.assertNoResult(d)
+        self.log.msg.assert_called_once_with('Starting lock acquisition')
 
         self.reactor.advance(10)
-        acquire_d.callback(None)
-        self.log.msg.assert_called_once_with('Lock acquisition in 10.0 seconds',
-                                             acquire_time=10.0)
-        self.method.assert_called_once_with(2, a=3)
+        self.acquire_d.callback(None)
+        self.assertEqual(
+            self.log.msg.mock_calls[-2:],
+            [mock.call('Lock acquisition in 10.0 seconds', acquire_time=10.0),
+             mock.call('Starting lock release')])
+        self.method.assert_called_once_with()
 
         self.reactor.advance(3)
-        release_d.callback(None)
+        self.release_d.callback(None)
         self.log.msg.assert_called_with('Lock release in 3.0 seconds',
                                         release_time=3.0)
-        self.assertEqual(self.log.msg.call_count, 2)
 
         self.failureResultOf(d, ValueError)
+
+    def test_acquire_timeout(self):
+        """
+        acquire is timed out if it does not succeed in a given time
+        """
+        d = with_lock(self.reactor, self.lock, self.method, self.log,
+                      acquire_timeout=9)
+        self.assertNoResult(d)
+        self.log.msg.assert_called_once_with('Starting lock acquisition')
+
+        self.reactor.advance(10)
+        f = self.failureResultOf(d, TimedOutError)
+        self.assertEqual(f.value.message, 'Lock acquisition timed out after 9 seconds.')
+        self.log.msg.assert_called_with('Lock acquisition failed in 10.0 seconds')
+
+        self.assertFalse(self.method.called)
+        self.assertFalse(self.lock.release.called)
+
+    def test_release_timeout(self):
+        """
+        release is timed out if it does not succeed in a given time
+        """
+        d = with_lock(self.reactor, self.lock, self.method, self.log,
+                      release_timeout=9)
+        self.acquire_d.callback(None)
+
+        self.method.assert_called_once_with()
+        self.method_d.callback('result')
+        self.lock.release.assert_called_once_with()
+
+        self.reactor.advance(10)
+        f = self.failureResultOf(d, TimedOutError)
+        self.assertEqual(f.value.message, 'Lock release timed out after 9 seconds.')
 
 
 class DelayTests(SynchronousTestCase):
