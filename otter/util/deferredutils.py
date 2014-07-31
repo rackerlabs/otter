@@ -181,6 +181,12 @@ class DeferredPool(object):
         """
         return len(self._pool)
 
+    def __contains__(self, deferred):
+        """
+        Return True if given deferred is in the pool. False if not
+        """
+        return deferred in self._pool
+
 
 def log_with_time(result, reactor, log, start, msg, time_kwarg=None):
     """
