@@ -12,12 +12,14 @@ from zope.interface import implementer, directlyProvides
 from testtools.matchers import Mismatch
 
 from twisted.internet import defer
-from twisted.internet.defer import succeed, Deferred
+from twisted.internet.defer import succeed, Deferred, maybeDeferred
 from twisted.python.failure import Failure
 from twisted.application.service import Service
 
 from otter.log.bound import BoundLog
 from otter.supervisor import ISupervisor
+from otter.models.interface import IScalingGroup
+from otter.util.deferredutils import DeferredPool
 
 
 class matches(object):
@@ -379,7 +381,7 @@ class FakeSupervisor(object, Service):
 
     def __init__(self, *args):
         self.args = args
-        self.index = 0
+        self.deferred_pool = DeferredPool()
         self.exec_calls = []
         self.exec_defs = []
         self.del_index = 0
@@ -389,11 +391,9 @@ class FakeSupervisor(object, Service):
         """
         Execute single launch config
         """
-        self.index += 1
         self.exec_calls.append((log, transaction_id, scaling_group, launch_config))
-        d = Deferred()
-        self.exec_defs.append(d)
-        return succeed((self.index, d))
+        self.exec_defs.append(Deferred())
+        return self.exec_defs[-1]
 
     def execute_delete_server(self, log, transaction_id, scaling_group, server):
         """
@@ -402,3 +402,26 @@ class FakeSupervisor(object, Service):
         self.del_index += 1
         self.del_calls.append((log, transaction_id, scaling_group, server))
         return succeed(self.del_index)
+
+
+def mock_group(state, tenant_id='tenant', group_id='group'):
+    """
+    Return mocked `IScalingGroup` that has tunable `modify_state` method
+
+    :param state: This will be passed to `modify_state` callable
+    """
+    group = iMock(IScalingGroup, tenant_id=tenant_id, uuid=group_id)
+    group.pause_modify_state = False
+    group.modify_state_values = []
+
+    def fake_modify_state(f, *args, **kwargs):
+        d = maybeDeferred(f, group, state, *args, **kwargs)
+        d.addCallback(lambda r: group.modify_state_values.append(r) or r)
+        if group.pause_modify_state:
+            group.modify_state_pause_d = Deferred()
+            return group.modify_state_pause_d.addCallback(lambda _: d)
+        else:
+            return d
+
+    group.modify_state.side_effect = fake_modify_state
+    return group
