@@ -713,8 +713,8 @@ class CassScalingGroup(object):
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         local_lock = self.local_locks.get_lock(self.uuid)
-        return local_lock.run(with_lock, self.reactor, lock,
-                              log.bind(category='locking'), _modify_state)
+        return local_lock.run(with_lock, self.reactor, lock, _modify_state,
+                              log.bind(category='locking'), acquire_timeout=150)
 
     def update_config(self, data):
         """
@@ -1103,7 +1103,8 @@ class CassScalingGroup(object):
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
-        return with_lock(self.reactor, lock, log.bind(category='locking'), _delete_group)
+        return with_lock(self.reactor, lock, _delete_group, log.bind(category='locking'),
+                         acquire_timeout=150)
 
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
@@ -1431,8 +1432,8 @@ class CassScalingGroupCollection:
         lock = self.kz_client.Lock(lock_path)
         lock.acquire = functools.partial(lock.acquire, timeout=5)
         start_time = self.reactor.seconds()
-        d = with_lock(self.reactor, lock,
-                      otter_log.bind(system='health_check'), lambda: None)
+        d = with_lock(self.reactor, lock, lambda: None,
+                      otter_log.bind(system='health_check'))
 
         d.addCallback(lambda _: self.kz_client.delete(lock_path, recursive=True))
         d.addCallback(lambda _: (True, {'total_time': self.reactor.seconds() - start_time}))
