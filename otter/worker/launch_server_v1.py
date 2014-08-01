@@ -541,11 +541,14 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
             server_id)
 
     def add_lb(server):
-        ip_address = private_ip_addresses(server)[0]
-        lbd = add_to_load_balancers(
-            ilog[0], lb_endpoint, auth_token, lb_config, ip_address, undo)
-        lbd.addCallback(lambda lb_response: (server, lb_response))
-        return lbd
+        if lb_config:
+            ip_address = private_ip_addresses(server)[0]
+            lbd = add_to_load_balancers(
+                ilog[0], lb_endpoint, auth_token, lb_config, ip_address, undo)
+            lbd.addCallback(lambda lb_response: (server, lb_response))
+            return lbd
+
+        return (server, [])
 
     def _create_server():
         d = create_server(server_endpoint, auth_token, server_config, log=log)

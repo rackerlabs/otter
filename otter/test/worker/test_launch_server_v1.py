@@ -1266,6 +1266,41 @@ class ServerTests(SynchronousTestCase):
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_server_doesnt_check_networks_if_no_load_balancers(
+            self, wait_for_active, create_server, add_to_load_balancers):
+        """
+        :func:`launch_server` will succeed at launching a server that has no
+        servicenet configured, so long as it also does not require load
+        balancers
+        """
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'}}
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'public': [{'version': 4, 'addr': '10.0.0.1'}]}
+            }
+        }
+
+        create_server.return_value = succeed(server_details)
+        wait_for_active.return_value = succeed(server_details)
+
+        log = mock.Mock()
+        d = launch_server(log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo)
+
+        result = self.successResultOf(d)
+        self.assertEqual(result, (server_details, []))
+
+        self.assertFalse(add_to_load_balancers.called)
+
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
     def test_launch_server_propagates_create_server_errors(
             self, wait_for_active, create_server, add_to_load_balancers):
         """
@@ -1336,8 +1371,10 @@ class ServerTests(SynchronousTestCase):
         """
         launch_server will propagate any errors from add_to_load_balancers.
         """
-        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
-                         'loadBalancers': []}
+        launch_config = {
+            'server': {'imageRef': '1', 'flavorRef': '1'},
+            'loadBalancers': [{'loadBalancerId': 12345, 'port': 80}]
+        }
 
         server_details = {
             'server': {
