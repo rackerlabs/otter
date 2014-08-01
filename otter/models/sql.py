@@ -84,6 +84,8 @@ class SQLScalingGroup(object):
         """
         See :meth:`~iface.IScalingGroup.view_manifest`.
         """
+        # REVIEW: This doesn't actually have to use @inlineCallbacks
+        # anymore
         group_configuration = yield self._get_config(conn)
         launch_configuration = yield self._get_launch_config(conn)
         scaling_policies = yield self.list_policies()
