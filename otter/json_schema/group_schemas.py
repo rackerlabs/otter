@@ -93,7 +93,8 @@ server = {
                 }
             },
             "required": False
-        }
+        },
+        "metadata": {"type": "object", "required": False}
     },
     "required": True
 }

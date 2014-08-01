@@ -272,6 +272,34 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
         self.assertRaisesRegexp(ValidationError, 'not of type',
                                 validate, invalid, group_schemas.launch_config)
 
+    def test_null_metadata_invalid(self):
+        """
+        metadata with None in it is not allowed
+        """
+        config = deepcopy(group_examples.launch_server_config()[0])
+        config['args']['server']['metadata'] = None
+        self.assertRaisesRegexp(
+            ValidationError, "None is not of type 'object'",
+            validate, config, group_schemas.launch_server)
+
+    def test_array_metadata_invalid(self):
+        """
+        metadata with array in it is not allowed
+        """
+        config = deepcopy(group_examples.launch_server_config()[0])
+        config['args']['server']['metadata'] = []
+        self.assertRaisesRegexp(
+            ValidationError, "\[\] is not of type 'object'",
+            validate, config, group_schemas.launch_server)
+
+    def test_no_metadata_valid(self):
+        """
+        No metadata in launch config is valid
+        """
+        config = deepcopy(group_examples.launch_server_config()[0])
+        del config['args']['server']['metadata']
+        validate(config, group_schemas.launch_server)
+
 
 class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
     """
