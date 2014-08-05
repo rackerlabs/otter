@@ -1037,7 +1037,9 @@ class ServerTests(SynchronousTestCase):
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
 
-        self.assertEqual(len(fs.mock_calls), 1)
+        self.assertEqual(fs.mock_calls,
+                         [mock.call('http://url/', 'my-auth-token', {},
+                                    log=self.log)])
 
     @mock.patch('otter.worker.launch_server_v1.find_server')
     def test_create_server_retries_if_no_server_found(self, fs):
@@ -1084,7 +1086,10 @@ class ServerTests(SynchronousTestCase):
                           clock=clock, _treq=_treq)
         clock.advance(15)
 
-        self.failureResultOf(d)
+        failure = self.failureResultOf(d, RequestError)
+        self.assertTrue(failure.value.reason.check(APIError))
+        real_failure = failure.value.reason
+        self.assertEqual(real_failure.value.code, 400)
         self.assertFalse(fs.called)
 
     @mock.patch('otter.worker.launch_server_v1.server_details')

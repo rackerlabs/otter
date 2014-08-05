@@ -247,7 +247,7 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
     """
     Create a new server.  If there is an error from Nova from this call,
     checks to see if the server was created anyway.  If not, will retry the
-    create ``retry_times`` (checking each time if a server).
+    create ``retries`` times (checking each time if a server).
 
     If the error from Nova is a 400, does not retry, because that implies that
     retrying will just result in another 400 (bad args).
