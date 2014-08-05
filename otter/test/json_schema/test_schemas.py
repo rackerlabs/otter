@@ -300,6 +300,28 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
         del config['args']['server']['metadata']
         validate(config, group_schemas.launch_server)
 
+    def test_special_char_metadata_invalid(self):
+        """
+        metadata with special character in launch config is valid
+        """
+        invalid = deepcopy(group_examples.launch_server_config()[0])
+        invalid['args']['server']['metadata'] = {'anc%': 'ag'}
+        self.assertRaises(ValidationError, validate, invalid,
+                          group_schemas.launch_server)
+
+    def test_more255_metadata_invalid(self):
+        """
+        metadata with key or value > 255 in launch config is valid
+        """
+        invalid = deepcopy(group_examples.launch_server_config()[0])
+        invalid['args']['server']['metadata'] = {'ab' * 150: 'ag'}
+        self.assertRaises(ValidationError, validate, invalid,
+                          group_schemas.launch_server)
+
+        invalid['args']['server']['metadata'] = {'ab': 'ag' * 150}
+        self.assertRaises(ValidationError, validate, invalid,
+                          group_schemas.launch_server)
+
 
 class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
     """
