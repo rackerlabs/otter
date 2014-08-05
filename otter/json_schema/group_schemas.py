@@ -98,7 +98,7 @@ server = {
             # TODO: Taken from Nova's validation code at
             # https://github.com/openstack/nova/blob/master/nova/api/validation/parameter_types.py#L83.
             # It will be ideal to import nova package and use their schema but their
-            # schema is fully complete and there are lots of dependencies when trying to
+            # schema is not fully complete and there are lots of dependencies when trying to
             # install nova package
             "type": "object",
             "patternProperties": {
