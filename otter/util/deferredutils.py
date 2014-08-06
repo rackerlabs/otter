@@ -208,25 +208,34 @@ def log_with_time(result, reactor, log, start, msg, time_kwarg=None):
     return result
 
 
-def with_lock(reactor, lock, log, func, *args, **kwargs):
+def with_lock(reactor, lock, func, log=None, acquire_timeout=None, release_timeout=None):
     """
     Context manager for any lock object that contains acquire() and release() methods
     """
-
+    if log:
+        log.msg('Starting lock acquisition')
     d = defer.maybeDeferred(lock.acquire)
-    d.addCallback(log_with_time, reactor, log, reactor.seconds(),
-                  'Lock acquisition', 'acquire_time')
-    d.addErrback(log_with_time, reactor, log, reactor.seconds(),
-                 'Lock acquisition failed')
+    if acquire_timeout is not None:
+        timeout_deferred(d, acquire_timeout, reactor, 'Lock acquisition')
+    if log:
+        d.addCallback(log_with_time, reactor, log, reactor.seconds(),
+                      'Lock acquisition', 'acquire_time')
+        d.addErrback(log_with_time, reactor, log, reactor.seconds(),
+                     'Lock acquisition failed')
 
     def release_lock(result):
+        if log:
+            log.msg('Starting lock release')
         d = defer.maybeDeferred(lock.release)
-        d.addCallback(
-            log_with_time, reactor, log, reactor.seconds(), 'Lock release', 'release_time')
+        if release_timeout is not None:
+            timeout_deferred(d, release_timeout, reactor, 'Lock release')
+        if log:
+            d.addCallback(
+                log_with_time, reactor, log, reactor.seconds(), 'Lock release', 'release_time')
         return d.addCallback(lambda _: result)
 
     def lock_acquired(_):
-        d = defer.maybeDeferred(func, *args, **kwargs).addBoth(release_lock)
+        d = defer.maybeDeferred(func).addBoth(release_lock)
         return d
 
     d.addCallback(lock_acquired)
