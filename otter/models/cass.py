@@ -714,7 +714,8 @@ class CassScalingGroup(object):
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         local_lock = self.local_locks.get_lock(self.uuid)
         return local_lock.run(with_lock, self.reactor, lock, _modify_state,
-                              log.bind(category='locking'), acquire_timeout=150)
+                              log.bind(category='locking'), acquire_timeout=150,
+                              release_timeout=30)
 
     def update_config(self, data):
         """
@@ -1109,7 +1110,7 @@ class CassScalingGroup(object):
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         d = with_lock(self.reactor, lock, _delete_group, log.bind(category='locking'),
-                      acquire_timeout=150)
+                      acquire_timeout=150, release_timeout=30)
         # Cleanup /locks/<groupID> znode as it will not be required anymore
         d.addCallback(_delete_lock_znode)
         return d
