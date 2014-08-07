@@ -42,4 +42,3 @@ class GroupFixtureNovaFailures(AutoscaleFixture):
         time.sleep(1)
 
         self.wait_for_expected_group_state(group.id, 0)
-
