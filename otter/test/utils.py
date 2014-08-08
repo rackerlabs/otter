@@ -277,6 +277,21 @@ def stub_pure_response(body, code=200, response_headers=None):
     return (StubResponse(code, response_headers), body)
 
 
+def headers_to_hashable(headers):
+    """
+    Turns a :class:`twisted.web.http.Headers` object and turns it into
+    something hashable.
+
+    :return:  a :obj:`tuple` of keys and values, the values being :obj:`tuples`
+        themselves.
+    """
+    if headers is not None:
+        return tuple(sorted(
+            [(k, tuple(sorted(v))) for k, v in headers.items()]
+        ))
+    return headers
+
+
 class StubTreq(object):
     """
     A stub version of otter.utils.logging_treq that returns canned responses
@@ -297,11 +312,6 @@ class StubTreq(object):
         self.reqs = reqs
         self.contents = contents
 
-    def _headers_to_tuple(self, headers):
-        if headers is not None:
-            return tuple(sorted(headers.items()))
-        return headers
-
     def request(self, method, url, **kwargs):
         """
         Return a result by looking up the arguments in the `reqs` dict.
@@ -313,9 +323,9 @@ class StubTreq(object):
         should be immutable, and it's hard to get the exact instance of
         BoundLog, that's being ignored for now.
         """
-        return succeed(self.reqs[
-            (method, url, self._headers_to_tuple(kwargs.pop('headers', None)),
-             kwargs.pop('data', None), tuple(kwargs.keys()))])
+        key = (method, url, headers_to_hashable(kwargs.pop('headers', None)),
+               kwargs.pop('data', None), tuple(kwargs.keys()))
+        return succeed(self.reqs[key])
 
     def content(self, response):
         """Return a result by looking up the response in the `contents` dict."""
