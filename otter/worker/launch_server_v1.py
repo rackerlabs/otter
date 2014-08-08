@@ -190,12 +190,10 @@ def find_server(server_endpoint, auth_token, server_config, log=None):
         None if none matches
     :raises: :class:`ServerCreationRetryError`
     """
-    server_info = server_config['server']
-
     query_params = {
-        'image': server_info['imageRef'],
-        'flavor': server_info['flavorRef'],
-        'name': '^{0}$'.format(re.escape(server_info['name']))
+        'image': server_config['imageRef'],
+        'flavor': server_config['flavorRef'],
+        'name': '^{0}$'.format(re.escape(server_config['name']))
     }
     url = '{path}?{query}'.format(
         path=append_segments(server_endpoint, 'servers', 'detail'),
@@ -208,18 +206,18 @@ def find_server(server_endpoint, auth_token, server_config, log=None):
             raise ServerCreationRetryError(
                 "Nova returned {0} servers that match the same "
                 "image/flavor and name {1}.".format(
-                    len(nova_servers), server_info['name']))
+                    len(nova_servers), server_config['name']))
 
         elif len(nova_servers) == 1:
             nova_server = list_server_details['servers'][0]
 
-            if nova_server['metadata'] != server_info['metadata']:
+            if nova_server['metadata'] != server_config['metadata']:
                 raise ServerCreationRetryError(
                     "Nova found a server of the right name ({name}) but wrong "
                     "metadata. Expected {expected_metadata} and got {nova_metadata}"
-                    .format(expected_metadata=server_info['metadata'],
+                    .format(expected_metadata=server_config['metadata'],
                             nova_metadata=nova_server['metadata'],
-                            name=server_info['name']))
+                            name=server_config['name']))
 
             return {'server': nova_server}
 

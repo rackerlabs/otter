@@ -797,12 +797,10 @@ class ServerTests(SynchronousTestCase):
         filtering on the image id, flavor id, and exact name in the server
         config.
         """
-        server_config = {'server': _get_server_info()}
-
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({"servers": []})
 
-        find_server('http://url/', 'my-auth-token', server_config)
+        find_server('http://url/', 'my-auth-token', _get_server_info())
 
         url = urlunsplit([
             'http', 'url', 'servers/detail',
@@ -817,8 +815,8 @@ class ServerTests(SynchronousTestCase):
         :func:`find_server` when giving the exact name of the server,
         regex-escapes the name
         """
-        server_config = {'server': _get_server_info()}
-        server_config['server']['name'] = r"this.is[]regex\dangerous()*"
+        server_config = _get_server_info()
+        server_config['name'] = r"this.is[]regex\dangerous()*"
 
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({"servers": []})
@@ -838,12 +836,10 @@ class ServerTests(SynchronousTestCase):
         """
         :func:`find_server` propagates any errors from Nova
         """
-        server_config = {'server': _get_server_info()}
-
         self.treq.get.return_value = succeed(mock.Mock(code=500))
         self.treq.content.return_value = succeed(error_body)
 
-        d = find_server('http://url/', 'my-auth-token', server_config)
+        d = find_server('http://url/', 'my-auth-token', _get_server_info())
         failure = self.failureResultOf(d, APIError)
         self.assertEqual(failure.value.code, 500)
 
@@ -852,12 +848,10 @@ class ServerTests(SynchronousTestCase):
         :func:`find_server` will return None for servers if Nova returns no
         matching servers
         """
-        server_config = {'server': _get_server_info()}
-
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({"servers": []})
 
-        d = find_server('http://url/', 'my-auth-token', server_config)
+        d = find_server('http://url/', 'my-auth-token', _get_server_info())
         self.assertIsNone(self.successResultOf(d))
 
     def test_find_server_raises_if_server_from_nova_has_wrong_metadata(self):
@@ -865,14 +859,12 @@ class ServerTests(SynchronousTestCase):
         :func:`find_server` will fail if the server Nova returned does not have
         matching metadata
         """
-        server_config = {'server': _get_server_info()}
-
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({
             'servers': [_get_server_info(metadata={'hello': 'there'})]
         })
 
-        d = find_server('http://url/', 'my-auth-token', server_config)
+        d = find_server('http://url/', 'my-auth-token', _get_server_info())
         self.failureResultOf(d, ServerCreationRetryError)
 
     def test_find_server_returns_match_from_nova(self):
@@ -880,12 +872,12 @@ class ServerTests(SynchronousTestCase):
         :func:`find_server` will return a server returned from Nova if the
         metadata match.
         """
-        server_config = {'server': _get_server_info(metadata={'hey': 'there'})}
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed(
             {'servers': [_get_server_info(metadata={'hey': 'there'})]})
 
-        d = find_server('http://url/', 'my-auth-token', server_config)
+        d = find_server('http://url/', 'my-auth-token',
+                        _get_server_info(metadata={'hey': 'there'}))
 
         self.assertEqual(
             self.successResultOf(d),
@@ -896,7 +888,6 @@ class ServerTests(SynchronousTestCase):
         :func:`find_server` will return a the first server returned from Nova
         whose metadata match.  It logs if there more than 1 server from Nova.
         """
-        server_config = {'server': _get_server_info()}
         servers = [
             _get_server_info(created='2014-04-04T04:04:04Z'),
             _get_server_info(created='2014-04-04T04:04:05Z'),
@@ -905,7 +896,7 @@ class ServerTests(SynchronousTestCase):
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({'servers': servers})
 
-        d = find_server('http://url/', 'my-auth-token', server_config,
+        d = find_server('http://url/', 'my-auth-token', _get_server_info(),
                         self.log)
 
         self.failureResultOf(d, ServerCreationRetryError)
