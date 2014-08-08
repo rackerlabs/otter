@@ -25,6 +25,7 @@ from urllib import urlencode
 
 from twisted.python.failure import Failure
 from twisted.internet.defer import gatherResults, maybeDeferred, DeferredSemaphore
+from twisted.internet.task import deferLater
 
 from otter.util import logging_treq as treq
 
@@ -241,7 +242,7 @@ class _NoCreatedServerFound(Exception):
 
 
 def create_server(server_endpoint, auth_token, server_config, log=None,
-                  clock=None, retries=3, _treq=None):
+                  clock=None, retries=3, create_failure_delay=5, _treq=None):
     """
     Create a new server.  If there is an error from Nova from this call,
     checks to see if the server was created anyway.  If not, will retry the
@@ -257,6 +258,9 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
     :param str auth_token: Keystone Auth Token.
     :param dict server_config: Nova server config.
     :param: int retries: Number of tries to retry the create.
+    :param: int create_failure_delay: how much time in seconds to wait after
+        a create server failure before checking Nova to see if a server
+        was created
 
     :param log: logger
     :type log: :class:`otter.log.bound.BoundLog`
@@ -302,7 +306,8 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
         if f.value.code == 400:
             return f
 
-        d = find_server(server_endpoint, auth_token, server_config, log=log)
+        d = deferLater(clock, create_failure_delay, find_server,
+                       server_endpoint, auth_token, server_config, log=log)
         d.addBoth(_check_results, f)
         return d
 

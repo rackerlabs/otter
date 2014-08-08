@@ -966,12 +966,15 @@ class ServerTests(SynchronousTestCase):
                json.dumps({'server': {}}), ("log",))
         resp = StubResponse(500, {})
 
+        clock = Clock()
         _treq = StubTreq({req: resp}, {resp: 'failure'})
 
         fs.return_value = fail(APIError(401, '', {}))
 
         d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
-                          retries=0, _treq=_treq)
+                          retries=0, _treq=_treq, clock=clock,
+                          create_failure_delay=5)
+        clock.advance(5)
 
         failure = self.failureResultOf(d, RequestError)
         real_failure = failure.value.reason
@@ -993,12 +996,16 @@ class ServerTests(SynchronousTestCase):
                json.dumps({'server': {'some': 'stuff'}}), ("log",))
         resp = StubResponse(500, {})
 
+        clock = Clock()
         _treq = StubTreq({req: resp}, {resp: 'failure'})
 
         fs.return_value = succeed("I'm a server!")
 
         d = create_server('http://url/', 'my-auth-token', {'some': 'stuff'},
-                          _treq=_treq)
+                          _treq=_treq, create_failure_delay=5, clock=clock)
+        self.assertNoResult(d)
+
+        clock.advance(5)
 
         result = self.successResultOf(d)
         self.assertEqual(result, "I'm a server!")
@@ -1015,12 +1022,16 @@ class ServerTests(SynchronousTestCase):
                json.dumps({'server': {}}), ("log",))
         resp = StubResponse(500, {})
 
+        clock = Clock()
         _treq = StubTreq({req: resp}, {resp: 'failure'})
 
         fs.return_value = succeed(None)
 
         d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
-                          retries=0, _treq=_treq)
+                          retries=0, _treq=_treq, clock=clock,
+                          create_failure_delay=5)
+        self.assertNoResult(d)
+        clock.advance(5)
 
         failure = self.failureResultOf(d, RequestError)
         real_failure = failure.value.reason
@@ -1050,11 +1061,12 @@ class ServerTests(SynchronousTestCase):
 
         clock = Clock()
         d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
-                          clock=clock, _treq=_treq)
+                          clock=clock, _treq=_treq, create_failure_delay=5)
+        clock.advance(5)
 
         for i in range(3):
             self.assertEqual(len(fs.mock_calls), i + 1)
-            clock.advance(15)
+            clock.pump([15, 5])
 
         self.failureResultOf(d)
         self.assertEqual(len(fs.mock_calls), 4)
