@@ -14,7 +14,6 @@ testtools==0.9.32
 croniter==0.3.3
 txkazoo==0.0.5
 
-# pinning dependencies of dependencies
 
 Werkzeug==0.9.3
 argparse==1.2.1
