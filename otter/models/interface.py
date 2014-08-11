@@ -567,57 +567,86 @@ class IScalingGroupServersCollection(Interface):
     Collection of servers intended to be there in a scaling group. Each server in the
     this group should eventually match to a real server in Nova. All operations on this
     model will not have any impact on real Nova servers. It is the caller's responsibility
-    to sync them (if needed)
+    to sync them (if needed).
     """
 
     def create_server_intent(log, status='pending'):
         """
         Create server intended to be there in scaling group
 
-        :param `BoungLog` log: A bound logger
+        :param :class:`BoungLog` log: A bound logger
         :param str status: status of the server. one of 'pending' or 'active'
 
-        :return: a dictionary of server with `id` in it
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
+                corresponding with :data:`otter.json_schema.model_schemas.server`
         :raises NoSuchScalingGroupError: if this scaling group does not exist
         """
 
     def update_server_intent(log, server_intent_id, nova_id, status, lb_info):
         """
         Update existing server intent information
-        TODO: Should it take dict returned from create_server as arg instead?
 
+        :param :class:`BoungLog` log: A bound logger
         :param str server_intent_id: ID of server intent
+        :param str nova_id: Server ID of corresponding Nova instance
+        :param str status: server status. One of 'pending' or 'active'
+        :param `dict` lb_info: Load balancer information dict. This will be stored as JSON
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
         :raises NoSuchScalingGroupError: if this scaling group does not exist
-        :raises NoSuchServerError: if the server id does not exist
+        :raises NoSuchServerError: if the server intent id does not exist
         """
 
     def list_server_intents(log, status=None, limit=100, marker=None):
         """
         List the server intents in the scaling group optionally filtered based on status
 
-        :return: a ``list`` of server ``dict`` with `id` in it
+        :param :class:`BoungLog` log: A bound logger
+        :param str status: server status. One of 'pending' or 'active'
+        :param int limit: Limit number of server intents to return
+        :param str marker: Marker from which to fetch servers
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with `list` of
+                server `dict` each correspondgin with
+                :data:`otter.json_schema.model_schemas.server`
+
+        :raises NoSuchScalingGroupError: if this scaling group does not exist
         """
 
     def get_server_intent(log, server_intent_id):
         """
         Get server intent from scaling group
+
+        :param :class:`BoungLog` log: A bound logger
+        :param str server_intent_id: ID of server intent being requested
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with
+                 server `dict` correspondgin with
+                :data:`otter.json_schema.model_schemas.server`
+
+        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        :raises NoSuchServerError: if the server intent id does not exist
         """
 
-    def delete_server_intent(log, server_id):
+    def delete_server_intent(log, server_intent_id):
         """
         Remove single server intent from scaling group
+
+        :param :class:`BoungLog` log: A bound logger
+        :param str server_intent_id: ID of server intent being deleted
 
         :raises NoSuchScalingGroupError: if this scaling group does not exist
         :raises NoSuchServerError: if the server id does not exist
         """
 
-    def delete_servers(log, server_ids):
+    def delete_servers(log, server_intent_ids):
         """
         Remove server intents from scaling group
 
+        :param :class:`BoungLog` log: A bound logger
         :param list server_intent_ids: List of server intent IDs to be deleted
+
         :raises NoSuchScalingGroupError: if this scaling group does not exist
         TODO: What about `NoSuchServerError`?
         """

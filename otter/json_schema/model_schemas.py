@@ -25,6 +25,18 @@ _id = {
 }
 
 
+def array_type(schema):
+    """
+    Return array type of given object schema
+    """
+    return {
+        "type": "array",
+        "items": schema,
+        "uniqueItems": True,
+        "required": True
+    }
+
+
 webhook = deepcopy(group_schemas.webhook)
 webhook['properties']['id'] = _id
 webhook['properties']['metadata']['required'] = True
@@ -49,13 +61,7 @@ webhook['properties']['capability'] = {
 }
 webhook['required'] = True
 
-webhook_list = {
-    "type": "array",
-    "items": webhook,
-    "uniqueItems": True,
-    "required": True
-}
-
+webhook_list = array_type(webhook)
 
 policy = deepcopy(group_schemas.policy)
 policy['properties']['id'] = _id
@@ -64,12 +70,7 @@ for _policy_type in policy['type']:
     _policy_type['properties']['webhooks'] = webhook_list
     _policy_type['properties']['webhooks']['required'] = False
 
-policy_list = {
-    "type": "array",
-    "items": policy,
-    "uniqueItems": True,
-    "required": True
-}
+policy_list = array_type(policy)
 
 
 # create group and view manifest returns a dictionary with keys being the ids
@@ -85,3 +86,26 @@ manifest = {
     },
     "additionalProperties": False
 }
+
+server = {
+    "type": "object",
+    "description": "Server information stored in model that maps to actual Nova instance",
+    "properties": {
+        "id": _id,
+        "nova_id": {
+            "type": "string",
+            "description": "Server ID of corresponding nova instance"
+        },
+        "status": {
+            "type": "string",
+            "decription": "Status of server. One of 'pending' or 'active'",
+            "pattern": "active|pending"
+        },
+        "lb_info": {
+            "type": "object",
+            "description": "Load balancer information. Currently leaving its schema open"
+        }
+    }
+}
+
+servers_list = array_type(server)
