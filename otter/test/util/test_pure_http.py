@@ -6,11 +6,14 @@ from testtools import TestCase
 
 from effect.testing import StubIntent, resolve_effect, resolve_stubs
 from effect.twisted import perform
-from effect import Effect
+from effect import Effect, ConstantIntent
 
 from otter.util.pure_http import request, Request
 from otter.util.http import APIError, headers
 from otter.test.utils import stub_pure_response, StubResponse, StubTreq
+
+
+Constant = lambda x: StubIntent(ConstantIntent(x))
 
 
 class RequestEffectTests(SynchronousTestCase):
@@ -53,7 +56,7 @@ class PureHTTPClientTests(TestCase):
     def _no_reauth_client(self):
         def auth(refresh=False):
             assert not refresh
-            return Effect(StubIntent(headers("my-token")))
+            return Effect(Constant(headers("my-token")))
         return lambda *args, **kwargs: resolve_stubs(request(*args, auth=auth, **kwargs))
 
     def test_json_request(self):
@@ -146,13 +149,13 @@ class PureHTTPClientTests(TestCase):
         return self._test_reauth(500, reauth_codes=(401, 403, 500))
 
     def _test_reauth(self, code, reauth_codes=None):
-        reauth_effect = Effect(StubIntent(headers("new-token")))
+        reauth_effect = Effect(Constant(headers("new-token")))
 
         def auth(refresh=False):
             if refresh:
                 return reauth_effect
             else:
-                return Effect(StubIntent(headers("first-token")))
+                return Effect(Constant(headers("first-token")))
         # First we try to make a simple request.
         kwargs = {}
         if reauth_codes is not None:
