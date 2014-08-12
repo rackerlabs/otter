@@ -271,8 +271,12 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
     :return: Deferred that fires with the CreateServer response as a dict.
     """
     path = append_segments(server_endpoint, 'servers')
-    if _treq is None:
+
+    if _treq is None:  # pragma: no cover
         _treq = treq
+    if clock is None:  # pragma: no cover
+        from twisted.internet import reactor
+        clock = reactor
 
     def _check_results(result, propagated_f):
         """
