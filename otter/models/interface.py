@@ -608,7 +608,7 @@ class IScalingGroupServersCollection(Interface):
         :param str marker: Marker from which to fetch servers
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with `list` of
-                server `dict` each correspondgin with
+                server `dict` each corresponding with
                 :data:`otter.json_schema.model_schemas.server`
 
         :raises NoSuchScalingGroupError: if this scaling group does not exist
