@@ -574,7 +574,7 @@ class IScalingGroupServersCollection(Interface):
         """
         Create server intended to be there in scaling group
 
-        :param :class:`BoungLog` log: A bound logger
+        :param :class:`BoundLog` log: A bound logger
         :param str status: status of the server. one of 'pending' or 'active'
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
@@ -586,7 +586,7 @@ class IScalingGroupServersCollection(Interface):
         """
         Update existing server intent information
 
-        :param :class:`BoungLog` log: A bound logger
+        :param :class:`BoundLog` log: A bound logger
         :param str server_intent_id: ID of server intent
         :param str nova_id: Server ID of corresponding Nova instance
         :param str status: server status. One of 'pending' or 'active'
@@ -602,7 +602,7 @@ class IScalingGroupServersCollection(Interface):
         """
         List the server intents in the scaling group optionally filtered based on status
 
-        :param :class:`BoungLog` log: A bound logger
+        :param :class:`BoundLog` log: A bound logger
         :param str status: server status. One of 'pending' or 'active'
         :param int limit: Limit number of server intents to return
         :param str marker: Marker from which to fetch servers
@@ -618,7 +618,7 @@ class IScalingGroupServersCollection(Interface):
         """
         Get server intent from scaling group
 
-        :param :class:`BoungLog` log: A bound logger
+        :param :class:`BoundLog` log: A bound logger
         :param str server_intent_id: ID of server intent being requested
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with
@@ -633,18 +633,18 @@ class IScalingGroupServersCollection(Interface):
         """
         Remove single server intent from scaling group
 
-        :param :class:`BoungLog` log: A bound logger
+        :param :class:`BoundLog` log: A bound logger
         :param str server_intent_id: ID of server intent being deleted
 
         :raises NoSuchScalingGroupError: if this scaling group does not exist
         :raises NoSuchServerError: if the server id does not exist
         """
 
-    def delete_servers(log, server_intent_ids):
+    def delete_server_intents(log, server_intent_ids):
         """
         Remove server intents from scaling group
 
-        :param :class:`BoungLog` log: A bound logger
+        :param :class:`BoundLog` log: A bound logger
         :param list server_intent_ids: List of server intent IDs to be deleted
 
         :raises NoSuchScalingGroupError: if this scaling group does not exist
