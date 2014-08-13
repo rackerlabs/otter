@@ -562,6 +562,17 @@ class IScalingGroup(Interface):
         """
 
 
+class NoSuchServerIntentError(Exception):
+    """
+    Error to be raised when attempting operations on a server intent that does not
+    exist.
+    """
+    def __init__(self, tenant_id, group_id, server_id):
+        super(NoSuchServerIntentError, self).__init__(
+            "No such server {s} in group {g} for tenant {t}"
+            .format(t=tenant_id, g=group_id, s=server_id))
+
+
 class IScalingGroupServersCollection(Interface):
     """
     Collection of servers intended to be there in a scaling group. Each server in the
@@ -595,7 +606,7 @@ class IScalingGroupServersCollection(Interface):
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
         :raises NoSuchScalingGroupError: if this scaling group does not exist
-        :raises NoSuchServerError: if the server intent id does not exist
+        :raises NoSuchServerIntentError: if the server intent id does not exist
         """
 
     def list_server_intents(log, status=None, limit=100, marker=None):
@@ -626,7 +637,7 @@ class IScalingGroupServersCollection(Interface):
                 :data:`otter.json_schema.model_schemas.server`
 
         :raises NoSuchScalingGroupError: if this scaling group does not exist
-        :raises NoSuchServerError: if the server intent id does not exist
+        :raises NoSuchServerIntentError: if the server intent id does not exist
         """
 
     def delete_server_intents(log, server_intent_ids):
