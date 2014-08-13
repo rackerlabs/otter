@@ -629,17 +629,6 @@ class IScalingGroupServersCollection(Interface):
         :raises NoSuchServerError: if the server intent id does not exist
         """
 
-    def delete_server_intent(log, server_intent_id):
-        """
-        Remove single server intent from scaling group
-
-        :param :class:`BoundLog` log: A bound logger
-        :param str server_intent_id: ID of server intent being deleted
-
-        :raises NoSuchScalingGroupError: if this scaling group does not exist
-        :raises NoSuchServerError: if the server id does not exist
-        """
-
     def delete_server_intents(log, server_intent_ids):
         """
         Remove server intents from scaling group
@@ -648,7 +637,6 @@ class IScalingGroupServersCollection(Interface):
         :param list server_intent_ids: List of server intent IDs to be deleted
 
         :raises NoSuchScalingGroupError: if this scaling group does not exist
-        TODO: What about `NoSuchServerError`?
         """
 
 
