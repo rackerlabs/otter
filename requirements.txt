@@ -7,7 +7,7 @@ yunomi==0.2.2
 iso8601==0.1.4
 lxml==3.0.1
 treq==0.2.0
-silverberg==0.1.7
+silverberg==0.1.8
 pyOpenSSL==0.13
 jsonfig==0.1.1
 testtools==0.9.32

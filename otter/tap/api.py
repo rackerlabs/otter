@@ -192,7 +192,8 @@ def makeService(config):
             reactor,
             RoundRobinCassandraCluster(
                 seed_endpoints,
-                config_value('cassandra.keyspace')),
+                config_value('cassandra.keyspace'),
+                disconnect_on_cancel=True),
             config_value('cassandra.timeout') or 30),
         log.bind(system='otter.silverberg'))
 
