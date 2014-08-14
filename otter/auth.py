@@ -142,10 +142,12 @@ class CachingAuthenticator(object):
                         cache_ttl=self._ttl,
                         **kwargs)
 
-    def authenticate_tenant(self, tenant_id, log=None):
+    def authenticate_tenant(self, tenant_id, log=None, refresh=False):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
+        if refresh:
+            self.invalidate(tenant_id)
         if log is None:
             log = self._log.bind(tenant_id=tenant_id)
         else:
@@ -192,6 +194,15 @@ class CachingAuthenticator(object):
         d.addErrback(when_auth_fails)
 
         return d
+
+    def invalidate(self, tenant_id):
+        # You may be concerned about what would happen if we're currently
+        # authentication. I don't think we need to worry about it.
+        self._cache.pop(tenant_id, None)
+
+    def pure_http_auth(self, tenant_id, refresh=False):
+        return self.authenticate_tenant(tenant_id)
+
 
 
 @implementer(IAuthenticator)
