@@ -351,7 +351,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         makeService(test_config)
         self.RoundRobinCassandraCluster.assert_called_once_with(
             [self.clientFromString.return_value],
-            'otter_test')
+            'otter_test', disconnect_on_cancel=True)
 
     def test_cassandra_scaling_group_collection_with_cluster(self):
         """
