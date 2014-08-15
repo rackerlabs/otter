@@ -38,7 +38,7 @@ from otter.worker.launch_server_v1 import (
 
 from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
                               matches, DummyException, IsBoundWith,
-                              StubTreq, StubResponse, headers_to_hashable)
+                              StubTreq, StubResponse)
 from testtools.matchers import IsInstance, StartsWith
 
 from otter.auth import headers
@@ -909,11 +909,11 @@ class ServerTests(SynchronousTestCase):
         attempt to find a server in Nova if the create request succeeds.
         """
         req = ('POST', 'http://url/servers',
-               headers_to_hashable(headers('my-auth-token')),
-               json.dumps({'server': {'some': 'stuff'}}), ("log",))
+               headers('my-auth-token'),
+               json.dumps({'server': {'some': 'stuff'}}), {'log': mock.ANY})
         resp = StubResponse(202, {})
 
-        _treq = StubTreq({req: resp}, {resp: '{"server": "created"}'})
+        _treq = StubTreq([(req, resp)], [(resp, '{"server": "created"}')])
 
         d = create_server('http://url/', 'my-auth-token', {'some': 'stuff'},
                           _treq=_treq)
@@ -962,12 +962,12 @@ class ServerTests(SynchronousTestCase):
         failure.
         """
         req = ('POST', 'http://url/servers',
-               headers_to_hashable(headers('my-auth-token')),
-               json.dumps({'server': {}}), ("log",))
+               headers('my-auth-token'),
+               json.dumps({'server': {}}), {'log': mock.ANY})
         resp = StubResponse(500, {})
 
         clock = Clock()
-        _treq = StubTreq({req: resp}, {resp: 'failure'})
+        _treq = StubTreq([(req, resp)], [(resp, 'failure')])
 
         fs.return_value = fail(APIError(401, '', {}))
 
@@ -992,12 +992,12 @@ class ServerTests(SynchronousTestCase):
         returns this found server successfully.  Creation is not retried.
         """
         req = ('POST', 'http://url/servers',
-               headers_to_hashable(headers('my-auth-token')),
-               json.dumps({'server': {'some': 'stuff'}}), ("log",))
+               headers('my-auth-token'),
+               json.dumps({'server': {'some': 'stuff'}}), {'log': mock.ANY})
         resp = StubResponse(500, {})
 
         clock = Clock()
-        _treq = StubTreq({req: resp}, {resp: 'failure'})
+        _treq = StubTreq([(req, resp)], [(resp, 'failure')])
 
         fs.return_value = succeed("I'm a server!")
 
@@ -1018,12 +1018,12 @@ class ServerTests(SynchronousTestCase):
         returns original error when on the last retry.
         """
         req = ('POST', 'http://url/servers',
-               headers_to_hashable(headers('my-auth-token')),
-               json.dumps({'server': {}}), ("log",))
+               headers('my-auth-token'),
+               json.dumps({'server': {}}), {'log': mock.ANY})
         resp = StubResponse(500, {})
 
         clock = Clock()
-        _treq = StubTreq({req: resp}, {resp: 'failure'})
+        _treq = StubTreq([(req, resp)], [(resp, 'failure')])
 
         fs.return_value = succeed(None)
 
@@ -1051,11 +1051,11 @@ class ServerTests(SynchronousTestCase):
         reties the create up to 3 times by default
         """
         req = ('POST', 'http://url/servers',
-               headers_to_hashable(headers('my-auth-token')),
-               json.dumps({'server': {}}), ("log",))
+               headers('my-auth-token'),
+               json.dumps({'server': {}}), {'log': mock.ANY})
         resp = StubResponse(500, {})
 
-        _treq = StubTreq({req: resp}, {resp: error_body})
+        _treq = StubTreq([(req, resp)], [(resp, error_body)])
 
         fs.side_effect = lambda *a, **kw: succeed(None)
 
@@ -1078,11 +1078,11 @@ class ServerTests(SynchronousTestCase):
         creation is not retried.  Server existence is not attempted.
         """
         req = ('POST', 'http://url/servers',
-               headers_to_hashable(headers('my-auth-token')),
-               json.dumps({'server': {}}), ("log",))
+               headers('my-auth-token'),
+               json.dumps({'server': {}}), {'log': mock.ANY})
         resp = StubResponse(400, {})
 
-        _treq = StubTreq({req: resp}, {resp: "User error!"})
+        _treq = StubTreq([(req, resp)], [(resp, "User error!")])
 
         clock = Clock()
         d = create_server('http://url/', 'my-auth-token', {}, log=self.log,

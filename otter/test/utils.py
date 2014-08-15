@@ -277,21 +277,6 @@ def stub_pure_response(body, code=200, response_headers=None):
     return (StubResponse(code, response_headers), body)
 
 
-def headers_to_hashable(headers):
-    """
-    Turns a :class:`twisted.web.http.Headers` object and turns it into
-    something hashable.
-
-    :return:  a :obj:`tuple` of keys and values, the values being :obj:`tuples`
-        themselves.
-    """
-    if headers is not None:
-        return tuple(sorted(
-            [(k, tuple(sorted(v))) for k, v in headers.items()]
-        ))
-    return headers
-
-
 class StubTreq(object):
     """
     A stub version of otter.utils.logging_treq that returns canned responses
@@ -309,6 +294,8 @@ class StubTreq(object):
             method should return. Keys should match up with the values of the
             `reqs` dict.
         """
+        check_unique_keys(reqs)
+        check_unique_keys(contents)
         self.reqs = reqs
         self.contents = contents
 
@@ -323,17 +310,17 @@ class StubTreq(object):
         should be immutable, and it's hard to get the exact instance of
         BoundLog, that's being ignored for now.
         """
-        key = (method, url, headers_to_hashable(kwargs.pop('headers', None)),
-               kwargs.pop('data', None), tuple(kwargs.keys()))
-        return succeed(self.reqs[key])
+        key = (method, url, kwargs.pop('headers', None),
+               kwargs.pop('data', None), kwargs)
+        return succeed(alist_get(self.reqs, key))
 
     def content(self, response):
         """Return a result by looking up the response in the `contents` dict."""
-        return succeed(self.contents[response])
+        return succeed(alist_get(self.contents, response))
 
     def json_content(self, response):
         """Return :meth:`content` after json-decoding"""
-        return succeed(json.loads(self.contents[response]))
+        return self.content(response).addCallback(json.loads)
 
     def put(self, url, data=None, **kwargs):
         """
@@ -435,3 +422,21 @@ def mock_group(state, tenant_id='tenant', group_id='group'):
 
     group.modify_state.side_effect = fake_modify_state
     return group
+
+
+def check_unique_keys(data):
+    """Check that all the keys in an association list are unique."""
+    # O(lol)
+    for itemindex, item in enumerate(data):
+        for indexagain, itemagain in enumerate(data):
+            if itemindex != indexagain and item[0] == itemagain[0]:
+                raise Exception("Duplicate items in EQDict: %r:%r and %r:%r"
+                                % (item[0], item[1], itemagain[0], itemagain[1]))
+
+
+def alist_get(data, key):
+    """Look up a value in an association list."""
+    for item in data:
+        if item[0] == key:
+            return item[1]
+    raise KeyError(key)
