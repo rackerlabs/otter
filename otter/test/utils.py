@@ -296,13 +296,10 @@ class StubTreq(object):
             method should return. Keys should match up with the values of the
             `reqs` dict.
         """
+        _check_unique_keys(reqs)
+        _check_unique_keys(contents)
         self.reqs = reqs
         self.contents = contents
-
-    def _headers_to_tuple(self, headers):
-        if headers is not None:
-            return tuple(sorted(headers.items()))
-        return headers
 
     def request(self, method, url, **kwargs):
         """
@@ -315,17 +312,17 @@ class StubTreq(object):
         should be immutable, and it's hard to get the exact instance of
         BoundLog, that's being ignored for now.
         """
-        return succeed(self.reqs[
-            (method, url, self._headers_to_tuple(kwargs.pop('headers', None)),
-             kwargs.pop('data', None), tuple(kwargs.keys()))])
+        key = (method, url, kwargs.pop('headers', None),
+               kwargs.pop('data', None), kwargs)
+        return succeed(alist_get(self.reqs, key))
 
     def content(self, response):
         """Return a result by looking up the response in the `contents` dict."""
-        return succeed(self.contents[response])
+        return succeed(alist_get(self.contents, response))
 
     def json_content(self, response):
         """Return :meth:`content` after json-decoding"""
-        return succeed(json.loads(self.contents[response]))
+        return self.content(response).addCallback(json.loads)
 
     def put(self, url, data=None, **kwargs):
         """
@@ -427,3 +424,21 @@ def mock_group(state, tenant_id='tenant', group_id='group'):
 
     group.modify_state.side_effect = fake_modify_state
     return group
+
+
+def _check_unique_keys(data):
+    """Check that all the keys in an association list are unique."""
+    # O(lol)
+    for itemindex, item in enumerate(data):
+        for itemagain in data[itemindex + 1:]:
+            if item[0] == itemagain[0]:
+                raise Exception("Duplicate items in EQDict: %r:%r and %r:%r"
+                                % (item[0], item[1], itemagain[0], itemagain[1]))
+
+
+def alist_get(data, key):
+    """Look up a value in an association list."""
+    for item in data:
+        if item[0] == key:
+            return item[1]
+    raise KeyError(key)

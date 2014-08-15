@@ -57,7 +57,7 @@
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2014-07-22</pubdate>
+        <pubdate>2014-08-14</pubdate>
         <copyright>
             <year>2014</year>
             <holder>Rackspace US, Inc.</holder>
@@ -69,6 +69,17 @@
             </annotation>
         </legalnotice>
         <revhistory>
+            <revision
+                xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <date>2014-08-14</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Added URI parameter <parameter>{serverId}</parameter> to Delete server from scaling group section. Added links to the Auto Scale Quick Start and Rackspace Complete API Reference to <link linkend="Resources-000">Additional Resources</link> section. Fixed typo. Corrected link for <link linkend="serviceEndpoints">Service Endpoints</link> section. </para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
             <revision
                 xmlns:raxm="http://docs.rackspace.com/api/metadata">
                 <date>2014-07-22</date>
@@ -86,7 +97,7 @@
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Republished to incorprate new Rackspace logo. </para>
+                            <para>Republished to incorporate new Rackspace logo. </para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
@@ -982,8 +993,7 @@ is external so it's handy for Getting Started to share -->
                 <tip>
                     <para>"To help you decide which regionalized endpoint to use, 
                         read about special considerations for choosing a data center at the Rackspace Knowledge Center article
-                        <link xlink:href="http://www.rackspace.com/knowledge_center/article/where-are-the-rackspace-data-centers-dfw-lon-hkg-etc">
-                            Where are the Rackspace data centers (DFW, LON, HKG, etc.) </link>."
+                        <link xlink:href="http://ord.admin.kc.rakr.net/knowledge_center/article/about-regions"> About Regions</link>."
                     </para>      
                 </tip>
             <para>

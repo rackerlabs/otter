@@ -57,15 +57,19 @@
                             required="true" style="template">
                             <wadl:doc
                                 xmlns="http://docbook.org/ns/docbook"
-                                xml:lang="EN"><para>A scaling
-                                   group.</para></wadl:doc>
+                                xml:lang="EN"><para>A scaling group.</para></wadl:doc>
                         </param>                        
                         <method href="#showGroupManifest"/>
                         <method href="#showGroupManifestWebhook"/>                                                
                         <method href="#deleteGroup"/>           
                  
-
                         <resource id="server" path="servers/{serverId}">
+                            <param name="serverId" type="osapi:UUID"
+                                required="true" style="template">
+                                <wadl:doc
+                                    xmlns="http://docbook.org/ns/docbook"
+                                    xml:lang="EN"><para>The Nova server ID for the server you want to delete from the scaling group.</para></wadl:doc>
+                            </param>  
                             <method href="#deleteGroupServer"/>
                         </resource>  
                         
