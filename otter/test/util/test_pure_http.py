@@ -25,10 +25,10 @@ class RequestEffectTests(SynchronousTestCase):
         The Request effect dispatches a request to treq, and returns a two-tuple
         of the Twisted Response object and the content as bytes.
         """
+        req = ('GET', 'http://google.com/', None, None,  {'log': None})
         response = StubResponse(200, {})
-        treq = StubTreq(
-            reqs={('GET', 'http://google.com/', None, None,  ('log',)): response},
-            contents={response: "content"})
+        treq = StubTreq(reqs=[(req, response)],
+                        contents=[(response, "content")])
         req = Request(method="get", url="http://google.com/")
         req.treq = treq
         self.assertEqual(
@@ -39,11 +39,11 @@ class RequestEffectTests(SynchronousTestCase):
         """
         The log specified in the Request is passed on to the treq implementation.
         """
-        response = StubResponse(200, {})
         log = object()
-        treq = StubTreq(
-            reqs={('GET', 'http://google.com/', None, None, ('log',)): response},
-            contents={response: "content"})
+        req = ('GET', 'http://google.com/', None, None, {'log': log})
+        response = StubResponse(200, {})
+        treq = StubTreq(reqs=[(req, response)],
+                        contents=[(response, "content")])
         req = Request(method="get", url="http://google.com/", log=log)
         req.treq = treq
         self.assertEqual(self.successResultOf(perform(Effect(req))),
