@@ -449,3 +449,16 @@ webhook = {
 
 update_webhook = deepcopy(webhook)
 update_webhook['properties']['metadata']['required'] = True
+
+
+def normalize_launch_config(config):
+    """
+    Normalize the metadata argument as part of the server arg in the launch
+    config - if it is null or invalid, just remove it.
+    """
+    server_info = config.get('args', {}).get('server', {})
+
+    if not isinstance(server_info.get('metadata'), dict):
+        server_info.pop('metadata', None)
+
+    return config

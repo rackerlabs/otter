@@ -820,6 +820,32 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                                         ConsistencyLevel.TWO)
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
+    def test_view_launch_null_server_metadata(self):
+        """
+        When viewing the launch config, if the server metadata is null no
+        metadata is returned
+        """
+        cass_response = [
+            {'launch_config': '{"_ver": 5, "args": {"server": {"metadata": null}}}',
+            'created_at': 3}]
+        self.returns = [cass_response]
+        d = self.group.view_launch_config()
+        r = self.successResultOf(d)
+        self.assertEqual(r, {"args": {"server": {}}})
+
+    def test_view_launch_invalid_server_metadata(self):
+        """
+        When viewing the launch config, if the server metadata is invalid no
+        metadata is returned
+        """
+        cass_response = [
+            {'launch_config': '{"_ver": 5, "args": {"server": {"metadata": ""}}}',
+            'created_at': 3}]
+        self.returns = [cass_response]
+        d = self.group.view_launch_config()
+        r = self.successResultOf(d)
+        self.assertEqual(r, {"args": {"server": {}}})
+
     def test_view_launch_no_version(self):
         """
         When viewing the launch config, any version information is removed from
@@ -1707,6 +1733,74 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                               exp_data, ConsistencyLevel.TWO,
                                               matches(IsInstance(NoSuchScalingGroupError)),
                                               self.mock_log)
+
+    @mock.patch('otter.models.cass.config_value', return_value=10)
+    @mock.patch('otter.models.cass.verified_view')
+    def test_view_manifest_with_null_server_args_in_launch(self, verified_view, _):
+        """
+        When viewing the manifest, the launch config is normalized (
+        metadata is removed if it is null)
+        """
+        irregular_launch_config = deepcopy(self.launch_config)
+        irregular_launch_config['args']['server']['metadata'] = None
+        self.launch_config['args']['server'].pop('metadata', None)
+
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(irregular_launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
+        })
+        self.group._naive_list_policies = mock.Mock(return_value=defer.succeed([]))
+
+        self.assertEqual(self.validate_view_manifest_return_value(), {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch_config,
+            'scalingPolicies': [],
+            'id': "12345678g",
+            'state': GroupState(
+                self.tenant_id,
+                self.group_id,
+                'a', {'A': 'R'},
+                {'P': 'R'}, '123',
+                {'PT': 'R'}, False)
+        })
+
+    @mock.patch('otter.models.cass.config_value', return_value=10)
+    @mock.patch('otter.models.cass.verified_view')
+    def test_view_manifest_with_invalid_server_args_in_launch(self, verified_view, _):
+        """
+        When viewing the manifest, the launch config is normalized (
+        metadata is removed if it is invalid)
+        """
+        irregular_launch_config = deepcopy(self.launch_config)
+        irregular_launch_config['args']['server']['metadata'] = "this is invalid"
+        self.launch_config['args']['server'].pop('metadata', None)
+
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(irregular_launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
+        })
+        self.group._naive_list_policies = mock.Mock(return_value=defer.succeed([]))
+
+        self.assertEqual(self.validate_view_manifest_return_value(), {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch_config,
+            'scalingPolicies': [],
+            'id': "12345678g",
+            'state': GroupState(
+                self.tenant_id,
+                self.group_id,
+                'a', {'A': 'R'},
+                {'P': 'R'}, '123',
+                {'PT': 'R'}, False)
+        })
 
     @mock.patch('otter.models.cass.assemble_webhooks_in_policies')
     @mock.patch('otter.models.cass.verified_view')
