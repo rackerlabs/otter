@@ -294,8 +294,8 @@ class StubTreq(object):
             method should return. Keys should match up with the values of the
             `reqs` dict.
         """
-        check_unique_keys(reqs)
-        check_unique_keys(contents)
+        _check_unique_keys(reqs)
+        _check_unique_keys(contents)
         self.reqs = reqs
         self.contents = contents
 
@@ -424,12 +424,12 @@ def mock_group(state, tenant_id='tenant', group_id='group'):
     return group
 
 
-def check_unique_keys(data):
+def _check_unique_keys(data):
     """Check that all the keys in an association list are unique."""
     # O(lol)
     for itemindex, item in enumerate(data):
-        for indexagain, itemagain in enumerate(data):
-            if itemindex != indexagain and item[0] == itemagain[0]:
+        for itemagain in data[itemindex + 1:]:
+            if item[0] == itemagain[0]:
                 raise Exception("Duplicate items in EQDict: %r:%r and %r:%r"
                                 % (item[0], item[1], itemagain[0], itemagain[1]))
 
