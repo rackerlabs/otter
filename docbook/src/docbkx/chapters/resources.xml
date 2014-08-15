@@ -41,7 +41,7 @@
                 <para>To see all the Rackspace API operations in one place, go to<link
                 xlink:href="http://api.rackspace.com/"> api.rackspace.com</link>. Use the links on the left to see the different product API references.</para></listitem>
              <listitem>
-                 <para>To see the Auto Scale API operations per language, view the<link
+                 <para>To see the Auto Scale API operations in various common programming languages, view the<link
                      xlink:href="https://developer.rackspace.com/docs/auto-scale/getting-started/"> Quick Start for Auto Scale</link>. Use 
                     the tabs at the top to see the different supported languages.</para></listitem>
         </itemizedlist>
