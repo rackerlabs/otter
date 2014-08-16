@@ -279,7 +279,7 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
         config = deepcopy(group_examples.launch_server_config()[0])
         config['args']['server']['metadata'] = []
         self.assertRaisesRegexp(
-            ValidationError, "\[\] is not of type 'object'",
+            ValidationError, "\[\] is not of type ",
             validate, config, group_schemas.launch_server)
 
     def test_no_metadata_valid(self):
