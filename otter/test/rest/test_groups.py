@@ -332,6 +332,21 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assert_status_code(400, None, 'POST', '{')
         self.flushLoggedErrors(InvalidJsonError)
 
+    def test_create_invalid_server_metadata_in_launch_config(self):
+        """
+        Invalid launch configuration raises 400
+        """
+        launch = launch_examples()[0]
+        launch['args']['server']['metadata'] = "invalid"
+
+        request_body = {
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch
+        }
+        self.assert_status_code(400, method='POST',
+                                body=json.dumps(request_body))
+        self.flushLoggedErrors()
+
     def test_group_create_invalid_schema_400(self):
         """
         Checks that the scaling groups schema is obeyed --
@@ -547,6 +562,39 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'launchConfiguration': launch
         }))
         self.flushLoggedErrors(AssertionError)
+
+    def test_create_group_normalizes_launch_config_null_server_metadata(self):
+        """
+        If the user passes in null for server metadata in the launch config,
+        create group first normalizes it before calling the model
+        """
+        config = config_examples()[0]
+
+        launch = launch_examples()[0]
+        launch['args']['server']['metadata'] = None
+
+        expected_launch = launch_examples()[0]
+        expected_launch['args']['server'].pop('metadata', None)
+
+        rval = {
+            'groupConfiguration': config,
+            'launchConfiguration': expected_launch,
+            'id': '1',
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False),
+            'scalingPolicies': []
+        }
+
+        self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
+
+        self.assert_status_code(
+            201, None, 'POST',
+            json.dumps({
+                'groupConfiguration': config, 'launchConfiguration': launch
+            }),
+            '/v1.0/11111/groups/1/')
+
+        self.mock_store.create_scaling_group.assert_called_once_with(
+            mock.ANY, mock.ANY, mock.ANY, expected_launch, None)
 
 
 class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
