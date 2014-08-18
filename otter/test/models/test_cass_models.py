@@ -827,7 +827,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         """
         cass_response = [
             {'launch_config': '{"_ver": 5, "args": {"server": {"metadata": null}}}',
-            'created_at': 3}]
+             'created_at': 3}]
         self.returns = [cass_response]
         d = self.group.view_launch_config()
         r = self.successResultOf(d)
@@ -840,7 +840,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         """
         cass_response = [
             {'launch_config': '{"_ver": 5, "args": {"server": {"metadata": ""}}}',
-            'created_at': 3}]
+             'created_at': 3}]
         self.returns = [cass_response]
         d = self.group.view_launch_config()
         r = self.successResultOf(d)
