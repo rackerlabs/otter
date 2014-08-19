@@ -573,7 +573,7 @@ class NoSuchServerIntentError(Exception):
             .format(t=tenant_id, g=group_id, s=server_id))
 
 
-class IScalingGroupServersCollection(Interface):
+class IScalingGroupServerIntentsCollection(Interface):
     """
     Collection of servers intended to be there in a scaling group. Each server in the
     this group should eventually match to a real server in Nova. All operations on this
