@@ -106,6 +106,58 @@ class NegativeGroupFixture(AutoscaleFixture):
                          '{1}'.format(updated_state.pendingCapacity + updated_state.activeCapacity,
                                       server_count - 1))
 
+    @tags(requires='mimic')
+    def test_system_create_group_create_succeeds_even_if_create_server_errors(self):
+        """
+        If a scaling group is created with a min. entity of 1, the group
+        starts off with a pending capacity of 1.  If creating the
+        server fails with a non-400, but if the server was created, the group
+        will end up with up with an active capacity of 1.
+        """
+        error = {
+            "message": "This is a simulated nova error",
+            "code": 500
+        }
+
+        # TODO: inject error into mimic such that the server is created but
+        # mimic/nova returns a 500.
+        lc_metadata = {'create_server_failure': json.dumps(error)}
+
+        create_response = self.autoscale_behaviors.create_scaling_group_given(
+            gc_min_entities=1,
+            lc_metadata=lc_metadata)
+        self.assertEquals(create_response.status_code, 201)
+        group = create_response.entity
+        self.resources.add(group, self.empty_scaling_group)
+
+        self.wait_for_expected_number_of_active_servers(group.id, 1)
+
+    @tags(requires='mimic')
+    def test_system_create_group_create_succees_if_create_server_fails_once(self):
+        """
+        If a scaling group is created with a min. entity of 1, the group
+        starts off with a pending capacity of 1.  Even if creating the
+        server fails, if it doesn't repeatedly fail the group will end up with
+        up with an active capacity of 1.
+        """
+        error = {
+            "message": "This is a simulated nova error",
+            "code": 500
+        }
+
+        # TODO: inject error into mimic such that the server create fails only
+        # once
+        lc_metadata = {'create_server_failure': json.dumps(error)}
+
+        create_response = self.autoscale_behaviors.create_scaling_group_given(
+            gc_min_entities=1,
+            lc_metadata=lc_metadata)
+        self.assertEquals(create_response.status_code, 201)
+        group = create_response.entity
+        self.resources.add(group, self.empty_scaling_group)
+
+        self.wait_for_expected_number_of_active_servers(group.id, 1)
+
     def test_system_create_delete_scaling_group_server_building_indefinitely(self):
         """
         Verify create delete scaling group when servers remain in 'build' state
