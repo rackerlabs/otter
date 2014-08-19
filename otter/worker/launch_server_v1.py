@@ -419,6 +419,34 @@ def check_deleted_clb(f, clb_id, node_id=None):
     return f
 
 
+def batch_add_lb(path, ip_ports):
+    def add():
+        d = treq.post(path, headers=headers(auth_token),
+                      data=json.dumps({"nodes": [{"address": ip_address,
+                                                  "port": port,
+                                                  "condition": "ENABLED",
+                                                  "type": "PRIMARY"}
+                                                 for ip_address, port in ip_ports]}),
+                      log=lb_log)
+        d.addCallback(check_success, [200, 202])
+        d.addErrback(log_lb_unexpected_errors, lb_log, 'add_node')
+        d.addErrback(wrap_request_error, path, 'add_node')
+        d.addErrback(check_deleted_clb, lb_id)
+        return d
+
+    d = retry(
+        add,
+        can_retry=compose_retries(
+            transient_errors_except(CLBOrNodeDeleted),
+            retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES)),
+        next_interval=random_interval(
+            *(config_value('worker.lb_retry_interval_range') or LB_RETRY_INTERVAL_RANGE)),
+        clock=clock)
+
+
+clbs = defaultdict(dict)
+
+
 def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
     """
     Add an IP addressed to a load balancer based on the lb_config.
@@ -441,39 +469,48 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
     lb_log = log.bind(loadbalancer_id=lb_id, ip_address=ip_address)
 
-    def add():
-        d = treq.post(path, headers=headers(auth_token),
-                      data=json.dumps({"nodes": [{"address": ip_address,
-                                                  "port": port,
-                                                  "condition": "ENABLED",
-                                                  "type": "PRIMARY"}]}),
-                      log=lb_log)
-        d.addCallback(check_success, [200, 202])
-        d.addErrback(log_lb_unexpected_errors, lb_log, 'add_node')
-        d.addErrback(wrap_request_error, path, 'add_node')
-        d.addErrback(check_deleted_clb, lb_id)
+    # Collect add node requests for one CLB for 30 seconds and initiate a batch addition
+    def release_waiters(r):
+        # Release them!
+        if isinstance(r, Failure):
+            # TODO: Errback all waiters
+            pass
+        for node in r['nodes']:
+            ip = node['address']
+            waiter, _ = clbs[path][ip]
+            waiter.callback({'nodes': [node]})
+            del clbs[path][ip]
+
+    def batch_add():
+        d = batch_add_lb(path, [(ip, port) for ip, (_, port) in clbs[path].items()])
+        d.addBoth(release_waiters)
+        d.addCallback(lambda r: fail(TransientRetryError()))
         return d
 
-    d = retry(
-        add,
-        can_retry=compose_retries(
-            transient_errors_except(CLBOrNodeDeleted),
-            retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES)),
-        next_interval=random_interval(
-            *(config_value('worker.lb_retry_interval_range') or LB_RETRY_INTERVAL_RANGE)),
-        clock=clock)
-
     def when_done(result):
-        lb_log.msg('Added to load balancer', node_id=result['nodes'][0]['id'])
+        node_id = result['nodes'][0]['id']
+        lb_log.msg('Added to load balancer', node_id=node_id)
         undo.push(remove_from_load_balancer,
                   lb_log,
                   endpoint,
                   auth_token,
                   lb_id,
-                  result['nodes'][0]['id'])
+                  node_id)
         return result
 
-    return d.addCallback(treq.json_content).addCallback(when_done)
+    if not clbs[path]:
+        clock.callLater(
+            10, retry, batch_add,
+            next_interval=repeating_interval(30),
+            can_retry=compose_retries(terminal_error_except(TransientRetryError),
+                                      lambda f: bool(len(clbs[path]))))
+
+    # queue it for next cycle
+    d = Deferred()
+    d.addCallback(when_done)
+    clbs[path][ip_address] = d, port
+
+    return d
 
 
 def add_to_load_balancers(log, endpoint, auth_token, lb_configs, ip_address, undo):
