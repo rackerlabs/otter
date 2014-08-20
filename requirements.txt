@@ -16,6 +16,7 @@ txkazoo==0.0.5
 
 # pinning dependencies of dependencies
 
+setuptools==5.7
 Werkzeug==0.9.3
 argparse==1.2.1
 cql==1.4.0
