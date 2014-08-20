@@ -419,7 +419,8 @@ def check_deleted_clb(f, clb_id, node_id=None):
     return f
 
 
-def batch_add_lb(path, ip_ports):
+def batch_add_lb(log, lb_id, path, auth_token, ip_ports):
+
     def add():
         d = treq.post(path, headers=headers(auth_token),
                       data=json.dumps({"nodes": [{"address": ip_address,
@@ -427,9 +428,10 @@ def batch_add_lb(path, ip_ports):
                                                   "condition": "ENABLED",
                                                   "type": "PRIMARY"}
                                                  for ip_address, port in ip_ports]}),
-                      log=lb_log)
+                      log=log)
         d.addCallback(check_success, [200, 202])
-        d.addErrback(log_lb_unexpected_errors, lb_log, 'add_node')
+        d.addCallback(treq.json_content)
+        d.addErrback(log_lb_unexpected_errors, log, 'add_node')
         d.addErrback(wrap_request_error, path, 'add_node')
         d.addErrback(check_deleted_clb, lb_id)
         return d
@@ -444,7 +446,9 @@ def batch_add_lb(path, ip_ports):
         clock=clock)
 
 
-clbs = defaultdict(dict)
+# This is unfortunate global state that stores currently running and waiting add node requests
+# Mapping of a CLB -> dict of nodes to be added
+add_clbs = defaultdict(dict)
 
 
 def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
@@ -467,7 +471,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
-    lb_log = log.bind(loadbalancer_id=lb_id, ip_address=ip_address)
+    lb_log = log.bind(loadbalancer_id=lb_id)
 
     # Collect add node requests for one CLB for 30 seconds and initiate a batch addition
     def release_waiters(r):
@@ -477,14 +481,15 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
             pass
         for node in r['nodes']:
             ip = node['address']
-            waiter, _ = clbs[path][ip]
+            waiter, _ = add_clbs[path][ip]
             waiter.callback({'nodes': [node]})
-            del clbs[path][ip]
+            del add_clbs[path][ip]
 
     def batch_add():
-        d = batch_add_lb(path, [(ip, port) for ip, (_, port) in clbs[path].items()])
+        d = batch_add_lb(lb_log, lb_id, path, auth_token,
+                         [(ip, port) for ip, (_, port) in add_clbs[path].items()])
         d.addBoth(release_waiters)
-        d.addCallback(lambda r: fail(TransientRetryError()))
+        d.addCallback(lambda _: fail(TransientRetryError()))
         return d
 
     def when_done(result):
@@ -498,17 +503,18 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
                   node_id)
         return result
 
-    if not clbs[path]:
+    if not add_clbs[path]:
+        # Currently no add node request for this CLB. Setup batch addition
         clock.callLater(
             10, retry, batch_add,
             next_interval=repeating_interval(30),
             can_retry=compose_retries(terminal_error_except(TransientRetryError),
-                                      lambda f: bool(len(clbs[path]))))
+                                      lambda f: bool(len(add_clbs[path]))))
 
     # queue it for next cycle
     d = Deferred()
     d.addCallback(when_done)
-    clbs[path][ip_address] = d, port
+    add_clbs[path][ip_address] = d, port
 
     return d
 
