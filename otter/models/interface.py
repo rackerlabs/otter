@@ -562,6 +562,95 @@ class IScalingGroup(Interface):
         """
 
 
+class NoSuchServerIntentError(Exception):
+    """
+    Error to be raised when attempting operations on a server intent that does not
+    exist.
+    """
+    def __init__(self, tenant_id, group_id, server_id):
+        super(NoSuchServerIntentError, self).__init__(
+            "No such server {s} in group {g} for tenant {t}"
+            .format(t=tenant_id, g=group_id, s=server_id))
+
+
+class IScalingGroupServerIntentsCollection(Interface):
+    """
+    Collection of servers intended to be there in a scaling group. Each server in the
+    this group should eventually match to a real server in Nova. All operations on this
+    model will not have any impact on real Nova servers. It is the caller's responsibility
+    to sync them (if needed).
+    """
+
+    def create_server_intent(log, status='pending'):
+        """
+        Create server intended to be there in scaling group
+
+        :param :class:`BoundLog` log: A bound logger
+        :param str status: status of the server. one of 'pending' or 'active'
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
+                corresponding with :data:`otter.json_schema.model_schemas.server`
+        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        """
+
+    def update_server_intent(log, server_intent_id, nova_id, status, lb_info):
+        """
+        Update existing server intent information
+
+        :param :class:`BoundLog` log: A bound logger
+        :param str server_intent_id: ID of server intent
+        :param str nova_id: Server ID of corresponding Nova instance
+        :param str status: server status. One of 'pending' or 'active'
+        :param `dict` lb_info: Load balancer information dict. This will be stored as JSON
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        :raises NoSuchServerIntentError: if the server intent id does not exist
+        """
+
+    def list_server_intents(log, status=None, limit=100, marker=None):
+        """
+        List the server intents in the scaling group optionally filtered based on status
+
+        :param :class:`BoundLog` log: A bound logger
+        :param str status: server status. One of 'pending' or 'active'
+        :param int limit: Limit number of server intents to return
+        :param str marker: Marker from which to fetch servers
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with `list` of
+                server `dict` each corresponding with
+                :data:`otter.json_schema.model_schemas.server`
+
+        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        """
+
+    def get_server_intent(log, server_intent_id):
+        """
+        Get server intent from scaling group
+
+        :param :class:`BoundLog` log: A bound logger
+        :param str server_intent_id: ID of server intent being requested
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with
+                 server `dict` correspondgin with
+                :data:`otter.json_schema.model_schemas.server`
+
+        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        :raises NoSuchServerIntentError: if the server intent id does not exist
+        """
+
+    def delete_server_intents(log, server_intent_ids):
+        """
+        Remove server intents from scaling group
+
+        :param :class:`BoundLog` log: A bound logger
+        :param list server_intent_ids: List of server intent IDs to be deleted
+
+        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        """
+
+
 class IScalingScheduleCollection(Interface):
     """
     A list of scaling events in the future
