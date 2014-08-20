@@ -27,4 +27,4 @@ httpretty==0.6.0
 pycrypto==2.6.1
 pymongo==2.5
 urllib3==1.7.1
-virtualenv==1.9.1
+virtualenv==1.11.6
