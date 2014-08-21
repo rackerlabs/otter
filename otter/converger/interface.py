@@ -3,6 +3,7 @@ Interfaces for convergence.
 """
 from zope.interface import Interface
 
+
 class IConverger(Interface):
     """
     A converger is a continuous process that, over time, causes the
