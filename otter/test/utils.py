@@ -416,7 +416,6 @@ class FakeSupervisor(object, Service):
         return succeed(self.del_index)
 
 
-<<<<<<< HEAD
 class FakeThreadPool(object):
     """
     A fake thread pool that actually just runs things synchronously in
