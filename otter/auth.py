@@ -50,6 +50,7 @@ from otter.util.retry import retry, retry_times, repeating_interval
 from otter.log import log as default_log
 from otter.util.http import (
     headers, check_success, append_segments, wrap_upstream_error)
+from otter.util.deferredutils import delay
 
 
 class IAuthenticator(Interface):
@@ -87,6 +88,29 @@ class RetryingAuthenticator(object):
             can_retry=retry_times(self._max_retries),
             next_interval=repeating_interval(self._retry_interval),
             clock=self._reactor)
+
+
+@implementer(IAuthenticator)
+class WaitingAuthenticator(object):
+    """
+    An authenticator that waits after getting the token and before returning it
+
+    :param IReactorTime reactor: An IReactorTime provider used for waiting
+    :param IAuthenticator authenticator: authenticate using this
+    :param float wait: Number of seconds to wait before returning
+    """
+    def __init__(self, reactor, authenticator, wait):
+        self._reactor = reactor
+        self._authenticator = authenticator
+        self._wait = wait
+
+    def authenticate_tenant(self, tenant_id, log=None):
+        """
+        see :meth:`IAuthenticator.authenticate_tenant`
+        """
+        d = self._authenticator.authenticate_tenant(tenant_id, log=log)
+        d.addCallback(delay, self._reactor, self._wait)
+        return d
 
 
 @implementer(IAuthenticator)
