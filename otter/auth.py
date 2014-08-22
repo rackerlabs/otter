@@ -181,18 +181,30 @@ class ImpersonatingAuthenticator(object):
         self._identity_admin_password = identity_admin_password
         self._url = url
         self._admin_url = admin_url
+        self._token = None
 
-    def authenticate_tenant(self, tenant_id, log=None):
-        """
-        see :meth:`IAuthenticator.authenticate_tenant`
-        """
+    def _auth_me(self, log):
         d = authenticate_user(self._url,
                               self._identity_admin_user,
                               self._identity_admin_password,
                               log=log)
         d.addCallback(extract_token)
+        d.addCallback(self._set_token)
 
-        def find_user(identity_admin_token):
+    def _set_token(self, token):
+        self._token = token
+        return self._token
+
+    def authenticate_tenant(self, tenant_id, log=None):
+        """
+        see :meth:`IAuthenticator.authenticate_tenant`
+        """
+        if not self._token:
+            d = self._auth_me(log)
+        else:
+            d = succeed(None)
+
+        def find_user(_):
             d = user_for_tenant(self._admin_url,
                                 self._identity_admin_user,
                                 self._identity_admin_password,
@@ -202,18 +214,27 @@ class ImpersonatingAuthenticator(object):
 
         d.addCallback(find_user)
 
-        def impersonate((identity_admin_token, user)):
+        def reauth_and_try_on_401(f):
+            f.trap(UpstreamError)
+            f.value.reason.trap(APIError)
+            if f.value.reason.value.code == 401:
+                d = self._auth_me(log)
+                d.addCallback(lambda t: impersonate(user))
+            else:
+                return f
+
+        def impersonate(user):
             iud = impersonate_user(self._admin_url,
                                    identity_admin_token,
                                    user, log=log)
             iud.addCallback(extract_token)
-            iud.addCallback(lambda token: (identity_admin_token, token))
             return iud
 
         d.addCallback(impersonate)
+        d.addErrback(reauth_and_try_on_401)
 
-        def endpoints((identity_admin_token, token)):
-            scd = endpoints_for_token(self._admin_url, identity_admin_token,
+        def endpoints(token):
+            scd = endpoints_for_token(self._admin_url, self._token,
                                       token, log=log)
             scd.addCallback(lambda endpoints: (token, _endpoints_to_service_catalog(endpoints)))
             return scd
