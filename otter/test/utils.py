@@ -12,13 +12,16 @@ from zope.interface import implementer, directlyProvides
 from testtools.matchers import Mismatch
 
 from twisted.internet import defer
-from twisted.internet.defer import succeed, Deferred
+from twisted.internet.defer import succeed, Deferred, maybeDeferred
 from twisted.internet.interfaces import IReactorThreads
+
 from twisted.python.failure import Failure
 from twisted.application.service import Service
 
 from otter.log.bound import BoundLog
 from otter.supervisor import ISupervisor
+from otter.models.interface import IScalingGroup
+from otter.util.deferredutils import DeferredPool
 
 
 class matches(object):
@@ -276,6 +279,21 @@ def stub_pure_response(body, code=200, response_headers=None):
     return (StubResponse(code, response_headers), body)
 
 
+def headers_to_hashable(headers):
+    """
+    Turns a :class:`twisted.web.http.Headers` object and turns it into
+    something hashable.
+
+    :return:  a :obj:`tuple` of keys and values, the values being :obj:`tuples`
+        themselves.
+    """
+    if headers is not None:
+        return tuple(sorted(
+            [(k, tuple(sorted(v))) for k, v in headers.items()]
+        ))
+    return headers
+
+
 class StubTreq(object):
     """
     A stub version of otter.utils.logging_treq that returns canned responses
@@ -296,11 +314,6 @@ class StubTreq(object):
         self.reqs = reqs
         self.contents = contents
 
-    def _headers_to_tuple(self, headers):
-        if headers is not None:
-            return tuple(sorted(headers.items()))
-        return headers
-
     def request(self, method, url, **kwargs):
         """
         Return a result by looking up the arguments in the `reqs` dict.
@@ -312,9 +325,9 @@ class StubTreq(object):
         should be immutable, and it's hard to get the exact instance of
         BoundLog, that's being ignored for now.
         """
-        return succeed(self.reqs[
-            (method, url, self._headers_to_tuple(kwargs.pop('headers', None)),
-             kwargs.pop('data', None), tuple(kwargs.keys()))])
+        key = (method, url, headers_to_hashable(kwargs.pop('headers', None)),
+               kwargs.pop('data', None), tuple(kwargs.keys()))
+        return succeed(self.reqs[key])
 
     def content(self, response):
         """Return a result by looking up the response in the `contents` dict."""
@@ -380,7 +393,7 @@ class FakeSupervisor(object, Service):
 
     def __init__(self, *args):
         self.args = args
-        self.index = 0
+        self.deferred_pool = DeferredPool()
         self.exec_calls = []
         self.exec_defs = []
         self.del_index = 0
@@ -390,11 +403,9 @@ class FakeSupervisor(object, Service):
         """
         Execute single launch config
         """
-        self.index += 1
         self.exec_calls.append((log, transaction_id, scaling_group, launch_config))
-        d = Deferred()
-        self.exec_defs.append(d)
-        return succeed((self.index, d))
+        self.exec_defs.append(Deferred())
+        return self.exec_defs[-1]
 
     def execute_delete_server(self, log, transaction_id, scaling_group, server):
         """
@@ -405,6 +416,7 @@ class FakeSupervisor(object, Service):
         return succeed(self.del_index)
 
 
+<<<<<<< HEAD
 class FakeThreadPool(object):
     """
     A fake thread pool that actually just runs things synchronously in
@@ -458,3 +470,26 @@ class FakeReactorThreads(object):
         Just call the function with the arguments.
         """
         return f(*args, **kw)
+
+
+def mock_group(state, tenant_id='tenant', group_id='group'):
+    """
+    Return mocked `IScalingGroup` that has tunable `modify_state` method
+
+    :param state: This will be passed to `modify_state` callable
+    """
+    group = iMock(IScalingGroup, tenant_id=tenant_id, uuid=group_id)
+    group.pause_modify_state = False
+    group.modify_state_values = []
+
+    def fake_modify_state(f, *args, **kwargs):
+        d = maybeDeferred(f, group, state, *args, **kwargs)
+        d.addCallback(lambda r: group.modify_state_values.append(r) or r)
+        if group.pause_modify_state:
+            group.modify_state_pause_d = Deferred()
+            return group.modify_state_pause_d.addCallback(lambda _: d)
+        else:
+            return d
+
+    group.modify_state.side_effect = fake_modify_state
+    return group

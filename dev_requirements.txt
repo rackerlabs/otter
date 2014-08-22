@@ -7,7 +7,7 @@ coverage==3.5.3
 docutils==0.9.1
 sphinx==1.1.3
 repoze.sphinx.autointerface==0.7.1
-terrarium==1.0.0rc2
+terrarium==1.0.0rc4
 python-subunit==0.0.8
 junitxml==0.7
 paramiko==1.10.0

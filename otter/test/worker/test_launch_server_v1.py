@@ -37,8 +37,11 @@ from otter.worker.launch_server_v1 import (
 
 
 from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
-                              matches, DummyException, IsBoundWith)
+                              matches, DummyException, IsBoundWith,
+                              StubTreq, StubResponse, headers_to_hashable)
 from testtools.matchers import IsInstance, StartsWith
+
+from otter.auth import headers
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error, TimedOutError
@@ -794,12 +797,10 @@ class ServerTests(SynchronousTestCase):
         filtering on the image id, flavor id, and exact name in the server
         config.
         """
-        server_config = {'server': _get_server_info()}
-
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({"servers": []})
 
-        find_server('http://url/', 'my-auth-token', server_config)
+        find_server('http://url/', 'my-auth-token', _get_server_info())
 
         url = urlunsplit([
             'http', 'url', 'servers/detail',
@@ -814,8 +815,8 @@ class ServerTests(SynchronousTestCase):
         :func:`find_server` when giving the exact name of the server,
         regex-escapes the name
         """
-        server_config = {'server': _get_server_info()}
-        server_config['server']['name'] = r"this.is[]regex\dangerous()*"
+        server_config = _get_server_info()
+        server_config['name'] = r"this.is[]regex\dangerous()*"
 
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({"servers": []})
@@ -835,12 +836,10 @@ class ServerTests(SynchronousTestCase):
         """
         :func:`find_server` propagates any errors from Nova
         """
-        server_config = {'server': _get_server_info()}
-
         self.treq.get.return_value = succeed(mock.Mock(code=500))
         self.treq.content.return_value = succeed(error_body)
 
-        d = find_server('http://url/', 'my-auth-token', server_config)
+        d = find_server('http://url/', 'my-auth-token', _get_server_info())
         failure = self.failureResultOf(d, APIError)
         self.assertEqual(failure.value.code, 500)
 
@@ -849,12 +848,10 @@ class ServerTests(SynchronousTestCase):
         :func:`find_server` will return None for servers if Nova returns no
         matching servers
         """
-        server_config = {'server': _get_server_info()}
-
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({"servers": []})
 
-        d = find_server('http://url/', 'my-auth-token', server_config)
+        d = find_server('http://url/', 'my-auth-token', _get_server_info())
         self.assertIsNone(self.successResultOf(d))
 
     def test_find_server_raises_if_server_from_nova_has_wrong_metadata(self):
@@ -862,14 +859,12 @@ class ServerTests(SynchronousTestCase):
         :func:`find_server` will fail if the server Nova returned does not have
         matching metadata
         """
-        server_config = {'server': _get_server_info()}
-
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({
             'servers': [_get_server_info(metadata={'hello': 'there'})]
         })
 
-        d = find_server('http://url/', 'my-auth-token', server_config)
+        d = find_server('http://url/', 'my-auth-token', _get_server_info())
         self.failureResultOf(d, ServerCreationRetryError)
 
     def test_find_server_returns_match_from_nova(self):
@@ -877,12 +872,12 @@ class ServerTests(SynchronousTestCase):
         :func:`find_server` will return a server returned from Nova if the
         metadata match.
         """
-        server_config = {'server': _get_server_info(metadata={'hey': 'there'})}
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed(
             {'servers': [_get_server_info(metadata={'hey': 'there'})]})
 
-        d = find_server('http://url/', 'my-auth-token', server_config)
+        d = find_server('http://url/', 'my-auth-token',
+                        _get_server_info(metadata={'hey': 'there'}))
 
         self.assertEqual(
             self.successResultOf(d),
@@ -893,7 +888,6 @@ class ServerTests(SynchronousTestCase):
         :func:`find_server` will return a the first server returned from Nova
         whose metadata match.  It logs if there more than 1 server from Nova.
         """
-        server_config = {'server': _get_server_info()}
         servers = [
             _get_server_info(created='2014-04-04T04:04:04Z'),
             _get_server_info(created='2014-04-04T04:04:05Z'),
@@ -902,32 +896,31 @@ class ServerTests(SynchronousTestCase):
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({'servers': servers})
 
-        d = find_server('http://url/', 'my-auth-token', server_config,
+        d = find_server('http://url/', 'my-auth-token', _get_server_info(),
                         self.log)
 
         self.failureResultOf(d, ServerCreationRetryError)
 
-    def test_create_server(self):
+    @mock.patch('otter.worker.launch_server_v1.find_server')
+    def test_create_server(self, fs):
         """
-        create_server will perform a properly formed POST request to the
-        server endpoint and return the decoded json content.
+        :func:`create_server` will perform a properly formed POST request to the
+        server endpoint and return the decoded json content.  It will not
+        attempt to find a server in Nova if the create request succeeds.
         """
-        response = mock.Mock()
-        response.code = 202
+        req = ('POST', 'http://url/servers',
+               headers_to_hashable(headers('my-auth-token')),
+               json.dumps({'server': {'some': 'stuff'}}), ("log",))
+        resp = StubResponse(202, {})
 
-        self.treq.post.return_value = succeed(response)
+        _treq = StubTreq({req: resp}, {resp: '{"server": "created"}'})
 
-        server_config = {
-            'name': 'someServer',
-            'imageRef': '1',
-            'flavorRef': '3'
-        }
-
-        d = create_server('http://url/', 'my-auth-token', server_config)
+        d = create_server('http://url/', 'my-auth-token', {'some': 'stuff'},
+                          _treq=_treq)
 
         result = self.successResultOf(d)
-
-        self.assertEqual(result, self.treq.json_content.return_value)
+        self.assertEqual(result, {"server": "created"})
+        self.assertFalse(fs.called)
 
     def test_create_server_limits(self):
         """
@@ -961,24 +954,146 @@ class ServerTests(SynchronousTestCase):
         self.successResultOf(ret_ds[1])
         self.successResultOf(ret_ds[2])
 
-    def test_create_server_propagates_api_failure(self):
+    @mock.patch('otter.worker.launch_server_v1.find_server')
+    def test_create_server_propagates_api_failure_from_create(self, fs):
         """
-        create_server will propagate API failures.
+        :func:`create_server` will propagate API failures from the call to
+        create the server, if :func:`find_server` also failed with an API
+        failure.
         """
-        response = mock.Mock()
-        response.code = 500
+        req = ('POST', 'http://url/servers',
+               headers_to_hashable(headers('my-auth-token')),
+               json.dumps({'server': {}}), ("log",))
+        resp = StubResponse(500, {})
 
-        self.treq.post.return_value = succeed(response)
-        self.treq.content.return_value = succeed(error_body)
+        clock = Clock()
+        _treq = StubTreq({req: resp}, {resp: 'failure'})
 
-        d = create_server('http://url/', 'my-auth-token', {})
+        fs.return_value = fail(APIError(401, '', {}))
 
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(RequestError))
+        d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
+                          retries=0, _treq=_treq, clock=clock,
+                          create_failure_delay=5)
+        clock.advance(5)
+
+        failure = self.failureResultOf(d, RequestError)
         real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
+
+        self.assertEqual(len(fs.mock_calls), 1)
+
+    @mock.patch('otter.worker.launch_server_v1.find_server')
+    def test_create_server_returns_found_server(self, fs):
+        """
+        If attempting to create a server fails due to a Nova error or identity
+        error, but a server was indeed created and found, :func:`create_server`
+        returns this found server successfully.  Creation is not retried.
+        """
+        req = ('POST', 'http://url/servers',
+               headers_to_hashable(headers('my-auth-token')),
+               json.dumps({'server': {'some': 'stuff'}}), ("log",))
+        resp = StubResponse(500, {})
+
+        clock = Clock()
+        _treq = StubTreq({req: resp}, {resp: 'failure'})
+
+        fs.return_value = succeed("I'm a server!")
+
+        d = create_server('http://url/', 'my-auth-token', {'some': 'stuff'},
+                          _treq=_treq, create_failure_delay=5, clock=clock)
+        self.assertNoResult(d)
+
+        clock.advance(5)
+
+        result = self.successResultOf(d)
+        self.assertEqual(result, "I'm a server!")
+
+    @mock.patch('otter.worker.launch_server_v1.find_server')
+    def test_create_server_errors_if_no_server_found(self, fs):
+        """
+        If attempting to create a server fails due to a Nova error or identity
+        error, and a created server was not found, :func:`create_server`
+        returns original error when on the last retry.
+        """
+        req = ('POST', 'http://url/servers',
+               headers_to_hashable(headers('my-auth-token')),
+               json.dumps({'server': {}}), ("log",))
+        resp = StubResponse(500, {})
+
+        clock = Clock()
+        _treq = StubTreq({req: resp}, {resp: 'failure'})
+
+        fs.return_value = succeed(None)
+
+        d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
+                          retries=0, _treq=_treq, clock=clock,
+                          create_failure_delay=5)
+        self.assertNoResult(d)
+        clock.advance(5)
+
+        failure = self.failureResultOf(d, RequestError)
+        real_failure = failure.value.reason
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+
+        self.assertEqual(fs.mock_calls,
+                         [mock.call('http://url/', 'my-auth-token', {},
+                                    log=self.log)])
+
+    @mock.patch('otter.worker.launch_server_v1.find_server')
+    def test_create_server_retries_if_no_server_found(self, fs):
+        """
+        If attempting to create a server fails due to a Nova error or identity
+        error, and no server was found to be created, :func:`create_server`
+        reties the create up to 3 times by default
+        """
+        req = ('POST', 'http://url/servers',
+               headers_to_hashable(headers('my-auth-token')),
+               json.dumps({'server': {}}), ("log",))
+        resp = StubResponse(500, {})
+
+        _treq = StubTreq({req: resp}, {resp: error_body})
+
+        fs.side_effect = lambda *a, **kw: succeed(None)
+
+        clock = Clock()
+        d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
+                          clock=clock, _treq=_treq, create_failure_delay=5)
+        clock.advance(5)
+
+        for i in range(3):
+            self.assertEqual(len(fs.mock_calls), i + 1)
+            clock.pump([15, 5])
+
+        self.failureResultOf(d)
+        self.assertEqual(len(fs.mock_calls), 4)
+
+    @mock.patch('otter.worker.launch_server_v1.find_server')
+    def test_create_server_does_not_retry_on_400_response(self, fs):
+        """
+        If attempting to create a server fails due to a Nova 400 error,
+        creation is not retried.  Server existence is not attempted.
+        """
+        req = ('POST', 'http://url/servers',
+               headers_to_hashable(headers('my-auth-token')),
+               json.dumps({'server': {}}), ("log",))
+        resp = StubResponse(400, {})
+
+        _treq = StubTreq({req: resp}, {resp: "User error!"})
+
+        clock = Clock()
+        d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
+                          clock=clock, _treq=_treq)
+        clock.advance(15)
+
+        failure = self.failureResultOf(d, RequestError)
+        self.assertTrue(failure.value.reason.check(APIError))
+        real_failure = failure.value.reason
+        self.assertEqual(real_failure.value.code, 400)
+        self.assertFalse(fs.called)
 
     @mock.patch('otter.worker.launch_server_v1.server_details')
     def test_wait_for_active(self, server_details):
@@ -1266,6 +1381,41 @@ class ServerTests(SynchronousTestCase):
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_server_doesnt_check_networks_if_no_load_balancers(
+            self, wait_for_active, create_server, add_to_load_balancers):
+        """
+        :func:`launch_server` will succeed at launching a server that has no
+        servicenet configured, so long as it also does not require load
+        balancers
+        """
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'}}
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'public': [{'version': 4, 'addr': '10.0.0.1'}]}
+            }
+        }
+
+        create_server.return_value = succeed(server_details)
+        wait_for_active.return_value = succeed(server_details)
+
+        log = mock.Mock()
+        d = launch_server(log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo)
+
+        result = self.successResultOf(d)
+        self.assertEqual(result, (server_details, []))
+
+        self.assertFalse(add_to_load_balancers.called)
+
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
     def test_launch_server_propagates_create_server_errors(
             self, wait_for_active, create_server, add_to_load_balancers):
         """
@@ -1336,8 +1486,10 @@ class ServerTests(SynchronousTestCase):
         """
         launch_server will propagate any errors from add_to_load_balancers.
         """
-        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
-                         'loadBalancers': []}
+        launch_config = {
+            'server': {'imageRef': '1', 'flavorRef': '1'},
+            'loadBalancers': [{'loadBalancerId': 12345, 'port': 80}]
+        }
 
         server_details = {
             'server': {
