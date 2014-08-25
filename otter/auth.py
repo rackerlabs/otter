@@ -189,43 +189,37 @@ class ImpersonatingAuthenticator(object):
                               self._identity_admin_password,
                               log=log)
         d.addCallback(extract_token)
-        d.addCallback(self._set_token)
-
-    def _set_token(self, token):
-        self._token = token
-        return self._token
+        d.addCallback(partial(setattr, self, "_token"))
 
     def authenticate_tenant(self, tenant_id, log=None):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
-        if not self._token:
-            d = self._auth_me(log)
-        else:
-            d = succeed(None)
+        d = user_for_tenant(self._admin_url,
+                            self._identity_admin_user,
+                            self._identity_admin_password,
+                            tenant_id, log=log)
 
-        def find_user(_):
-            d = user_for_tenant(self._admin_url,
-                                self._identity_admin_user,
-                                self._identity_admin_password,
-                                tenant_id, log=log)
-            d.addCallback(lambda username: (identity_admin_token, username))
-            return d
+        def auth_if_needed(user):
+            if self._token is None:
+                return self._auth_me(log).addCallback(lambda _: user)
+            else:
+                return user
 
-        d.addCallback(find_user)
+        d.addCallback(auth_if_needed)
 
         def reauth_and_try_on_401(f):
             f.trap(UpstreamError)
             f.value.reason.trap(APIError)
             if f.value.reason.value.code == 401:
-                d = self._auth_me(log)
-                d.addCallback(lambda t: impersonate(user))
+                self._token = None
+                return self._auth_me(log).addCallback(lambda t: impersonate(user))
             else:
                 return f
 
         def impersonate(user):
             iud = impersonate_user(self._admin_url,
-                                   identity_admin_token,
+                                   self._token,
                                    user, log=log)
             iud.addCallback(extract_token)
             return iud
