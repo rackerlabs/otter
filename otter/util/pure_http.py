@@ -1,5 +1,5 @@
 """
-Pure HTTP utilities.
+Purely functional HTTP client.
 """
 import json
 
@@ -120,10 +120,12 @@ _request = compose(content_request, _request)
 
 def request(method, url, *args, **kwargs):
     """
-    Make an HTTP request, with a number of conveniences:
+    Make an HTTP request, with a number of conveniences. Accepts the same
+    arguments as :class:`Request`, in addition to these:
 
-    :param success_codes: HTTP codes to accept as successful
+    :param tuple success_codes: integer HTTP codes to accept as successful
     :param data: python object, to be encoded with json
     :param auth: a function to be used to retrieve auth tokens
+    :param tuple reauth_codes: integer HTTP codes upon which to reauthenticate
     """
     return _request(method, url, *args, **kwargs)
