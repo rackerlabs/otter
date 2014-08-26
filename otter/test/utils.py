@@ -13,6 +13,8 @@ from testtools.matchers import Mismatch
 
 from twisted.internet import defer
 from twisted.internet.defer import succeed, Deferred, maybeDeferred
+from twisted.internet.interfaces import IReactorThreads
+
 from twisted.python.failure import Failure
 from twisted.application.service import Service
 
@@ -399,6 +401,61 @@ class FakeSupervisor(object, Service):
         self.del_index += 1
         self.del_calls.append((log, transaction_id, scaling_group, server))
         return succeed(self.del_index)
+
+
+class FakeThreadPool(object):
+    """
+    A fake thread pool that actually just runs things synchronously in
+    the calling thread.
+    """
+    def callInThread(self, func, *args, **kw):
+        """
+        Calls ``func`` with given arguments in the calling thread.
+        """
+        return func(*args, **kw)
+
+    def callInThreadWithCallback(self, onResult, func, *args, **kw):
+        """
+        Calls ``func`` with given arguments in the calling thread.
+
+        If ``onResult`` is :const:`None`, it is not used. Otherwise,
+        it is called with :const:`True` and the result if the call
+        succeeded, or :const:`False` and the failure if it failed.
+        """
+        if onResult is None:
+            onResult = lambda success, result: None
+
+        try:
+            result = func(*args, **kw)
+        except Exception as e:
+            onResult(False, Failure(e))
+        else:
+            onResult(True, result)
+
+
+@implementer(IReactorThreads)
+class FakeReactorThreads(object):
+    """
+    An IReactorThreads implementation that doesn't actually run
+    anything in any other threads.
+    """
+    def getThreadPool(self):
+        """
+        Return a new :class:`FakeThreadPool`.
+        """
+        return FakeThreadPool()
+
+    def callInThread(self, f, *args, **kwargs):
+        """
+        Just call the function with the arguments.
+        """
+        return f(*args, **kwargs)
+
+    def callFromThread(self, f, *args, **kw):
+        """
+        Just call the function with the arguments.
+        """
+        return f(*args, **kw)
 
 
 def mock_group(state, tenant_id='tenant', group_id='group'):

@@ -13,6 +13,7 @@ jsonfig==0.1.1
 testtools==0.9.32
 croniter==0.3.3
 txkazoo==0.0.5
+alchimia==0.4
 
 # pinning dependencies of dependencies
 
