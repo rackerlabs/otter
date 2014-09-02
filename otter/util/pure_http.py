@@ -46,30 +46,35 @@ def get_request(method, url, **kwargs):
     return Effect(Request(method=method, url=url, **kwargs))
 
 
-def request_with_auth(get_request, method, url, auth=None,
+def request_with_auth(get_request, method, url,
+                      get_auth_headers,
+                      refresh_auth_info,
                       headers=None, reauth_codes=(401, 403),
                       **kwargs):
     """
-    Create an authenticated request. If the request fails with an auth-related
-    error, a fresh token will be requested automatically.
+    Create an authenticated request.
 
-    The given 'auth' argument should be a function that returns an Effect of
-    authentication headers to add to the request. Before the request is made,
-    the auth function will be called with no arguments to get the auth token to
-    be used (which may be cached). If the application request fails with an
-    auth-related error, the auth function will be invoked again, with a
-    refresh=True argument. In this case, new authentication information should
-    be retrieved from the authentication service and cached for future calls.
+    This handles book-keeping on a caching auth info store by using
+    (optionally) cached auth information to create the request, and in
+    the event of an authentication error (specified by :param:`reauth_codes`),
+    clearing that cache.
 
-    If refreshing auth information returns successfully, the original response
-    will be returned. If it results in an error, that error will be
+    :param get_auth_headers: A function that returns an Effect of
+        (perhaps cached) auth-related headers to add to the request.
+    :param refresh_auth_info: A function that returns an Effect which indicates
+        that a future call to get_auth_headers should return a fresh set of
+        headers. This may or may not actually retrieve the new information to
+        store in a cache -- it just needs to cause the next get_auth_headers
+        to be fresh. Any successful result of this effect is ignored.
+
+    If either of these functions result in an error, that error will be
     propagated.
     """
 
-    def handle_reauth(result):
+    def maybe_refresh(result):
         response, content = result
         if response.code in reauth_codes:
-            return auth(refresh=True).on(success=lambda headers: result)
+            return refresh_auth_info().on(success=lambda ignored: result)
         else:
             return result
 
@@ -77,9 +82,9 @@ def request_with_auth(get_request, method, url, auth=None,
         req_headers = {} if headers is None else headers
         req_headers = merge(req_headers, auth_headers)
         eff = get_request(method, url, headers=req_headers, **kwargs)
-        return eff.on(success=lambda r: handle_reauth(r))
+        return eff.on(success=maybe_refresh)
 
-    return auth().on(success=try_request)
+    return get_auth_headers().on(success=try_request)
 
 
 def status_check(success_codes, result):
@@ -125,7 +130,8 @@ def request(method, url, *args, **kwargs):
 
     :param tuple success_codes: integer HTTP codes to accept as successful
     :param data: python object, to be encoded with json
-    :param auth: a function to be used to retrieve auth tokens
+    :param get_auth_headers: a function to retrieve auth tokens
+    :param refresh_auth_info: a function to refresh the auth cache
     :param tuple reauth_codes: integer HTTP codes upon which to reauthenticate
     """
     return _request(method, url, *args, **kwargs)
