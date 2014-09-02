@@ -2,7 +2,7 @@
 Initial implementation of a version one launch_server_v1 config.
 
 Ultimately this launch config will be responsible for:
-0) Generating server name and injecting our AS metadata (TODO)
+0) Generating server name and injecting our AS metadata
 1) Starting a server
 2) Executing a user defined deployment script (TODO)
 3) Adding the server to a load balancer.
@@ -573,7 +573,7 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
     launch_config = deepcopy(launch_config)
     server_config = launch_config['server']
 
-    if 'metadata' not in server_config:
+    if not isinstance(server_config.get('metadata'), dict):
         server_config['metadata'] = {}
 
     server_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid

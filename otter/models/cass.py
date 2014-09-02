@@ -24,6 +24,7 @@ from otter.util.config import config_value
 from otter.util.deferredutils import with_lock
 from otter.scheduler import next_cron_occurrence
 from otter.log import log as otter_log
+from otter.json_schema.group_schemas import normalize_launch_config
 
 from silverberg.client import ConsistencyLevel
 
@@ -44,6 +45,7 @@ def serialize_json_data(data, ver):
     dataOut = data.copy()
     dataOut["_ver"] = ver
     return json.dumps(dataOut)
+
 
 # ACHTUNG LOOKENPEEPERS!
 #
@@ -613,7 +615,8 @@ class CassScalingGroup(object):
         def _generate_manifest((group, policies)):
             return {
                 'groupConfiguration': _jsonloads_data(group['group_config']),
-                'launchConfiguration': _jsonloads_data(group['launch_config']),
+                'launchConfiguration': normalize_launch_config(
+                    _jsonloads_data(group['launch_config'])),
                 'scalingPolicies': policies,
                 'id': self.uuid,
                 'state': _unmarshal_state(group)
@@ -660,7 +663,8 @@ class CassScalingGroup(object):
                           self.get_consistency('view', 'partial'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
 
-        return d.addCallback(lambda group: _jsonloads_data(group['launch_config']))
+        return d.addCallback(lambda group: normalize_launch_config(
+            _jsonloads_data(group['launch_config'])))
 
     def view_state(self, consistency=None):
         """

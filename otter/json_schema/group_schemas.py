@@ -51,6 +51,21 @@ metadata = {
     "additionalProperties": False
 }
 
+server_metadata = {
+    # TODO: Taken from Nova's validation code at
+    # https://github.com/openstack/nova/blob/master/nova/api/validation/parameter_types.py#L83.
+    # It will be ideal to import nova package and use their schema but their
+    # schema is not fully complete and there are lots of dependencies when trying to
+    # install nova package
+    "type": "object",
+    "patternProperties": {
+        "^[a-zA-Z0-9-_:. ]{1,255}$": {
+            "type": "string", "maxLength": 255
+        }
+    },
+    "additionalProperties": False,
+}
+
 # nova server payload
 server = {
     "type": "object",
@@ -95,18 +110,7 @@ server = {
             "required": False
         },
         "metadata": {
-            # TODO: Taken from Nova's validation code at
-            # https://github.com/openstack/nova/blob/master/nova/api/validation/parameter_types.py#L83.
-            # It will be ideal to import nova package and use their schema but their
-            # schema is not fully complete and there are lots of dependencies when trying to
-            # install nova package
-            "type": "object",
-            "patternProperties": {
-                "^[a-zA-Z0-9-_:. ]{1,255}$": {
-                    "type": "string", "maxLength": 255
-                }
-            },
-            "additionalProperties": False,
+            "type": [server_metadata, "null"],
             "required": False
         }
     },
@@ -449,3 +453,16 @@ webhook = {
 
 update_webhook = deepcopy(webhook)
 update_webhook['properties']['metadata']['required'] = True
+
+
+def normalize_launch_config(config):
+    """
+    Normalize the metadata argument as part of the server arg in the launch
+    config - if it is null or invalid, just remove it.
+    """
+    server_info = config.get('args', {}).get('server', {})
+
+    if not isinstance(server_info.get('metadata'), dict):
+        server_info.pop('metadata', None)
+
+    return config

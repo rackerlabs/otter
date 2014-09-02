@@ -1800,11 +1800,57 @@ class ConfigPreparationTests(SynchronousTestCase):
 
         self.assertEqual(expected_name, launch_config['server']['name'])
 
-    def test_server_metadata(self):
+    def test_server_metadata_no_metadata(self):
         """
-        The auto scaling group should be added to the server metadata.
+        The auto scaling group should be added to the server metadata if no
+        metadata was provided.
         """
         test_config = {'server': {}}
+        expected_metadata = {
+            'rax:auto_scaling_group_id': self.scaling_group_uuid}
+
+        launch_config = prepare_launch_config(self.scaling_group_uuid,
+                                              test_config)
+
+        self.assertEqual(expected_metadata,
+                         launch_config['server']['metadata'])
+
+    def test_server_metadata_empty_metadata(self):
+        """
+        The auto scaling group should be added to the server metadata if an
+        empty metadata dict was provided.
+        """
+        test_config = {'server': {'metadata': {}}}
+        expected_metadata = {
+            'rax:auto_scaling_group_id': self.scaling_group_uuid}
+
+        launch_config = prepare_launch_config(self.scaling_group_uuid,
+                                              test_config)
+
+        self.assertEqual(expected_metadata,
+                         launch_config['server']['metadata'])
+
+    def test_server_metadata_null_metadata(self):
+        """
+        The auto scaling group should be added to the server metadata if null
+        was provided as metadata.
+        """
+        test_config = {'server': {'metadata': None}}
+        expected_metadata = {
+            'rax:auto_scaling_group_id': self.scaling_group_uuid}
+
+        launch_config = prepare_launch_config(self.scaling_group_uuid,
+                                              test_config)
+
+        self.assertEqual(expected_metadata,
+                         launch_config['server']['metadata'])
+
+    def test_server_metadata_invalid_metadata(self):
+        """
+        The auto scaling group should be added to the server metadata if invalid
+        metadata was provided.
+        """
+        test_config = {'server': {'metadata': []}}
         expected_metadata = {
             'rax:auto_scaling_group_id': self.scaling_group_uuid}
 
