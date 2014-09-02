@@ -55,7 +55,7 @@ if [[ "$1" == "--dev" ]]; then
 fi
 
 echo "Building virtualenv..."
-terrarium --target ${TARGET} install $REQUIREMENTS
+terrarium --no-bootstrap --target ${TARGET} install $REQUIREMENTS
 
 echo "Virtualenv build.  Done."
 
