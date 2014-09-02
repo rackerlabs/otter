@@ -58,10 +58,10 @@ class PureHTTPClientTests(TestCase):
             return Effect(Constant(headers("my-token")))
         return (
             lambda *args, **kwargs:
-                resolve_stubs(request(*args,
-                                      get_auth_headers=auth,
-                                      refresh_auth_info=lambda: None,
-                                      **kwargs)))
+            resolve_stubs(request(*args,
+                                  get_auth_headers=auth,
+                                  refresh_auth_info=lambda: None,
+                                  **kwargs)))
 
     def test_json_request(self):
         """
@@ -157,8 +157,10 @@ class PureHTTPClientTests(TestCase):
 
         def get_auth_headers():
             return Effect(Constant(headers("first-token")))
+
         def refresh_auth_info():
             return reauth_effect
+
         # First we try to make a simple request.
         kwargs = {}
         if reauth_codes is not None:

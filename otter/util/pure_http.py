@@ -46,45 +46,55 @@ def get_request(method, url, **kwargs):
     return Effect(Request(method=method, url=url, **kwargs))
 
 
+def auth_request(get_request, method, url, get_auth_headers, headers=None,
+                 **kwargs):
+    """
+    Performs an authenticated request, calling a function to get auth headers.
+
+    :param get_auth_headers: A function that should return an Effect that
+        returns auth-related headers as a dict.
+    """
+    def try_request(auth_headers):
+        req_headers = {} if headers is None else headers
+        req_headers = merge(req_headers, auth_headers)
+        eff = get_request(method, url, headers=req_headers, **kwargs)
+        return eff
+    return get_auth_headers().on(success=try_request)
+
+
+def refresh_auth_on_error(reauth_codes, refresh_auth_info, result):
+    """
+    Refreshes an auth cache if an HTTP response is an auth-related error.
+
+    :param refresh_auth_info: A function that should return an Effect that
+        invalidates or clears out any cached auth information that
+        auth_request's get_auth_headers function returns.
+    :param tuple reauth_codes: integer HTTP codes which should cause a refresh.
+    """
+    response, content = result
+    if response.code in reauth_codes:
+        return refresh_auth_info().on(success=lambda ignored: result)
+    else:
+        return result
+
+
 def request_with_auth(get_request, method, url,
                       get_auth_headers,
                       refresh_auth_info,
                       headers=None, reauth_codes=(401, 403),
                       **kwargs):
     """
-    Create an authenticated request.
+    Get a request that will perform book-keeping on cached auth info.
 
-    This handles book-keeping on a caching auth info store by using
-    (optionally) cached auth information to create the request, and in
-    the event of an authentication error (specified by :param:`reauth_codes`),
-    clearing that cache.
+    This composes the :func:`auth_request` and :func:`refresh_auth_on_error`
+    functions.
 
-    :param get_auth_headers: A function that returns an Effect of
-        (perhaps cached) auth-related headers to add to the request.
-    :param refresh_auth_info: A function that returns an Effect which indicates
-        that a future call to get_auth_headers should return a fresh set of
-        headers. This may or may not actually retrieve the new information to
-        store in a cache -- it just needs to cause the next get_auth_headers
-        to be fresh. Any successful result of this effect is ignored.
-
-    If either of these functions result in an error, that error will be
-    propagated.
+    :param get_auth_headers: As per :func:`auth_request`
+    :param refresh_auth_info: As per :func:`refresh_auth_on_error`
+    :param reauth_codes: As per :func:`refresh_auth_on_error`.
     """
-
-    def maybe_refresh(result):
-        response, content = result
-        if response.code in reauth_codes:
-            return refresh_auth_info().on(success=lambda ignored: result)
-        else:
-            return result
-
-    def try_request(auth_headers):
-        req_headers = {} if headers is None else headers
-        req_headers = merge(req_headers, auth_headers)
-        eff = get_request(method, url, headers=req_headers, **kwargs)
-        return eff.on(success=maybe_refresh)
-
-    return get_auth_headers().on(success=try_request)
+    eff = auth_request(get_request, method, url, get_auth_headers, headers=headers, **kwargs)
+    return eff.on(success=partial(refresh_auth_on_error, reauth_codes, refresh_auth_info))
 
 
 def status_check(success_codes, result):
