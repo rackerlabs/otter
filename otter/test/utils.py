@@ -253,8 +253,8 @@ def mock_log(*args, **kwargs):
 
         log.msg.assert_called_with(mock.ANY, bound_value1="val", ...)
 
-    Since in all likelyhood, testing that certain values are bound would be more
-    important than testing the exact logged message.
+    Since in all likelyhood, testing that certain values are bound would be
+    more important than testing the exact logged message.
     """
     return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
 
@@ -272,6 +272,8 @@ def stub_pure_response(body, code=200, response_headers=None):
     """
     Return the type of two-tuple response that pure_http.Request returns.
     """
+    if isinstance(body, dict):
+        body = json.dumps(body)
     if response_headers is None:
         response_headers = {}
     return (StubResponse(code, response_headers), body)
