@@ -59,7 +59,7 @@ def request_with_auth(get_request, method, url, auth=None,
     be used (which may be cached). If the application request fails with an
     auth-related error, the auth function will be invoked again, with a
     refresh=True argument. In this case, new authentication information should
-    be retrieved from the authentication service, if necessary.
+    be retrieved from the authentication service and cached for future calls.
 
     If refreshing auth information returns successfully, the original response
     will be returned. If it results in an error, that error will be
