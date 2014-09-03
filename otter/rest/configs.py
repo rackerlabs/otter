@@ -27,8 +27,8 @@ def normalize_launch_config(config):
     """
     server_info = config.get('args', {}).get('server', {})
 
-    if not isinstance(server_info.get('metadata'), dict):
-        server_info.pop('metadata', None)
+    if server_info.get('metadata') is None:
+        server_info.pop('metadata')
 
     return config
 
