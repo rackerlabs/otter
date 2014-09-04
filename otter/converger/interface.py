@@ -22,7 +22,7 @@ class IConverger(Interface):
 
         :param bytes group_id: The group's unique identifier.
         :param int desired_capacity: The desired number of machines for the
-            load balancer.
+            scaling group.
         :raises ValueError: (synchronously) If the given desired
             capacity is impossible, e.g. negative or larger than some
             system-wide limit.
