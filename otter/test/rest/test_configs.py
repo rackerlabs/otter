@@ -418,6 +418,38 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_group.update_launch_config.assert_called_once_with(
             launch_examples()[0])
 
+    def test_update_launch_config_null_server_metadata(self):
+        """
+        Updating a launch config with null as the server metadata causes the
+        update to happen with effectively no metadata.
+        """
+        launch = launch_examples()[0]
+        launch['args']['server']['metadata'] = None
+
+        expected_launch = launch_examples()[0]
+        expected_launch['args']['server'].pop('metadata', None)
+
+        self.mock_group.update_launch_config.return_value = defer.succeed(None)
+        self.assert_status_code(
+            204, method='PUT', body=json.dumps(launch))
+        self.mock_group.update_launch_config.assert_called_once_with(
+            expected_launch)
+
+    def test_update_launch_config_invalid_server_metadata(self):
+        """
+        If invalid server metadata is provided, updating the launch config will
+        fail with a 400
+        """
+        launch = launch_examples()[0]
+        launch['args']['server']['metadata'] = "invalid"
+
+        self.mock_group.update_launch_config.return_value = defer.succeed(None)
+        self.assert_status_code(
+            400, method='PUT', body=json.dumps(launch))
+
+        self.assertFalse(self.mock_store.get_scaling_group.called)
+        self.assertFalse(self.mock_group.update_launch_config.called)
+
     def test_launch_config_modify_bad_or_missing_input_400(self):
         """
         Checks that an update with no PUT data will fail with a 400
