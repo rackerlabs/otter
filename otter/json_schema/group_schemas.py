@@ -146,6 +146,7 @@ launch_server = {
                     # doesn't seem like a good idea.
                     "required": False,
                     "minItems": 0,
+                    "maxItems": 5,
                     "uniqueItems": True,
                     "items": {
                         "type": "object",
