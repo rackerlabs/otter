@@ -61,8 +61,23 @@ class IAuthenticator(Interface):
         """
         :param tenant_id: A keystone tenant ID to authenticate as.
 
-        :returns: 2-tuple of auth token and service catalog.
+        :returns: Deferred of a 2-tuple of auth token and service catalog.
         """
+
+
+class ICachingAuthenticator(IAuthenticator):
+    def invalidate(tenant_id):
+        """
+        Invalidate the cache for a particular tenant.
+
+        After this is called, a call to authenticate_tenant must return a fresh
+        token.
+
+        :param tenant_id: A keystone tenant ID
+
+        :returns: None
+        """
+
 
 
 @implementer(IAuthenticator)
@@ -113,7 +128,7 @@ class WaitingAuthenticator(object):
         return d
 
 
-@implementer(IAuthenticator)
+@implementer(ICachingAuthenticator)
 class CachingAuthenticator(object):
     """
     An authenticator which cases the result of the provided auth_function
@@ -142,12 +157,10 @@ class CachingAuthenticator(object):
                         cache_ttl=self._ttl,
                         **kwargs)
 
-    def authenticate_tenant(self, tenant_id, log=None, refresh=False):
+    def authenticate_tenant(self, tenant_id, log=None):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
-        if refresh:
-            self.invalidate(tenant_id)
         if log is None:
             log = self._log.bind(tenant_id=tenant_id)
         else:
@@ -196,12 +209,8 @@ class CachingAuthenticator(object):
         return d
 
     def invalidate(self, tenant_id):
-        # You may be concerned about what would happen if we're currently
-        # authentication. I don't think we need to worry about it.
+        """Remove a tenant's token from the cache."""
         self._cache.pop(tenant_id, None)
-
-    def pure_http_auth(self, tenant_id, refresh=False):
-        return self.authenticate_tenant(tenant_id)
 
 
 
