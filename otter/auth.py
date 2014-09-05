@@ -61,7 +61,25 @@ class IAuthenticator(Interface):
         """
         :param tenant_id: A keystone tenant ID to authenticate as.
 
-        :returns: 2-tuple of auth token and service catalog.
+        :returns: Deferred of a 2-tuple of auth token and service catalog.
+        """
+
+
+class ICachingAuthenticator(IAuthenticator):
+    """
+    Caching authenticators can authenticate tenants and can have their cache
+    invalidated on a tenant-by-tenant basis.
+    """
+    def invalidate(tenant_id):
+        """
+        Invalidate the cache for a particular tenant.
+
+        After this is called, a call to authenticate_tenant must return a fresh
+        token.
+
+        :param tenant_id: A keystone tenant ID
+
+        :returns: :data:`None`
         """
 
 
@@ -113,7 +131,7 @@ class WaitingAuthenticator(object):
         return d
 
 
-@implementer(IAuthenticator)
+@implementer(ICachingAuthenticator)
 class CachingAuthenticator(object):
     """
     An authenticator which cases the result of the provided auth_function
@@ -192,6 +210,10 @@ class CachingAuthenticator(object):
         d.addErrback(when_auth_fails)
 
         return d
+
+    def invalidate(self, tenant_id):
+        """Remove a tenant's token from the cache."""
+        self._cache.pop(tenant_id, None)
 
 
 @implementer(IAuthenticator)
