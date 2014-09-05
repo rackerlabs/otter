@@ -554,6 +554,18 @@ class CachingAuthenticatorTests(SynchronousTestCase):
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(APIError))
 
+    def test_invalidate(self):
+        """
+        The invalidate method causes the next authenticate_tenant call to
+        re-authenticate.
+        """
+        self.ca.authenticate_tenant(1)
+        self.ca.invalidate(1)
+        self.ca.authenticate_tenant(1)
+        self.auth_function.assert_has_calls([
+            mock.call(1, log=matches(IsInstance(default_log.__class__))),
+            mock.call(1, log=matches(IsInstance(default_log.__class__)))])
+
 
 class RetryingAuthenticatorTests(SynchronousTestCase):
     """
