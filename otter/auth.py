@@ -79,7 +79,7 @@ class ICachingAuthenticator(IAuthenticator):
 
         :param tenant_id: A keystone tenant ID
 
-        :returns: None
+        :returns: :data:`None`
         """
 
 
