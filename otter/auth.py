@@ -66,6 +66,10 @@ class IAuthenticator(Interface):
 
 
 class ICachingAuthenticator(IAuthenticator):
+    """
+    Caching authenticators can authenticate tenants and can have their cache
+    invalidated on a tenant-by-tenant basis.
+    """
     def invalidate(tenant_id):
         """
         Invalidate the cache for a particular tenant.
@@ -77,7 +81,6 @@ class ICachingAuthenticator(IAuthenticator):
 
         :returns: None
         """
-
 
 
 @implementer(IAuthenticator)
@@ -211,7 +214,6 @@ class CachingAuthenticator(object):
     def invalidate(self, tenant_id):
         """Remove a tenant's token from the cache."""
         self._cache.pop(tenant_id, None)
-
 
 
 @implementer(IAuthenticator)
