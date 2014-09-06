@@ -1261,9 +1261,13 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'INSERT INTO policy_webhooks("tenantId", "groupId", "policyId", "webhookId", '
             'data, capability, "webhookKey") VALUES (:tenantId, :groupId, :policyId, '
             ':webhook0Id, :webhook0, :webhook0Capability, :webhook0Key) '
+            'INSERT INTO webhook_keys("tenantId", "groupId", "policyId", "webhookKey") '
+            'VALUES (:tenantId, :groupId, :policyId, :webhook0Key) '
             'INSERT INTO policy_webhooks("tenantId", "groupId", "policyId", "webhookId", '
             'data, capability, "webhookKey") VALUES (:tenantId, :groupId, :policyId, '
             ':webhook1Id, :webhook1, :webhook1Capability, :webhook1Key) '
+            'INSERT INTO webhook_keys("tenantId", "groupId", "policyId", "webhookKey") '
+            'VALUES (:tenantId, :groupId, :policyId, :webhook1Key) '
             'APPLY BATCH;')
 
         # can't test the parameters, because they contain serialized JSON.

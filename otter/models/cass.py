@@ -104,6 +104,9 @@ _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey") VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
     ':{name}Capability, :{name}Key)')
+_cql_insert_webhook_key = (
+    'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookKey") '
+    'VALUES (:tenantId, :groupId, :policyId, :{name}Key)')
 _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", {column}) '
                'VALUES (:tenantId, :groupId, {name}) USING TIMESTAMP :ts')
 _cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
@@ -320,7 +323,8 @@ def _build_schedule_policy(policy, event_table, queries, data, polname, buckets)
         data[polname + 'cron'] = cron
 
 
-def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters):
+def _build_webhooks(bare_webhooks, webhooks_table, webhooks_keys_table,
+                    queries, cql_parameters):
     """
     Because inserting many values into a table with compound keys with one
     insert statement is hard. This builds a bunch of insert statements and a
@@ -349,6 +353,8 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters):
         webhook_id = generate_key_str('webhook')
         queries.append(_cql_insert_webhook.format(cf=webhooks_table,
                                                   name=name))
+        queries.append(_cql_insert_webhook_key.format(cf=webhooks_keys_table,
+                                                      name=name))
 
         # generate the real data that will be stored, which includes the webhook
         # token, the capability stuff, and metadata by default
@@ -571,6 +577,7 @@ class CassScalingGroup(object):
         self.policies_table = "scaling_policies"
         self.state_table = "group_state"
         self.webhooks_table = "policy_webhooks"
+        self.webhooks_keys_table = "webhook_keys"
         self.event_table = "scaling_schedule_v2"
 
         self.get_consistency = get_consistency
@@ -992,8 +999,8 @@ class CassScalingGroup(object):
         def _do_create(lastRev):
             queries = []
             cql_params = main_params.copy()
-            output = _build_webhooks(data, self.webhooks_table, queries,
-                                     cql_params)
+            output = _build_webhooks(data, self.webhooks_table, self.webhooks_keys_table,
+                                     queries, cql_params)
 
             b = Batch(queries, cql_params,
                       consistency=self.get_consistency('create', 'webhook'))
