@@ -1083,7 +1083,7 @@ class CassScalingGroup(object):
         # Events can only be deleted by policy id, since that and trigger are
         # the only parts of the compound key
         @self.with_timestamp
-        def _delete_everything(ts, policies):
+        def _delete_everything(ts, webhooks):
             params = {
                 'tenantId': self.tenant_id,
                 'groupId': self.uuid,
@@ -1094,6 +1094,13 @@ class CassScalingGroup(object):
                 (self.policies_table, self.webhooks_table)]
             queries.append(_cql_delete_group.format(cf=self.group_table))
 
+            del_webhook_keys = 'DELETE FROM {cf} WHERE "webhookKey"=:{name}webhookKey'
+            for i, webhook in enumerate(webhooks):
+                name = 'key{}'.format(i)
+                queries.append(
+                    del_webhook_keys.format(cf=self.webhooks_keys_table, name=name))
+                params[name + 'webhookKey'] = webhook['webhookKey']
+
             b = Batch(queries, params,
                       consistency=self.get_consistency('delete', 'group'))
 
@@ -1103,7 +1110,7 @@ class CassScalingGroup(object):
             if len(state.active) + len(state.pending) > 0:
                 raise GroupNotEmptyError(self.tenant_id, self.uuid)
 
-            d = self._naive_list_policies()
+            d = self._naive_list_all_webhooks()
             d.addCallback(_delete_everything)
             return d
 

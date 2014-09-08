@@ -1841,18 +1841,17 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.flushLoggedErrors(GroupNotEmptyError)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
     def test_delete_empty_scaling_group_with_policies(self, mock_naive,
                                                       mock_view_state):
         """
         ``delete_group`` deletes config, launch config, state, and the group's
-        policies and webhooks and events if the scaling group is empty.
-        It uses naive list policies to figure out what events to delete.
+        policies and webhooks if the scaling group is empty.
         """
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
         mock_naive.return_value = defer.succeed(
-            [{'id': 'policyA'}, {'id': 'policyB'}])
+            [{'webhookKey': 'w1'}, {'webhookKey': 'w2'}])
 
         self.returns = [None]
         self.clock.advance(34.575)
@@ -1862,13 +1861,17 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         expected_data = {'tenantId': self.tenant_id,
                          'groupId': self.group_id,
-                         'ts': 34575000}
+                         'ts': 34575000,
+                         'key0webhookKey': 'w1',
+                         'key1webhookKey': 'w2'}
         expected_cql = (
             'BEGIN BATCH '
             'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM scaling_group USING TIMESTAMP :ts '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM webhook_keys WHERE "webhookKey"=:key0webhookKey '
+            'DELETE FROM webhook_keys WHERE "webhookKey"=:key1webhookKey '
             'APPLY BATCH;')
 
         self.connection.execute.assert_called_once_with(
@@ -1881,18 +1884,17 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             '/locks/' + self.group.uuid, recursive=True)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
     def test_delete_empty_scaling_group_with_zero_policies(self, mock_naive,
                                                            mock_view_state):
         """
         ``delete_group`` deletes config, launch config, state, and the group's
         policies and webhooks but not events if the scaling group is empty but
         has no policies.
-        It uses naive list policies to figure out what events to delete.
         """
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
-        mock_naive.return_value = defer.succeed({})
+        mock_naive.return_value = defer.succeed([])
 
         self.returns = [None]
         self.clock.advance(34.575)
