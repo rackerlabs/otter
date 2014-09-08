@@ -29,6 +29,16 @@ class Batch(object):
         return client.execute(self._generate(), self.params, self.consistency)
 
 
+def batch(statements, timestamp=None):
+    """
+    Return batch statement wrapping given statements.
+
+    NOTE: This is functionally same as above `Batch` class but is better since
+    it is pure and does not contain unnecessary args: params and connnection
+    """
+    return Batch(statements, {}, None, timestamp)._generate()
+
+
 # TODO: This should ideally goto silverberg but is here due to `timeout_deferred`
 # implementation. It should be coming out in Twisted itself.
 # See http://twistedmatrix.com/trac/changeset/42627

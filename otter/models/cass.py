@@ -17,7 +17,7 @@ from otter.models.interface import (
     NoSuchWebhookError, UnrecognizedCapabilityError,
     IScalingScheduleCollection, IAdmin, ScalingGroupOverLimitError,
     WebhooksOverLimitError, PoliciesOverLimitError)
-from otter.util.cqlbatch import Batch
+from otter.util.cqlbatch import Batch, batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
 from otter.util.config import config_value
@@ -1059,13 +1059,16 @@ class CassScalingGroup(object):
         self.log.bind(policy_id=policy_id, webhook_id=webhook_id).msg("Deleting webhook")
 
         def _do_delete(lastRev):
-            query = _cql_delete_one_webhook.format(cf=self.webhooks_table)
+            del_on_key = 'DELETE FROM {cf} WHERE "webhookKey"=:webhookKey'
+            queries = [_cql_delete_one_webhook.format(cf=self.webhooks_table),
+                       del_on_key.format(cf=self.webhooks_keys_table)]
 
-            d = self.connection.execute(query,
+            d = self.connection.execute(batch(queries),
                                         {"tenantId": self.tenant_id,
                                          "groupId": self.uuid,
                                          "policyId": policy_id,
-                                         "webhookId": webhook_id},
+                                         "webhookId": webhook_id,
+                                         "webhookKey": lastRev['capability']['hash']},
                                         self.get_consistency('delete', 'webhook'))
             return d
 

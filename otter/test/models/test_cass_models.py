@@ -1648,11 +1648,14 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             None]
         d = self.group.delete_webhook('3444', '4555')
         self.assertIsNone(self.successResultOf(d))  # delete returns None
-        expectedCql = ('DELETE FROM policy_webhooks WHERE '
+        expectedCql = ('BEGIN BATCH '
+                       'DELETE FROM policy_webhooks WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND '
-                       '"policyId" = :policyId AND "webhookId" = :webhookId')
+                       '"policyId" = :policyId AND "webhookId" = :webhookId '
+                       'DELETE FROM webhook_keys WHERE "webhookKey"=:webhookKey '
+                       'APPLY BATCH;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g",
-                        "policyId": "3444", "webhookId": "4555"}
+                        "policyId": "3444", "webhookId": "4555", 'webhookKey': 'h'}
 
         self.assertEqual(len(self.connection.execute.mock_calls), 2)  # view, delete
         self.connection.execute.assert_called_with(expectedCql,
