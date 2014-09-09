@@ -1128,7 +1128,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.succeed({}))
-    def test_delete_policy_valid_policy(self, mock_get_policy):
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks',
+                return_value=defer.succeed([{'webhookKey': 'w1'}, {'webhookKey': 'w2'}]))
+    def test_delete_policy_valid_policy(self, mock_webhooks, mock_get_policy):
         """
         When you delete a scaling policy, it checks if the policy exists and
         if it does, deletes the policy and all its associated webhooks.
@@ -1144,11 +1146,15 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             '"groupId" = :groupId AND "policyId" = :policyId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND '
             '"groupId" = :groupId AND "policyId" = :policyId '
+            'DELETE FROM webhook_keys WHERE "webhookKey"=:key0webhookKey '
+            'DELETE FROM webhook_keys WHERE "webhookKey"=:key1webhookKey '
             'APPLY BATCH;')
         expected_data = {
             "tenantId": self.group.tenant_id,
             "groupId": self.group.uuid,
-            "policyId": "3222"}
+            "policyId": "3222",
+            "key0webhookKey": 'w1',
+            "key1webhookKey": 'w2'}
 
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)

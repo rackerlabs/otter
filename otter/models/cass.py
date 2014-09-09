@@ -104,9 +104,6 @@ _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey") VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
     ':{name}Capability, :{name}Key)')
-_cql_insert_webhook_key = (
-    'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookKey") '
-    'VALUES (:tenantId, :groupId, :policyId, :{name}Key)')
 _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", {column}) '
                'VALUES (:tenantId, :groupId, {name}) USING TIMESTAMP :ts')
 _cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
@@ -131,8 +128,13 @@ _cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} '
 _cql_list_all_in_group = ('SELECT * FROM {cf} WHERE "tenantId" = :tenantId '
                           'AND "groupId" = :groupId {order_by};')
 
+# Webhook keys table
+_cql_insert_webhook_key = (
+    'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookKey") '
+    'VALUES (:tenantId, :groupId, :policyId, :{name}Key)')
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
+_cql_del_on_key = 'DELETE FROM {cf} WHERE "webhookKey"=:{name}webhookKey'
 
 _cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId;')
 _cql_count_for_policy = ('SELECT COUNT(*) FROM {cf} WHERE '
@@ -481,6 +483,13 @@ def verified_view(connection, view_query, del_query, data, consistency, exceptio
 
     d = connection.execute(view_query, data, consistency)
     return d.addCallback(_check_resurrection)
+
+
+def _append_del_webhook_queries(table, queries, params, webhooks):
+    for i, webhook in enumerate(webhooks):
+        name = 'key{}'.format(i)
+        queries.append(_cql_del_on_key.format(cf=table, name=name))
+        params[name + 'webhookKey'] = webhook['webhookKey']
 
 
 class WeakLocks(object):
@@ -905,17 +914,21 @@ class CassScalingGroup(object):
         """
         self.log.bind(policy_id=policy_id).msg("Deleting policy")
 
-        def _do_delete(_):
+        def _do_delete(webhooks):
             queries = [
                 _cql_delete_all_in_policy.format(cf=self.policies_table),
                 _cql_delete_all_in_policy.format(cf=self.webhooks_table)]
-            b = Batch(queries, {"tenantId": self.tenant_id,
-                                "groupId": self.uuid,
-                                "policyId": policy_id},
+            params = {"tenantId": self.tenant_id, "groupId": self.uuid,
+                      "policyId": policy_id}
+            # delete webhook keys
+            _append_del_webhook_queries(
+                self.webhooks_keys_table, queries, params, webhooks)
+            b = Batch(queries, params,
                       consistency=self.get_consistency('delete', 'policy'))
             return b.execute(self.connection)
 
         d = self.get_policy(policy_id)
+        d.addCallback(lambda _: self._naive_list_all_webhooks())
         d.addCallback(_do_delete)
         return d
 
@@ -1059,9 +1072,8 @@ class CassScalingGroup(object):
         self.log.bind(policy_id=policy_id, webhook_id=webhook_id).msg("Deleting webhook")
 
         def _do_delete(lastRev):
-            del_on_key = 'DELETE FROM {cf} WHERE "webhookKey"=:webhookKey'
             queries = [_cql_delete_one_webhook.format(cf=self.webhooks_table),
-                       del_on_key.format(cf=self.webhooks_keys_table)]
+                       _cql_del_on_key.format(cf=self.webhooks_keys_table, name='')]
 
             d = self.connection.execute(batch(queries),
                                         {"tenantId": self.tenant_id,
@@ -1094,12 +1106,9 @@ class CassScalingGroup(object):
                 (self.policies_table, self.webhooks_table)]
             queries.append(_cql_delete_group.format(cf=self.group_table))
 
-            del_webhook_keys = 'DELETE FROM {cf} WHERE "webhookKey"=:{name}webhookKey'
-            for i, webhook in enumerate(webhooks):
-                name = 'key{}'.format(i)
-                queries.append(
-                    del_webhook_keys.format(cf=self.webhooks_keys_table, name=name))
-                params[name + 'webhookKey'] = webhook['webhookKey']
+            # Add queries to delete webhook keys
+            _append_del_webhook_queries(
+                self.webhooks_keys_table, queries, params, webhooks)
 
             b = Batch(queries, params,
                       consistency=self.get_consistency('delete', 'group'))
