@@ -130,8 +130,8 @@ _cql_list_all_in_group = ('SELECT * FROM {cf} WHERE "tenantId" = :tenantId '
 
 # Webhook keys table
 _cql_insert_webhook_key = (
-    'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookKey") '
-    'VALUES (:tenantId, :groupId, :policyId, :{name}Key)')
+    'INSERT INTO {cf}("webhookKey", "tenantId", "groupId", "policyId") '
+    'VALUES (:{name}Key, :tenantId, :groupId, :policyId)')
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
 _cql_del_on_key = 'DELETE FROM {cf} WHERE "webhookKey"=:{name}webhookKey'
