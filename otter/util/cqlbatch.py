@@ -34,7 +34,7 @@ def batch(statements, timestamp=None):
     Return batch statement wrapping given statements.
 
     NOTE: This is functionally same as above `Batch` class but is better since
-    it is pure and does not contain unnecessary args: params and connnection
+    it is pure and does not contain unnecessary args: params, connnection and consistency
     """
     return Batch(statements, {}, None, timestamp)._generate()
 
