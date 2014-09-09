@@ -1096,8 +1096,6 @@ class CassScalingGroup(object):
         """
         log = self.log.bind(system='CassScalingGroup.delete_group')
 
-        # Events can only be deleted by policy id, since that and trigger are
-        # the only parts of the compound key
         @self.with_timestamp
         def _delete_everything(ts, webhooks):
             # delete webhook keys
