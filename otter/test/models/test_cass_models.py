@@ -1142,12 +1142,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         expected_cql = (
             'BEGIN BATCH '
+            'DELETE FROM webhook_keys WHERE "webhookKey"=:key0webhookKey '
+            'DELETE FROM webhook_keys WHERE "webhookKey"=:key1webhookKey '
             'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND '
             '"groupId" = :groupId AND "policyId" = :policyId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND '
             '"groupId" = :groupId AND "policyId" = :policyId '
-            'DELETE FROM webhook_keys WHERE "webhookKey"=:key0webhookKey '
-            'DELETE FROM webhook_keys WHERE "webhookKey"=:key1webhookKey '
             'APPLY BATCH;')
         expected_data = {
             "tenantId": self.group.tenant_id,
@@ -1872,12 +1872,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                          'key1webhookKey': 'w2'}
         expected_cql = (
             'BEGIN BATCH '
+            'DELETE FROM webhook_keys WHERE "webhookKey"=:key0webhookKey '
+            'DELETE FROM webhook_keys WHERE "webhookKey"=:key1webhookKey '
             'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM scaling_group USING TIMESTAMP :ts '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
-            'DELETE FROM webhook_keys WHERE "webhookKey"=:key0webhookKey '
-            'DELETE FROM webhook_keys WHERE "webhookKey"=:key1webhookKey '
             'APPLY BATCH;')
 
         self.connection.execute.assert_called_once_with(

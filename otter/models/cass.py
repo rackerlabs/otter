@@ -485,11 +485,16 @@ def verified_view(connection, view_query, del_query, data, consistency, exceptio
     return d.addCallback(_check_resurrection)
 
 
-def _append_del_webhook_queries(table, queries, params, webhooks):
+def _del_webhook_queries(table, webhooks):
+    """
+    Return queries and params to delete webhooks from webhook_keys table
+    """
+    queries, params = [], {}
     for i, webhook in enumerate(webhooks):
         name = 'key{}'.format(i)
         queries.append(_cql_del_on_key.format(cf=table, name=name))
         params[name + 'webhookKey'] = webhook['webhookKey']
+    return queries, params
 
 
 class WeakLocks(object):
@@ -915,14 +920,13 @@ class CassScalingGroup(object):
         self.log.bind(policy_id=policy_id).msg("Deleting policy")
 
         def _do_delete(webhooks):
-            queries = [
-                _cql_delete_all_in_policy.format(cf=self.policies_table),
-                _cql_delete_all_in_policy.format(cf=self.webhooks_table)]
-            params = {"tenantId": self.tenant_id, "groupId": self.uuid,
-                      "policyId": policy_id}
             # delete webhook keys
-            _append_del_webhook_queries(
-                self.webhooks_keys_table, queries, params, webhooks)
+            queries, params = _del_webhook_queries(self.webhooks_keys_table, webhooks)
+            queries.extend([
+                _cql_delete_all_in_policy.format(cf=self.policies_table),
+                _cql_delete_all_in_policy.format(cf=self.webhooks_table)])
+            params.update({"tenantId": self.tenant_id, "groupId": self.uuid,
+                           "policyId": policy_id})
             b = Batch(queries, params,
                       consistency=self.get_consistency('delete', 'policy'))
             return b.execute(self.connection)
@@ -1096,19 +1100,14 @@ class CassScalingGroup(object):
         # the only parts of the compound key
         @self.with_timestamp
         def _delete_everything(ts, webhooks):
-            params = {
-                'tenantId': self.tenant_id,
-                'groupId': self.uuid,
-                'ts': ts
-            }
-            queries = [
-                _cql_delete_all_in_group.format(cf=table, name='') for table in
-                (self.policies_table, self.webhooks_table)]
-            queries.append(_cql_delete_group.format(cf=self.group_table))
+            # delete webhook keys
+            queries, params = _del_webhook_queries(self.webhooks_keys_table, webhooks)
 
-            # Add queries to delete webhook keys
-            _append_del_webhook_queries(
-                self.webhooks_keys_table, queries, params, webhooks)
+            queries.extend([
+                _cql_delete_all_in_group.format(cf=table, name='') for table in
+                (self.policies_table, self.webhooks_table)])
+            queries.append(_cql_delete_group.format(cf=self.group_table))
+            params.update({'tenantId': self.tenant_id, 'groupId': self.uuid, 'ts': ts})
 
             b = Batch(queries, params,
                       consistency=self.get_consistency('delete', 'group'))
