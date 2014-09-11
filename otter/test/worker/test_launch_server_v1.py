@@ -32,7 +32,8 @@ from otter.worker.launch_server_v1 import (
     LB_RETRY_INTERVAL_RANGE,
     find_server,
     ServerCreationRetryError,
-    CLBOrNodeDeleted
+    CLBOrNodeDeleted,
+    generate_server_metadata
 )
 
 
@@ -1774,6 +1775,34 @@ class ConfigPreparationTests(SynchronousTestCase):
         self.generate_server_name.return_value = 'as000000'
 
         self.scaling_group_uuid = '1111111-11111-11111-11111111'
+
+    def test_generate_server_metadata_adds_scaling_group_name(self):
+        """
+        The server metadata contains the group name.
+        """
+        output = generate_server_metadata(self.scaling_group_uuid,
+                                          {'server': {}})
+        self.assertEqual(output,
+                         {'rax:auto_scaling_group_id': self.scaling_group_uuid})
+
+    def test_generate_server_metadata_adds_lb_index_and_lb_keys(self):
+        """
+        If load balancers are configured, load balancer ids and the relevant
+        information needed to add the the server to the load balancer (IP and
+        port for now)
+        """
+        output = generate_server_metadata(
+            self.scaling_group_uuid,
+            {"loadBalancers": [
+                {'loadBalancerId': 1, 'port': 80},
+                {'loadBalancerId': 2, 'port': 2200}
+            ]})
+        self.assertEqual(output, {
+            'rax:auto_scaling_group_id': self.scaling_group_uuid,
+            'rax:auto_scaling_lbids': '[1, 2]',
+            'rax:auto_scaling:lb:1': '{"port": 80}',
+            'rax:auto_scaling:lb:2': '{"port": 2200}'
+        })
 
     def test_server_name_suffix(self):
         """
