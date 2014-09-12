@@ -661,6 +661,19 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     log = log.bind(server_name=server_config['name'])
     ilog = [None]
 
+    def check_metadata(server):
+        # sanity check to make sure the metadata didn't change - can probably
+        # be removed after a while if we do not see any log messages from this
+        # function
+        expected = launch_config['server']['metadata']
+        result = server['server'].get('metadata')
+        if  result != expected:
+            ilog[0].msg('Server metadata has changed.',
+                        metadata_check=True,
+                        expected_metadata=expected,
+                        nova_metadata=result)
+        return server
+
     def wait_for_server(server):
         server_id = server['server']['id']
 
@@ -675,7 +688,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
             ilog[0],
             server_endpoint,
             auth_token,
-            server_id)
+            server_id).addCallback(check_metadata)
 
     def add_lb(server):
         if lb_config:

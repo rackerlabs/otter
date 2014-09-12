@@ -1622,7 +1622,9 @@ class ServerTests(SynchronousTestCase):
             'server': {
                 'id': '1',
                 'addresses': {'private': [
-                    {'version': 4, 'addr': '10.0.0.1'}]}}}
+                    {'version': 4, 'addr': '10.0.0.1'}]},
+                'metadata': generate_server_metadata(self.scaling_group.uuid,
+                                                     launch_config)}}
 
         mock_cs.side_effect = lambda *a, **kw: succeed(server_details)
 
