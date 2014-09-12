@@ -1329,7 +1329,12 @@ class ServerTests(SynchronousTestCase):
         expected_server_config = {
             'imageRef': '1', 'flavorRef': '1', 'name': 'as000000',
             'metadata': {
-                'rax:auto_scaling_group_id': '1111111-11111-11111-11111111'}}
+                'rax:auto_scaling_group_id': '1111111-11111-11111-11111111',
+                'rax:auto_scaling_lbids': '[12345, 54321]',
+                'rax:auto_scaling:lb:12345': '{"port": 80}',
+                'rax:auto_scaling:lb:54321': '{"port": 81}'
+            }
+        }
 
         server_details = {
             'server': {
@@ -1863,7 +1868,8 @@ class ConfigPreparationTests(SynchronousTestCase):
         auto scaling group and auto scaling server name should be
         added to the node metadata for a load balancer.
         """
-        test_config = {'server': {}, 'loadBalancers': [{'id': 1, 'port': 80}]}
+        test_config = {'server': {},
+                       'loadBalancers': [{'loadBalancerId': 1, 'port': 80}]}
 
         expected_metadata = {
             'rax:auto_scaling_group_id': self.scaling_group_uuid,
@@ -1880,7 +1886,7 @@ class ConfigPreparationTests(SynchronousTestCase):
         auto scaling metadata should be merged with user specified metadata.
         """
         test_config = {'server': {}, 'loadBalancers': [
-            {'id': 1, 'port': 80, 'metadata': {'foo': 'bar'}}]}
+            {'loadBalancerId': 1, 'port': 80, 'metadata': {'foo': 'bar'}}]}
 
         expected_metadata = {
             'rax:auto_scaling_group_id': self.scaling_group_uuid,

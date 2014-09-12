@@ -575,7 +575,8 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
     if 'metadata' not in server_config:
         server_config['metadata'] = {}
 
-    server_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
+    server_config['metadata'].update(generate_server_metadata(
+        scaling_group_uuid, launch_config))
 
     if server_config.get('name'):
         server_name = server_config.get('name')
