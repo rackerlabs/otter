@@ -669,7 +669,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
         result = server['server'].get('metadata')
         if  result != expected:
             ilog[0].msg('Server metadata has changed.',
-                        metadata_check=True,
+                        sanity_check=True,
                         expected_metadata=expected,
                         nova_metadata=result)
         return server

@@ -1422,6 +1422,53 @@ class ServerTests(SynchronousTestCase):
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_server_logs_if_metadata_does_not_match(
+            self, wait_for_active, create_server, add_to_load_balancers):
+        """
+        :func:`launch_server` will succeed but log a message if a server's
+            metadata has changed between server launch and server becoming
+            active
+        """
+        launch_config = {
+            'server': {'imageRef': '1', 'flavorRef': '1'},
+            'loadBalancers': [{'loadBalancerId': 12345, 'port': 80}]
+        }
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'public': [{'version': 4, 'addr': '10.0.0.1'}],
+                              'private': [{'version': 4, 'addr': '1.1.1.1'}]},
+                'metadata': {'this': 'is invalid'}
+            }
+        }
+
+        create_server.return_value = succeed(server_details)
+        wait_for_active.return_value = succeed(server_details)
+
+        d = launch_server(self.log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo)
+
+        expected_metadata = generate_server_metadata(self.scaling_group.uuid,
+                                                     launch_config)
+
+        self.successResultOf(d)
+        self.assertEqual(
+            self.log.msg.mock_calls,
+            [mock.call('Server metadata has changed.',
+                       sanity_check=True,
+                       expected_metadata=expected_metadata,
+                       nova_metadata={'this': 'is invalid'},
+                       server_id=mock.ANY,
+                       server_name=mock.ANY)])
+
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
     def test_launch_server_propagates_create_server_errors(
             self, wait_for_active, create_server, add_to_load_balancers):
         """
