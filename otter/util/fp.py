@@ -1,5 +1,9 @@
 # coding: utf-8
 
+
+from pyrsistent import pvector, pmap
+
+
 """Functional programming helpers."""
 
 
@@ -30,3 +34,34 @@ def wrappers(*stuff):
     All functions after the first should take a callable as their first argument.
     """
     return reduce(wrap, stuff)
+
+
+def freeze(o):
+    """
+    Recursively convert a simple Python data structure (lists, tuples,
+    dictionaries) into pyrsistent versions of those data structures.
+    """
+    typ = type(o)
+    if typ is dict:
+        return pmap({k: freeze(v) for k, v in o.iteritems()})
+    elif typ is list:
+        return pvector(map(freeze, o))
+    elif typ is tuple:
+        return tuple(map(freeze, o))
+    else:
+        return o
+
+
+def unfreeze(o):
+    """
+    Recursively convert pyrsistent data structures into basic Python types.
+    """
+    typ = type(o)
+    if typ is type(pvector()):
+        return map(unfreeze, o)
+    if typ is type(pmap()):
+        return {k: unfreeze(v) for k, v in o.iteritems()}
+    if typ is tuple:
+        return tuple(map(unfreeze, o))
+    else:
+        return o
