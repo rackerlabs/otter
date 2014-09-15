@@ -64,11 +64,10 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now):
     servers_in_error = servers_by_state.get('ERROR', [])
     servers_in_active = servers_by_state.get('ACTIVE', [])
     servers_in_building = servers_by_state.get('BUILDING', [])
-    create_steps = [
-        CreateServer(launch_config=desired_state.launch_config)
-    ] * (desired_state.desired
-        - (len(servers_in_active)
-           + len(servers_in_building)))
+    create_server = CreateServer(launch_config=desired_state.launch_config)
+    create_steps = [create_server] * (desired_state.desired
+                                      - (len(servers_in_active)
+                                         + len(servers_in_building)))
     newest_to_oldest = sorted(servers_with_cheese,
                               key=lambda s: -s.created)
     servers_to_delete = newest_to_oldest[desired_state.desired:]
