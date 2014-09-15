@@ -1,5 +1,7 @@
 # coding: utf-8
 
+"""Functional programming utilities."""
+
 
 from pyrsistent import pvector, pmap
 

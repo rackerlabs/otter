@@ -1,3 +1,5 @@
+"""Tests for otter.util.fp"""
+
 from pyrsistent import m, v
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -19,6 +21,7 @@ class IsTypeAndValue(object):
         return 'IsTypeAndValue {} {}'.format(self.type, self.value)
 
     def match(self, value):
+        """Ensure that matches type and equality."""
         if self.type is not type(value):
             return Mismatch("{} is not of type {}".format(
                 type(value), self.type))
