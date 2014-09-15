@@ -8,6 +8,8 @@ from characteristic import attributes
 from zope.interface import Interface, implementer
 from toolz.itertoolz import groupby
 
+from otter.util.fp import freeze
+
 
 class IStep(Interface):
     """
@@ -21,15 +23,17 @@ class IStep(Interface):
         """
 
 
-@attributes(['id', 'launch_config', 'desired'])
+@attributes(['launch_config', 'desired'])
 class DesiredGroupState(object):
     """
     The desired state for a scaling group.
 
-    :ivar str id: The group's ID.
     :ivar dict launch_config: nova launch config.
     :ivar int desired: the number of desired servers within the group.
     """
+
+    def __init__(self):
+        self.launch_config = freeze(self.launch_config)
 
 
 @attributes(['id', 'state', 'created'])
@@ -76,16 +80,16 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now):
     delete_error_steps = [DeleteServer(server_id=server.id)
                           for server in servers_in_error]
     return Convergence(
-        group_id=desired_state.id,
         steps=Counter(create_steps + delete_steps + delete_error_steps))
 
 
-@attributes(['steps', 'group_id'])
+@attributes(['steps'])
 class Convergence(object):
     """
     A :obj:`Convergence` is a set of steps required to converge a ``group_id``.
 
-    :ivar set steps: A set of :obj:`IStep`s to be performed in parallel.
+    :ivar Counter steps: A :obj:`Counter` of :obj:`IStep`s to be performed in
+    parallel.
     """
 
 

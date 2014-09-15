@@ -1,24 +1,20 @@
 """Tests for convergence."""
 
+from pyrsistent import m
+
+from collections import Counter
+
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence import (
-    converge, Convergence as Cnvgnc, CreateServer, DeleteServer,
+    converge, Convergence, CreateServer, DeleteServer,
     AddToLoadBalancer, RemoveFromLoadBalancer, ChangeLoadBalancerNode,
-    DesiredGroupState as DSG, NovaServer)
-
-
-
-def DesiredGroupState(launch_config, desired):
-    return DSG(id=1, launch_config=launch_config, desired=desired)
+    DesiredGroupState, NovaServer)
 
 
 def server(id, state, created=0):
+    """Convenience for creating a :obj:`NovaServer`."""
     return NovaServer(id=id, state=state, created=created)
-
-
-def Convergence(steps):
-    return Cnvgnc(group_id=1, steps=steps)
 
 
 class ConvergeTests(SynchronousTestCase):
@@ -36,8 +32,8 @@ class ConvergeTests(SynchronousTestCase):
                 {},
                 0),
             Convergence(
-                steps=[
-                    CreateServer(launch_config={})]))
+                steps=Counter([
+                    CreateServer(launch_config=m())])))
 
     def test_converge_give_me_multiple_server(self):
         """
@@ -51,9 +47,9 @@ class ConvergeTests(SynchronousTestCase):
                 {},
                 0),
             Convergence(
-                steps=[
-                    CreateServer(launch_config={}),
-                    CreateServer(launch_config={})]))
+                steps=Counter([
+                    CreateServer(launch_config=m()),
+                    CreateServer(launch_config=m())])))
 
     def test_count_building_as_meeting_capacity(self):
         """
@@ -67,7 +63,7 @@ class ConvergeTests(SynchronousTestCase):
                 {},
                 0),
             Convergence(
-                steps=[]))
+                steps=Counter([])))
 
     def test_delete_nodes_in_error_state(self):
         """
@@ -81,10 +77,10 @@ class ConvergeTests(SynchronousTestCase):
                 {},
                 0),
             Convergence(
-                steps=[
+                steps=Counter([
                     DeleteServer(server_id='abc'),
-                    CreateServer(launch_config={}),
-                ]))
+                    CreateServer(launch_config=m()),
+                ])))
 
     def test_scale_down(self):
         """If we have more servers than desired, we delete some."""
@@ -96,9 +92,10 @@ class ConvergeTests(SynchronousTestCase):
                 {},
                 0),
             Convergence(
-                steps=[
+                steps=Counter([
                     DeleteServer(server_id='abc'),
-                ]))
+                ])))
+
 
 # time out (delete) building servers
 # delete building first
