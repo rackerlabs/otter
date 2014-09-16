@@ -104,16 +104,50 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_config={}, desired=1),
+                DesiredGroupState(launch_config={}, desired=2),
                 [server('abc', ACTIVE, created=0),
-                 server('def', BUILD, created=1)],
+                 server('def', BUILD, created=1),
+                 server('ghi', ACTIVE, created=2)],
                 {},
                 0),
             Convergence(
                 steps=Counter([
                     DeleteServer(server_id='def')])))
 
+    def test_timeout_building(self):
+        """
+        Servers that have been building for too long will be deleted and
+        replaced.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=2),
+                [server('slowpoke', BUILD, created=0),
+                 server('ok', ACTIVE, created=0)],
+                 {},
+                 3600),
+            Convergence(
+                steps=Counter([
+                    DeleteServer(server_id='slowpoke'),
+                    CreateServer(launch_config=m())])))
+
+    def test_timeout_replace_only_when_necessary(self):
+        """
+        If a server is timing out *and* we're over capacity, it will be
+        deleted without replacement.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=2),
+                [server('slowpoke', BUILD, created=0),
+                 server('old-ok', ACTIVE, created=0),
+                 server('new-ok', ACTIVE, created=3600)],
+                 {},
+                 3600),
+            Convergence(
+                steps=Counter([
+                    DeleteServer(server_id='slowpoke')])))
+
 
 # time out (delete) building servers
-# delete building first
 # load balancers!

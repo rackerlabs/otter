@@ -52,7 +52,12 @@ ERROR = 'ERROR'
 BUILD = 'BUILD'
 
 
-def converge(desired_state, servers_with_cheese, load_balancer_contents, now):
+def _partition(pred, seq):
+    groups = groupby(pred, seq)
+    return groups.get(True, []), groups.get(False, [])
+
+def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
+             timeout=3600):
     """
     Create a :obj:`Convergence` that indicates how to transition from the state
     provided by the given parameters to the :obj:`DesiredGroupState` described
@@ -61,31 +66,55 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now):
     :param DesiredGroupState desired_state: The desired group state.
     :param dict servers_with_cheese: a dictionary mapping server IDs to nova
         server information (the JSON-serializable dictionary returned from a
-        ``.../servers/detail/`` request)
+        ``.../servers/detail/`` request). This must only contain servers that
+        are being managed for the specified group.
     :param dict load_balancer_contents: a dictionary mapping load balancer IDs
         to lists of 2-tuples of (IP address, loadbalancer node ID).
     :param float now: number of seconds since the POSIX epoch indicating the
         time at which the convergence was requested.
+    :param float timeout: Number of seconds after which we will delete a server
+        in BUILD.
 
     :rtype: obj:`Convergence`
     """
-    servers_by_state = groupby(lambda s: s.state, servers_with_cheese)
+    newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
+    servers_by_state = groupby(lambda s: s.state, newest_to_oldest)
     servers_in_error = servers_by_state.get('ERROR', [])
     servers_in_active = servers_by_state.get('ACTIVE', [])
     servers_in_build = servers_by_state.get('BUILD', [])
+
+    building_too_long, waiting_for_build = _partition(
+        lambda server: now - server.created >= timeout,
+        servers_in_build)
+
     create_server = CreateServer(launch_config=desired_state.launch_config)
+
+    # delete any servers that have been building for too long
+    delete_timeout_steps = [DeleteServer(server_id=server.id)
+                            for server in building_too_long]
+
+    # create servers
     create_steps = [create_server] * (desired_state.desired
                                       - (len(servers_in_active)
-                                         + len(servers_in_build)))
-    newest_to_oldest = sorted(servers_in_active,
-                              key=lambda s: -s.created)
-    servers_to_delete = (newest_to_oldest + servers_in_build)[desired_state.desired:]
+                                         + len(waiting_for_build)))
+
+    # delete over capacity, starting with building, then active,
+    # preferring older
+    servers_to_delete = (servers_in_active + waiting_for_build)[desired_state.desired:]
     delete_steps = [DeleteServer(server_id=server.id)
                     for server in servers_to_delete]
+
+    # delete all servers in error.
     delete_error_steps = [DeleteServer(server_id=server.id)
                           for server in servers_in_error]
+
+
     return Convergence(
-        steps=Counter(create_steps + delete_steps + delete_error_steps))
+        steps=Counter(create_steps
+                      + delete_steps
+                      + delete_error_steps
+                      + delete_timeout_steps
+                      ))
 
 
 @attributes(['steps'])
