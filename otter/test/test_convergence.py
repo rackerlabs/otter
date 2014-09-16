@@ -9,7 +9,8 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.convergence import (
     converge, Convergence, CreateServer, DeleteServer,
     AddToLoadBalancer, RemoveFromLoadBalancer, ChangeLoadBalancerNode,
-    DesiredGroupState, NovaServer)
+    DesiredGroupState, NovaServer,
+    ACTIVE, ERROR, BUILD)
 
 
 def server(id, state, created=0):
@@ -35,7 +36,7 @@ class ConvergeTests(SynchronousTestCase):
                 steps=Counter([
                     CreateServer(launch_config=m())])))
 
-    def test_converge_give_me_multiple_server(self):
+    def test_converge_give_me_multiple_servers(self):
         """
         Multiple servers are added at a time if there are not enough servers to
         meet the desired capacity.
@@ -59,7 +60,7 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', 'BUILDING')],
+                [server('abc', BUILD)],
                 {},
                 0),
             Convergence(
@@ -73,7 +74,7 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', 'ERROR')],
+                [server('abc', ERROR)],
                 {},
                 0),
             Convergence(
@@ -83,18 +84,34 @@ class ConvergeTests(SynchronousTestCase):
                 ])))
 
     def test_scale_down(self):
-        """If we have more servers than desired, we delete some."""
+        """If we have more servers than desired, we delete the oldest."""
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', 'ACTIVE', created=0),
-                 server('def', 'ACTIVE', created=1)],
+                [server('abc', ACTIVE, created=0),
+                 server('def', ACTIVE, created=1)],
                 {},
                 0),
             Convergence(
                 steps=Counter([
                     DeleteServer(server_id='abc'),
                 ])))
+
+    def test_scale_down_building_first(self):
+        """
+        When scaling down, first we delete building servers, in preference
+        to older server.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=1),
+                [server('abc', ACTIVE, created=0),
+                 server('def', BUILD, created=1)],
+                {},
+                0),
+            Convergence(
+                steps=Counter([
+                    DeleteServer(server_id='def')])))
 
 
 # time out (delete) building servers
