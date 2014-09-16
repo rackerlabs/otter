@@ -6,9 +6,8 @@ from collections import Counter
 
 from characteristic import attributes
 from zope.interface import Interface, implementer
-from toolz.itertoolz import groupby
 
-from otter.util.fp import freeze
+from otter.util.fp import freeze, partition_bool, partition_groups
 
 
 class IStep(Interface):
@@ -52,10 +51,6 @@ ERROR = 'ERROR'
 BUILD = 'BUILD'
 
 
-def _partition(pred, seq):
-    groups = groupby(pred, seq)
-    return groups.get(True, []), groups.get(False, [])
-
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
              timeout=3600):
     """
@@ -78,12 +73,10 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     :rtype: obj:`Convergence`
     """
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
-    servers_by_state = groupby(lambda s: s.state, newest_to_oldest)
-    servers_in_error = servers_by_state.get('ERROR', [])
-    servers_in_active = servers_by_state.get('ACTIVE', [])
-    servers_in_build = servers_by_state.get('BUILD', [])
+    servers_in_error, servers_in_active, servers_in_build = partition_groups(
+        lambda s: s.state, newest_to_oldest, ['ERROR', 'ACTIVE', 'BUILD'])
 
-    building_too_long, waiting_for_build = _partition(
+    building_too_long, waiting_for_build = partition_bool(
         lambda server: now - server.created >= timeout,
         servers_in_build)
 
@@ -107,7 +100,6 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # delete all servers in error.
     delete_error_steps = [DeleteServer(server_id=server.id)
                           for server in servers_in_error]
-
 
     return Convergence(
         steps=Counter(create_steps

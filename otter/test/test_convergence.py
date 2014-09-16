@@ -8,7 +8,6 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence import (
     converge, Convergence, CreateServer, DeleteServer,
-    AddToLoadBalancer, RemoveFromLoadBalancer, ChangeLoadBalancerNode,
     DesiredGroupState, NovaServer,
     ACTIVE, ERROR, BUILD)
 
@@ -124,8 +123,8 @@ class ConvergeTests(SynchronousTestCase):
                 DesiredGroupState(launch_config={}, desired=2),
                 [server('slowpoke', BUILD, created=0),
                  server('ok', ACTIVE, created=0)],
-                 {},
-                 3600),
+                {},
+                3600),
             Convergence(
                 steps=Counter([
                     DeleteServer(server_id='slowpoke'),
@@ -142,8 +141,8 @@ class ConvergeTests(SynchronousTestCase):
                 [server('slowpoke', BUILD, created=0),
                  server('old-ok', ACTIVE, created=0),
                  server('new-ok', ACTIVE, created=3600)],
-                 {},
-                 3600),
+                {},
+                3600),
             Convergence(
                 steps=Counter([
                     DeleteServer(server_id='slowpoke')])))
