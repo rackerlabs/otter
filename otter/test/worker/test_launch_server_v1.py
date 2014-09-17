@@ -32,7 +32,8 @@ from otter.worker.launch_server_v1 import (
     LB_RETRY_INTERVAL_RANGE,
     find_server,
     ServerCreationRetryError,
-    CLBOrNodeDeleted
+    CLBOrNodeDeleted,
+    generate_server_metadata
 )
 
 
@@ -1328,7 +1329,12 @@ class ServerTests(SynchronousTestCase):
         expected_server_config = {
             'imageRef': '1', 'flavorRef': '1', 'name': 'as000000',
             'metadata': {
-                'rax:auto_scaling_group_id': '1111111-11111-11111-11111111'}}
+                'rax:auto_scaling_group_id': '1111111-11111-11111-11111111',
+                'rax:auto_scaling_lbids': '[12345, 54321]',
+                'rax:auto_scaling:lb:12345': '{"port": 80}',
+                'rax:auto_scaling:lb:54321': '{"port": 81}'
+            }
+        }
 
         server_details = {
             'server': {
@@ -1412,6 +1418,53 @@ class ServerTests(SynchronousTestCase):
         self.assertEqual(result, (server_details, []))
 
         self.assertFalse(add_to_load_balancers.called)
+
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_server_logs_if_metadata_does_not_match(
+            self, wait_for_active, create_server, add_to_load_balancers):
+        """
+        :func:`launch_server` will succeed but log a message if a server's
+            metadata has changed between server launch and server becoming
+            active
+        """
+        launch_config = {
+            'server': {'imageRef': '1', 'flavorRef': '1'},
+            'loadBalancers': [{'loadBalancerId': 12345, 'port': 80}]
+        }
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'public': [{'version': 4, 'addr': '10.0.0.1'}],
+                              'private': [{'version': 4, 'addr': '1.1.1.1'}]},
+                'metadata': {'this': 'is invalid'}
+            }
+        }
+
+        create_server.return_value = succeed(server_details)
+        wait_for_active.return_value = succeed(server_details)
+
+        d = launch_server(self.log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo)
+
+        expected_metadata = generate_server_metadata(self.scaling_group.uuid,
+                                                     launch_config)
+
+        self.successResultOf(d)
+        self.assertEqual(
+            self.log.msg.mock_calls,
+            [mock.call('Server metadata has changed.',
+                       sanity_check=True,
+                       expected_metadata=expected_metadata,
+                       nova_metadata={'this': 'is invalid'},
+                       server_id=mock.ANY,
+                       server_name=mock.ANY)])
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
@@ -1616,7 +1669,9 @@ class ServerTests(SynchronousTestCase):
             'server': {
                 'id': '1',
                 'addresses': {'private': [
-                    {'version': 4, 'addr': '10.0.0.1'}]}}}
+                    {'version': 4, 'addr': '10.0.0.1'}]},
+                'metadata': generate_server_metadata(self.scaling_group.uuid,
+                                                     launch_config)}}
 
         mock_cs.side_effect = lambda *a, **kw: succeed(server_details)
 
@@ -1775,6 +1830,34 @@ class ConfigPreparationTests(SynchronousTestCase):
 
         self.scaling_group_uuid = '1111111-11111-11111-11111111'
 
+    def test_generate_server_metadata_adds_scaling_group_name(self):
+        """
+        The server metadata contains the group name.
+        """
+        output = generate_server_metadata(self.scaling_group_uuid,
+                                          {'server': {}})
+        self.assertEqual(output,
+                         {'rax:auto_scaling_group_id': self.scaling_group_uuid})
+
+    def test_generate_server_metadata_adds_lb_index_and_lb_keys(self):
+        """
+        If load balancers are configured, load balancer ids and the relevant
+        information needed to add the the server to the load balancer (IP and
+        port for now)
+        """
+        output = generate_server_metadata(
+            self.scaling_group_uuid,
+            {"loadBalancers": [
+                {'loadBalancerId': 1, 'port': 80},
+                {'loadBalancerId': 2, 'port': 2200}
+            ]})
+        self.assertEqual(output, {
+            'rax:auto_scaling_group_id': self.scaling_group_uuid,
+            'rax:auto_scaling_lbids': '[1, 2]',
+            'rax:auto_scaling:lb:1': '{"port": 80}',
+            'rax:auto_scaling:lb:2': '{"port": 2200}'
+        })
+
     def test_server_name_suffix(self):
         """
         The server name uses the name specified in the launch config as a
@@ -1834,7 +1917,8 @@ class ConfigPreparationTests(SynchronousTestCase):
         auto scaling group and auto scaling server name should be
         added to the node metadata for a load balancer.
         """
-        test_config = {'server': {}, 'loadBalancers': [{'id': 1, 'port': 80}]}
+        test_config = {'server': {},
+                       'loadBalancers': [{'loadBalancerId': 1, 'port': 80}]}
 
         expected_metadata = {
             'rax:auto_scaling_group_id': self.scaling_group_uuid,
@@ -1851,7 +1935,7 @@ class ConfigPreparationTests(SynchronousTestCase):
         auto scaling metadata should be merged with user specified metadata.
         """
         test_config = {'server': {}, 'loadBalancers': [
-            {'id': 1, 'port': 80, 'metadata': {'foo': 'bar'}}]}
+            {'loadBalancerId': 1, 'port': 80, 'metadata': {'foo': 'bar'}}]}
 
         expected_metadata = {
             'rax:auto_scaling_group_id': self.scaling_group_uuid,
