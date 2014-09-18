@@ -4,6 +4,7 @@ from functools import partial
 from urllib import urlencode
 import sys
 import json
+from collections import namedtuple
 
 from twisted.internet import task, defer
 from twisted.internet.endpoints import clientFromString
@@ -126,20 +127,22 @@ def get_scaling_group_servers(reactor, tenant_id, authenticator, service_name, r
     return d
 
 
+GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual')
+
+
 def get_tenant_metrics(tenant_id, scaling_groups, servers):
     """
     Get tenant's metrics
 
-    :param ``dict`` scaling_groups: Tenant's scaling groups from CASS
+    :param ``list`` of ``dict`` scaling_groups: Tenant's scaling groups from CASS
     :param ``dict`` servers: Servers from Nova grouped based on scaling group ID
+    :return: ``list`` of (tenantId, groupId, desired, actual) GroupMetrics namedtuples
     """
-
-
-def process_tenant_groups(scaling_groups):
-    """
-    Process tenant's groups by collecting the real servers in a group and returning
-    the total desired and total actual
-    """
+    print('processing tenant {} with groups {} and servers {}'.format(
+        tenant_id, len(scaling_groups), len(servers)))
+    return [GroupMetrics(tenant_id, g['groupId'], g['desired'],
+                         len(servers.get(g['groupId'], {})))
+            for g in scaling_groups]
 
 
 def get_authenticator(reactor, identity):
@@ -171,34 +174,29 @@ def main(reactor, config):
     client = connect_cass_servers(reactor, config['cassandra'])
     authenticator = get_authenticator(reactor, config['identity'])
 
-    total_desired = 0
-    total_actual = [0]
-
     tenanted_groups = yield get_scaling_groups(reactor, client)
     print('got tenants', len(tenanted_groups))
-
-    def calc_tenant_actual(tenant_id):
-        d = get_scaling_group_servers(
-            reactor, tenant_id, authenticator, config['services']['nova'], config['region'])
-        d.addCallback(compose(sum, map(len), lambda servers: servers.itervalues()))
-        return d
-
-    def incr_total_actual(actual):
-        total_actual[0] += actual
-        print('total actual till now', total_actual[0])
 
     # TODO: Use cooperator instead
     sem = defer.DeferredSemaphore(10)
     defs = []
+    all_groups = []
     for tenant_id, groups in tenanted_groups.iteritems():
-        total_desired += sum([group['desired'] for group in groups])
-        print('total desired till now', total_desired)
-        d = sem.run(calc_tenant_actual, tenant_id)
-        d.addCallback(incr_total_actual)
+        d = sem.run(
+            get_scaling_group_servers, reactor, tenant_id, authenticator,
+            config['services']['nova'], config['region'])
+        d.addCallback(partial(get_tenant_metrics, tenant_id, groups))
+        d.addCallback(all_groups.extend)
         defs.append(d)
 
     yield defer.gatherResults(defs)
-    print('total desired: {}, total actual: {}'.format(total_desired, total_actual[0]))
+    total_desired = sum([g.desired for g in all_groups])
+    total_actual = sum([g.actual for g in all_groups])
+    print('total desired: {}, total actual: {}'.format(total_desired, total_actual))
+
+    sorted_groups = sorted(all_groups, key=lambda g: abs(g.desired - g.actual), reverse=True)
+    print('groups sorted as per divergence', *sorted_groups, sep='\n')
+
     yield client.disconnect()
 
 
