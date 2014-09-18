@@ -14,7 +14,7 @@ import treq
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
-from toolz.curried import groupby, filter, map
+from toolz.curried import groupby, filter
 from toolz.functoolz import compose
 
 from otter.util.http import append_segments, check_success, headers
@@ -68,7 +68,7 @@ def get_scaling_groups(reactor, client, batch_size=100):
 
 
 @defer.inlineCallbacks
-def get_all_server_details(reactor, tenant_id, authenticator, service_name, region, limit=100):
+def get_all_server_details(tenant_id, authenticator, service_name, region, limit=100, clock=None):
     """
     Return all servers of a tenant
     TODO: service_name is possibly internal to this function but I don't want to pass config here?
@@ -78,6 +78,11 @@ def get_all_server_details(reactor, tenant_id, authenticator, service_name, regi
     endpoint = public_endpoint_url(catalog, service_name, region)
     url = append_segments(endpoint, 'servers', 'detail')
     query = {'limit': limit}
+    all_servers = []
+
+    if clock is None:
+        from twisted.internet import reactor
+        clock = reactor
 
     def fetch(url, headers):
         d = treq.get(url, headers=headers)
@@ -85,11 +90,10 @@ def get_all_server_details(reactor, tenant_id, authenticator, service_name, regi
         d.addCallback(treq.json_content)
         return d
 
-    all_servers = []
     while True:
         d = retry(partial(fetch, '{}?{}'.format(url, urlencode(query)), headers(token)),
                   can_retry=retry_times(5),
-                  next_interval=exponential_backoff_interval(2), clock=reactor)
+                  next_interval=exponential_backoff_interval(2), clock=clock)
         servers = (yield d)['servers']
         all_servers.extend(servers)
         if len(servers) < limit:
@@ -99,7 +103,7 @@ def get_all_server_details(reactor, tenant_id, authenticator, service_name, regi
     defer.returnValue(all_servers)
 
 
-def get_scaling_group_servers(reactor, tenant_id, authenticator, service_name, region):
+def get_scaling_group_servers(tenant_id, authenticator, service_name, region, clock=None):
     """
     Return tenant's servers that belong to a scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
@@ -117,7 +121,7 @@ def get_scaling_group_servers(reactor, tenant_id, authenticator, service_name, r
     valid_statuses = ('ACTIVE', 'BUILD', 'HARD_REBOOT', 'MIGRATION', 'PASSWORD',
                       'RESIZE', 'REVERT_RESIZE', 'VERIFY_RESIZE')
 
-    d = get_all_server_details(reactor, tenant_id, authenticator, service_name, region)
+    d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
     # filter out invalid servers
     d.addCallback(filter(lambda s: s['status'] in valid_statuses))
     # group based on scaling_group_id
@@ -183,8 +187,8 @@ def main(reactor, config):
     all_groups = []
     for tenant_id, groups in tenanted_groups.iteritems():
         d = sem.run(
-            get_scaling_group_servers, reactor, tenant_id, authenticator,
-            config['services']['nova'], config['region'])
+            get_scaling_group_servers, tenant_id, authenticator,
+            config['services']['nova'], config['region'], clock=reactor)
         d.addCallback(partial(get_tenant_metrics, tenant_id, groups))
         d.addCallback(all_groups.extend)
         defs.append(d)
