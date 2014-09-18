@@ -25,6 +25,7 @@ from otter.auth import user_for_tenant
 from otter.auth import ImpersonatingAuthenticator
 from otter.auth import CachingAuthenticator
 from otter.auth import RetryingAuthenticator
+from otter.auth import WaitingAuthenticator
 from otter.auth import IAuthenticator
 
 expected_headers = {'accept': ['application/json'],
@@ -553,6 +554,18 @@ class CachingAuthenticatorTests(SynchronousTestCase):
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(APIError))
 
+    def test_invalidate(self):
+        """
+        The invalidate method causes the next authenticate_tenant call to
+        re-authenticate.
+        """
+        self.ca.authenticate_tenant(1)
+        self.ca.invalidate(1)
+        self.ca.authenticate_tenant(1)
+        self.auth_function.assert_has_calls([
+            mock.call(1, log=matches(IsInstance(default_log.__class__))),
+            mock.call(1, log=matches(IsInstance(default_log.__class__)))])
+
 
 class RetryingAuthenticatorTests(SynchronousTestCase):
     """
@@ -606,3 +619,36 @@ class RetryingAuthenticatorTests(SynchronousTestCase):
         self.clock.pump([4] * 4)
         f = self.failureResultOf(d, APIError)
         self.assertEqual(f.value.code, 500)
+
+
+class WaitingAuthenticatorTests(SynchronousTestCase):
+    """
+    Tests for `WaitingAuthenticator`
+    """
+
+    def setUp(self):
+        """
+        Create WaitingAuthenticator
+        """
+        self.clock = Clock()
+        self.mock_auth = iMock(IAuthenticator)
+        self.authenticator = WaitingAuthenticator(self.clock, self.mock_auth, 5)
+
+    def test_waits(self):
+        """
+        Waits before returning token
+        """
+        self.mock_auth.authenticate_tenant.return_value = succeed('token')
+        d = self.authenticator.authenticate_tenant('t1', 'log')
+        self.assertNoResult(d)
+        self.clock.advance(5)
+        self.assertEqual(self.successResultOf(d), 'token')
+        self.mock_auth.authenticate_tenant.assert_called_once_with('t1', log='log')
+
+    def test_no_wait_on_error(self):
+        """
+        Does not wait if internal auth errors
+        """
+        self.mock_auth.authenticate_tenant.return_value = fail(ValueError('e'))
+        d = self.authenticator.authenticate_tenant('t1', 'log')
+        self.failureResultOf(d, ValueError)

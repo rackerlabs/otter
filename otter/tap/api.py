@@ -32,6 +32,7 @@ from otter.supervisor import SupervisorService, set_supervisor
 from otter.auth import ImpersonatingAuthenticator
 from otter.auth import RetryingAuthenticator
 from otter.auth import CachingAuthenticator
+from otter.auth import WaitingAuthenticator
 
 from otter.log import log
 from silverberg.cluster import RoundRobinCassandraCluster
@@ -173,6 +174,34 @@ class HealthChecker(object):
         return d.addCallback(assembleResults)
 
 
+def generate_authenticator(reactor):
+    """
+    Generate authenticator
+    """
+    # REVIEW: Seperating out to test. Have any better idea?
+    cache_ttl = config_value('identity.cache_ttl')
+    if cache_ttl is None:
+        # FIXME: Pick an arbitrary cache ttl value based on absolutely no
+        # science.
+        cache_ttl = 300
+
+    return CachingAuthenticator(
+        reactor,
+        WaitingAuthenticator(
+            reactor,
+            RetryingAuthenticator(
+                reactor,
+                ImpersonatingAuthenticator(
+                    config_value('identity.username'),
+                    config_value('identity.password'),
+                    config_value('identity.url'),
+                    config_value('identity.admin_url')),
+                max_retries=config_value('identity.max_retries'),
+                retry_interval=config_value('identity.retry_interval')),
+            config_value('identity.wait') or 5),
+        cache_ttl)
+
+
 def makeService(config):
     """
     Set up the otter-api service.
@@ -192,7 +221,8 @@ def makeService(config):
             reactor,
             RoundRobinCassandraCluster(
                 seed_endpoints,
-                config_value('cassandra.keyspace')),
+                config_value('cassandra.keyspace'),
+                disconnect_on_cancel=True),
             config_value('cassandra.timeout') or 30),
         log.bind(system='otter.silverberg'))
 
@@ -209,26 +239,7 @@ def makeService(config):
     if bobby_url is not None:
         set_bobby(BobbyClient(bobby_url))
 
-    cache_ttl = config_value('identity.cache_ttl')
-
-    if cache_ttl is None:
-        # FIXME: Pick an arbitrary cache ttl value based on absolutely no
-        # science.
-        cache_ttl = 300
-
-    authenticator = CachingAuthenticator(
-        reactor,
-        RetryingAuthenticator(
-            reactor,
-            ImpersonatingAuthenticator(
-                config_value('identity.username'),
-                config_value('identity.password'),
-                config_value('identity.url'),
-                config_value('identity.admin_url')),
-            max_retries=config_value('identity.max_retries'),
-            retry_interval=config_value('identity.retry_interval')),
-        cache_ttl)
-
+    authenticator = generate_authenticator(reactor)
     supervisor = SupervisorService(authenticator.authenticate_tenant,
                                    region, coiterate)
     supervisor.setServiceParent(s)

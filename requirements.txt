@@ -7,12 +7,15 @@ yunomi==0.2.2
 iso8601==0.1.4
 lxml==3.0.1
 treq==0.2.0
-silverberg==0.1.7
+silverberg==0.1.8
 pyOpenSSL==0.13
 jsonfig==0.1.1
 testtools==0.9.32
 croniter==0.3.3
 txkazoo==0.0.5
+effect==0.1a6
+characteristic==0.1.0
+toolz==0.6.0
 
 # pinning dependencies of dependencies
 

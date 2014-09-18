@@ -20,6 +20,19 @@ from otter.supervisor import get_supervisor
 from otter.rest.errors import InvalidMinEntities
 
 
+def normalize_launch_config(config):
+    """
+    Normalize the metadata argument as part of the server arg in the launch
+    config - if it is null or invalid, just remove it.
+    """
+    server_info = config.get('args', {}).get('server', {})
+
+    if server_info.get('metadata') is None:
+        server_info.pop('metadata', None)
+
+    return config
+
+
 class OtterConfig(object):
     """
     REST endpoints for the configuration of scaling groups.
@@ -229,6 +242,7 @@ class OtterLaunch(object):
         Users may have an invalid configuration based on dependencies.
         """
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        data = normalize_launch_config(data)
         deferred = get_supervisor().validate_launch_config(self.log, self.tenant_id, data)
         deferred.addCallback(lambda _: rec.update_launch_config(data))
         return deferred

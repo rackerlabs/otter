@@ -214,6 +214,28 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
             self.assertRaisesRegexp(ValidationError, 'not of type', validate,
                                     base, group_schemas.launch_config)
 
+    def test_too_many_load_balancers_do_not_validate(self):
+        """
+        If more than 5 load balancers are provided, the launch config fails to
+        validate.
+        """
+        invalid = {
+            "type": "launch_server",
+            "args": {
+                "server": {},
+                "loadBalancers": [{'loadBalancerId': i, 'port': 80}
+                                  for i in range(6)]
+            }
+        }
+
+        # the type fails ot valdiate because the load balancer list is too long
+        self.assertRaisesRegexp(ValidationError, 'is too long',
+                                validate, invalid, group_schemas.launch_server)
+        # because the type schema fails to validate, the config schema
+        # fails to validate because it is not the given type
+        self.assertRaisesRegexp(ValidationError, 'not of type',
+                                validate, invalid, group_schemas.launch_config)
+
     def test_duplicate_load_balancers_do_not_validate(self):
         """
         If the same load balancer config appears twice, the launch config
@@ -272,16 +294,6 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
         self.assertRaisesRegexp(ValidationError, 'not of type',
                                 validate, invalid, group_schemas.launch_config)
 
-    def test_null_metadata_invalid(self):
-        """
-        metadata with None in it is not allowed
-        """
-        config = deepcopy(group_examples.launch_server_config()[0])
-        config['args']['server']['metadata'] = None
-        self.assertRaisesRegexp(
-            ValidationError, "None is not of type 'object'",
-            validate, config, group_schemas.launch_server)
-
     def test_array_metadata_invalid(self):
         """
         metadata with array in it is not allowed
@@ -289,7 +301,7 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
         config = deepcopy(group_examples.launch_server_config()[0])
         config['args']['server']['metadata'] = []
         self.assertRaisesRegexp(
-            ValidationError, "\[\] is not of type 'object'",
+            ValidationError, "\[\] is not of type ",
             validate, config, group_schemas.launch_server)
 
     def test_no_metadata_valid(self):

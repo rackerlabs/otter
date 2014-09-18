@@ -50,6 +50,7 @@ from otter.util.retry import retry, retry_times, repeating_interval
 from otter.log import log as default_log
 from otter.util.http import (
     headers, check_success, append_segments, wrap_upstream_error)
+from otter.util.deferredutils import delay
 
 
 class IAuthenticator(Interface):
@@ -60,7 +61,25 @@ class IAuthenticator(Interface):
         """
         :param tenant_id: A keystone tenant ID to authenticate as.
 
-        :returns: 2-tuple of auth token and service catalog.
+        :returns: Deferred of a 2-tuple of auth token and service catalog.
+        """
+
+
+class ICachingAuthenticator(IAuthenticator):
+    """
+    Caching authenticators can authenticate tenants and can have their cache
+    invalidated on a tenant-by-tenant basis.
+    """
+    def invalidate(tenant_id):
+        """
+        Invalidate the cache for a particular tenant.
+
+        After this is called, a call to authenticate_tenant must return a fresh
+        token.
+
+        :param tenant_id: A keystone tenant ID
+
+        :returns: :data:`None`
         """
 
 
@@ -90,6 +109,29 @@ class RetryingAuthenticator(object):
 
 
 @implementer(IAuthenticator)
+class WaitingAuthenticator(object):
+    """
+    An authenticator that waits after getting the token and before returning it
+
+    :param IReactorTime reactor: An IReactorTime provider used for waiting
+    :param IAuthenticator authenticator: authenticate using this
+    :param float wait: Number of seconds to wait before returning
+    """
+    def __init__(self, reactor, authenticator, wait):
+        self._reactor = reactor
+        self._authenticator = authenticator
+        self._wait = wait
+
+    def authenticate_tenant(self, tenant_id, log=None):
+        """
+        see :meth:`IAuthenticator.authenticate_tenant`
+        """
+        d = self._authenticator.authenticate_tenant(tenant_id, log=log)
+        d.addCallback(delay, self._reactor, self._wait)
+        return d
+
+
+@implementer(ICachingAuthenticator)
 class CachingAuthenticator(object):
     """
     An authenticator which cases the result of the provided auth_function
@@ -168,6 +210,10 @@ class CachingAuthenticator(object):
         d.addErrback(when_auth_fails)
 
         return d
+
+    def invalidate(self, tenant_id):
+        """Remove a tenant's token from the cache."""
+        self._cache.pop(tenant_id, None)
 
 
 @implementer(IAuthenticator)

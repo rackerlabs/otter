@@ -1,16 +1,15 @@
 """
 Initial implementation of a version one launch_server_v1 config.
 
-Ultimately this launch config will be responsible for:
-0) Generating server name and injecting our AS metadata (TODO)
+This launch config worker is responsible for:
+0) Generating server name and injecting our AS metadata
 1) Starting a server
-2) Executing a user defined deployment script (TODO)
-3) Adding the server to a load balancer.
-4) Configuring MaaS? (TODO)
+2) Adding the server to a load balancer.
 
-The shape of this is nowhere near solidified, probably most of these
-functions are actually private and many of the utilities will get
-moved out of here.
+On delete, this worker:
+0) (TODO) Puts the server into draining mode on the load balancer
+1) Removes the the server from the load balancer(s)
+2) Deletes the server
 
 Also no attempt is currently being made to define the public API for
 initiating a launch_server job.
@@ -576,7 +575,8 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
     if 'metadata' not in server_config:
         server_config['metadata'] = {}
 
-    server_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
+    server_config['metadata'].update(generate_server_metadata(
+        scaling_group_uuid, launch_config))
 
     if server_config.get('name'):
         server_name = server_config.get('name')
@@ -591,6 +591,34 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
         lb_config['metadata']['rax:auto_scaling_server_name'] = server_config['name']
 
     return launch_config
+
+
+def generate_server_metadata(group_id, launch_config):
+    """
+    Given a scaling group ID and the launch config, generate the scaling-group
+    specific metadata that should be on the server.
+
+    :param str group_id: The ID of the scaling group
+    :param dict launch_config: The complete launch config args we want to build
+        the servers from
+
+    :return dict: The autoscaling-specific part of the metadata with which to
+        create a server of this particular autoscaling group
+    """
+    metadata = {'rax:auto_scaling_group_id': group_id}
+    lbs = launch_config.get('loadBalancers', [])
+
+    if lbs:
+        lbids = []
+        for lb_config in lbs:
+            config_without_lbid = lb_config.copy()
+            lb_id = config_without_lbid.pop('loadBalancerId')
+            lbids.append(lb_id)
+            metadata['rax:auto_scaling:lb:{0}'.format(lb_id)] = json.dumps(
+                config_without_lbid)
+
+        metadata['rax:auto_scaling_lbids'] = json.dumps(lbids)
+    return metadata
 
 
 def launch_server(log, region, scaling_group, service_catalog, auth_token,
@@ -633,6 +661,19 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     log = log.bind(server_name=server_config['name'])
     ilog = [None]
 
+    def check_metadata(server):
+        # sanity check to make sure the metadata didn't change - can probably
+        # be removed after a while if we do not see any log messages from this
+        # function
+        expected = launch_config['server']['metadata']
+        result = server['server'].get('metadata')
+        if  result != expected:
+            ilog[0].msg('Server metadata has changed.',
+                        sanity_check=True,
+                        expected_metadata=expected,
+                        nova_metadata=result)
+        return server
+
     def wait_for_server(server):
         server_id = server['server']['id']
 
@@ -647,7 +688,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
             ilog[0],
             server_endpoint,
             auth_token,
-            server_id)
+            server_id).addCallback(check_metadata)
 
     def add_lb(server):
         if lb_config:

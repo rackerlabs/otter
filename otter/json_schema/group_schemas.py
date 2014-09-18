@@ -51,6 +51,21 @@ metadata = {
     "additionalProperties": False
 }
 
+server_metadata = {
+    # TODO: Taken from Nova's validation code at
+    # https://github.com/openstack/nova/blob/master/nova/api/validation/parameter_types.py#L83.
+    # It will be ideal to import nova package and use their schema but their
+    # schema is not fully complete and there are lots of dependencies when trying to
+    # install nova package
+    "type": "object",
+    "patternProperties": {
+        "^[a-zA-Z0-9-_:. ]{1,255}$": {
+            "type": "string", "maxLength": 255
+        }
+    },
+    "additionalProperties": False,
+}
+
 # nova server payload
 server = {
     "type": "object",
@@ -95,18 +110,7 @@ server = {
             "required": False
         },
         "metadata": {
-            # TODO: Taken from Nova's validation code at
-            # https://github.com/openstack/nova/blob/master/nova/api/validation/parameter_types.py#L83.
-            # It will be ideal to import nova package and use their schema but their
-            # schema is not fully complete and there are lots of dependencies when trying to
-            # install nova package
-            "type": "object",
-            "patternProperties": {
-                "^[a-zA-Z0-9-_:. ]{1,255}$": {
-                    "type": "string", "maxLength": 255
-                }
-            },
-            "additionalProperties": False,
+            "type": [server_metadata, "null"],
             "required": False
         }
     },
@@ -142,6 +146,7 @@ launch_server = {
                     # doesn't seem like a good idea.
                     "required": False,
                     "minItems": 0,
+                    "maxItems": 5,
                     "uniqueItems": True,
                     "items": {
                         "type": "object",

@@ -15,7 +15,8 @@
         "url": "https://staging.identity.api.rackspacecloud.com/v2.0",
         "admin_url": "https://staging.identity.api.rackspacecloud.com/v2.0",
         "max_retries": 10,
-        "retry_interval": 10
+        "retry_interval": 10,
+        "wait": 3
     },
     "zookeeper": {
         "hosts": "127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183",
