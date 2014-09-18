@@ -3,8 +3,88 @@
 Convergence.
 """
 
+from functools import partial
+from urllib import urlencode
+
+import treq
+
+from twisted.internet import defer
+
 from characteristic import attributes
 from zope.interface import Interface, implementer
+
+from toolz.curried import filter, groupby
+
+from otter.log import log as default_log
+from otter.util.http import append_segments, check_success, headers
+from otter.util.retry import retry, retry_times, exponential_backoff_interval
+# TODO: I hate including this!
+from otter.worker.launch_server_v1 import public_endpoint_url
+
+
+@defer.inlineCallbacks
+def get_all_server_details(tenant_id, authenticator, service_name, region,
+                           limit=100, clock=None):
+    """
+    Return all servers of a tenant
+    TODO: service_name is possibly internal to this function but I don't want to pass config here?
+    NOTE: This really screams to be a independent txcloud-type API
+    """
+    token, catalog = yield authenticator.authenticate_tenant(tenant_id, log=default_log)
+    endpoint = public_endpoint_url(catalog, service_name, region)
+    url = append_segments(endpoint, 'servers', 'detail')
+    query = {'limit': limit}
+    all_servers = []
+
+    if clock is None:
+        from twisted.internet import reactor
+        clock = reactor
+
+    def fetch(url, headers):
+        d = treq.get(url, headers=headers)
+        d.addCallback(check_success, [200])
+        d.addCallback(treq.json_content)
+        return d
+
+    while True:
+        d = retry(partial(fetch, '{}?{}'.format(url, urlencode(query)), headers(token)),
+                  can_retry=retry_times(5),
+                  next_interval=exponential_backoff_interval(2), clock=clock)
+        servers = (yield d)['servers']
+        all_servers.extend(servers)
+        if len(servers) < limit:
+            break
+        query.update({'marker': servers[-1]['id']})
+
+    defer.returnValue(all_servers)
+
+
+def get_scaling_group_servers(tenant_id, authenticator, service_name, region, clock=None):
+    """
+    Return tenant's servers that belong to a scaling group as
+    {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
+    """
+
+    def group_id(server_details):
+        m = server_details.get('metadata', {})
+        return m.get('rax:auto_scaling_group_id', 'nogroup')
+
+    def del_nogroup(grouped_servers):
+        if 'nogroup' in grouped_servers:
+            del grouped_servers['nogroup']
+        return grouped_servers
+
+    valid_statuses = ('ACTIVE', 'BUILD', 'HARD_REBOOT', 'MIGRATION', 'PASSWORD',
+                      'RESIZE', 'REVERT_RESIZE', 'VERIFY_RESIZE')
+
+    d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
+    # filter out invalid servers
+    d.addCallback(filter(lambda s: s['status'] in valid_statuses))
+    # group based on scaling_group_id
+    d.addCallback(groupby(group_id))
+    # remove servers not belonging to any group
+    d.addCallback(del_nogroup)
+    return d
 
 
 class IStep(Interface):

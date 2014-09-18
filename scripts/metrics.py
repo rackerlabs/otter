@@ -1,7 +1,10 @@
+"""
+Script to collect metrics (total desired, actual and pending) from a DC
+"""
+
 from __future__ import print_function
 
 from functools import partial
-from urllib import urlencode
 import sys
 import json
 from collections import namedtuple
@@ -9,21 +12,14 @@ from collections import namedtuple
 from twisted.internet import task, defer
 from twisted.internet.endpoints import clientFromString
 
-import treq
-
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import groupby, filter
 from toolz.functoolz import compose
 
-from otter.util.http import append_segments, check_success, headers
 from otter.auth import RetryingAuthenticator, ImpersonatingAuthenticator
-from otter.log import log as otter_log
-from otter.util.retry import retry, retry_times, exponential_backoff_interval
-
-# TODO: I hate including this!
-from otter.worker.launch_server_v1 import public_endpoint_url
+from otter.convergence import get_scaling_group_servers
 
 
 @defer.inlineCallbacks
@@ -41,6 +37,7 @@ def get_scaling_groups(reactor, client, batch_size=100):
     where_token = 'WHERE token("tenantId") > token(:tenantId)'
 
     # setup function that removes groups not having desired and groups them together
+    # TODO: Better name than gfilter?
     gfilter = compose(groupby(lambda g: g['tenantId']),
                       filter(lambda g: g['desired'] is not None))
 
@@ -65,70 +62,6 @@ def get_scaling_groups(reactor, client, batch_size=100):
                                      ConsistencyLevel.ONE)
         groups.extend(batch)
     defer.returnValue(gfilter(groups))
-
-
-@defer.inlineCallbacks
-def get_all_server_details(tenant_id, authenticator, service_name, region, limit=100, clock=None):
-    """
-    Return all servers of a tenant
-    TODO: service_name is possibly internal to this function but I don't want to pass config here?
-    NOTE: This really screams to be a independent txcloud-type API
-    """
-    token, catalog = yield authenticator.authenticate_tenant(tenant_id, log=otter_log)
-    endpoint = public_endpoint_url(catalog, service_name, region)
-    url = append_segments(endpoint, 'servers', 'detail')
-    query = {'limit': limit}
-    all_servers = []
-
-    if clock is None:
-        from twisted.internet import reactor
-        clock = reactor
-
-    def fetch(url, headers):
-        d = treq.get(url, headers=headers)
-        d.addCallback(check_success, [200])
-        d.addCallback(treq.json_content)
-        return d
-
-    while True:
-        d = retry(partial(fetch, '{}?{}'.format(url, urlencode(query)), headers(token)),
-                  can_retry=retry_times(5),
-                  next_interval=exponential_backoff_interval(2), clock=clock)
-        servers = (yield d)['servers']
-        all_servers.extend(servers)
-        if len(servers) < limit:
-            break
-        query.update({'marker': servers[-1]['id']})
-
-    defer.returnValue(all_servers)
-
-
-def get_scaling_group_servers(tenant_id, authenticator, service_name, region, clock=None):
-    """
-    Return tenant's servers that belong to a scaling group as
-    {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
-    """
-
-    def group_id(server_details):
-        m = server_details.get('metadata', {})
-        return m.get('rax:auto_scaling_group_id', 'nogroup')
-
-    def del_nogroup(grouped_servers):
-        if 'nogroup' in grouped_servers:
-            del grouped_servers['nogroup']
-        return grouped_servers
-
-    valid_statuses = ('ACTIVE', 'BUILD', 'HARD_REBOOT', 'MIGRATION', 'PASSWORD',
-                      'RESIZE', 'REVERT_RESIZE', 'VERIFY_RESIZE')
-
-    d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
-    # filter out invalid servers
-    d.addCallback(filter(lambda s: s['status'] in valid_statuses))
-    # group based on scaling_group_id
-    d.addCallback(groupby(group_id))
-    # remove servers not belonging to any group
-    d.addCallback(del_nogroup)
-    return d
 
 
 GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual')
