@@ -24,7 +24,7 @@ from otter.worker.launch_server_v1 import public_endpoint_url
 
 @defer.inlineCallbacks
 def get_all_server_details(tenant_id, authenticator, service_name, region,
-                           limit=100, clock=None):
+                           limit=100, clock=None, _treq=None):
     """
     Return all servers of a tenant
     TODO: service_name is possibly internal to this function but I don't want to pass config here?
@@ -40,10 +40,14 @@ def get_all_server_details(tenant_id, authenticator, service_name, region,
         from twisted.internet import reactor
         clock = reactor
 
+    if _treq is None:
+        _treq = treq
+
     def fetch(url, headers):
-        d = treq.get(url, headers=headers)
+        #import pudb; pu.db
+        d = _treq.get(url, headers=headers)
         d.addCallback(check_success, [200])
-        d.addCallback(treq.json_content)
+        d.addCallback(_treq.json_content)
         return d
 
     while True:
