@@ -59,10 +59,9 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     by ``desired_state``.
 
     :param DesiredGroupState desired_state: The desired group state.
-    :param dict servers_with_cheese: a dictionary mapping server IDs to nova
-        server information (the JSON-serializable dictionary returned from a
-        ``.../servers/detail/`` request). This must only contain servers that
-        are being managed for the specified group.
+    :param list servers_with_cheese: a list of of :obj:`NovaServer` instances.
+        This must only contain servers that are being managed for the specified
+        group.
     :param dict load_balancer_contents: a dictionary mapping load balancer IDs
         to lists of 2-tuples of (IP address, loadbalancer node ID).
     :param float now: number of seconds since the POSIX epoch indicating the
@@ -74,7 +73,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     """
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
     servers_in_error, servers_in_active, servers_in_build = partition_groups(
-        lambda s: s.state, newest_to_oldest, ['ERROR', 'ACTIVE', 'BUILD'])
+        lambda s: s.state, newest_to_oldest, [ERROR, ACTIVE, BUILD])
 
     building_too_long, waiting_for_build = partition_bool(
         lambda server: now - server.created >= timeout,
