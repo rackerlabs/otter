@@ -438,7 +438,7 @@ def _check_unique_keys(data):
 
 def alist_get(data, key):
     """Look up a value in an association list."""
-    for item in data:
-        if item[0] == key:
-            return item[1]
+    for dkey, dvalue in data:
+        if dkey == key:
+            return dvalue
     raise KeyError(key)
