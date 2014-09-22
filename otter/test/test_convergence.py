@@ -100,7 +100,7 @@ class ConvergeTests(SynchronousTestCase):
                 [server('abc', ACTIVE, created=0),
                  server('def', BUILD, created=1),
                  server('ghi', ACTIVE, created=2)],
-                    {},
+                {},
                 0),
             Convergence(
                 steps=pbag([DeleteServer(server_id='def')])))

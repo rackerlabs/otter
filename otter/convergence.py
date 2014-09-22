@@ -2,8 +2,6 @@
 Convergence.
 """
 
-from collections import Counter
-
 from characteristic import attributes
 from pyrsistent import pbag
 from zope.interface import Interface, implementer
