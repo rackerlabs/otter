@@ -3,10 +3,10 @@ Convergence.
 """
 
 from characteristic import attributes
-from pyrsistent import pbag
+from pyrsistent import pbag, freeze
 from zope.interface import Interface, implementer
 
-from otter.util.fp import freeze, partition_bool, partition_groups
+from otter.util.fp import partition_bool, partition_groups
 
 
 class IStep(Interface):
