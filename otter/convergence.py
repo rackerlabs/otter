@@ -5,6 +5,7 @@ Convergence.
 from collections import Counter
 
 from characteristic import attributes
+from pyrsistent import pbag
 from zope.interface import Interface, implementer
 
 from otter.util.fp import freeze, partition_bool, partition_groups
@@ -101,11 +102,11 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                           for server in servers_in_error]
 
     return Convergence(
-        steps=Counter(create_steps
-                      + delete_steps
-                      + delete_error_steps
-                      + delete_timeout_steps
-                      ))
+        steps=pbag(create_steps
+                   + delete_steps
+                   + delete_error_steps
+                   + delete_timeout_steps
+                   ))
 
 
 @attributes(['steps'])
@@ -113,8 +114,8 @@ class Convergence(object):
     """
     A :obj:`Convergence` is a set of steps required to converge a ``group_id``.
 
-    :ivar Counter steps: A :obj:`Counter` of :obj:`IStep`s to be performed in
-    parallel.
+    :ivar pbag steps: A :obj:`pbag` of :obj:`IStep`s to be performed in
+        parallel.
     """
 
 

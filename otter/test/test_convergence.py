@@ -1,8 +1,6 @@
 """Tests for convergence."""
 
-from pyrsistent import m
-
-from collections import Counter
+from pyrsistent import pmap, pbag
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -32,8 +30,7 @@ class ConvergeTests(SynchronousTestCase):
                 {},
                 0),
             Convergence(
-                steps=Counter([
-                    CreateServer(launch_config=m())])))
+                steps=pbag([CreateServer(launch_config=pmap())])))
 
     def test_converge_give_me_multiple_servers(self):
         """
@@ -47,9 +44,9 @@ class ConvergeTests(SynchronousTestCase):
                 {},
                 0),
             Convergence(
-                steps=Counter([
-                    CreateServer(launch_config=m()),
-                    CreateServer(launch_config=m())])))
+                steps=pbag([
+                    CreateServer(launch_config=pmap()),
+                    CreateServer(launch_config=pmap())])))
 
     def test_count_building_as_meeting_capacity(self):
         """
@@ -62,8 +59,7 @@ class ConvergeTests(SynchronousTestCase):
                 [server('abc', BUILD)],
                 {},
                 0),
-            Convergence(
-                steps=Counter([])))
+            Convergence(steps=pbag([])))
 
     def test_delete_nodes_in_error_state(self):
         """
@@ -77,9 +73,9 @@ class ConvergeTests(SynchronousTestCase):
                 {},
                 0),
             Convergence(
-                steps=Counter([
+                steps=pbag([
                     DeleteServer(server_id='abc'),
-                    CreateServer(launch_config=m()),
+                    CreateServer(launch_config=pmap()),
                 ])))
 
     def test_scale_down(self):
@@ -91,10 +87,7 @@ class ConvergeTests(SynchronousTestCase):
                  server('def', ACTIVE, created=1)],
                 {},
                 0),
-            Convergence(
-                steps=Counter([
-                    DeleteServer(server_id='abc'),
-                ])))
+            Convergence(steps=pbag([DeleteServer(server_id='abc')])))
 
     def test_scale_down_building_first(self):
         """
@@ -107,11 +100,10 @@ class ConvergeTests(SynchronousTestCase):
                 [server('abc', ACTIVE, created=0),
                  server('def', BUILD, created=1),
                  server('ghi', ACTIVE, created=2)],
-                {},
+                    {},
                 0),
             Convergence(
-                steps=Counter([
-                    DeleteServer(server_id='def')])))
+                steps=pbag([DeleteServer(server_id='def')])))
 
     def test_timeout_building(self):
         """
@@ -126,9 +118,9 @@ class ConvergeTests(SynchronousTestCase):
                 {},
                 3600),
             Convergence(
-                steps=Counter([
+                steps=pbag([
                     DeleteServer(server_id='slowpoke'),
-                    CreateServer(launch_config=m())])))
+                    CreateServer(launch_config=pmap())])))
 
     def test_timeout_replace_only_when_necessary(self):
         """
@@ -143,9 +135,7 @@ class ConvergeTests(SynchronousTestCase):
                  server('new-ok', ACTIVE, created=3600)],
                 {},
                 3600),
-            Convergence(
-                steps=Counter([
-                    DeleteServer(server_id='slowpoke')])))
+            Convergence(steps=pbag([DeleteServer(server_id='slowpoke')])))
 
 
 # time out (delete) building servers
