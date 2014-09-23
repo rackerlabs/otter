@@ -79,3 +79,69 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         self.assertNoResult(d)
         self.clock.pump([2 ** i for i in range(1, 6)])
         self.failureResultOf(d, APIError)
+
+
+class GetScalingGroupServersTests(SynchronousTestCase):
+    """
+    Tests for :func:`get_scaling_group_servers`
+    """
+
+    def setUp(self):
+        """
+        Mock and setup :func:`get_all_server_details`
+        """
+        self.mock_gasd = patch(self, 'otter.convergence.get_all_server_details')
+        self.servers = []
+        self.clock = None
+
+        def gasd(*args, **kwargs):
+            if args == ('t', 'a', 's', 'r') and kwargs == {'clock': self.clock}:
+                return succeed(self.servers)
+
+        # Setup function to return value only on expected args to avoid asserting
+        # its called every time
+        self.mock_gasd.side_effect = gasd
+
+    def test_filters_no_metadata(self):
+        """
+        Does not include servers which do not have metadata in it
+        """
+        self.servers = [{'id': i} for i in range(10)]
+        d = get_scaling_group_servers('t', 'a', 's', 'r')
+        self.assertEqual(self.successResultOf(d), {})
+
+    def test_filters_no_as_metadata(self):
+        """
+        Does not include servers which have metadata but does not have AS info in it
+        """
+        self.servers = [{'id': i, 'metadata': {}} for i in range(10)]
+        self.clock = Clock()
+        d = get_scaling_group_servers('t', 'a', 's', 'r', clock=self.clock)
+        self.assertEqual(self.successResultOf(d), {})
+
+    def test_returns_as_servers(self):
+        """
+        Returns servers with AS metadata in it grouped by scaling group ID
+        """
+        as_servers = (
+            [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i} for i in range(5)] +
+            [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i} for i in range(5, 8)] +
+            [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
+        self.servers = as_servers + [{'metadata': 'junk'}] * 3
+        d = get_scaling_group_servers('t', 'a', 's', 'r')
+        self.assertEqual(
+            self.successResultOf(d),
+            {'a': as_servers[:5] + [as_servers[-1]], 'b': as_servers[5:8]})
+
+    def test_filters_on_user_criteria(self):
+        """
+        Considers user provided filter if provided
+        """
+        as_servers = (
+            [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i} for i in range(5)] +
+            [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i} for i in range(5, 8)])
+        self.servers = as_servers + [{'metadata': 'junk'}] * 3
+        d = get_scaling_group_servers('t', 'a', 's', 'r', sfilter=lambda s: s['id'] % 3 == 0)
+        self.assertEqual(
+            self.successResultOf(d),
+            {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})

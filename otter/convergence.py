@@ -14,6 +14,7 @@ from characteristic import attributes
 from zope.interface import Interface, implementer
 
 from toolz.curried import filter, groupby
+from toolz.functoolz import compose
 
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
@@ -64,31 +65,29 @@ def get_all_server_details(tenant_id, authenticator, service_name, region,
     defer.returnValue(all_servers)
 
 
-def get_scaling_group_servers(tenant_id, authenticator, service_name, region, clock=None):
+def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
+                              sfilter=None, clock=None):
     """
     Return tenant's servers that belong to a scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
+
+    :param sfilter: `callable` taking single server as arg and returns True the server
+                    should be returned, False otherwise
     """
 
-    def group_id(server_details):
-        m = server_details.get('metadata', {})
-        return m.get('rax:auto_scaling_group_id', 'nogroup')
+    def has_group_id(s):
+        return 'metadata' in s and 'rax:auto_scaling_group_id' in s['metadata']
 
-    def del_nogroup(grouped_servers):
-        if 'nogroup' in grouped_servers:
-            del grouped_servers['nogroup']
-        return grouped_servers
+    def group_id(s):
+        return s['metadata']['rax:auto_scaling_group_id']
 
-    valid_statuses = ('ACTIVE', 'BUILD', 'HARD_REBOOT', 'MIGRATION', 'PASSWORD',
-                      'RESIZE', 'REVERT_RESIZE', 'VERIFY_RESIZE')
+    if sfilter is not None:
+        servers_apply = compose(groupby(group_id), filter(sfilter), filter(has_group_id))
+    else:
+        servers_apply = compose(groupby(group_id), filter(has_group_id))
 
     d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
-    # filter out invalid servers
-    d.addCallback(filter(lambda s: s['status'] in valid_statuses))
-    # group based on scaling_group_id
-    d.addCallback(groupby(group_id))
-    # remove servers not belonging to any group
-    d.addCallback(del_nogroup)
+    d.addCallback(servers_apply)
     return d
 
 
