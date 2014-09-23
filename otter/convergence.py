@@ -44,14 +44,15 @@ def get_all_server_details(tenant_id, authenticator, service_name, region,
         _treq = treq
 
     def fetch(url, headers):
-        #import pudb; pu.db
         d = _treq.get(url, headers=headers)
-        d.addCallback(check_success, [200])
+        d.addCallback(check_success, [200], _treq=_treq)
         d.addCallback(_treq.json_content)
         return d
 
     while True:
-        d = retry(partial(fetch, '{}?{}'.format(url, urlencode(query)), headers(token)),
+        # sort based on query name to make the tests predictable
+        urlparams = sorted(query.items(), key=lambda e: e[0])
+        d = retry(partial(fetch, '{}?{}'.format(url, urlencode(urlparams)), headers(token)),
                   can_retry=retry_times(5),
                   next_interval=exponential_backoff_interval(2), clock=clock)
         servers = (yield d)['servers']
