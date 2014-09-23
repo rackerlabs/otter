@@ -1,4 +1,3 @@
-
 """
 Convergence.
 """
@@ -11,6 +10,7 @@ import treq
 from twisted.internet import defer
 
 from characteristic import attributes
+from pyrsistent import pbag
 from zope.interface import Interface, implementer
 
 from toolz.curried import filter, groupby
@@ -18,6 +18,7 @@ from toolz.functoolz import compose
 
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
+from otter.util.fp import freeze, partition_bool, partition_groups
 from otter.util.retry import retry, retry_times, exponential_backoff_interval
 # TODO: I hate including this!
 from otter.worker.launch_server_v1 import public_endpoint_url
@@ -103,42 +104,99 @@ class IStep(Interface):
         """
 
 
-@attributes(['id', 'launch_config', 'desired'])
+@attributes(['launch_config', 'desired'])
 class DesiredGroupState(object):
     """
     The desired state for a scaling group.
 
-    :ivar str id: The group's ID.
     :ivar dict launch_config: nova launch config.
     :ivar int desired: the number of desired servers within the group.
     """
 
+    def __init__(self):
+        self.launch_config = freeze(self.launch_config)
 
-def converge(desired_state, servers_with_cheese, load_balancer_contents, now):
+
+@attributes(['id', 'state', 'created'])
+class NovaServer(object):
+    """
+    Information about a server that was retrieved from Nova.
+
+    :ivar str id: The server id.
+    :ivar str state: Current state of the server.
+    :ivar float created: Timestamp at which the server was created.
+    """
+
+
+ACTIVE = 'ACTIVE'
+ERROR = 'ERROR'
+BUILD = 'BUILD'
+
+
+def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
+             timeout=3600):
     """
     Create a :obj:`Convergence` that indicates how to transition from the state
     provided by the given parameters to the :obj:`DesiredGroupState` described
     by ``desired_state``.
 
     :param DesiredGroupState desired_state: The desired group state.
-    :param dict servers_with_cheese: a dictionary mapping server IDs to nova
-        server information (the JSON-serializable dictionary returned from a
-        ``.../servers/detail/`` request)
+    :param list servers_with_cheese: a list of of :obj:`NovaServer` instances.
+        This must only contain servers that are being managed for the specified
+        group.
     :param dict load_balancer_contents: a dictionary mapping load balancer IDs
         to lists of 2-tuples of (IP address, loadbalancer node ID).
     :param float now: number of seconds since the POSIX epoch indicating the
         time at which the convergence was requested.
+    :param float timeout: Number of seconds after which we will delete a server
+        in BUILD.
 
     :rtype: obj:`Convergence`
     """
+    newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
+    servers_in_error, servers_in_active, servers_in_build = partition_groups(
+        lambda s: s.state, newest_to_oldest, [ERROR, ACTIVE, BUILD])
+
+    building_too_long, waiting_for_build = partition_bool(
+        lambda server: now - server.created >= timeout,
+        servers_in_build)
+
+    create_server = CreateServer(launch_config=desired_state.launch_config)
+
+    # delete any servers that have been building for too long
+    delete_timeout_steps = [DeleteServer(server_id=server.id)
+                            for server in building_too_long]
+
+    # create servers
+    create_steps = [create_server] * (desired_state.desired
+                                      - (len(servers_in_active)
+                                         + len(waiting_for_build)))
+
+    # delete over capacity, starting with building, then active,
+    # preferring older
+    servers_to_delete = (servers_in_active + waiting_for_build)[desired_state.desired:]
+    delete_steps = [DeleteServer(server_id=server.id)
+                    for server in servers_to_delete]
+
+    # delete all servers in error.
+    delete_error_steps = [DeleteServer(server_id=server.id)
+                          for server in servers_in_error]
+
+    return Convergence(
+        steps=pbag(create_steps
+                   + delete_steps
+                   + delete_error_steps
+                   + delete_timeout_steps
+                   ))
 
 
-@attributes(['steps', 'group_id'])
+@attributes(['steps'])
 class Convergence(object):
     """
     A :obj:`Convergence` is a set of steps required to converge a ``group_id``.
 
-    :ivar set steps: A set of :obj:`IStep`s to be performed in parallel.
+    :ivar pbag steps: A :obj:`pbag` of :obj:`IStep`s to be performed in
+        parallel.
     """
 
 
