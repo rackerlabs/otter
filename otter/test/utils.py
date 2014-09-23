@@ -20,6 +20,7 @@ from otter.log.bound import BoundLog
 from otter.supervisor import ISupervisor
 from otter.models.interface import IScalingGroup
 from otter.util.deferredutils import DeferredPool
+from otter.util.fp import freeze
 
 
 class matches(object):
@@ -263,9 +264,11 @@ class StubResponse(object):
     """
     A fake pre-built Twisted Web Response object.
     """
-    def __init__(self, code, headers):
+    def __init__(self, code, headers, data=None):
         self.code = code
         self.headers = headers
+        # Data is not part of twisted response object
+        self._data = data
 
 
 def stub_pure_response(body, code=200, response_headers=None):
@@ -346,6 +349,86 @@ class StubTreq(object):
         if method in ('get', 'head', 'delete'):
             return partial(self.request, method.upper())
         raise AttributeError("StubTreq has no attribute '{0}'".format(method))
+
+    def __str__(self):
+        return 'StubTreq; requests: {}, contents: {}'.format(
+            self.reqs, self.contents)
+
+
+class StubTreq2(object):
+    """
+    A stub version of otter.utils.logging_treq that returns canned responses
+    from dictionaries.
+
+    It tries to be simpler from above `StubTreq` based on its arguments. It correlates
+    requests keeping track of Twisted response objects internally. Its also simpler
+    because it doesn't expect immuatable args
+    """
+    def __init__(self, reqs=None):
+        """
+        :param reqs: A list of 2-item tuple containing (method, url, <kwargs dict>)
+            as first item. The second item is either (response code, response data)
+            tuple or list of these tuples. When it is list, each `request` call with
+            same args will return first popped element
+
+        'log' would also be a useful kwarg to check, but since dictionary keys
+        should be immutable, and it's hard to get the exact instance of
+        BoundLog, that's being ignored for now.
+        """
+        self.reqs = {}
+        if reqs is not None:
+            for (method, url, kwargs), response in reqs:
+                kwargs.pop('log', None)
+                self.reqs[freeze((method, url, kwargs))] = response
+
+    def request(self, method, url, **kwargs):
+        """
+        Return a result by looking up the arguments in the `reqs` dict.
+        The only kwargs we care about are 'headers' and 'data',
+        although if other kwargs are passed their keys count as part of the
+        request.
+        """
+        kwargs.pop('log', None)
+        resp = self.reqs[freeze((method, url, kwargs))]
+        if isinstance(resp, list):
+            code, data = resp.pop(0)
+        else:
+            code, data = resp
+        return succeed(StubResponse(code, (), data))
+
+    def content(self, response):
+        """Return a result by taking the data from `response` itself."""
+        return succeed(response._data)
+
+    def json_content(self, response):
+        """Return :meth:`content` after json-decoding"""
+        return self.content(response).addCallback(json.loads)
+
+    def put(self, url, data=None, **kwargs):
+        """
+        Syntactic sugar for making a PUT request, because the order of the
+        params are different than :meth:`request`
+        """
+        return self.request('PUT', url, data=data, **kwargs)
+
+    def post(self, url, data=None, **kwargs):
+        """
+        Syntactic sugar for making a POST request, because the order of the
+        params are different than :meth:`request`
+        """
+        return self.request('POST', url, data=data, **kwargs)
+
+    def __getattr__(self, method):
+        """
+        Syntactic sugar for making head/get/delete requests, because the order
+        of parameters is the same as :meth:`request`
+        """
+        if method in ('get', 'head', 'delete'):
+            return partial(self.request, method.upper())
+        raise AttributeError("StubTreq has no attribute '{0}'".format(method))
+
+    def __str__(self):
+        return 'StubTreq; requests: {}'.format(self.reqs)
 
 
 def mock_treq(code=200, json_content={}, method='get', content='', treq_mock=None):
