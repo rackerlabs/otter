@@ -943,6 +943,14 @@ class RemoveServerTests(SynchronousTestCase):
         set_supervisor(self.supervisor)
         self.addCleanup(set_supervisor, None)
 
+    def _remove_server(self, replace=True, purge=True, server_id="s0"):
+        """
+        Try to remove a server from the group.
+        """
+        d = remove_server_from_group(self.log, self.tid, server_id,
+                                     replace, purge, self.group, self.state)
+        return d
+
     def _assert_server_in_group_state(self, state):
         """
         Assert that the server is still in the group state.
@@ -997,9 +1005,8 @@ class RemoveServerTests(SynchronousTestCase):
         If specific server is not in the group, :class:`ServerNotFoundError`
         is raised.
         """
-        self.assertRaises(
-            ServerNotFoundError, remove_server_from_group, self.log,
-            self.tid, 's2', True, True, self.group, self.state)
+        self.assertRaises(ServerNotFoundError,
+                          self._remove_server, server_id="BOGUS")
 
         self._assert_server_in_group_state(self.state)
         self._assert_create_not_scheduled(self.state)
@@ -1013,8 +1020,7 @@ class RemoveServerTests(SynchronousTestCase):
         """
         self.state.add_job('j1')
         self.group.view_config.return_value = succeed({'minEntities': 2})
-        d = remove_server_from_group(
-            self.log, self.tid, 's0', False, True, self.group, self.state)
+        d = self._remove_server(replace=False, purge=True)
         self.failureResultOf(d, CannotDeleteServerBelowMinError)
 
         self._assert_server_in_group_state(self.state)
@@ -1027,8 +1033,7 @@ class RemoveServerTests(SynchronousTestCase):
         Server is removed, purged and replaced.
         """
         self.group.view_launch_config.return_value = succeed('launch')
-        d = remove_server_from_group(
-            self.log, self.tid, 's0', True, True, self.group, self.state)
+        d = self._remove_server(replace=True, purge=True)
         state = self.successResultOf(d)
 
         self._assert_server_not_in_group_state(state)
@@ -1042,8 +1047,7 @@ class RemoveServerTests(SynchronousTestCase):
         desired is reduced by 1.
         """
         self.group.view_config.return_value = succeed({'minEntities': 0})
-        d = remove_server_from_group(
-            self.log, self.tid, 's0', False, True, self.group, self.state)
+        d = self._remove_server(replace=False, purge=True)
         state = self.successResultOf(d)
 
         self._assert_server_not_in_group_state(state)
@@ -1070,8 +1074,7 @@ class RemoveServerTests(SynchronousTestCase):
         The server is removed, replaced, but not purged.
         """
         self.group.view_config.return_value = succeed({'minEntities': 0})
-        d = remove_server_from_group(
-            self.log, self.tid, 's0', True, False, self.group, self.state)
+        d = self._remove_server(replace=True, purge=False)
         state = self.successResultOf(d)
 
         self._assert_server_not_in_group_state(state)
