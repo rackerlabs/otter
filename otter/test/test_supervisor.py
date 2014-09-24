@@ -1061,8 +1061,7 @@ class RemoveServerTests(SynchronousTestCase):
         """
         The server is removed, but not replaced and not purged.
         """
-        d = remove_server_from_group(
-            self.log, self.tid, 's0', False, False, self.group, self.state)
+        d = self._remove_server(replace=False, purge=False)
         state = self.successResultOf(d)
 
         self._assert_server_not_in_group_state(state)
