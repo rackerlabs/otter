@@ -25,6 +25,7 @@ from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError)
 from otter.rest.decorators import InvalidJsonError, InvalidQueryArgument
 
+from otter.rest import groups
 from otter.rest.groups import format_state_dict, extract_bool_arg
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
@@ -1079,59 +1080,99 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         super(GroupServersTests, self).setUp()
         self.mock_rsfg = patch(self, 'otter.rest.groups.remove_server_from_group',
                                return_value=None)
-        self.mock_eba = patch(self, 'otter.rest.groups.extract_bool_arg',
-                              return_value=True)
+        self.patch(groups, "extract_bool_arg", self._extract_bool_arg)
+        self._replace = self._purge = True
 
-    def _check_calls(self, replace):
-        self.mock_eba.assert_called_once_with(matches(IsInstance(Request)), 'replace', True)
-        req = self.mock_eba.call_args[0][0]
-        self.assertEqual(req.uri, self.endpoint + 's1')
+    def _extract_bool_arg(self, request, key, default):
+        """
+        A fake _extract_bool_arg, for testing.
+        """
+        self.assertTrue(isinstance(request, Request))
+        self._request = request
+        # REVIEW: I copied this behavior from the old code. Is this really how
+        # we're supposed to access the request object? Seems like a common
+        # thing to want. Should this entire thing even exist? Why can't we
+        # give it a Request(Channel(), True) with some args? --lvh
+        if key == "replace":
+            self.assertTrue(default)
+            return self._replace
+        elif key == "purge":
+            self.assertTrue(default)
+            return self._purge
+        else:  # pragma: no cover
+            raise RuntimeError("unknown extract_bool_arg key: {}".format(key))
+
+    def _check_remove_server_from_group_call(self, replace=True, purge=True):
+        """
+        Asserts that the call to :func:`remove_server_from_group` is correct.
+        """
         self.mock_rsfg.assert_called_once_with(
-            matches(IsBoundWith(system='otter.rest.groups.delete_server', tenant_id='11111',
-                                scaling_group_id='one', server_id='s1',
+            matches(IsBoundWith(system='otter.rest.groups.delete_server',
+                                tenant_id='11111',
+                                scaling_group_id='one',
+                                server_id='s1',
                                 transaction_id='transaction-id')),
-            'transaction-id', 's1', replace, self.mock_group, self.mock_state)
+            'transaction-id', 's1', replace, purge, self.mock_group, self.mock_state)
 
-    def test_server_delete_with_replace(self):
+    def _test_server_delete(self, replace, purge):
         """
-        Server is deleted and replaced, when ``replace`` query argument is
-        :data:`True`.
-        """
-        response_body = self.assert_status_code(202, method="DELETE",
-                                                endpoint=self.endpoint + 's1')
-        self.assertEqual(response_body, "")
-        self._check_calls(replace=True)
+        A generic server deletion test.
 
-    def test_server_delete_without_replace(self):
+        :param bool replace: Should the server be replaced?
+        :param bool purge: Should the server be purged?
+        :return: :data:`None`.
         """
-        Server is deleted, but not replaced, when ``replace`` query argument is
-        :data:`False`.
+        self._replace, self._purge = replace, purge
+        body = self.assert_status_code(202, self.endpoint + 's1', "DELETE")
+        self.assertEqual(body, "")
+        self.assertEqual(self._request.uri, self.endpoint + 's1')
+        self._check_remove_server_from_group_call(replace, purge)
+
+    def test_server_purge_with_replace(self):
         """
-        self.mock_eba.return_value = False
-        response_body = self.assert_status_code(202, method="DELETE",
-                                                endpoint=self.endpoint + 's1')
-        self.assertEqual(response_body, "")
-        self._check_calls(replace=False)
+        Servers can be purged and replaced.
+        """
+        self._test_server_delete(replace=True, purge=True)
+
+    def test_server_purge_without_replace(self):
+        """
+        Servers can be purged without replacement.
+        """
+        self._test_server_delete(replace=False, purge=True)
+
+    def test_server_removal_with_replace(self):
+        """
+        Servers can be removed from the group, without being removed from Nova,
+        but with replacement.
+        """
+        self._test_server_delete(replace=True, purge=False)
+
+    def test_server_removal_without_replace(self):
+        """
+        Servers can be removed from the group, without being removed from Nova,
+        and without replacement.
+        """
+        self._test_server_delete(replace=False, purge=False)
 
     def test_server_delete_server_not_found(self):
         """
         404 error is returned when server is not found
         """
         self.mock_rsfg.return_value = defer.fail(ServerNotFoundError('t', 'g', 's'))
-        response_body = self.assert_status_code(404, method="DELETE",
-                                                endpoint=self.endpoint + 's1')
-        self.assertIn('ServerNotFoundError', response_body)
-        self._check_calls(True)
+        body = self.assert_status_code(404, self.endpoint + 's1', "DELETE")
+        self.assertIn('ServerNotFoundError', body)
+        self.assertEqual(self._request.uri, self.endpoint + 's1')
+        self._check_remove_server_from_group_call()
 
     def test_server_delete_size_error(self):
         """
         403 error is returned if deleting server will break min/max boundary
         """
         self.mock_rsfg.return_value = defer.fail(CannotDeleteServerBelowMinError('t', 'g', 's', 3))
-        response_body = self.assert_status_code(403, method="DELETE",
-                                                endpoint=self.endpoint + 's1')
-        self.assertIn('CannotDeleteServerBelowMinError', response_body)
-        self._check_calls(True)
+        body = self.assert_status_code(403, self.endpoint + 's1', "DELETE")
+        self.assertIn('CannotDeleteServerBelowMinError', body)
+        self.assertEqual(self._request.uri, self.endpoint + 's1')
+        self._check_remove_server_from_group_call()
 
     def test_get_servers_not_implemented(self):
         """
