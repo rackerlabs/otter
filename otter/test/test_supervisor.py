@@ -946,7 +946,6 @@ class RemoveServerTests(SynchronousTestCase):
         self.group.view_config.return_value = succeed({'minEntities': 0})
         self.group.view_launch_config.return_value = succeed('launch')
 
-
     def _remove_server(self, replace=True, purge=True, server_id="s0"):
         """
         Try to remove a server from the group.
