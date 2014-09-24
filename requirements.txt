@@ -16,9 +16,7 @@ txkazoo==0.0.5
 effect==0.1a6
 characteristic==0.1.0
 toolz==0.6.0
-
-# pyrsistent should be released soon!
-git+https://github.com/tobgu/pyrsistent.git@27d117a4c6414068404c8bef4644f66789189eb3#egg=pyrsistent
+pyrsistent==0.5.0
 
 # pinning dependencies of dependencies
 
