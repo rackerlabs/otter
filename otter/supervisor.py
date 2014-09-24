@@ -495,17 +495,20 @@ class CannotDeleteServerBelowMinError(Exception):
 
 def remove_server_from_group(log, trans_id, server_id, replace, group, state):
     """
-    Remove specific server from the group and optionally replace it by creatig new
-    server
+    Remove a specific server from the group, optionally replacing it
+    with a new one.
 
     :param log: A bound logger
-    :param trans_id: transaction id for this operation
-    :param server_id: ID of server to be removed
-    :param replace: Should the server be replaced?
-    :param group: A :class:`otter.models.interface.IScalingGroup` implementation
-    :param state: A :class:`otter.models.interface.GroupState` object
+    :param bytes trans_id: The transaction id for this operation.
+    :param bytes server_id: The id of the server to be removed.
+    :param bool replace: Should the server be replaced?
+    :param group: The scaling group to remove a server from.
+    :type group: :class:`~otter.models.interface.IScalingGroup`
+    :param state: The current state of the group.
+    :type state: :class:`~otter.models.interface.GroupState`
 
-    :return: Deferred that fires with updated state object
+    :return: The (deferred) updated state.
+    :rtype: deferred :class:`~otter.models.interface.GroupState`
     """
 
     def reduce_desired(config):
