@@ -1100,7 +1100,7 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         response_body = self.assert_status_code(202, method="DELETE",
                                                 endpoint=self.endpoint + 's1')
         self.assertEqual(response_body, "")
-        self._check_calls(True)
+        self._check_calls(replace=True)
 
     def test_server_delete_without_replace(self):
         """
@@ -1111,7 +1111,7 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         response_body = self.assert_status_code(202, method="DELETE",
                                                 endpoint=self.endpoint + 's1')
         self.assertEqual(response_body, "")
-        self._check_calls(False)
+        self._check_calls(replace=False)
 
     def test_server_delete_server_not_found(self):
         """
