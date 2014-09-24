@@ -943,6 +943,10 @@ class RemoveServerTests(SynchronousTestCase):
         set_supervisor(self.supervisor)
         self.addCleanup(set_supervisor, None)
 
+        self.group.view_config.return_value = succeed({'minEntities': 0})
+        self.group.view_launch_config.return_value = succeed('launch')
+
+
     def _remove_server(self, replace=True, purge=True, server_id="s0"):
         """
         Try to remove a server from the group.
@@ -1032,7 +1036,6 @@ class RemoveServerTests(SynchronousTestCase):
         """
         Server is removed, purged and replaced.
         """
-        self.group.view_launch_config.return_value = succeed('launch')
         d = self._remove_server(replace=True, purge=True)
         state = self.successResultOf(d)
 
@@ -1046,7 +1049,6 @@ class RemoveServerTests(SynchronousTestCase):
         Server is removed and purged from Nova, but not replaced. The
         desired is reduced by 1.
         """
-        self.group.view_config.return_value = succeed({'minEntities': 0})
         d = self._remove_server(replace=False, purge=True)
         state = self.successResultOf(d)
 
@@ -1059,7 +1061,6 @@ class RemoveServerTests(SynchronousTestCase):
         """
         The server is removed, but not replaced and not purged.
         """
-        self.group.view_config.return_value = succeed({'minEntities': 0})
         d = remove_server_from_group(
             self.log, self.tid, 's0', False, False, self.group, self.state)
         state = self.successResultOf(d)
@@ -1073,7 +1074,6 @@ class RemoveServerTests(SynchronousTestCase):
         """
         The server is removed, replaced, but not purged.
         """
-        self.group.view_config.return_value = succeed({'minEntities': 0})
         d = self._remove_server(replace=True, purge=False)
         state = self.successResultOf(d)
 
