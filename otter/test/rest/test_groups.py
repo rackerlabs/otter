@@ -1094,8 +1094,8 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
 
     def test_server_delete_with_replace(self):
         """
-        Server is deleted and replaced by calling remove_server_from_group
-        with correct args when "replace" query is True
+        Server is deleted and replaced, when ``replace`` query argument is
+        :data:`True`.
         """
         response_body = self.assert_status_code(202, method="DELETE",
                                                 endpoint=self.endpoint + 's1')
@@ -1104,8 +1104,8 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
 
     def test_server_delete_without_replace(self):
         """
-        Server is deleted and not replaced by calling remove_server_from_group
-        with correct args when "replace" query is false
+        Server is deleted, but not replaced, when ``replace`` query argument is
+        :data:`False`.
         """
         self.mock_eba.return_value = False
         response_body = self.assert_status_code(202, method="DELETE",
