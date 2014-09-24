@@ -943,36 +943,6 @@ class RemoveServerTests(SynchronousTestCase):
         set_supervisor(self.supervisor)
         self.addCleanup(set_supervisor, None)
 
-    def test_server_not_found(self):
-        """
-        If specific server is not in the group, :class:`ServerNotFoundError`
-        is raised.
-        """
-        self.assertRaises(
-            ServerNotFoundError, remove_server_from_group, self.log,
-            self.tid, 's2', True, True, self.group, self.state)
-
-        self._assert_server_in_group_state(self.state)
-        self._assert_create_not_scheduled(self.state)
-        self._assert_delete_not_scheduled()
-        self.assertEqual(self.state.desired, 1)
-
-    def test_not_deleted_below_min(self):
-        """
-        :class:`CannotDeleteServerBelowMinError` is raised if the current
-        (active + pending) number of servers is already the minimum.
-        """
-        self.state.add_job('j1')
-        self.group.view_config.return_value = succeed({'minEntities': 2})
-        d = remove_server_from_group(
-            self.log, self.tid, 's0', False, True, self.group, self.state)
-        self.failureResultOf(d, CannotDeleteServerBelowMinError)
-
-        self._assert_server_in_group_state(self.state)
-        self._assert_delete_not_scheduled()
-        self._assert_create_not_scheduled(self.state)
-        self.assertEqual(self.state.desired, 1)
-
     def _assert_server_in_group_state(self, state):
         """
         Assert that the server is still in the group state.
@@ -1021,6 +991,36 @@ class RemoveServerTests(SynchronousTestCase):
         """
         self.assertNotIn('jid', state.pending)
         self.assertEqual(self.supervisor.exec_calls, [])
+
+    def test_server_not_found(self):
+        """
+        If specific server is not in the group, :class:`ServerNotFoundError`
+        is raised.
+        """
+        self.assertRaises(
+            ServerNotFoundError, remove_server_from_group, self.log,
+            self.tid, 's2', True, True, self.group, self.state)
+
+        self._assert_server_in_group_state(self.state)
+        self._assert_create_not_scheduled(self.state)
+        self._assert_delete_not_scheduled()
+        self.assertEqual(self.state.desired, 1)
+
+    def test_not_deleted_below_min(self):
+        """
+        :class:`CannotDeleteServerBelowMinError` is raised if the current
+        (active + pending) number of servers is already the minimum.
+        """
+        self.state.add_job('j1')
+        self.group.view_config.return_value = succeed({'minEntities': 2})
+        d = remove_server_from_group(
+            self.log, self.tid, 's0', False, True, self.group, self.state)
+        self.failureResultOf(d, CannotDeleteServerBelowMinError)
+
+        self._assert_server_in_group_state(self.state)
+        self._assert_delete_not_scheduled()
+        self._assert_create_not_scheduled(self.state)
+        self.assertEqual(self.state.desired, 1)
 
     def test_replaced_and_removed(self):
         """
