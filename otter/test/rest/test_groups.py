@@ -31,8 +31,6 @@ from otter.rest.groups import format_state_dict, extract_bool_arg
 from otter.test.rest.request import DummyException, RestAPITestMixin
 from otter.test.utils import patch, matches, IsBoundWith
 
-from testtools.matchers import IsInstance
-
 from otter.rest.bobby import set_bobby
 from otter.bobby import BobbyClient
 
