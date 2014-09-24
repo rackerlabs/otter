@@ -507,7 +507,7 @@ def remove_server_from_group(log, trans_id, server_id, replace, group, state):
     :param state: The current state of the group.
     :type state: :class:`~otter.models.interface.GroupState`
 
-    :return: The (deferred) updated state.
+    :return: The updated state.
     :rtype: deferred :class:`~otter.models.interface.GroupState`
     """
 
