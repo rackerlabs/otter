@@ -3,7 +3,7 @@ Tests for the worker supervisor.
 """
 import mock
 
-from testtools.matchers import ContainsDict, Equals, IsInstance, KeysEqual
+from testtools.matchers import ContainsDict, Equals, IsInstance
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed, fail, Deferred
