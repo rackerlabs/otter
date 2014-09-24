@@ -1092,7 +1092,7 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
                                 transaction_id='transaction-id')),
             'transaction-id', 's1', replace, self.mock_group, self.mock_state)
 
-    def test_server_delete_true(self):
+    def test_server_delete_with_replace(self):
         """
         Server is deleted and replaced by calling remove_server_from_group
         with correct args when "replace" query is True
@@ -1102,7 +1102,7 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(response_body, "")
         self._check_calls(True)
 
-    def test_server_delete_false(self):
+    def test_server_delete_without_replace(self):
         """
         Server is deleted and not replaced by calling remove_server_from_group
         with correct args when "replace" query is false
