@@ -64,7 +64,7 @@ def get_scaling_groups(client, batch_size=100):
     defer.returnValue(gfilter(groups))
 
 
-GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual')
+GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual pending')
 
 
 def get_tenant_metrics(tenant_id, scaling_groups, servers):
@@ -77,9 +77,38 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers):
     """
     print('processing tenant {} with groups {} and servers {}'.format(
         tenant_id, len(scaling_groups), len(servers)))
-    return [GroupMetrics(tenant_id, g['groupId'], g['desired'],
-                         len(servers.get(g['groupId'], {})))
-            for g in scaling_groups]
+    metrics = []
+    for group in scaling_groups:
+        group_id = group['groupId']
+        create_metrics = partial(GroupMetrics, tenant_id, group_id, group['desired'])
+        if group_id not in servers:
+            metrics.append(create_metrics(0, 0))
+        else:
+            active = len(list(filter(lambda s: s['status'] == 'ACTIVE', servers[group_id])))
+            metrics.append(create_metrics(active, len(servers[group_id]) - active))
+    return metrics
+
+
+def get_all_metrics(tenanted_groups, authenticator, nova_service, region, clock=None):
+    """
+    Get all group's metrics
+
+    :return: ``list`` of `GroupMetrics` via `Deferred`
+    """
+    # TODO: Use cooperator instead
+    sem = defer.DeferredSemaphore(10)
+    defs = []
+    all_groups = []
+    for tenant_id, groups in tenanted_groups.iteritems():
+        d = sem.run(
+            get_scaling_group_servers, tenant_id, authenticator,
+            nova_service, region, sfilter=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
+            clock=clock)
+        d.addCallback(partial(get_tenant_metrics, tenant_id, groups))
+        d.addCallback(all_groups.extend)
+        defs.append(d)
+
+    return defer.gatherResults(defs).addCallback(lambda _: all_groups)
 
 
 def get_authenticator(reactor, identity):
@@ -114,19 +143,9 @@ def main(reactor, config):
     tenanted_groups = yield get_scaling_groups(client)
     print('got tenants', len(tenanted_groups))
 
-    # TODO: Use cooperator instead
-    sem = defer.DeferredSemaphore(10)
-    defs = []
-    all_groups = []
-    for tenant_id, groups in tenanted_groups.iteritems():
-        d = sem.run(
-            get_scaling_group_servers, tenant_id, authenticator,
-            config['services']['nova'], config['region'], clock=reactor)
-        d.addCallback(partial(get_tenant_metrics, tenant_id, groups))
-        d.addCallback(all_groups.extend)
-        defs.append(d)
-
-    yield defer.gatherResults(defs)
+    all_groups = yield get_all_metrics(tenanted_groups, authenticator,
+                                       config['services']['nova'], config['region'],
+                                       clock=reactor)
 
     total_desired, total_actual = reduce(
         lambda (t_desired, t_actual), g: (t_desired + g.desired, t_actual + g.actual),

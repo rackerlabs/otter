@@ -9,7 +9,9 @@ from pyrsistent import freeze
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
 
-from otter.metrics import get_scaling_groups
+from otter.metrics import (
+    get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics)
+from otter.test.utils import patch
 
 from silverberg.client import CQLClient
 
@@ -91,3 +93,48 @@ class GetScalingGroupsTests(SynchronousTestCase):
             {'limit': 5, 'tenantId': 2}, [])
         d = get_scaling_groups(self.client, 5)
         self.assertEqual(self.successResultOf(d), {1: groups1, 2: groups2})
+
+
+class GetMetricsTests(SynchronousTestCase):
+    """
+    Tests for :func:`get_tenant_metrics` and :func:`get_all_metrics`
+    """
+
+    def setUp(self):
+        """
+        Mock get_scaling_group_servers
+        """
+        self.tenant_servers = {}
+        self.mock_gsgs = patch(
+            self, 'otter.metrics.get_scaling_group_servers',
+            side_effect=lambda t, *a, **k: succeed(self.tenant_servers[t]))
+
+    def test_get_tenant_metrics(self):
+        """
+        Gets group's metrics
+        """
+        servers = {'g1': [{'status': 'ACTIVE'}] * 3 + [{'status': 'BUILD'}] * 2}
+        groups = [{'groupId': 'g1', 'desired': 3}, {'groupId': 'g2', 'desired': 4}]
+        self.assertEqual(
+            get_tenant_metrics('t', groups, servers),
+            [GroupMetrics('t', 'g1', 3, 3, 2), GroupMetrics('t', 'g2', 4, 0, 0)])
+
+    def test_get_all_metrics(self):
+        """
+        Gets group's metrics
+        """
+        servers_t1 = {'g1': [{'status': 'ACTIVE'}] * 3 + [{'status': 'BUILD'}] * 2,
+                      'g2': [{'status': 'ACTIVE'}]}
+        servers_t2 = {'g4': [{'status': 'ACTIVE'}, {'status': 'BUILD'}]}
+        groups = {'t1': [{'groupId': 'g1', 'desired': 3}, {'groupId': 'g2', 'desired': 4}],
+                  't2': [{'groupId': 'g4', 'desired': 2}]}
+
+        self.tenant_servers['t1'] = servers_t1
+        self.tenant_servers['t2'] = servers_t2
+
+        d = get_all_metrics(groups, 'a', 'n', 'r', clock='c')
+
+        self.assertEqual(
+            set(self.successResultOf(d)),
+            set([GroupMetrics('t1', 'g1', 3, 3, 2), GroupMetrics('t1', 'g2', 4, 1, 0),
+                 GroupMetrics('t2', 'g4', 2, 1, 1)]))
