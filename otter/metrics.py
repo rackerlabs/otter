@@ -23,7 +23,7 @@ from otter.convergence import get_scaling_group_servers
 
 
 @defer.inlineCallbacks
-def get_scaling_groups(reactor, client, batch_size=100):
+def get_scaling_groups(client, batch_size=100):
     """
     Return scaling groups grouped based on tenantId as
     {tenantId: list of groups} where each group is a ``dict`` that has
@@ -111,7 +111,7 @@ def main(reactor, config):
     client = connect_cass_servers(reactor, config['cassandra'])
     authenticator = get_authenticator(reactor, config['identity'])
 
-    tenanted_groups = yield get_scaling_groups(reactor, client)
+    tenanted_groups = yield get_scaling_groups(client)
     print('got tenants', len(tenanted_groups))
 
     # TODO: Use cooperator instead
@@ -127,12 +127,14 @@ def main(reactor, config):
         defs.append(d)
 
     yield defer.gatherResults(defs)
-    total_desired = sum([g.desired for g in all_groups])
-    total_actual = sum([g.actual for g in all_groups])
+
+    total_desired, total_actual = reduce(
+        lambda (t_desired, t_actual), g: (t_desired + g.desired, t_actual + g.actual),
+        all_groups, (0, 0))
     print('total desired: {}, total actual: {}'.format(total_desired, total_actual))
 
-    sorted_groups = sorted(all_groups, key=lambda g: abs(g.desired - g.actual), reverse=True)
-    print('groups sorted as per divergence', *sorted_groups, sep='\n')
+    all_groups.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
+    print('groups sorted as per divergence', *all_groups, sep='\n')
 
     yield client.disconnect()
 
