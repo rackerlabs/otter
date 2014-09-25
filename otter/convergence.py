@@ -10,7 +10,7 @@ import treq
 from twisted.internet import defer
 
 from characteristic import attributes
-from pyrsistent import pbag
+from pyrsistent import pbag, freeze
 from zope.interface import Interface, implementer
 
 from toolz.curried import filter, groupby
@@ -18,7 +18,7 @@ from toolz.functoolz import compose
 
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
-from otter.util.fp import freeze, partition_bool, partition_groups
+from otter.util.fp import partition_bool, partition_groups
 from otter.util.retry import retry, retry_times, exponential_backoff_interval
 # TODO: I hate including this!
 from otter.worker.launch_server_v1 import public_endpoint_url

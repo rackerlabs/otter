@@ -20,7 +20,8 @@ from otter.log.bound import BoundLog
 from otter.supervisor import ISupervisor
 from otter.models.interface import IScalingGroup
 from otter.util.deferredutils import DeferredPool
-from otter.util.fp import freeze
+
+from pyrsistent import freeze
 
 
 class matches(object):
