@@ -35,7 +35,10 @@ class DesiredGroupState(object):
         self.launch_config = freeze(self.launch_config)
 
 
-@attributes(['id', 'state', 'created', 'desired_lbs', 'current_lbs'])
+@attributes(['id', 'state', 'created',
+             Attribute('private_address', default_value='', instance_of=str),
+             Attribute('desired_lbs', default_value={}, instance_of=dict),
+             Attribute('current_lbs', default_value={}, instance_of=dict)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -202,8 +205,8 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         for server in servers_in_active
         for step in _converge_lb_state(server.desired_lbs,
                                        server.current_lbs,
-                                       server.state.private_address)
-        if server not in servers_to_delete]
+                                       server.private_address)
+        if server not in servers_to_delete and server.private_address]
 
     return Convergence(
         steps=pbag(create_steps
