@@ -1087,10 +1087,6 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         """
         self.assertTrue(isinstance(request, Request))
         self._request = request
-        # REVIEW: I copied this behavior from the old code. Is this really how
-        # we're supposed to access the request object? Seems like a common
-        # thing to want. Should this entire thing even exist? Why can't we
-        # give it a Request(Channel(), True) with some args? --lvh
         if key == "replace":
             self.assertTrue(default)
             return self._replace
