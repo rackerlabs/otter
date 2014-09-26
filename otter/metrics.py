@@ -67,7 +67,7 @@ def get_scaling_groups(client, batch_size=100):
 GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual pending')
 
 
-def get_tenant_metrics(tenant_id, scaling_groups, servers):
+def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
     """
     Get tenant's metrics
 
@@ -75,8 +75,9 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers):
     :param ``dict`` servers: Servers from Nova grouped based on scaling group ID
     :return: ``list`` of (tenantId, groupId, desired, actual) GroupMetrics namedtuples
     """
-    print('processing tenant {} with groups {} and servers {}'.format(
-        tenant_id, len(scaling_groups), len(servers)))
+    if _print:
+        print('processing tenant {} with groups {} and servers {}'.format(
+              tenant_id, len(scaling_groups), len(servers)))
     metrics = []
     for group in scaling_groups:
         group_id = group['groupId']
@@ -89,7 +90,8 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers):
     return metrics
 
 
-def get_all_metrics(tenanted_groups, authenticator, nova_service, region, clock=None):
+def get_all_metrics(tenanted_groups, authenticator, nova_service, region,
+                    clock=None, _print=False):
     """
     Get all group's metrics
 
@@ -104,7 +106,7 @@ def get_all_metrics(tenanted_groups, authenticator, nova_service, region, clock=
             get_scaling_group_servers, tenant_id, authenticator,
             nova_service, region, sfilter=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
             clock=clock)
-        d.addCallback(partial(get_tenant_metrics, tenant_id, groups))
+        d.addCallback(partial(get_tenant_metrics, tenant_id, groups, _print=_print))
         d.addCallback(all_groups.extend)
         defs.append(d)
 
@@ -145,7 +147,7 @@ def main(reactor, config):
 
     all_groups = yield get_all_metrics(tenanted_groups, authenticator,
                                        config['services']['nova'], config['region'],
-                                       clock=reactor)
+                                       clock=reactor, _print=True)
 
     total_desired, total_actual = reduce(
         lambda (t_desired, t_actual), g: (t_desired + g.desired, t_actual + g.actual),
