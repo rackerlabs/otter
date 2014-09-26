@@ -149,9 +149,8 @@ def main(reactor, config):
                                        config['services']['nova'], config['region'],
                                        clock=reactor, _print=True)
 
-    total_desired, total_actual = reduce(
-        lambda (t_desired, t_actual), g: (t_desired + g.desired, t_actual + g.actual),
-        all_groups, (0, 0))
+    total_desired, total_actual = reduce(lambda (td, ta), g: (td + g.desired, ta + g.actual),
+                                         all_groups, (0, 0))
     print('total desired: {}, total actual: {}'.format(total_desired, total_actual))
 
     all_groups.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
