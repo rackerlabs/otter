@@ -32,7 +32,8 @@ class GetScalingGroupsTests(SynchronousTestCase):
             return succeed(self.exec_args[freeze((query, params))])
 
         self.client.execute.side_effect = _exec
-        self.select = 'SELECT "tenantId", "groupId", desired, active, pending FROM scaling_group '
+        self.select = ('SELECT "tenantId","groupId",desired,active,pending,created_at '
+                       'FROM scaling_group ')
 
     def _add_exec_args(self, query, params, ret):
         self.exec_args[freeze((query, params))] = ret
@@ -41,27 +42,30 @@ class GetScalingGroupsTests(SynchronousTestCase):
         """
         Gets all groups when total groups < batch size
         """
-        groups = [{'tenantId': i, 'groupId': j, 'desired': 3}
+        groups = [{'tenantId': i, 'groupId': j, 'desired': 3, 'created_at': 'c'}
                   for i in range(2) for j in range(2)]
         self._add_exec_args(self.select + ' LIMIT :limit;', {'limit': 5}, groups)
-        d = get_scaling_groups(self.client, 5)
-        self.assertEqual(self.successResultOf(d), {0: groups[:2], 1: groups[2:]})
+        d = get_scaling_groups(self.client, batch_size=5)
+        self.assertEqual(list(self.successResultOf(d)), groups)
 
-    def test_filters_no_desired(self):
+    def test_filters_no_created_or_desired(self):
         """
-        Does not include groups that do not have desired
+        Does not include groups that do not have created_at or desired
         """
-        groups = [{'tenantId': 1, 'groupId': 2, 'desired': None},
-                  {'tenantId': 1, 'groupId': 2, 'desired': 4}]
+        groups = [{'tenantId': 1, 'groupId': 2, 'desired': 3, 'created_at': None},
+                  {'tenantId': 1, 'groupId': 3, 'desired': None, 'created_at': 'c'},
+                  {'tenantId': 1, 'groupId': 4, 'desired': None, 'created_at': None},
+                  {'tenantId': 1, 'groupId': 5, 'desired': 3, 'created_at': 'c'}]
         self._add_exec_args(self.select + ' LIMIT :limit;', {'limit': 5}, groups)
-        d = get_scaling_groups(self.client, 5)
-        self.assertEqual(self.successResultOf(d), {1: groups[1:]})
+        d = get_scaling_groups(self.client, batch_size=5)
+        self.assertEqual(list(self.successResultOf(d)), groups[-1:])
 
     def test_groups_more_batch(self):
         """
         Gets all groups of tenant even if they are more than batch size
         """
-        groups = [{'tenantId': 1, 'groupId': i, 'desired': 3} for i in range(7)]
+        groups = [{'tenantId': 1, 'groupId': i, 'desired': 3, 'created_at': 'c'}
+                  for i in range(7)]
         self._add_exec_args(self.select + ' LIMIT :limit;', {'limit': 5}, groups[:5])
         self._add_exec_args(
             self.select + 'WHERE "tenantId"=:tenantId AND "groupId">:groupId LIMIT :limit;',
@@ -69,15 +73,17 @@ class GetScalingGroupsTests(SynchronousTestCase):
         self._add_exec_args(
             self.select + 'WHERE token("tenantId") > token(:tenantId) LIMIT :limit;',
             {'limit': 5, 'tenantId': 1}, [])
-        d = get_scaling_groups(self.client, 5)
-        self.assertEqual(self.successResultOf(d), {1: groups})
+        d = get_scaling_groups(self.client, batch_size=5)
+        self.assertEqual(list(self.successResultOf(d)), groups)
 
     def test_tenants_more_batch(self):
         """
         Gets tenants if they are tenant, groups are > batch size
         """
-        groups1 = [{'tenantId': 1, 'groupId': i, 'desired': 3} for i in range(7)]
-        groups2 = [{'tenantId': 2, 'groupId': i, 'desired': 4} for i in range(9)]
+        groups1 = [{'tenantId': 1, 'groupId': i, 'desired': 3, 'created_at': 'c'}
+                   for i in range(7)]
+        groups2 = [{'tenantId': 2, 'groupId': i, 'desired': 4, 'created_at': 'c'}
+                   for i in range(9)]
         self._add_exec_args(self.select + ' LIMIT :limit;', {'limit': 5}, groups1[:5])
         self._add_exec_args(
             self.select + 'WHERE "tenantId"=:tenantId AND "groupId">:groupId LIMIT :limit;',
@@ -91,8 +97,8 @@ class GetScalingGroupsTests(SynchronousTestCase):
         self._add_exec_args(
             self.select + 'WHERE token("tenantId") > token(:tenantId) LIMIT :limit;',
             {'limit': 5, 'tenantId': 2}, [])
-        d = get_scaling_groups(self.client, 5)
-        self.assertEqual(self.successResultOf(d), {1: groups1, 2: groups2})
+        d = get_scaling_groups(self.client, batch_size=5)
+        self.assertEqual(list(self.successResultOf(d)), groups1 + groups2)
 
 
 class GetMetricsTests(SynchronousTestCase):
@@ -126,8 +132,9 @@ class GetMetricsTests(SynchronousTestCase):
         servers_t1 = {'g1': [{'status': 'ACTIVE'}] * 3 + [{'status': 'BUILD'}] * 2,
                       'g2': [{'status': 'ACTIVE'}]}
         servers_t2 = {'g4': [{'status': 'ACTIVE'}, {'status': 'BUILD'}]}
-        groups = {'t1': [{'groupId': 'g1', 'desired': 3}, {'groupId': 'g2', 'desired': 4}],
-                  't2': [{'groupId': 'g4', 'desired': 2}]}
+        groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 3},
+                  {'tenantId': 't1', 'groupId': 'g2', 'desired': 4},
+                  {'tenantId': 't2', 'groupId': 'g4', 'desired': 2}]
 
         self.tenant_servers['t1'] = servers_t1
         self.tenant_servers['t2'] = servers_t2

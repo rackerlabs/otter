@@ -16,35 +16,38 @@ from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import groupby, filter
-from toolz.functoolz import compose
 
 from otter.auth import RetryingAuthenticator, ImpersonatingAuthenticator
 from otter.convergence import get_scaling_group_servers
 
 
 @defer.inlineCallbacks
-def get_scaling_groups(client, batch_size=100):
+def get_scaling_groups(client, props=None, batch_size=100):
     """
-    Return scaling groups grouped based on tenantId as
-    {tenantId: list of groups} where each group is a ``dict`` that has
-    'tenantId', 'groupId', 'desired', 'active' and 'pending' properties
+    Return scaling groups from Cassandra as a list of ``dict`` where each dict has
+    'tenantId', 'groupId', 'desired', 'active', 'pending' and any other properties
+    given in `props`
+
+    :param :class:`silverber.client.CQLClient` client: A cassandra client oject
+    :param ``list`` props: List of extra properties to extract
+    :oaram int batch_size: Number of groups to fetch at a time
+    :return: `Deferred` with ``list`` of ``dict``
     """
     # TODO: Currently returning all groups as one giant list for now. Will try to use Twisted tubes
     # to do streaming later
-    query = ('SELECT "tenantId", "groupId", desired, active, pending FROM scaling_group '
-             '{where} LIMIT :limit;')
+    _props = (['"tenantId"', '"groupId"', 'desired', 'active', 'pending', 'created_at']
+              + (props or []))
+    query = 'SELECT ' + ','.join(_props) + ' FROM scaling_group {where} LIMIT :limit;'
     where_key = 'WHERE "tenantId"=:tenantId AND "groupId">:groupId'
     where_token = 'WHERE token("tenantId") > token(:tenantId)'
 
-    # setup function that removes groups not having desired and groups them together
-    # TODO: Better name than gfilter?
-    gfilter = compose(groupby(lambda g: g['tenantId']),
-                      filter(lambda g: g['desired'] is not None))
+    # setup function that removes groups not having desired
+    group_filter = filter(lambda g: g['desired'] is not None and g['created_at'] is not None)
 
     batch = yield client.execute(query.format(where=''),
                                  {'limit': batch_size}, ConsistencyLevel.ONE)
     if len(batch) < batch_size:
-        defer.returnValue(gfilter(batch))
+        defer.returnValue(group_filter(batch))
 
     groups = batch
     while batch != []:
@@ -61,7 +64,23 @@ def get_scaling_groups(client, batch_size=100):
                                      {'limit': batch_size, 'tenantId': tenantId},
                                      ConsistencyLevel.ONE)
         groups.extend(batch)
-    defer.returnValue(gfilter(groups))
+    defer.returnValue(group_filter(groups))
+
+
+@defer.inlineCallbacks
+def check_rackconnect(client):
+    """
+    Rackconnect metrics
+    """
+    from toolz.dicttoolz import get_in
+
+    groups = yield get_scaling_groups(client, props=['launch_config'])
+    for group in groups:
+        lbpool = get_in(['args', 'server', 'metadata', 'RackConnectLBPool'],
+                        json.loads(group['launch_config']))
+        if lbpool is not None:
+            print('Tenant: {} Group: {} RackconnectLBPool: {}'.format(
+                  group['tenantId'], group['groupId'], lbpool))
 
 
 GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual pending')
@@ -90,27 +109,35 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
     return metrics
 
 
-def get_all_metrics(tenanted_groups, authenticator, nova_service, region,
+def get_all_metrics(cass_groups, authenticator, nova_service, region,
                     clock=None, _print=False):
     """
     Get all group's metrics
 
-    :return: ``list`` of `GroupMetrics` via `Deferred`
+    :param iterable cass_groups: Groups got from cassandra as
+    :param :class:`otter.auth.IAuthenticator` authenticator: object that impersonates a tenant
+    :param str nova_service: Nova service name in service catalog
+    :param str region: DC region
+    :param :class:`twisted.internet.IReactorTime` clock: IReactorTime provider
+    :param bool _print: Should the function print while processing?
+
+    :return: ``list`` of `GroupMetrics` as `Deferred`
     """
     # TODO: Use cooperator instead
     sem = defer.DeferredSemaphore(10)
+    tenanted_groups = groupby(lambda g: g['tenantId'], cass_groups)
     defs = []
-    all_groups = []
+    group_metrics = []
     for tenant_id, groups in tenanted_groups.iteritems():
         d = sem.run(
             get_scaling_group_servers, tenant_id, authenticator,
             nova_service, region, sfilter=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
             clock=clock)
         d.addCallback(partial(get_tenant_metrics, tenant_id, groups, _print=_print))
-        d.addCallback(all_groups.extend)
+        d.addCallback(group_metrics.extend)
         defs.append(d)
 
-    return defer.gatherResults(defs).addCallback(lambda _: all_groups)
+    return defer.gatherResults(defs).addCallback(lambda _: group_metrics)
 
 
 def get_authenticator(reactor, identity):
@@ -142,19 +169,17 @@ def main(reactor, config):
     client = connect_cass_servers(reactor, config['cassandra'])
     authenticator = get_authenticator(reactor, config['identity'])
 
-    tenanted_groups = yield get_scaling_groups(client)
-    print('got tenants', len(tenanted_groups))
-
-    all_groups = yield get_all_metrics(tenanted_groups, authenticator,
-                                       config['services']['nova'], config['region'],
-                                       clock=reactor, _print=True)
+    cass_groups = yield get_scaling_groups(client)
+    group_metrics = yield get_all_metrics(
+        cass_groups, authenticator, config['services']['nova'], config['region'],
+        clock=reactor, _print=True)
 
     total_desired, total_actual = reduce(lambda (td, ta), g: (td + g.desired, ta + g.actual),
-                                         all_groups, (0, 0))
+                                         group_metrics, (0, 0))
     print('total desired: {}, total actual: {}'.format(total_desired, total_actual))
 
-    all_groups.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
-    print('groups sorted as per divergence', *all_groups, sep='\n')
+    group_metrics.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
+    print('groups sorted as per divergence', *group_metrics, sep='\n')
 
     yield client.disconnect()
 
