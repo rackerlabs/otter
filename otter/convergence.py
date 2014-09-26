@@ -2,7 +2,7 @@
 Convergence.
 """
 
-from characteristic import attributes
+from characteristic import attributes, Attribute
 from pyrsistent import pbag, freeze
 from zope.interface import Interface, implementer
 
@@ -17,7 +17,8 @@ class IStep(Interface):
 
     def as_request():
         """
-        Create a request for performing this step.
+        Create a :class:`Request` object that contains relevant information for
+        performing a HTTP request
         """
 
 
@@ -34,7 +35,7 @@ class DesiredGroupState(object):
         self.launch_config = freeze(self.launch_config)
 
 
-@attributes(['id', 'state', 'created'])
+@attributes(['id', 'state', 'created', 'desired_lbs', 'current_lbs'])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -42,12 +43,102 @@ class NovaServer(object):
     :ivar str id: The server id.
     :ivar str state: Current state of the server.
     :ivar float created: Timestamp at which the server was created.
+    :ivar dict desired_lbs: Dictionary with keys of type
+        ``(loadbalancer_id, port)`` mapped to :class:`DesiredLBConfig`
+    :ivar dict current_lbs: Dictionary with keys of type
+        ``(loadbalancer_id, port)`` mapped to :class:`ActualLBConfig`
+    """
+
+
+@attributes(["lb_id", "port",
+             Attribute("weight", default_value=1, instance_of=int),
+             Attribute("condition", default_value="ENABLED", instance_of=str),
+             Attribute("type", default_value="PRIMARY", instance_of=str)])
+class DesiredLBConfig(object):
+    """
+    Information representing a desired load balancer port mapping; how
+    a particular server should be port-mapped to a particular load balancer.
+
+    :ivar int lb_id: The load balancer ID.
+    :ivar int port: The port, which together with the server's IP, specifies
+        the service that should be load-balanced by the load balancer.
+    :ivar int weight: The weight to be used for certain load-balancing
+        algorithms if configured on the load balancer.  Defaults to 1,
+        the max is 100.
+    :ivar str condition: One of ``ENABLED``, ``DISABLED``, or ``DRAINING`` -
+        the default is ``ENABLED``
+    :ivar str type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
+    """
+
+
+@attributes(["lb_id", "port", "address", "node_id", "weight", "condition",
+             "type"])
+class ActualLBConfig(object):
+    """
+    Information representing the actual configuration of a load balancer port
+    mapping.
+
+    :ivar int lb_id: The load balancer ID.
+    :ivar int port: The port, which together with the server's IP, specifies
+        the service that should be load-balanced by the load balancer.
+    :ivar int address: The IP address, which together with the port, specifies
+        the service that should be load-balanced by the load balancer.
+    :ivar int node_id: The ID of the node, which is represents a unique
+        combination of IP and port number, on the load balancer.
+    :ivar int weight: The weight to be used for certain load-balancing
+        algorithms if configured on the load balancer.
+    :ivar str condition: One of ``ENABLED``, ``DISABLED``, or ``DRAINING``
+    :ivar str type: One of ``PRIMARY`` or ``SECONDARY``
     """
 
 
 ACTIVE = 'ACTIVE'
 ERROR = 'ERROR'
 BUILD = 'BUILD'
+
+
+def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
+    """
+    Produce a series of steps to converge a server's current load balancer
+    state towards its desired load balancer state.
+
+    The server will be removed from any extra load balancers the server
+    currently be on, and it will be added on the correct port, with the correct
+    weight, and correct status, to the desired load balancers.
+
+    Both ``desired_lb_state`` and ``current_lb_state`` are dictionaries keyed
+    by a tuple of ``(loadbalancer_id, port)``.
+
+    Note: this supports user customizable types (e.g. PRIMARY or SECONDARY), but
+    in practice it should probably only be added as PRIMARY.  SECONDARY can only
+    be used if load balancer health monitoring is enabled, and would be used as
+    backup servers anyway.
+    """
+    for key, desired_config in desired_lb_state.iteritems():
+        current_config = current_lb_state.get(key)
+
+        if current_config is None:
+            yield AddToLoadBalancer(loadbalancer_id=desired_config.lb_id,
+                                    address=ip_address,
+                                    port=desired_config.port,
+                                    condition=desired_config.condition,
+                                    weight=desired_config.weight,
+                                    type=desired_config.type)
+
+        elif (desired_config.condition != current_config.condition or
+              desired_config.weight != current_config.weight or
+              desired_config.type != current_config.type):
+            yield ChangeLoadBalancerNode(loadbalancer_id=desired_config.lb_id,
+                                         node_id=current_config.node_id,
+                                         condition=desired_config.condition,
+                                         weight=desired_config.weight,
+                                         type=desired_config.type)
+
+    undesired = (item for item in current_lb_state.iteritems()
+                 if item[0] not in desired_lb_state)
+
+    for key, config in undesired:
+        yield RemoveFromLoadBalancer(config.lb_id, config.node_id)
 
 
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
@@ -92,25 +183,42 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # delete over capacity, starting with building, then active,
     # preferring older
     servers_to_delete = (servers_in_active + waiting_for_build)[desired_state.desired:]
-    delete_steps = [DeleteServer(server_id=server.id)
-                    for server in servers_to_delete]
+    delete_steps = (
+        [DeleteServer(server_id=server.id) for server in servers_to_delete] +
+        [RemoveFromLoadBalancer(lb_config.lb_id, lb_config.node_id)
+         for server in servers_to_delete
+         for lb_config in server.current_lbs])
 
     # delete all servers in error.
-    delete_error_steps = [DeleteServer(server_id=server.id)
-                          for server in servers_in_error]
+    delete_error_steps = (
+        [DeleteServer(server_id=server.id) for server in servers_in_error] +
+        [RemoveFromLoadBalancer(lb_config.lb_id, lb_config.node_id)
+         for server in servers_in_error
+         for lb_config in server.current_lbs])
+
+    # converge all the servers that remain to their desired load balancer state
+    lb_converge_steps = [
+        step
+        for server in servers_in_active
+        for step in _converge_lb_state(server.desired_lbs,
+                                       server.current_lbs,
+                                       server.state.private_address)
+        if server not in servers_to_delete]
 
     return Convergence(
         steps=pbag(create_steps
                    + delete_steps
                    + delete_error_steps
                    + delete_timeout_steps
+                   + lb_converge_steps
                    ))
 
 
 @attributes(['steps'])
 class Convergence(object):
     """
-    A :obj:`Convergence` is a set of steps required to converge a ``group_id``.
+    A :obj:`Convergence` is a set of :class:`ISteps` required to converge a
+        ``group_id``.
 
     :ivar pbag steps: A :obj:`pbag` of :obj:`IStep`s to be performed in
         parallel.
@@ -155,11 +263,11 @@ class RemoveFromLoadBalancer(object):
 
 
 @implementer(IStep)
-@attributes(['loadbalancer_id', 'node_id', 'condition', 'weight'])
+@attributes(['loadbalancer_id', 'node_id', 'condition', 'weight', 'type'])
 class ChangeLoadBalancerNode(object):
     """
-    An existing port mapping on a load balancer must have its condition or
-    weight modified.
+    An existing port mapping on a load balancer must have its condition,
+    weight, or type modified.
     """
 
 
@@ -170,7 +278,11 @@ CLOUD_LOAD_BALANCERS = 'cloudLoadBalancers'
 @attributes(['service', 'method', 'path', 'headers', 'data'])
 class Request(object):
     """
-    A Rackspace API request must be performed.
+    An object representing a Rackspace API request that must be performed.
+
+    A :class:`Request` only stores information - something else must use the
+    information to make an HTTP request, as a :class:`Request` itself has no
+    behaviors.
 
     :ivar str service: The name of the Rackspace service; either
         :obj:`CLOUD_SERVERS` or :obj:`CLOUD_LOAD_BALANCERS`.
