@@ -15,7 +15,7 @@ from twisted.internet.endpoints import clientFromString
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
-from toolz.curried import groupby, filter
+from toolz.curried import groupby, filter, get_in
 
 from otter.auth import RetryingAuthenticator, ImpersonatingAuthenticator
 from otter.convergence import get_scaling_group_servers
@@ -72,8 +72,6 @@ def check_rackconnect(client):
     """
     Rackconnect metrics
     """
-    from toolz.dicttoolz import get_in
-
     groups = yield get_scaling_groups(client, props=['launch_config'])
     for group in groups:
         lbpool = get_in(['args', 'server', 'metadata', 'RackConnectLBPool'],
@@ -81,6 +79,44 @@ def check_rackconnect(client):
         if lbpool is not None:
             print('Tenant: {} Group: {} RackconnectLBPool: {}'.format(
                   group['tenantId'], group['groupId'], lbpool))
+
+
+def check_tenant_config(tenant_id, groups, grouped_servers):
+    """
+    Check if servers in the tenant's groups are different, i.e. have different flavor
+    or image
+    """
+    props = (['flavor', 'id'], ['image', 'id'])
+    for group in groups:
+        group_id = group['groupId']
+        if group_id not in grouped_servers:
+            continue
+        uniques = set(map(lambda s: tuple(get_in(p, s) for p in props),
+                          grouped_servers[group_id]))
+        if len(uniques) > 1:
+            print('tenant {} group {} diff types: {}'.format(tenant_id, group_id, uniques))
+
+
+@defer.inlineCallbacks
+def check_diff_configs(client, authenticator, nova_service, region, clock=None):
+    """
+    Find groups having servers with different launch config in them
+    """
+    cass_groups = yield get_scaling_groups(client)
+    tenanted_groups = groupby(lambda g: g['tenantId'], cass_groups)
+    print('got tenants', len(tenanted_groups))
+
+    defs = []
+    sem = defer.DeferredSemaphore(10)
+    for tenant_id, groups in tenanted_groups.iteritems():
+        d = sem.run(
+            get_scaling_group_servers, tenant_id, authenticator,
+            nova_service, region, sfilter=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
+            clock=clock)
+        d.addCallback(partial(check_tenant_config, tenant_id, groups))
+        defs.append(d)
+
+    yield defer.gatherResults(defs)
 
 
 GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual pending')
