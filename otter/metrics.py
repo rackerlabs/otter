@@ -67,7 +67,8 @@ def get_scaling_groups(client, props=None, batch_size=100):
                                           'groupId': batch[-1]['groupId']},
                                          ConsistencyLevel.ONE)
             groups.extend(batch)
-        # Get next 'tenantId' rows using token
+        # We then get next tenant's groups by using there hash value. i.e
+        # tenants whose hash > last tenant id we just fetched
         batch = yield client.execute(query.format(where=where_token),
                                      {'limit': batch_size, 'tenantId': tenantId},
                                      ConsistencyLevel.ONE)
