@@ -38,9 +38,9 @@ class GetScalingGroupsTests(SynchronousTestCase):
     def _add_exec_args(self, query, params, ret):
         self.exec_args[freeze((query, params))] = ret
 
-    def test_no_batch(self):
+    def test_all_groups_less_than_batch(self):
         """
-        Gets all groups when total groups < batch size
+        Works when number of all groups of all tenants < batch size
         """
         groups = [{'tenantId': i, 'groupId': j, 'desired': 3, 'created_at': 'c'}
                   for i in range(2) for j in range(2)]
@@ -60,9 +60,10 @@ class GetScalingGroupsTests(SynchronousTestCase):
         d = get_scaling_groups(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups[-1:])
 
-    def test_groups_more_batch(self):
+    def test_last_tenant_has_less_groups(self):
         """
-        Gets all groups of tenant even if they are more than batch size
+        Fetches initial batch, then gets all groups of last tenant in that batch
+        and stops when there are no more tenants
         """
         groups = [{'tenantId': 1, 'groupId': i, 'desired': 3, 'created_at': 'c'}
                   for i in range(7)]
@@ -76,9 +77,9 @@ class GetScalingGroupsTests(SynchronousTestCase):
         d = get_scaling_groups(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups)
 
-    def test_tenants_more_batch(self):
+    def test_many_tenants_having_more_than_batch_groups(self):
         """
-        Gets tenants if they are tenant, groups are > batch size
+        Gets all groups when there are many tenants each of them having groups > batch size
         """
         groups1 = [{'tenantId': 1, 'groupId': i, 'desired': 3, 'created_at': 'c'}
                    for i in range(7)]
