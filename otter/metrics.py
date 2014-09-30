@@ -35,9 +35,10 @@ def get_scaling_groups(client, props=None, batch_size=100):
     """
     # TODO: Currently returning all groups as one giant list for now. Will try to use Twisted tubes
     # to do streaming later
-    _props = (['"tenantId"', '"groupId"', 'desired', 'active', 'pending', 'created_at']
-              + (props or []))
-    query = 'SELECT ' + ','.join(_props) + ' FROM scaling_group {where} LIMIT :limit;'
+    _props = set(['"tenantId"', '"groupId"', 'desired',
+                  'active', 'pending', 'created_at']) | set(props or [])
+    query = ('SELECT ' + ','.join(sorted(list(_props))) +
+             ' FROM scaling_group {where} LIMIT :limit;')
     where_key = 'WHERE "tenantId"=:tenantId AND "groupId">:groupId'
     where_token = 'WHERE token("tenantId") > token(:tenantId)'
 

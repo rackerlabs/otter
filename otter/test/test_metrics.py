@@ -32,7 +32,7 @@ class GetScalingGroupsTests(SynchronousTestCase):
             return succeed(self.exec_args[freeze((query, params))])
 
         self.client.execute.side_effect = _exec
-        self.select = ('SELECT "tenantId","groupId",desired,active,pending,created_at '
+        self.select = ('SELECT "groupId","tenantId",active,created_at,desired,pending '
                        'FROM scaling_group ')
 
     def _add_exec_args(self, query, params, ret):
