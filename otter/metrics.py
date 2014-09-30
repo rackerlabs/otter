@@ -8,6 +8,7 @@ from functools import partial
 import sys
 import json
 from collections import namedtuple
+import time
 
 from twisted.internet import task, defer
 from twisted.internet.endpoints import clientFromString
@@ -16,9 +17,15 @@ from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import groupby, filter, get_in
+from toolz.dicttoolz import merge
 
-from otter.auth import RetryingAuthenticator, ImpersonatingAuthenticator
+from otter.auth import (
+    RetryingAuthenticator, ImpersonatingAuthenticator, authenticate_user,
+    extract_token)
+# TODO: THis should be in auth
+from otter.worker.launch_server_v1 import public_endpoint_url
 from otter.convergence import get_scaling_group_servers
+from otter.util.http import append_segments, headers, check_success
 
 
 @defer.inlineCallbacks
@@ -185,6 +192,38 @@ def get_all_metrics(cass_groups, authenticator, nova_service, region,
     return defer.gatherResults(defs).addCallback(lambda _: group_metrics)
 
 
+@defer.inlineCallbacks
+def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual,
+                         _treq=None):
+    """
+    Add found metrics to cloud metrics
+    """
+    resp = yield authenticate_user(identity_url, conf['username'], conf['password'])
+    token = extract_token(resp)
+
+    if _treq is None: # pragma: no cover
+        import treq
+        _treq = treq
+
+    url = public_endpoint_url(resp['access']['serviceCatalog'], conf['service'], conf['region'])
+
+    # TODO: Take from config?
+    ttl_seconds = 30 * 24 * 60 * 60 # one month
+    metric_part = {'collectionTime': int(time.time()), 'ttlInSeconds': ttl_seconds}
+
+    d = _treq.post(
+        append_segments(url, 'ingest'), headers=headers(token),
+        data=json.dumps([merge(metric_part,
+                               {'metricValue': total_desired,
+                                'metricName': '{}.desired'.format(region)}),
+                         merge(metric_part,
+                               {'metricValue': total_actual,
+                                'metricName': '{}.actual'.format(region)})]))
+    d.addCallback(check_success, [200], _treq=_treq)
+    d.addCallback(_treq.content)
+    yield d
+
+
 def get_authenticator(reactor, identity):
     """
     Return authenticator based on identity config
@@ -222,6 +261,9 @@ def main(reactor, config):
     total_desired, total_actual = reduce(lambda (td, ta), g: (td + g.desired, ta + g.actual),
                                          group_metrics, (0, 0))
     print('total desired: {}, total actual: {}'.format(total_desired, total_actual))
+    yield add_to_cloud_metrics(config['metrics'], config['identity']['url'],
+                               config['region'], total_desired, total_actual,
+                               group_metrics)
 
     group_metrics.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
     print('groups sorted as per divergence', *group_metrics, sep='\n')

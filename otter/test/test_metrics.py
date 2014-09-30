@@ -3,15 +3,20 @@ Tests for `metrics.py`
 """
 
 import mock
+import json
 
 from pyrsistent import freeze
+
+from toolz.dicttoolz import merge
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
 
 from otter.metrics import (
-    get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics)
-from otter.test.utils import patch
+    get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
+    add_to_cloud_metrics)
+from otter.test.utils import patch, StubTreq2
+from otter.util.http import headers
 
 from silverberg.client import CQLClient
 
@@ -145,3 +150,44 @@ class GetMetricsTests(SynchronousTestCase):
             set(self.successResultOf(d)),
             set([GroupMetrics('t1', 'g1', 3, 3, 2), GroupMetrics('t1', 'g2', 4, 1, 0),
                  GroupMetrics('t2', 'g4', 2, 1, 1)]))
+
+
+class AddToCloudMetricsTests(SynchronousTestCase):
+    """
+    Tests for :func:`add_to_cloud_metrics`
+    """
+
+    def setUp(self):
+        """
+        Setup treq
+        """
+        self.resp = {
+            'access': {
+                'token': {'id': 'token'},
+                'serviceCatalog': [
+                    {'endpoints': [{"region": "IAD", "publicURL": "url"}],
+                     "name": "cloudMetricsIngest"}
+                ]
+            }
+        }
+        self.au = patch(self, 'otter.metrics.authenticate_user',
+                        return_value=succeed(self.resp))
+
+    @mock.patch('otter.metrics.time')
+    def test_added(self, mock_time):
+        td = 10
+        ta = 20
+        mock_time.time.return_value = 100
+        m = {'collectionTime': 100, 'ttlInSeconds': 30 * 24 * 60 * 60}
+        md = merge(m, {'metricValue': td, 'metricName': 'ord.desired'})
+        ma = merge(m, {'metricValue': ta, 'metricName': 'ord.actual'})
+        req = ('POST', 'url/ingest', {'headers': headers('token'),
+                                      'data': json.dumps([md, ma])})
+        treq = StubTreq2([(req, (200, ''))])
+        conf = {'username': 'a', 'password': 'p', 'service': 'cloudMetricsIngest',
+                'region': 'IAD'}
+
+        d = add_to_cloud_metrics(conf, 'idurl', 'ord', td, ta, _treq=treq)
+
+        self.assertIsNone(self.successResultOf(d))
+        self.au.assert_called_once_with('idurl', 'a', 'p')
