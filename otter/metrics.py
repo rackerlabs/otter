@@ -133,10 +133,11 @@ GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual pen
 
 def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
     """
-    Get tenant's metrics
+    Produce per-group metrics for all the groups of a tenant
 
     :param ``list`` of ``dict`` scaling_groups: Tenant's scaling groups from CASS
-    :param ``dict`` servers: Servers from Nova grouped based on scaling group ID
+    :param ``dict`` servers: Servers from Nova grouped based on scaling group ID.
+                             Expects only ACTIVE or BUILD servers
     :return: ``list`` of (tenantId, groupId, desired, actual) GroupMetrics namedtuples
     """
     if _print:
@@ -157,7 +158,8 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
 def get_all_metrics(cass_groups, authenticator, nova_service, region,
                     clock=None, _print=False):
     """
-    Get all group's metrics
+    Gather server data for and produce metrics for all groups across all tenants
+    in a region
 
     :param iterable cass_groups: Groups got from cassandra as
     :param :class:`otter.auth.IAuthenticator` authenticator: object that impersonates a tenant
