@@ -45,14 +45,21 @@ def get_scaling_groups(client, props=None, batch_size=100):
     # setup function that removes groups not having desired
     group_filter = filter(lambda g: g['desired'] is not None and g['created_at'] is not None)
 
+    # We first start by getting all groups limited on batch size
+    # It will return groups sorted first based on hash of tenant id and then based
+    # group id. Note that only tenant id is sorted based on hash; group id is sorted
+    # normally
     batch = yield client.execute(query.format(where=''),
                                  {'limit': batch_size}, ConsistencyLevel.ONE)
     if len(batch) < batch_size:
         defer.returnValue(group_filter(batch))
 
+    # We got batch size response. That means there are probably more groups
     groups = batch
     while batch != []:
-        # get all groups of tenantId
+        # We start by getting all the groups of last tenant ID we received except
+        # the ones we already got. We do that by asking groups > last group id since
+        # groups are sorted
         tenantId = batch[-1]['tenantId']
         while len(batch) == batch_size:
             batch = yield client.execute(query.format(where=where_key),
