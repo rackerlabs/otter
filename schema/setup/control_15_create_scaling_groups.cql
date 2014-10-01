@@ -50,6 +50,7 @@ CREATE COLUMNFAMILY scaling_group (
     "policyTouched" ascii,
     paused boolean,
     created_at timestamp,
+    status ascii
     PRIMARY KEY("tenantId", "groupId")
 ) WITH compaction = {
     'class' : 'SizeTieredCompactionStrategy',

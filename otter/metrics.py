@@ -22,7 +22,7 @@ from otter.convergence import get_scaling_group_servers
 
 
 @defer.inlineCallbacks
-def get_scaling_groups(client, props=None, batch_size=100):
+def get_scaling_groups(client, props=None, batch_size=100, group_pred=None):
     """
     Return scaling groups from Cassandra as a list of ``dict`` where each dict has
     'tenantId', 'groupId', 'desired', 'active', 'pending' and any other properties
@@ -44,6 +44,7 @@ def get_scaling_groups(client, props=None, batch_size=100):
 
     # setup function that removes groups not having desired
     group_filter = filter(lambda g: g['desired'] is not None and g['created_at'] is not None)
+    group_filter = compose(filter(group_pred or lambda g: g), group_filter)
 
     # We first start by getting all groups limited on batch size
     # It will return groups sorted first based on hash of tenant id and then based
