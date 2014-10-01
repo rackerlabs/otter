@@ -120,7 +120,7 @@ def check_diff_configs(client, authenticator, nova_service, region, clock=None):
     for tenant_id, groups in tenanted_groups.iteritems():
         d = sem.run(
             get_scaling_group_servers, tenant_id, authenticator,
-            nova_service, region, sfilter=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
+            nova_service, region, server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
             clock=clock)
         d.addCallback(partial(check_tenant_config, tenant_id, groups))
         defs.append(d)

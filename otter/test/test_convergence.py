@@ -146,7 +146,8 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i} for i in range(5)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i} for i in range(5, 8)])
         self.servers = as_servers + [{'metadata': 'junk'}] * 3
-        d = get_scaling_group_servers('t', 'a', 's', 'r', sfilter=lambda s: s['id'] % 3 == 0)
+        d = get_scaling_group_servers('t', 'a', 's', 'r',
+                                      server_predicate=lambda s: s['id'] % 3 == 0)
         self.assertEqual(
             self.successResultOf(d),
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})

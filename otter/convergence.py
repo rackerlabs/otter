@@ -67,13 +67,13 @@ def get_all_server_details(tenant_id, authenticator, service_name, region,
 
 
 def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
-                              sfilter=None, clock=None):
+                              server_predicate=None, clock=None):
     """
     Return tenant's servers that belong to a scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
 
-    :param sfilter: `callable` taking single server as arg and returns True the server
-                    should be returned, False otherwise
+    :param server_predicate: `callable` taking single server as arg and returns True
+                              if the server should be included, False otherwise
     """
 
     def has_group_id(s):
@@ -82,10 +82,8 @@ def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
     def group_id(s):
         return s['metadata']['rax:auto_scaling_group_id']
 
-    if sfilter is not None:
-        servers_apply = compose(groupby(group_id), filter(sfilter), filter(has_group_id))
-    else:
-        servers_apply = compose(groupby(group_id), filter(has_group_id))
+    server_predicate = server_predicate if server_predicate is not None else lambda s: s
+    servers_apply = compose(groupby(group_id), filter(server_predicate), filter(has_group_id))
 
     d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
     d.addCallback(servers_apply)
