@@ -38,11 +38,10 @@ def get_all_server_details(tenant_id, authenticator, service_name, region,
     query = {'limit': limit}
     all_servers = []
 
-    if clock is None:
-        from twisted.internet import reactor
-        clock = reactor
+    if clock is None: # pragma: no cover
+        from twisted.internet import reactor as clock
 
-    if _treq is None:
+    if _treq is None: # pragma: no cover
         _treq = treq
 
     def fetch(url, headers):
