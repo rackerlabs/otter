@@ -177,17 +177,19 @@ class AddToCloudMetricsTests(SynchronousTestCase):
     def test_added(self, mock_time):
         td = 10
         ta = 20
+        tp = 3
         mock_time.time.return_value = 100
         m = {'collectionTime': 100, 'ttlInSeconds': 30 * 24 * 60 * 60}
         md = merge(m, {'metricValue': td, 'metricName': 'ord.desired'})
         ma = merge(m, {'metricValue': ta, 'metricName': 'ord.actual'})
+        mp = merge(m, {'metricValue': tp, 'metricName': 'ord.pending'})
         req = ('POST', 'url/ingest', {'headers': headers('token'),
-                                      'data': json.dumps([md, ma])})
+                                      'data': json.dumps([md, ma, mp])})
         treq = StubTreq2([(req, (200, ''))])
         conf = {'username': 'a', 'password': 'p', 'service': 'cloudMetricsIngest',
                 'region': 'IAD'}
 
-        d = add_to_cloud_metrics(conf, 'idurl', 'ord', td, ta, _treq=treq)
+        d = add_to_cloud_metrics(conf, 'idurl', 'ord', td, ta, tp, _treq=treq)
 
         self.assertIsNone(self.successResultOf(d))
         self.au.assert_called_once_with('idurl', 'a', 'p')

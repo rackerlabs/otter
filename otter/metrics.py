@@ -26,6 +26,7 @@ from otter.auth import (
 from otter.worker.launch_server_v1 import public_endpoint_url
 from otter.convergence import get_scaling_group_servers
 from otter.util.http import append_segments, headers, check_success
+from otter.log import log as otter_log
 
 
 @defer.inlineCallbacks
@@ -194,11 +195,14 @@ def get_all_metrics(cass_groups, authenticator, nova_service, region,
 
 @defer.inlineCallbacks
 def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual,
-                         _treq=None):
+                         total_pending, _treq=None):
     """
     Add found metrics to cloud metrics
     """
-    resp = yield authenticate_user(identity_url, conf['username'], conf['password'])
+    # TODO: Have generic authentication function that auths, gets the service URL
+    # and returns the token
+    resp = yield authenticate_user(identity_url, conf['username'], conf['password'],
+                                   log=otter_log)
     token = extract_token(resp)
 
     if _treq is None: # pragma: no cover
@@ -218,7 +222,10 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
                                 'metricName': '{}.desired'.format(region)}),
                          merge(metric_part,
                                {'metricValue': total_actual,
-                                'metricName': '{}.actual'.format(region)})]))
+                                'metricName': '{}.actual'.format(region)}),
+                         merge(metric_part,
+                               {'metricValue': total_pending,
+                                'metricName': '{}.pending'.format(region)})]))
     d.addCallback(check_success, [200], _treq=_treq)
     d.addCallback(_treq.content)
     yield d
@@ -258,12 +265,15 @@ def main(reactor, config):
         cass_groups, authenticator, config['services']['nova'], config['region'],
         clock=reactor, _print=True)
 
-    total_desired, total_actual = reduce(lambda (td, ta), g: (td + g.desired, ta + g.actual),
-                                         group_metrics, (0, 0))
-    print('total desired: {}, total actual: {}'.format(total_desired, total_actual))
+    total_desired, total_actual, total_pending = reduce(
+        lambda (td, ta, tp), g: (td + g.desired, ta + g.actual, tp + g.pending),
+        group_metrics, (0, 0, 0))
+    print('total desired: {}, total actual: {}, total pending: {}'.format(
+        total_desired, total_actual, total_pending))
     yield add_to_cloud_metrics(config['metrics'], config['identity']['url'],
                                config['region'], total_desired, total_actual,
-                               group_metrics)
+                               total_pending)
+    print('added to cloud metrics')
 
     group_metrics.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
     print('groups sorted as per divergence', *group_metrics, sep='\n')
