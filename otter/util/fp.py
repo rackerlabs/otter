@@ -62,3 +62,11 @@ def partition_bool(pred, seq):
         True, second the elements for which the predicate is False.
     """
     return partition_groups(pred, seq, (True, False))
+
+
+def predicate_all(*preds):
+    """
+    Return a predicate function that combines all the given predicate functions
+    with and operator
+    """
+    return lambda a: reduce(lambda p1, p2: p1(a) and p2(a), preds)
