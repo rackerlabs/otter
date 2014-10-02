@@ -43,8 +43,10 @@ def get_scaling_groups(client, props=None, batch_size=100, group_pred=None):
     where_token = 'WHERE token("tenantId") > token(:tenantId)'
 
     # setup function that removes groups not having desired
-    group_filter = filter(lambda g: g['desired'] is not None and g['created_at'] is not None)
-    group_filter = compose(filter(group_pred or lambda g: g), group_filter)
+    has_desired = lambda g: g['desired'] is not None
+    has_created_at = lambda g: g['created_at'] is not None
+    group_pred = group_pred or lambda g: g
+    group_filter = filter(predicate_all(has_desired, has_created_at, group_pred))
 
     # We first start by getting all groups limited on batch size
     # It will return groups sorted first based on hash of tenant id and then based
@@ -217,7 +219,8 @@ def main(reactor, config):
     client = connect_cass_servers(reactor, config['cassandra'])
     authenticator = get_authenticator(reactor, config['identity'])
 
-    cass_groups = yield get_scaling_groups(client)
+    cass_groups = yield get_scaling_groups(client, props=['status'],
+                                           group_pred=lambda g: g['stauts'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
         cass_groups, authenticator, config['services']['nova'], config['region'],
         clock=reactor, _print=True)
