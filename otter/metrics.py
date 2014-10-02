@@ -211,9 +211,8 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
 
     url = public_endpoint_url(resp['access']['serviceCatalog'], conf['service'], conf['region'])
 
-    # TODO: Take from config?
-    ttl_seconds = 30 * 24 * 60 * 60 # one month
-    metric_part = {'collectionTime': int(time.time()), 'ttlInSeconds': ttl_seconds}
+    metric_part = {'collectionTime': int(time.time() * 1000),
+                   'ttlInSeconds': conf['ttl']}
 
     d = _treq.post(
         append_segments(url, 'ingest'), headers=headers(token),
@@ -253,7 +252,7 @@ def connect_cass_servers(reactor, config):
 
 
 @defer.inlineCallbacks
-def main(reactor, config):
+def main(reactor, config, _print=False):
     """
     Start collecting the metrics
     """
@@ -263,20 +262,21 @@ def main(reactor, config):
     cass_groups = yield get_scaling_groups(client)
     group_metrics = yield get_all_metrics(
         cass_groups, authenticator, config['services']['nova'], config['region'],
-        clock=reactor, _print=True)
+        clock=reactor, _print=_print)
 
     total_desired, total_actual, total_pending = reduce(
         lambda (td, ta, tp), g: (td + g.desired, ta + g.actual, tp + g.pending),
         group_metrics, (0, 0, 0))
-    print('total desired: {}, total actual: {}, total pending: {}'.format(
-        total_desired, total_actual, total_pending))
+    if _print:
+        print('total desired: {}, total actual: {}, total pending: {}'.format(
+            total_desired, total_actual, total_pending))
     yield add_to_cloud_metrics(config['metrics'], config['identity']['url'],
                                config['region'], total_desired, total_actual,
                                total_pending)
-    print('added to cloud metrics')
-
-    group_metrics.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
-    print('groups sorted as per divergence', *group_metrics, sep='\n')
+    if _print:
+        print('added to cloud metrics')
+        group_metrics.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
+        print('groups sorted as per divergence', *group_metrics, sep='\n')
 
     yield client.disconnect()
 
@@ -284,4 +284,5 @@ def main(reactor, config):
 if __name__ == '__main__':
     config = json.load(open(sys.argv[1]))
     config['services'] = {'nova': 'cloudServersOpenStack'}
-    task.react(main, (config, ))
+    # TODO: Take _print as cmd-line arg and pass it.
+    task.react(main, (config, True))

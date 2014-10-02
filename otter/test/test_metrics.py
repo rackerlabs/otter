@@ -14,9 +14,12 @@ from twisted.internet.defer import succeed
 
 from otter.metrics import (
     get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
-    add_to_cloud_metrics)
-from otter.test.utils import patch, StubTreq2
+    add_to_cloud_metrics, main as metrics_main)
+from otter.test.utils import patch, StubTreq2, matches
 from otter.util.http import headers
+from otter.log import BoundLog
+
+from testtools.matchers import IsInstance
 
 from silverberg.client import CQLClient
 
@@ -179,7 +182,7 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         ta = 20
         tp = 3
         mock_time.time.return_value = 100
-        m = {'collectionTime': 100, 'ttlInSeconds': 30 * 24 * 60 * 60}
+        m = {'collectionTime': 100000, 'ttlInSeconds': 5 * 24 * 60 * 60}
         md = merge(m, {'metricValue': td, 'metricName': 'ord.desired'})
         ma = merge(m, {'metricValue': ta, 'metricName': 'ord.actual'})
         mp = merge(m, {'metricValue': tp, 'metricName': 'ord.pending'})
@@ -187,9 +190,60 @@ class AddToCloudMetricsTests(SynchronousTestCase):
                                       'data': json.dumps([md, ma, mp])})
         treq = StubTreq2([(req, (200, ''))])
         conf = {'username': 'a', 'password': 'p', 'service': 'cloudMetricsIngest',
-                'region': 'IAD'}
+                'region': 'IAD', 'ttl': m['ttlInSeconds']}
 
         d = add_to_cloud_metrics(conf, 'idurl', 'ord', td, ta, tp, _treq=treq)
 
         self.assertIsNone(self.successResultOf(d))
-        self.au.assert_called_once_with('idurl', 'a', 'p')
+        self.au.assert_called_once_with('idurl', 'a', 'p', log=matches(IsInstance(BoundLog)))
+
+
+class MainTests(SynchronousTestCase):
+    """
+    Tests for :func:`main`
+    """
+
+    def setUp(self):
+        """
+        mock dependent functions
+        """
+        self.connect_cass_servers = patch(self, 'otter.metrics.connect_cass_servers')
+        self.get_authenticator = patch(self, 'otter.metrics.get_authenticator')
+        self.get_scaling_groups = patch(self, 'otter.metrics.get_scaling_groups')
+        self.get_all_metrics = patch(self, 'otter.metrics.get_all_metrics')
+        self.add_to_cloud_metrics = patch(self, 'otter.metrics.add_to_cloud_metrics')
+
+    def test_metrics_collected(self):
+        """
+        Metrics is collected after getting groups from cass and servers from nova
+        and it is added to blueflood
+        """
+        client = mock.Mock(spec=['disconnect'])
+        client.disconnect.return_value = succeed(None)
+        self.connect_cass_servers.return_value = client
+
+        auth = mock.Mock()
+        self.get_authenticator.return_value = auth
+
+        groups = mock.Mock()
+        self.get_scaling_groups.return_value = succeed(groups)
+
+        metrics = [GroupMetrics('t', 'g1', 3, 2, 0), GroupMetrics('t2', 'g1', 4, 4, 1),
+                   GroupMetrics('t2', 'g', 100, 20, 0)]
+        self.get_all_metrics.return_value = succeed(metrics)
+
+        _reactor = mock.Mock()
+        config = {'cassandra': 'c', 'identity': {'url': 'id'}, 'metrics': 'm',
+                  'region': 'r', 'services': {'nova': 'cloudServersOpenStack'}}
+
+        d = metrics_main(_reactor, config)
+        self.assertIsNone(self.successResultOf(d))
+
+        self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
+        self.get_authenticator.assert_called_once_with(_reactor, {'url': 'id'})
+        self.get_scaling_groups.assert_called_once_with(client)
+        self.get_all_metrics.assert_called_once_with(
+            groups, auth, 'cloudServersOpenStack', 'r', clock=_reactor, _print=False)
+        self.add_to_cloud_metrics.assert_called_once_with(
+            'm', 'id', 'r', 107, 26, 1)
+        client.disconnect.assert_called_once_with()
