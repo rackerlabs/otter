@@ -278,8 +278,12 @@ def makeService(config):
     if config_value('zookeeper'):
         threads = config_value('zookeeper.threads') or 10
         kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'),
+                                  # Keep trying to connect until the end of time with
+                                  # max interval of 10 minutes
+                                  connection_retry=dict(max_tries=-1, max_delay=600),
                                   threads=threads, txlog=log.bind(system='kazoo'))
-        d = kz_client.start()
+        # Don't timeout. Keep trying to connect forever
+        d = kz_client.start(timeout=None)
 
         def on_client_ready(_):
             # Setup scheduler service after starting

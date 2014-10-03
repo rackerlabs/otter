@@ -3,10 +3,90 @@ Convergence.
 """
 
 from characteristic import attributes, Attribute
+from functools import partial
+from urllib import urlencode
+
+import treq
+
+from twisted.internet import defer
+
 from pyrsistent import pbag, freeze
 from zope.interface import Interface, implementer
 
+from toolz.curried import filter, groupby
+from toolz.functoolz import compose
+
+from otter.log import log as default_log
+from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
+from otter.util.retry import retry, retry_times, exponential_backoff_interval
+# TODO: I hate including this!
+from otter.worker.launch_server_v1 import public_endpoint_url
+
+
+@defer.inlineCallbacks
+def get_all_server_details(tenant_id, authenticator, service_name, region,
+                           limit=100, clock=None, _treq=None):
+    """
+    Return all servers of a tenant
+    TODO: service_name is possibly internal to this function but I don't want to pass config here?
+    NOTE: This really screams to be a independent txcloud-type API
+    """
+    token, catalog = yield authenticator.authenticate_tenant(tenant_id, log=default_log)
+    endpoint = public_endpoint_url(catalog, service_name, region)
+    url = append_segments(endpoint, 'servers', 'detail')
+    query = {'limit': limit}
+    all_servers = []
+
+    if clock is None:  # pragma: no cover
+        from twisted.internet import reactor as clock
+
+    if _treq is None:  # pragma: no cover
+        _treq = treq
+
+    def fetch(url, headers):
+        d = _treq.get(url, headers=headers)
+        d.addCallback(check_success, [200], _treq=_treq)
+        d.addCallback(_treq.json_content)
+        return d
+
+    while True:
+        # sort based on query name to make the tests predictable
+        urlparams = sorted(query.items(), key=lambda e: e[0])
+        d = retry(partial(fetch, '{}?{}'.format(url, urlencode(urlparams)), headers(token)),
+                  can_retry=retry_times(5),
+                  next_interval=exponential_backoff_interval(2), clock=clock)
+        servers = (yield d)['servers']
+        all_servers.extend(servers)
+        if len(servers) < limit:
+            break
+        query.update({'marker': servers[-1]['id']})
+
+    defer.returnValue(all_servers)
+
+
+def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
+                              server_predicate=None, clock=None):
+    """
+    Return tenant's servers that belong to a scaling group as
+    {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
+
+    :param server_predicate: `callable` taking single server as arg and returns True
+                              if the server should be included, False otherwise
+    """
+
+    def has_group_id(s):
+        return 'metadata' in s and 'rax:auto_scaling_group_id' in s['metadata']
+
+    def group_id(s):
+        return s['metadata']['rax:auto_scaling_group_id']
+
+    server_predicate = server_predicate if server_predicate is not None else lambda s: s
+    servers_apply = compose(groupby(group_id), filter(server_predicate), filter(has_group_id))
+
+    d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
+    d.addCallback(servers_apply)
+    return d
 
 
 class IStep(Interface):
