@@ -69,4 +69,4 @@ def predicate_all(*preds):
     Return a predicate function that combines all the given predicate functions
     with and operator
     """
-    return lambda a: reduce(lambda p1, p2: p1(a) and p2(a), preds)
+    return reduce(lambda p1, p2: lambda a: p1(a) and p2(a), preds)
