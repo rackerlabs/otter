@@ -8,6 +8,7 @@ from functools import partial
 import sys
 import json
 from collections import namedtuple
+import time
 
 from twisted.internet import task, defer
 from twisted.internet.endpoints import clientFromString
@@ -16,9 +17,19 @@ from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import groupby, filter, get_in
+from toolz.dicttoolz import merge
 
-from otter.auth import RetryingAuthenticator, ImpersonatingAuthenticator
+from otter.auth import (
+    RetryingAuthenticator, ImpersonatingAuthenticator, authenticate_user,
+    extract_token)
+
+# TODO: Below function has knowledge of service catalog and is independent of
+# worker code. This and other similar code in worker should be moved to otter.auth
+from otter.worker.launch_server_v1 import public_endpoint_url
+
 from otter.convergence import get_scaling_group_servers
+from otter.util.http import append_segments, headers, check_success
+from otter.log import log as otter_log
 
 
 @defer.inlineCallbacks
@@ -190,6 +201,49 @@ def get_all_metrics(cass_groups, authenticator, nova_service, region,
     return defer.gatherResults(defs).addCallback(lambda _: group_metrics)
 
 
+@defer.inlineCallbacks
+def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual,
+                         total_pending, _treq=None):
+    """
+    Add total number of desired, actual and pending servers of a region to Cloud metrics
+
+    :param ``dict`` conf: Metrics configuration, will contain credentials used to authenticate
+                        to cloud metrics, and other conf like ttl
+    :param str identity_url: URL of identity API to authenticate users given in `conf`
+    :param str region: which region's metric is collected
+    :param int total_desired: Total number of servers currently desired in a region
+    :param int total_actual: Total number of servers currently there in a region
+    :param int total_pending: Total number of servers currently building in a region
+    :param ``treq`` _treq: Optional treq implementation for testing
+
+    :return: `Deferred` with None
+    """
+    # TODO: Have generic authentication function that auths, gets the service URL
+    # and returns the token
+    resp = yield authenticate_user(identity_url, conf['username'], conf['password'],
+                                   log=otter_log)
+    token = extract_token(resp)
+
+    if _treq is None:  # pragma: no cover
+        import treq
+        _treq = treq
+
+    url = public_endpoint_url(resp['access']['serviceCatalog'], conf['service'], conf['region'])
+
+    metric_part = {'collectionTime': int(time.time() * 1000),
+                   'ttlInSeconds': conf['ttl']}
+    totals = [('desired', total_desired), ('actual', total_actual), ('pending', total_pending)]
+    d = _treq.post(
+        append_segments(url, 'ingest'), headers=headers(token),
+        data=json.dumps([merge(metric_part,
+                               {'metricValue': value,
+                                'metricName': '{}.{}'.format(region, metric)})
+                         for metric, value in totals]))
+    d.addCallback(check_success, [200], _treq=_treq)
+    d.addCallback(_treq.content)
+    yield d
+
+
 def get_authenticator(reactor, identity):
     """
     Return authenticator based on identity config
@@ -212,7 +266,7 @@ def connect_cass_servers(reactor, config):
 
 
 @defer.inlineCallbacks
-def main(reactor, config):
+def main(reactor, config, _print=False):
     """
     Start collecting the metrics
     """
@@ -223,14 +277,21 @@ def main(reactor, config):
                                            group_pred=lambda g: g['stauts'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
         cass_groups, authenticator, config['services']['nova'], config['region'],
-        clock=reactor, _print=True)
+        clock=reactor, _print=_print)
 
-    total_desired, total_actual = reduce(lambda (td, ta), g: (td + g.desired, ta + g.actual),
-                                         group_metrics, (0, 0))
-    print('total desired: {}, total actual: {}'.format(total_desired, total_actual))
-
-    group_metrics.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
-    print('groups sorted as per divergence', *group_metrics, sep='\n')
+    total_desired, total_actual, total_pending = reduce(
+        lambda (td, ta, tp), g: (td + g.desired, ta + g.actual, tp + g.pending),
+        group_metrics, (0, 0, 0))
+    if _print:
+        print('total desired: {}, total actual: {}, total pending: {}'.format(
+            total_desired, total_actual, total_pending))
+    yield add_to_cloud_metrics(config['metrics'], config['identity']['url'],
+                               config['region'], total_desired, total_actual,
+                               total_pending)
+    if _print:
+        print('added to cloud metrics')
+        group_metrics.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
+        print('groups sorted as per divergence', *group_metrics, sep='\n')
 
     yield client.disconnect()
 
@@ -238,4 +299,5 @@ def main(reactor, config):
 if __name__ == '__main__':
     config = json.load(open(sys.argv[1]))
     config['services'] = {'nova': 'cloudServersOpenStack'}
-    task.react(main, (config, ))
+    # TODO: Take _print as cmd-line arg and pass it.
+    task.react(main, (config, True))
