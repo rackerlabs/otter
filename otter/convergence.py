@@ -57,10 +57,10 @@ class NovaServer(object):
              Attribute("weight", default_value=1, instance_of=int),
              Attribute("condition", default_value="ENABLED", instance_of=str),
              Attribute("type", default_value="PRIMARY", instance_of=str)])
-class DesiredLBConfig(object):
+class LBConfig(object):
     """
-    Information representing a desired load balancer port mapping; how
-    a particular server should be port-mapped to a particular load balancer.
+    Information representing a load balancer port mapping; how a particular
+    server *should* be port-mapped to a particular load balancer.
 
     :ivar int lb_id: The load balancer ID.
     :ivar int port: The port, which together with the server's IP, specifies
@@ -74,24 +74,19 @@ class DesiredLBConfig(object):
     """
 
 
-@attributes(["lb_id", "port", "address", "node_id", "weight", "condition",
-             "type"])
-class ActualLBConfig(object):
+@attributes(["node_id", "address", "config"])
+class LBNode(object):
     """
-    Information representing the actual configuration of a load balancer port
-    mapping.
+    Information representing an actual node on a load balancer, which is
+    an actual, existing, specific port mapping on a load balancer.
 
-    :ivar int lb_id: The load balancer ID.
-    :ivar int port: The port, which together with the server's IP, specifies
-        the service that should be load-balanced by the load balancer.
-    :ivar int address: The IP address, which together with the port, specifies
-        the service that should be load-balanced by the load balancer.
     :ivar int node_id: The ID of the node, which is represents a unique
         combination of IP and port number, on the load balancer.
-    :ivar int weight: The weight to be used for certain load-balancing
-        algorithms if configured on the load balancer.
-    :ivar str condition: One of ``ENABLED``, ``DISABLED``, or ``DRAINING``
-    :ivar str type: One of ``PRIMARY`` or ``SECONDARY``
+    :ivar int address: The IP address, which together with the port, specifies
+        the service that should be load-balanced by the load balancer.
+
+    :ivar config: The configuration for the port mapping
+    :type config: :class:`LBConfig`
     """
 
 
@@ -118,9 +113,9 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     backup servers anyway.
     """
     for key, desired_config in desired_lb_state.iteritems():
-        current_config = current_lb_state.get(key)
+        lb_node = current_lb_state.get(key)
 
-        if current_config is None:
+        if lb_node is None:
             yield AddToLoadBalancer(loadbalancer_id=desired_config.lb_id,
                                     address=ip_address,
                                     port=desired_config.port,
@@ -128,20 +123,19 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
                                     weight=desired_config.weight,
                                     type=desired_config.type)
 
-        elif (desired_config.condition != current_config.condition or
-              desired_config.weight != current_config.weight or
-              desired_config.type != current_config.type):
+        elif desired_config != lb_node.config:
             yield ChangeLoadBalancerNode(loadbalancer_id=desired_config.lb_id,
-                                         node_id=current_config.node_id,
+                                         node_id=lb_node.node_id,
                                          condition=desired_config.condition,
                                          weight=desired_config.weight,
                                          type=desired_config.type)
 
-    undesired = (item for item in current_lb_state.iteritems()
-                 if item[0] not in desired_lb_state)
+    undesirables = (item for item in current_lb_state.iteritems()
+                    if item[0] not in desired_lb_state)
 
-    for key, config in undesired:
-        yield RemoveFromLoadBalancer(config.lb_id, config.node_id)
+    for key, current in undesirables:
+        yield RemoveFromLoadBalancer(loadbalancer_id=current.config.lb_id,
+                                     node_id=current.node_id)
 
 
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
