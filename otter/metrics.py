@@ -216,18 +216,13 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
 
     metric_part = {'collectionTime': int(time.time() * 1000),
                    'ttlInSeconds': conf['ttl']}
-
+    totals = [('desired', total_desired), ('actual', total_actual), ('pending', total_pending)]
     d = _treq.post(
         append_segments(url, 'ingest'), headers=headers(token),
         data=json.dumps([merge(metric_part,
-                               {'metricValue': total_desired,
-                                'metricName': '{}.desired'.format(region)}),
-                         merge(metric_part,
-                               {'metricValue': total_actual,
-                                'metricName': '{}.actual'.format(region)}),
-                         merge(metric_part,
-                               {'metricValue': total_pending,
-                                'metricName': '{}.pending'.format(region)})]))
+                               {'metricValue': value,
+                                'metricName': '{}.{}'.format(region, metric)})
+                         for metric, value in totals]))
     d.addCallback(check_success, [200], _treq=_treq)
     d.addCallback(_treq.content)
     yield d
