@@ -201,6 +201,17 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
                          total_pending, _treq=None):
     """
     Add total number of desired, actual and pending servers of a region to Cloud metrics
+
+    :param ``dict`` conf: Metrics configuration, will contain credentials used to authenticate
+                        to cloud metrics, and other conf like ttl
+    :param str identity_url: URL of identity API to authenticate users given in `conf`
+    :param str region: which region's metric is collected
+    :param int total_desired: Total number of servers currently desired in a region
+    :param int total_actual: Total number of servers currently there in a region
+    :param int total_pending: Total number of servers currently building in a region
+    :param ``treq`` _treq: Optional treq implementation for testing
+
+    :return: `Deferred` with None
     """
     # TODO: Have generic authentication function that auths, gets the service URL
     # and returns the token
