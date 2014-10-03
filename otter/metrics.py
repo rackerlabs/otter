@@ -205,7 +205,7 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
                                    log=otter_log)
     token = extract_token(resp)
 
-    if _treq is None: # pragma: no cover
+    if _treq is None:  # pragma: no cover
         import treq
         _treq = treq
 

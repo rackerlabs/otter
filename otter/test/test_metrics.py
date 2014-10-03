@@ -178,6 +178,9 @@ class AddToCloudMetricsTests(SynchronousTestCase):
 
     @mock.patch('otter.metrics.time')
     def test_added(self, mock_time):
+        """
+        total desired, pending and actual are added to cloud metrics
+        """
         td = 10
         ta = 20
         tp = 3
