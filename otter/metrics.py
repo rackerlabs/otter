@@ -22,8 +22,11 @@ from toolz.dicttoolz import merge
 from otter.auth import (
     RetryingAuthenticator, ImpersonatingAuthenticator, authenticate_user,
     extract_token)
-# TODO: THis should be in auth
+
+# TODO: Below function has knowledge of service catalog and is independent of
+# worker code. This and other similar code in worker should be moved to otter.auth
 from otter.worker.launch_server_v1 import public_endpoint_url
+
 from otter.convergence import get_scaling_group_servers
 from otter.util.http import append_segments, headers, check_success
 from otter.log import log as otter_log
@@ -197,7 +200,7 @@ def get_all_metrics(cass_groups, authenticator, nova_service, region,
 def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual,
                          total_pending, _treq=None):
     """
-    Add found metrics to cloud metrics
+    Add total number of desired, actual and pending servers of a region to Cloud metrics
     """
     # TODO: Have generic authentication function that auths, gets the service URL
     # and returns the token
