@@ -29,6 +29,7 @@ from otter.worker.launch_server_v1 import public_endpoint_url
 
 from otter.convergence import get_scaling_group_servers
 from otter.util.http import append_segments, headers, check_success
+from otter.util.fp import predicate_all
 from otter.log import log as otter_log
 
 
@@ -56,7 +57,7 @@ def get_scaling_groups(client, props=None, batch_size=100, group_pred=None):
     # setup function that removes groups not having desired
     has_desired = lambda g: g['desired'] is not None
     has_created_at = lambda g: g['created_at'] is not None
-    group_pred = group_pred or lambda g: g
+    group_pred = group_pred or (lambda g: g)
     group_filter = filter(predicate_all(has_desired, has_created_at, group_pred))
 
     # We first start by getting all groups limited on batch size

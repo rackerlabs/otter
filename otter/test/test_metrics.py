@@ -68,6 +68,32 @@ class GetScalingGroupsTests(SynchronousTestCase):
         d = get_scaling_groups(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups[-1:])
 
+    def test_filters_on_group_pred_arg(self):
+        """
+        If group_pred arg is given then returns groups for which group_pred returns True
+        """
+        groups = [{'tenantId': 1, 'groupId': 2, 'desired': 3, 'created_at': 'c'},
+                  {'tenantId': 1, 'groupId': 3, 'desired': 2, 'created_at': 'c'},
+                  {'tenantId': 1, 'groupId': 4, 'desired': 6, 'created_at': 'c'},
+                  {'tenantId': 1, 'groupId': 5, 'desired': 4, 'created_at': 'c'}]
+        self._add_exec_args(self.select + ' LIMIT :limit;', {'limit': 5}, groups)
+        d = get_scaling_groups(self.client, batch_size=5,
+                               group_pred=lambda g: g['desired'] % 3 == 0)
+        self.assertEqual(list(self.successResultOf(d)), [groups[0], groups[2]])
+
+    def test_gets_props(self):
+        """
+        If props arg is given then returns groups with that property in it
+        """
+        groups = [{'tenantId': 1, 'groupId': 2, 'desired': 3, 'created_at': 'c', 'launch': 'l'},
+                  {'tenantId': 1, 'groupId': 3, 'desired': 2, 'created_at': 'c', 'launch': 'b'}]
+        self._add_exec_args(
+            ('SELECT "groupId","tenantId",active,created_at,desired,launch,pending '
+             'FROM scaling_group  LIMIT :limit;'),
+            {'limit': 5}, groups)
+        d = get_scaling_groups(self.client, props=['launch'], batch_size=5)
+        self.assertEqual(list(self.successResultOf(d)), groups)
+
     def test_last_tenant_has_less_groups(self):
         """
         Fetches initial batch, then gets all groups of last tenant in that batch
