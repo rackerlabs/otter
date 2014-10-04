@@ -15,7 +15,7 @@ from twisted.internet.defer import succeed
 from otter.metrics import (
     get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
     add_to_cloud_metrics, main as metrics_main)
-from otter.test.utils import patch, StubTreq2, matches
+from otter.test.utils import patch, StubTreq2, matches, IsCallable
 from otter.util.http import headers
 from otter.log import BoundLog
 
@@ -180,6 +180,10 @@ class GetMetricsTests(SynchronousTestCase):
             set(self.successResultOf(d)),
             set([GroupMetrics('t1', 'g1', 3, 3, 2), GroupMetrics('t1', 'g2', 4, 1, 0),
                  GroupMetrics('t2', 'g4', 2, 1, 1)]))
+        self.mock_gsgs.assert_any_call(
+            't1', 'a', 'n', 'r', server_predicate=IsCallable(), clock='c')
+        self.mock_gsgs.assert_any_call(
+            't2', 'a', 'n', 'r', server_predicate=IsCallable(), clock='c')
 
 
 class AddToCloudMetricsTests(SynchronousTestCase):

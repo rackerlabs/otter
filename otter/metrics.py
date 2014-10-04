@@ -193,7 +193,8 @@ def get_all_metrics(cass_groups, authenticator, nova_service, region,
     for tenant_id, groups in tenanted_groups.iteritems():
         d = sem.run(
             get_scaling_group_servers, tenant_id, authenticator,
-            nova_service, region, sfilter=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
+            nova_service, region,
+            server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
             clock=clock)
         d.addCallback(partial(get_tenant_metrics, tenant_id, groups, _print=_print))
         d.addCallback(group_metrics.extend)
