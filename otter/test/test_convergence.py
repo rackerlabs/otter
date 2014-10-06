@@ -12,8 +12,10 @@ from otter.util.http import headers, APIError
 from otter.convergence import (
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
-    DesiredGroupState, NovaServer,
-    ACTIVE, ERROR, BUILD)
+    RemoveFromLoadBalancer, ChangeLoadBalancerNode,
+    DesiredGroupState, NovaServer, Request,
+    ACTIVE, ERROR, BUILD,
+    ServiceType)
 
 from pyrsistent import pmap, pbag
 
@@ -283,3 +285,68 @@ class ConvergeTests(SynchronousTestCase):
 
 # time out (delete) building servers
 # load balancers!
+
+
+class RequestConversionTests(SynchronousTestCase):
+    """
+    Tests for converting ISteps to :obj:`Request`s.
+    """
+
+    def test_create_server(self):
+        """
+        :obj:`CreateServer.as_request` produces a request for creating a server.
+        """
+        create = CreateServer(launch_config=pmap({'name': 'myserver', 'flavorRef': '1'}))
+        self.assertEqual(
+            create.as_request(),
+            Request(
+                service=ServiceType.CLOUD_SERVERS,
+                method='POST',
+                path='servers',
+                data=pmap({'name': 'myserver', 'flavorRef': '1'})))
+
+    def test_delete_server(self):
+        """
+        :obj:`DeleteServer.as_request` produces a request for deleting a server.
+        """
+        delete = DeleteServer(server_id='abc123')
+        self.assertEqual(
+            delete.as_request(),
+            Request(
+                service=ServiceType.CLOUD_SERVERS,
+                method='DELETE',
+                path='servers/abc123'))
+
+    def test_remove_from_load_balancer(self):
+        """
+        :obj:`RemoveFromLoadBalancer.as_request` produces a request for
+        removing a node from a load balancer.
+        """
+        lbremove = RemoveFromLoadBalancer(
+            loadbalancer_id='abc123',
+            node_id='node1')
+        self.assertEqual(
+            lbremove.as_request(),
+            Request(
+                service=ServiceType.CLOUD_LOAD_BALANCERS,
+                method='DELETE',
+                path='loadbalancers/abc123/node1'))
+
+    def test_change_load_balancer_node(self):
+        """
+        :obj:`ChangeLoadBalancerNode.as_request` produces a request for
+        modifying a load balancer node.
+        """
+        changenode = ChangeLoadBalancerNode(
+            loadbalancer_id='abc123',
+            node_id='node1',
+            condition='DRAINING',
+            weight=50)
+        self.assertEqual(
+            changenode.as_request(),
+            Request(
+                service=ServiceType.CLOUD_LOAD_BALANCERS,
+                method='PUT',
+                path='loadbalancers/abc123/nodes/node1',
+                data={'condition': 'DRAINING',
+                      'weight': 50}))
