@@ -51,5 +51,12 @@
     },
     "elasticsearch": {
       "host": "http://127.0.0.1:9200"
+    },
+    "metrics": {
+        "service": "cloudMetricsIngest",
+        "region": "IAD",
+        "username": "stretchdev",
+        "password": "REPLACE_WITH_REAL_PASSWORD",
+        "ttl": 432000
     }
 }
