@@ -18,8 +18,6 @@ from twisted.python.constants import Names, NamedConstant
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
 
-from otter.util.fp import partition_bool, partition_groups
-from otter.util.http import append_segments
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
