@@ -13,7 +13,7 @@ from twisted.internet import defer
 from pyrsistent import pbag, freeze
 from zope.interface import Interface, implementer
 
-from toolz.curried import filter, groupby
+from toolz.curried import filter, groupby, keymap, valmap
 from toolz.functoolz import compose
 
 from otter.log import log as default_log
@@ -126,10 +126,9 @@ class NovaServer(object):
     :ivar str id: The server id.
     :ivar str state: Current state of the server.
     :ivar float created: Timestamp at which the server was created.
+    :ivar str private_address: The private IPv4 address used to access
     :ivar dict desired_lbs: Dictionary with keys of type
         ``(loadbalancer_id, port)`` mapped to :class:`DesiredLBConfig`
-    :ivar dict current_lbs: Dictionary with keys of type
-        ``(loadbalancer_id, port)`` mapped to :class:`ActualLBConfig`
     """
 
 
@@ -218,6 +217,29 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
                                      node_id=current.node_id)
 
 
+def _map_lb_nodes_to_servers(servers, lb_nodes):
+    """
+    Creates a dictionary that allows looking which load balancer mappings
+    correspond to a particular server.
+
+    This function assumes that there can be only one IP address per server
+    that can be added to a load balancer.  Current implementation is the
+    ServiceNet (private) address.
+
+    :param list servers: a list of of :obj:`NovaServer` instances.
+    :param list lb_nodes: a list of :class:`LBNode` instances
+
+    :return: a ``dict`` ``{server_id: {(lb_id, port): LBNode}}``
+    """
+    server_id_by_address = {s.private_address: s.id for s in servers}
+
+    return compose(
+        keymap(lambda address: server_id_by_address[address]),
+        valmap(lambda nodes: {(n.config.lb_id, n.config.port): n for n in nodes}),
+        groupby(lambda n: n.address),
+        filter(lambda n: n.address in server_id_by_address))(lb_nodes)
+
+
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
              timeout=3600):
     """
@@ -230,7 +252,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         This must only contain servers that are being managed for the specified
         group.
     :param dict load_balancer_contents: a dictionary mapping load balancer IDs
-        to lists of 2-tuples of (IP address, loadbalancer node ID).
+        to lists of :class:`LBNode`.
     :param float now: number of seconds since the POSIX epoch indicating the
         time at which the convergence was requested.
     :param float timeout: Number of seconds after which we will delete a server
