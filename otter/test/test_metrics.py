@@ -275,7 +275,8 @@ class MainTests(SynchronousTestCase):
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_authenticator.assert_called_once_with(_reactor, {'url': 'id'})
-        self.get_scaling_groups.assert_called_once_with(client)
+        self.get_scaling_groups.assert_called_once_with(
+            client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
             groups, auth, 'cloudServersOpenStack', 'r', clock=_reactor, _print=False)
         self.add_to_cloud_metrics.assert_called_once_with(

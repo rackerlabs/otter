@@ -276,7 +276,7 @@ def main(reactor, config, _print=False):
     authenticator = get_authenticator(reactor, config['identity'])
 
     cass_groups = yield get_scaling_groups(client, props=['status'],
-                                           group_pred=lambda g: g['stauts'] != 'DISABLED')
+                                           group_pred=lambda g: g['status'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
         cass_groups, authenticator, config['services']['nova'], config['region'],
         clock=reactor, _print=_print)
