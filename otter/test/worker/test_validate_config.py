@@ -78,6 +78,18 @@ class ValidateLaunchServerConfigTests(SynchronousTestCase):
         self.assertEqual(f.value.message, ('Following problems with launch configuration:\n' +
                                            'Inactive imageRef "meh" in launchConfiguration'))
 
+    def test_empty_image(self):
+        """
+        An empty string in the image param means that Nova will use
+        boot-from-volume.  The empty string still validates.
+        """
+        self.launch_config['server']['imageRef'] = ""
+
+        d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
+        self.successResultOf(d)
+
+        self.assertFalse(self.validate_image.called)
+
     def test_invalid_flavor(self):
         """
         Invalid flavor causes InvalidLaunchConfiguration

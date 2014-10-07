@@ -356,11 +356,10 @@ class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
 
     def test_empty_image(self):
         """
-        invalidates if imageRef is an empty string
+        Empty string for ``imageRef`` is valid.
         """
         self.server['imageRef'] = ''
-        self.assertRaisesRegexp(ValidationError, "'' is too short",
-                                validate, self.server, group_schemas.server)
+        validate(self.server, group_schemas.server)
 
     def test_blank_image(self):
         """

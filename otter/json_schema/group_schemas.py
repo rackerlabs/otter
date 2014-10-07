@@ -84,14 +84,13 @@ server = {
         "imageRef": {
             "type": "string",
             "required": True,
-            "minLength": 1,
-            "pattern": "\S+"  # must contain non-whitespace
+            "pattern": "^\S*$"  # must contain non-whitespace
         },
         "flavorRef": {
             "type": "string",
             "required": True,
             "minLength": 1,
-            "pattern": "\S+"  # must contain non-whitespace
+            "pattern": "^\S+$"  # must contain non-whitespace
         },
         "personality": {
             "type": "array",
