@@ -303,7 +303,8 @@ class Options(usage.Options):
         """
         Parse config file and add nova service name
         """
-        self.update(json.load(open(self['config'])))
+        self.open = getattr(self, 'open', None) or open  # For testing
+        self.update(json.load(self.open(self['config'])))
         self.update({'services': {'nova': 'cloudServersOpenStack'}})
 
 

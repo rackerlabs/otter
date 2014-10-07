@@ -4,6 +4,7 @@ Tests for `metrics.py`
 
 import mock
 import json
+from io import StringIO
 
 from pyrsistent import freeze
 
@@ -15,7 +16,7 @@ from twisted.application.internet import TimerService
 
 from otter.metrics import (
     get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
-    add_to_cloud_metrics, main as metrics_main, makeService)
+    add_to_cloud_metrics, main as metrics_main, makeService, Options)
 from otter.test.utils import patch, StubTreq2, matches
 from otter.util.http import headers
 from otter.log import BoundLog
@@ -251,6 +252,22 @@ class MainTests(SynchronousTestCase):
         self.add_to_cloud_metrics.assert_called_once_with(
             'm', 'id', 'r', 107, 26, 1)
         client.disconnect.assert_called_once_with()
+
+
+class APIOptionsTests(SynchronousTestCase):
+    """
+    Test the various command line options.
+    """
+
+    def test_port_options(self):
+        """
+        The port long option should end up in the 'port' key.
+        """
+        config = Options()
+        config.open = mock.Mock(return_value=StringIO(u'{"a": "b"}'))
+        config.parseOptions(['--config=file.json'])
+        self.assertEqual(config, {'a': 'b', 'config': 'file.json',
+                                  'services': {'nova': 'cloudServersOpenStack'}})
 
 
 class ServiceTests(SynchronousTestCase):
