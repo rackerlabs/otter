@@ -40,7 +40,7 @@ from otter.worker.launch_server_v1 import (
 from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
                               matches, DummyException, IsBoundWith,
                               StubTreq, StubResponse)
-from testtools.matchers import IsInstance, StartsWith
+from testtools.matchers import IsInstance, StartsWith, MatchesRegex
 
 from otter.auth import headers
 from otter.util.http import APIError, RequestError, wrap_request_error
@@ -810,6 +810,28 @@ class ServerTests(SynchronousTestCase):
 
         self.treq.get.assert_called_once_with(url, headers=expected_headers,
                                               log=mock.ANY)
+
+    def test_find_server_filters_by_image_even_if_image_name_is_blank(self):
+        """
+        The :func:`find_server` filters on the image id even if the image id
+        is blank (in the case of boot from volume - the server details does
+        not have any information about block device mapping, however).
+
+        The query arg for image should just be "image=", so the URL should look
+        like "...?...&image=" or "...?...&image=&..."
+
+        Searching for "image=" will find only servers with an empty image id.
+        """
+        server_config = _get_server_info()
+        server_config['imageRef'] = ""
+
+        self.treq.get.return_value = succeed(mock.Mock(code=200))
+        self.treq.json_content.return_value = succeed({"servers": []})
+
+        find_server('http://url/', 'my-auth-token', server_config)
+        self.treq.get.assert_called_once_with(
+            matches(MatchesRegex('.*\?(.+&)?image=(&.+)$')), headers=expected_headers,
+            log=mock.ANY)
 
     def test_find_server_regex_escapes_server_name(self):
         """
