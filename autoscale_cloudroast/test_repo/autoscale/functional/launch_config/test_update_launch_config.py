@@ -130,3 +130,38 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
         self.assertEquals(update_launchconfig_response.status_code, 204,
                           msg='Update launch config does not allow partial requests'
                           ' for group {0}'.format(self.group.id))
+
+    def test_update_launch_config_with_boot_from_volume(self):
+        """
+        Update a scaling group's launch config with a blank image ID.  Request
+        succeeds, overwriting previous launch config.
+
+        TODO: once block_device_mapping is validated (because image ID should
+        only be empty if ``block_device_mapping`` is specified), the
+        ``update_launch_config`` function should take ``block_device_mapping``
+        (the autoscale and nova fixtures should be updated), and the
+        updated launch config in autoscale should be checked for
+        ``block_device_mapping``.
+        """
+        lc_name = rand_name('boot_from_volume')
+        lc_image_ref = ""
+        lc_flavor_ref = '4'
+        update_lc_response = self.autoscale_client.update_launch_config(
+            group_id=self.group.id,
+            name=lc_name,
+            image_ref=lc_image_ref,
+            flavor_ref=lc_flavor_ref)
+
+        self.assertEquals(update_lc_response.status_code, 204,
+                          msg='Update launch config failed with {0} as against a 204, success for'
+                          ' group {1}'.format(update_lc_response.status_code, self.group.id))
+        self.validate_headers(update_lc_response.headers)
+
+        launchconfig_response = self.autoscale_client.view_launch_config(
+            self.group.id)
+        updated_launchconfig = launchconfig_response.entity
+
+        self.assertEquals(
+            updated_launchconfig.server.imageRef, lc_image_ref,
+            msg='Server ImageRef in the launch config did not update '
+            'for group {0}'.format(self.group.id))
