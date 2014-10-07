@@ -12,6 +12,8 @@ import time
 
 from twisted.internet import task, defer
 from twisted.internet.endpoints import clientFromString
+from twisted.application.internet import TimerService
+from twisted.python import usage
 
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
@@ -290,8 +292,33 @@ def main(reactor, config, _print=False):
     yield client.disconnect()
 
 
+class Options(usage.Options):
+    """
+    Options for otter-metrics service
+    """
+
+    optParameters = [["config", "c", "config.json", "path to JSON configuration file"]]
+
+    def postOptions(self):
+        """
+        Parse config file and add nova service name
+        """
+        self.update(json.load(open(self['config'])))
+        self.update({'services': {'nova': 'cloudServersOpenStack'}})
+
+
+def makeService(config):
+    """
+    Set up the otter-metrics service.
+    """
+    from twisted.internet import reactor
+    config = dict(config)
+    return TimerService(
+        get_in(['metrics', 'interval'], config, default=60), main, reactor, config)
+
+
 if __name__ == '__main__':
-    config = json.load(open(sys.argv[1]))
+    config = json.load(open(sys.argv[2]))
     config['services'] = {'nova': 'cloudServersOpenStack'}
     # TODO: Take _print as cmd-line arg and pass it.
     task.react(main, (config, True))

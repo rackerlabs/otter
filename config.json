@@ -57,6 +57,7 @@
         "region": "IAD",
         "username": "stretchdev",
         "password": "REPLACE_WITH_REAL_PASSWORD",
-        "ttl": 432000
+        "ttl": 432000,
+        "interval": 60
     }
 }

@@ -11,10 +11,11 @@ from toolz.dicttoolz import merge
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
+from twisted.application.internet import TimerService
 
 from otter.metrics import (
     get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
-    add_to_cloud_metrics, main as metrics_main)
+    add_to_cloud_metrics, main as metrics_main, makeService)
 from otter.test.utils import patch, StubTreq2, matches
 from otter.util.http import headers
 from otter.log import BoundLog
@@ -250,3 +251,30 @@ class MainTests(SynchronousTestCase):
         self.add_to_cloud_metrics.assert_called_once_with(
             'm', 'id', 'r', 107, 26, 1)
         client.disconnect.assert_called_once_with()
+
+
+class ServiceTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.metrics.makeService` and :func:`otter.metrics.Options`
+    """
+
+    def test_make_service(self):
+        """
+        TimerService is returned with main as its function
+        """
+        c = {'metrics': {'interval': 20}}
+        s = makeService(c)
+        self.assertIsInstance(s, TimerService)
+        self.assertEqual(s.step, 20)
+        from twisted.internet.base import ReactorBase
+        self.assertEqual(
+            s.call,
+            (metrics_main, (matches(IsInstance(ReactorBase)), c), {}))
+
+    def test_make_service_no_interval(self):
+        """
+        makeService uses 60 as default interval if not provided in config
+        """
+        s = makeService({})
+        self.assertIsInstance(s, TimerService)
+        self.assertEqual(s.step, 60)
