@@ -174,6 +174,11 @@ class LaunchConfigTest(AutoscaleFixture):
         Create a scaling group with a launch config that has an empty image ID,
         and minEntities=1.  Ensure a server with an empty image ID was created
         on the group.
+
+        TODO: this test should be able to pass on actual nova (not just mimic)
+        so long as ``block_device_mapping`` is also passed as part of the launch
+        config, but this requires a refactoring of the autoscale as well as
+        nova client/fixtures/models.
         """
         group_response = self.autoscale_client.create_scaling_group(
             gc_name='test',
