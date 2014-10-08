@@ -22,7 +22,7 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         self.invalid_flavor_ids = ['INVALID-FLAVOR-ID', '8888', '-4', None, '',
                                    '  ']
         self.invalid_image_ids = ['INVALID-IMAGE-ID', '1111',
-                                  self.lc_image_ref + 'Z', None, '  ']
+                                  self.lc_image_ref + 'Z', '  ']
 
     def test_update_scaling_group_launch_config_to_invalid_imageid(self):
         """

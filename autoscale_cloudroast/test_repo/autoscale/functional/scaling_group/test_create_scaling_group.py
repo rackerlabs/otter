@@ -163,9 +163,9 @@ class CreateScalingGroupTest(AutoscaleFixture):
         self._test_created_scaling_group_groupconfig_fields()
         self._test_created_scaling_group_launchconfig_scalingpolicy_fields()
 
-    def test_create_scaling_group_with_boot_from_volume(self):
+    def test_create_scaling_group_with_boot_from_volume_empty_image(self):
         """
-        Create a scaling group with a blank image ID, and test that the
+        Create a scaling group with an empty image ID, and test that the
         response is successful and that all the launch config fields match
         what was created.
 
@@ -177,6 +177,24 @@ class CreateScalingGroupTest(AutoscaleFixture):
         should test whether ``block_device_mapping`` matches.
         """
         self.lc_image_ref = ""
+        self._create_scaling_group()
+        self._test_create_scaling_group_response()
+        self._test_created_scaling_group_launchconfig_scalingpolicy_fields()
+
+    def test_create_scaling_group_with_boot_from_volume_null_image(self):
+        """
+        Create a scaling group with a None image ID, and test that the
+        response is successful and that all the launch config fields match
+        what was created.
+
+        TODO: once block_device_mapping is validated (because image ID should
+        only be empty if ``block_device_mapping`` is specified), the create
+        scaling group function should take ``block_device_mapping`` (the
+        autoscale and nova fixtures should be updated), and
+        :func:`_test_created_scaling_group_launchconfig_scalingpolicy_fields`
+        should test whether ``block_device_mapping`` matches.
+        """
+        self.lc_image_ref = None
         self._create_scaling_group()
         self._test_create_scaling_group_response()
         self._test_created_scaling_group_launchconfig_scalingpolicy_fields()
