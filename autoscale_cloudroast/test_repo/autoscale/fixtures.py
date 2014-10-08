@@ -267,6 +267,17 @@ class AutoscaleFixture(BaseTestFixture):
             params = server_name
         return [server.id for server in self.get_non_deleting_servers(params)]
 
+    def get_group_servers_based_on_metadata(self, group_id):
+        """
+        Returns a list of servers that belong to a group, from looking at the
+        server metadata
+        """
+        def is_in_group(server):
+            metadata = self.autoscale_behaviors.to_data(server.metadata)
+            return metadata.get('rax:auto_scaling_group_id') == group_id
+
+        return [s for s in self.get_non_deleting_servers() if is_in_group(s)]
+
     def verify_server_count_using_server_metadata(self, group_id, expected_count):
         """
         Asserts the expected count is the number of servers with the groupid
@@ -274,12 +285,7 @@ class AutoscaleFixture(BaseTestFixture):
         """
         end_time = time.time() + 60
         while time.time() < end_time:
-            servers = self.get_non_deleting_servers()
-            metadata_list = [self.autoscale_behaviors.to_data(server.metadata)
-                             for server in servers]
-            group_ids_list_from_metadata = [each.get('rax:auto_scaling_group_id') for each
-                                            in metadata_list]
-            actual_count = group_ids_list_from_metadata.count(group_id)
+            actual_count = len(self.get_group_servers_based_on_metadata(group_id))
             if actual_count is expected_count:
                 break
             time.sleep(5)
