@@ -679,5 +679,6 @@ class OtterServers(object):
         d = group.modify_state(
             partial(remove_server_from_group, self.log.bind(server_id=server_id),
                     transaction_id(request), server_id,
-                    extract_bool_arg(request, 'replace', True)))
+                    extract_bool_arg(request, 'replace', True),
+                    extract_bool_arg(request, 'purge', True)))
         return d
