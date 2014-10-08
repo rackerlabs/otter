@@ -811,20 +811,11 @@ class ServerTests(SynchronousTestCase):
         self.treq.get.assert_called_once_with(url, headers=expected_headers,
                                               log=mock.ANY)
 
-    def test_find_server_filters_by_image_even_if_image_name_is_blank(self):
+    def _test_find_server_no_image_id(self, server_config):
         """
-        The :func:`find_server` filters on the image id even if the image id
-        is blank (in the case of boot from volume - the server details does
-        not have any information about block device mapping, however).
-
         The query arg for image should just be "image=", so the URL should look
         like "...?...&image=" or "...?...&image=&..."
-
-        Searching for "image=" will find only servers with an empty image id.
         """
-        server_config = _get_server_info()
-        server_config['imageRef'] = ""
-
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({"servers": []})
 
@@ -832,6 +823,42 @@ class ServerTests(SynchronousTestCase):
         self.treq.get.assert_called_once_with(
             matches(MatchesRegex('.*\?(.+&)?image=(&.+)$')), headers=expected_headers,
             log=mock.ANY)
+
+    def test_find_server_filters_by_image_even_if_imageRef_is_empty(self):
+        """
+        The :func:`find_server` filters on the image id even if the image id
+        is blank (in the case of boot from volume - the server details does
+        not have any information about block device mapping, however).
+
+        Searching for "image=" will find only servers with an empty image id.
+        """
+        server_config = _get_server_info()
+        server_config['imageRef'] = ""
+        self._test_find_server_no_image_id(server_config)
+
+    def test_find_server_filters_by_image_even_if_imageRef_is_null(self):
+        """
+        The :func:`find_server` filters on the image id even if the image id
+        is null (in the case of boot from volume - the server details does
+        not have any information about block device mapping, however).
+
+        Searching for "image=" will find only servers with an empty image id.
+        """
+        server_config = _get_server_info()
+        server_config['imageRef'] = None
+        self._test_find_server_no_image_id(server_config)
+
+    def test_find_server_filters_by_image_even_if_imageRef_not_provided(self):
+        """
+        The :func:`find_server` filters on the image id even if the image id
+        is not provided (in the case of boot from volume - the server details
+        does not have any information about block device mapping, however).
+
+        Searching for "image=" will find only servers with an empty image id.
+        """
+        server_config = _get_server_info()
+        server_config.pop('imageRef')
+        self._test_find_server_no_image_id(server_config)
 
     def test_find_server_regex_escapes_server_name(self):
         """

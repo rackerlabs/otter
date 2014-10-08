@@ -361,6 +361,20 @@ class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
         self.server['imageRef'] = ''
         validate(self.server, group_schemas.server)
 
+    def test_null_image(self):
+        """
+        Null for ``imageRef`` is valid.
+        """
+        self.server['imageRef'] = None
+        validate(self.server, group_schemas.server)
+
+    def test_no_image(self):
+        """
+        Not providing ``imageRef`` is valid.
+        """
+        self.server.pop('imageRef')
+        validate(self.server, group_schemas.server)
+
     def test_blank_image(self):
         """
         invalidates if imageRef is just whitespace

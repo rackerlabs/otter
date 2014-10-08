@@ -82,9 +82,8 @@ server = {
                     "all new servers (including the name attribute)."),
     "properties": {
         "imageRef": {
-            "type": "string",
-            "required": True,
-            "pattern": "^\S*$"  # must contain non-whitespace
+            "type": ["string", "null"],
+            "pattern": "^\S*$"  # must contain non-whitespace, if it's there
         },
         "flavorRef": {
             "type": "string",

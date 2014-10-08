@@ -191,10 +191,14 @@ def find_server(server_endpoint, auth_token, server_config, log=None):
     :raises: :class:`ServerCreationRetryError`
     """
     query_params = {
-        'image': server_config['imageRef'],
+        'image': server_config.get('imageRef', ''),
         'flavor': server_config['flavorRef'],
         'name': '^{0}$'.format(re.escape(server_config['name']))
     }
+
+    if query_params['image'] is None:
+        query_params['image'] = ''
+
     url = '{path}?{query}'.format(
         path=append_segments(server_endpoint, 'servers', 'detail'),
         query=urlencode(query_params))

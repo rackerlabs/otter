@@ -90,6 +90,30 @@ class ValidateLaunchServerConfigTests(SynchronousTestCase):
 
         self.assertFalse(self.validate_image.called)
 
+    def test_null_image(self):
+        """
+        None in the image param means that Nova will use boot-from-volume.
+        The ``None`` ``imageRef`` still validates.
+        """
+        self.launch_config['server']['imageRef'] = None
+
+        d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
+        self.successResultOf(d)
+
+        self.assertFalse(self.validate_image.called)
+
+    def test_no_image(self):
+        """
+        Not providing an ``imageRef`` param means that Nova will use
+        boot-from-volume.  The server args still validate.
+        """
+        self.launch_config['server'].pop('imageRef')
+
+        d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
+        self.successResultOf(d)
+
+        self.assertFalse(self.validate_image.called)
+
     def test_invalid_flavor(self):
         """
         Invalid flavor causes InvalidLaunchConfiguration
