@@ -17,7 +17,7 @@ from twisted.internet.base import ReactorBase
 from otter.metrics import (
     get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
     add_to_cloud_metrics, collect_metrics, MetricsService, makeService, Options)
-from otter.test.utils import patch, StubTreq2, matches
+from otter.test.utils import patch, StubTreq2, matches, IsCallable
 from otter.util.http import headers
 from otter.log import BoundLog
 
@@ -48,9 +48,9 @@ class GetScalingGroupsTests(SynchronousTestCase):
     def _add_exec_args(self, query, params, ret):
         self.exec_args[freeze((query, params))] = ret
 
-    def test_no_batch(self):
+    def test_all_groups_less_than_batch(self):
         """
-        Gets all groups when total groups < batch size
+        Works when number of all groups of all tenants < batch size
         """
         groups = [{'tenantId': i, 'groupId': j, 'desired': 3, 'created_at': 'c'}
                   for i in range(2) for j in range(2)]
@@ -70,9 +70,10 @@ class GetScalingGroupsTests(SynchronousTestCase):
         d = get_scaling_groups(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups[-1:])
 
-    def test_groups_more_batch(self):
+    def test_last_tenant_has_less_groups(self):
         """
-        Gets all groups of tenant even if they are more than batch size
+        Fetches initial batch, then gets all groups of last tenant in that batch
+        and stops when there are no more tenants
         """
         groups = [{'tenantId': 1, 'groupId': i, 'desired': 3, 'created_at': 'c'}
                   for i in range(7)]
@@ -86,9 +87,9 @@ class GetScalingGroupsTests(SynchronousTestCase):
         d = get_scaling_groups(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups)
 
-    def test_tenants_more_batch(self):
+    def test_many_tenants_having_more_than_batch_groups(self):
         """
-        Gets tenants if they are tenant, groups are > batch size
+        Gets all groups when there are many tenants each of them having groups > batch size
         """
         groups1 = [{'tenantId': 1, 'groupId': i, 'desired': 3, 'created_at': 'c'}
                    for i in range(7)]
@@ -155,6 +156,10 @@ class GetMetricsTests(SynchronousTestCase):
             set(self.successResultOf(d)),
             set([GroupMetrics('t1', 'g1', 3, 3, 2), GroupMetrics('t1', 'g2', 4, 1, 0),
                  GroupMetrics('t2', 'g4', 2, 1, 1)]))
+        self.mock_gsgs.assert_any_call(
+            't1', 'a', 'n', 'r', server_predicate=IsCallable(), clock='c')
+        self.mock_gsgs.assert_any_call(
+            't2', 'a', 'n', 'r', server_predicate=IsCallable(), clock='c')
 
 
 class AddToCloudMetricsTests(SynchronousTestCase):

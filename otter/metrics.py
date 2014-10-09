@@ -133,7 +133,7 @@ def check_diff_configs(client, authenticator, nova_service, region, clock=None):
     for tenant_id, groups in tenanted_groups.iteritems():
         d = sem.run(
             get_scaling_group_servers, tenant_id, authenticator,
-            nova_service, region, sfilter=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
+            nova_service, region, server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
             clock=clock)
         d.addCallback(partial(check_tenant_config, tenant_id, groups))
         defs.append(d)
@@ -146,10 +146,11 @@ GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual pen
 
 def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
     """
-    Get tenant's metrics
+    Produce per-group metrics for all the groups of a tenant
 
     :param ``list`` of ``dict`` scaling_groups: Tenant's scaling groups from CASS
-    :param ``dict`` servers: Servers from Nova grouped based on scaling group ID
+    :param ``dict`` servers: Servers from Nova grouped based on scaling group ID.
+                             Expects only ACTIVE or BUILD servers
     :return: ``list`` of (tenantId, groupId, desired, actual) GroupMetrics namedtuples
     """
     if _print:
@@ -170,7 +171,8 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
 def get_all_metrics(cass_groups, authenticator, nova_service, region,
                     clock=None, _print=False):
     """
-    Get all group's metrics
+    Gather server data for and produce metrics for all groups across all tenants
+    in a region
 
     :param iterable cass_groups: Groups got from cassandra as
     :param :class:`otter.auth.IAuthenticator` authenticator: object that impersonates a tenant
@@ -189,7 +191,8 @@ def get_all_metrics(cass_groups, authenticator, nova_service, region,
     for tenant_id, groups in tenanted_groups.iteritems():
         d = sem.run(
             get_scaling_group_servers, tenant_id, authenticator,
-            nova_service, region, sfilter=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
+            nova_service, region,
+            server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
             clock=clock)
         d.addCallback(partial(get_tenant_metrics, tenant_id, groups, _print=_print))
         d.addCallback(group_metrics.extend)
@@ -204,14 +207,14 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
     """
     Add total number of desired, actual and pending servers of a region to Cloud metrics
 
-    :param ``dict`` conf: Metrics configuration, will contain credentials used to authenticate
+    :param dict conf: Metrics configuration, will contain credentials used to authenticate
                         to cloud metrics, and other conf like ttl
     :param str identity_url: URL of identity API to authenticate users given in `conf`
     :param str region: which region's metric is collected
     :param int total_desired: Total number of servers currently desired in a region
     :param int total_actual: Total number of servers currently there in a region
     :param int total_pending: Total number of servers currently building in a region
-    :param ``treq`` _treq: Optional treq implementation for testing
+    :param _treq: Optional treq implementation for testing
 
     :return: `Deferred` with None
     """

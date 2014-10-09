@@ -13,6 +13,8 @@ from characteristic import attributes
 from pyrsistent import pbag, freeze
 from zope.interface import Interface, implementer
 
+from twisted.python.constants import Names, NamedConstant
+
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
 
@@ -38,11 +40,10 @@ def get_all_server_details(tenant_id, authenticator, service_name, region,
     query = {'limit': limit}
     all_servers = []
 
-    if clock is None:
-        from twisted.internet import reactor
-        clock = reactor
+    if clock is None:  # pragma: no cover
+        from twisted.internet import reactor as clock
 
-    if _treq is None:
+    if _treq is None:  # pragma: no cover
         _treq = treq
 
     def fetch(url, headers):
@@ -67,13 +68,13 @@ def get_all_server_details(tenant_id, authenticator, service_name, region,
 
 
 def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
-                              sfilter=None, clock=None):
+                              server_predicate=None, clock=None):
     """
     Return tenant's servers that belong to a scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
 
-    :param sfilter: `callable` taking single server as arg and returns True the server
-                    should be returned, False otherwise
+    :param server_predicate: `callable` taking single server as arg and returns True
+                              if the server should be included, False otherwise
     """
 
     def has_group_id(s):
@@ -82,10 +83,8 @@ def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
     def group_id(s):
         return s['metadata']['rax:auto_scaling_group_id']
 
-    if sfilter is not None:
-        servers_apply = compose(groupby(group_id), filter(sfilter), filter(has_group_id))
-    else:
-        servers_apply = compose(groupby(group_id), filter(has_group_id))
+    server_predicate = server_predicate if server_predicate is not None else lambda s: s
+    servers_apply = compose(groupby(group_id), filter(server_predicate), filter(has_group_id))
 
     d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
     d.addCallback(servers_apply)
@@ -209,6 +208,14 @@ class CreateServer(object):
     :ivar dict launch_config: Nova launch configuration.
     """
 
+    def as_request(self):
+        """Produce a :obj:`Request` to create a server."""
+        return Request(
+            service=ServiceType.CLOUD_SERVERS,
+            method='POST',
+            path='servers',
+            data=self.launch_config)
+
 
 @implementer(IStep)
 @attributes(['server_id'])
@@ -218,6 +225,13 @@ class DeleteServer(object):
 
     :ivar str server_id: a Nova server ID.
     """
+
+    def as_request(self):
+        """Produce a :obj:`Request` to delete a server."""
+        return Request(
+            service=ServiceType.CLOUD_SERVERS,
+            method='DELETE',
+            path=append_segments('servers', self.server_id))
 
 
 @implementer(IStep)
@@ -236,6 +250,15 @@ class RemoveFromLoadBalancer(object):
     A server must be removed from a load balancer.
     """
 
+    def as_request(self):
+        """Produce a :obj:`Request` to remove a load balancer node."""
+        return Request(
+            service=ServiceType.CLOUD_LOAD_BALANCERS,
+            method='DELETE',
+            path=append_segments('loadbalancers',
+                                 str(self.loadbalancer_id),
+                                 str(self.node_id)))
+
 
 @implementer(IStep)
 @attributes(['loadbalancer_id', 'node_id', 'condition', 'weight'])
@@ -245,18 +268,32 @@ class ChangeLoadBalancerNode(object):
     weight modified.
     """
 
+    def as_request(self):
+        """Produce a :obj:`Request` to modify a load balancer node."""
+        return Request(
+            service=ServiceType.CLOUD_LOAD_BALANCERS,
+            method='PUT',
+            path=append_segments('loadbalancers',
+                                 self.loadbalancer_id,
+                                 'nodes', self.node_id),
+            data={'condition': self.condition,
+                  'weight': self.weight})
 
-CLOUD_SERVERS = 'cloudServersOpenStack'
-CLOUD_LOAD_BALANCERS = 'cloudLoadBalancers'
+
+class ServiceType(Names):
+    """Constants representing Rackspace cloud services."""
+    CLOUD_SERVERS = NamedConstant()
+    CLOUD_LOAD_BALANCERS = NamedConstant()
 
 
-@attributes(['service', 'method', 'path', 'headers', 'data'])
+@attributes(['service', 'method', 'path', 'headers', 'data'],
+            defaults={'headers': None, 'data': None})
 class Request(object):
     """
     A Rackspace API request must be performed.
 
-    :ivar str service: The name of the Rackspace service; either
-        :obj:`CLOUD_SERVERS` or :obj:`CLOUD_LOAD_BALANCERS`.
+    :ivar ServiceType service: The Rackspace service that the request
+        should be sent to. One of the members of :obj:`ServiceType`.
     :ivar bytes method: The HTTP method.
     :ivar bytes path: The path relative to a tenant namespace provided by the
         service.  For example, for cloud servers, this path would be appended

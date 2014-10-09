@@ -120,6 +120,14 @@ class CheckFailure(object):
             self.exception_type)
 
 
+class IsCallable(object):
+    """
+    Class that can be used in tests that checks if given argument is callable
+    """
+    def __eq__(self, other):
+        return callable(other)
+
+
 def fixture(fixture_name):
     """
     :param fixture_name: The base filename of the fixture, ex: simple.atom.

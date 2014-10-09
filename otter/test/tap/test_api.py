@@ -482,8 +482,10 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.log.bind.assert_called_with(system='kazoo')
         mock_txkz.assert_called_once_with(
-            hosts='zk_hosts', threads=20, txlog=self.log.bind.return_value)
-        kz_client.start.assert_called_once_with()
+            hosts='zk_hosts', threads=20,
+            connection_retry=dict(max_tries=-1, max_delay=600),
+            txlog=self.log.bind.return_value)
+        kz_client.start.assert_called_once_with(timeout=None)
 
         # setup_scheduler and store.kz_client is not called yet, and nothing
         # added to the health checker
@@ -514,8 +516,9 @@ class APIMakeServiceTests(SynchronousTestCase):
         makeService(config)
 
         mock_txkz.assert_called_once_with(
-            hosts='zk_hosts', threads=20, txlog=mock.ANY)
-        kz_client.start.assert_called_once_with()
+            hosts='zk_hosts', threads=20,
+            connection_retry=dict(max_tries=-1, max_delay=600), txlog=mock.ANY)
+        kz_client.start.assert_called_once_with(timeout=None)
         self.assertFalse(mock_setup_scheduler.called)
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
                                              'Could not start TxKazooClient')

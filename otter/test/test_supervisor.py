@@ -3,7 +3,7 @@ Tests for the worker supervisor.
 """
 import mock
 
-from testtools.matchers import ContainsDict, Equals, IsInstance, KeysEqual
+from testtools.matchers import ContainsDict, Equals, IsInstance
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed, fail, Deferred
@@ -943,73 +943,139 @@ class RemoveServerTests(SynchronousTestCase):
         set_supervisor(self.supervisor)
         self.addCleanup(set_supervisor, None)
 
-    def test_server_not_found(self):
-        """
-        If specific server is not in the group `ServerNotFoundError` is raised
-        """
-        self.assertRaises(
-            ServerNotFoundError, remove_server_from_group, self.log,
-            self.tid, 's2', True, self.group, self.state)
-        # no server launched or deleted
-        self.assertEqual(self.supervisor.exec_calls, [])
-        self.assertEqual(self.supervisor.del_calls, [])
-        # desired & active/pending not changed
-        self.assertEqual(self.state.desired, 1)
-        self.assertEqual(self.state.active, {'s0': {'id': 's0'}})
-        self.assertEqual(self.state.pending, {})
+        self.group.view_config.return_value = succeed({'minEntities': 0})
+        self.group.view_launch_config.return_value = succeed('launch')
 
-    def _check_removed(self, state):
+    def _remove_server(self, replace=True, purge=True, server_id="s0"):
+        """
+        Try to remove a server from the group.
+        """
+        d = remove_server_from_group(self.log, self.tid, server_id,
+                                     replace, purge, self.group, self.state)
+        return d
+
+    def _assert_server_in_group_state(self, state):
+        """
+        Assert that the server is still in the group state.
+        """
+        self.assertEqual(state.active, {'s0': {'id': 's0'}})
+
+    def _assert_server_not_in_group_state(self, state):
+        """
+        Assert that the server is not in the group state.
+        """
         self.assertNotIn('s0', state.active)
+
+    def _assert_delete_scheduled(self):
+        """
+        Assert that the server was scheduled for deletion.
+        """
         self.assertEqual(self.supervisor.del_calls[-1],
                          (matches(IsBoundWith(server_id='s0', system='otter.job.delete')),
                           self.tid, self.group, {'id': 's0'}))
 
-    def test_replaced_and_removed(self):
+    def _assert_delete_not_scheduled(self):
         """
-        Server is removed and replaced by creating new
+        Assert that the server was scheduled for deletion.
         """
-        self.group.view_launch_config.return_value = succeed('launch')
-        d = remove_server_from_group(self.log, self.tid, 's0', True, self.group, self.state)
-        state = self.successResultOf(d)
-        # server removed?
-        self._check_removed(state)
-        # new server added?
+        self.assertEqual(self.supervisor.del_calls, [])
+
+    def _assert_create_scheduled(self, state):
+        """
+        Assert that a new server is being created. Specifically, checks
+        that the id is now pending, and that the supervisor has a
+        create server call.
+        """
         self.assertIn('jid', state.pending)
         self.assertEqual(self.supervisor.exec_calls[-1],
-                         (matches(IsBoundWith(image_ref=mock.ANY, flavor_ref=mock.ANY,
-                                              system='otter.job.launch', job_id='jid')),
+                         (matches(IsBoundWith(image_ref=mock.ANY,
+                                              flavor_ref=mock.ANY,
+                                              system='otter.job.launch',
+                                              job_id='jid')),
                           self.tid, self.group, 'launch'))
-        # desired not changed
+
+    def _assert_create_not_scheduled(self, state):
+        """
+        Assert that a new server is not being created. Specifically,
+        checks that the id does not exist in pending, and no creation
+        calls were issued.
+        """
+        self.assertNotIn('jid', state.pending)
+        self.assertEqual(self.supervisor.exec_calls, [])
+
+    def test_server_not_found(self):
+        """
+        If specific server is not in the group, :class:`ServerNotFoundError`
+        is raised.
+        """
+        self.assertRaises(ServerNotFoundError,
+                          self._remove_server, server_id="BOGUS")
+
+        self._assert_server_in_group_state(self.state)
+        self._assert_create_not_scheduled(self.state)
+        self._assert_delete_not_scheduled()
         self.assertEqual(self.state.desired, 1)
 
-    def test_not_replaced_removed(self):
+    def test_not_deleted_below_min(self):
         """
-        Server is removed, not replaced and desired is reduced by 1
-        """
-        self.group.view_config.return_value = succeed({'minEntities': 0})
-        d = remove_server_from_group(self.log, self.tid, 's0', False, self.group, self.state)
-        state = self.successResultOf(d)
-        # server removed?
-        self._check_removed(state)
-        # desired reduced and no server launched?
-        self.assertEqual(state.desired, 0)
-        self.assertEqual(len(state.pending), 0)
-        self.assertEqual(len(self.supervisor.exec_calls), 0)
-
-    def test_not_replaced_below_min(self):
-        """
-        `CannotDeleteServerBelowMinError` is raised if current (active + pending) == min servers
+        :class:`CannotDeleteServerBelowMinError` is raised if the current
+        (active + pending) number of servers is already the minimum.
         """
         self.state.add_job('j1')
         self.group.view_config.return_value = succeed({'minEntities': 2})
-        d = remove_server_from_group(self.log, self.tid, 's0', False, self.group, self.state)
+        d = self._remove_server(replace=False, purge=True)
         self.failureResultOf(d, CannotDeleteServerBelowMinError)
-        # server is not deleted
-        self.assertIn('s0', self.state.active)
-        self.assertEqual(self.supervisor.del_calls, [])
-        # server is not launched
-        self.assertEqual(self.state.pending, matches(KeysEqual('j1')))
-        self.assertEqual(len(self.supervisor.exec_calls), 0)
-        # desired & active not changed
+
+        self._assert_server_in_group_state(self.state)
+        self._assert_delete_not_scheduled()
+        self._assert_create_not_scheduled(self.state)
         self.assertEqual(self.state.desired, 1)
-        self.assertEqual(self.state.active, {'s0': {'id': 's0'}})
+
+    def test_replaced_and_removed(self):
+        """
+        Server is removed, purged and replaced.
+        """
+        d = self._remove_server(replace=True, purge=True)
+        state = self.successResultOf(d)
+
+        self._assert_server_not_in_group_state(state)
+        self._assert_delete_scheduled()
+        self._assert_create_scheduled(state)
+        self.assertEqual(self.state.desired, 1)
+
+    def test_not_replaced(self):
+        """
+        Server is removed and purged from Nova, but not replaced. The
+        desired is reduced by 1.
+        """
+        d = self._remove_server(replace=False, purge=True)
+        state = self.successResultOf(d)
+
+        self._assert_server_not_in_group_state(state)
+        self._assert_delete_scheduled()
+        self._assert_create_not_scheduled(state)
+        self.assertEqual(state.desired, 0)
+
+    def test_not_replaced_and_not_purged(self):
+        """
+        The server is removed, but not replaced and not purged.
+        """
+        d = self._remove_server(replace=False, purge=False)
+        state = self.successResultOf(d)
+
+        self._assert_server_not_in_group_state(state)
+        self._assert_delete_not_scheduled()
+        self._assert_create_not_scheduled(state)
+        self.assertEqual(state.desired, 0)
+
+    def test_replaced_but_not_purged(self):
+        """
+        The server is removed, replaced, but not purged.
+        """
+        d = self._remove_server(replace=True, purge=False)
+        state = self.successResultOf(d)
+
+        self._assert_server_not_in_group_state(state)
+        self._assert_delete_not_scheduled()
+        self._assert_create_scheduled(state)
+        self.assertEqual(state.desired, 1)
