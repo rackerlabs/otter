@@ -185,16 +185,24 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     currently be on, and it will be added on the correct port, with the correct
     weight, and correct status, to the desired load balancers.
 
-    Both ``desired_lb_state`` and ``current_lb_state`` are dictionaries keyed
-    by a tuple of ``(loadbalancer_id, port)``.
+    :param list desired_lb_state: ``list`` of :obj:`LBConfig`
+    :param list current_lb_state: ``list`` of :obj:`LBNode`
+    :param str ip_address: the IP address of the server to converge
 
     Note: this supports user customizable types (e.g. PRIMARY or SECONDARY), but
     in practice it should probably only be added as PRIMARY.  SECONDARY can only
     be used if load balancer health monitoring is enabled, and would be used as
     backup servers anyway.
     """
-    for key, desired_config in desired_lb_state.iteritems():
-        lb_node = current_lb_state.get(key)
+    # put both desired and current into dictionaries keyed by load balancer ID
+    # and port, because those are the two required values of a mapping
+    desired_lb_map = {(config.lb_id, config.port): config
+                      for config in desired_lb_state}
+    current_lb_map = {(node.config.lb_id, node.config.port): node
+                      for node in current_lb_state}
+
+    for key, desired_config in desired_lb_map.iteritems():
+        lb_node = current_lb_map.get(key)
 
         if lb_node is None:
             yield AddToLoadBalancer(loadbalancer_id=desired_config.lb_id,
@@ -211,8 +219,8 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
                                          weight=desired_config.weight,
                                          type=desired_config.type)
 
-    undesirables = (item for item in current_lb_state.iteritems()
-                    if item[0] not in desired_lb_state)
+    undesirables = (item for item in current_lb_map.iteritems()
+                    if item[0] not in desired_lb_map)
 
     for key, current in undesirables:
         yield RemoveFromLoadBalancer(loadbalancer_id=current.config.lb_id,

@@ -180,9 +180,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If a desired LB config is not in the set of current configs,
         `converge_lb_state` returns a :class:`AddToLoadBalancer` object
         """
-        desired = {(5, 80): LBConfig(lb_id=5, port=80)}
-        result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_state={},
+        result = _converge_lb_state(desired_lb_state=[LBConfig(lb_id=5, port=80)],
+                                    current_lb_state=[],
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
@@ -195,9 +194,9 @@ class ConvergeLBStateTests(SynchronousTestCase):
         but the configuration is wrong, `converge_lb_state` returns a
         :class:`ChangeLoadBalancerNode` object
         """
-        desired = {(5, 80): LBConfig(lb_id=5, port=80)}
-        current = {(5, 80): LBNode(node_id=123, address='1.1.1.1',
-                                   config=LBConfig(lb_id=5, port=80, weight=5))}
+        desired = [LBConfig(lb_id=5, port=80)]
+        current = [LBNode(node_id=123, address='1.1.1.1',
+                          config=LBConfig(lb_id=5, port=80, weight=5))]
 
         result = _converge_lb_state(desired_lb_state=desired,
                                     current_lb_state=current,
@@ -212,10 +211,10 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If a current lb config is not in the desired set of lb configs,
         `converge_lb_state` returns a :class:`RemoveFromLoadBalancer` object
         """
-        current = {(5, 80): LBNode(node_id=123, address='1.1.1.1',
-                                   config=LBConfig(lb_id=5, port=80, weight=5))}
+        current = [LBNode(node_id=123, address='1.1.1.1',
+                          config=LBConfig(lb_id=5, port=80, weight=5))]
 
-        result = _converge_lb_state(desired_lb_state={},
+        result = _converge_lb_state(desired_lb_state=[],
                                     current_lb_state=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(
@@ -227,9 +226,9 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If the desired lb state matches the current lb state,
         `converge_lb_state` returns nothing
         """
-        desired = {(5, 80): LBConfig(lb_id=5, port=80)}
-        current = {(5, 80): LBNode(node_id=123, address='1.1.1.1',
-                                   config=LBConfig(lb_id=5, port=80))}
+        desired = [LBConfig(lb_id=5, port=80)]
+        current = [LBNode(node_id=123, address='1.1.1.1',
+                          config=LBConfig(lb_id=5, port=80))]
 
         result = _converge_lb_state(desired_lb_state=desired,
                                     current_lb_state=current,
