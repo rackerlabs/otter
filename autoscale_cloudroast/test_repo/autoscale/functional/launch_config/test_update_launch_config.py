@@ -169,7 +169,6 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
                 msg='Server ImageRef in the launch config did not update '
                 'for group {0}'.format(self.group.id))
 
-
     def test_update_launch_config_with_boot_from_volume_empty_image(self):
         """
         Update a scaling group's launch config with an empty image ID.  Request
