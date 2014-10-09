@@ -2,6 +2,8 @@
 Test to create and verify the created group.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
+from autoscale.models.request.autoscale_requests import null
+
 import base64
 from cloudcafe.common.tools.datagen import rand_name
 
@@ -113,10 +115,24 @@ class CreateScalingGroupTest(AutoscaleFixture):
                          self.scaling_group.launchConfiguration.server.name,
                          msg='Server name provided in the launch config did not match'
                          ' for group {0}'.format(self.scaling_group.id))
-        self.assertEqual(self.lc_image_ref,
-                         self.scaling_group.launchConfiguration.server.imageRef,
-                         msg='Image id did not match'
-                         ' for group {0}'.format(self.scaling_group.id))
+
+        # None is no argument, null is null.  Yes this is terrible.
+        # Cloudcafe removes arguments from the json if the value is None.
+        # So a null value was hacked in to be 'null'
+        if self.lc_image_ref is None:
+            self.assertFalse(hasattr(self.scaling_group.launchConfiguration.server,
+                                     'imageRef'))
+        elif self.lc_image_ref is null:
+            self.assertEqual(None,
+                             self.scaling_group.launchConfiguration.server.imageRef,
+                             msg='Image id did not match'
+                             ' for group {0}'.format(self.scaling_group.id))
+        else:
+            self.assertEqual(self.lc_image_ref,
+                             self.scaling_group.launchConfiguration.server.imageRef,
+                             msg='Image id did not match'
+                             ' for group {0}'.format(self.scaling_group.id))
+
         self.assertEqual(self.lc_flavor_ref,
                          self.scaling_group.launchConfiguration.server.flavorRef,
                          msg='Flavor id did not match'
@@ -184,6 +200,24 @@ class CreateScalingGroupTest(AutoscaleFixture):
     def test_create_scaling_group_with_boot_from_volume_null_image(self):
         """
         Create a scaling group with a None image ID, and test that the
+        response is successful and that all the launch config fields match
+        what was created.
+
+        TODO: once block_device_mapping is validated (because image ID should
+        only be empty if ``block_device_mapping`` is specified), the create
+        scaling group function should take ``block_device_mapping`` (the
+        autoscale and nova fixtures should be updated), and
+        :func:`_test_created_scaling_group_launchconfig_scalingpolicy_fields`
+        should test whether ``block_device_mapping`` matches.
+        """
+        self.lc_image_ref = null
+        self._create_scaling_group()
+        self._test_create_scaling_group_response()
+        self._test_created_scaling_group_launchconfig_scalingpolicy_fields()
+
+    def test_create_scaling_group_with_boot_from_volume_no_image(self):
+        """
+        Create a scaling group with no image ID, and test that the
         response is successful and that all the launch config fields match
         what was created.
 

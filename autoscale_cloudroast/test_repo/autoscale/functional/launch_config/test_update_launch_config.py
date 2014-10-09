@@ -1,6 +1,7 @@
 """
 Test to update launch config.
 """
+from autoscale.models.request.autoscale_requests import null
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cloudcafe.common.tools.datagen import rand_name
 
@@ -152,10 +153,22 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
             self.group.id)
         updated_launchconfig = launchconfig_response.entity
 
-        self.assertEquals(
-            updated_launchconfig.server.imageRef, lc_image_ref,
-            msg='Server ImageRef in the launch config did not update '
-            'for group {0}'.format(self.group.id))
+        # None is no argument, null is null.  Yes this is terrible.
+        # Cloudcafe removes arguments from the json if the value is None.
+        # So a null value was hacked in to be 'null'
+        if lc_image_ref is None:
+            self.assertFalse(hasattr(updated_launchconfig.server, 'imageRef'))
+        elif lc_image_ref is null:
+            self.assertEquals(
+                updated_launchconfig.server.imageRef, None,
+                msg='Server ImageRef in the launch config did not update '
+                'for group {0}'.format(self.group.id))
+        else:
+            self.assertEquals(
+                updated_launchconfig.server.imageRef, lc_image_ref,
+                msg='Server ImageRef in the launch config did not update '
+                'for group {0}'.format(self.group.id))
+
 
     def test_update_launch_config_with_boot_from_volume_empty_image(self):
         """
@@ -174,6 +187,20 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
     def test_update_launch_config_with_boot_from_volume_null_image(self):
         """
         Update a scaling group's launch config with a null image ID.  Request
+        succeeds, overwriting previous launch config.
+
+        TODO: once block_device_mapping is validated (because image ID should
+        only be empty if ``block_device_mapping`` is specified), the
+        ``update_launch_config`` function should take ``block_device_mapping``
+        (the autoscale and nova fixtures should be updated), and the
+        updated launch config in autoscale should be checked for
+        ``block_device_mapping``.
+        """
+        self._test_boot_from_volume(null)
+
+    def test_update_launch_config_with_boot_from_volume_no_image(self):
+        """
+        Update a scaling group's launch config without an image ID.  Request
         succeeds, overwriting previous launch config.
 
         TODO: once block_device_mapping is validated (because image ID should
