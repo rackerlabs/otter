@@ -263,14 +263,26 @@ def connect_cass_servers(reactor, config):
 
 
 @defer.inlineCallbacks
-def main(reactor, config, _print=False):
+def collect_metrics(reactor, config, client=None, authenticator=None, _print=False):
     """
     Start collecting the metrics
-    """
-    client = connect_cass_servers(reactor, config['cassandra'])
-    authenticator = get_authenticator(reactor, config['identity'])
 
-    cass_groups = yield get_scaling_groups(client)
+    :param reactor: Twisted reactor
+    :param dict config: Configuration got from file containing all info
+                        needed to collect metrics
+    :param :class:`silverberg.client.CQLClient` client: Optional cassandra client.
+            A new client will be created if this is not given and disconnected before
+            returing
+    :param :class:`otter.auth.IAuthenticator` authenticator: Optional authenticator
+            A new authenticator will be created if this is not given
+    :param bool _print: Should debug messages be printed to stdout?
+
+    :return: :class:`Deferred` with None
+    """
+    _client = client or connect_cass_servers(reactor, config['cassandra'])
+    authenticator = authenticator or get_authenticator(reactor, config['identity'])
+
+    cass_groups = yield get_scaling_groups(_client)
     group_metrics = yield get_all_metrics(
         cass_groups, authenticator, config['services']['nova'], config['region'],
         clock=reactor, _print=_print)
@@ -289,7 +301,9 @@ def main(reactor, config, _print=False):
         group_metrics.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
         print('groups sorted as per divergence', *group_metrics, sep='\n')
 
-    yield client.disconnect()
+    # Diconnect only if we created the client
+    if not client:
+        yield _client.disconnect()
 
 
 class Options(usage.Options):
@@ -308,18 +322,44 @@ class Options(usage.Options):
         self.update({'services': {'nova': 'cloudServersOpenStack'}})
 
 
+class MetricsService(TimerService, object):
+    """
+    Service collects metrics on continuous basis
+    """
+
+    def __init__(self, config):
+        """
+        Initialize the service by connecting to Cassandra and setting up
+        authenticator
+
+        :param dict config: All the config necessary to run the service.
+                            Comes from config file
+        """
+        from twisted.internet import reactor
+        self.client = connect_cass_servers(reactor, config['cassandra'])
+        authenticator = get_authenticator(reactor, config['identity'])
+        TimerService.__init__(
+            self, get_in(['metrics', 'interval'], config, default=60),
+            collect_metrics, reactor, config, client=self.client,
+            authenticator=authenticator)
+
+    def stopService(self):
+        """
+        Stop service by stopping the timer and disconnecting cass client
+        """
+        TimerService.stopService(self)
+        return self.client.disconnect()
+
+
 def makeService(config):
     """
     Set up the otter-metrics service.
     """
-    from twisted.internet import reactor
-    config = dict(config)
-    return TimerService(
-        get_in(['metrics', 'interval'], config, default=60), main, reactor, config)
+    return MetricsService(dict(config))
 
 
 if __name__ == '__main__':
-    config = json.load(open(sys.argv[2]))
+    config = json.load(open(sys.argv[1]))
     config['services'] = {'nova': 'cloudServersOpenStack'}
     # TODO: Take _print as cmd-line arg and pass it.
-    task.react(main, (config, True))
+    task.react(collect_metrics, (config, None, None, True))
