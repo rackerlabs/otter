@@ -15,7 +15,7 @@ from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
 
-from toolz.curried import filter, groupby, keymap, valmap
+from toolz.curried import filter, groupby
 from toolz.functoolz import compose
 
 from otter.log import log as default_log
@@ -227,29 +227,6 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
                                      node_id=current.node_id)
 
 
-def _map_lb_nodes_to_servers(servers, lb_nodes):
-    """
-    Creates a dictionary that allows looking which load balancer mappings
-    correspond to a particular server.
-
-    This function assumes that there can be only one IP address per server
-    that can be added to a load balancer.  Current implementation is the
-    ServiceNet (private) address.
-
-    :param list servers: a list of of :obj:`NovaServer` instances.
-    :param list lb_nodes: a list of :class:`LBNode` instances
-
-    :return: a ``dict`` ``{server_id: {(lb_id, port): LBNode}}``
-    """
-    server_id_by_address = {s.private_address: s.id for s in servers}
-
-    return compose(
-        keymap(lambda address: server_id_by_address[address]),
-        valmap(lambda nodes: {(n.config.lb_id, n.config.port): n for n in nodes}),
-        groupby(lambda n: n.address),
-        filter(lambda n: n.address in server_id_by_address))(lb_nodes)
-
-
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
              timeout=3600):
     """
@@ -271,9 +248,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
 
     :rtype: obj:`Convergence`
     """
-    lbs_by_server_id = _map_lb_nodes_to_servers(
-        servers_with_cheese,
-        load_balancer_contents)
+    lbs_by_address = groupby(lambda n: n.address)(load_balancer_contents)
 
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
     servers_in_error, servers_in_active, servers_in_build = partition_groups(
@@ -302,7 +277,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         [RemoveFromLoadBalancer(loadbalancer_id=lb_node.config.lb_id,
                                 node_id=lb_node.node_id)
          for server in servers_to_delete
-         for lb_node in lbs_by_server_id.get(server.id, {}).values()])
+         for lb_node in lbs_by_address.get(server.private_address, [])])
 
     # delete all servers in error.
     delete_error_steps = (
@@ -310,14 +285,14 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         [RemoveFromLoadBalancer(loadbalancer_id=lb_node.config.lb_id,
                                 node_id=lb_node.node_id)
          for server in servers_in_error
-         for lb_node in lbs_by_server_id.get(server.id, {}).values()])
+         for lb_node in lbs_by_address.get(server.private_address, [])])
 
     # converge all the servers that remain to their desired load balancer state
     lb_converge_steps = [
         step
         for server in servers_in_active
         for step in _converge_lb_state(server.desired_lbs,
-                                       lbs_by_server_id.get(server.id, {}),
+                                       lbs_by_address.get(server.private_address, []),
                                        server.private_address)
         if server not in servers_to_delete and server.private_address]
 

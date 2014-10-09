@@ -10,11 +10,11 @@ from otter.test.utils import StubTreq2, patch, iMock
 from otter.auth import IAuthenticator
 from otter.util.http import headers, APIError
 from otter.convergence import (
+    _converge_lb_state,
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     AddToLoadBalancer, ChangeLoadBalancerNode, RemoveFromLoadBalancer,
-    _converge_lb_state, _map_lb_nodes_to_servers,
     ACTIVE, ERROR, BUILD,
     ServiceType)
 
@@ -234,62 +234,6 @@ class ConvergeLBStateTests(SynchronousTestCase):
                                     current_lb_state=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(list(result), [])
-
-
-class MapLBNodesToServersTests(SynchronousTestCase):
-    """
-    Tests for :func:`_map_lb_nodes_to_servers`
-    """
-    def test_maps_each_node_to_its_lbid_and_port(self):
-        """
-        A server's load balancer nodes are mapped by their lbid and port
-        """
-        lb_nodes = {(i * 2, i * 3): LBNode(address="1.1.1.1", node_id=i,
-                                           config=LBConfig(lb_id=i * 2,
-                                                           port=i * 3))
-                    for i in range(1, 11)}
-
-        results = _map_lb_nodes_to_servers(
-            [NovaServer(id='1', state="ACTIVE", created='',
-                        private_address='1.1.1.1')],
-            lb_nodes.values())
-
-        self.assertEqual(results, {'1': lb_nodes})
-
-    def test_maps_each_address_to_server_id(self):
-        """
-        a set of load balancer nodes on a server
-        """
-        addresses = ["{0}.{0}.{0}.{0}".format(i) for i in range(1, 11)]
-
-        lb_nodes = [LBNode(address=address,
-                           node_id=i,
-                           config=LBConfig(lb_id=i * 2, port=i * 3))
-                    for i, address in enumerate(addresses)]
-
-        results = _map_lb_nodes_to_servers(
-            [NovaServer(id=str(i), state="ACTIVE", created='',
-                        private_address=address)
-             for i, address in enumerate(addresses)],
-            lb_nodes)
-
-        expected = {
-            str(i): {(node.config.lb_id, node.config.port): node}
-            for i, node in enumerate(lb_nodes)
-        }
-
-        self.assertEqual(results, expected)
-
-    def test_ignores_nodes_with_ips_that_do_not_correspond_to_servers(self):
-        """
-        LB nodes that are mapped to IPs that do not correspond to the servers
-        in the servers list are filtered out
-        """
-        results = _map_lb_nodes_to_servers(
-            [],
-            [LBNode(address="1.1.1.1", node_id=1,
-                    config=LBConfig(lb_id=5, port=80))])
-        self.assertEqual(results, {})
 
 
 def server(id, state, created=0, **kwargs):
