@@ -371,10 +371,10 @@ class ConvergeTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
                 [server('abc', ERROR, private_address='1.1.1.1')],
-                {5: [LBNode(address='1.1.1.1', node_id=3,
-                            config=LBConfig(lb_id=5, port=80)),
-                     LBNode(address='1.1.1.1', node_id=5,
-                            config=LBConfig(lb_id=5, port=8080))]},
+                [LBNode(address='1.1.1.1', node_id=3,
+                        config=LBConfig(lb_id=5, port=80)),
+                 LBNode(address='1.1.1.1', node_id=5,
+                        config=LBConfig(lb_id=5, port=8080))],
                 0),
             Convergence(
                 steps=pbag([
@@ -405,8 +405,8 @@ class ConvergeTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=0),
                 [server('abc', ACTIVE, private_address='1.1.1.1', created=0)],
-                {5: [LBNode(address='1.1.1.1', node_id=3,
-                            config=LBConfig(lb_id=5, port=80))]},
+                [LBNode(address='1.1.1.1', node_id=3,
+                        config=LBConfig(lb_id=5, port=80))],
                 0),
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),

@@ -17,7 +17,6 @@ from twisted.python.constants import Names, NamedConstant
 
 from toolz.curried import filter, groupby, keymap, valmap
 from toolz.functoolz import compose
-from toolz.itertoolz import concat
 
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
@@ -251,11 +250,12 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     by ``desired_state``.
 
     :param DesiredGroupState desired_state: The desired group state.
-    :param list servers_with_cheese: a list of of :obj:`NovaServer` instances.
+    :param list servers_with_cheese: a list of :obj:`NovaServer` instances.
         This must only contain servers that are being managed for the specified
         group.
-    :param dict load_balancer_contents: a dictionary mapping load balancer IDs
-        to lists of :class:`LBNode`.
+    :param load_balancer_contents: a list of :obj:`LBNode` instances.  This must
+        contain all the load balancer mappings for all the load balancers on the
+        tenant.
     :param float now: number of seconds since the POSIX epoch indicating the
         time at which the convergence was requested.
     :param float timeout: Number of seconds after which we will delete a server
@@ -265,7 +265,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     """
     lbs_by_server_id = _map_lb_nodes_to_servers(
         servers_with_cheese,
-        concat(load_balancer_contents.values()))
+        load_balancer_contents)
 
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
     servers_in_error, servers_in_active, servers_in_build = partition_groups(
