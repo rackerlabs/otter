@@ -293,9 +293,9 @@ class MapLBNodesToServersTests(SynchronousTestCase):
         self.assertEqual(results, {})
 
 
-def server(id, state, created=0):
+def server(id, state, created=0, **kwargs):
     """Convenience for creating a :obj:`NovaServer`."""
-    return NovaServer(id=id, state=state, created=created)
+    return NovaServer(id=id, state=state, created=created, **kwargs)
 
 
 class ConvergeTests(SynchronousTestCase):
@@ -361,6 +361,29 @@ class ConvergeTests(SynchronousTestCase):
                     CreateServer(launch_config=pmap()),
                 ])))
 
+    def test_delete_error_state_servers_with_lb_nodes(self):
+        """
+        If a server we created enters error state and it is attached to one
+        or more load balancers, it will be removed from its load balancers
+        as well as get deleted.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=1),
+                [server('abc', ERROR, private_address='1.1.1.1')],
+                {5: [LBNode(address='1.1.1.1', node_id=3,
+                            config=LBConfig(lb_id=5, port=80)),
+                     LBNode(address='1.1.1.1', node_id=5,
+                            config=LBConfig(lb_id=5, port=8080))]},
+                0),
+            Convergence(
+                steps=pbag([
+                    DeleteServer(server_id='abc'),
+                    RemoveFromLoadBalancer(loadbalancer_id=5, node_id=3),
+                    RemoveFromLoadBalancer(loadbalancer_id=5, node_id=5),
+                    CreateServer(launch_config=pmap()),
+                ])))
+
     def test_scale_down(self):
         """If we have more servers than desired, we delete the oldest."""
         self.assertEqual(
@@ -371,6 +394,24 @@ class ConvergeTests(SynchronousTestCase):
                 {},
                 0),
             Convergence(steps=pbag([DeleteServer(server_id='abc')])))
+
+    def test_scale_down_with_lb_nodes(self):
+        """
+        When scaling down, if there are any servers to be deleted that are
+        attached to existing load balancers, they will also be also removed
+        from said load balancers
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0),
+                [server('abc', ACTIVE, private_address='1.1.1.1', created=0)],
+                {5: [LBNode(address='1.1.1.1', node_id=3,
+                            config=LBConfig(lb_id=5, port=80))]},
+                0),
+            Convergence(steps=pbag([
+                DeleteServer(server_id='abc'),
+                RemoveFromLoadBalancer(loadbalancer_id=5, node_id=3)
+            ])))
 
     def test_scale_down_building_first(self):
         """

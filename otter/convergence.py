@@ -2,7 +2,6 @@
 Convergence.
 """
 
-from characteristic import attributes, Attribute
 from functools import partial
 from urllib import urlencode
 
@@ -10,6 +9,7 @@ import treq
 
 from twisted.internet import defer
 
+from characteristic import attributes, Attribute
 from pyrsistent import pbag, freeze
 from zope.interface import Interface, implementer
 
@@ -17,6 +17,7 @@ from twisted.python.constants import Names, NamedConstant
 
 from toolz.curried import filter, groupby, keymap, valmap
 from toolz.functoolz import compose
+from toolz.itertoolz import concat
 
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
@@ -100,7 +101,7 @@ class IStep(Interface):
     def as_request():
         """
         Create a :class:`Request` object that contains relevant information for
-        performing a HTTP request
+        performing the HTTP request required for this step
         """
 
 
@@ -129,8 +130,8 @@ class NovaServer(object):
     :ivar str state: Current state of the server.
     :ivar float created: Timestamp at which the server was created.
     :ivar str private_address: The private IPv4 address used to access
-    :ivar dict desired_lbs: Dictionary with keys of type
-        ``(loadbalancer_id, port)`` mapped to :class:`DesiredLBConfig`
+    :ivar dict desired_lbs: dictionary with keys of type
+        ``(loadbalancer_id, port)`` mapped to :class:`LBConfig`
     """
 
 
@@ -262,6 +263,10 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
 
     :rtype: obj:`Convergence`
     """
+    lbs_by_server_id = _map_lb_nodes_to_servers(
+        servers_with_cheese,
+        concat(load_balancer_contents.values()))
+
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
     servers_in_error, servers_in_active, servers_in_build = partition_groups(
         lambda s: s.state, newest_to_oldest, [ERROR, ACTIVE, BUILD])
@@ -286,23 +291,25 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     servers_to_delete = (servers_in_active + waiting_for_build)[desired_state.desired:]
     delete_steps = (
         [DeleteServer(server_id=server.id) for server in servers_to_delete] +
-        [RemoveFromLoadBalancer(lb_config.lb_id, lb_config.node_id)
+        [RemoveFromLoadBalancer(loadbalancer_id=lb_node.config.lb_id,
+                                node_id=lb_node.node_id)
          for server in servers_to_delete
-         for lb_config in server.current_lbs])
+         for lb_node in lbs_by_server_id.get(server.id, {}).values()])
 
     # delete all servers in error.
     delete_error_steps = (
         [DeleteServer(server_id=server.id) for server in servers_in_error] +
-        [RemoveFromLoadBalancer(lb_config.lb_id, lb_config.node_id)
+        [RemoveFromLoadBalancer(loadbalancer_id=lb_node.config.lb_id,
+                                node_id=lb_node.node_id)
          for server in servers_in_error
-         for lb_config in server.current_lbs])
+         for lb_node in lbs_by_server_id.get(server.id, {}).values()])
 
     # converge all the servers that remain to their desired load balancer state
     lb_converge_steps = [
         step
         for server in servers_in_active
         for step in _converge_lb_state(server.desired_lbs,
-                                       server.current_lbs,
+                                       lbs_by_server_id.get(server.id, {}),
                                        server.private_address)
         if server not in servers_to_delete and server.private_address]
 
