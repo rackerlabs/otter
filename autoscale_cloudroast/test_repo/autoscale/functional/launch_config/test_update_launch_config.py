@@ -137,7 +137,7 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
         Helper to assert that updating boot from volume works
         """
         lc_name = rand_name('boot_from_volume')
-        lc_flavor_ref = '4'
+        lc_flavor_ref = self.lc_flavor_ref
         update_lc_response = self.autoscale_client.update_launch_config(
             group_id=self.group.id,
             name=lc_name,
