@@ -13,8 +13,8 @@ from otter.convergence import (
     _converge_lb_state,
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
+    RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddToLoadBalancer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
-    AddToLoadBalancer, ChangeLoadBalancerNode, RemoveFromLoadBalancer,
     ACTIVE, ERROR, BUILD,
     ServiceType)
 
