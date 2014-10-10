@@ -168,6 +168,32 @@ class LaunchConfigTest(AutoscaleFixture):
         self.verify_group_state(group.id, self.gc_min_entities_alt)
         self.verify_server_count_using_server_metadata(group.id, self.gc_min_entities_alt)
 
+    @tags(requires='mimic')
+    def test_system_launchconfig_with_boot_from_volume(self):
+        """
+        Create a scaling group with a launch config that has an empty image ID,
+        and minEntities=1.  Ensure a server with an empty image ID was created
+        on the group.
+
+        TODO: this test should be able to pass on actual nova (not just mimic)
+        so long as ``block_device_mapping`` is also passed as part of the launch
+        config, but this requires a refactoring of the autoscale as well as
+        nova client/fixtures/models.
+        """
+        group_response = self.autoscale_client.create_scaling_group(
+            gc_name='test',
+            gc_cooldown=self.gc_cooldown,
+            gc_min_entities=self.gc_min_entities_alt,
+            lc_image_ref="",
+            lc_flavor_ref=self.lc_flavor_ref)
+        group = group_response.entity
+        self.resources.add(group, self.empty_scaling_group)
+        self.verify_group_state(group.id, self.gc_min_entities_alt)
+
+        servers = self.get_group_servers_based_on_metadata(group.id)
+        self.assertEquals(1, len(servers))
+        self.assertEquals("", servers[0].image.id)
+
     @tags(speed='quick')
     def test_system_update_launchconfig_while_group_building(self):
         """
