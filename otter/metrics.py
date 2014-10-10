@@ -34,6 +34,9 @@ from otter.util.http import append_segments, headers, check_success
 from otter.log import log as otter_log
 
 
+metrics_log = otter_log.bind(system='otter.metrics')
+
+
 @defer.inlineCallbacks
 def get_scaling_groups(client, props=None, batch_size=100):
     """
@@ -221,12 +224,12 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
     # TODO: Have generic authentication function that auths, gets the service URL
     # and returns the token
     resp = yield authenticate_user(identity_url, conf['username'], conf['password'],
-                                   log=otter_log)
+                                   log=metrics_log)
     token = extract_token(resp)
 
     if _treq is None:  # pragma: no cover
-        import treq
-        _treq = treq
+        from otter.util import logging_treq
+        _treq = logging_treq
 
     url = public_endpoint_url(resp['access']['serviceCatalog'], conf['service'], conf['region'])
 
@@ -238,7 +241,8 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
         data=json.dumps([merge(metric_part,
                                {'metricValue': value,
                                 'metricName': '{}.{}'.format(region, metric)})
-                         for metric, value in totals]))
+                         for metric, value in totals]),
+        log=metrics_log)
     d.addCallback(check_success, [200], _treq=_treq)
     d.addCallback(_treq.content)
     yield d
@@ -293,12 +297,15 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
     total_desired, total_actual, total_pending = reduce(
         lambda (td, ta, tp), g: (td + g.desired, ta + g.actual, tp + g.pending),
         group_metrics, (0, 0, 0))
+    metrics_log.msg('total desired: {td}, total_actual: {ta}, total pending: {tp}',
+                    td=total_desired, ta=total_actual, tp=total_pending)
     if _print:
         print('total desired: {}, total actual: {}, total pending: {}'.format(
             total_desired, total_actual, total_pending))
     yield add_to_cloud_metrics(config['metrics'], config['identity']['url'],
                                config['region'], total_desired, total_actual,
                                total_pending)
+    metrics_log.msg('added to cloud metrics')
     if _print:
         print('added to cloud metrics')
         group_metrics.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
