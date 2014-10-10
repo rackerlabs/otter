@@ -181,7 +181,7 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     state towards its desired load balancer state.
 
     The server will be removed from any extra load balancers the server
-    currently be on, and it will be added on the correct port, with the correct
+    is currently on, and it will be added on the correct port, with the correct
     weight, and correct status, to the desired load balancers.
 
     :param list desired_lb_state: `list` of :obj:`LBConfig`
