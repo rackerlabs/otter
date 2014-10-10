@@ -3,6 +3,7 @@ Unittests for the launch_server_v1 launch config.
 """
 import mock
 import json
+from toolz.dicttoolz import merge
 from urllib import urlencode
 from urlparse import urlunsplit
 
@@ -33,7 +34,8 @@ from otter.worker.launch_server_v1 import (
     find_server,
     ServerCreationRetryError,
     CLBOrNodeDeleted,
-    generate_server_metadata
+    generate_server_metadata,
+    _without_otter_server_metadata
 )
 
 
@@ -1958,6 +1960,43 @@ class ConfigPreparationTests(SynchronousTestCase):
                                               test_config)
 
         self.assertNotIdentical(test_config, launch_config)
+
+
+class MetadataRemovalTests(SynchronousTestCase):
+    def test_without_otter_server_metadata(self):
+        """
+        :func:`_without_otter_server_metadata` correctly removes
+        otter-specific keys and correctly keeps other keys.
+        """
+        launch_config = {
+            'server': {'imageRef': '1',
+                       'flavorRef': '1'},
+            'loadBalancers': [
+                {'loadBalancerId': 12345, 'port': 80},
+                {'loadBalancerId': 54321, 'port': 81}
+            ]
+        }
+        metadata = generate_server_metadata("group_id", launch_config)
+        extra_junk = {
+            "Rittenhouse overproof rye": "5 cl",
+            "Carpano Antica Formula": "2 cl",
+            "Luxardo maraschino": "2 bsp",
+            "Pierre Ferrand Dry Curacao": "1 bsp",
+            "Un Emile absinthe": "1 bsp",
+            "Angostura bitters": "3 drops",
+            "stir": "vigorously, with ice",
+            "serve": "with lemon rind, squeezed"
+        }
+
+        samples = [
+            ({}, {}),
+            (metadata, {}),
+            (merge(metadata, extra_junk), extra_junk)
+        ]
+
+        for metadata, expected_scrubbed_metadata in samples:
+            scrubbed = _without_otter_server_metadata(metadata)
+            self.assertEqual(scrubbed, expected_scrubbed_metadata)
 
 
 # An instance associated with a single load balancer.

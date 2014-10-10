@@ -621,6 +621,14 @@ def generate_server_metadata(group_id, launch_config):
     return metadata
 
 
+def _without_otter_server_metadata(metadata):
+    """
+    Returns a copy of the metadata with all the otter-specific keys removed.
+    """
+    return {k: v for (k, v) in metadata.iteritems()
+            if not k.startswith("rax:auto_scaling")}
+
+
 def launch_server(log, region, scaling_group, service_catalog, auth_token,
                   launch_config, undo, clock=None):
     """
