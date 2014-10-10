@@ -404,6 +404,27 @@ class ConvergeTests(SynchronousTestCase):
                 3600),
             Convergence(steps=pbag([DeleteServer(server_id='slowpoke')])))
 
+    def test_converge_active_servers_ignores_servers_to_be_deleted(self):
+        """
+        Only servers in active that are not being deleted will have their
+        load balancers converged.
+        """
+        desired_lbs = [LBConfig(lb_id=5, port=80)]
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=1),
+                [server('abc', ACTIVE, private_address='1.1.1.1', created=0,
+                        desired_lbs=desired_lbs),
+                 server('bcd', ACTIVE, private_address='2.2.2.2', created=1,
+                        desired_lbs=desired_lbs)],
+                [],
+                0),
+            Convergence(steps=pbag([
+                DeleteServer(server_id='abc'),
+                AddToLoadBalancer(loadbalancer_id=5, address='2.2.2.2', port=80,
+                                  condition="ENABLED", weight=1, type="PRIMARY")
+            ])))
+
 
 # time out (delete) building servers
 # load balancers!
