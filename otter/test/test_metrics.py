@@ -288,9 +288,10 @@ class APIOptionsTests(SynchronousTestCase):
     Test the various command line options.
     """
 
-    def test_port_options(self):
+    def test_config_options(self):
         """
-        The port long option should end up in the 'port' key.
+        File given in --config option is parsed and its contents are added to `Options`
+        object
         """
         config = Options()
         config.open = mock.Mock(return_value=StringIO(u'{"a": "b"}'))
