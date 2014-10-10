@@ -119,8 +119,7 @@ class DesiredGroupState(object):
 
 @attributes(['id', 'state', 'created',
              Attribute('private_address', default_value='', instance_of=str),
-             Attribute('desired_lbs', default_value={}, instance_of=dict),
-             Attribute('current_lbs', default_value={}, instance_of=dict)])
+             Attribute('desired_lbs', default_value={}, instance_of=dict)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
