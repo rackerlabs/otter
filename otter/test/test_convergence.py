@@ -313,7 +313,7 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ERROR, private_address='1.1.1.1')],
+                [server('abc', ERROR, servicenet_address='1.1.1.1')],
                 [LBNode(address='1.1.1.1', node_id=3,
                         config=LBConfig(lb_id=5, port=80)),
                  LBNode(address='1.1.1.1', node_id=5,
@@ -347,7 +347,7 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=0),
-                [server('abc', ACTIVE, private_address='1.1.1.1', created=0)],
+                [server('abc', ACTIVE, servicenet_address='1.1.1.1', created=0)],
                 [LBNode(address='1.1.1.1', node_id=3,
                         config=LBConfig(lb_id=5, port=80))],
                 0),
@@ -413,9 +413,9 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ACTIVE, private_address='1.1.1.1', created=0,
+                [server('abc', ACTIVE, servicenet_address='1.1.1.1', created=0,
                         desired_lbs=desired_lbs),
-                 server('bcd', ACTIVE, private_address='2.2.2.2', created=1,
+                 server('bcd', ACTIVE, servicenet_address='2.2.2.2', created=1,
                         desired_lbs=desired_lbs)],
                 [],
                 0),

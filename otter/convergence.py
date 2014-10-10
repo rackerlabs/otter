@@ -118,7 +118,7 @@ class DesiredGroupState(object):
 
 
 @attributes(['id', 'state', 'created',
-             Attribute('private_address', default_value='', instance_of=str),
+             Attribute('servicenet_address', default_value='', instance_of=str),
              Attribute('desired_lbs', default_factory=list, instance_of=list)])
 class NovaServer(object):
     """
@@ -127,7 +127,8 @@ class NovaServer(object):
     :ivar str id: The server id.
     :ivar str state: Current state of the server.
     :ivar float created: Timestamp at which the server was created.
-    :ivar str private_address: The private IPv4 address used to access
+    :ivar str servicenet_address: The private ServiceNet IPv4 address, if
+        the server is on the ServiceNet network
     :ivar list desired_lbs: `list` of :class:`LBConfig`
     """
 
@@ -275,7 +276,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         [RemoveFromLoadBalancer(loadbalancer_id=lb_node.config.lb_id,
                                 node_id=lb_node.node_id)
          for server in servers_to_delete
-         for lb_node in lbs_by_address.get(server.private_address, [])])
+         for lb_node in lbs_by_address.get(server.servicenet_address, [])])
 
     # delete all servers in error.
     delete_error_steps = (
@@ -283,16 +284,17 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         [RemoveFromLoadBalancer(loadbalancer_id=lb_node.config.lb_id,
                                 node_id=lb_node.node_id)
          for server in servers_in_error
-         for lb_node in lbs_by_address.get(server.private_address, [])])
+         for lb_node in lbs_by_address.get(server.servicenet_address, [])])
 
     # converge all the servers that remain to their desired load balancer state
     lb_converge_steps = [
         step
         for server in servers_in_active
-        for step in _converge_lb_state(server.desired_lbs,
-                                       lbs_by_address.get(server.private_address, []),
-                                       server.private_address)
-        if server not in servers_to_delete and server.private_address]
+        for step in _converge_lb_state(
+            server.desired_lbs,
+            lbs_by_address.get(server.servicenet_address, []),
+            server.servicenet_address)
+        if server not in servers_to_delete and server.servicenet_address]
 
     return Convergence(
         steps=pbag(create_steps
