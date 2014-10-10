@@ -119,7 +119,7 @@ class DesiredGroupState(object):
 
 @attributes(['id', 'state', 'created',
              Attribute('private_address', default_value='', instance_of=str),
-             Attribute('desired_lbs', default_value={}, instance_of=dict)])
+             Attribute('desired_lbs', default_factory=list, instance_of=list)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -128,8 +128,7 @@ class NovaServer(object):
     :ivar str state: Current state of the server.
     :ivar float created: Timestamp at which the server was created.
     :ivar str private_address: The private IPv4 address used to access
-    :ivar dict desired_lbs: dictionary with keys of type
-        ``(loadbalancer_id, port)`` mapped to :class:`LBConfig`
+    :ivar list desired_lbs: `list` of :class:`LBConfig`
     """
 
 
@@ -184,8 +183,8 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     currently be on, and it will be added on the correct port, with the correct
     weight, and correct status, to the desired load balancers.
 
-    :param list desired_lb_state: ``list`` of :obj:`LBConfig`
-    :param list current_lb_state: ``list`` of :obj:`LBNode`
+    :param list desired_lb_state: `list` of :obj:`LBConfig`
+    :param list current_lb_state: `list` of :obj:`LBNode`
     :param str ip_address: the IP address of the server to converge
 
     Note: this supports user customizable types (e.g. PRIMARY or SECONDARY), but
