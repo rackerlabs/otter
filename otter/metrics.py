@@ -322,6 +322,8 @@ class Options(usage.Options):
         """
         self.open = getattr(self, 'open', None) or open  # For testing
         self.update(json.load(self.open(self['config'])))
+        # TODO: This is hard-coded here and in tap/api.py. Should be there in
+        # config file only
         self.update({'services': {'nova': 'cloudServersOpenStack'}})
 
 
