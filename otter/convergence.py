@@ -246,7 +246,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
 
     :rtype: obj:`Convergence`
     """
-    lbs_by_address = groupby(lambda n: n.address)(load_balancer_contents)
+    lbs_by_address = groupby(lambda n: n.address, load_balancer_contents)
 
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
     servers_in_error, servers_in_active, servers_in_build = partition_groups(
