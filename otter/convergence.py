@@ -26,6 +26,22 @@ from otter.util.retry import retry, retry_times, exponential_backoff_interval
 from otter.worker.launch_server_v1 import public_endpoint_url
 
 
+class NodeCondition(Names):
+    """Constants representing the condition a load balancer node can be in"""
+    ENABLED = NamedConstant()   # Node can accept new connections.
+    DRAINING = NamedConstant()  # Node cannot accept any new connections.
+                                # Existing connections are forcibly terminated.
+    DISABLED = NamedConstant()  # Node cannot accept any new connections.
+                                # Existing connections are permitted to continue.
+
+
+class NodeType(Names):
+    """Constants representing the type of a load balancer node"""
+    PRIMARY = NamedConstant()    # Node in normal rotation
+    SECONDARY = NamedConstant()  # Node only put into normal rotation if a
+                                 # primary node fails.
+
+
 @defer.inlineCallbacks
 def get_all_server_details(tenant_id, authenticator, service_name, region,
                            limit=100, clock=None, _treq=None):
@@ -135,8 +151,10 @@ class NovaServer(object):
 
 @attributes(["lb_id", "port",
              Attribute("weight", default_value=1, instance_of=int),
-             Attribute("condition", default_value="ENABLED", instance_of=str),
-             Attribute("type", default_value="PRIMARY", instance_of=str)])
+             Attribute("condition", default_value=NodeCondition.ENABLED,
+                       instance_of=NamedConstant),
+             Attribute("type", default_value=NodeType.PRIMARY,
+                       instance_of=NamedConstant)])
 class LBConfig(object):
     """
     Information representing a load balancer port mapping; how a particular

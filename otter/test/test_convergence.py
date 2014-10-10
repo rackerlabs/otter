@@ -16,7 +16,7 @@ from otter.convergence import (
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddToLoadBalancer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ACTIVE, ERROR, BUILD,
-    ServiceType)
+    ServiceType, NodeCondition, NodeType)
 
 from pyrsistent import pmap, pbag
 
@@ -167,8 +167,8 @@ class ObjectStorageTests(SynchronousTestCase):
         """
         lb = LBConfig(lb_id=1, port=80)
         self.assertEqual(lb.weight, 1)
-        self.assertEqual(lb.condition, "ENABLED")
-        self.assertEqual(lb.type, "PRIMARY")
+        self.assertEqual(lb.condition, NodeCondition.ENABLED)
+        self.assertEqual(lb.type, NodeType.PRIMARY)
 
 
 class ConvergeLBStateTests(SynchronousTestCase):
@@ -186,7 +186,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         self.assertEqual(
             list(result),
             [AddToLoadBalancer(loadbalancer_id=5, address='1.1.1.1', port=80,
-                               condition="ENABLED", type="PRIMARY", weight=1)])
+                               condition=NodeCondition.ENABLED,
+                               type=NodeType.PRIMARY, weight=1)])
 
     def test_change_lb_node(self):
         """
@@ -204,7 +205,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         self.assertEqual(
             list(result),
             [ChangeLoadBalancerNode(loadbalancer_id=5, node_id=123, weight=1,
-                                    condition="ENABLED", type="PRIMARY")])
+                                    condition=NodeCondition.ENABLED,
+                                    type=NodeType.PRIMARY)])
 
     def test_remove_lb_node(self):
         """
@@ -422,7 +424,8 @@ class ConvergeTests(SynchronousTestCase):
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),
                 AddToLoadBalancer(loadbalancer_id=5, address='2.2.2.2', port=80,
-                                  condition="ENABLED", weight=1, type="PRIMARY")
+                                  condition=NodeCondition.ENABLED, weight=1,
+                                  type=NodeType.PRIMARY)
             ])))
 
 
