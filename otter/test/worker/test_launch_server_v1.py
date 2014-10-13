@@ -1963,6 +1963,9 @@ class ConfigPreparationTests(SynchronousTestCase):
 
 
 class MetadataRemovalTests(SynchronousTestCase):
+    """
+    Tests for removal of metadata.
+    """
     def test_without_otter_server_metadata(self):
         """
         :func:`_without_otter_server_metadata` correctly removes
