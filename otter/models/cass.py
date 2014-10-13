@@ -17,7 +17,7 @@ from otter.models.interface import (
     NoSuchWebhookError, UnrecognizedCapabilityError,
     IScalingScheduleCollection, IAdmin, ScalingGroupOverLimitError,
     WebhooksOverLimitError, PoliciesOverLimitError)
-from otter.util.cqlbatch import Batch
+from otter.util.cqlbatch import Batch, batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
 from otter.util.config import config_value
@@ -128,8 +128,13 @@ _cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} '
 _cql_list_all_in_group = ('SELECT * FROM {cf} WHERE "tenantId" = :tenantId '
                           'AND "groupId" = :groupId {order_by};')
 
+# Webhook keys table
+_cql_insert_webhook_key = (
+    'INSERT INTO {cf}("webhookKey", "tenantId", "groupId", "policyId") '
+    'VALUES (:{name}Key, :tenantId, :groupId, :policyId)')
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
+_cql_del_on_key = 'DELETE FROM {cf} WHERE "webhookKey"=:{name}webhookKey'
 
 _cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId;')
 _cql_count_for_policy = ('SELECT COUNT(*) FROM {cf} WHERE '
@@ -320,7 +325,8 @@ def _build_schedule_policy(policy, event_table, queries, data, polname, buckets)
         data[polname + 'cron'] = cron
 
 
-def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters):
+def _build_webhooks(bare_webhooks, webhooks_table, webhooks_keys_table,
+                    queries, cql_parameters):
     """
     Because inserting many values into a table with compound keys with one
     insert statement is hard. This builds a bunch of insert statements and a
@@ -349,6 +355,8 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters):
         webhook_id = generate_key_str('webhook')
         queries.append(_cql_insert_webhook.format(cf=webhooks_table,
                                                   name=name))
+        queries.append(_cql_insert_webhook_key.format(cf=webhooks_keys_table,
+                                                      name=name))
 
         # generate the real data that will be stored, which includes the webhook
         # token, the capability stuff, and metadata by default
@@ -477,6 +485,18 @@ def verified_view(connection, view_query, del_query, data, consistency, exceptio
     return d.addCallback(_check_resurrection)
 
 
+def _del_webhook_queries(table, webhooks):
+    """
+    Return queries and params to delete webhooks from webhook_keys table
+    """
+    queries, params = [], {}
+    for i, webhook in enumerate(webhooks):
+        name = 'key{}'.format(i)
+        queries.append(_cql_del_on_key.format(cf=table, name=name))
+        params[name + 'webhookKey'] = webhook['webhookKey']
+    return queries, params
+
+
 class WeakLocks(object):
     """
     A cache of DeferredLocks mapped based on uuid that gets garbage collected
@@ -571,6 +591,7 @@ class CassScalingGroup(object):
         self.policies_table = "scaling_policies"
         self.state_table = "group_state"
         self.webhooks_table = "policy_webhooks"
+        self.webhooks_keys_table = "webhook_keys"
         self.event_table = "scaling_schedule_v2"
 
         self.get_consistency = get_consistency
@@ -898,17 +919,20 @@ class CassScalingGroup(object):
         """
         self.log.bind(policy_id=policy_id).msg("Deleting policy")
 
-        def _do_delete(_):
-            queries = [
+        def _do_delete(webhooks):
+            # delete webhook keys
+            queries, params = _del_webhook_queries(self.webhooks_keys_table, webhooks)
+            queries.extend([
                 _cql_delete_all_in_policy.format(cf=self.policies_table),
-                _cql_delete_all_in_policy.format(cf=self.webhooks_table)]
-            b = Batch(queries, {"tenantId": self.tenant_id,
-                                "groupId": self.uuid,
-                                "policyId": policy_id},
+                _cql_delete_all_in_policy.format(cf=self.webhooks_table)])
+            params.update({"tenantId": self.tenant_id, "groupId": self.uuid,
+                           "policyId": policy_id})
+            b = Batch(queries, params,
                       consistency=self.get_consistency('delete', 'policy'))
             return b.execute(self.connection)
 
         d = self.get_policy(policy_id)
+        d.addCallback(lambda _: self._naive_list_all_webhooks())
         d.addCallback(_do_delete)
         return d
 
@@ -992,8 +1016,8 @@ class CassScalingGroup(object):
         def _do_create(lastRev):
             queries = []
             cql_params = main_params.copy()
-            output = _build_webhooks(data, self.webhooks_table, queries,
-                                     cql_params)
+            output = _build_webhooks(data, self.webhooks_table, self.webhooks_keys_table,
+                                     queries, cql_params)
 
             b = Batch(queries, cql_params,
                       consistency=self.get_consistency('create', 'webhook'))
@@ -1052,13 +1076,15 @@ class CassScalingGroup(object):
         self.log.bind(policy_id=policy_id, webhook_id=webhook_id).msg("Deleting webhook")
 
         def _do_delete(lastRev):
-            query = _cql_delete_one_webhook.format(cf=self.webhooks_table)
+            queries = [_cql_delete_one_webhook.format(cf=self.webhooks_table),
+                       _cql_del_on_key.format(cf=self.webhooks_keys_table, name='')]
 
-            d = self.connection.execute(query,
+            d = self.connection.execute(batch(queries),
                                         {"tenantId": self.tenant_id,
                                          "groupId": self.uuid,
                                          "policyId": policy_id,
-                                         "webhookId": webhook_id},
+                                         "webhookId": webhook_id,
+                                         "webhookKey": lastRev['capability']['hash']},
                                         self.get_consistency('delete', 'webhook'))
             return d
 
@@ -1070,19 +1096,16 @@ class CassScalingGroup(object):
         """
         log = self.log.bind(system='CassScalingGroup.delete_group')
 
-        # Events can only be deleted by policy id, since that and trigger are
-        # the only parts of the compound key
         @self.with_timestamp
-        def _delete_everything(ts, policies):
-            params = {
-                'tenantId': self.tenant_id,
-                'groupId': self.uuid,
-                'ts': ts
-            }
-            queries = [
+        def _delete_everything(ts, webhooks):
+            # delete webhook keys
+            queries, params = _del_webhook_queries(self.webhooks_keys_table, webhooks)
+
+            queries.extend([
                 _cql_delete_all_in_group.format(cf=table, name='') for table in
-                (self.policies_table, self.webhooks_table)]
+                (self.policies_table, self.webhooks_table)])
             queries.append(_cql_delete_group.format(cf=self.group_table))
+            params.update({'tenantId': self.tenant_id, 'groupId': self.uuid, 'ts': ts})
 
             b = Batch(queries, params,
                       consistency=self.get_consistency('delete', 'group'))
@@ -1093,7 +1116,7 @@ class CassScalingGroup(object):
             if len(state.active) + len(state.pending) > 0:
                 raise GroupNotEmptyError(self.tenant_id, self.uuid)
 
-            d = self._naive_list_policies()
+            d = self._naive_list_all_webhooks()
             d.addCallback(_delete_everything)
             return d
 

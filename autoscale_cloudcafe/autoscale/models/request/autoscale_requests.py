@@ -1,9 +1,15 @@
 """
 Marshalling for autoscale requests
 """
+from collections import namedtuple
+
 from cafe.engine.models.base import AutoMarshallingModel
 from cloudcafe.compute.servers_api.models.requests import CreateServer
 import json
+
+
+_NullArg = namedtuple("JSONNull", [])
+null = _NullArg()
 
 
 class Webhook_Request(AutoMarshallingModel):
@@ -298,15 +304,24 @@ class Config_Request(AutoMarshallingModel):
         self.load_balancers = load_balancers
 
     def _obj_to_json(self):
-        server = CreateServer(name=self.name, imageRef=self.image_ref,
-                              flavorRef=self.flavor_ref,
-                              personality=self.personality,
-                              metadata=self.metadata,
-                              diskConfig=self.disk_config,
-                              networks=self.networks)
-        server_json = server._obj_to_json()
+        kwargs = {
+            "name": self.name,
+            "imageRef": self.image_ref,
+            "flavorRef": self.flavor_ref,
+            "personality": self.personality,
+            "metadata": self.metadata,
+            "diskConfig": self.disk_config,
+            "networks": self.networks
+        }
+        server_json = CreateServer(**kwargs)._obj_to_json()
+        server_json = json.loads(server_json)
+        # allow null args specifically - cloudcafe removes any that are None
+        for k, v in kwargs.iteritems():
+            if v is null:
+                server_json['server'][k] = None
+
         body = {'type': 'launch_server',
-                'args': json.loads(server_json)}
+                'args': server_json}
         if self.load_balancers:
             body['args']['loadBalancers'] = self.load_balancers
         # if self.disk_config:

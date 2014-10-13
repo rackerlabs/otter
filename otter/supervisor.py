@@ -493,44 +493,74 @@ class CannotDeleteServerBelowMinError(Exception):
                  tenant_id=tenant_id, group_id=group_id))
 
 
-def remove_server_from_group(log, trans_id, server_id, replace, group, state):
+def remove_server_from_group(log, trans_id, server_id, replace, purge, group, state):
     """
-    Remove specific server from the group and optionally replace it by creatig new
-    server
+    Remove a specific server from the group, optionally replacing it
+    with a new one, and optionally deleting the old one from Nova.
 
     :param log: A bound logger
-    :param trans_id: transaction id for this operation
-    :param server_id: ID of server to be removed
-    :param replace: Should the server be replaced?
-    :param group: A :class:`otter.models.interface.IScalingGroup` implementation
-    :param state: A :class:`otter.models.interface.GroupState` object
+    :param bytes trans_id: The transaction id for this operation.
+    :param bytes server_id: The id of the server to be removed.
+    :param bool replace: Should the server be replaced?
+    :param bool purge: Should the server be deleted from Nova?
+    :param group: The scaling group to remove a server from.
+    :type group: :class:`~otter.models.interface.IScalingGroup`
+    :param state: The current state of the group.
+    :type state: :class:`~otter.models.interface.GroupState`
 
-    :return: Deferred that fires with updated state object
+    :return: The updated state.
+    :rtype: deferred :class:`~otter.models.interface.GroupState`
     """
 
-    def reduce_desired(config):
+    def maybe_reduce_desired(config):
+        """
+        If the desired capacity is still above the minimum, decrement it.
+        Otherwise, raise an exception.
+
+        :param config: The group configuration.
+        :raises CannotDeleteServerBelowMinError: If the group is already at
+            minimum capacity, and therefore the group can not be scaled down
+            further.
+        :return: :data:`None`
+        """
         if len(state.active) + len(state.pending) == config['minEntities']:
             raise CannotDeleteServerBelowMinError(
                 group.tenant_id, group.uuid, server_id, config['minEntities'])
         else:
             state.desired -= 1
 
-    def remove_server(_):
-        server_info = state.active[server_id]
+    def remove_server_from_state(_):
+        """
+        Remove the server from the group state, then return the modified
+        group state.
+        """
         state.remove_active(server_id)
+        return state
+
+    def remove_server_from_nova(_):
+        """
+        Remove the server from Nova.
+
+        Please note that this does *not* return a deferred, because its return
+        value is in the deferred chain in :func:`remove_server_from_group`,
+        which shouldn't wait until the server has been removed.
+        """
         supervisor = get_supervisor()
         d = _DeleteJob(log, trans_id, group, server_info, supervisor).start()
         supervisor.deferred_pool.add(d)
-        return state
 
-    if server_id in state.active:
-        if replace:
-            d = group.view_launch_config()
-            d.addCallback(lambda lc: execute_launch_config(log, trans_id, state, lc, group, 1))
-        else:
-            # Before reducing servers, check if it is below minimum required servers
-            d = group.view_config()
-            d.addCallback(reduce_desired)
-        return d.addCallback(remove_server)
-    else:
+    if server_id not in state.active:
         raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
+    elif replace:
+        d = group.view_launch_config()
+        d.addCallback(lambda lc: execute_launch_config(log, trans_id, state, lc, group, 1))
+    else:
+        d = group.view_config()
+        d.addCallback(maybe_reduce_desired)
+
+    if purge:
+        server_info = state.active[server_id]
+        d.addCallback(remove_server_from_nova)
+
+    d.addCallback(remove_server_from_state)
+    return d
