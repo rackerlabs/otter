@@ -35,7 +35,7 @@ from otter.worker.launch_server_v1 import (
     ServerCreationRetryError,
     CLBOrNodeDeleted,
     generate_server_metadata,
-    _without_otter_server_metadata
+    _without_otter_metadata
 )
 
 
@@ -1966,10 +1966,10 @@ class MetadataRemovalTests(SynchronousTestCase):
     """
     Tests for removal of metadata.
     """
-    def test_without_otter_server_metadata(self):
+    def test_without_otter_metadata(self):
         """
-        :func:`_without_otter_server_metadata` correctly removes
-        otter-specific keys and correctly keeps other keys.
+        :func:`_without_otter_metadata` correctly removes otter-specific
+        keys and correctly keeps other keys.
         """
         launch_config = {
             'server': {'imageRef': '1',
@@ -1998,7 +1998,7 @@ class MetadataRemovalTests(SynchronousTestCase):
         ]
 
         for metadata, expected_scrubbed_metadata in samples:
-            scrubbed = _without_otter_server_metadata(metadata)
+            scrubbed = _without_otter_metadata(metadata)
             self.assertEqual(scrubbed, expected_scrubbed_metadata)
 
 

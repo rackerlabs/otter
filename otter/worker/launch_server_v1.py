@@ -621,7 +621,7 @@ def generate_server_metadata(group_id, launch_config):
     return metadata
 
 
-def _without_otter_server_metadata(metadata):
+def _without_otter_metadata(metadata):
     """
     Returns a copy of the metadata with all the otter-specific keys removed.
     """
