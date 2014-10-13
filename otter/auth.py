@@ -181,6 +181,7 @@ class ImpersonatingAuthenticator(object):
         self._identity_admin_password = identity_admin_password
         self._url = url
         self._admin_url = admin_url
+        # cached token to admin identity
         self._token = None
 
     def _auth_me(self, log):
@@ -195,27 +196,12 @@ class ImpersonatingAuthenticator(object):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
+        auth = partial(self._auth_me, log)
+
         d = user_for_tenant(self._admin_url,
                             self._identity_admin_user,
                             self._identity_admin_password,
                             tenant_id, log=log)
-
-        def auth_if_needed(user):
-            if self._token is None:
-                return self._auth_me(log).addCallback(lambda _: user)
-            else:
-                return user
-
-        d.addCallback(auth_if_needed)
-
-        def reauth_and_try_on_401(f):
-            f.trap(UpstreamError)
-            f.value.reason.trap(APIError)
-            if f.value.reason.value.code == 401:
-                self._token = None
-                return self._auth_me(log).addCallback(lambda t: impersonate(user))
-            else:
-                return f
 
         def impersonate(user):
             iud = impersonate_user(self._admin_url,
@@ -224,8 +210,7 @@ class ImpersonatingAuthenticator(object):
             iud.addCallback(extract_token)
             return iud
 
-        d.addCallback(impersonate)
-        d.addErrback(reauth_and_try_on_401)
+        d.addCallback(lambda user: retry_on_unauth(partial(impersonate, user), auth))
 
         def endpoints(token):
             scd = endpoints_for_token(self._admin_url, self._token,
@@ -233,7 +218,7 @@ class ImpersonatingAuthenticator(object):
             scd.addCallback(lambda endpoints: (token, _endpoints_to_service_catalog(endpoints)))
             return scd
 
-        d.addCallback(endpoints)
+        d.addCallback(lambda token: retry_on_unauth(partial(endpoints, token), auth))
 
         return d
 

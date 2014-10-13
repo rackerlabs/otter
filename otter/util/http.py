@@ -477,3 +477,33 @@ def transaction_id(request):
     :returns: A string transaction id.
     """
     return request.responseHeaders.getRawHeaders('X-Response-Id')[0]
+
+
+def retry_on_unauth(func, auth):
+    """
+    Retry `func` again if it fails with 401 error by authenticating by calling `auth`.
+    `func` must return a deferred that should errback with either UpstreamError or APIError
+    on 401
+
+    :param func: No-arg callable to call again if it fails with 401
+    :param auth: No-arg callable that authenticates
+
+    :return: `Deferred` from `func`
+    """
+    d = func()
+
+    def check_401(f):
+        if f.check(UpstreamError):
+            f.value.reason.value.trap(APIError)
+            error = f.value.reason.value
+        elif f.check(APIError):
+            error = f.value
+        else:
+            return f
+        if error.code == 401:
+            return auth().addCallback(lambda _: func())
+        else:
+            return f
+
+    d.addErrback(check_401)
+    return d
