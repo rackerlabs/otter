@@ -180,8 +180,9 @@ class LBNode(object):
 
     :ivar int node_id: The ID of the node, which is represents a unique
         combination of IP and port number, on the load balancer.
-    :ivar int address: The IP address, which together with the port, specifies
-        the service that should be load-balanced by the load balancer.
+    :ivar str address: The IP address of the node.  The IP and port form a
+        unique mapping on the load balancer, which is assigned a node ID.  Two
+        nodes with the same IP and port cannot exist on a single load balancer.
 
     :ivar config: The configuration for the port mapping
     :type config: :class:`LBConfig`
