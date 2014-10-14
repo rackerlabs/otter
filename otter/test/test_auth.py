@@ -307,6 +307,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
                                                        self.password,
                                                        log=None)
         self.assertEqual(self.ia._token, 'auth-token')
+        self.assertFalse(self.log.msg.called)
 
         self.authenticate_user.reset_mock()
 
@@ -314,6 +315,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         self.authenticate_user.assert_called_once_with(self.url, self.user,
                                                        self.password,
                                                        log=self.log)
+        self.log.msg.assert_called_once_with('Getting new token')
         self.assertEqual(self.ia._token, 'auth-token')
 
     def test_authenticate_tenant_gets_user_for_specified_tenant(self):
@@ -367,6 +369,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         self.authenticate_user.assert_called_once_with(self.url, self.user,
                                                        self.password,
                                                        log=self.log)
+        self.log.msg.assert_called_once_with('Getting new token')
 
     def test_authenticate_tenant_gets_endpoints_for_the_impersonation_token(self):
         """
@@ -393,6 +396,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         self.authenticate_user.assert_called_once_with(self.url, self.user,
                                                        self.password,
                                                        log=self.log)
+        self.log.msg.assert_called_once_with('Getting new token')
 
     def test_authenticate_tenant_returns_impersonation_token_and_endpoint_list(self):
         """

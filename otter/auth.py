@@ -231,6 +231,8 @@ class ImpersonatingAuthenticator(object):
         self._token = None
 
     def _auth_me(self, log):
+        if log:
+            log.msg('Getting new token')
         d = authenticate_user(self._url,
                               self._identity_admin_user,
                               self._identity_admin_password,
