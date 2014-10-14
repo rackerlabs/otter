@@ -237,6 +237,30 @@ class ConvergeLBStateTests(SynchronousTestCase):
                                     ip_address='1.1.1.1')
         self.assertEqual(list(result), [])
 
+    def test_all_changes(self):
+        """
+        Remove, change, and add a node to a load balancer all together
+        """
+        desired = [LBConfig(lb_id=5, port=80),
+                   LBConfig(lb_id=6, port=80, weight=2)]
+        current = [LBNode(node_id=123, address='1.1.1.1',
+                          config=LBConfig(lb_id=5, port=8080)),
+                   LBNode(node_id=234, address='1.1.1.1',
+                          config=LBConfig(lb_id=6, port=80))]
+
+        result = _converge_lb_state(desired_lb_state=desired,
+                                    current_lb_state=current,
+                                    ip_address='1.1.1.1')
+        self.assertEqual(set(result), set([
+            AddToLoadBalancer(loadbalancer_id=5, address='1.1.1.1', port=80,
+                              condition=NodeCondition.ENABLED,
+                              type=NodeType.PRIMARY, weight=1),
+            ChangeLoadBalancerNode(loadbalancer_id=6, node_id=234, weight=2,
+                                   condition=NodeCondition.ENABLED,
+                                   type=NodeType.PRIMARY),
+            RemoveFromLoadBalancer(loadbalancer_id=5, node_id=123)
+        ]))
+
 
 def server(id, state, created=0, **kwargs):
     """Convenience for creating a :obj:`NovaServer`."""
