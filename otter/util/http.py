@@ -494,7 +494,7 @@ def retry_on_unauth(func, auth):
 
     def check_401(f):
         if f.check(UpstreamError):
-            f.value.reason.value.trap(APIError)
+            f.value.reason.trap(APIError)
             error = f.value.reason.value
         elif f.check(APIError):
             error = f.value

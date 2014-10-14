@@ -49,7 +49,7 @@ from otter.util.retry import retry, retry_times, repeating_interval
 
 from otter.log import log as default_log
 from otter.util.http import (
-    headers, check_success, append_segments, wrap_upstream_error)
+    headers, check_success, append_segments, wrap_upstream_error, retry_on_unauth)
 from otter.util.deferredutils import delay
 
 
@@ -237,6 +237,7 @@ class ImpersonatingAuthenticator(object):
                               log=log)
         d.addCallback(extract_token)
         d.addCallback(partial(setattr, self, "_token"))
+        return d
 
     def authenticate_tenant(self, tenant_id, log=None):
         """
