@@ -1976,16 +1976,7 @@ sample_launch_config = {
 }
 sample_otter_metadata = generate_server_metadata("group_id",
                                                  sample_launch_config)
-sample_user_metadata = OrderedDict([
-    ("Rittenhouse overproof rye", "5 cl"),
-    ("Carpano Antica Formula", "2 cl"),
-    ("Luxardo maraschino", "2 bsp"),
-    ("Pierre Ferrand Dry Curacao", "1 bsp"),
-    ("Un Emile absinthe", "1 bsp"),
-    ("Angostura bitters", "3 drops"),
-    ("stir", "vigorously, with ice"),
-    ("serve", "with lemon rind, squeezed")
-])
+sample_user_metadata = {"some_user_key": "some_user_value"}
 
 
 class MetadataRemovalTests(SynchronousTestCase):
@@ -2037,8 +2028,8 @@ class MetadataRemovalTests(SynchronousTestCase):
                                   server_id="server",
                                   _treq=treq)
 
-        resp = self.successResultOf(d.addCallback(treq.json_content))
-        self.assertEqual(resp, sample_user_metadata)
+        body = self.successResultOf(d.addCallback(treq.content))
+        self.assertEqual(body, "")
 
 
 # An instance associated with a single load balancer.
