@@ -4,6 +4,7 @@ Tests for `metrics.py`
 
 import mock
 import json
+from io import StringIO
 
 from pyrsistent import freeze
 
@@ -11,10 +12,11 @@ from toolz.dicttoolz import merge
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
+from twisted.internet.base import ReactorBase
 
 from otter.metrics import (
     get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
-    add_to_cloud_metrics, main as metrics_main)
+    add_to_cloud_metrics, collect_metrics, MetricsService, makeService, Options)
 from otter.test.utils import patch, StubTreq2, matches, IsCallable
 from otter.util.http import headers
 from otter.log import BoundLog
@@ -206,9 +208,9 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         self.au.assert_called_once_with('idurl', 'a', 'p', log=matches(IsInstance(BoundLog)))
 
 
-class MainTests(SynchronousTestCase):
+class CollectMetricsTests(SynchronousTestCase):
     """
-    Tests for :func:`main`
+    Tests for :func:`collect_metrics`
     """
 
     def setUp(self):
@@ -216,42 +218,132 @@ class MainTests(SynchronousTestCase):
         mock dependent functions
         """
         self.connect_cass_servers = patch(self, 'otter.metrics.connect_cass_servers')
-        self.get_authenticator = patch(self, 'otter.metrics.get_authenticator')
-        self.get_scaling_groups = patch(self, 'otter.metrics.get_scaling_groups')
-        self.get_all_metrics = patch(self, 'otter.metrics.get_all_metrics')
-        self.add_to_cloud_metrics = patch(self, 'otter.metrics.add_to_cloud_metrics')
+        self.client = mock.Mock(spec=['disconnect'])
+        self.client.disconnect.return_value = succeed(None)
+        self.connect_cass_servers.return_value = self.client
+
+        self.auth = mock.Mock()
+        self.get_authenticator = patch(self, 'otter.metrics.get_authenticator',
+                                       return_value=self.auth)
+
+        self.groups = mock.Mock()
+        self.get_scaling_groups = patch(self, 'otter.metrics.get_scaling_groups',
+                                        return_value=succeed(self.groups))
+
+        self.metrics = [GroupMetrics('t', 'g1', 3, 2, 0),
+                        GroupMetrics('t2', 'g1', 4, 4, 1),
+                        GroupMetrics('t2', 'g', 100, 20, 0)]
+        self.get_all_metrics = patch(self, 'otter.metrics.get_all_metrics',
+                                     return_value=succeed(self.metrics))
+
+        self.add_to_cloud_metrics = patch(self, 'otter.metrics.add_to_cloud_metrics',
+                                          return_value=succeed(None))
+
+        self.config = {'cassandra': 'c', 'identity': {'url': 'id'}, 'metrics': 'm',
+                       'region': 'r', 'services': {'nova': 'cloudServersOpenStack'}}
 
     def test_metrics_collected(self):
         """
         Metrics is collected after getting groups from cass and servers from nova
         and it is added to blueflood
         """
-        client = mock.Mock(spec=['disconnect'])
-        client.disconnect.return_value = succeed(None)
-        self.connect_cass_servers.return_value = client
-
-        auth = mock.Mock()
-        self.get_authenticator.return_value = auth
-
-        groups = mock.Mock()
-        self.get_scaling_groups.return_value = succeed(groups)
-
-        metrics = [GroupMetrics('t', 'g1', 3, 2, 0), GroupMetrics('t2', 'g1', 4, 4, 1),
-                   GroupMetrics('t2', 'g', 100, 20, 0)]
-        self.get_all_metrics.return_value = succeed(metrics)
-
         _reactor = mock.Mock()
-        config = {'cassandra': 'c', 'identity': {'url': 'id'}, 'metrics': 'm',
-                  'region': 'r', 'services': {'nova': 'cloudServersOpenStack'}}
-
-        d = metrics_main(_reactor, config)
+        d = collect_metrics(_reactor, self.config)
         self.assertIsNone(self.successResultOf(d))
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_authenticator.assert_called_once_with(_reactor, {'url': 'id'})
-        self.get_scaling_groups.assert_called_once_with(client)
+        self.get_scaling_groups.assert_called_once_with(self.client)
         self.get_all_metrics.assert_called_once_with(
-            groups, auth, 'cloudServersOpenStack', 'r', clock=_reactor, _print=False)
+            self.groups, self.auth, 'cloudServersOpenStack', 'r',
+            clock=_reactor, _print=False)
         self.add_to_cloud_metrics.assert_called_once_with(
             'm', 'id', 'r', 107, 26, 1)
-        client.disconnect.assert_called_once_with()
+        self.client.disconnect.assert_called_once_with()
+
+    def test_with_client(self):
+        """
+        Uses client provided and does not disconnect it before returning
+        """
+        client = mock.Mock(spec=['disconnect'])
+        d = collect_metrics(mock.Mock(), self.config, client=client)
+        self.assertIsNone(self.successResultOf(d))
+        self.assertFalse(self.connect_cass_servers.called)
+        self.assertFalse(client.disconnect.called)
+
+    def test_with_authenticator(self):
+        """
+        Uses authenticator provided instead of creating new
+        """
+        _reactor, auth = mock.Mock(), mock.Mock()
+        d = collect_metrics(_reactor, self.config, authenticator=auth)
+        self.assertIsNone(self.successResultOf(d))
+        self.assertFalse(self.get_authenticator.called)
+        self.get_all_metrics.assert_called_once_with(
+            self.groups, auth, 'cloudServersOpenStack', 'r', clock=_reactor, _print=False)
+
+
+class APIOptionsTests(SynchronousTestCase):
+    """
+    Test the various command line options.
+    """
+
+    def test_config_options(self):
+        """
+        File given in --config option is parsed and its contents are added to `Options`
+        object
+        """
+        config = Options()
+        config.open = mock.Mock(return_value=StringIO(u'{"a": "b"}'))
+        config.parseOptions(['--config=file.json'])
+        self.assertEqual(config, {'a': 'b', 'config': 'file.json',
+                                  'services': {'nova': 'cloudServersOpenStack'}})
+
+
+class ServiceTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.metrics.makeService` and :class:`otter.metrics.MetricsService`
+    """
+
+    def setUp(self):
+        """
+        Mock cass connection and authenticator
+        """
+        self.client = mock.Mock(spec=['disconnect'])
+        self.mock_ccs = patch(self, 'otter.metrics.connect_cass_servers', return_value=self.client)
+        self.mock_ga = patch(self, 'otter.metrics.get_authenticator', return_value='auth')
+        self.config = {'cassandra': 'c', 'identity': 'i', 'metrics': {'interval': 20}}
+        self.mock_cm = patch(self, 'otter.metrics.collect_metrics')
+
+    @mock.patch('otter.metrics.MetricsService')
+    def test_make_service(self, mock_ms):
+        """
+        MetricsService is returned with config
+        """
+        c = {'a': 'v'}
+        s = makeService(c)
+        self.assertIs(s, mock_ms.return_value)
+        mock_ms.assert_called_once_with(c)
+
+    def test_service_init(self):
+        """
+        MetricsService is initialized with connected cass client and authenticator
+        """
+        s = MetricsService(self.config)
+        self.mock_ccs.assert_called_once_with(matches(IsInstance(ReactorBase)), 'c')
+        self.mock_ga.assert_called_once_with(matches(IsInstance(ReactorBase)), 'i')
+        self.assertEqual(s.step, 20)
+        self.assertEqual(
+            s.call,
+            (self.mock_cm, (matches(IsInstance(ReactorBase)), self.config),
+             dict(client=self.client, authenticator='auth')))
+
+    def test_stop_service(self):
+        """
+        Client is disconnected when service is stopped
+        """
+        s = MetricsService(self.config)
+        s.startService()
+        r = s.stopService()
+        self.assertIs(r, self.client.disconnect.return_value)
+        self.assertFalse(s.running)
