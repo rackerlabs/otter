@@ -306,14 +306,16 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
          for lb_node in lbs_by_address.get(server.servicenet_address, [])])
 
     # converge all the servers that remain to their desired load balancer state
+    new_active_servers = filter(lambda s: s not in servers_to_delete,
+                                servers_in_active)
     lb_converge_steps = [
         step
-        for server in servers_in_active
+        for server in new_active_servers
         for step in _converge_lb_state(
             server.desired_lbs,
             lbs_by_address.get(server.servicenet_address, []),
             server.servicenet_address)
-        if server not in servers_to_delete and server.servicenet_address]
+        if server.servicenet_address]
 
     return Convergence(
         steps=pbag(create_steps
