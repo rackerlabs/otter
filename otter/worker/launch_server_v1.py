@@ -15,11 +15,13 @@ Also no attempt is currently being made to define the public API for
 initiating a launch_server job.
 """
 
-from functools import partial
 import json
 import itertools
-from copy import deepcopy
 import re
+
+from functools import partial
+from copy import deepcopy
+from toolz import comp
 from urllib import urlencode
 
 from twisted.python.failure import Failure
@@ -627,6 +629,38 @@ def _without_otter_metadata(metadata):
     """
     return {k: v for (k, v) in metadata.iteritems()
             if not k.startswith("rax:auto_scaling")}
+
+
+def remove_otter_metadata(log, auth_token, service_catalog, region, server_id,
+                           _treq=treq):
+    """
+    Remove the otter-specific management metadata from the server.
+
+    :param BoundLog log: The bound logger instance.
+    :param str auth_token: Keystone auth token.
+    :param str region: The region the server is in.
+    :param str server_id: The id of the server to remove metadata from.
+    :param _treq: The treq instance; possibly a test double.
+    """
+    bound_log = log.bind(region=region, server_id=server_id)
+    bound_log.msg("Removing otter-specific metadata")
+
+    service_name = config_value('cloudServersOpenStack')
+    endpoint = public_endpoint_url(service_catalog, service_name, region)
+    url = append_segments(endpoint, 'servers', server_id, 'metadata')
+
+    auth_hdr = headers(auth_token)
+
+    get, put = [lambda data=None, method=method: _treq.request(method, url,
+                                                          headers=auth_hdr,
+                                                          data=data,
+                                                          log=bound_log)
+                for method in ["GET", "PUT"]]
+
+    return (get()
+            .addCallback(_treq.json_content)
+            .addCallback(comp(json.dumps, _without_otter_metadata))
+            .addCallback(put))
 
 
 def launch_server(log, region, scaling_group, service_catalog, auth_token,

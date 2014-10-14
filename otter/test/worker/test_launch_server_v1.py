@@ -3,6 +3,7 @@ Unittests for the launch_server_v1 launch config.
 """
 import mock
 import json
+from collections import OrderedDict
 from toolz.dicttoolz import merge
 from urllib import urlencode
 from urlparse import urlunsplit
@@ -35,13 +36,14 @@ from otter.worker.launch_server_v1 import (
     ServerCreationRetryError,
     CLBOrNodeDeleted,
     generate_server_metadata,
-    _without_otter_metadata
+    _without_otter_metadata,
+    remove_otter_metadata,
 )
 
 
 from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
                               matches, DummyException, IsBoundWith,
-                              StubTreq, StubResponse)
+                              StubTreq, StubTreq2, StubResponse)
 from testtools.matchers import IsInstance, StartsWith
 
 from otter.auth import headers
@@ -1962,6 +1964,30 @@ class ConfigPreparationTests(SynchronousTestCase):
         self.assertNotIdentical(test_config, launch_config)
 
 
+sample_launch_config = {
+    'server': {
+        'imageRef': '1',
+        'flavorRef': '1'
+    },
+    'loadBalancers': [
+        {'loadBalancerId': 12345, 'port': 80},
+        {'loadBalancerId': 54321, 'port': 81}
+    ]
+}
+sample_otter_metadata = generate_server_metadata("group_id",
+                                                 sample_launch_config)
+sample_user_metadata = OrderedDict([
+    ("Rittenhouse overproof rye", "5 cl"),
+    ("Carpano Antica Formula", "2 cl"),
+    ("Luxardo maraschino", "2 bsp"),
+    ("Pierre Ferrand Dry Curacao", "1 bsp"),
+    ("Un Emile absinthe", "1 bsp"),
+    ("Angostura bitters", "3 drops"),
+    ("stir", "vigorously, with ice"),
+    ("serve", "with lemon rind, squeezed")
+])
+
+
 class MetadataRemovalTests(SynchronousTestCase):
     """
     Tests for removal of metadata.
@@ -1971,35 +1997,48 @@ class MetadataRemovalTests(SynchronousTestCase):
         :func:`_without_otter_metadata` correctly removes otter-specific
         keys and correctly keeps other keys.
         """
-        launch_config = {
-            'server': {'imageRef': '1',
-                       'flavorRef': '1'},
-            'loadBalancers': [
-                {'loadBalancerId': 12345, 'port': 80},
-                {'loadBalancerId': 54321, 'port': 81}
-            ]
-        }
-        metadata = generate_server_metadata("group_id", launch_config)
-        extra_junk = {
-            "Rittenhouse overproof rye": "5 cl",
-            "Carpano Antica Formula": "2 cl",
-            "Luxardo maraschino": "2 bsp",
-            "Pierre Ferrand Dry Curacao": "1 bsp",
-            "Un Emile absinthe": "1 bsp",
-            "Angostura bitters": "3 drops",
-            "stir": "vigorously, with ice",
-            "serve": "with lemon rind, squeezed"
-        }
-
         samples = [
             ({}, {}),
-            (metadata, {}),
-            (merge(metadata, extra_junk), extra_junk)
+            (sample_otter_metadata, {}),
+            (merge(sample_otter_metadata, sample_user_metadata),
+             sample_user_metadata)
         ]
 
         for metadata, expected_scrubbed_metadata in samples:
             scrubbed = _without_otter_metadata(metadata)
             self.assertEqual(scrubbed, expected_scrubbed_metadata)
+
+
+    def test_remove_otter_metadata(self):
+        """
+        Removing otter metadata works correctly.
+        """
+        set_config_data({"cloudServersOpenStack": "cloudServersOpenStack"})
+        self.addCleanup(set_config_data, {})
+
+        log = mock.Mock()
+
+        expected_url = 'http://ord.openstack/servers/server/metadata'
+        treq = StubTreq2([(("GET", expected_url,
+                            {"headers": expected_headers,
+                             "data": None}),
+                           (200, json.dumps(merge(sample_otter_metadata,
+                                                  sample_user_metadata)))),
+                          (("PUT", expected_url,
+                            {"headers": expected_headers,
+                             "data": json.dumps(sample_user_metadata)}),
+                           (200, ""))])
+
+        import pudb; pudb.set_trace()
+        d = remove_otter_metadata(log=log,
+                                  auth_token="my-auth-token",
+                                  service_catalog=fake_service_catalog,
+                                  region="ORD",
+                                  server_id="server",
+                                  _treq=treq)
+
+        resp = self.successResultOf(d.addCallback(treq.json_content))
+        self.assertEqual(resp, sample_user_metadata)
 
 
 # An instance associated with a single load balancer.
