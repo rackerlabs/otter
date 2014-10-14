@@ -416,38 +416,43 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         """
         authenticate_tenant propagates errors from authenticate_user.
         """
-        self.impersonate_user.side_effect = lambda *a, **k: fail(APIError(401, '4'))
-        self.authenticate_user.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
+        self.impersonate_user.side_effect = lambda *a, **k: fail(
+            UpstreamError(Failure(APIError(401, '4')), 'identity', 'o'))
+        self.authenticate_user.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
+        f = self.failureResultOf(self.ia.authenticate_tenant(111111), UpstreamError)
+        self.assertEqual(f.value.reason.value.code, 500)
 
     def test_authenticate_tenant_propagates_user_list_errors(self):
         """
         authenticate_tenant propagates errors from user_for_tenant
         """
-        self.user_for_tenant.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
+        self.user_for_tenant.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
+        f = self.failureResultOf(self.ia.authenticate_tenant(111111), UpstreamError)
+        self.assertEqual(f.value.reason.value.code, 500)
 
     def test_authenticate_tenant_propagates_impersonation_errors(self):
         """
         authenticate_tenant propagates errors from impersonate_user
         """
-        self.impersonate_user.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
+        self.impersonate_user.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
+        f = self.failureResultOf(self.ia.authenticate_tenant(111111))
+        self.assertEqual(f.value.reason.value.code, 500)
 
     def test_authenticate_tenant_propagates_endpoint_list_errors(self):
         """
         authenticate_tenant propagates errors from endpoints_for_token
         """
-        self.endpoints_for_token.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
+        self.endpoints_for_token.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
+        f = self.failureResultOf(self.ia.authenticate_tenant(111111), UpstreamError)
+        self.assertEqual(f.value.reason.value.code, 500)
 
 
 class CachingAuthenticatorTests(SynchronousTestCase):
