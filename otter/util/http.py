@@ -494,7 +494,8 @@ def retry_on_unauth(func, auth):
 
     def check_401(f):
         f.trap(UpstreamError)
-        f.value.reason.trap(APIError)
+        if not f.value.reason.check(APIError):
+            return f
         if f.value.reason.value.code == 401:
             return auth().addCallback(lambda _: func())
         else:
