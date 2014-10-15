@@ -651,11 +651,8 @@ def remove_otter_metadata(log, auth_token, service_catalog, region, server_id,
 
     auth_hdr = headers(auth_token)
 
-    get, put = [lambda data=None, method=method: _treq.request(method,
-                                                          url,
-                                                          headers=auth_hdr,
-                                                          data=data,
-                                                          log=bound_log)
+    get, put = [lambda data=None, method=method: _treq.request(
+        method, url, headers=auth_hdr, data=data, log=bound_log)
                 for method in ["GET", "PUT"]]
 
     return (get()
