@@ -1998,7 +1998,6 @@ class MetadataRemovalTests(SynchronousTestCase):
             scrubbed = _without_otter_metadata(metadata)
             self.assertEqual(scrubbed, expected_scrubbed_metadata)
 
-
     def test_remove_otter_metadata(self):
         """
         Removing otter metadata works correctly.
