@@ -632,7 +632,7 @@ def _without_otter_metadata(metadata):
 
 
 def remove_otter_metadata(log, auth_token, service_catalog, region, server_id,
-                           _treq=treq):
+                          _treq=treq):
     """
     Remove the otter-specific management metadata from the server.
 
@@ -651,7 +651,8 @@ def remove_otter_metadata(log, auth_token, service_catalog, region, server_id,
 
     auth_hdr = headers(auth_token)
 
-    get, put = [lambda data=None, method=method: _treq.request(method, url,
+    get, put = [lambda data=None, method=method: _treq.request(method,
+                                                          url,
                                                           headers=auth_hdr,
                                                           data=data,
                                                           log=bound_log)
