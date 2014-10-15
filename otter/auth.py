@@ -232,7 +232,7 @@ class ImpersonatingAuthenticator(object):
 
     def _auth_me(self, log):
         if log:
-            log.msg('Getting new token')
+            log.msg('Getting new identity admin token')
         d = authenticate_user(self._url,
                               self._identity_admin_user,
                               self._identity_admin_password,
