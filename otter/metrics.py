@@ -20,6 +20,7 @@ from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import groupby, filter, get_in
 from toolz.dicttoolz import merge
+from toolz.functoolz import identity
 
 from otter.auth import (
     RetryingAuthenticator, ImpersonatingAuthenticator, authenticate_user,
@@ -62,7 +63,7 @@ def get_scaling_groups(client, props=None, batch_size=100, group_pred=None):
     # setup function that removes groups not having desired
     has_desired = lambda g: g['desired'] is not None
     has_created_at = lambda g: g['created_at'] is not None
-    group_pred = group_pred or (lambda g: g)
+    group_pred = group_pred or identity
     group_filter = filter(predicate_all(has_desired, has_created_at, group_pred))
 
     # We first start by getting all groups limited on batch size
