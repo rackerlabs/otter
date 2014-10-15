@@ -2018,7 +2018,6 @@ class MetadataRemovalTests(SynchronousTestCase):
                              "data": json.dumps(sample_user_metadata)}),
                            (200, ""))])
 
-        import pudb; pudb.set_trace()
         d = remove_otter_metadata(log=log,
                                   auth_token="my-auth-token",
                                   service_catalog=fake_service_catalog,
