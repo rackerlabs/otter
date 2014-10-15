@@ -12,6 +12,8 @@ import time
 
 from twisted.internet import task, defer
 from twisted.internet.endpoints import clientFromString
+from twisted.application.internet import TimerService
+from twisted.python import usage
 
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
@@ -31,6 +33,9 @@ from otter.convergence import get_scaling_group_servers
 from otter.util.http import append_segments, headers, check_success
 from otter.util.fp import predicate_all
 from otter.log import log as otter_log
+
+
+metrics_log = otter_log.bind(system='otter.metrics')
 
 
 @defer.inlineCallbacks
@@ -209,26 +214,26 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
     """
     Add total number of desired, actual and pending servers of a region to Cloud metrics
 
-    :param ``dict`` conf: Metrics configuration, will contain credentials used to authenticate
+    :param dict conf: Metrics configuration, will contain credentials used to authenticate
                         to cloud metrics, and other conf like ttl
     :param str identity_url: URL of identity API to authenticate users given in `conf`
     :param str region: which region's metric is collected
     :param int total_desired: Total number of servers currently desired in a region
     :param int total_actual: Total number of servers currently there in a region
     :param int total_pending: Total number of servers currently building in a region
-    :param ``treq`` _treq: Optional treq implementation for testing
+    :param _treq: Optional treq implementation for testing
 
     :return: `Deferred` with None
     """
     # TODO: Have generic authentication function that auths, gets the service URL
     # and returns the token
     resp = yield authenticate_user(identity_url, conf['username'], conf['password'],
-                                   log=otter_log)
+                                   log=metrics_log)
     token = extract_token(resp)
 
     if _treq is None:  # pragma: no cover
-        import treq
-        _treq = treq
+        from otter.util import logging_treq
+        _treq = logging_treq
 
     url = public_endpoint_url(resp['access']['serviceCatalog'], conf['service'], conf['region'])
 
@@ -240,7 +245,8 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
         data=json.dumps([merge(metric_part,
                                {'metricValue': value,
                                 'metricName': '{}.{}'.format(region, metric)})
-                         for metric, value in totals]))
+                         for metric, value in totals]),
+        log=metrics_log)
     d.addCallback(check_success, [200], _treq=_treq)
     d.addCallback(_treq.content)
     yield d
@@ -268,14 +274,26 @@ def connect_cass_servers(reactor, config):
 
 
 @defer.inlineCallbacks
-def main(reactor, config, _print=False):
+def collect_metrics(reactor, config, client=None, authenticator=None, _print=False):
     """
     Start collecting the metrics
-    """
-    client = connect_cass_servers(reactor, config['cassandra'])
-    authenticator = get_authenticator(reactor, config['identity'])
 
-    cass_groups = yield get_scaling_groups(client, props=['status'],
+    :param reactor: Twisted reactor
+    :param dict config: Configuration got from file containing all info
+                        needed to collect metrics
+    :param :class:`silverberg.client.CQLClient` client: Optional cassandra client.
+            A new client will be created if this is not given and disconnected before
+            returing
+    :param :class:`otter.auth.IAuthenticator` authenticator: Optional authenticator
+            A new authenticator will be created if this is not given
+    :param bool _print: Should debug messages be printed to stdout?
+
+    :return: :class:`Deferred` with None
+    """
+    _client = client or connect_cass_servers(reactor, config['cassandra'])
+    authenticator = authenticator or get_authenticator(reactor, config['identity'])
+
+    cass_groups = yield get_scaling_groups(_client, props=['status'],
                                            group_pred=lambda g: g['status'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
         cass_groups, authenticator, config['services']['nova'], config['region'],
@@ -284,22 +302,81 @@ def main(reactor, config, _print=False):
     total_desired, total_actual, total_pending = reduce(
         lambda (td, ta, tp), g: (td + g.desired, ta + g.actual, tp + g.pending),
         group_metrics, (0, 0, 0))
+    metrics_log.msg('total desired: {td}, total_actual: {ta}, total pending: {tp}',
+                    td=total_desired, ta=total_actual, tp=total_pending)
     if _print:
         print('total desired: {}, total actual: {}, total pending: {}'.format(
             total_desired, total_actual, total_pending))
     yield add_to_cloud_metrics(config['metrics'], config['identity']['url'],
                                config['region'], total_desired, total_actual,
                                total_pending)
+    metrics_log.msg('added to cloud metrics')
     if _print:
         print('added to cloud metrics')
         group_metrics.sort(key=lambda g: abs(g.desired - g.actual), reverse=True)
         print('groups sorted as per divergence', *group_metrics, sep='\n')
 
-    yield client.disconnect()
+    # Diconnect only if we created the client
+    if not client:
+        yield _client.disconnect()
+
+
+class Options(usage.Options):
+    """
+    Options for otter-metrics service
+    """
+
+    optParameters = [["config", "c", "config.json", "path to JSON configuration file"]]
+
+    def postOptions(self):
+        """
+        Parse config file and add nova service name
+        """
+        self.open = getattr(self, 'open', None) or open  # For testing
+        self.update(json.load(self.open(self['config'])))
+        # TODO: This is hard-coded here and in tap/api.py. Should be there in
+        # config file only
+        self.update({'services': {'nova': 'cloudServersOpenStack'}})
+
+
+class MetricsService(TimerService, object):
+    """
+    Service collects metrics on continuous basis
+    """
+
+    def __init__(self, config):
+        """
+        Initialize the service by connecting to Cassandra and setting up
+        authenticator
+
+        :param dict config: All the config necessary to run the service.
+                            Comes from config file
+        """
+        from twisted.internet import reactor
+        self.client = connect_cass_servers(reactor, config['cassandra'])
+        authenticator = get_authenticator(reactor, config['identity'])
+        TimerService.__init__(
+            self, get_in(['metrics', 'interval'], config, default=60),
+            collect_metrics, reactor, config, client=self.client,
+            authenticator=authenticator)
+
+    def stopService(self):
+        """
+        Stop service by stopping the timer and disconnecting cass client
+        """
+        TimerService.stopService(self)
+        return self.client.disconnect()
+
+
+def makeService(config):
+    """
+    Set up the otter-metrics service.
+    """
+    return MetricsService(dict(config))
 
 
 if __name__ == '__main__':
     config = json.load(open(sys.argv[1]))
     config['services'] = {'nova': 'cloudServersOpenStack'}
     # TODO: Take _print as cmd-line arg and pass it.
-    task.react(main, (config, True))
+    task.react(collect_metrics, (config, None, None, True))
