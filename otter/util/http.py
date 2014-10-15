@@ -482,7 +482,7 @@ def transaction_id(request):
 def retry_on_unauth(func, auth):
     """
     Retry `func` again if it fails with 401 error by authenticating by calling `auth`.
-    `func` must return a deferred that should errback with either UpstreamError or APIError
+    `func` must return a deferred that should errback with UpstreamError
     on 401
 
     :param func: No-arg callable to call again if it fails with 401
