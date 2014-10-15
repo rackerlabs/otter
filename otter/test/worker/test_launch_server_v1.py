@@ -3,7 +3,6 @@ Unittests for the launch_server_v1 launch config.
 """
 import mock
 import json
-from collections import OrderedDict
 from toolz.dicttoolz import merge
 from urllib import urlencode
 from urlparse import urlunsplit
