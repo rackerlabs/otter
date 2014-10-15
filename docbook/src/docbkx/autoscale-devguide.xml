@@ -57,7 +57,7 @@
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2014-08-14</pubdate>
+        <pubdate>2014-10-15</pubdate>
         <copyright>
             <year>2014</year>
             <holder>Rackspace US, Inc.</holder>
@@ -69,6 +69,18 @@
             </annotation>
         </legalnotice>
         <revhistory>
+            <revision
+                xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <date>2014-10-15</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Added note to update (<methodname>PUT</methodname>) operations that all parameters are replaced with the new values provided. This means that 
+                            parameters that are optional for a create (<methodname>POST</methodname>) are required for an update (<methodname>PUT</methodname>). </para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
             <revision
                 xmlns:raxm="http://docs.rackspace.com/api/metadata">
                 <date>2014-08-14</date>
