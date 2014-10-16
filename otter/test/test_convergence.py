@@ -13,7 +13,7 @@ from otter.convergence import (
     _converge_lb_state,
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
-    RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddToLoadBalancer,
+    RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ACTIVE, ERROR, BUILD,
     ServiceType, NodeCondition, NodeType)
@@ -165,7 +165,7 @@ class ObjectStorageTests(SynchronousTestCase):
         The required values for a LBConfig are just the lb_id and port.  The
         other attributes have default values.
         """
-        lb = LBConfig(lb_id=1, port=80)
+        lb = LBConfig(port=80)
         self.assertEqual(lb.weight, 1)
         self.assertEqual(lb.condition, NodeCondition.ENABLED)
         self.assertEqual(lb.type, NodeType.PRIMARY)
@@ -180,14 +180,19 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If a desired LB config is not in the set of current configs,
         `converge_lb_state` returns a :class:`AddToLoadBalancer` object
         """
-        result = _converge_lb_state(desired_lb_state=[LBConfig(lb_id=5, port=80)],
+        result = _converge_lb_state(desired_lb_state={5: LBConfig(port=80)},
                                     current_lb_state=[],
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
-            [AddToLoadBalancer(loadbalancer_id=5, address='1.1.1.1', port=80,
-                               condition=NodeCondition.ENABLED,
-                               type=NodeType.PRIMARY, weight=1)])
+            [AddNodesToLoadBalancer(
+                lb_id=5,
+                node_configs={
+                    '1.1.1.1': LBConfig(
+                        port=80,
+                        condition=NodeCondition.ENABLED,
+                        type=NodeType.PRIMARY,
+                        weight=1)})])
 
     def test_change_lb_node(self):
         """
@@ -195,9 +200,9 @@ class ConvergeLBStateTests(SynchronousTestCase):
         but the configuration is wrong, `converge_lb_state` returns a
         :class:`ChangeLoadBalancerNode` object
         """
-        desired = [LBConfig(lb_id=5, port=80)]
-        current = [LBNode(node_id=123, address='1.1.1.1',
-                          config=LBConfig(lb_id=5, port=80, weight=5))]
+        desired = {5: LBConfig(port=80)}
+        current = [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                          config=LBConfig(port=80, weight=5))]
 
         result = _converge_lb_state(desired_lb_state=desired,
                                     current_lb_state=current,
@@ -213,10 +218,10 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If a current lb config is not in the desired set of lb configs,
         `converge_lb_state` returns a :class:`RemoveFromLoadBalancer` object
         """
-        current = [LBNode(node_id=123, address='1.1.1.1',
-                          config=LBConfig(lb_id=5, port=80, weight=5))]
+        current = [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                          config=LBConfig(port=80, weight=5))]
 
-        result = _converge_lb_state(desired_lb_state=[],
+        result = _converge_lb_state(desired_lb_state={},
                                     current_lb_state=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(
@@ -228,9 +233,9 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If the desired lb state matches the current lb state,
         `converge_lb_state` returns nothing
         """
-        desired = [LBConfig(lb_id=5, port=80)]
-        current = [LBNode(node_id=123, address='1.1.1.1',
-                          config=LBConfig(lb_id=5, port=80))]
+        desired = {5: LBConfig(port=80)}
+        current = [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                          config=LBConfig(port=80))]
 
         result = _converge_lb_state(desired_lb_state=desired,
                                     current_lb_state=current,
@@ -241,20 +246,25 @@ class ConvergeLBStateTests(SynchronousTestCase):
         """
         Remove, change, and add a node to a load balancer all together
         """
-        desired = [LBConfig(lb_id=5, port=80),
-                   LBConfig(lb_id=6, port=80, weight=2)]
-        current = [LBNode(node_id=123, address='1.1.1.1',
-                          config=LBConfig(lb_id=5, port=8080)),
-                   LBNode(node_id=234, address='1.1.1.1',
-                          config=LBConfig(lb_id=6, port=80))]
+        desired = {5: LBConfig(port=80),
+                   6: LBConfig(port=80, weight=2)}
+        current = [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                          config=LBConfig(port=8080)),
+                   LBNode(lb_id=6, node_id=234, address='1.1.1.1',
+                          config=LBConfig(port=80))]
 
         result = _converge_lb_state(desired_lb_state=desired,
                                     current_lb_state=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(set(result), set([
-            AddToLoadBalancer(loadbalancer_id=5, address='1.1.1.1', port=80,
-                              condition=NodeCondition.ENABLED,
-                              type=NodeType.PRIMARY, weight=1),
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                node_configs=pmap({
+                    '1.1.1.1': LBConfig(
+                        port=80,
+                        condition=NodeCondition.ENABLED,
+                        type=NodeType.PRIMARY,
+                        weight=1)})),
             ChangeLoadBalancerNode(loadbalancer_id=6, node_id=234, weight=2,
                                    condition=NodeCondition.ENABLED,
                                    type=NodeType.PRIMARY),
@@ -340,10 +350,10 @@ class ConvergeTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
                 [server('abc', ERROR, servicenet_address='1.1.1.1')],
-                [LBNode(address='1.1.1.1', node_id=3,
-                        config=LBConfig(lb_id=5, port=80)),
-                 LBNode(address='1.1.1.1', node_id=5,
-                        config=LBConfig(lb_id=5, port=8080))],
+                [LBNode(lb_id=5, address='1.1.1.1', node_id=3,
+                        config=LBConfig(port=80)),
+                 LBNode(lb_id=5, address='1.1.1.1', node_id=5,
+                        config=LBConfig(port=8080))],
                 0),
             Convergence(
                 steps=pbag([
@@ -374,8 +384,8 @@ class ConvergeTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=0),
                 [server('abc', ACTIVE, servicenet_address='1.1.1.1', created=0)],
-                [LBNode(address='1.1.1.1', node_id=3,
-                        config=LBConfig(lb_id=5, port=80))],
+                [LBNode(lb_id=5, address='1.1.1.1', node_id=3,
+                        config=LBConfig(port=80))],
                 0),
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),
@@ -435,21 +445,24 @@ class ConvergeTests(SynchronousTestCase):
         Only servers in active that are not being deleted will have their
         load balancers converged.
         """
-        desired_lbs = [LBConfig(lb_id=5, port=80)]
+        desired_lbs = {5: LBConfig(port=80)}
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ACTIVE, servicenet_address='1.1.1.1', created=0,
-                        desired_lbs=desired_lbs),
-                 server('bcd', ACTIVE, servicenet_address='2.2.2.2', created=1,
-                        desired_lbs=desired_lbs)],
+                DesiredGroupState(launch_config={}, desired=1, desired_lbs=desired_lbs),
+                [server('abc', ACTIVE, servicenet_address='1.1.1.1', created=0),
+                 server('bcd', ACTIVE, servicenet_address='2.2.2.2', created=1)],
                 [],
                 0),
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),
-                AddToLoadBalancer(loadbalancer_id=5, address='2.2.2.2', port=80,
-                                  condition=NodeCondition.ENABLED, weight=1,
-                                  type=NodeType.PRIMARY)
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    node_configs=pmap({
+                        '2.2.2.2': LBConfig(
+                            port=80,
+                            condition=NodeCondition.ENABLED,
+                            weight=1,
+                            type=NodeType.PRIMARY)}))
             ])))
 
 
