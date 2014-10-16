@@ -31,3 +31,19 @@ class PredicateAllTests(SynchronousTestCase):
         Works with one arg also
         """
         self.assertTrue(predicate_all(lambda a: a % 2 == 0)(4))
+
+    def test_multiple_args(self):
+        """
+        Works with multiple argument predicates
+        """
+        self.assertTrue(
+            predicate_all(lambda a, b: a % 2 == 0 and b % 2 == 0,
+                          lambda a, b: a % 3 == 0 and b % 3 == 0)(6, 12))
+
+    def test_multiple_kw_args(self):
+        """
+        Works with multiple keyword argument predicates
+        """
+        self.assertTrue(
+            predicate_all(lambda **k: k['a'] % 2 == 0 and k['b'] % 2 == 0,
+                          lambda **k: k['a'] % 3 == 0 and k['b'] % 3 == 0)(a=6, b=12))
