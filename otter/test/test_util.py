@@ -674,7 +674,7 @@ class RetryOnUnauthTests(SynchronousTestCase):
         """
 
         def _auth():
-            raise ValueError('e')
+            raise KeyError('e')
 
         self.auth = _auth
 
@@ -724,3 +724,15 @@ class RetryOnUnauthTests(SynchronousTestCase):
         f = self.failureResultOf(d, UpstreamError)
         f.value.reason.trap(APIError)
         self.assertEqual(f.value.reason.value.code, 500)
+
+    def test_auth_error_propogates(self):
+        """
+        `auth()` errors are propogated
+        """
+        auth = mock.Mock(spec=[], return_value=fail(ValueError('a')))
+        func = mock.Mock(side_effect=[
+            fail(UpstreamError(Failure(APIError(401, '401')), 'identity', 'o')),
+            succeed('r')])
+        d = retry_on_unauth(func, auth)
+        self.failureResultOf(d, ValueError)
+        auth.assert_called_once_with()
