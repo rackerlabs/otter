@@ -1026,6 +1026,10 @@
                 entities, the maximum number of entities, the global
                 cooldown time, and other metadata. If the update is
                 successful, no response body is returned.</para>
+            <note><para>All Rackspace Auto Scale update (<methodname>PUT</methodname>) operations completely replace the configuration being updated. Empty values (for example, 
+                <varname>{ }</varname>)in the update 
+                are accepted and overwrite previously specified parameters. New parameters can be specified. All create (<methodname>POST</methodname>) parameters, even optional ones, 
+                are required for the update operation. </para></note>      
         </wadl:doc>
         <request>
             <param style="plain" name="maxEntities" required="true"
@@ -1155,6 +1159,10 @@
                 balancers to join the server to, which networks to add
                 the server to, and other metadata. If the update is
                 successful, no response body is returned.</para>
+            <note><para>All Rackspace Auto Scale update (<methodname>PUT</methodname>) operations completely replace the configuration being updated. Empty values (for example, 
+                <varname>{ }</varname>)in the update 
+                are accepted and overwrite previously specified parameters. New parameters can be specified. All create (<methodname>POST</methodname>) parameters, even optional ones, 
+                are required for the update operation. </para></note>
         </wadl:doc>
         <request>
             <param style="plain" name="args" required="false"
@@ -1728,6 +1736,10 @@
                 adjustment, and cooldown time for the policy in the
                 request body in JSON format. If the change succeeds,
                 no response body is returned.</para>
+            <note><para>All Rackspace Auto Scale update (<methodname>PUT</methodname>) operations completely replace the configuration being updated. Empty values (for example, 
+                <varname>{ }</varname>)in the update 
+                are accepted and overwrite previously specified parameters. New parameters can be specified. All create (<methodname>POST</methodname>) parameters, even optional ones, 
+                are required for the update operation. </para></note>
         </wadl:doc>
         <request>
             <representation mediaType="application/json">
@@ -1977,11 +1989,16 @@
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Update webhook">
             <para role="shortdesc">Updates a webhook for a specified
-                tenant and scaling policy.</para><para>If the
+                tenant and scaling policy.</para>
+            <para>If the
                 specified webhook is not recognized, the change is
                 ignored. If you submit a URL, the URL is ignored but
                 that does not invalidate the request. If the change is
                 successful, no response body is returned.</para>
+            <note><para>All Rackspace Auto Scale update (<methodname>PUT</methodname>) operations completely replace the configuration being updated. Empty values (for example, 
+                <varname>{ }</varname>)in the update 
+            are accepted and overwrite previously specified parameters. New parameters can be specified. All create (<methodname>POST</methodname>) webhook parameters, even optional ones, 
+                are required for the update webhook operation, including the <parameter>metadata</parameter> parameter. </para></note>
         </wadl:doc>
         <request>
             <param style="plain" name="name" type="string"
@@ -2004,19 +2021,19 @@
                     <xsdxt:code
                         href="../docbkx/samples/reqPutWebhook.json"/>
                 </wadl:doc>
-                <param style="plain" name="name" type="string"
+                <param style="plain" name="name" type="object"
                     required="true" path="$.[*].name">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >This parameter specifies a name for the
-                        webhook for logging purposes</wadl:doc>
+                        webhook for logging purposes.</wadl:doc>
                 </param>
-                <param style="plain" name="metadata" required="false"
+                <param style="plain" name="metadata" required="true"
                     type="object" path="$.[*].metadata">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >This parameter specifies user-provided
                         key-value metadata. Both keys and values
                         should be strings not exceeding 256 characters
-                        in length.</wadl:doc>
+                        in length. An empty value, <code>{ }</code> is acceptable.</wadl:doc>
                 </param>
             </representation>
         </request>
