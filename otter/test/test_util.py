@@ -712,7 +712,7 @@ class RetryOnUnauthTests(SynchronousTestCase):
             succeed('r')])
         d = retry_on_unauth(func, auth)
         self.assertEqual(self.successResultOf(d), 'r')
-        auth.assert_called_with()
+        auth.assert_called_once_with()
 
     def test_500_error(self):
         """
