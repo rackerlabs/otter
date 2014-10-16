@@ -20,6 +20,7 @@ from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import groupby, filter, get_in
 from toolz.dicttoolz import merge
+from toolz.functoolz import identity
 
 from otter.auth import (
     RetryingAuthenticator, ImpersonatingAuthenticator, authenticate_user,
@@ -31,6 +32,7 @@ from otter.worker.launch_server_v1 import public_endpoint_url
 
 from otter.convergence import get_scaling_group_servers
 from otter.util.http import append_segments, headers, check_success
+from otter.util.fp import predicate_all
 from otter.log import log as otter_log
 
 
@@ -38,7 +40,7 @@ metrics_log = otter_log.bind(system='otter.metrics')
 
 
 @defer.inlineCallbacks
-def get_scaling_groups(client, props=None, batch_size=100):
+def get_scaling_groups(client, props=None, batch_size=100, group_pred=None):
     """
     Return scaling groups from Cassandra as a list of ``dict`` where each dict has
     'tenantId', 'groupId', 'desired', 'active', 'pending' and any other properties
@@ -59,7 +61,10 @@ def get_scaling_groups(client, props=None, batch_size=100):
     where_token = 'WHERE token("tenantId") > token(:tenantId)'
 
     # setup function that removes groups not having desired
-    group_filter = filter(lambda g: g['desired'] is not None and g['created_at'] is not None)
+    has_desired = lambda g: g['desired'] is not None
+    has_created_at = lambda g: g['created_at'] is not None
+    group_pred = group_pred or identity
+    group_filter = filter(predicate_all(has_desired, has_created_at, group_pred))
 
     # We first start by getting all groups limited on batch size
     # It will return groups sorted first based on hash of tenant id and then based
@@ -289,7 +294,8 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
     _client = client or connect_cass_servers(reactor, config['cassandra'])
     authenticator = authenticator or get_authenticator(reactor, config['identity'])
 
-    cass_groups = yield get_scaling_groups(_client)
+    cass_groups = yield get_scaling_groups(_client, props=['status'],
+                                           group_pred=lambda g: g['status'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
         cass_groups, authenticator, config['services']['nova'], config['region'],
         clock=reactor, _print=_print)
