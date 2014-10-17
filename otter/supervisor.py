@@ -57,14 +57,13 @@ class ISupervisor(Interface):
     # REVIEW: is execute_verb_noun an intentional pattern, or
     # something we accidentally grew with execute_delete_server after
     # execute_launch_config?
-    def execute_scrub_metadata(log, transaction_id, tenant_id, region, server_id):
+    def execute_scrub_metadata(log, transaction_id, tenant_id, server_id):
         """
         Scrubs otter-specific metadata off of a single server.
 
         :param log: Bound logger.
         :param str transaction_id: The transaction id.
         :param str tenant_id: The tenant id.
-        :param str region: The region of the server.
         :param str server_id: The server id.
         """
 
@@ -163,7 +162,7 @@ class SupervisorService(object, Service):
 
         return d
 
-    def execute_scrub_metadata(self, log, transaction_id, tenant_id, region, server_id):
+    def execute_scrub_metadata(self, log, transaction_id, tenant_id, server_id):
         """
         See :meth:`ISupervisor.execute_scrub_metadata`.
         """
@@ -181,7 +180,7 @@ class SupervisorService(object, Service):
             d = launch_server_v1.remove_otter_metadata(log,
                                                        auth_token,
                                                        service_catalog,
-                                                       region,
+                                                       self.region,
                                                        server_id)
             return d
         d.addCallback(when_authenticated)
