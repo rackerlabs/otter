@@ -116,7 +116,7 @@ class LaunchConfigTests(SupervisorTests):
         super(LaunchConfigTests, self).setUp()
 
         self.launch_server = patch(
-            self, 'otter.supervisor.launch_server_v1.launch_server',
+            self, 'otter.worker.launch_server_v1.launch_server',
             return_value=succeed((self.fake_server_details, {})))
         self.generate_job_id = patch(self, 'otter.supervisor.generate_job_id')
         self.generate_job_id.return_value = 'job-id'
