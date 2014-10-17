@@ -405,7 +405,7 @@ class _Job(object):
 
     def __init__(self, log, transaction_id, scaling_group, supervisor):
         """
-        :param log: a bound logger instance that can be used for logging
+        :param log: A bound logger instance.
         :param str transaction_id: a transaction id
         :param IScalingGroup scaling_group: the scaling group for which a job
             should be created
