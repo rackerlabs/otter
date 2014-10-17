@@ -1015,6 +1015,26 @@ class RemoveServerTests(SynchronousTestCase):
         self.assertNotIn('jid', state.pending)
         self.assertEqual(self.supervisor.exec_calls, [])
 
+    def _assert_metadata_scrubbing_scheduled(self, expected_server_id="s0"):
+        """
+        Assert that otter-specific metadata scrubbing was scheduled.
+        """
+        _, txn_id, tenant_id, server_id = self.supervisor.scrub_calls[-1]
+        self.assertEqual(txn_id, self.tid)
+        # REVIEW: This is "tenant", not "tid"; the implementation gets
+        # it from the group object, not the group_state object. I
+        # think it doesn't matter, because the two *should* always be
+        # consistent; the fact that it isn't is a bug in the test
+        # suite... right?
+        self.assertEqual(tenant_id, "tenant")
+        self.assertEqual(server_id, expected_server_id)
+
+    def _assert_metadata_scrubbing_not_scheduled(self):
+        """
+        Asserts that no metadata scrubbing was scheduled.
+        """
+        self.assertEqual(len(self.supervisor.scrub_calls), 0)
+
     def test_server_not_found(self):
         """
         If specific server is not in the group, :class:`ServerNotFoundError`
@@ -1026,6 +1046,7 @@ class RemoveServerTests(SynchronousTestCase):
         self._assert_server_in_group_state(self.state)
         self._assert_create_not_scheduled(self.state)
         self._assert_delete_not_scheduled()
+        self._assert_metadata_scrubbing_not_scheduled()
         self.assertEqual(self.state.desired, 1)
 
     def test_not_deleted_below_min(self):
@@ -1041,6 +1062,7 @@ class RemoveServerTests(SynchronousTestCase):
         self._assert_server_in_group_state(self.state)
         self._assert_delete_not_scheduled()
         self._assert_create_not_scheduled(self.state)
+        self._assert_metadata_scrubbing_not_scheduled()
         self.assertEqual(self.state.desired, 1)
 
     def test_replaced_and_removed(self):
@@ -1066,6 +1088,7 @@ class RemoveServerTests(SynchronousTestCase):
         self._assert_server_not_in_group_state(state)
         self._assert_delete_scheduled()
         self._assert_create_not_scheduled(state)
+        self._assert_metadata_scrubbing_not_scheduled()
         self.assertEqual(state.desired, 0)
 
     def test_not_replaced_and_not_purged(self):
@@ -1078,6 +1101,7 @@ class RemoveServerTests(SynchronousTestCase):
         self._assert_server_not_in_group_state(state)
         self._assert_delete_not_scheduled()
         self._assert_create_not_scheduled(state)
+        self._assert_metadata_scrubbing_scheduled()
         self.assertEqual(state.desired, 0)
 
     def test_replaced_but_not_purged(self):
@@ -1090,4 +1114,5 @@ class RemoveServerTests(SynchronousTestCase):
         self._assert_server_not_in_group_state(state)
         self._assert_delete_not_scheduled()
         self._assert_create_scheduled(state)
+        self._assert_metadata_scrubbing_scheduled()
         self.assertEqual(state.desired, 1)
