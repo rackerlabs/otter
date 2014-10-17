@@ -567,6 +567,66 @@ class DeleteJobTests(SynchronousTestCase):
                                              'Server deletion job failed')
 
 
+class ScrubJobTests(SynchronousTestCase):
+    """
+    Tests for :class:`supervisor._ScrubJob`.
+    """
+
+    def setUp(self):
+        """
+        Set up an environment for testing :class:`supervisor._ScrubJob`.
+        """
+        self.supervisor = iMock(ISupervisor)
+        self.log = mock.Mock()
+
+    def _create_job(self):
+        """
+        Creates a job with associated bound logger.
+
+        Checks that the logger was appropriately bound.
+        """
+        job = supervisor._ScrubJob(self.log,
+                                   "txn-id",
+                                   "tenant-id",
+                                   "server-id",
+                                   self.supervisor)
+        self.log.bind.assert_called_once_with(
+            system='otter.job.scrub_otter_metadata')
+        bound_log = self.log.bind.return_value
+        return job, bound_log
+
+    def test_scrub_job(self):
+        """
+        Starting a scrub job works correctly.
+        """
+        d = succeed(None)
+        self.supervisor.execute_scrub_metadata.return_value = d
+
+        job, bound_log = self._create_job()
+        self.successResultOf(job.start())
+
+        _, bind_kwargs = bound_log.bind.call_args
+        self.assertEqual(bind_kwargs, {"audit_log": True})
+
+        bound_log.bind.return_value.msg.assert_called_once_with(
+            "Otter-specific metadata scrubbed.",
+            event_type="server.scrub_otter_metadata")
+
+    def test_failed_job(self):
+        """
+        When a scrubbing job fails, the failure is logged.
+        """
+        e = RuntimeError("o noes")
+        self.supervisor.execute_scrub_metadata.return_value = fail(e)
+
+        job, bound_log = self._create_job()
+        self.successResultOf(job.start())
+
+        (f, msg), _ = bound_log.err.call_args
+        self.assertEqual(f.value, e)
+        self.assertEqual(msg, "Server metadata scrubbing failed.")
+
+
 class ExecScaleDownTests(SynchronousTestCase):
     """
     Tests for :func:`otter.supervisor.exec_scale_down`
