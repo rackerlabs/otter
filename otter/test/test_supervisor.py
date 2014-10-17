@@ -235,7 +235,7 @@ class DeleteServerTests(SupervisorTests):
         """
         super(DeleteServerTests, self).setUp()
         self.delete_server = patch(
-            self, 'otter.supervisor.launch_server_v1.delete_server',
+            self, 'otter.worker.launch_server_v1.delete_server',
             return_value=succeed(None))
 
         self.fake_server = self.fake_server_details['server']
