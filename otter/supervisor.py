@@ -402,6 +402,7 @@ class _Job(object):
 
     Calls the supervisor to create one server, and handles job completion.
     """
+
     def __init__(self, log, transaction_id, scaling_group, supervisor):
         """
         :param log: a bound logger instance that can be used for logging
