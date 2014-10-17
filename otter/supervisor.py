@@ -187,7 +187,6 @@ class SupervisorService(object, Service):
 
         return d
 
-
     def validate_launch_config(self, log, tenant_id, launch_config):
         """
         Validate launch config for a tenant
@@ -366,6 +365,35 @@ class _DeleteJob(object):
         # REVIEW: Logging this as err since failing to delete a server will cost
         # money to customers and affect us. We should know and try to delete it manually asap
         self.log.err(failure, 'Server deletion job failed')
+
+
+class _ScrubJob(object):
+    """
+    Otter-specific metadata scrubbing job.
+    """
+
+    def __init__(self, log, transaction_id, tenant_id, server_id, supervisor):
+        self.log = log.bind(system="otter.job.scrub_otter_metadata")
+        self.transaction_id = transaction_id
+        self.tenant_id = tenant_id
+        self.server_id = server_id
+        self.supervisor = supervisor
+
+    def start(self):
+        """
+        Start the metadata scrubbing job.
+        """
+        d = self.supervisor.execute_scrub_metadata(
+            self.log, self.transaction_id, self.tenant_id, self.server_id)
+
+        def _scrub_succeeded(_):
+            audit(self.log).msg("Otter-specific metadata scrubbed.",
+                                event_type="server.scrub_otter_metadata")
+
+        def _scrub_failed(f):
+            self.log.err(f, "Server metadata scrubbing failed.")
+
+        return d.addCallbacks(_scrub_succeeded, _scrub_failed)
 
 
 class _Job(object):
