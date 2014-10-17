@@ -585,7 +585,10 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge, group, st
         which shouldn't wait until the server has been removed.
         """
         supervisor = get_supervisor()
-        d = _DeleteJob(log, trans_id, group, server_info, supervisor).start()
+        job = _DeleteJob(log, trans_id, group, server_info, supervisor)
+        d = job.start()
+        supervisor.deferred_pool.add(d)
+
     def scrub_otter_metadata(_):
         """
         Scrub otter-specific metadata from the server.
