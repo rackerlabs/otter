@@ -501,8 +501,8 @@ class DeleteJobTests(SynchronousTestCase):
         self.supervisor.execute_delete_server.assert_called_once_with(
             self.log, 'trans_id', 'group', {'id': 2, 'b': 'lah'})
         d = self.supervisor.execute_delete_server.return_value
-        d.addCallback.assert_called_once_with(self.job._job_completed)
-        d.addErrback.assert_called_once_with(self.job._job_failed)
+        d.addCallbacks.assert_called_once_with(self.job._job_completed,
+                                               self.job._job_failed)
         self.log.msg.assert_called_once_with('Started server deletion job')
 
     def test_job_completed(self):
