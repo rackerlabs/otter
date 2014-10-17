@@ -410,6 +410,8 @@ class _Job(object):
         :param IScalingGroup scaling_group: the scaling group for which a job
             should be created
         :param dict launch_config: the launch config to scale up a server
+        :param ISupervisor supervisor: The supervisor responsible for keeping
+            track of this job.
         """
         self.log = log.bind(system='otter.job.launch')
         self.transaction_id = transaction_id
