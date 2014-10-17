@@ -176,7 +176,7 @@ class SupervisorService(object, Service):
         # execute_delete_server using a macro. (It's harder to do so
         # now, because of the differences in signatures.)
 
-        def when_authenticated(auth_token, service_catalog):
+        def when_authenticated((auth_token, service_catalog)):
             d = launch_server_v1.remove_otter_metadata(log,
                                                        auth_token,
                                                        service_catalog,
