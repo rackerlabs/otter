@@ -281,6 +281,37 @@ class DeleteServerTests(SupervisorTests):
         self.assertEqual(f.value, expected)
 
 
+class ScrubMetadataTests(SupervisorTests):
+    """
+    Tests for func:``otter.supervisor.execute_scrub_metadata``.
+    """
+    def setUp(self):
+        """
+        Set up the test.
+        """
+        super(ScrubMetadataTests, self).setUp()
+        self.remove_otter_metadata = patch(
+            self,
+            'otter.worker.launch_server_v1.remove_otter_metadata',
+            return_value=succeed(None))
+
+    def test_scrub_metadata(self):
+        """
+        Tests metadata scrubbing.
+        """
+        d = self.supervisor.execute_scrub_metadata(
+            self.log, "txn-id", "tenant-id", "server-id")
+        self.successResultOf(d)
+        self.auth_function.assert_called_once_with(
+            "tenant-id", log=self.log.bind.return_value)
+        self.remove_otter_metadata.assert_called_once_with(
+            self.log.bind.return_value,
+            self.auth_token,
+            self.service_catalog,
+            self.supervisor.region,
+            "server-id")
+
+
 class ValidateLaunchConfigTests(SupervisorTests):
     """
     Tests for func:``otter.supervisor.validate_launch_config``
