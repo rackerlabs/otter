@@ -409,7 +409,6 @@ class _Job(object):
         :param str transaction_id: a transaction id
         :param IScalingGroup scaling_group: the scaling group for which a job
             should be created
-        :param dict launch_config: the launch config to scale up a server
         :param ISupervisor supervisor: The supervisor responsible for keeping
             track of this job.
         """
@@ -422,6 +421,8 @@ class _Job(object):
     def start(self, launch_config):
         """
         Kick off a job by calling the supervisor with a launch config.
+
+        :param dict launch_config: The launch config to scale up a server.
         """
         try:
             image = launch_config['args']['server']['imageRef']
