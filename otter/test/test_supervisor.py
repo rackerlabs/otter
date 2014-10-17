@@ -23,6 +23,18 @@ from otter.test.utils import (
 from otter.util.deferredutils import DeferredPool
 
 
+class FakeSupervisorTests(SynchronousTestCase):
+    """
+    Tests for the supervisor test double.
+    """
+    def test_interface(self):
+        """
+        The supervisor test double implements the supervisor interface.
+        """
+        fake_supervisor = FakeSupervisor()
+        verifyObject(ISupervisor, fake_supervisor)
+
+
 class SupervisorTests(SynchronousTestCase):
     """
     Common stuff for tests in SupervisorService
