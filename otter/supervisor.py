@@ -355,8 +355,7 @@ class _DeleteJob(object):
         """
         d = self.supervisor.execute_delete_server(
             self.log, self.trans_id, self.scaling_group, self.server_info)
-        d.addCallback(self._job_completed)
-        d.addErrback(self._job_failed)
+        d.addCallbacks(self._job_completed, self._job_failed)
         self.log.msg('Started server deletion job')
         return d
 
