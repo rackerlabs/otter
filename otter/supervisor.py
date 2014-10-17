@@ -373,8 +373,9 @@ class _DeleteJob(object):
 
 class _Job(object):
     """
-    Private class representing a server creation job.  This calls the supervisor
-    to create one server, and also handles job completion.
+    Server creation job.
+
+    Calls the supervisor to create one server, and handles job completion.
     """
     def __init__(self, log, transaction_id, scaling_group, supervisor):
         """
