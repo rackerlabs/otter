@@ -471,12 +471,16 @@ class FakeSupervisor(object, Service):
     """
 
     def __init__(self, *args):
+        """
+        Initialize the fake supervisor.
+        """
         self.args = args
         self.deferred_pool = DeferredPool()
         self.exec_calls = []
         self.exec_defs = []
         self.del_index = 0
         self.del_calls = []
+        self.scrub_calls = []
 
     def execute_config(self, log, transaction_id, scaling_group, launch_config):
         """
