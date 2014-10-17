@@ -55,7 +55,7 @@
     "metrics": {
         "service": "cloudMetricsIngest",
         "region": "IAD",
-        "username": "stretchdev",
+        "username": "REPLACE_WITH_REAL_USERNAME",
         "password": "REPLACE_WITH_REAL_PASSWORD",
         "ttl": 432000,
         "interval": 60
