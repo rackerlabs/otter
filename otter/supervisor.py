@@ -373,6 +373,13 @@ class _ScrubJob(object):
     """
 
     def __init__(self, log, transaction_id, tenant_id, server_id, supervisor):
+        """
+        :param log: A bound logger instance.
+        :param str transaction_id: A transaction id.
+        :param str server_id: The id of the server to scrub the metadata of.
+        :param ISupervisor supervisor: The supervisor responsible for keeping
+            track of this job.
+        """
         self.log = log.bind(system="otter.job.scrub_otter_metadata")
         self.transaction_id = transaction_id
         self.tenant_id = tenant_id
