@@ -586,7 +586,22 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge, group, st
         """
         supervisor = get_supervisor()
         d = _DeleteJob(log, trans_id, group, server_info, supervisor).start()
+    def scrub_otter_metadata(_):
+        """
+        Scrub otter-specific metadata from the server.
+        """
+        supervisor = get_supervisor()
+        job = _ScrubJob(log, trans_id, group.tenant_id, server_id, supervisor)
+        d = job.start()
         supervisor.deferred_pool.add(d)
+        # REVIEW: is it safe to use deferreds after they have been
+        # added to a DeferredPool?
+        # REVIEW: do we actually wait until the metadata is scrubbed?
+        # If we don't, there are more refactoring options here;
+        # _ScrubJob can be changed to have the same signature as
+        # _DeleteJob, and then the if purge: ... else: ... block below
+        # just becomes a choice of which job to run.
+        return d
 
     if server_id not in state.active:
         raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
@@ -600,6 +615,8 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge, group, st
     if purge:
         server_info = state.active[server_id]
         d.addCallback(remove_server_from_nova)
+    else:
+        d.addCallback(scrub_otter_metadata)
 
     d.addCallback(remove_server_from_state)
     return d
