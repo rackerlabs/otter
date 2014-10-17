@@ -30,9 +30,6 @@ class ISupervisor(Interface):
 
         :param log: Bound logger.
         :param str transaction_id: Transaction ID.
-        :param callable auth_function: A 1-argument callable that takes a tenant_id,
-            and returns a Deferred that fires with a 2-tuple of auth_token and
-            service_catalog.
         :param IScalingGroup scaling_group: Scaling Group.
         :param dict launch_config: The launch config for the scaling group.
 
