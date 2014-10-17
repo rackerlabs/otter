@@ -470,7 +470,7 @@ class FakeSupervisor(object, Service):
     A fake supervisor that keeps track of calls made
     """
 
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         """
         Initialize the fake supervisor.
         """
