@@ -292,7 +292,7 @@ class Config_Request(AutoMarshallingModel):
 
     def __init__(self, name, image_ref, flavor_ref, personality=None,
                  metadata=None, disk_config=None, networks=None,
-                 load_balancers=None):
+                 load_balancers=None, block_device_mapping=None):
         super(Config_Request, self).__init__()
         self.name = name
         self.image_ref = image_ref
@@ -302,6 +302,7 @@ class Config_Request(AutoMarshallingModel):
         self.disk_config = disk_config
         self.networks = networks
         self.load_balancers = load_balancers
+        self.block_device_mapping = block_device_mapping
 
     def _obj_to_json(self):
         kwargs = {
@@ -320,12 +321,16 @@ class Config_Request(AutoMarshallingModel):
             if v is null:
                 server_json['server'][k] = None
 
+        # TODO: pass this in kwargs once Cloudcafe is updated so that
+        # CreateServer takes a block_device_mapping kwarg
+        if self.block_device_mapping:
+            server_json['server']['block_device_mapping'] = self.block_device_mapping
+
         body = {'type': 'launch_server',
                 'args': server_json}
         if self.load_balancers:
             body['args']['loadBalancers'] = self.load_balancers
-        # if self.disk_config:
-        #    del body['args']['server']['diskConfig']
+
         return json.dumps(body)
 
 
@@ -340,6 +345,7 @@ class ScalingGroup_Request(AutoMarshallingModel):
                  gc_max_entities=None, gc_metadata=None,
                  lc_personality=None, lc_metadata=None,
                  lc_disk_config=None, lc_networks=None,
+                 lc_block_device_mapping=None,
                  lc_load_balancers=None, sp_list=None):
         super(ScalingGroup_Request, self).__init__()
         self.gc_name = gc_name
@@ -354,6 +360,7 @@ class ScalingGroup_Request(AutoMarshallingModel):
         self.lc_metadata = lc_metadata
         self.lc_disk_config = lc_disk_config
         self.lc_networks = lc_networks
+        self.lc_block_device_mapping = lc_block_device_mapping
         self.lc_load_balancers = lc_load_balancers
         self.sp_list = sp_list
 
@@ -364,6 +371,7 @@ class ScalingGroup_Request(AutoMarshallingModel):
                                 metadata=self.lc_metadata,
                                 disk_config=self.lc_disk_config,
                                 networks=self.lc_networks,
+                                block_device_mapping=self.lc_block_device_mapping,
                                 load_balancers=self.lc_load_balancers)
         group = Group_Request(name=self.gc_name, cooldown=self.gc_cooldown,
                               min_entities=self.gc_min_entities,

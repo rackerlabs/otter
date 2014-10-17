@@ -501,6 +501,7 @@ class ScalingGroupFixture(AutoscaleFixture):
                    lc_image_ref=None, lc_flavor_ref=None,
                    lc_personality=None, lc_metadata=None,
                    lc_disk_config=None, lc_networks=None,
+                   lc_block_device_mapping=None,
                    lc_load_balancers=None):
         """
         Creates a scaling group with config values
@@ -532,6 +533,7 @@ class ScalingGroupFixture(AutoscaleFixture):
                 lc_metadata=lc_metadata,
                 lc_disk_config=lc_disk_config,
                 lc_networks=lc_networks,
+                lc_block_device_mapping=lc_block_device_mapping,
                 lc_load_balancers=lc_load_balancers)
         cls.group = cls.create_group_response.entity
         cls.resources.add(cls.group.id,
