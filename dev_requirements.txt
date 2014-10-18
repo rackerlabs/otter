@@ -20,7 +20,7 @@ IPy==0.81
 # pin deps of deps
 
 httpretty==0.6.0
-pymongo==2.5.2
+pymongo==2.5
 argparse==1.2.1
 Pygments==1.5
 Jinja2==2.6
