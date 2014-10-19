@@ -10,7 +10,7 @@ import treq
 from twisted.internet import defer
 
 from characteristic import attributes, Attribute
-from pyrsistent import pbag, freeze, v
+from pyrsistent import pbag, freeze, s
 from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
@@ -225,7 +225,7 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
             if lb_node is None:
                 yield AddNodesToLoadBalancer(
                     lb_id=lb_id,
-                    node_configs=v((ip_address, desired_config)))
+                    node_configs=s((ip_address, desired_config)))
 
             elif desired_config != lb_node.config:
                 yield ChangeLoadBalancerNode(
@@ -378,7 +378,7 @@ class AddNodesToLoadBalancer(object):
     """
     Multiple nodes must be added to a load balancer.
 
-    :param node_configs: A sequence of two-tuples of address and
+    :param node_configs: A collection of two-tuples of address and
         :obj:`LBConfig`.
     """
 
