@@ -10,7 +10,7 @@ import treq
 from twisted.internet import defer
 
 from characteristic import attributes, Attribute
-from pyrsistent import pbag, freeze, pmap
+from pyrsistent import pbag, freeze, v
 from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
@@ -128,8 +128,8 @@ class DesiredGroupState(object):
 
     :ivar dict launch_config: nova launch config.
     :ivar int desired: the number of desired servers within the group.
-    :ivar dict desired_lbs: A mapping of load balancer IDs to :class:`LBConfig`
-        instances.
+    :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
+        :class:`LBConfig` instances.
     """
 
     def __init__(self):
@@ -204,7 +204,7 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     is currently on, and it will be added on the correct port, with the correct
     weight, and correct status, to the desired load balancers.
 
-    :param dict desired_lb_state: `dict` mapping LB IDs to :obj:`LBConfig`
+    :param dict desired_lb_state: As per :obj:`DesiredGroupState`.desired_lbs
     :param list current_lb_state: `list` of :obj:`LBNode`
     :param str ip_address: the IP address of the server to converge
 
@@ -213,36 +213,33 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     be used if load balancer health monitoring is enabled, and would be used as
     backup servers anyway.
     """
-    # put both desired and current into dictionaries keyed by load balancer ID
-    # and port, because those are the two required values of a mapping
-    desired_lb_map = {(lb_id, config.port): config
-                      for lb_id, config in desired_lb_state.iteritems()}
+    # LB Configurations are specified to us as LB IDs and ports, so index
+    # current LB based on that.
     current_lb_map = {(node.lb_id, node.config.port): node
                       for node in current_lb_state}
 
-    for key, desired_config in desired_lb_map.iteritems():
-        lb_id = key[0]
-        lb_node = current_lb_map.get(key)
+    for lb_id, configs in desired_lb_state.iteritems():
+        for desired_config in configs:
+            lb_node = current_lb_map.get((lb_id, desired_config.port))
 
-        if lb_node is None:
-            yield AddNodesToLoadBalancer(
-                lb_id=lb_id,
-                node_configs=pmap({ip_address: LBConfig(
-                    port=desired_config.port,
+            if lb_node is None:
+                yield AddNodesToLoadBalancer(
+                    lb_id=lb_id,
+                    node_configs=v((ip_address, desired_config)))
+
+            elif desired_config != lb_node.config:
+                yield ChangeLoadBalancerNode(
+                    loadbalancer_id=lb_node.lb_id,
+                    node_id=lb_node.node_id,
                     condition=desired_config.condition,
                     weight=desired_config.weight,
-                    type=desired_config.type)}))
+                    type=desired_config.type)
 
-        elif desired_config != lb_node.config:
-            yield ChangeLoadBalancerNode(loadbalancer_id=lb_node.lb_id,
-                                         node_id=lb_node.node_id,
-                                         condition=desired_config.condition,
-                                         weight=desired_config.weight,
-                                         type=desired_config.type)
-
+    desired_ids_and_ports = [(lb_id, config.port)
+                             for lb_id, configs in desired_lb_state.iteritems()
+                             for config in configs]
     undesirables = (item for item in current_lb_map.iteritems()
-                    if item[0] not in desired_lb_map)
-
+                    if item[0] not in desired_ids_and_ports)
     for key, current in undesirables:
         yield RemoveFromLoadBalancer(loadbalancer_id=current.lb_id,
                                      node_id=current.node_id)
@@ -381,7 +378,8 @@ class AddNodesToLoadBalancer(object):
     """
     Multiple nodes must be added to a load balancer.
 
-    :param node_configs: a mapping of IP address to :class:`LBConfig`.
+    :param node_configs: A sequence of two-tuples of address and
+        :obj:`LBConfig`.
     """
 
 

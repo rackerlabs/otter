@@ -18,7 +18,7 @@ from otter.convergence import (
     ACTIVE, ERROR, BUILD,
     ServiceType, NodeCondition, NodeType)
 
-from pyrsistent import pmap, pbag
+from pyrsistent import pmap, pbag, v
 
 
 class GetAllServerDetailsTests(SynchronousTestCase):
@@ -180,19 +180,14 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If a desired LB config is not in the set of current configs,
         `converge_lb_state` returns a :class:`AddToLoadBalancer` object
         """
-        result = _converge_lb_state(desired_lb_state={5: LBConfig(port=80)},
+        result = _converge_lb_state(desired_lb_state={5: [LBConfig(port=80)]},
                                     current_lb_state=[],
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
             [AddNodesToLoadBalancer(
                 lb_id=5,
-                node_configs={
-                    '1.1.1.1': LBConfig(
-                        port=80,
-                        condition=NodeCondition.ENABLED,
-                        type=NodeType.PRIMARY,
-                        weight=1)})])
+                node_configs=v(('1.1.1.1', LBConfig(port=80))))])
 
     def test_change_lb_node(self):
         """
@@ -200,7 +195,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         but the configuration is wrong, `converge_lb_state` returns a
         :class:`ChangeLoadBalancerNode` object
         """
-        desired = {5: LBConfig(port=80)}
+        desired = {5: [LBConfig(port=80)]}
         current = [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
                           config=LBConfig(port=80, weight=5))]
 
@@ -233,7 +228,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If the desired lb state matches the current lb state,
         `converge_lb_state` returns nothing
         """
-        desired = {5: LBConfig(port=80)}
+        desired = {5: [LBConfig(port=80)]}
         current = [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
                           config=LBConfig(port=80))]
 
@@ -246,8 +241,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         """
         Remove, change, and add a node to a load balancer all together
         """
-        desired = {5: LBConfig(port=80),
-                   6: LBConfig(port=80, weight=2)}
+        desired = {5: [LBConfig(port=80)],
+                   6: [LBConfig(port=80, weight=2)]}
         current = [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
                           config=LBConfig(port=8080)),
                    LBNode(lb_id=6, node_id=234, address='1.1.1.1',
@@ -259,17 +254,35 @@ class ConvergeLBStateTests(SynchronousTestCase):
         self.assertEqual(set(result), set([
             AddNodesToLoadBalancer(
                 lb_id=5,
-                node_configs=pmap({
-                    '1.1.1.1': LBConfig(
-                        port=80,
-                        condition=NodeCondition.ENABLED,
-                        type=NodeType.PRIMARY,
-                        weight=1)})),
+                node_configs=v(
+                    ('1.1.1.1', LBConfig(port=80)))),
             ChangeLoadBalancerNode(loadbalancer_id=6, node_id=234, weight=2,
                                    condition=NodeCondition.ENABLED,
                                    type=NodeType.PRIMARY),
             RemoveFromLoadBalancer(loadbalancer_id=5, node_id=123)
         ]))
+
+    def test_same_lb_multiple_ports(self):
+        """
+        It's possible to have the same load balancer using multiple ports on
+        the host.
+
+        (use case: running multiple single-threaded server processes on a
+        machine)
+        """
+        desired = {5: [LBConfig(port=8080), LBConfig(port=8081)]}
+        current = []
+        result = _converge_lb_state(desired, current, '1.1.1.1')
+        self.assertEqual(
+            set(result),
+            set([
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    node_configs=v(('1.1.1.1', LBConfig(port=8080)))),
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    node_configs=v(('1.1.1.1', LBConfig(port=8081))))
+                ]))
 
 
 def server(id, state, created=0, **kwargs):
@@ -445,7 +458,7 @@ class ConvergeTests(SynchronousTestCase):
         Only servers in active that are not being deleted will have their
         load balancers converged.
         """
-        desired_lbs = {5: LBConfig(port=80)}
+        desired_lbs = {5: [LBConfig(port=80)]}
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1, desired_lbs=desired_lbs),
@@ -457,17 +470,10 @@ class ConvergeTests(SynchronousTestCase):
                 DeleteServer(server_id='abc'),
                 AddNodesToLoadBalancer(
                     lb_id=5,
-                    node_configs=pmap({
-                        '2.2.2.2': LBConfig(
-                            port=80,
-                            condition=NodeCondition.ENABLED,
-                            weight=1,
-                            type=NodeType.PRIMARY)}))
+                    node_configs=v(('2.2.2.2', LBConfig(port=80))))
             ])))
 
-
 # time out (delete) building servers
-# load balancers!
 
 
 class RequestConversionTests(SynchronousTestCase):
