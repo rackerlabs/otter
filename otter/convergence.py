@@ -10,7 +10,7 @@ import treq
 from twisted.internet import defer
 
 from characteristic import attributes, Attribute
-from pyrsistent import pbag, freeze, s
+from pyrsistent import pbag, freeze, s, pset
 from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
@@ -326,6 +326,31 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                    ))
 
 
+def _optimize_lb_adds(lb_add_steps):
+    """
+    Merge together multiple :obj:`AddNodesToLoadBalancer`, per load balancer.
+
+    :param steps_by_lb: Iterable of :obj:`AddNodesToLoadBalancer`.
+    """
+    steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
+    return [
+        AddNodesToLoadBalancer(
+            lb_id=lbid,
+            node_configs=pset(reduce(lambda s, y: s.union(y),
+                                     [step.node_configs for step in steps])))
+        for lbid, steps in steps_by_lb.iteritems()
+    ]
+
+
+def optimize_steps(steps):
+    """Optimize steps."""
+    lb_adds, other = partition_bool(
+        lambda s: type(s) is AddNodesToLoadBalancer,
+        steps)
+    merged_adds = _optimize_lb_adds(lb_adds)
+    return pbag(merged_adds + other)
+
+
 @attributes(['steps'])
 class Convergence(object):
     """
@@ -343,7 +368,7 @@ class CreateServer(object):
     """
     A server must be created.
 
-    :ivar dict launch_config: Nova launch configuration.
+    :ivar pmap launch_config: Nova launch configuration.
     """
 
     def as_request(self):
