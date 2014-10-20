@@ -658,7 +658,8 @@ def scrub_otter_metadata(log, auth_token, service_catalog, region, server_id,
     return (get()
             .addCallback(_treq.json_content)
             .addCallback(comp(json.dumps, _without_otter_metadata))
-            .addCallback(put))
+            .addCallback(put)
+            .addCallback(_treq.content))
 
 
 def launch_server(log, region, scaling_group, service_catalog, auth_token,

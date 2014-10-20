@@ -2025,7 +2025,7 @@ class MetadataScrubbingTests(SynchronousTestCase):
                                  server_id="server",
                                  _treq=treq)
 
-        body = self.successResultOf(d.addCallback(treq.content))
+        body = self.successResultOf(d)
         self.assertEqual(body, "")
 
 
