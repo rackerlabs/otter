@@ -162,8 +162,8 @@ class ObjectStorageTests(SynchronousTestCase):
     """
     def test_lbconfig_default_weight_condition_and_type(self):
         """
-        The required values for a LBConfig are just the lb_id and port.  The
-        other attributes have default values.
+        :obj:`LBConfig` only requires a port.  The other attributes have
+        default values.
         """
         lb = LBConfig(port=80)
         self.assertEqual(lb.weight, 1)
