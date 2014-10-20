@@ -225,7 +225,7 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
             if lb_node is None:
                 yield AddNodesToLoadBalancer(
                     lb_id=lb_id,
-                    node_configs=s((ip_address, desired_config)))
+                    address_configs=s((ip_address, desired_config)))
 
             elif desired_config != lb_node.config:
                 yield ChangeLoadBalancerNode(
@@ -373,12 +373,12 @@ class DeleteServer(object):
 
 
 @implementer(IStep)
-@attributes(['lb_id', 'node_configs'])
+@attributes(['lb_id', 'address_configs'])
 class AddNodesToLoadBalancer(object):
     """
     Multiple nodes must be added to a load balancer.
 
-    :param node_configs: A collection of two-tuples of address and
+    :param address_configs: A collection of two-tuples of address and
         :obj:`LBConfig`.
     """
 
