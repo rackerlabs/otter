@@ -632,7 +632,7 @@ def _without_otter_metadata(metadata):
 
 
 def scrub_otter_metadata(log, auth_token, service_catalog, region, server_id,
-                          _treq=treq):
+                         _treq=treq):
     """
     Scrub otter-specific management metadata from the server.
 
