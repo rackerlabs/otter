@@ -584,7 +584,7 @@ class OptimizerTests(SynchronousTestCase):
                 AddNodesToLoadBalancer(
                     lb_id=5,
                     address_configs=s(('1.1.1.1', LBConfig(port=80)),
-                                   ('1.1.1.1', LBConfig(port=8080))))]))
+                                      ('1.1.1.1', LBConfig(port=8080))))]))
 
     def test_multiple_load_balancers(self):
         """Aggregation is done on a per-load-balancer basis."""
@@ -608,11 +608,11 @@ class OptimizerTests(SynchronousTestCase):
                 AddNodesToLoadBalancer(
                     lb_id=5,
                     address_configs=s(('1.1.1.1', LBConfig(port=80)),
-                                   ('1.1.1.2', LBConfig(port=80)))),
+                                      ('1.1.1.2', LBConfig(port=80)))),
                 AddNodesToLoadBalancer(
                     lb_id=6,
                     address_configs=s(('1.1.1.1', LBConfig(port=80)),
-                                   ('1.1.1.2', LBConfig(port=80)))),
+                                      ('1.1.1.2', LBConfig(port=80)))),
             ]))
 
     def test_optimize_leaves_other_steps(self):

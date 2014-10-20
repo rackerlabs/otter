@@ -338,7 +338,7 @@ def _optimize_lb_adds(lb_add_steps):
         AddNodesToLoadBalancer(
             lb_id=lbid,
             address_configs=pset(reduce(lambda s, y: s.union(y),
-                                     [step.address_configs for step in steps])))
+                                 [step.address_configs for step in steps])))
         for lbid, steps in steps_by_lb.iteritems()
     ]
 
