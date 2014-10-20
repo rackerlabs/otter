@@ -204,7 +204,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
-            [ChangeLoadBalancerNode(loadbalancer_id=5, node_id=123, weight=1,
+            [ChangeLoadBalancerNode(lb_id=5, node_id=123, weight=1,
                                     condition=NodeCondition.ENABLED,
                                     type=NodeType.PRIMARY)])
 
@@ -221,7 +221,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
-            [RemoveFromLoadBalancer(loadbalancer_id=5, node_id=123)])
+            [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
 
     def test_do_nothing(self):
         """
@@ -255,10 +255,10 @@ class ConvergeLBStateTests(SynchronousTestCase):
             AddNodesToLoadBalancer(
                 lb_id=5,
                 node_configs=s(('1.1.1.1', LBConfig(port=80)))),
-            ChangeLoadBalancerNode(loadbalancer_id=6, node_id=234, weight=2,
+            ChangeLoadBalancerNode(lb_id=6, node_id=234, weight=2,
                                    condition=NodeCondition.ENABLED,
                                    type=NodeType.PRIMARY),
-            RemoveFromLoadBalancer(loadbalancer_id=5, node_id=123)
+            RemoveFromLoadBalancer(lb_id=5, node_id=123)
         ]))
 
     def test_same_lb_multiple_ports(self):
@@ -370,8 +370,8 @@ class ConvergeTests(SynchronousTestCase):
             Convergence(
                 steps=pbag([
                     DeleteServer(server_id='abc'),
-                    RemoveFromLoadBalancer(loadbalancer_id=5, node_id=3),
-                    RemoveFromLoadBalancer(loadbalancer_id=5, node_id=5),
+                    RemoveFromLoadBalancer(lb_id=5, node_id=3),
+                    RemoveFromLoadBalancer(lb_id=5, node_id=5),
                     CreateServer(launch_config=pmap()),
                 ])))
 
@@ -401,7 +401,7 @@ class ConvergeTests(SynchronousTestCase):
                 0),
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),
-                RemoveFromLoadBalancer(loadbalancer_id=5, node_id=3)
+                RemoveFromLoadBalancer(lb_id=5, node_id=3)
             ])))
 
     def test_scale_down_building_first(self):
@@ -511,7 +511,7 @@ class RequestConversionTests(SynchronousTestCase):
         removing a node from a load balancer.
         """
         lbremove = RemoveFromLoadBalancer(
-            loadbalancer_id='abc123',
+            lb_id='abc123',
             node_id='node1')
         self.assertEqual(
             lbremove.as_request(),
@@ -526,7 +526,7 @@ class RequestConversionTests(SynchronousTestCase):
         modifying a load balancer node.
         """
         changenode = ChangeLoadBalancerNode(
-            loadbalancer_id='abc123',
+            lb_id='abc123',
             node_id='node1',
             condition='DRAINING',
             weight=50,

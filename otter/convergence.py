@@ -229,7 +229,7 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
 
             elif desired_config != lb_node.config:
                 yield ChangeLoadBalancerNode(
-                    loadbalancer_id=lb_node.lb_id,
+                    lb_id=lb_node.lb_id,
                     node_id=lb_node.node_id,
                     condition=desired_config.condition,
                     weight=desired_config.weight,
@@ -241,7 +241,7 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     undesirables = (item for item in current_lb_map.iteritems()
                     if item[0] not in desired_ids_and_ports)
     for key, current in undesirables:
-        yield RemoveFromLoadBalancer(loadbalancer_id=current.lb_id,
+        yield RemoveFromLoadBalancer(lb_id=current.lb_id,
                                      node_id=current.node_id)
 
 
@@ -292,7 +292,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     servers_to_delete = (servers_in_active + waiting_for_build)[desired_state.desired:]
     delete_steps = (
         [DeleteServer(server_id=server.id) for server in servers_to_delete] +
-        [RemoveFromLoadBalancer(loadbalancer_id=lb_node.lb_id,
+        [RemoveFromLoadBalancer(lb_id=lb_node.lb_id,
                                 node_id=lb_node.node_id)
          for server in servers_to_delete
          for lb_node in lbs_by_address.get(server.servicenet_address, [])])
@@ -300,7 +300,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # delete all servers in error.
     delete_error_steps = (
         [DeleteServer(server_id=server.id) for server in servers_in_error] +
-        [RemoveFromLoadBalancer(loadbalancer_id=lb_node.lb_id,
+        [RemoveFromLoadBalancer(lb_id=lb_node.lb_id,
                                 node_id=lb_node.node_id)
          for server in servers_in_error
          for lb_node in lbs_by_address.get(server.servicenet_address, [])])
@@ -384,7 +384,7 @@ class AddNodesToLoadBalancer(object):
 
 
 @implementer(IStep)
-@attributes(['loadbalancer_id', 'node_id'])
+@attributes(['lb_id', 'node_id'])
 class RemoveFromLoadBalancer(object):
     """
     A server must be removed from a load balancer.
@@ -396,12 +396,12 @@ class RemoveFromLoadBalancer(object):
             service=ServiceType.CLOUD_LOAD_BALANCERS,
             method='DELETE',
             path=append_segments('loadbalancers',
-                                 str(self.loadbalancer_id),
+                                 str(self.lb_id),
                                  str(self.node_id)))
 
 
 @implementer(IStep)
-@attributes(['loadbalancer_id', 'node_id', 'condition', 'weight', 'type'])
+@attributes(['lb_id', 'node_id', 'condition', 'weight', 'type'])
 class ChangeLoadBalancerNode(object):
     """
     An existing port mapping on a load balancer must have its condition,
@@ -414,7 +414,7 @@ class ChangeLoadBalancerNode(object):
             service=ServiceType.CLOUD_LOAD_BALANCERS,
             method='PUT',
             path=append_segments('loadbalancers',
-                                 self.loadbalancer_id,
+                                 self.lb_id,
                                  'nodes', self.node_id),
             data={'condition': self.condition,
                   'weight': self.weight})
