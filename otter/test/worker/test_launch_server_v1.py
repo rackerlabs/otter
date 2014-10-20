@@ -36,7 +36,7 @@ from otter.worker.launch_server_v1 import (
     CLBOrNodeDeleted,
     generate_server_metadata,
     _without_otter_metadata,
-    remove_otter_metadata,
+    scrub_otter_metadata,
 )
 
 
@@ -1978,9 +1978,9 @@ sample_otter_metadata = generate_server_metadata("group_id",
 sample_user_metadata = {"some_user_key": "some_user_value"}
 
 
-class MetadataRemovalTests(SynchronousTestCase):
+class MetadataScrubbingTests(SynchronousTestCase):
     """
-    Tests for removal of metadata.
+    Tests for scrubbing of metadata.
     """
     def test_without_otter_metadata(self):
         """
@@ -1998,9 +1998,9 @@ class MetadataRemovalTests(SynchronousTestCase):
             scrubbed = _without_otter_metadata(metadata)
             self.assertEqual(scrubbed, expected_scrubbed_metadata)
 
-    def test_remove_otter_metadata(self):
+    def test_scrub_otter_metadata(self):
         """
-        Removing otter metadata works correctly.
+        Scrubbing otter metadata works correctly.
         """
         set_config_data({"cloudServersOpenStack": "cloudServersOpenStack"})
         self.addCleanup(set_config_data, {})
@@ -2018,12 +2018,12 @@ class MetadataRemovalTests(SynchronousTestCase):
                              "data": json.dumps(sample_user_metadata)}),
                            (200, ""))])
 
-        d = remove_otter_metadata(log=log,
-                                  auth_token="my-auth-token",
-                                  service_catalog=fake_service_catalog,
-                                  region="ORD",
-                                  server_id="server",
-                                  _treq=treq)
+        d = scrub_otter_metadata(log=log,
+                                 auth_token="my-auth-token",
+                                 service_catalog=fake_service_catalog,
+                                 region="ORD",
+                                 server_id="server",
+                                 _treq=treq)
 
         body = self.successResultOf(d.addCallback(treq.content))
         self.assertEqual(body, "")

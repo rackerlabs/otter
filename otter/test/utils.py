@@ -499,7 +499,7 @@ class FakeSupervisor(object, Service):
         self.del_calls.append((log, transaction_id, scaling_group, server))
         return succeed(self.del_index)
 
-    def execute_scrub_metadata(self, log, transaction_id, tenant_id, server_id):
+    def scrub_otter_metadata(self, log, transaction_id, tenant_id, server_id):
         """
         Scrubs otter-specific metadata off a server.
         """

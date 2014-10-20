@@ -54,16 +54,13 @@ class ISupervisor(Interface):
             before callback(ing).
         """
 
-    # REVIEW: is execute_verb_noun an intentional pattern, or
-    # something we accidentally grew with execute_delete_server after
-    # execute_launch_config?
-    def execute_scrub_metadata(log, transaction_id, tenant_id, server_id):
+    def scrub_otter_metadata(log, transaction_id, tenant_id, server_id):
         """
-        Scrubs otter-specific metadata off of a single server.
+        Remove otter-specific metadata off of a single server.
 
         :param log: Bound logger.
         :param str transaction_id: The transaction id.
-        :param str tenant_id: The tenant id.
+        :param str tenant_id: The tenant_id.
         :param str server_id: The server id.
         """
 
@@ -162,22 +159,17 @@ class SupervisorService(object, Service):
 
         return d
 
-    def execute_scrub_metadata(self, log, transaction_id, tenant_id, server_id):
+    def scrub_otter_metadata(self, log, transaction_id, tenant_id, server_id):
         """
-        See :meth:`ISupervisor.execute_scrub_metadata`.
+        See :meth:`ISupervisor.scrub_otter_metadata`.
         """
-        # REVIEW: I noticed other logs don't bind transaction id... why?
         log = log.bind(server_id=server_id, tenant_id=tenant_id)
 
         d = self.auth_function(tenant_id, log=log)
         log.msg("Authenticating for tenant")
 
-        # REVIEW: this would be trivial to refactor together with
-        # execute_delete_server using a macro. (It's harder to do so
-        # now, because of the differences in signatures.)
-
         def when_authenticated((auth_token, service_catalog)):
-            d = launch_server_v1.remove_otter_metadata(log,
+            d = launch_server_v1.scrub_otter_metadata(log,
                                                        auth_token,
                                                        service_catalog,
                                                        self.region,
@@ -390,7 +382,7 @@ class _ScrubJob(object):
         """
         Start the metadata scrubbing job.
         """
-        d = self.supervisor.execute_scrub_metadata(
+        d = self.supervisor.scrub_otter_metadata(
             self.log, self.transaction_id, self.tenant_id, self.server_id)
 
         def _scrub_succeeded(_):
@@ -636,13 +628,6 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge, group, st
         job = _ScrubJob(log, trans_id, group.tenant_id, server_id, supervisor)
         d = job.start()
         supervisor.deferred_pool.add(d)
-        # REVIEW: is it safe to use deferreds after they have been
-        # added to a DeferredPool?
-        # REVIEW: do we actually wait until the metadata is scrubbed?
-        # If we don't, there are more refactoring options here;
-        # _ScrubJob can be changed to have the same signature as
-        # _DeleteJob, and then the if purge: ... else: ... block below
-        # just becomes a choice of which job to run.
         return d
 
     if server_id not in state.active:

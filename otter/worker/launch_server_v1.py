@@ -631,10 +631,10 @@ def _without_otter_metadata(metadata):
             if not k.startswith("rax:auto_scaling")}
 
 
-def remove_otter_metadata(log, auth_token, service_catalog, region, server_id,
+def scrub_otter_metadata(log, auth_token, service_catalog, region, server_id,
                           _treq=treq):
     """
-    Remove the otter-specific management metadata from the server.
+    Scrub otter-specific management metadata from the server.
 
     :param BoundLog log: The bound logger instance.
     :param str auth_token: Keystone auth token.
@@ -643,7 +643,7 @@ def remove_otter_metadata(log, auth_token, service_catalog, region, server_id,
     :param _treq: The treq instance; possibly a test double.
     """
     bound_log = log.bind(region=region, server_id=server_id)
-    bound_log.msg("Removing otter-specific metadata")
+    bound_log.msg("Scrubbing otter-specific metadata")
 
     service_name = config_value('cloudServersOpenStack')
     endpoint = public_endpoint_url(service_catalog, service_name, region)

@@ -283,28 +283,28 @@ class DeleteServerTests(SupervisorTests):
 
 class ScrubMetadataTests(SupervisorTests):
     """
-    Tests for func:``otter.supervisor.execute_scrub_metadata``.
+    Tests for func:``otter.supervisor.scrub_otter_metadata``.
     """
     def setUp(self):
         """
         Set up the test.
         """
         super(ScrubMetadataTests, self).setUp()
-        self.remove_otter_metadata = patch(
+        self.scrub_otter_metadata = patch(
             self,
-            'otter.worker.launch_server_v1.remove_otter_metadata',
+            'otter.worker.launch_server_v1.scrub_otter_metadata',
             return_value=succeed(None))
 
     def test_scrub_metadata(self):
         """
         Tests metadata scrubbing.
         """
-        d = self.supervisor.execute_scrub_metadata(
+        d = self.supervisor.scrub_otter_metadata(
             self.log, "txn-id", "tenant-id", "server-id")
         self.successResultOf(d)
         self.auth_function.assert_called_once_with(
             "tenant-id", log=self.log.bind.return_value)
-        self.remove_otter_metadata.assert_called_once_with(
+        self.scrub_otter_metadata.assert_called_once_with(
             self.log.bind.return_value,
             self.auth_token,
             self.service_catalog,
@@ -600,7 +600,7 @@ class ScrubJobTests(SynchronousTestCase):
         Starting a scrub job works correctly.
         """
         d = succeed(None)
-        self.supervisor.execute_scrub_metadata.return_value = d
+        self.supervisor.scrub_otter_metadata.return_value = d
 
         job, bound_log = self._create_job()
         self.successResultOf(job.start())
@@ -617,7 +617,7 @@ class ScrubJobTests(SynchronousTestCase):
         When a scrubbing job fails, the failure is logged.
         """
         e = RuntimeError("o noes")
-        self.supervisor.execute_scrub_metadata.return_value = fail(e)
+        self.supervisor.scrub_otter_metadata.return_value = fail(e)
 
         job, bound_log = self._create_job()
         self.successResultOf(job.start())
@@ -629,7 +629,7 @@ class ScrubJobTests(SynchronousTestCase):
 
 class ExecScaleDownTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.supervisor.exec_scale_down`
+    Tests for :func:`otter.supervisor.exec_scale_down`.
     """
 
     def setUp(self):
