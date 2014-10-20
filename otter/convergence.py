@@ -213,36 +213,37 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     be used if load balancer health monitoring is enabled, and would be used as
     backup servers anyway.
     """
-    # LB Configurations are specified to us as LB IDs and ports, so index
-    # current LB based on that.
-    current_lb_map = {(node.lb_id, node.config.port): node
-                      for node in current_lb_state}
+    desired = {
+        (lb_id, config.port): config
+        for lb_id, configs in desired_lb_state.items()
+        for config in configs}
+    current = {
+        (node.lb_id, node.config.port): node
+        for node in current_lb_state}
+    desired_idports = set(desired)
+    current_idports = set(current)
 
-    for lb_id, configs in desired_lb_state.iteritems():
-        for desired_config in configs:
-            lb_node = current_lb_map.get((lb_id, desired_config.port))
-
-            if lb_node is None:
-                yield AddNodesToLoadBalancer(
-                    lb_id=lb_id,
-                    address_configs=s((ip_address, desired_config)))
-
-            elif desired_config != lb_node.config:
-                yield ChangeLoadBalancerNode(
-                    lb_id=lb_node.lb_id,
-                    node_id=lb_node.node_id,
-                    condition=desired_config.condition,
-                    weight=desired_config.weight,
-                    type=desired_config.type)
-
-    desired_ids_and_ports = [(lb_id, config.port)
-                             for lb_id, configs in desired_lb_state.iteritems()
-                             for config in configs]
-    undesirables = (item for item in current_lb_map.iteritems()
-                    if item[0] not in desired_ids_and_ports)
-    for key, current in undesirables:
-        yield RemoveFromLoadBalancer(lb_id=current.lb_id,
-                                     node_id=current.node_id)
+    adds = [
+        AddNodesToLoadBalancer(
+            lb_id=lb_id,
+            address_configs=s((ip_address, desired[lb_id, port])))
+        for lb_id, port in desired_idports - current_idports]
+    removes = [
+        RemoveFromLoadBalancer(
+            lb_id=lb_id,
+            node_id=current[lb_id, port].node_id)
+        for lb_id, port in current_idports - desired_idports]
+    changes = [
+        ChangeLoadBalancerNode(
+            lb_id=lb_id,
+            node_id=current[lb_id, port].node_id,
+            condition=desired_config.condition,
+            weight=desired_config.weight,
+            type=desired_config.type)
+        for (lb_id, port), desired_config in desired.iteritems()
+        if ((lb_id, port) in current
+            and current[lb_id, port].config != desired_config)]
+    return adds + removes + changes
 
 
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
