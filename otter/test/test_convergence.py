@@ -187,7 +187,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
             list(result),
             [AddNodesToLoadBalancer(
                 lb_id=5,
-                node_configs=s(('1.1.1.1', LBConfig(port=80))))])
+                address_configs=s(('1.1.1.1', LBConfig(port=80))))])
 
     def test_change_lb_node(self):
         """
@@ -254,7 +254,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         self.assertEqual(set(result), set([
             AddNodesToLoadBalancer(
                 lb_id=5,
-                node_configs=s(('1.1.1.1', LBConfig(port=80)))),
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
             ChangeLoadBalancerNode(lb_id=6, node_id=234, weight=2,
                                    condition=NodeCondition.ENABLED,
                                    type=NodeType.PRIMARY),
@@ -277,10 +277,10 @@ class ConvergeLBStateTests(SynchronousTestCase):
             set([
                 AddNodesToLoadBalancer(
                     lb_id=5,
-                    node_configs=s(('1.1.1.1', LBConfig(port=8080)))),
+                    address_configs=s(('1.1.1.1', LBConfig(port=8080)))),
                 AddNodesToLoadBalancer(
                     lb_id=5,
-                    node_configs=s(('1.1.1.1', LBConfig(port=8081))))
+                    address_configs=s(('1.1.1.1', LBConfig(port=8081))))
                 ]))
 
 
@@ -469,7 +469,7 @@ class ConvergeTests(SynchronousTestCase):
                 DeleteServer(server_id='abc'),
                 AddNodesToLoadBalancer(
                     lb_id=5,
-                    node_configs=s(('2.2.2.2', LBConfig(port=80))))
+                    address_configs=s(('2.2.2.2', LBConfig(port=80))))
             ])))
 
 # time out (delete) building servers
