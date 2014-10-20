@@ -552,16 +552,16 @@ class OptimizerTests(SynchronousTestCase):
         steps = pbag([
             AddNodesToLoadBalancer(
                 lb_id=5,
-                node_configs=s(('1.1.1.1', LBConfig(port=80)))),
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
             AddNodesToLoadBalancer(
                 lb_id=5,
-                node_configs=s(('1.2.3.4', LBConfig(port=80))))])
+                address_configs=s(('1.2.3.4', LBConfig(port=80))))])
         self.assertEqual(
             optimize_steps(steps),
             pbag([
                 AddNodesToLoadBalancer(
                     lb_id=5,
-                    node_configs=s(
+                    address_configs=s(
                         ('1.1.1.1', LBConfig(port=80)),
                         ('1.2.3.4', LBConfig(port=80)))
                 )]))
@@ -573,17 +573,17 @@ class OptimizerTests(SynchronousTestCase):
         steps = pbag([
             AddNodesToLoadBalancer(
                 lb_id=5,
-                node_configs=s(('1.1.1.1', LBConfig(port=80)))),
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
             AddNodesToLoadBalancer(
                 lb_id=5,
-                node_configs=s(('1.1.1.1', LBConfig(port=8080))))])
+                address_configs=s(('1.1.1.1', LBConfig(port=8080))))])
 
         self.assertEqual(
             optimize_steps(steps),
             pbag([
                 AddNodesToLoadBalancer(
                     lb_id=5,
-                    node_configs=s(('1.1.1.1', LBConfig(port=80)),
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
                                    ('1.1.1.1', LBConfig(port=8080))))]))
 
     def test_multiple_load_balancers(self):
@@ -591,27 +591,27 @@ class OptimizerTests(SynchronousTestCase):
         steps = pbag([
             AddNodesToLoadBalancer(
                 lb_id=5,
-                node_configs=s(('1.1.1.1', LBConfig(port=80)))),
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
             AddNodesToLoadBalancer(
                 lb_id=5,
-                node_configs=s(('1.1.1.2', LBConfig(port=80)))),
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
             AddNodesToLoadBalancer(
                 lb_id=6,
-                node_configs=s(('1.1.1.1', LBConfig(port=80)))),
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
             AddNodesToLoadBalancer(
                 lb_id=6,
-                node_configs=s(('1.1.1.2', LBConfig(port=80)))),
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
         ])
         self.assertEqual(
             optimize_steps(steps),
             pbag([
                 AddNodesToLoadBalancer(
                     lb_id=5,
-                    node_configs=s(('1.1.1.1', LBConfig(port=80)),
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
                                    ('1.1.1.2', LBConfig(port=80)))),
                 AddNodesToLoadBalancer(
                     lb_id=6,
-                    node_configs=s(('1.1.1.1', LBConfig(port=80)),
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
                                    ('1.1.1.2', LBConfig(port=80)))),
             ]))
 
@@ -622,7 +622,7 @@ class OptimizerTests(SynchronousTestCase):
         steps = pbag([
             AddNodesToLoadBalancer(
                 lb_id=5,
-                node_configs=s(('1.1.1.1', LBConfig(port=80)))),
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
             CreateServer(launch_config=pmap({}))
         ])
         self.assertEqual(
