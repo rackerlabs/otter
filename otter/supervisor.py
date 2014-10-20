@@ -170,10 +170,10 @@ class SupervisorService(object, Service):
 
         def when_authenticated((auth_token, service_catalog)):
             d = launch_server_v1.scrub_otter_metadata(log,
-                                                       auth_token,
-                                                       service_catalog,
-                                                       self.region,
-                                                       server_id)
+                                                      auth_token,
+                                                      service_catalog,
+                                                      self.region,
+                                                      server_id)
             return d
         d.addCallback(when_authenticated)
 
