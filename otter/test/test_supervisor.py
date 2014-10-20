@@ -1112,11 +1112,6 @@ class RemoveServerTests(SynchronousTestCase):
         """
         _, txn_id, tenant_id, server_id = self.supervisor.scrub_calls[-1]
         self.assertEqual(txn_id, self.tid)
-        # REVIEW: This is "tenant", not "tid"; the implementation gets
-        # it from the group object, not the group_state object. I
-        # think it doesn't matter, because the two *should* always be
-        # consistent; the fact that it isn't is a bug in the test
-        # suite... right?
         self.assertEqual(tenant_id, "tenant")
         self.assertEqual(server_id, expected_server_id)
 
