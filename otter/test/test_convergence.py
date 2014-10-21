@@ -169,6 +169,14 @@ class ObjectStorageTests(SynchronousTestCase):
         self.assertEqual(lb.weight, 1)
         self.assertEqual(lb.condition, NodeCondition.ENABLED)
         self.assertEqual(lb.type, NodeType.PRIMARY)
+        self.assertEqual(lb.draining_time, 0)
+
+    def test_lbconfig_equality_not_dependent_on_draining_time(self):
+        """
+        :obj:`LBConfig.draining_time` is not used when comparing two
+        :obj:`LBConfig`s
+        """
+        self.assertEqual(LBConfig(port=80, draining_time=5), LBConfig(port=80))
 
 
 class ConvergeLBStateTests(SynchronousTestCase):
