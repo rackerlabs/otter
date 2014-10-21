@@ -577,7 +577,7 @@ class ScrubJobTests(SynchronousTestCase):
         Set up an environment for testing :class:`supervisor._ScrubJob`.
         """
         self.supervisor = iMock(ISupervisor)
-        self.log = mock.Mock()
+        self.log = mock_log()
 
     def _create_job(self):
         """
@@ -590,10 +590,7 @@ class ScrubJobTests(SynchronousTestCase):
                                    "tenant-id",
                                    "server-id",
                                    self.supervisor)
-        self.log.bind.assert_called_once_with(
-            system='otter.job.scrub_otter_metadata')
-        bound_log = self.log.bind.return_value
-        return job, bound_log
+        return job
 
     def test_scrub_job(self):
         """
@@ -602,15 +599,14 @@ class ScrubJobTests(SynchronousTestCase):
         d = succeed(None)
         self.supervisor.scrub_otter_metadata.return_value = d
 
-        job, bound_log = self._create_job()
+        job = self._create_job()
         self.successResultOf(job.start())
 
-        _, bind_kwargs = bound_log.bind.call_args
-        self.assertEqual(bind_kwargs, {"audit_log": True})
-
-        bound_log.bind.return_value.msg.assert_called_once_with(
+        self.log.msg.assert_called_with(
             "Otter-specific metadata scrubbed.",
-            event_type="server.scrub_otter_metadata")
+            audit_log=True,
+            event_type="server.scrub_otter_metadata",
+            system="otter.job.scrub_otter_metadata")
 
     def test_failed_job(self):
         """
@@ -619,10 +615,10 @@ class ScrubJobTests(SynchronousTestCase):
         e = RuntimeError("o noes")
         self.supervisor.scrub_otter_metadata.return_value = fail(e)
 
-        job, bound_log = self._create_job()
+        job = self._create_job()
         self.successResultOf(job.start())
 
-        (f, msg), _ = bound_log.err.call_args
+        (f, msg), _ = self.log.err.call_args
         self.assertEqual(f.value, e)
         self.assertEqual(msg, "Server metadata scrubbing failed.")
 
