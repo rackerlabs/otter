@@ -16,7 +16,7 @@ from otter.convergence import (
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ACTIVE, ERROR, BUILD,
-    ServiceType, NodeCondition, NodeType)
+    ServiceType, NodeCondition, NodeType, optimize_steps)
 
 from pyrsistent import pmap, pbag, s
 
@@ -539,3 +539,92 @@ class RequestConversionTests(SynchronousTestCase):
                 path='loadbalancers/abc123/nodes/node1',
                 data={'condition': 'DRAINING',
                       'weight': 50}))
+
+
+class OptimizerTests(SynchronousTestCase):
+    """Tests for :func:`optimize_steps`."""
+
+    def test_optimize_lb_adds(self):
+        """
+        Multiple :class:`AddNodesToLoadBalancer` steps for the same LB
+        are merged into one.
+        """
+        steps = pbag([
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.2.3.4', LBConfig(port=80))))])
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    address_configs=s(
+                        ('1.1.1.1', LBConfig(port=80)),
+                        ('1.2.3.4', LBConfig(port=80)))
+                )]))
+
+    def test_optimize_maintain_unique_ports(self):
+        """
+        Multiple ports can be specified for the same address and LB ID.
+        """
+        steps = pbag([
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=8080))))])
+
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.1', LBConfig(port=8080))))]))
+
+    def test_multiple_load_balancers(self):
+        """Aggregation is done on a per-load-balancer basis."""
+        steps = pbag([
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=6,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=6,
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
+        ])
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.2', LBConfig(port=80)))),
+                AddNodesToLoadBalancer(
+                    lb_id=6,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.2', LBConfig(port=80)))),
+            ]))
+
+    def test_optimize_leaves_other_steps(self):
+        """
+        Non-LB steps are not touched by the optimizer.
+        """
+        steps = pbag([
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            CreateServer(launch_config=pmap({}))
+        ])
+        self.assertEqual(
+            optimize_steps(steps),
+            steps)
