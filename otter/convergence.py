@@ -10,7 +10,7 @@ import treq
 from twisted.internet import defer
 
 from characteristic import attributes, Attribute
-from pyrsistent import pbag, freeze
+from pyrsistent import pbag, freeze, s
 from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
@@ -120,13 +120,16 @@ class IStep(Interface):
         """
 
 
-@attributes(['launch_config', 'desired'])
+@attributes(['launch_config', 'desired',
+             Attribute('desired_lbs', default_factory=dict, instance_of=dict)])
 class DesiredGroupState(object):
     """
     The desired state for a scaling group.
 
     :ivar dict launch_config: nova launch config.
     :ivar int desired: the number of desired servers within the group.
+    :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
+        :class:`LBConfig` instances.
     """
 
     def __init__(self):
@@ -134,8 +137,7 @@ class DesiredGroupState(object):
 
 
 @attributes(['id', 'state', 'created',
-             Attribute('servicenet_address', default_value='', instance_of=str),
-             Attribute('desired_lbs', default_factory=list, instance_of=list)])
+             Attribute('servicenet_address', default_value='', instance_of=str)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -145,11 +147,10 @@ class NovaServer(object):
     :ivar float created: Timestamp at which the server was created.
     :ivar str servicenet_address: The private ServiceNet IPv4 address, if
         the server is on the ServiceNet network
-    :ivar list desired_lbs: `list` of :class:`LBConfig`
     """
 
 
-@attributes(["lb_id", "port",
+@attributes(["port",
              Attribute("weight", default_value=1, instance_of=int),
              Attribute("condition", default_value=NodeCondition.ENABLED,
                        instance_of=NamedConstant),
@@ -158,9 +159,8 @@ class NovaServer(object):
 class LBConfig(object):
     """
     Information representing a load balancer port mapping; how a particular
-    server *should* be port-mapped to a particular load balancer.
+    server *should* be port-mapped to a load balancer.
 
-    :ivar int lb_id: The load balancer ID.
     :ivar int port: The port, which together with the server's IP, specifies
         the service that should be load-balanced by the load balancer.
     :ivar int weight: The weight to be used for certain load-balancing
@@ -172,12 +172,13 @@ class LBConfig(object):
     """
 
 
-@attributes(["node_id", "address", "config"])
+@attributes(["lb_id", "node_id", "address", "config"])
 class LBNode(object):
     """
     Information representing an actual node on a load balancer, which is
     an actual, existing, specific port mapping on a load balancer.
 
+    :ivar int lb_id: The Load Balancer ID.
     :ivar int node_id: The ID of the node, which is represents a unique
         combination of IP and port number, on the load balancer.
     :ivar str address: The IP address of the node.  The IP and port form a
@@ -203,7 +204,7 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     is currently on, and it will be added on the correct port, with the correct
     weight, and correct status, to the desired load balancers.
 
-    :param list desired_lb_state: `list` of :obj:`LBConfig`
+    :param dict desired_lb_state: As per :obj:`DesiredGroupState`.desired_lbs
     :param list current_lb_state: `list` of :obj:`LBNode`
     :param str ip_address: the IP address of the server to converge
 
@@ -212,37 +213,37 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     be used if load balancer health monitoring is enabled, and would be used as
     backup servers anyway.
     """
-    # put both desired and current into dictionaries keyed by load balancer ID
-    # and port, because those are the two required values of a mapping
-    desired_lb_map = {(config.lb_id, config.port): config
-                      for config in desired_lb_state}
-    current_lb_map = {(node.config.lb_id, node.config.port): node
-                      for node in current_lb_state}
+    desired = {
+        (lb_id, config.port): config
+        for lb_id, configs in desired_lb_state.items()
+        for config in configs}
+    current = {
+        (node.lb_id, node.config.port): node
+        for node in current_lb_state}
+    desired_idports = set(desired)
+    current_idports = set(current)
 
-    for key, desired_config in desired_lb_map.iteritems():
-        lb_node = current_lb_map.get(key)
-
-        if lb_node is None:
-            yield AddToLoadBalancer(loadbalancer_id=desired_config.lb_id,
-                                    address=ip_address,
-                                    port=desired_config.port,
-                                    condition=desired_config.condition,
-                                    weight=desired_config.weight,
-                                    type=desired_config.type)
-
-        elif desired_config != lb_node.config:
-            yield ChangeLoadBalancerNode(loadbalancer_id=desired_config.lb_id,
-                                         node_id=lb_node.node_id,
-                                         condition=desired_config.condition,
-                                         weight=desired_config.weight,
-                                         type=desired_config.type)
-
-    undesirables = (item for item in current_lb_map.iteritems()
-                    if item[0] not in desired_lb_map)
-
-    for key, current in undesirables:
-        yield RemoveFromLoadBalancer(loadbalancer_id=current.config.lb_id,
-                                     node_id=current.node_id)
+    adds = [
+        AddNodesToLoadBalancer(
+            lb_id=lb_id,
+            address_configs=s((ip_address, desired[lb_id, port])))
+        for lb_id, port in desired_idports - current_idports]
+    removes = [
+        RemoveFromLoadBalancer(
+            lb_id=lb_id,
+            node_id=current[lb_id, port].node_id)
+        for lb_id, port in current_idports - desired_idports]
+    changes = [
+        ChangeLoadBalancerNode(
+            lb_id=lb_id,
+            node_id=current[lb_id, port].node_id,
+            condition=desired_config.condition,
+            weight=desired_config.weight,
+            type=desired_config.type)
+        for (lb_id, port), desired_config in desired.iteritems()
+        if ((lb_id, port) in current
+            and current[lb_id, port].config != desired_config)]
+    return adds + removes + changes
 
 
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
@@ -292,7 +293,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     servers_to_delete = (servers_in_active + waiting_for_build)[desired_state.desired:]
     delete_steps = (
         [DeleteServer(server_id=server.id) for server in servers_to_delete] +
-        [RemoveFromLoadBalancer(loadbalancer_id=lb_node.config.lb_id,
+        [RemoveFromLoadBalancer(lb_id=lb_node.lb_id,
                                 node_id=lb_node.node_id)
          for server in servers_to_delete
          for lb_node in lbs_by_address.get(server.servicenet_address, [])])
@@ -300,7 +301,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # delete all servers in error.
     delete_error_steps = (
         [DeleteServer(server_id=server.id) for server in servers_in_error] +
-        [RemoveFromLoadBalancer(loadbalancer_id=lb_node.config.lb_id,
+        [RemoveFromLoadBalancer(lb_id=lb_node.lb_id,
                                 node_id=lb_node.node_id)
          for server in servers_in_error
          for lb_node in lbs_by_address.get(server.servicenet_address, [])])
@@ -312,7 +313,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         step
         for server in new_active_servers
         for step in _converge_lb_state(
-            server.desired_lbs,
+            desired_state.desired_lbs,
             lbs_by_address.get(server.servicenet_address, []),
             server.servicenet_address)
         if server.servicenet_address]
@@ -373,16 +374,18 @@ class DeleteServer(object):
 
 
 @implementer(IStep)
-@attributes(['loadbalancer_id', 'address', 'port', 'condition', 'weight',
-             'type'])
-class AddToLoadBalancer(object):
+@attributes(['lb_id', 'address_configs'])
+class AddNodesToLoadBalancer(object):
     """
-    A server must be added to a load balancer.
+    Multiple nodes must be added to a load balancer.
+
+    :param address_configs: A collection of two-tuples of address and
+        :obj:`LBConfig`.
     """
 
 
 @implementer(IStep)
-@attributes(['loadbalancer_id', 'node_id'])
+@attributes(['lb_id', 'node_id'])
 class RemoveFromLoadBalancer(object):
     """
     A server must be removed from a load balancer.
@@ -394,12 +397,12 @@ class RemoveFromLoadBalancer(object):
             service=ServiceType.CLOUD_LOAD_BALANCERS,
             method='DELETE',
             path=append_segments('loadbalancers',
-                                 str(self.loadbalancer_id),
+                                 str(self.lb_id),
                                  str(self.node_id)))
 
 
 @implementer(IStep)
-@attributes(['loadbalancer_id', 'node_id', 'condition', 'weight', 'type'])
+@attributes(['lb_id', 'node_id', 'condition', 'weight', 'type'])
 class ChangeLoadBalancerNode(object):
     """
     An existing port mapping on a load balancer must have its condition,
@@ -412,7 +415,7 @@ class ChangeLoadBalancerNode(object):
             service=ServiceType.CLOUD_LOAD_BALANCERS,
             method='PUT',
             path=append_segments('loadbalancers',
-                                 self.loadbalancer_id,
+                                 self.lb_id,
                                  'nodes', self.node_id),
             data={'condition': self.condition,
                   'weight': self.weight})
