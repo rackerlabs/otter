@@ -9,7 +9,7 @@ import treq
 
 from twisted.internet import defer
 
-from characteristic import attributes
+from characteristic import attributes, Attribute
 from pyrsistent import pbag, freeze
 from zope.interface import Interface, implementer
 
@@ -24,6 +24,22 @@ from otter.util.fp import partition_bool, partition_groups
 from otter.util.retry import retry, retry_times, exponential_backoff_interval
 # TODO: I hate including this!
 from otter.worker.launch_server_v1 import public_endpoint_url
+
+
+class NodeCondition(Names):
+    """Constants representing the condition a load balancer node can be in"""
+    ENABLED = NamedConstant()   # Node can accept new connections.
+    DRAINING = NamedConstant()  # Node cannot accept any new connections.
+                                # Existing connections are forcibly terminated.
+    DISABLED = NamedConstant()  # Node cannot accept any new connections.
+                                # Existing connections are permitted to continue.
+
+
+class NodeType(Names):
+    """Constants representing the type of a load balancer node"""
+    PRIMARY = NamedConstant()    # Node in normal rotation
+    SECONDARY = NamedConstant()  # Node only put into normal rotation if a
+                                 # primary node fails.
 
 
 @defer.inlineCallbacks
@@ -99,7 +115,8 @@ class IStep(Interface):
 
     def as_request():
         """
-        Create a request for performing this step.
+        Create a :class:`Request` object that contains relevant information for
+        performing the HTTP request required for this step
         """
 
 
@@ -116,7 +133,9 @@ class DesiredGroupState(object):
         self.launch_config = freeze(self.launch_config)
 
 
-@attributes(['id', 'state', 'created'])
+@attributes(['id', 'state', 'created',
+             Attribute('servicenet_address', default_value='', instance_of=str),
+             Attribute('desired_lbs', default_factory=list, instance_of=list)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -124,12 +143,106 @@ class NovaServer(object):
     :ivar str id: The server id.
     :ivar str state: Current state of the server.
     :ivar float created: Timestamp at which the server was created.
+    :ivar str servicenet_address: The private ServiceNet IPv4 address, if
+        the server is on the ServiceNet network
+    :ivar list desired_lbs: `list` of :class:`LBConfig`
+    """
+
+
+@attributes(["lb_id", "port",
+             Attribute("weight", default_value=1, instance_of=int),
+             Attribute("condition", default_value=NodeCondition.ENABLED,
+                       instance_of=NamedConstant),
+             Attribute("type", default_value=NodeType.PRIMARY,
+                       instance_of=NamedConstant)])
+class LBConfig(object):
+    """
+    Information representing a load balancer port mapping; how a particular
+    server *should* be port-mapped to a particular load balancer.
+
+    :ivar int lb_id: The load balancer ID.
+    :ivar int port: The port, which together with the server's IP, specifies
+        the service that should be load-balanced by the load balancer.
+    :ivar int weight: The weight to be used for certain load-balancing
+        algorithms if configured on the load balancer.  Defaults to 1,
+        the max is 100.
+    :ivar str condition: One of ``ENABLED``, ``DISABLED``, or ``DRAINING`` -
+        the default is ``ENABLED``
+    :ivar str type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
+    """
+
+
+@attributes(["node_id", "address", "config"])
+class LBNode(object):
+    """
+    Information representing an actual node on a load balancer, which is
+    an actual, existing, specific port mapping on a load balancer.
+
+    :ivar int node_id: The ID of the node, which is represents a unique
+        combination of IP and port number, on the load balancer.
+    :ivar str address: The IP address of the node.  The IP and port form a
+        unique mapping on the load balancer, which is assigned a node ID.  Two
+        nodes with the same IP and port cannot exist on a single load balancer.
+
+    :ivar config: The configuration for the port mapping
+    :type config: :class:`LBConfig`
     """
 
 
 ACTIVE = 'ACTIVE'
 ERROR = 'ERROR'
 BUILD = 'BUILD'
+
+
+def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
+    """
+    Produce a series of steps to converge a server's current load balancer
+    state towards its desired load balancer state.
+
+    The server will be removed from any extra load balancers the server
+    is currently on, and it will be added on the correct port, with the correct
+    weight, and correct status, to the desired load balancers.
+
+    :param list desired_lb_state: `list` of :obj:`LBConfig`
+    :param list current_lb_state: `list` of :obj:`LBNode`
+    :param str ip_address: the IP address of the server to converge
+
+    Note: this supports user customizable types (e.g. PRIMARY or SECONDARY), but
+    in practice it should probably only be added as PRIMARY.  SECONDARY can only
+    be used if load balancer health monitoring is enabled, and would be used as
+    backup servers anyway.
+    """
+    # put both desired and current into dictionaries keyed by load balancer ID
+    # and port, because those are the two required values of a mapping
+    desired_lb_map = {(config.lb_id, config.port): config
+                      for config in desired_lb_state}
+    current_lb_map = {(node.config.lb_id, node.config.port): node
+                      for node in current_lb_state}
+
+    for key, desired_config in desired_lb_map.iteritems():
+        lb_node = current_lb_map.get(key)
+
+        if lb_node is None:
+            yield AddToLoadBalancer(loadbalancer_id=desired_config.lb_id,
+                                    address=ip_address,
+                                    port=desired_config.port,
+                                    condition=desired_config.condition,
+                                    weight=desired_config.weight,
+                                    type=desired_config.type)
+
+        elif desired_config != lb_node.config:
+            yield ChangeLoadBalancerNode(loadbalancer_id=desired_config.lb_id,
+                                         node_id=lb_node.node_id,
+                                         condition=desired_config.condition,
+                                         weight=desired_config.weight,
+                                         type=desired_config.type)
+
+    undesirables = (item for item in current_lb_map.iteritems()
+                    if item[0] not in desired_lb_map)
+
+    for key, current in undesirables:
+        yield RemoveFromLoadBalancer(loadbalancer_id=current.config.lb_id,
+                                     node_id=current.node_id)
 
 
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
@@ -140,11 +253,12 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     by ``desired_state``.
 
     :param DesiredGroupState desired_state: The desired group state.
-    :param list servers_with_cheese: a list of of :obj:`NovaServer` instances.
+    :param list servers_with_cheese: a list of :obj:`NovaServer` instances.
         This must only contain servers that are being managed for the specified
         group.
-    :param dict load_balancer_contents: a dictionary mapping load balancer IDs
-        to lists of 2-tuples of (IP address, loadbalancer node ID).
+    :param load_balancer_contents: a list of :obj:`LBNode` instances.  This must
+        contain all the load balancer mappings for all the load balancers on the
+        tenant.
     :param float now: number of seconds since the POSIX epoch indicating the
         time at which the convergence was requested.
     :param float timeout: Number of seconds after which we will delete a server
@@ -152,6 +266,8 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
 
     :rtype: obj:`Convergence`
     """
+    lbs_by_address = groupby(lambda n: n.address, load_balancer_contents)
+
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
     servers_in_error, servers_in_active, servers_in_build = partition_groups(
         lambda s: s.state, newest_to_oldest, [ERROR, ACTIVE, BUILD])
@@ -174,25 +290,47 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # delete over capacity, starting with building, then active,
     # preferring older
     servers_to_delete = (servers_in_active + waiting_for_build)[desired_state.desired:]
-    delete_steps = [DeleteServer(server_id=server.id)
-                    for server in servers_to_delete]
+    delete_steps = (
+        [DeleteServer(server_id=server.id) for server in servers_to_delete] +
+        [RemoveFromLoadBalancer(loadbalancer_id=lb_node.config.lb_id,
+                                node_id=lb_node.node_id)
+         for server in servers_to_delete
+         for lb_node in lbs_by_address.get(server.servicenet_address, [])])
 
     # delete all servers in error.
-    delete_error_steps = [DeleteServer(server_id=server.id)
-                          for server in servers_in_error]
+    delete_error_steps = (
+        [DeleteServer(server_id=server.id) for server in servers_in_error] +
+        [RemoveFromLoadBalancer(loadbalancer_id=lb_node.config.lb_id,
+                                node_id=lb_node.node_id)
+         for server in servers_in_error
+         for lb_node in lbs_by_address.get(server.servicenet_address, [])])
+
+    # converge all the servers that remain to their desired load balancer state
+    new_active_servers = filter(lambda s: s not in servers_to_delete,
+                                servers_in_active)
+    lb_converge_steps = [
+        step
+        for server in new_active_servers
+        for step in _converge_lb_state(
+            server.desired_lbs,
+            lbs_by_address.get(server.servicenet_address, []),
+            server.servicenet_address)
+        if server.servicenet_address]
 
     return Convergence(
         steps=pbag(create_steps
                    + delete_steps
                    + delete_error_steps
                    + delete_timeout_steps
+                   + lb_converge_steps
                    ))
 
 
 @attributes(['steps'])
 class Convergence(object):
     """
-    A :obj:`Convergence` is a set of steps required to converge a ``group_id``.
+    A :obj:`Convergence` is a set of :class:`ISteps` required to converge a
+        ``group_id``.
 
     :ivar pbag steps: A :obj:`pbag` of :obj:`IStep`s to be performed in
         parallel.
@@ -261,11 +399,11 @@ class RemoveFromLoadBalancer(object):
 
 
 @implementer(IStep)
-@attributes(['loadbalancer_id', 'node_id', 'condition', 'weight'])
+@attributes(['loadbalancer_id', 'node_id', 'condition', 'weight', 'type'])
 class ChangeLoadBalancerNode(object):
     """
-    An existing port mapping on a load balancer must have its condition or
-    weight modified.
+    An existing port mapping on a load balancer must have its condition,
+    weight, or type modified.
     """
 
     def as_request(self):
@@ -290,7 +428,11 @@ class ServiceType(Names):
             defaults={'headers': None, 'data': None})
 class Request(object):
     """
-    A Rackspace API request must be performed.
+    An object representing a Rackspace API request that must be performed.
+
+    A :class:`Request` only stores information - something else must use the
+    information to make an HTTP request, as a :class:`Request` itself has no
+    behaviors.
 
     :ivar ServiceType service: The Rackspace service that the request
         should be sent to. One of the members of :obj:`ServiceType`.
