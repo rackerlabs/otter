@@ -14,6 +14,7 @@ from otter.convergence import (
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
+    SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ACTIVE, ERROR, BUILD,
     ServiceType, NodeCondition, NodeType, optimize_steps)
@@ -512,6 +513,21 @@ class RequestConversionTests(SynchronousTestCase):
                 service=ServiceType.CLOUD_SERVERS,
                 method='DELETE',
                 path='servers/abc123'))
+
+    def test_set_metadata_item(self):
+        """
+        :obj:`SetMetadataItemOnServer.as_request` produces a request for
+        setting a metadata item on a particular server.
+        """
+        meta = SetMetadataItemOnServer(server_id='abc123', key='metadata_key',
+                                       value='teapot')
+        self.assertEqual(
+            meta.as_request(),
+            Request(
+                service=ServiceType.CLOUD_SERVERS,
+                method='PUT',
+                path='servers/abc123/metadata/metadata_key',
+                data={'meta': {'metadata_key': 'teapot'}}))
 
     def test_remove_from_load_balancer(self):
         """
