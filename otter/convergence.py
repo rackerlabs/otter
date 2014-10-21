@@ -344,7 +344,15 @@ def _optimize_lb_adds(lb_add_steps):
 
 
 def optimize_steps(steps):
-    """Optimize steps."""
+    """
+    Optimize steps.
+
+    Currently batches up groups of :obj:`AddNodesToLoadBalancer` steps into
+    one per load balancer.
+
+    :param pbag steps: Collection of steps.
+    :return: a pbag of steps.
+    """
     lb_adds, other = partition_bool(
         lambda s: type(s) is AddNodesToLoadBalancer,
         steps)
