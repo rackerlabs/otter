@@ -3,6 +3,7 @@ Unittests for the launch_server_v1 launch config.
 """
 import mock
 import json
+from toolz.dicttoolz import merge
 from urllib import urlencode
 from urlparse import urlunsplit
 
@@ -33,13 +34,15 @@ from otter.worker.launch_server_v1 import (
     find_server,
     ServerCreationRetryError,
     CLBOrNodeDeleted,
-    generate_server_metadata
+    generate_server_metadata,
+    _without_otter_metadata,
+    scrub_otter_metadata,
 )
 
 
 from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
                               matches, DummyException, IsBoundWith,
-                              StubTreq, StubResponse)
+                              StubTreq, StubTreq2, StubResponse)
 from testtools.matchers import IsInstance, StartsWith, MatchesRegex
 
 from otter.auth import headers
@@ -2007,6 +2010,72 @@ class ConfigPreparationTests(SynchronousTestCase):
                                               test_config)
 
         self.assertNotIdentical(test_config, launch_config)
+
+
+sample_launch_config = {
+    'server': {
+        'imageRef': '1',
+        'flavorRef': '1'
+    },
+    'loadBalancers': [
+        {'loadBalancerId': 12345, 'port': 80},
+        {'loadBalancerId': 54321, 'port': 81}
+    ]
+}
+sample_otter_metadata = generate_server_metadata("group_id",
+                                                 sample_launch_config)
+sample_user_metadata = {"some_user_key": "some_user_value"}
+
+
+class MetadataScrubbingTests(SynchronousTestCase):
+    """
+    Tests for scrubbing of metadata.
+    """
+    def test_without_otter_metadata(self):
+        """
+        :func:`_without_otter_metadata` correctly removes otter-specific
+        keys and correctly keeps other keys.
+        """
+        samples = [
+            ({}, {}),
+            (sample_otter_metadata, {}),
+            (merge(sample_otter_metadata, sample_user_metadata),
+             sample_user_metadata)
+        ]
+
+        for metadata, expected_scrubbed_metadata in samples:
+            scrubbed = _without_otter_metadata(metadata)
+            self.assertEqual(scrubbed, expected_scrubbed_metadata)
+
+    def test_scrub_otter_metadata(self):
+        """
+        Scrubbing otter metadata works correctly.
+        """
+        set_config_data({"cloudServersOpenStack": "cloudServersOpenStack"})
+        self.addCleanup(set_config_data, {})
+
+        log = mock.Mock()
+
+        expected_url = 'http://ord.openstack/servers/server/metadata'
+        treq = StubTreq2([(("GET", expected_url,
+                            {"headers": expected_headers,
+                             "data": None}),
+                           (200, json.dumps(merge(sample_otter_metadata,
+                                                  sample_user_metadata)))),
+                          (("PUT", expected_url,
+                            {"headers": expected_headers,
+                             "data": json.dumps(sample_user_metadata)}),
+                           (200, ""))])
+
+        d = scrub_otter_metadata(log=log,
+                                 auth_token="my-auth-token",
+                                 service_catalog=fake_service_catalog,
+                                 region="ORD",
+                                 server_id="server",
+                                 _treq=treq)
+
+        body = self.successResultOf(d)
+        self.assertEqual(body, "")
 
 
 # An instance associated with a single load balancer.

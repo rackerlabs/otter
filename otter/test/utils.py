@@ -470,13 +470,18 @@ class FakeSupervisor(object, Service):
     A fake supervisor that keeps track of calls made
     """
 
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
+        """
+        Initialize the fake supervisor.
+        """
         self.args = args
         self.deferred_pool = DeferredPool()
         self.exec_calls = []
         self.exec_defs = []
         self.del_index = 0
         self.del_calls = []
+        self.scrub_calls = []
+        self.scrub_defs = []
 
     def execute_config(self, log, transaction_id, scaling_group, launch_config):
         """
@@ -493,6 +498,13 @@ class FakeSupervisor(object, Service):
         self.del_index += 1
         self.del_calls.append((log, transaction_id, scaling_group, server))
         return succeed(self.del_index)
+
+    def scrub_otter_metadata(self, log, transaction_id, tenant_id, server_id):
+        """
+        Scrubs otter-specific metadata off a server.
+        """
+        self.scrub_calls.append((log, transaction_id, tenant_id, server_id))
+        return succeed(None)
 
 
 def mock_group(state, tenant_id='tenant', group_id='group'):

@@ -30,9 +30,6 @@ class ISupervisor(Interface):
 
         :param log: Bound logger.
         :param str transaction_id: Transaction ID.
-        :param callable auth_function: A 1-argument callable that takes a tenant_id,
-            and returns a Deferred that fires with a 2-tuple of auth_token and
-            service_catalog.
         :param IScalingGroup scaling_group: Scaling Group.
         :param dict launch_config: The launch config for the scaling group.
 
@@ -57,6 +54,16 @@ class ISupervisor(Interface):
             before callback(ing).
         """
 
+    def scrub_otter_metadata(log, transaction_id, tenant_id, server_id):
+        """
+        Remove otter-specific metadata off of a single server.
+
+        :param log: Bound logger.
+        :param str transaction_id: The transaction id.
+        :param str tenant_id: The tenant_id.
+        :param str server_id: The server id.
+        """
+
 
 @implementer(ISupervisor)
 class SupervisorService(object, Service):
@@ -65,10 +72,9 @@ class SupervisorService(object, Service):
 
     :ivar callable auth_function: authentication function to use to obtain an
         auth token and service catalog.  Should accept a tenant ID.
-
     :ivar callable coiterate: coiterate function that will be passed to
         InMemoryUndoStack.
-
+    :ivar str region: The region in which this supervisor is operating.
     :ivar DeferredPool deferred_pool: a pool in which to store deferreds that
         should be waited on
     """
@@ -134,7 +140,7 @@ class SupervisorService(object, Service):
 
     def execute_delete_server(self, log, transaction_id, scaling_group, server):
         """
-        see :meth:`ISupervisor.execute_delete_server`
+        See :meth:`ISupervisor.execute_delete_server`
         """
         log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
 
@@ -149,6 +155,26 @@ class SupervisorService(object, Service):
 
         d = self.auth_function(scaling_group.tenant_id, log=log)
         log.msg("Authenticating for tenant")
+        d.addCallback(when_authenticated)
+
+        return d
+
+    def scrub_otter_metadata(self, log, transaction_id, tenant_id, server_id):
+        """
+        See :meth:`ISupervisor.scrub_otter_metadata`.
+        """
+        log = log.bind(server_id=server_id, tenant_id=tenant_id)
+
+        d = self.auth_function(tenant_id, log=log)
+        log.msg("Authenticating for tenant")
+
+        def when_authenticated((auth_token, service_catalog)):
+            d = launch_server_v1.scrub_otter_metadata(log,
+                                                      auth_token,
+                                                      service_catalog,
+                                                      self.region,
+                                                      server_id)
+            return d
         d.addCallback(when_authenticated)
 
         return d
@@ -320,8 +346,7 @@ class _DeleteJob(object):
         """
         d = self.supervisor.execute_delete_server(
             self.log, self.trans_id, self.scaling_group, self.server_info)
-        d.addCallback(self._job_completed)
-        d.addErrback(self._job_failed)
+        d.addCallbacks(self._job_completed, self._job_failed)
         self.log.msg('Started server deletion job')
         return d
 
@@ -334,18 +359,57 @@ class _DeleteJob(object):
         self.log.err(failure, 'Server deletion job failed')
 
 
+class _ScrubJob(object):
+    """
+    Otter-specific metadata scrubbing job.
+    """
+
+    def __init__(self, log, transaction_id, tenant_id, server_id, supervisor):
+        """
+        :param log: A bound logger instance.
+        :param str transaction_id: A transaction id.
+        :param str server_id: The id of the server to scrub the metadata of.
+        :param ISupervisor supervisor: The supervisor responsible for keeping
+            track of this job.
+        """
+        self.log = log.bind(system="otter.job.scrub_otter_metadata")
+        self.transaction_id = transaction_id
+        self.tenant_id = tenant_id
+        self.server_id = server_id
+        self.supervisor = supervisor
+
+    def start(self):
+        """
+        Start the metadata scrubbing job.
+        """
+        d = self.supervisor.scrub_otter_metadata(
+            self.log, self.transaction_id, self.tenant_id, self.server_id)
+
+        def _scrub_succeeded(_):
+            audit(self.log).msg("Otter-specific metadata scrubbed.",
+                                event_type="server.scrub_otter_metadata")
+
+        def _scrub_failed(f):
+            self.log.err(f, "Server metadata scrubbing failed.")
+
+        return d.addCallbacks(_scrub_succeeded, _scrub_failed)
+
+
 class _Job(object):
     """
-    Private class representing a server creation job.  This calls the supervisor
-    to create one server, and also handles job completion.
+    Server creation job.
+
+    Calls the supervisor to create one server, and handles job completion.
     """
+
     def __init__(self, log, transaction_id, scaling_group, supervisor):
         """
-        :param log: a bound logger instance that can be used for logging
-        :param str transaction_id: a transaction id
-        :param IScalingGroup scaling_group: the scaling group for which a job
-            should be created
-        :param dict launch_config: the launch config to scale up a server
+        :param log: A bound logger instance.
+        :param str transaction_id: A transaction id.
+        :param IScalingGroup scaling_group: The scaling group for which a job
+            should be created.
+        :param ISupervisor supervisor: The supervisor responsible for keeping
+            track of this job.
         """
         self.log = log.bind(system='otter.job.launch')
         self.transaction_id = transaction_id
@@ -356,6 +420,8 @@ class _Job(object):
     def start(self, launch_config):
         """
         Kick off a job by calling the supervisor with a launch config.
+
+        :param dict launch_config: The launch config to scale up a server.
         """
         try:
             image = launch_config['args']['server']['imageRef']
@@ -498,6 +564,10 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge, group, st
     Remove a specific server from the group, optionally replacing it
     with a new one, and optionally deleting the old one from Nova.
 
+    If the old server is not deleted from Nova, otter-specific metdata
+    is removed: otherwise, a different part of otter may later mistake
+    the server as one that *should* still be in the group.
+
     :param log: A bound logger
     :param bytes trans_id: The transaction id for this operation.
     :param bytes server_id: The id of the server to be removed.
@@ -546,8 +616,19 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge, group, st
         which shouldn't wait until the server has been removed.
         """
         supervisor = get_supervisor()
-        d = _DeleteJob(log, trans_id, group, server_info, supervisor).start()
+        job = _DeleteJob(log, trans_id, group, server_info, supervisor)
+        d = job.start()
         supervisor.deferred_pool.add(d)
+
+    def scrub_otter_metadata(_):
+        """
+        Scrub otter-specific metadata from the server.
+        """
+        supervisor = get_supervisor()
+        job = _ScrubJob(log, trans_id, group.tenant_id, server_id, supervisor)
+        d = job.start()
+        supervisor.deferred_pool.add(d)
+        return d
 
     if server_id not in state.active:
         raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
@@ -561,6 +642,8 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge, group, st
     if purge:
         server_info = state.active[server_id]
         d.addCallback(remove_server_from_nova)
+    else:
+        d.addCallback(scrub_otter_metadata)
 
     d.addCallback(remove_server_from_state)
     return d

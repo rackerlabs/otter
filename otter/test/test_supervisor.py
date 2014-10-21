@@ -23,6 +23,18 @@ from otter.test.utils import (
 from otter.util.deferredutils import DeferredPool
 
 
+class FakeSupervisorTests(SynchronousTestCase):
+    """
+    Tests for the supervisor test double.
+    """
+    def test_interface(self):
+        """
+        The supervisor test double implements the supervisor interface.
+        """
+        fake_supervisor = FakeSupervisor()
+        verifyObject(ISupervisor, fake_supervisor)
+
+
 class SupervisorTests(SynchronousTestCase):
     """
     Common stuff for tests in SupervisorService
@@ -104,7 +116,7 @@ class LaunchConfigTests(SupervisorTests):
         super(LaunchConfigTests, self).setUp()
 
         self.launch_server = patch(
-            self, 'otter.supervisor.launch_server_v1.launch_server',
+            self, 'otter.worker.launch_server_v1.launch_server',
             return_value=succeed((self.fake_server_details, {})))
         self.generate_job_id = patch(self, 'otter.supervisor.generate_job_id')
         self.generate_job_id.return_value = 'job-id'
@@ -223,7 +235,7 @@ class DeleteServerTests(SupervisorTests):
         """
         super(DeleteServerTests, self).setUp()
         self.delete_server = patch(
-            self, 'otter.supervisor.launch_server_v1.delete_server',
+            self, 'otter.worker.launch_server_v1.delete_server',
             return_value=succeed(None))
 
         self.fake_server = self.fake_server_details['server']
@@ -267,6 +279,37 @@ class DeleteServerTests(SupervisorTests):
 
         f = self.failureResultOf(d, ValueError)
         self.assertEqual(f.value, expected)
+
+
+class ScrubMetadataTests(SupervisorTests):
+    """
+    Tests for func:``otter.supervisor.scrub_otter_metadata``.
+    """
+    def setUp(self):
+        """
+        Set up the test.
+        """
+        super(ScrubMetadataTests, self).setUp()
+        self.scrub_otter_metadata = patch(
+            self,
+            'otter.worker.launch_server_v1.scrub_otter_metadata',
+            return_value=succeed(None))
+
+    def test_scrub_metadata(self):
+        """
+        Tests metadata scrubbing.
+        """
+        d = self.supervisor.scrub_otter_metadata(
+            self.log, "txn-id", "tenant-id", "server-id")
+        self.successResultOf(d)
+        self.auth_function.assert_called_once_with(
+            "tenant-id", log=self.log.bind.return_value)
+        self.scrub_otter_metadata.assert_called_once_with(
+            self.log.bind.return_value,
+            self.auth_token,
+            self.service_catalog,
+            self.supervisor.region,
+            "server-id")
 
 
 class ValidateLaunchConfigTests(SupervisorTests):
@@ -501,8 +544,8 @@ class DeleteJobTests(SynchronousTestCase):
         self.supervisor.execute_delete_server.assert_called_once_with(
             self.log, 'trans_id', 'group', {'id': 2, 'b': 'lah'})
         d = self.supervisor.execute_delete_server.return_value
-        d.addCallback.assert_called_once_with(self.job._job_completed)
-        d.addErrback.assert_called_once_with(self.job._job_failed)
+        d.addCallbacks.assert_called_once_with(self.job._job_completed,
+                                               self.job._job_failed)
         self.log.msg.assert_called_once_with('Started server deletion job')
 
     def test_job_completed(self):
@@ -524,9 +567,65 @@ class DeleteJobTests(SynchronousTestCase):
                                              'Server deletion job failed')
 
 
+class ScrubJobTests(SynchronousTestCase):
+    """
+    Tests for :class:`supervisor._ScrubJob`.
+    """
+
+    def setUp(self):
+        """
+        Set up an environment for testing :class:`supervisor._ScrubJob`.
+        """
+        self.supervisor = iMock(ISupervisor)
+        self.log = mock_log()
+
+    def _create_job(self):
+        """
+        Creates a job with associated bound logger.
+
+        Checks that the logger was appropriately bound.
+        """
+        job = supervisor._ScrubJob(self.log,
+                                   "txn-id",
+                                   "tenant-id",
+                                   "server-id",
+                                   self.supervisor)
+        return job
+
+    def test_scrub_job(self):
+        """
+        Starting a scrub job works correctly.
+        """
+        d = succeed(None)
+        self.supervisor.scrub_otter_metadata.return_value = d
+
+        job = self._create_job()
+        self.successResultOf(job.start())
+
+        self.log.msg.assert_called_with(
+            "Otter-specific metadata scrubbed.",
+            audit_log=True,
+            event_type="server.scrub_otter_metadata",
+            system="otter.job.scrub_otter_metadata")
+
+    def test_failed_job(self):
+        """
+        When a scrubbing job fails, the failure is logged.
+        """
+        e = RuntimeError("o noes")
+        self.supervisor.scrub_otter_metadata.return_value = fail(e)
+
+        job = self._create_job()
+        self.successResultOf(job.start())
+
+        (f, msg), _ = self.log.err.call_args
+        self.assertEqual(f.value, e)
+        self.assertEqual(msg, "Server metadata scrubbing failed.")
+
+
 class ExecScaleDownTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.supervisor.exec_scale_down`
+    Tests for :func:`otter.supervisor.exec_scale_down`.
     """
 
     def setUp(self):
@@ -1003,6 +1102,21 @@ class RemoveServerTests(SynchronousTestCase):
         self.assertNotIn('jid', state.pending)
         self.assertEqual(self.supervisor.exec_calls, [])
 
+    def _assert_metadata_scrubbing_scheduled(self, expected_server_id="s0"):
+        """
+        Assert that otter-specific metadata scrubbing was scheduled.
+        """
+        _, txn_id, tenant_id, server_id = self.supervisor.scrub_calls[-1]
+        self.assertEqual(txn_id, self.tid)
+        self.assertEqual(tenant_id, "tenant")
+        self.assertEqual(server_id, expected_server_id)
+
+    def _assert_metadata_scrubbing_not_scheduled(self):
+        """
+        Asserts that no metadata scrubbing was scheduled.
+        """
+        self.assertEqual(len(self.supervisor.scrub_calls), 0)
+
     def test_server_not_found(self):
         """
         If specific server is not in the group, :class:`ServerNotFoundError`
@@ -1014,6 +1128,7 @@ class RemoveServerTests(SynchronousTestCase):
         self._assert_server_in_group_state(self.state)
         self._assert_create_not_scheduled(self.state)
         self._assert_delete_not_scheduled()
+        self._assert_metadata_scrubbing_not_scheduled()
         self.assertEqual(self.state.desired, 1)
 
     def test_not_deleted_below_min(self):
@@ -1029,6 +1144,7 @@ class RemoveServerTests(SynchronousTestCase):
         self._assert_server_in_group_state(self.state)
         self._assert_delete_not_scheduled()
         self._assert_create_not_scheduled(self.state)
+        self._assert_metadata_scrubbing_not_scheduled()
         self.assertEqual(self.state.desired, 1)
 
     def test_replaced_and_removed(self):
@@ -1054,6 +1170,7 @@ class RemoveServerTests(SynchronousTestCase):
         self._assert_server_not_in_group_state(state)
         self._assert_delete_scheduled()
         self._assert_create_not_scheduled(state)
+        self._assert_metadata_scrubbing_not_scheduled()
         self.assertEqual(state.desired, 0)
 
     def test_not_replaced_and_not_purged(self):
@@ -1066,6 +1183,7 @@ class RemoveServerTests(SynchronousTestCase):
         self._assert_server_not_in_group_state(state)
         self._assert_delete_not_scheduled()
         self._assert_create_not_scheduled(state)
+        self._assert_metadata_scrubbing_scheduled()
         self.assertEqual(state.desired, 0)
 
     def test_replaced_but_not_purged(self):
@@ -1078,4 +1196,5 @@ class RemoveServerTests(SynchronousTestCase):
         self._assert_server_not_in_group_state(state)
         self._assert_delete_not_scheduled()
         self._assert_create_scheduled(state)
+        self._assert_metadata_scrubbing_scheduled()
         self.assertEqual(state.desired, 1)
