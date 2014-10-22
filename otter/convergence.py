@@ -175,7 +175,7 @@ class LBConfig(object):
     """
 
 
-@attributes(["lb_id", "node_id", "address", "drained_since", "config"])
+@attributes(["lb_id", "node_id", "address", "drained_at", "config"])
 class LBNode(object):
     """
     Information representing an actual node on a load balancer, which is
@@ -187,8 +187,8 @@ class LBNode(object):
     :ivar str address: The IP address of the node.  The IP and port form a
         unique mapping on the load balancer, which is assigned a node ID.  Two
         nodes with the same IP and port cannot exist on a single load balancer.
-    :ivar float drained_since: Seconds expired since this node has been put in
-        DRAINING. Will be `None` if node is not DRAINING
+    :ivar float drained_at: EPOCH at which this node was put in DRAINING.
+        Will be 0 if node is not DRAINING
 
     :ivar config: The configuration for the port mapping
     :type config: :class:`LBConfig`
