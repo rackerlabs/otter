@@ -208,9 +208,12 @@ class LBNode(object):
     """
 
 
-ACTIVE = 'ACTIVE'
-ERROR = 'ERROR'
-BUILD = 'BUILD'
+class ServerState(Names):
+    """Constants representing the state cloud servers can have"""
+    ACTIVE = NamedConstant()    # corresponds to Nova "ACTIVE"
+    ERROR = NamedConstant()     # corresponds to Nova "ERROR"
+    BUILD = NamedConstant()     # corresponds to Nova "BUILD" or "BUILDING"
+    DELETING = NamedConstant()  # Autoscale is deleting the server
 
 
 def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
@@ -289,7 +292,9 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
 
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
     servers_in_error, servers_in_active, servers_in_build = partition_groups(
-        lambda s: s.state, newest_to_oldest, [ERROR, ACTIVE, BUILD])
+        lambda s: s.state, newest_to_oldest, [ServerState.ERROR,
+                                              ServerState.ACTIVE,
+                                              ServerState.BUILD])
 
     building_too_long, waiting_for_build = partition_bool(
         lambda server: now - server.created >= timeout,
