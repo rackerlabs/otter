@@ -155,13 +155,11 @@ class NovaServer(object):
              Attribute("condition", default_value=NodeCondition.ENABLED,
                        instance_of=NamedConstant),
              Attribute("type", default_value=NodeType.PRIMARY,
-                       instance_of=NamedConstant),
-             Attribute("draining_time", default_value=0, instance_of=int,
-                       exclude_from_cmp=True)])
+                       instance_of=NamedConstant)])
 class LBConfig(object):
     """
     Information representing a load balancer port mapping; how a particular
-    server *should* be port-mapped to a cloud load balancer.
+    server *should* be port-mapped to a load balancer.
 
     :ivar int port: The port, which together with the server's IP, specifies
         the service that should be load-balanced by the load balancer.
@@ -171,18 +169,6 @@ class LBConfig(object):
     :ivar str condition: One of ``ENABLED``, ``DISABLED``, or ``DRAINING`` -
         the default is ``ENABLED``
     :ivar str type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
-
-    :ivar int draining_time: How long to leave the node in draining before it
-        can be removed from the load balancer.  ``draining_time`` is not used
-        for comparing :class:`LBConfig`s
-
-    TODO: this is not the ideal place for ``draining_time``, since
-    :class:`LBConfig` is more about what node on a CLB should look like.
-    And :class:`LBConfig` may not be applicable to a hardware LB.  It is also
-    possible that ``draining_time`` does not apply to hardware LBs.
-
-    So `draining_time` is here until other load balancer requirements are
-    understood and a better place is found for it.
     """
 
 
