@@ -192,7 +192,7 @@ class LaunchConfigTest(AutoscaleFixture):
                 "volume_size": "100",
                 "source_type": "image",
                 "destination_type": "volume",
-                "delete_on_termination": False
+                "delete_on_termination": True
             }])
         group = group_response.entity
         self.resources.add(group, self.empty_scaling_group)
