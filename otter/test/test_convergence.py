@@ -160,6 +160,7 @@ class ObjectStorageTests(SynchronousTestCase):
     """
     Tests for objects that store data such as :class:`LBConfig`
     """
+
     def test_lbconfig_default_weight_condition_and_type(self):
         """
         :obj:`LBConfig` only requires a port.  The other attributes have
@@ -169,6 +170,13 @@ class ObjectStorageTests(SynchronousTestCase):
         self.assertEqual(lb.weight, 1)
         self.assertEqual(lb.condition, NodeCondition.ENABLED)
         self.assertEqual(lb.type, NodeType.PRIMARY)
+
+    def test_lbconfig_not_cmp_draining(self):
+        """
+        :obj:`LBConfig.draining_timeout` is excluded from comparison
+        """
+        self.assertEqual(LBConfig(port=80, draining_timeout=2.4),
+                         LBConfig(port=80, draining_timeout=5.4))
 
 
 class ConvergeLBStateTests(SynchronousTestCase):

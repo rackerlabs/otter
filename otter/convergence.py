@@ -155,7 +155,9 @@ class NovaServer(object):
              Attribute("condition", default_value=NodeCondition.ENABLED,
                        instance_of=NamedConstant),
              Attribute("type", default_value=NodeType.PRIMARY,
-                       instance_of=NamedConstant)])
+                       instance_of=NamedConstant),
+             Attribute("draining_timeout", default_value=0.0, instance_of=float,
+                       exclude_from_cmp=True)])
 class LBConfig(object):
     """
     Information representing a load balancer port mapping; how a particular
@@ -169,10 +171,19 @@ class LBConfig(object):
     :ivar str condition: One of ``ENABLED``, ``DISABLED``, or ``DRAINING`` -
         the default is ``ENABLED``
     :ivar str type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
+
+    TODO: this is not the ideal place for ``draining_timeout``, since
+    :class:`LBConfig` is more about what node on a CLB should look like.
+    And :class:`LBConfig` may not be applicable to a hardware LB.
+    So `draining_timeout` is here until other load balancer requirements are
+    understood and a better place is found for it.
+    :ivar float draining_timeout: Number of seconds node should be in DRAINING
+        state before being removed
     """
 
 
-@attributes(["lb_id", "node_id", "address", "config"])
+@attributes(["lb_id", "node_id", "address",
+             Attribute("drained_at", default_value=0.0, instance_of=float), "config"])
 class LBNode(object):
     """
     Information representing an actual node on a load balancer, which is
@@ -184,6 +195,8 @@ class LBNode(object):
     :ivar str address: The IP address of the node.  The IP and port form a
         unique mapping on the load balancer, which is assigned a node ID.  Two
         nodes with the same IP and port cannot exist on a single load balancer.
+    :ivar float drained_at: EPOCH at which this node was put in DRAINING.
+        Will be 0 if node is not DRAINING
 
     :ivar config: The configuration for the port mapping
     :type config: :class:`LBConfig`
