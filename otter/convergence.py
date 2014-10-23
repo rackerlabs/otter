@@ -172,8 +172,7 @@ class LBConfig(object):
     """
 
 
-@attributes(["lb_id", "node_id", "address", "config",
-             Attribute("last_updated", default_value=0.0, instance_of=float)])
+@attributes(["lb_id", "node_id", "address", "config"])
 class LBNode(object):
     """
     Information representing an actual node on a load balancer, which is
@@ -188,9 +187,6 @@ class LBNode(object):
 
     :ivar config: The configuration for the port mapping
     :type config: :class:`LBConfig`
-
-    :ivar float last_updated: Seconds since the epoch since the node was last
-        updated.
     """
 
 
