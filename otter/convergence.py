@@ -5,6 +5,7 @@ Convergence.
 from functools import partial
 from urllib import urlencode
 import calendar
+import json
 
 import treq
 
@@ -15,6 +16,8 @@ from pyrsistent import pbag, freeze, s
 from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
+
+import effect
 
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
@@ -38,11 +41,18 @@ class NodeCondition(Names):
                                 # Existing connections are permitted to continue.
 
 
+condition_map = {'ENABLED': NodeCondition.ENABLED, 'DISABLED': NodeCondition.DISABLED,
+                 'DRAINING': NodeCondition.DRAINING}
+
+
 class NodeType(Names):
     """Constants representing the type of a load balancer node"""
     PRIMARY = NamedConstant()    # Node in normal rotation
     SECONDARY = NamedConstant()  # Node only put into normal rotation if a
                                  # primary node fails.
+
+
+nodetype_map = {'PRIMARY': NodeType.PRIMARY, 'SECONDARY': NodeType.SECONDARY}
 
 
 @defer.inlineCallbacks
@@ -126,6 +136,43 @@ def extract_drained_at(feed):
         return calendar.timegm(from_timestamp(atom.updated(entry)).utctimetuple())
     else:
         raise ValueError('Unexpected summary: {}'.format(summary))
+
+
+def get_load_balancer_contents(request):
+    """
+    Get load balancer contents as list of `LBNode`
+
+    :param request: A tenant-bound request function
+    """
+
+    def fetch_nodes(lbs_d):
+        ids = [lb['id'] for lb in lbs_d]
+        return effect.parallel(
+            [request('GET', append_segments('loadbalancers', _id, 'nodes'))
+             for _id in ids]).on(lambda r: (ids, [json.loads(n) for n in r]))
+
+    def to_lbnodes((ids, nodess)):
+        return [LBNode(lb_id=_id, node_id=node['id'],
+                       config=LBConfig(port=node['port'], weight=node['weight'],
+                                       condition=condition_map[node['condition']],
+                                       type=nodetype_map[node['type']]))
+                for _id, nodes in zip(ids, nodess)
+                for node in nodes]
+
+    def fetch_drained_atoms(nodes):
+        return effect.parallel(
+            [request(
+                'GET',
+                append_segments('loadbalancers', n.lb_id, 'nodes', '{}.atom'.format(n.node_id)))
+             for n in nodes if n.condition == NodeCondition.DRAINING]).on(lambda r: (nodes, r))
+
+    def fill_drained_at((nodes, feeds)):
+        for node, feed in zip(nodes, feeds):
+            node.drained_at = extract_drained_at(feed)
+        return nodes
+
+    return request('GET', 'loadbalancers').on(
+        json.loads).on(fetch_nodes).on(to_lbnodes).on(fetch_drained_atoms).on(fill_drained_at)
 
 
 class IStep(Interface):
