@@ -17,6 +17,7 @@ from twisted.python.constants import Names, NamedConstant
 
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
+from toolz.itertoolz import mapcat
 
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
@@ -121,7 +122,8 @@ class IStep(Interface):
 
 
 @attributes(['launch_config', 'desired',
-             Attribute('desired_lbs', default_factory=dict, instance_of=dict)])
+             Attribute('desired_lbs', default_factory=dict, instance_of=dict),
+             Attribute('draining_timeout', default_value=0.0, instance_of=float)])
 class DesiredGroupState(object):
     """
     The desired state for a scaling group.
@@ -130,6 +132,10 @@ class DesiredGroupState(object):
     :ivar int desired: the number of desired servers within the group.
     :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
         :class:`LBConfig` instances.
+    :ivar float draining_timeout: If greater than zero, when the server is
+        scaled down it will be put into draining condition.  It will remain
+        in draining condition for a maximum of ``draining_timeout`` seconds
+        before being removed from the load balancer and then deleted.
     """
 
     def __init__(self):
@@ -385,17 +391,18 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                                       - (len(servers_in_active)
                                          + len(waiting_for_build)))
 
-    # delete over capacity, starting with building, then active,
-    # preferring older
+    # Scale down over capacity, starting with building, then active,
+    # preferring older.  Also, finish draining/deleting servers already in
+    # draining state
     servers_to_delete = (servers_in_active + waiting_for_build)[desired_state.desired:]
-    delete_steps = (
-        [DeleteServer(server_id=server.id) for server in servers_to_delete] +
-        [RemoveFromLoadBalancer(lb_id=lb_node.lb_id,
-                                node_id=lb_node.node_id)
-         for server in servers_to_delete
-         for lb_node in lbs_by_address.get(server.servicenet_address, [])])
+    scale_down_steps = list(mapcat(
+        lambda server: _drain_and_delete_server(
+            server, desired_state.draining_timeout,
+            lbs_by_address.get(server.servicenet_address, []), now),
+        servers_to_delete + draining_servers))
 
-    # delete all servers in error.
+    # delete all servers in error - draining does not need to be handled because
+    # servers in error presumably are not serving traffic anyway
     delete_error_steps = (
         [DeleteServer(server_id=server.id) for server in servers_in_error] +
         [RemoveFromLoadBalancer(lb_id=lb_node.lb_id,
@@ -404,11 +411,11 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
          for lb_node in lbs_by_address.get(server.servicenet_address, [])])
 
     # converge all the servers that remain to their desired load balancer state
-    new_active_servers = filter(lambda s: s not in servers_to_delete,
-                                servers_in_active)
+    still_active_servers = filter(lambda s: s not in servers_to_delete,
+                                  servers_in_active)
     lb_converge_steps = [
         step
-        for server in new_active_servers
+        for server in still_active_servers
         for step in _converge_lb_state(
             desired_state.desired_lbs,
             lbs_by_address.get(server.servicenet_address, []),
@@ -417,7 +424,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
 
     return Convergence(
         steps=pbag(create_steps
-                   + delete_steps
+                   + scale_down_steps
                    + delete_error_steps
                    + delete_timeout_steps
                    + lb_converge_steps

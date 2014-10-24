@@ -10,7 +10,7 @@ from otter.test.utils import StubTreq2, patch, iMock
 from otter.auth import IAuthenticator
 from otter.util.http import headers, APIError
 from otter.convergence import (
-    _remove_from_lb_with_draining, _converge_lb_state, _drain_and_delete_server,
+    _remove_from_lb_with_draining, _converge_lb_state,
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
@@ -415,79 +415,153 @@ def server(id, state, created=0, **kwargs):
 
 class DrainAndDeleteServerTests(SynchronousTestCase):
     """
-    Tests for :func:`_drain_and_delete_server`
+    Tests for :func:`converge` having to do with draining and deleting servers.
     """
     def test_active_server_without_load_balancers_can_be_deleted(self):
         """
-        If the server is not attached to any load balancers, it can be deleted.
-        It is not first put into draining state.
+        If an active server to be scaled down is not attached to any load
+        balancers, it can be deleted. It is not first put into draining state.
         """
-        results = _drain_and_delete_server(
-            server('abc', state=ServerState.ACTIVE), 10, [], 0)
-        self.assertEqual(results, [DeleteServer(server_id='abc')])
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                [server('abc', state=ServerState.ACTIVE)],
+                [],
+                0),
+            Convergence(steps=pbag([DeleteServer(server_id='abc')])))
 
-    def test_server_can_be_deleted_if_all_lbs_can_be_removed(self):
+    def test_active_server_can_be_deleted_if_all_lbs_can_be_removed(self):
         """
-        If the server can be removed from all the load balancers, the server
-        can be deleted.  It is not first put into draining state.
+        If an active server to be scaled down can be removed from all the load
+        balancers, the server can be deleted.  It is not first put into
+        draining state.
         """
-        results = _drain_and_delete_server(
-            server('abc', state=ServerState.ACTIVE), 0,
-            [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
-                    config=LBConfig(port=80))],
-            0)
-        self.assertEqual(set(results),
-                         set([DeleteServer(server_id='abc'),
-                              RemoveFromLoadBalancer(lb_id=1, node_id=1)]))
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0),
+                [server('abc', state=ServerState.ACTIVE,
+                        servicenet_address='1.1.1.1')],
+                [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                        config=LBConfig(port=80))],
+                0),
+            Convergence(steps=pbag([
+                DeleteServer(server_id='abc'),
+                RemoveFromLoadBalancer(lb_id=1, node_id=1)
+            ])))
+
+    def test_draining_server_can_be_deleted_if_all_lbs_can_be_removed(self):
+        """
+        If draining server can be removed from all the load balancers, the
+        server can be deleted.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0),
+                [server('abc', state=ServerState.DRAINING,
+                        servicenet_address='1.1.1.1')],
+                [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                        config=LBConfig(port=80,
+                        condition=NodeCondition.DRAINING))],
+                0),
+            Convergence(steps=pbag([
+                DeleteServer(server_id='abc'),
+                RemoveFromLoadBalancer(lb_id=1, node_id=1)
+            ])))
 
     def test_draining_server_ignored_if_waiting_for_timeout(self):
         """
         If the server already in draining state is waiting for the draining
         timeout on some load balancers, nothing is done to it.
         """
-        results = _drain_and_delete_server(
-            server('abc', state=ServerState.DRAINING), 10,
-            [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
-                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
-                    drained_at=1.0, connections=1)],
-            2)
-        self.assertEqual(results, [])
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                [server('abc', state=ServerState.DRAINING,
+                        servicenet_address='1.1.1.1')],
+                [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                        config=LBConfig(port=80,
+                        condition=NodeCondition.DRAINING),
+                        drained_at=1.0, connections=1)],
+                2),
+            Convergence(steps=pbag([])))
 
     def test_active_server_is_drained_if_not_all_lbs_can_be_removed(self):
         """
-        If an active server cannot be removed from all the load balancers, it is
-        set to draining state and all the nodes are set to draining condition.
+        If an active server to be deleted cannot be removed from all the load
+        balancers, it is set to draining state and all the nodes are set to
+        draining condition.
         """
-        results = _drain_and_delete_server(
-            server('abc', state=ServerState.ACTIVE), 10,
-            [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
-                    config=LBConfig(port=80))],
-            0)
         self.assertEqual(
-            set(results),
-            set([ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
-                                        condition=NodeCondition.DRAINING,
-                                        type=NodeType.PRIMARY),
-                 SetMetadataItemOnServer(server_id='abc',
-                                         key='rax:auto_scaling_draining',
-                                         value='draining')]))
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                [server('abc', state=ServerState.ACTIVE,
+                        servicenet_address='1.1.1.1')],
+                [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                        config=LBConfig(port=80))],
+                0),
+            Convergence(steps=pbag([
+                ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
+                                       condition=NodeCondition.DRAINING,
+                                       type=NodeType.PRIMARY),
+                SetMetadataItemOnServer(server_id='abc',
+                                        key='rax:auto_scaling_draining',
+                                        value='draining')
+            ])))
 
-    def test_draining_server_cannot_be_deleted_if_not_all_lbs_can_be_removed(self):
+    def test_active_server_is_drained_even_if_all_already_in_draining(self):
         """
-        If the server cannot be removed from all the load balancers, the server
-        is not deleted.  If it is already in draining, the metadata is not
-        re-set to draining.
+        If an active server already has all of its load balancers in draining,
+        but it cannot be removed from all of them yet, it is set to draining
+        state even though no load balancer actions need to be performed.
+
+        This can happen for instance if the server was supposed to be deleted
+        in a previous convergence run, and the load balancers were set to
+        draining but setting the server metadata failed.
         """
-        results = _drain_and_delete_server(
-            server('abc', state=ServerState.DRAINING), 10,
-            [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
-                    config=LBConfig(port=80))],
-            1)
         self.assertEqual(
-            results,
-            [ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
-                                    condition=NodeCondition.DRAINING,
-                                    type=NodeType.PRIMARY)])
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                [server('abc', state=ServerState.ACTIVE,
+                        servicenet_address='1.1.1.1')],
+                [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                        config=LBConfig(port=80,
+                                        condition=NodeCondition.DRAINING),
+                        connections=1, drained_at=0.0)],
+                1),
+            Convergence(steps=pbag([
+                SetMetadataItemOnServer(server_id='abc',
+                                        key='rax:auto_scaling_draining',
+                                        value='draining')
+            ])))
+
+    def test_draining_server_has_all_enabled_lb_set_to_draining(self):
+        """
+        If a draining server is enabled on any load balancers, it is set to
+        draining on those load balancers and it is not deleted.  The metadata
+        is not re-set to draining.
+
+        This can happen for instance if the server was supposed to be deleted
+        in a previous convergence run, and the server metadata was set but
+        the load balancers update failed.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                [server('abc', state=ServerState.DRAINING,
+                        servicenet_address='1.1.1.1')],
+                [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                        config=LBConfig(port=80))],
+                1),
+            Convergence(steps=pbag([
+                ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
+                                       condition=NodeCondition.DRAINING,
+                                       type=NodeType.PRIMARY)
+            ])))
 
 
 class ConvergeTests(SynchronousTestCase):
@@ -502,7 +576,7 @@ class ConvergeTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
                 [],
-                {},
+                [],
                 0),
             Convergence(
                 steps=pbag([CreateServer(launch_config=pmap())])))
@@ -516,7 +590,7 @@ class ConvergeTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
                 [],
-                {},
+                [],
                 0),
             Convergence(
                 steps=pbag([
@@ -532,7 +606,7 @@ class ConvergeTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
                 [server('abc', ServerState.BUILD)],
-                {},
+                [],
                 0),
             Convergence(steps=pbag([])))
 
@@ -545,7 +619,7 @@ class ConvergeTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
                 [server('abc', ServerState.ERROR)],
-                {},
+                [],
                 0),
             Convergence(
                 steps=pbag([
@@ -583,7 +657,7 @@ class ConvergeTests(SynchronousTestCase):
                 DesiredGroupState(launch_config={}, desired=1),
                 [server('abc', ServerState.ACTIVE, created=0),
                  server('def', ServerState.ACTIVE, created=1)],
-                {},
+                [],
                 0),
             Convergence(steps=pbag([DeleteServer(server_id='abc')])))
 
@@ -616,7 +690,7 @@ class ConvergeTests(SynchronousTestCase):
                 [server('abc', ServerState.ACTIVE, created=0),
                  server('def', ServerState.BUILD, created=1),
                  server('ghi', ServerState.ACTIVE, created=2)],
-                {},
+                [],
                 0),
             Convergence(
                 steps=pbag([DeleteServer(server_id='def')])))
@@ -631,7 +705,7 @@ class ConvergeTests(SynchronousTestCase):
                 DesiredGroupState(launch_config={}, desired=2),
                 [server('slowpoke', ServerState.BUILD, created=0),
                  server('ok', ServerState.ACTIVE, created=0)],
-                {},
+                [],
                 3600),
             Convergence(
                 steps=pbag([
@@ -649,7 +723,7 @@ class ConvergeTests(SynchronousTestCase):
                 [server('slowpoke', ServerState.BUILD, created=0),
                  server('old-ok', ServerState.ACTIVE, created=0),
                  server('new-ok', ServerState.ACTIVE, created=3600)],
-                {},
+                [],
                 3600),
             Convergence(steps=pbag([DeleteServer(server_id='slowpoke')])))
 
