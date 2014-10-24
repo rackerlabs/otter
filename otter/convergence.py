@@ -266,10 +266,10 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     by ``desired_state``.
 
     :param DesiredGroupState desired_state: The desired group state.
-    :param list servers_with_cheese: a list of :obj:`NovaServer` instances.
+    :param set servers_with_cheese: a list of :obj:`NovaServer` instances.
         This must only contain servers that are being managed for the specified
         group.
-    :param load_balancer_contents: a list of :obj:`LBNode` instances.  This must
+    :param load_balancer_contents: a set of :obj:`LBNode` instances.  This must
         contain all the load balancer mappings for all the load balancers on the
         tenant.
     :param float now: number of seconds since the POSIX epoch indicating the
