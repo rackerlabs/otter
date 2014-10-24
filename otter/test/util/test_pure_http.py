@@ -4,12 +4,13 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from testtools import TestCase
 
-from effect.testing import StubIntent, resolve_effect, resolve_stubs
+from effect.testing import StubIntent, resolve_stubs
 from effect.twisted import perform
-from effect import Effect, ConstantIntent
+from effect import Effect, ConstantIntent, FuncIntent
 
-from otter.util.pure_http import request, Request
-from otter.util.http import APIError, headers
+from otter.util.pure_http import (
+    request_with_auth, Request, check_status, bind_root, get_request)
+from otter.util.http import APIError
 from otter.test.utils import stub_pure_response, StubResponse, StubTreq
 
 
@@ -50,86 +51,68 @@ class RequestEffectTests(SynchronousTestCase):
                          (response, "content"))
 
 
-class PureHTTPClientTests(TestCase):
-    """Tests for the pure HTTP client functions."""
+class CheckStatusTests(TestCase):
+    """Tests :func:`check_status`"""
 
-    def _no_reauth_client(self):
-        def auth():
-            return Effect(Constant(headers("my-token")))
-        return (
-            lambda *args, **kwargs:
-            resolve_stubs(request(*args,
-                                  get_auth_headers=auth,
-                                  refresh_auth_info=lambda: None,
-                                  **kwargs)))
-
-    def test_json_request(self):
+    def test_check_status(self):
         """
-        The request we pass in is performed after adding some standard headers.
+        :func:`check_status` raises an APIError when HTTP codes don't match.
         """
-        request_ = self._no_reauth_client()
-        eff = request_("get", "/foo")
-        req = eff.intent
-        self.assertEqual(req.method, "get")
-        self.assertEqual(req.url, "/foo")
-        self.assertIs(req.data, None)
-        self.assertEqual(req.headers, headers('my-token'))
+        self.assertRaises(
+            APIError,
+            check_status,
+            (200,),
+            stub_pure_response({"foo": "bar"}, code=404))
 
-    def test_json_response(self):
-        """The JSON response is decoded into Python objects."""
-        request_ = self._no_reauth_client()
-        eff = request_("get", "/foo")
-        self.assertEqual(
-            resolve_effect(eff, stub_pure_response({"foo": "bar"})),
-            {'foo': 'bar'})
+    def test_check_status_success(self):
+        """When the HTTP code matches, the response is returned."""
+        response = stub_pure_response({"foo": "bar"}, code=404)
+        result = check_status((404,),  response)
+        self.assertEqual(result, response)
+
+
+class RequestWithAuthTests(TestCase):
+    """Tests for :func:`request_with_auth`"""
+
+    def setUp(self):
+        """Save auth and invalidate effects."""
+        super(RequestWithAuthTests, self).setUp()
+        self.invalidations = []
+        invalidate = lambda: self.invalidations.append(True)
+        self.auth_effect = Effect(Constant({"x-auth-token": "abc123"}))
+        self.invalidate_effect = Effect(StubIntent(FuncIntent(invalidate)))
 
     def test_header_merging(self):
         """
-        The headers passed in the original request are merged with a
-        pre-defined set.
+        The headers passed in the original request are merged with
+        authentication headers.
         """
-        request_ = self._no_reauth_client()
-        eff = request_("get", "/foo", headers={"x-mine": "abc123"})
-        req = eff.intent
-        expected_headers = headers('my-token')
-        expected_headers['x-mine'] = 'abc123'
-        self.assertEqual(req.headers, expected_headers)
+        eff = request_with_auth(
+            lambda headers: get_request("m", "u", headers=headers),
+            self.auth_effect,
+            self.invalidate_effect,
+            headers={"default": "headers"})
+        self.assertEqual(
+            resolve_stubs(eff).intent,
+            Request(method="m",
+                    url="u",
+                    headers={"x-auth-token": "abc123",
+                             "default": "headers"}))
 
-    def test_default_headers_win(self):
+    def test_auth_headers_win(self):
         """
-        When merging headers together, the predefined set takes precedent
-        over any that are passed.
+        When merging headers together, auth headers win.
         """
-        request_ = self._no_reauth_client()
-        eff = request_("get", "/foo", headers={"x-auth-token": "abc123"})
-        req = eff.intent
-        expected_headers = headers('my-token')
-        self.assertEqual(req.headers, expected_headers)
-
-    def test_data(self):
-        """The data member in the request is encoded with json."""
-        request_ = self._no_reauth_client()
-        eff = request_("get", "/foo", data={'foo': 'bar'})
-        req = eff.intent
-        self.assertEqual(req.data, '{"foo": "bar"}')
-
-    def test_api_error_default(self):
-        """
-        APIError is raised when the response code isn't 200, by default.
-        """
-        request_ = self._no_reauth_client()
-        eff = request_("get", "/foo")
-        self.assertRaises(
-            APIError,
-            resolve_effect, eff,
-            stub_pure_response({"foo": "bar"}, code=404))
-
-    def test_api_error_specified(self):
-        """Any HTTP response code can be specified as being successful."""
-        request_ = self._no_reauth_client()
-        eff = request_("get", url="/foo", success_codes=[404])
-        stub_result = stub_pure_response({"foo": "bar"}, code=404)
-        self.assertEqual(resolve_effect(eff, stub_result), {"foo": "bar"})
+        eff = request_with_auth(
+            lambda headers: get_request("m", "u", headers=headers),
+            self.auth_effect,
+            self.invalidate_effect,
+            headers={"x-auth-token": "fooey"})
+        self.assertEqual(
+            resolve_stubs(eff).intent,
+            Request(method="m",
+                    url="u",
+                    headers={"x-auth-token": "abc123"}))
 
     def test_reauth_successful(self):
         """
@@ -153,34 +136,29 @@ class PureHTTPClientTests(TestCase):
         return self._test_reauth(500, reauth_codes=(401, 403, 500))
 
     def _test_reauth(self, code, reauth_codes=None):
-        reauth_effect = Effect(Constant(None))
-
-        def get_auth_headers():
-            return Effect(Constant(headers("first-token")))
-
-        def refresh_auth_info():
-            return reauth_effect
-
         # First we try to make a simple request.
         kwargs = {}
         if reauth_codes is not None:
             kwargs['reauth_codes'] = reauth_codes
-        eff = request("get", "/foo",
-                      get_auth_headers=get_auth_headers,
-                      refresh_auth_info=refresh_auth_info,
-                      **kwargs)
+        badauth = stub_pure_response("badauth!", code=code)
+        eff = request_with_auth(
+            lambda headers: badauth,
+            self.auth_effect,
+            self.invalidate_effect,
+            headers={"base": "header"},
+            **kwargs)
+        self.assertEqual(resolve_stubs(eff), badauth)
+        self.assertEqual(self.invalidations, [True])
 
-        # The initial (cached) auth headers are retrieved.
-        eff = resolve_stubs(eff)
 
-        # when an authentication error is returned from the HTTP server,
-        # the auth info is automitacally refreshed:
-        stub_result = stub_pure_response("badauth!", code=code)
-        reauth_effect_result = resolve_effect(eff, stub_result)
-        self.assertIs(reauth_effect_result.intent, reauth_effect.intent)
+class BindRootTests(TestCase):
+    """Tests for :func:`bind_root`"""
 
-        # And the original auth error HTTP response is still returned.
-        api_error = self.assertRaises(APIError, resolve_stubs, reauth_effect_result)
-        self.assertEqual(api_error.code, code)
-        self.assertEqual(api_error.body, "badauth!")
-        self.assertEqual(api_error.headers, {})
+    def test_bind_root(self):
+        """
+        :func:`bind_root` returns a new request function that appends any
+        passed URL paths onto the root URL.
+        """
+        request = bind_root(get_request, "http://slashdot.org/")
+        self.assertEqual(request("get", "foo").intent.url,
+                         "http://slashdot.org/foo")
