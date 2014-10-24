@@ -67,8 +67,35 @@ server_metadata = {
 }
 
 # nova server payload
-server = {
+
+_bfv_server = {
     "type": "object",
+    "properties": {
+        "imageRef": {
+            "type": ["string", "null"],
+            "maxLength": 0
+        },
+        "block_device_mapping": {
+            "type": "array",
+            "items": {"type": "object"},
+            "required": True
+        }
+    }
+}
+
+_non_bfv_server = {
+    "type": "object",
+    "properties": {
+        "imageRef": {
+            "type": "string",
+            "pattern": "^\S+$",  # must contain non-whitespace
+            "required": True
+        }
+    }
+}
+
+server = {
+    "type": [_bfv_server, _non_bfv_server],
     # The schema for the create server attributes should come
     # from Nova, or Nova should provide some no-op method to
     # validate creating a server. Autoscale should not
@@ -82,14 +109,16 @@ server = {
                     "all new servers (including the name attribute)."),
     "properties": {
         "imageRef": {
-            "type": ["string", "null"],
-            "pattern": "^\S*$"  # must contain non-whitespace, if it's there
         },
         "flavorRef": {
             "type": "string",
             "required": True,
             "minLength": 1,
             "pattern": "^\S+$"  # must contain non-whitespace
+        },
+        "block_device_mapping": {
+            "type": "array",
+            "items": {"type": "object"}
         },
         "personality": {
             "type": "array",

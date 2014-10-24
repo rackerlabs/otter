@@ -142,7 +142,15 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
             group_id=self.group.id,
             name=lc_name,
             image_ref=lc_image_ref,
-            flavor_ref=lc_flavor_ref)
+            flavor_ref=lc_flavor_ref,
+            block_device_mapping=[{
+                "boot_index": "0",
+                "uuid": self.lc_image_ref,
+                "volume_size": "100",
+                "source_type": "image",
+                "destination_type": "volume",
+                "delete_on_termination": False
+            }])
 
         self.assertEquals(update_lc_response.status_code, 204,
                           msg='Update launch config failed with {0} as against a 204, success for'
@@ -173,13 +181,6 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
         """
         Update a scaling group's launch config with an empty image ID.  Request
         succeeds, overwriting previous launch config.
-
-        TODO: once block_device_mapping is validated (because image ID should
-        only be empty if ``block_device_mapping`` is specified), the
-        ``update_launch_config`` function should take ``block_device_mapping``
-        (the autoscale and nova fixtures should be updated), and the
-        updated launch config in autoscale should be checked for
-        ``block_device_mapping``.
         """
         self._test_boot_from_volume("")
 
@@ -187,13 +188,6 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
         """
         Update a scaling group's launch config with a null image ID.  Request
         succeeds, overwriting previous launch config.
-
-        TODO: once block_device_mapping is validated (because image ID should
-        only be empty if ``block_device_mapping`` is specified), the
-        ``update_launch_config`` function should take ``block_device_mapping``
-        (the autoscale and nova fixtures should be updated), and the
-        updated launch config in autoscale should be checked for
-        ``block_device_mapping``.
         """
         self._test_boot_from_volume(null)
 
@@ -201,12 +195,5 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
         """
         Update a scaling group's launch config without an image ID.  Request
         succeeds, overwriting previous launch config.
-
-        TODO: once block_device_mapping is validated (because image ID should
-        only be empty if ``block_device_mapping`` is specified), the
-        ``update_launch_config`` function should take ``block_device_mapping``
-        (the autoscale and nova fixtures should be updated), and the
-        updated launch config in autoscale should be checked for
-        ``block_device_mapping``.
         """
         self._test_boot_from_volume(None)
