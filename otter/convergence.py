@@ -294,6 +294,9 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
             lb_id=lb_id,
             address_configs=s((ip_address, desired[lb_id, port])))
         for lb_id, port in desired_idports - current_idports]
+
+    # TODO: Removes could be replaced with _remove_from_lb_with_draining if
+    # we wanted to support draining for moving load balancers too
     removes = [
         RemoveFromLoadBalancer(
             lb_id=lb_id,
@@ -310,6 +313,31 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
         if ((lb_id, port) in current
             and current[lb_id, port].config != desired_config)]
     return adds + removes + changes
+
+
+def _drain_and_delete_server(server, timeout, current_lb_state, now):
+    """
+    If server is not already in draining state, put it into draining state.
+    If the server is free of load balancers, just delete it.
+    """
+    lb_draining_steps = _remove_from_lb_with_draining(timeout, current_lb_state,
+                                                      now)
+
+    # if there are no load balancers that are waiting on draining timeouts or
+    # connections, just delete the server too
+    if (len(lb_draining_steps) == len(current_lb_state) and
+        all([isinstance(step, RemoveFromLoadBalancer)
+             for step in lb_draining_steps])):
+        return lb_draining_steps + [DeleteServer(server_id=server.id)]
+
+    # if the server is not already in draining state, put it into draining
+    if server.state != ServerState.DRAINING:
+        return lb_draining_steps + [
+            SetMetadataItemOnServer(server_id=server.id,
+                                    key='rax:auto_scaling_draining',
+                                    value='draining')]
+
+    return lb_draining_steps
 
 
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,

@@ -10,7 +10,7 @@ from otter.test.utils import StubTreq2, patch, iMock
 from otter.auth import IAuthenticator
 from otter.util.http import headers, APIError
 from otter.convergence import (
-    _remove_from_lb_with_draining, _converge_lb_state,
+    _remove_from_lb_with_draining, _converge_lb_state, _drain_and_delete_server,
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
@@ -413,6 +413,83 @@ def server(id, state, created=0, **kwargs):
     return NovaServer(id=id, state=state, created=created, **kwargs)
 
 
+class DrainAndDeleteServerTests(SynchronousTestCase):
+    """
+    Tests for :func:`_drain_and_delete_server`
+    """
+    def test_active_server_without_load_balancers_can_be_deleted(self):
+        """
+        If the server is not attached to any load balancers, it can be deleted.
+        It is not first put into draining state.
+        """
+        results = _drain_and_delete_server(
+            server('abc', state=ServerState.ACTIVE), 10, [], 0)
+        self.assertEqual(results, [DeleteServer(server_id='abc')])
+
+    def test_server_can_be_deleted_if_all_lbs_can_be_removed(self):
+        """
+        If the server can be removed from all the load balancers, the server
+        can be deleted.  It is not first put into draining state.
+        """
+        results = _drain_and_delete_server(
+            server('abc', state=ServerState.ACTIVE), 0,
+            [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                    config=LBConfig(port=80))],
+            0)
+        self.assertEqual(set(results),
+                         set([DeleteServer(server_id='abc'),
+                              RemoveFromLoadBalancer(lb_id=1, node_id=1)]))
+
+    def test_draining_server_ignored_if_waiting_for_timeout(self):
+        """
+        If the server already in draining state is waiting for the draining
+        timeout on some load balancers, nothing is done to it.
+        """
+        results = _drain_and_delete_server(
+            server('abc', state=ServerState.DRAINING), 10,
+            [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=1.0, connections=1)],
+            2)
+        self.assertEqual(results, [])
+
+    def test_active_server_is_drained_if_not_all_lbs_can_be_removed(self):
+        """
+        If an active server cannot be removed from all the load balancers, it is
+        set to draining state and all the nodes are set to draining condition.
+        """
+        results = _drain_and_delete_server(
+            server('abc', state=ServerState.ACTIVE), 10,
+            [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                    config=LBConfig(port=80))],
+            0)
+        self.assertEqual(
+            set(results),
+            set([ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
+                                        condition=NodeCondition.DRAINING,
+                                        type=NodeType.PRIMARY),
+                 SetMetadataItemOnServer(server_id='abc',
+                                         key='rax:auto_scaling_draining',
+                                         value='draining')]))
+
+    def test_draining_server_cannot_be_deleted_if_not_all_lbs_can_be_removed(self):
+        """
+        If the server cannot be removed from all the load balancers, the server
+        is not deleted.  If it is already in draining, the metadata is not
+        re-set to draining.
+        """
+        results = _drain_and_delete_server(
+            server('abc', state=ServerState.DRAINING), 10,
+            [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                    config=LBConfig(port=80))],
+            1)
+        self.assertEqual(
+            results,
+            [ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
+                                    condition=NodeCondition.DRAINING,
+                                    type=NodeType.PRIMARY)])
+
+
 class ConvergeTests(SynchronousTestCase):
     """Tests for :func:`converge`."""
 
@@ -595,8 +672,6 @@ class ConvergeTests(SynchronousTestCase):
                     lb_id=5,
                     address_configs=s(('2.2.2.2', LBConfig(port=80))))
             ])))
-
-# time out (delete) building servers
 
 
 class RequestConversionTests(SynchronousTestCase):
