@@ -575,8 +575,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [],
-                [],
+                set(),
+                set(),
                 0),
             Convergence(
                 steps=pbag([CreateServer(launch_config=pmap())])))
@@ -589,8 +589,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [],
-                [],
+                set(),
+                set(),
                 0),
             Convergence(
                 steps=pbag([
@@ -605,8 +605,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ServerState.BUILD)],
-                [],
+                set([server('abc', ServerState.BUILD)]),
+                set(),
                 0),
             Convergence(steps=pbag([])))
 
@@ -618,8 +618,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ServerState.ERROR)],
-                [],
+                set([server('abc', ServerState.ERROR)]),
+                set(),
                 0),
             Convergence(
                 steps=pbag([
@@ -636,11 +636,11 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ServerState.ERROR, servicenet_address='1.1.1.1')],
-                [LBNode(lb_id=5, address='1.1.1.1', node_id=3,
-                        config=LBConfig(port=80)),
-                 LBNode(lb_id=5, address='1.1.1.1', node_id=5,
-                        config=LBConfig(port=8080))],
+                set([server('abc', ServerState.ERROR, servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=5, address='1.1.1.1', node_id=3,
+                            config=LBConfig(port=80)),
+                     LBNode(lb_id=5, address='1.1.1.1', node_id=5,
+                            config=LBConfig(port=8080))]),
                 0),
             Convergence(
                 steps=pbag([
@@ -655,9 +655,9 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ServerState.ACTIVE, created=0),
-                 server('def', ServerState.ACTIVE, created=1)],
-                [],
+                set([server('abc', ServerState.ACTIVE, created=0),
+                     server('def', ServerState.ACTIVE, created=1)]),
+                set(),
                 0),
             Convergence(steps=pbag([DeleteServer(server_id='abc')])))
 
@@ -670,9 +670,10 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=0),
-                [server('abc', ServerState.ACTIVE, servicenet_address='1.1.1.1', created=0)],
-                [LBNode(lb_id=5, address='1.1.1.1', node_id=3,
-                        config=LBConfig(port=80))],
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1', created=0)]),
+                set([LBNode(lb_id=5, address='1.1.1.1', node_id=3,
+                            config=LBConfig(port=80))]),
                 0),
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),
@@ -687,10 +688,10 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [server('abc', ServerState.ACTIVE, created=0),
-                 server('def', ServerState.BUILD, created=1),
-                 server('ghi', ServerState.ACTIVE, created=2)],
-                [],
+                set([server('abc', ServerState.ACTIVE, created=0),
+                     server('def', ServerState.BUILD, created=1),
+                     server('ghi', ServerState.ACTIVE, created=2)]),
+                set(),
                 0),
             Convergence(
                 steps=pbag([DeleteServer(server_id='def')])))
@@ -703,9 +704,9 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [server('slowpoke', ServerState.BUILD, created=0),
-                 server('ok', ServerState.ACTIVE, created=0)],
-                [],
+                set([server('slowpoke', ServerState.BUILD, created=0),
+                     server('ok', ServerState.ACTIVE, created=0)]),
+                set(),
                 3600),
             Convergence(
                 steps=pbag([
@@ -720,10 +721,10 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [server('slowpoke', ServerState.BUILD, created=0),
-                 server('old-ok', ServerState.ACTIVE, created=0),
-                 server('new-ok', ServerState.ACTIVE, created=3600)],
-                [],
+                set([server('slowpoke', ServerState.BUILD, created=0),
+                     server('old-ok', ServerState.ACTIVE, created=0),
+                     server('new-ok', ServerState.ACTIVE, created=3600)]),
+                set(),
                 3600),
             Convergence(steps=pbag([DeleteServer(server_id='slowpoke')])))
 
@@ -736,9 +737,11 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1, desired_lbs=desired_lbs),
-                [server('abc', ServerState.ACTIVE, servicenet_address='1.1.1.1', created=0),
-                 server('bcd', ServerState.ACTIVE, servicenet_address='2.2.2.2', created=1)],
-                [],
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1', created=0),
+                     server('bcd', ServerState.ACTIVE,
+                            servicenet_address='2.2.2.2', created=1)]),
+                set(),
                 0),
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),
