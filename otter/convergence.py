@@ -366,9 +366,11 @@ def optimize_steps(steps):
     :param pbag steps: Collection of steps.
     :return: a pbag of steps.
     """
-    lb_adds, other = partition_bool(
-        lambda s: type(s) is AddNodesToLoadBalancer,
-        steps)
+    optimizable_types = [AddNodesToLoadBalancer]
+    lb_adds, other = partition_groups(
+        lambda s: type(s) if type(s) in optimizable_types else None,
+        steps,
+        optimizable_types + [None])
     merged_adds = _optimize_lb_adds(lb_adds)
     return pbag(merged_adds + other)
 
