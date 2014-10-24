@@ -15,6 +15,7 @@ from otter.convergence import (
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
     AddNodesToRCv3LoadBalancer, AddNodesToRCv3LoadBalancers,
+    RemoveNodeFromRCv3LoadBalancer, RemoveNodesFromRCv3LoadBalancers,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ACTIVE, ERROR, BUILD,
     ServiceType, NodeCondition, NodeType, optimize_steps)
@@ -667,6 +668,36 @@ class OptimizerTests(SynchronousTestCase):
         ])
         self.assertEqual(optimize_steps(unoptimized), optimized)
 
+
+    def test_optimize_rcv3_removes(self):
+        """
+        RackConnect v3.0 steps for removing nodes from load balancers are
+        merged.
+        """
+        unoptimized = pbag([
+            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-1", node_id="node-a"),
+            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-1", node_id="node-b"),
+            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-1", node_id="node-c"),
+            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-1", node_id="node-d"),
+            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-2", node_id="node-a"),
+            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-2", node_id="node-b"),
+            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-3", node_id="node-c"),
+            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-3", node_id="node-d")
+        ])
+        optimized = pbag([
+            RemoveNodesFromRCv3LoadBalancers(lb_node_pairs=pset([
+                ("lb-1", "node-a"),
+                ("lb-1", "node-b"),
+                ("lb-1", "node-c"),
+                ("lb-1", "node-d"),
+                ("lb-2", "node-a"),
+                ("lb-2", "node-b"),
+                ("lb-3", "node-c"),
+                ("lb-3", "node-d")
+            ]))
+        ])
+        self.assertEqual(optimize_steps(unoptimized), optimized)
+
     # TODO: Write a test that a set of AddNodesToRCv3LoadBalancer +
     # some AddNodesToRCv3LoadBalancers all get coalesced into 1? That
-    # requires multiple optimization passes.
+    # requires multiple optimization passes. Same thing for removing.
