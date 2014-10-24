@@ -184,7 +184,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
             0,
             [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
                     config=LBConfig(port=80))],
-            lambda: 0)
+            0)
 
         self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
 
@@ -197,7 +197,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
             10,
             [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
                     config=LBConfig(port=80, condition=NodeCondition.DISABLED))],
-            lambda: 0)
+            0)
 
         self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
 
@@ -209,7 +209,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
             10,
             [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
                     config=LBConfig(port=80))],
-            lambda: 0)
+            0)
 
         self.assertEqual(
             result,
@@ -227,7 +227,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
             [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
                     config=LBConfig(port=80, condition=NodeCondition.DRAINING),
                     drained_at=0.0, connections=1)],
-            lambda: 5)
+            5)
 
         self.assertEqual(result, [])
 
@@ -241,7 +241,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
             [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
                     config=LBConfig(port=80, condition=NodeCondition.DRAINING),
                     drained_at=0.0, connections=0)],
-            lambda: 5)
+            5)
 
         self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
 
@@ -255,7 +255,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
             [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
                     config=LBConfig(port=80, condition=NodeCondition.DRAINING),
                     drained_at=0.0, connections=10)],
-            lambda: 15)
+            15)
 
         self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
 
@@ -284,7 +284,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
                    connections=10, drained_at=0.0)]
 
-        result = _remove_from_lb_with_draining(10, current, lambda: 10)
+        result = _remove_from_lb_with_draining(10, current, 10)
         self.assertEqual(set(result), set([
             ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
                                    condition=NodeCondition.DRAINING,

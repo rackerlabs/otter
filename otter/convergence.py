@@ -226,8 +226,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
         removed
     :param list nodes: `list` of :obj:`LBNode` that should be
         drained, then removed
-    :param callable now: `callable` that returns the current time in seconds
-        since the epoch
+    :param float now: number of seconds since the POSIX epoch indicating the
+        time at which the convergence was requested.
 
     :rtype: `list` of :class:`IStep`
     """
@@ -240,12 +240,11 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
             lambda n: n.config.condition, nodes, [NodeCondition.DRAINING,
                                                   NodeCondition.ENABLED])
 
-        current_time = now()
         # Nothing should be done to these, because the timeout has not expired
         # and there are still active connections
         in_drain = [node for node in draining
                     if (node.connections > 0 and
-                        current_time - node.drained_at < timeout)]
+                        now - node.drained_at < timeout)]
 
     removes = [RemoveFromLoadBalancer(lb_id=node.lb_id, node_id=node.node_id)
                for node in (set(nodes) - set(to_drain) - set(in_drain))]
