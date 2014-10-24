@@ -121,7 +121,8 @@ class IStep(Interface):
 
 
 @attributes(['launch_config', 'desired',
-             Attribute('desired_lbs', default_factory=dict, instance_of=dict)])
+             Attribute('desired_lbs', default_factory=dict, instance_of=dict),
+             Attribute('draining_timeout', default_value=0.0, instance_of=float)])
 class DesiredGroupState(object):
     """
     The desired state for a scaling group.
@@ -130,6 +131,10 @@ class DesiredGroupState(object):
     :ivar int desired: the number of desired servers within the group.
     :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
         :class:`LBConfig` instances.
+    :ivar float draining_timeout: If greater than zero, when the server is
+        scaled down it will be put into draining condition.  It will remain
+        in draining condition for a maximum of ``draining_timeout`` seconds
+        before being removed from the load balancer and then deleted.
     """
 
     def __init__(self):
@@ -155,9 +160,7 @@ class NovaServer(object):
              Attribute("condition", default_value=NodeCondition.ENABLED,
                        instance_of=NamedConstant),
              Attribute("type", default_value=NodeType.PRIMARY,
-                       instance_of=NamedConstant),
-             Attribute("draining_timeout", default_value=0.0, instance_of=float,
-                       exclude_from_cmp=True)])
+                       instance_of=NamedConstant)])
 class LBConfig(object):
     """
     Information representing a load balancer port mapping; how a particular
@@ -171,14 +174,6 @@ class LBConfig(object):
     :ivar str condition: One of ``ENABLED``, ``DISABLED``, or ``DRAINING`` -
         the default is ``ENABLED``
     :ivar str type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
-
-    TODO: this is not the ideal place for ``draining_timeout``, since
-    :class:`LBConfig` is more about what node on a CLB should look like.
-    And :class:`LBConfig` may not be applicable to a hardware LB.
-    So `draining_timeout` is here until other load balancer requirements are
-    understood and a better place is found for it.
-    :ivar float draining_timeout: Number of seconds node should be in DRAINING
-        state before being removed
     """
 
 
@@ -227,6 +222,8 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     in practice it should probably only be added as PRIMARY.  SECONDARY can only
     be used if load balancer health monitoring is enabled, and would be used as
     backup servers anyway.
+
+    :rtype: `list` of :class:`IStep`
     """
     desired = {
         (lb_id, config.port): config
