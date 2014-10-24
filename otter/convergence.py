@@ -421,6 +421,26 @@ class DeleteServer(object):
 
 
 @implementer(IStep)
+@attributes(['server_id', 'key', 'value'])
+class SetMetadataItemOnServer(object):
+    """
+    A metadata key/value item must be set on a server.
+
+    :ivar str server_id: a Nova server ID.
+    :ivar str key: The metadata key to set (<=256 characters)
+    :ivar str value: The value to assign to the metadata key (<=256 characters)
+    """
+    def as_request(self):
+        """Produce a :obj:`Request` to set a metadata item on a server"""
+        return Request(
+            service=ServiceType.CLOUD_SERVERS,
+            method='PUT',
+            path=append_segments('servers', self.server_id, 'metadata',
+                                 self.key),
+            data={'meta': {self.key: self.value}})
+
+
+@implementer(IStep)
 @attributes(['lb_id', 'address_configs'])
 class AddNodesToLoadBalancer(object):
     """
