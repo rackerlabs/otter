@@ -549,6 +549,12 @@ def _optimize_lb_adds(lb_add_steps):
 
 @_optimizer(AddNodesToRCv3LoadBalancer)
 def _optimize_rcv3_lb_adds(steps):
+    """
+    Merge :obj:`AddNodesToRCv3LoadBalancer` objects to a single
+    :obj:`AddNodesToRCv3LoadBalancers` step.
+
+    :param steps: Iterable of :obj:`AddNodesToRCv3LoadBalancer`.
+    """
     pairs = pset([(step.lb_id, node_id)
                   for step in steps
                   for node_id in step.node_ids])
@@ -557,6 +563,12 @@ def _optimize_rcv3_lb_adds(steps):
 
 @_optimizer(RemoveNodeFromRCv3LoadBalancer)
 def _optimize_rcv3_lb_removes(steps):
+    """
+    Merge :obj:`RemoveNodeFromRCv3LoadBalancer` objects to a single
+    :obj:`RemoveNodesFromRCv3LoadBalancers` step.
+
+    :param steps: Iterable of :obj:`RemoveNodeFromRCv3LoadBalancer`.
+    """
     pairs = pset((step.lb_id, step.node_id) for step in steps)
     return [RemoveNodesFromRCv3LoadBalancers(lb_node_pairs=pairs)]
 
