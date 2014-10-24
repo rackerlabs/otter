@@ -15,8 +15,7 @@ from otter.convergence import (
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
-    ACTIVE, ERROR, BUILD,
-    ServiceType, NodeCondition, NodeType, optimize_steps)
+    ServerState, ServiceType, NodeCondition, NodeType, optimize_steps)
 
 from pyrsistent import pmap, pbag, s
 
@@ -309,7 +308,7 @@ class ConvergeTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
                 [],
-                {},
+                [],
                 0),
             Convergence(
                 steps=pbag([CreateServer(launch_config=pmap())])))
@@ -323,7 +322,7 @@ class ConvergeTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
                 [],
-                {},
+                [],
                 0),
             Convergence(
                 steps=pbag([
@@ -338,8 +337,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', BUILD)],
-                {},
+                [server('abc', ServerState.BUILD)],
+                [],
                 0),
             Convergence(steps=pbag([])))
 
@@ -351,8 +350,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ERROR)],
-                {},
+                [server('abc', ServerState.ERROR)],
+                [],
                 0),
             Convergence(
                 steps=pbag([
@@ -369,7 +368,7 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ERROR, servicenet_address='1.1.1.1')],
+                [server('abc', ServerState.ERROR, servicenet_address='1.1.1.1')],
                 [LBNode(lb_id=5, address='1.1.1.1', node_id=3,
                         config=LBConfig(port=80)),
                  LBNode(lb_id=5, address='1.1.1.1', node_id=5,
@@ -388,9 +387,9 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ACTIVE, created=0),
-                 server('def', ACTIVE, created=1)],
-                {},
+                [server('abc', ServerState.ACTIVE, created=0),
+                 server('def', ServerState.ACTIVE, created=1)],
+                [],
                 0),
             Convergence(steps=pbag([DeleteServer(server_id='abc')])))
 
@@ -403,7 +402,7 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=0),
-                [server('abc', ACTIVE, servicenet_address='1.1.1.1', created=0)],
+                [server('abc', ServerState.ACTIVE, servicenet_address='1.1.1.1', created=0)],
                 [LBNode(lb_id=5, address='1.1.1.1', node_id=3,
                         config=LBConfig(port=80))],
                 0),
@@ -420,10 +419,10 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [server('abc', ACTIVE, created=0),
-                 server('def', BUILD, created=1),
-                 server('ghi', ACTIVE, created=2)],
-                {},
+                [server('abc', ServerState.ACTIVE, created=0),
+                 server('def', ServerState.BUILD, created=1),
+                 server('ghi', ServerState.ACTIVE, created=2)],
+                [],
                 0),
             Convergence(
                 steps=pbag([DeleteServer(server_id='def')])))
@@ -436,9 +435,9 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [server('slowpoke', BUILD, created=0),
-                 server('ok', ACTIVE, created=0)],
-                {},
+                [server('slowpoke', ServerState.BUILD, created=0),
+                 server('ok', ServerState.ACTIVE, created=0)],
+                [],
                 3600),
             Convergence(
                 steps=pbag([
@@ -453,10 +452,10 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [server('slowpoke', BUILD, created=0),
-                 server('old-ok', ACTIVE, created=0),
-                 server('new-ok', ACTIVE, created=3600)],
-                {},
+                [server('slowpoke', ServerState.BUILD, created=0),
+                 server('old-ok', ServerState.ACTIVE, created=0),
+                 server('new-ok', ServerState.ACTIVE, created=3600)],
+                [],
                 3600),
             Convergence(steps=pbag([DeleteServer(server_id='slowpoke')])))
 
@@ -469,8 +468,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1, desired_lbs=desired_lbs),
-                [server('abc', ACTIVE, servicenet_address='1.1.1.1', created=0),
-                 server('bcd', ACTIVE, servicenet_address='2.2.2.2', created=1)],
+                [server('abc', ServerState.ACTIVE, servicenet_address='1.1.1.1', created=0),
+                 server('bcd', ServerState.ACTIVE, servicenet_address='2.2.2.2', created=1)],
                 [],
                 0),
             Convergence(steps=pbag([
@@ -479,8 +478,6 @@ class ConvergeTests(SynchronousTestCase):
                     lb_id=5,
                     address_configs=s(('2.2.2.2', LBConfig(port=80))))
             ])))
-
-# time out (delete) building servers
 
 
 class RequestConversionTests(SynchronousTestCase):
