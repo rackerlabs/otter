@@ -121,7 +121,8 @@ class IStep(Interface):
 
 
 @attributes(['launch_config', 'desired',
-             Attribute('desired_lbs', default_factory=dict, instance_of=dict)])
+             Attribute('desired_lbs', default_factory=dict, instance_of=dict),
+             Attribute('draining_timeout', default_value=0.0, instance_of=float)])
 class DesiredGroupState(object):
     """
     The desired state for a scaling group.
@@ -130,6 +131,10 @@ class DesiredGroupState(object):
     :ivar int desired: the number of desired servers within the group.
     :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
         :class:`LBConfig` instances.
+    :ivar float draining_timeout: If greater than zero, when the server is
+        scaled down it will be put into draining condition.  It will remain
+        in draining condition for a maximum of ``draining_timeout`` seconds
+        before being removed from the load balancer and then deleted.
     """
 
     def __init__(self):
@@ -155,9 +160,7 @@ class NovaServer(object):
              Attribute("condition", default_value=NodeCondition.ENABLED,
                        instance_of=NamedConstant),
              Attribute("type", default_value=NodeType.PRIMARY,
-                       instance_of=NamedConstant),
-             Attribute("draining_timeout", default_value=0.0, instance_of=float,
-                       exclude_from_cmp=True)])
+                       instance_of=NamedConstant)])
 class LBConfig(object):
     """
     Information representing a load balancer port mapping; how a particular
@@ -171,14 +174,6 @@ class LBConfig(object):
     :ivar str condition: One of ``ENABLED``, ``DISABLED``, or ``DRAINING`` -
         the default is ``ENABLED``
     :ivar str type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
-
-    TODO: this is not the ideal place for ``draining_timeout``, since
-    :class:`LBConfig` is more about what node on a CLB should look like.
-    And :class:`LBConfig` may not be applicable to a hardware LB.
-    So `draining_timeout` is here until other load balancer requirements are
-    understood and a better place is found for it.
-    :ivar float draining_timeout: Number of seconds node should be in DRAINING
-        state before being removed
     """
 
 
@@ -203,9 +198,11 @@ class LBNode(object):
     """
 
 
-ACTIVE = 'ACTIVE'
-ERROR = 'ERROR'
-BUILD = 'BUILD'
+class ServerState(Names):
+    """Constants representing the state cloud servers can have"""
+    ACTIVE = NamedConstant()    # corresponds to Nova "ACTIVE"
+    ERROR = NamedConstant()     # corresponds to Nova "ERROR"
+    BUILD = NamedConstant()     # corresponds to Nova "BUILD" or "BUILDING"
 
 
 def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
@@ -225,6 +222,8 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     in practice it should probably only be added as PRIMARY.  SECONDARY can only
     be used if load balancer health monitoring is enabled, and would be used as
     backup servers anyway.
+
+    :rtype: `list` of :class:`IStep`
     """
     desired = {
         (lb_id, config.port): config
@@ -284,7 +283,9 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
 
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
     servers_in_error, servers_in_active, servers_in_build = partition_groups(
-        lambda s: s.state, newest_to_oldest, [ERROR, ACTIVE, BUILD])
+        lambda s: s.state, newest_to_oldest, [ServerState.ERROR,
+                                              ServerState.ACTIVE,
+                                              ServerState.BUILD])
 
     building_too_long, waiting_for_build = partition_bool(
         lambda server: now - server.created >= timeout,
@@ -320,11 +321,11 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
          for lb_node in lbs_by_address.get(server.servicenet_address, [])])
 
     # converge all the servers that remain to their desired load balancer state
-    new_active_servers = filter(lambda s: s not in servers_to_delete,
-                                servers_in_active)
+    still_active_servers = filter(lambda s: s not in servers_to_delete,
+                                  servers_in_active)
     lb_converge_steps = [
         step
-        for server in new_active_servers
+        for server in still_active_servers
         for step in _converge_lb_state(
             desired_state.desired_lbs,
             lbs_by_address.get(server.servicenet_address, []),
@@ -417,6 +418,26 @@ class DeleteServer(object):
             service=ServiceType.CLOUD_SERVERS,
             method='DELETE',
             path=append_segments('servers', self.server_id))
+
+
+@implementer(IStep)
+@attributes(['server_id', 'key', 'value'])
+class SetMetadataItemOnServer(object):
+    """
+    A metadata key/value item must be set on a server.
+
+    :ivar str server_id: a Nova server ID.
+    :ivar str key: The metadata key to set (<=256 characters)
+    :ivar str value: The value to assign to the metadata key (<=256 characters)
+    """
+    def as_request(self):
+        """Produce a :obj:`Request` to set a metadata item on a server"""
+        return Request(
+            service=ServiceType.CLOUD_SERVERS,
+            method='PUT',
+            path=append_segments('servers', self.server_id, 'metadata',
+                                 self.key),
+            data={'meta': {self.key: self.value}})
 
 
 @implementer(IStep)
