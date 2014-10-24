@@ -33,7 +33,7 @@ class RequestEffectTests(SynchronousTestCase):
         req = Request(method="get", url="http://google.com/")
         req.treq = treq
         self.assertEqual(
-            self.successResultOf(perform(Effect(req))),
+            self.successResultOf(perform(None, Effect(req))),
             (response, "content"))
 
     def test_log(self):
@@ -47,7 +47,7 @@ class RequestEffectTests(SynchronousTestCase):
                         contents=[(response, "content")])
         req = Request(method="get", url="http://google.com/", log=log)
         req.treq = treq
-        self.assertEqual(self.successResultOf(perform(Effect(req))),
+        self.assertEqual(self.successResultOf(perform(None, Effect(req))),
                          (response, "content"))
 
 
