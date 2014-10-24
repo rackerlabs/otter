@@ -10,7 +10,7 @@ from otter.test.utils import StubTreq2, patch, iMock
 from otter.auth import IAuthenticator
 from otter.util.http import headers, APIError
 from otter.convergence import (
-    _converge_lb_state,
+    _remove_from_lb_with_draining, _converge_lb_state,
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
@@ -177,6 +177,132 @@ class ObjectStorageTests(SynchronousTestCase):
         """
         self.assertEqual(LBConfig(port=80, draining_timeout=2.4),
                          LBConfig(port=80, draining_timeout=5.4))
+
+
+class RemoveFromLBWithDrainingTests(SynchronousTestCase):
+    """
+    Tests for :func:`_remove_from_lb_with_draining`
+    """
+    def get_now(self, return_val):
+        return lambda: return_val
+
+    def test_zero_timeout_remove_from_lb(self):
+        """
+        If the timeout is zero, all nodes are just removed
+        """
+        result = _remove_from_lb_with_draining(
+            0,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80))],
+            self.get_now(0))
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_disabled_state_is_removed(self):
+        """
+        Nodes in disabled state are just removed from the load balancer even
+        if the timeout is positive
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DISABLED))],
+            self.get_now(0))
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_enabled_state_is_drained(self):
+        """
+        Nodes in enabled state are put into draining.
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80))],
+            self.get_now(0))
+
+        self.assertEqual(
+            result,
+            [ChangeLoadBalancerNode(lb_id=5, node_id=123, weight=1,
+                                    condition=NodeCondition.DRAINING,
+                                    type=NodeType.PRIMARY)])
+
+    def test_draining_state_is_ignored_if_connections_and_not_yet_timeout(self):
+        """
+        Nodes in draining state will be ignored if they still have connections
+        and the timeout is not yet expired
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0, connections=1)],
+            self.get_now(5))
+
+        self.assertEqual(result, [])
+
+    def test_draining_state_removed_if_no_connections_and_not_yet_timeout(self):
+        """
+        Nodes in draining state will be removed if they have no more
+        connections, even if the timeout is not yet expired
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0, connections=0)],
+            self.get_now(5))
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_draining_state_removed_if_connections_and_timeout_expired(self):
+        """
+        Nodes in draining state will be removed when the timeout expires even
+        if they still have active connections
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0, connections=10)],
+            self.get_now(15))
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_all_changes_together(self):
+        """
+        Given all possible combination of load balancer states and timeouts,
+        ensure function produces the right set of step for all of them.
+        """
+        current = [
+            # enabled, should be drained
+            LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                   config=LBConfig(port=80)),
+            # disabled, should be removed
+            LBNode(lb_id=2, node_id=2, address='1.1.1.1',
+                   config=LBConfig(port=80, condition=NodeCondition.DISABLED)),
+            # draining, still connections, should be ignored
+            LBNode(lb_id=3, node_id=3, address='1.1.1.1',
+                   config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                   connections=3, drained_at=5.0),
+            # draining, no connections, should be removed
+            LBNode(lb_id=4, node_id=4, address='1.1.1.1',
+                   config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                   connections=0, drained_at=5.0),
+            # draining, timeout exired, should be removed
+            LBNode(lb_id=5, node_id=5, address='1.1.1.1',
+                   config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                   connections=10, drained_at=0.0)]
+
+        result = _remove_from_lb_with_draining(10, current, self.get_now(10))
+        self.assertEqual(set(result), set([
+            ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
+                                   condition=NodeCondition.DRAINING,
+                                   type=NodeType.PRIMARY),
+            RemoveFromLoadBalancer(lb_id=2, node_id=2),
+            RemoveFromLoadBalancer(lb_id=4, node_id=4),
+            RemoveFromLoadBalancer(lb_id=5, node_id=5),
+        ]))
 
 
 class ConvergeLBStateTests(SynchronousTestCase):

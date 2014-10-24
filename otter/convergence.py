@@ -183,7 +183,9 @@ class LBConfig(object):
 
 
 @attributes(["lb_id", "node_id", "address",
-             Attribute("drained_at", default_value=0.0, instance_of=float), "config"])
+             Attribute("drained_at", default_value=0.0, instance_of=float),
+             Attribute("connections", default_value=None),
+             "config"])
 class LBNode(object):
     """
     Information representing an actual node on a load balancer, which is
@@ -197,6 +199,8 @@ class LBNode(object):
         nodes with the same IP and port cannot exist on a single load balancer.
     :ivar float drained_at: EPOCH at which this node was put in DRAINING.
         Will be 0 if node is not DRAINING
+    :ivar int connections: The number of active connections on the node - this
+        is None by default (the stat is not available yet)
 
     :ivar config: The configuration for the port mapping
     :type config: :class:`LBConfig`
@@ -208,7 +212,62 @@ class ServerState(Names):
     ACTIVE = NamedConstant()    # corresponds to Nova "ACTIVE"
     ERROR = NamedConstant()     # corresponds to Nova "ERROR"
     BUILD = NamedConstant()     # corresponds to Nova "BUILD" or "BUILDING"
-    DELETING = NamedConstant()  # Autoscale is deleting the server
+    DRAINING = NamedConstant()  # Autoscale is deleting the server
+
+
+def _remove_from_lb_with_draining(timeout, nodes, now):
+    """
+    Produce a series of steps that will eventually remove all the given nodes.
+    It does this in three steps:
+
+    For any particular node in ``nodes``:
+
+    1. If the timeout is greater than zero, and the node is ``ENABLED``, the
+       node will be changed to ``DRAINING``.
+
+    2. If the node is ``DRAINING``, and the timeout has already expired or
+       there are no more active connections, the node will be removed from the
+       load balancer.
+
+    3. If the node is in any other state, or if the timeout is zero, it will be
+       removed from the load balancer.
+
+    :param float timeout: the time the node should remain in draining until
+        removed
+    :param list nodes: `list` of :obj:`LBNode` that should be
+        drained, then removed
+    :param callable now: `callable` that returns the current time in seconds
+        since the epoch
+
+    :rtype: `list` of :class:`IStep`
+    """
+    to_drain = []
+    in_drain = []
+
+    # only put nodes into draining if a timeout is specified
+    if timeout > 0:
+        draining, to_drain = partition_groups(
+            lambda n: n.config.condition, nodes, [NodeCondition.DRAINING,
+                                                  NodeCondition.ENABLED])
+
+        current_time = now()
+        # Nothing should be done to these, because the timeout has not expired
+        # and there are still active connections
+        in_drain = [node for node in draining
+                    if (node.connections > 0 and
+                        current_time - node.drained_at < timeout)]
+
+    removes = [RemoveFromLoadBalancer(lb_id=node.lb_id, node_id=node.node_id)
+               for node in (set(nodes) - set(to_drain) - set(in_drain))]
+
+    changes = [ChangeLoadBalancerNode(lb_id=node.lb_id,
+                                      node_id=node.node_id,
+                                      condition=NodeCondition.DRAINING,
+                                      weight=node.config.weight,
+                                      type=node.config.type)
+               for node in to_drain]
+
+    return removes + changes
 
 
 def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
@@ -228,6 +287,8 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     in practice it should probably only be added as PRIMARY.  SECONDARY can only
     be used if load balancer health monitoring is enabled, and would be used as
     backup servers anyway.
+
+    :rtype: `list` of :class:`IStep`
     """
     desired = {
         (lb_id, config.port): config
@@ -286,10 +347,11 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     lbs_by_address = groupby(lambda n: n.address, load_balancer_contents)
 
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
-    servers_in_error, servers_in_active, servers_in_build = partition_groups(
+    servers_in_error, servers_in_active, servers_in_build, draining_servers = partition_groups(
         lambda s: s.state, newest_to_oldest, [ServerState.ERROR,
                                               ServerState.ACTIVE,
-                                              ServerState.BUILD])
+                                              ServerState.BUILD,
+                                              ServerState.DRAINING])
 
     building_too_long, waiting_for_build = partition_bool(
         lambda server: now - server.created >= timeout,
