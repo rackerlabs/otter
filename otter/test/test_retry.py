@@ -1,6 +1,11 @@
 """
 Tests for :mod:`otter.utils.retry`
 """
+import sys
+
+from effect import Delay
+from effect.testing import resolve_effect
+
 import mock
 
 from twisted.internet.task import Clock
@@ -11,7 +16,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.util.retry import (retry, repeating_interval, random_interval,
                               transient_errors_except, retry_times,
                               compose_retries, exponential_backoff_interval,
-                              terminal_errors_except)
+                              terminal_errors_except, should_retry_effect)
 from otter.test.utils import CheckFailure, DummyException
 
 
@@ -388,3 +393,48 @@ class NextIntervalHelperTests(SynchronousTestCase):
         self.assertEqual(next_interval(err), 3)
         self.assertEqual(next_interval(err), 6)
         self.assertEqual(next_interval(err), 12)
+
+
+class ShouldRetryEffectTests(SynchronousTestCase):
+    """Tests for :func:`should_retry`."""
+
+    def _get_exc(self):
+        """Get an exception tuple."""
+        try:
+            1 / 0
+        except:
+            return sys.exc_info()
+
+    def test_should_retry_indeed(self):
+        """
+        :func:`should_retry` returns a function that returns an Effect of
+        True when retrying is allowed, after delaying based on the
+        ``next_interval`` argument.
+        """
+        eff = should_retry_effect(lambda f: True, lambda: 1, self._get_exc())
+        self.assertEqual(eff.intent, Delay(1))
+        result = resolve_effect(eff, None)
+        self.assertTrue(result)
+
+    def test_failure_to_user_function(self):
+        """
+        The ``can_retry`` argument gets passed a failure correctly constructed
+        out of the exception passed.
+        """
+        e = self._get_exc()
+        failures = []
+
+        def can_retry(f):
+            failures.append(f)
+            return True
+        should_retry_effect(can_retry, lambda: 1, e)
+        [f] = failures
+        self.assertEqual((f.type, f.value, f.tb), e)
+
+    def test_no_retry(self):
+        """
+        When the can_retry function returns False, should_retry_effect
+        returns an effect of False.
+        """
+        eff = should_retry_effect(lambda f: False, lambda: 1, self._get_exc())
+        self.assertEqual(resolve_effect(eff, eff.intent.result), False)
