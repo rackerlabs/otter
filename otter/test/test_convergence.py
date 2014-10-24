@@ -1,6 +1,7 @@
 """Tests for convergence."""
 
 import json
+import calendar
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.task import Clock
@@ -9,6 +10,7 @@ from twisted.internet.defer import succeed
 from otter.test.utils import StubTreq2, patch, iMock
 from otter.auth import IAuthenticator
 from otter.util.http import headers, APIError
+from otter.util.timestamp import from_timestamp
 from otter.convergence import (
     _converge_lb_state,
     get_all_server_details, get_scaling_group_servers,
@@ -16,7 +18,7 @@ from otter.convergence import (
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ACTIVE, ERROR, BUILD,
-    ServiceType, NodeCondition, NodeType)
+    ServiceType, NodeCondition, NodeType, extract_drained_at)
 
 from pyrsistent import pmap, pbag, s
 
@@ -154,6 +156,34 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         self.assertEqual(
             self.successResultOf(d),
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
+
+
+class ExtractDrainedTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.convergence.extract_drained_at`
+    """
+    summary = ("Node successfully updated with address: " +
+               "'10.23.45.6', port: '8080', weight: '1', condition: 'DRAINING'")
+    updated = '2014-10-23T18:10:48.000Z'
+    feed = ('<feed xmlns="http://www.w3.org/2005/Atom">' +
+            '<entry><summary>{}</summary><updated>{}</updated></entry>' +
+            '<entry><summary>else</summary><updated>badtime</updated></entry>' +
+            '</feed>')
+
+    def test_first_entry(self):
+        """
+        Takes the first entry only
+        """
+        feed = self.feed.format(self.summary, self.updated)
+        self.assertEqual(extract_drained_at(feed),
+                         calendar.timegm(from_timestamp(self.updated).utctimetuple()))
+
+    def test_invalid_first_entry(self):
+        """
+        Raises error if first entry is not DRAINING entry
+        """
+        feed = self.feed.format("Node successfully updated with ENABLED", self.updated)
+        self.assertRaises(ValueError, extract_drained_at, feed)
 
 
 class ObjectStorageTests(SynchronousTestCase):

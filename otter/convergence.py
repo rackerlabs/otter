@@ -4,6 +4,7 @@ Convergence.
 
 from functools import partial
 from urllib import urlencode
+import calendar
 
 import treq
 
@@ -22,6 +23,8 @@ from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
 from otter.util.retry import retry, retry_times, exponential_backoff_interval
+from otter.util.timestamp import from_timestamp
+from otter.indexer import atom
 # TODO: I hate including this!
 from otter.worker.launch_server_v1 import public_endpoint_url
 
@@ -105,6 +108,24 @@ def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
     d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
     d.addCallback(servers_apply)
     return d
+
+
+def extract_drained_at(feed):
+    """
+    Extract time when node was changed to DRAINING
+
+    :param str feed: Atom feed of the node
+    :rtype float
+    """
+    # TODO: This function temporarily only looks at last entry assuming that
+    # it was draining operation. May need to look at all entries in reverse order
+    # and check for draining operation. This could include paging to further entries
+    entry = atom.entries(atom.parse(feed))[0]
+    summary = atom.summary(entry)
+    if 'Node successfully updated' in summary and 'DRAINING' in summary:
+        return calendar.timegm(from_timestamp(atom.updated(entry)).utctimetuple())
+    else:
+        raise ValueError('Unexpected summary: {}'.format(summary))
 
 
 class IStep(Interface):
