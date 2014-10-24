@@ -321,7 +321,7 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     return adds + removes + changes
 
 
-def _drain_and_delete_server(server, timeout, current_lb_state, now):
+def _drain_and_delete(server, timeout, current_lb_state, now):
     """
     If server is not already in draining state, put it into draining state.
     If the server is free of load balancers, just delete it.
@@ -395,11 +395,14 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # preferring older.  Also, finish draining/deleting servers already in
     # draining state
     servers_to_delete = (servers_in_active + waiting_for_build)[desired_state.desired:]
-    scale_down_steps = list(mapcat(
-        lambda server: _drain_and_delete_server(
+
+    def drain_and_delete_a_server(server):
+        return _drain_and_delete(
             server, desired_state.draining_timeout,
-            lbs_by_address.get(server.servicenet_address, []), now),
-        servers_to_delete + draining_servers))
+            lbs_by_address.get(server.servicenet_address, []), now)
+
+    scale_down_steps = list(mapcat(drain_and_delete_a_server,
+                                   servers_to_delete + draining_servers))
 
     # delete all servers in error - draining does not need to be handled because
     # servers in error presumably are not serving traffic anyway
