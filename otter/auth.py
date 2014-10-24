@@ -49,7 +49,7 @@ from otter.util.retry import retry, retry_times, repeating_interval
 
 from otter.log import log as default_log
 from otter.util.http import (
-    headers, check_success, append_segments, wrap_upstream_error)
+    headers, check_success, append_segments, wrap_upstream_error, retry_on_unauth)
 from otter.util.deferredutils import delay
 
 
@@ -227,44 +227,47 @@ class ImpersonatingAuthenticator(object):
         self._identity_admin_password = identity_admin_password
         self._url = url
         self._admin_url = admin_url
+        # cached token to admin identity
+        self._token = None
 
-    def authenticate_tenant(self, tenant_id, log=None):
-        """
-        see :meth:`IAuthenticator.authenticate_tenant`
-        """
+    def _auth_me(self, log):
+        if log:
+            log.msg('Getting new identity admin token')
         d = authenticate_user(self._url,
                               self._identity_admin_user,
                               self._identity_admin_password,
                               log=log)
         d.addCallback(extract_token)
+        d.addCallback(partial(setattr, self, "_token"))
+        return d
 
-        def find_user(identity_admin_token):
-            d = user_for_tenant(self._admin_url,
-                                self._identity_admin_user,
-                                self._identity_admin_password,
-                                tenant_id, log=log)
-            d.addCallback(lambda username: (identity_admin_token, username))
-            return d
+    def authenticate_tenant(self, tenant_id, log=None):
+        """
+        see :meth:`IAuthenticator.authenticate_tenant`
+        """
+        auth = partial(self._auth_me, log)
 
-        d.addCallback(find_user)
+        d = user_for_tenant(self._admin_url,
+                            self._identity_admin_user,
+                            self._identity_admin_password,
+                            tenant_id, log=log)
 
-        def impersonate((identity_admin_token, user)):
+        def impersonate(user):
             iud = impersonate_user(self._admin_url,
-                                   identity_admin_token,
+                                   self._token,
                                    user, log=log)
             iud.addCallback(extract_token)
-            iud.addCallback(lambda token: (identity_admin_token, token))
             return iud
 
-        d.addCallback(impersonate)
+        d.addCallback(lambda user: retry_on_unauth(partial(impersonate, user), auth))
 
-        def endpoints((identity_admin_token, token)):
-            scd = endpoints_for_token(self._admin_url, identity_admin_token,
+        def endpoints(token):
+            scd = endpoints_for_token(self._admin_url, self._token,
                                       token, log=log)
             scd.addCallback(lambda endpoints: (token, _endpoints_to_service_catalog(endpoints)))
             return scd
 
-        d.addCallback(endpoints)
+        d.addCallback(lambda token: retry_on_unauth(partial(endpoints, token), auth))
 
         return d
 

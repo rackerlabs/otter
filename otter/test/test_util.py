@@ -13,7 +13,8 @@ from twisted.web.http_headers import Headers
 
 from otter.util.http import (
     append_segments, APIError, check_success, headers,
-    raise_error_on_code, wrap_request_error, RequestError, UpstreamError)
+    raise_error_on_code, wrap_request_error, RequestError, UpstreamError,
+    retry_on_unauth)
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
 from otter.util.deferredutils import with_lock, delay, TimedOutError
@@ -660,3 +661,78 @@ class MatchesTests(SynchronousTestCase):
         self.matcher.match.return_value = mock.Mock(describe=lambda: 'not none')
         self.matches == 'else'
         self.assertEqual(repr(self.matches), 'matches(ms): <mismatch: not none>')
+
+
+class RetryOnUnauthTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.util.http.retry_on_unauth`
+    """
+
+    def setUp(self):
+        """
+        Sample auth function
+        """
+
+        def _auth():
+            raise KeyError('e')
+
+        self.auth = _auth
+
+    def test_success(self):
+        """
+        `func` value is returned if it succeeds
+        """
+        d = retry_on_unauth(lambda: succeed('a'), self.auth)
+        self.assertEqual(self.successResultOf(d), 'a')
+
+    def test_non_upstream(self):
+        """
+        Any error other than UpstreamError is returned
+        """
+        d = retry_on_unauth(lambda: fail(ValueError('a')), self.auth)
+        self.failureResultOf(d, ValueError)
+
+    def test_non_apierror(self):
+        """
+        Any error other than APIError in UpstreamError is propogated
+        """
+        d = retry_on_unauth(
+            lambda: fail(UpstreamError(Failure(ValueError('a')), 'identity', 'o')),
+            self.auth)
+        f = self.failureResultOf(d, UpstreamError)
+        f.value.reason.trap(ValueError)
+
+    def test_auth_error(self):
+        """
+        Calls auth() followed by func() again if initial func() returns 401
+        """
+        auth = mock.Mock(spec=[], return_value=succeed('a'))
+        func = mock.Mock(side_effect=[
+            fail(UpstreamError(Failure(APIError(401, '401')), 'identity', 'o')),
+            succeed('r')])
+        d = retry_on_unauth(func, auth)
+        self.assertEqual(self.successResultOf(d), 'r')
+        auth.assert_called_once_with()
+
+    def test_500_error(self):
+        """
+        Any error other than 401 is propogated
+        """
+        d = retry_on_unauth(
+            lambda: fail(UpstreamError(Failure(APIError(500, 'a')), 'identity', 'o')),
+            self.auth)
+        f = self.failureResultOf(d, UpstreamError)
+        f.value.reason.trap(APIError)
+        self.assertEqual(f.value.reason.value.code, 500)
+
+    def test_auth_error_propogates(self):
+        """
+        `auth()` errors are propogated
+        """
+        auth = mock.Mock(spec=[], return_value=fail(ValueError('a')))
+        func = mock.Mock(side_effect=[
+            fail(UpstreamError(Failure(APIError(401, '401')), 'identity', 'o')),
+            succeed('r')])
+        d = retry_on_unauth(func, auth)
+        self.failureResultOf(d, ValueError)
+        auth.assert_called_once_with()

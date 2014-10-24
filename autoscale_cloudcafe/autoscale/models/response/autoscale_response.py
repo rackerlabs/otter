@@ -181,7 +181,15 @@ class Config(AutoMarshallingModel):
         """
         config = Config(**config_dict)
         if hasattr(config, 'server'):
-            config.server = Server._json_to_obj(config.server)
+            server_obj = Server._json_to_obj(config.server)
+
+        # TODO: Unhack this once cloudcafe is upgraded to a version that has
+        # block_device_mapping
+        if 'block_device_mapping' in config.server:
+            server_obj.block_device_mapping = config.server['block_device_mapping']
+
+        config.server = server_obj
+
         if hasattr(config, 'loadBalancers'):
             config.loadBalancers = Lbaas._json_to_obj(config.loadBalancers)
         for each in config_dict:
