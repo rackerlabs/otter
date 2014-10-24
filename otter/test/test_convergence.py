@@ -426,8 +426,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=0,
                                   draining_timeout=10.0),
-                [server('abc', state=ServerState.ACTIVE)],
-                [],
+                set([server('abc', state=ServerState.ACTIVE)]),
+                set(),
                 0),
             Convergence(steps=pbag([DeleteServer(server_id='abc')])))
 
@@ -440,10 +440,10 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=0),
-                [server('abc', state=ServerState.ACTIVE,
-                        servicenet_address='1.1.1.1')],
-                [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
-                        config=LBConfig(port=80))],
+                set([server('abc', state=ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80))]),
                 0),
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),
@@ -458,11 +458,11 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=0),
-                [server('abc', state=ServerState.DRAINING,
-                        servicenet_address='1.1.1.1')],
-                [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
-                        config=LBConfig(port=80,
-                        condition=NodeCondition.DRAINING))],
+                set([server('abc', state=ServerState.DRAINING,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80,
+                            condition=NodeCondition.DRAINING))]),
                 0),
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),
@@ -478,12 +478,12 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=0,
                                   draining_timeout=10.0),
-                [server('abc', state=ServerState.DRAINING,
-                        servicenet_address='1.1.1.1')],
-                [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
-                        config=LBConfig(port=80,
-                        condition=NodeCondition.DRAINING),
-                        drained_at=1.0, connections=1)],
+                set([server('abc', state=ServerState.DRAINING,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80,
+                            condition=NodeCondition.DRAINING),
+                            drained_at=1.0, connections=1)]),
                 2),
             Convergence(steps=pbag([])))
 
@@ -497,10 +497,10 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=0,
                                   draining_timeout=10.0),
-                [server('abc', state=ServerState.ACTIVE,
-                        servicenet_address='1.1.1.1')],
-                [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
-                        config=LBConfig(port=80))],
+                set([server('abc', state=ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80))]),
                 0),
             Convergence(steps=pbag([
                 ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
@@ -525,12 +525,12 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=0,
                                   draining_timeout=10.0),
-                [server('abc', state=ServerState.ACTIVE,
-                        servicenet_address='1.1.1.1')],
-                [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
-                        config=LBConfig(port=80,
-                                        condition=NodeCondition.DRAINING),
-                        connections=1, drained_at=0.0)],
+                set([server('abc', state=ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80,
+                                            condition=NodeCondition.DRAINING),
+                            connections=1, drained_at=0.0)]),
                 1),
             Convergence(steps=pbag([
                 SetMetadataItemOnServer(server_id='abc',
@@ -552,10 +552,10 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(launch_config={}, desired=0,
                                   draining_timeout=10.0),
-                [server('abc', state=ServerState.DRAINING,
-                        servicenet_address='1.1.1.1')],
-                [LBNode(lb_id=1, node_id=1, address='1.1.1.1',
-                        config=LBConfig(port=80))],
+                set([server('abc', state=ServerState.DRAINING,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80))]),
                 1),
             Convergence(steps=pbag([
                 ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
