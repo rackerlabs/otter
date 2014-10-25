@@ -145,21 +145,19 @@ def get_load_balancer_contents(request):
     :param request: A tenant-bound request function
     """
 
-    def fetch_nodes(lbs_d):
-        ids = [lb['id'] for lb in lbs_d]
+    def fetch_nodes(lbs):
+        ids = [lb['id'] for lb in json.loads(lbs)]
         return effect.parallel(
             [request('GET', append_segments('loadbalancers', _id, 'nodes'))
              for _id in ids]).on(lambda r: (ids, [json.loads(n) for n in r]))
 
-    def to_lbnodes((ids, nodess)):
-        return [LBNode(lb_id=_id, node_id=node['id'],
+    def fetch_drained_feeds((ids, nodess)):
+        nodes = [LBNode(lb_id=_id, node_id=node['id'],
                        config=LBConfig(port=node['port'], weight=node['weight'],
                                        condition=condition_map[node['condition']],
                                        type=nodetype_map[node['type']]))
-                for _id, nodes in zip(ids, nodess)
-                for node in nodes]
-
-    def fetch_drained_atoms(nodes):
+                 for _id, nodes in zip(ids, nodess)
+                 for node in nodes]
         return effect.parallel(
             [request(
                 'GET',
@@ -172,7 +170,7 @@ def get_load_balancer_contents(request):
         return nodes
 
     return request('GET', 'loadbalancers').on(
-        json.loads).on(fetch_nodes).on(to_lbnodes).on(fetch_drained_atoms).on(fill_drained_at)
+        fetch_nodes).on(fetch_drained_feeds).on(fill_drained_at)
 
 
 class IStep(Interface):
