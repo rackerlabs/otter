@@ -6,6 +6,7 @@ from functools import partial
 from urllib import urlencode
 import calendar
 import json
+from itertools import izip as zip
 
 import treq
 
@@ -148,24 +149,26 @@ def get_load_balancer_contents(request):
     def fetch_nodes(lbs):
         ids = [lb['id'] for lb in json.loads(lbs)]
         return effect.parallel(
-            [request('GET', append_segments('loadbalancers', _id, 'nodes'))
+            [request('GET', append_segments('loadbalancers', str(_id), 'nodes'))
              for _id in ids]).on(lambda r: (ids, [json.loads(n) for n in r]))
 
-    def fetch_drained_feeds((ids, nodess)):
-        nodes = [LBNode(lb_id=_id, node_id=node['id'],
-                       config=LBConfig(port=node['port'], weight=node['weight'],
-                                       condition=condition_map[node['condition']],
-                                       type=nodetype_map[node['type']]))
-                 for _id, nodes in zip(ids, nodess)
+    def fetch_drained_feeds((ids, all_lb_nodes)):
+        nodes = [LBNode(lb_id=_id, node_id=node['id'], address=node['address'],
+                        config=LBConfig(port=node['port'], weight=node['weight'],
+                                        condition=condition_map[node['condition']],
+                                        type=nodetype_map[node['type']]))
+                 for _id, nodes in zip(ids, all_lb_nodes)
                  for node in nodes]
+        draining = [n for n in nodes if n.config.condition == NodeCondition.DRAINING]
         return effect.parallel(
             [request(
                 'GET',
-                append_segments('loadbalancers', n.lb_id, 'nodes', '{}.atom'.format(n.node_id)))
-             for n in nodes if n.condition == NodeCondition.DRAINING]).on(lambda r: (nodes, r))
+                append_segments('loadbalancers', str(n.lb_id), 'nodes',
+                                '{}.atom'.format(n.node_id)))
+             for n in draining]).on(lambda r: (nodes, draining, r))
 
-    def fill_drained_at((nodes, feeds)):
-        for node, feed in zip(nodes, feeds):
+    def fill_drained_at((nodes, draining, feeds)):
+        for node, feed in zip(draining, feeds):
             node.drained_at = extract_drained_at(feed)
         return nodes
 

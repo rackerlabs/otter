@@ -2,6 +2,7 @@
 
 import json
 import calendar
+from functools import partial
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.task import Clock
@@ -18,9 +19,13 @@ from otter.convergence import (
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ACTIVE, ERROR, BUILD,
-    ServiceType, NodeCondition, NodeType, extract_drained_at)
+    ServiceType, NodeCondition, NodeType, extract_drained_at,
+    get_load_balancer_contents)
 
 from pyrsistent import pmap, pbag, s
+
+from effect import ConstantIntent, Effect
+from effect.testing import StubIntent, resolve_stubs
 
 
 class GetAllServerDetailsTests(SynchronousTestCase):
@@ -184,6 +189,104 @@ class ExtractDrainedTests(SynchronousTestCase):
         """
         feed = self.feed.format("Node successfully updated with ENABLED", self.updated)
         self.assertRaises(ValueError, extract_drained_at, feed)
+
+
+class GetLBContentsTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.convergence.get_load_balancer_contents`
+    """
+
+    def setUp(self):
+        """
+        Stub request function and mock `extract_drained_at`
+        """
+        self.reqs = {
+            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes'): [
+                {'id': '11', 'port': 20, 'address': 'a11',
+                 'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
+                {'id': '12', 'port': 20, 'address': 'a12',
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}],
+            ('GET', 'loadbalancers/2/nodes'): [
+                {'id': '21', 'port': 20, 'address': 'a21',
+                 'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
+                {'id': '22', 'port': 20, 'address': 'a22',
+                 'weight': 3, 'condition': 'DRAINING', 'type': 'PRIMARY'}],
+            ('GET', 'loadbalancers/1/nodes/11.atom'): '11feed',
+            ('GET', 'loadbalancers/2/nodes/22.atom'): '22feed'
+        }
+        self.feeds = {'11feed': 1.0, '22feed': 2.0}
+        self.mock_eda = patch(
+            self, 'otter.convergence.extract_drained_at',
+            side_effect=lambda f: self.feeds[f])
+
+    def _request(self):
+        def request(method, url):
+            body = self.reqs[(method, url)]
+            body = body if type(body) is str else json.dumps(body)
+            return Effect(StubIntent(ConstantIntent(body)))
+        return request
+
+    def test_success(self):
+        """
+        Gets LB contents with drained_at correctly
+        """
+        eff = get_load_balancer_contents(self._request())
+        draining, enabled = NodeCondition.DRAINING, NodeCondition.ENABLED
+        make_config = partial(LBConfig, port=20, type=NodeType.PRIMARY)
+        self.assertEqual(
+            resolve_stubs(eff),
+            [LBNode(lb_id=1, node_id='11', address='a11', drained_at=1.0,
+                    config=make_config(weight=2, condition=draining)),
+             LBNode(lb_id=1, node_id='12', address='a12',
+                    config=make_config(weight=2, condition=enabled)),
+             LBNode(lb_id=2, node_id='21', address='a21',
+                    config=make_config(weight=3, condition=enabled)),
+             LBNode(lb_id=2, node_id='22', address='a22', drained_at=2.0,
+                    config=make_config(weight=3, condition=draining))])
+
+    def test_no_lb(self):
+        """
+        Return empty list if there are no LB
+        """
+        self.reqs = {('GET', 'loadbalancers'): []}
+        eff = get_load_balancer_contents(self._request())
+        self.assertEqual(resolve_stubs(eff), [])
+
+    def test_no_nodes(self):
+        """
+        Return empty if there are LBs but no nodes in them
+        """
+        self.reqs = {
+            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes'): [],
+            ('GET', 'loadbalancers/2/nodes'): []
+        }
+        eff = get_load_balancer_contents(self._request())
+        self.assertEqual(resolve_stubs(eff), [])
+
+    def test_no_draining(self):
+        """
+        Doesnt fetch feeds if all nodes are ENABLED
+        """
+        self.reqs = {
+            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes'): [
+                {'id': '11', 'port': 20, 'address': 'a11',
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
+            ],
+            ('GET', 'loadbalancers/2/nodes'): [
+                {'id': '21', 'port': 20, 'address': 'a21',
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
+            ]
+        }
+        config = LBConfig(port=20, weight=2, condition=NodeCondition.ENABLED,
+                          type=NodeType.PRIMARY)
+        eff = get_load_balancer_contents(self._request())
+        self.assertEqual(
+            resolve_stubs(eff),
+            [LBNode(lb_id=1, node_id='11', address='a11', config=config),
+             LBNode(lb_id=2, node_id='21', address='a21', config=config)])
 
 
 class ObjectStorageTests(SynchronousTestCase):
