@@ -92,7 +92,7 @@ def request_with_auth(request,
 
 def check_status(success_codes, result):
     """Ensure that the response code is acceptable. If not, raise APIError."""
-    (response, content) = result
+    response, content = result
     if response.code not in success_codes:
         raise APIError(response.code, content, response.headers)
     return result
