@@ -9,7 +9,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
 
 from otter.util.http import headers, APIError
-from otter.auth_http import get_request_func, bind_service
+from otter.http import get_request_func, bind_service
 from otter.test.utils import stub_pure_response
 from otter.util.pure_http import Request
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
