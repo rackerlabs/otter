@@ -76,7 +76,7 @@ def bind_service(request_func, tenant_id, authenticator, service_name, region,
     # We authenticate_tenant here, which is a duplicate to the one in the
     # underlying request_func, but the authenticators are always caching in
     # practice.
-    eff = Effect(FuncIntent(partial(authenticator.authenticate_tenant, tenant_id, log)))
+    eff = Effect(FuncIntent(lambda: authenticator.authenticate_tenant(tenant_id, log)))
 
     @wraps(request_func)
     def service_request(*args, **kwargs):
