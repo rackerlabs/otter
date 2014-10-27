@@ -75,8 +75,7 @@ def launch_server_config():
                 },
                 "loadBalancers": [
                     {
-                        "loadBalancerId": 441,
-                        "port": 80,
+                        "loadBalancerId": "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2",
                         "rackConnect": True
                     }
                 ]
