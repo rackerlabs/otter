@@ -592,7 +592,6 @@ def optimize_steps(steps):
 
     steps_by_type = groupby(grouping_fn, steps)
     unoptimizable = steps_by_type.pop("unoptimizable", [])
-
     omg_optimized = concat(_optimizers[step_type](steps)
                            for step_type, steps in steps_by_type.iteritems())
     return pbag(concatv(omg_optimized, unoptimizable))
