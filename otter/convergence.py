@@ -14,6 +14,7 @@ from pyrsistent import pbag, freeze, s, pset
 from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
+from twisted.python.constants import Values, ValueConstant
 
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
@@ -618,11 +619,11 @@ def optimize_steps(steps):
     return pbag(concatv(omg_optimized, unoptimizable))
 
 
-class ServiceType(Names):
+class ServiceType(Values):
     """Constants representing Rackspace cloud services."""
-    CLOUD_SERVERS = NamedConstant()
-    CLOUD_LOAD_BALANCERS = NamedConstant()
-    RACKCONNECT_V3 = NamedConstant()
+    CLOUD_SERVERS = ValueConstant('cloudServersOpenStack')
+    CLOUD_LOAD_BALANCERS = ValueConstant('cloudLoadBalancers')
+    RACKCONNECT_V3 = ValueConstant('baconBaconBaconBacon')
 
 
 @attributes(['service', 'method', 'path', 'headers', 'data'],
