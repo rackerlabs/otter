@@ -17,6 +17,7 @@ from twisted.python.constants import Names, NamedConstant
 
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
+from toolz.itertoolz import concat, concatv
 
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
@@ -340,39 +341,6 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                    ))
 
 
-def _optimize_lb_adds(lb_add_steps):
-    """
-    Merge together multiple :obj:`AddNodesToLoadBalancer`, per load balancer.
-
-    :param steps_by_lb: Iterable of :obj:`AddNodesToLoadBalancer`.
-    """
-    steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
-    return [
-        AddNodesToLoadBalancer(
-            lb_id=lbid,
-            address_configs=pset(reduce(lambda s, y: s.union(y),
-                                        [step.address_configs for step in steps])))
-        for lbid, steps in steps_by_lb.iteritems()
-    ]
-
-
-def optimize_steps(steps):
-    """
-    Optimize steps.
-
-    Currently batches up groups of :obj:`AddNodesToLoadBalancer` steps into
-    one per load balancer.
-
-    :param pbag steps: Collection of steps.
-    :return: a pbag of steps.
-    """
-    lb_adds, other = partition_bool(
-        lambda s: type(s) is AddNodesToLoadBalancer,
-        steps)
-    merged_adds = _optimize_lb_adds(lb_adds)
-    return pbag(merged_adds + other)
-
-
 @attributes(['steps'])
 class Convergence(object):
     """
@@ -467,10 +435,194 @@ class ChangeLoadBalancerNode(object):
                   'weight': self.weight})
 
 
+@implementer(IStep)
+@attributes(['lb_id', 'node_ids'])
+class AddNodesToRCv3LoadBalancer(object):
+    """
+    Multiple nodes must be added to a RackConnect v3.0 load balancer.
+    """
+
+    def as_request(self):
+        """
+        Produce a :obj:`Request` to add some servers to an RCv3 load balancer.
+
+        REVIEW: do we actually need to implement this, or is it okay to
+        rely on it always being optimized away?
+        """
+        raise NotImplementedError()
+
+
+def _rackconnect_bulk_request(lb_node_pairs, method):
+    """
+    Creates a bulk request for RackConnect v3.0 load balancers.
+
+    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
+        connections to be made or broken.
+    :param str method: The method of the request ``"DELETE"`` or
+        ``"POST"``.
+    """
+    return Request(
+        service=ServiceType.RACKCONNECT_V3,
+        method="POST",
+        path=append_segments("load_balancer_pools",
+                             "nodes"),
+        data=[{"cloud_server": {"id": node},
+               "load_balancer_pool": {"id": lb}}
+              for (lb, node) in lb_node_pairs])
+
+
+@implementer(IStep)
+@attributes(['lb_node_pairs'])
+class AddNodesToRCv3LoadBalancers(object):
+    """
+    Some connections must be made between some combination of nodes
+    and RackConnect v3.0 load balancers.
+
+    Each connection is independently specified.
+
+    See http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
+
+    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
+        connections to be made.
+    """
+
+    def as_request(self):
+        """
+        Produce a :obj:`Request` to add some nodes to some RCv3 load
+        balancers.
+        """
+        return _rackconnect_bulk_request(self.lb_node_pairs, "POST")
+
+
+@implementer(IStep)
+@attributes(["lb_id", "node_id"])
+class RemoveNodeFromRCv3LoadBalancer(object):
+    """
+    A node must be removed from a RackConnect v3.0 load balancer.
+    """
+
+    def as_request(self):
+        """
+        Produce a :obj:`Request` to remove some servers from an RCv3 load
+        balancer.
+
+        REVIEW: same comment as for AddNodesToRCv3LoadBalancer.as_request
+        """
+        raise NotImplementedError()
+
+
+@implementer(IStep)
+@attributes(['lb_node_pairs'])
+class RemoveNodesFromRCv3LoadBalancers(object):
+    """
+    Some connections must be removed between some combination of nodes
+    and RackConnect v3.0 load balancers.
+
+    See http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
+
+    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
+        connections to be removed.
+    """
+
+    def as_request(self):
+        """
+        Produce a :obj:`Request` to remove some nodes from some RCv3 load
+        balancers.
+        """
+        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE")
+
+
+_optimizers = {}
+
+
+def _optimizer(step_type):
+    """
+    A decorator for a type-specific optimizer.
+
+    Usage::
+
+        @_optimizer(StepTypeToOptimize)
+        def optimizing_function(steps_of_that_type):
+           return iterable_of_optimized_steps
+    """
+    def _add_to_optimizers(optimizer):
+        _optimizers[step_type] = optimizer
+        return optimizer
+    return _add_to_optimizers
+
+
+@_optimizer(AddNodesToLoadBalancer)
+def _optimize_lb_adds(lb_add_steps):
+    """
+    Merge together multiple :obj:`AddNodesToLoadBalancer`, per load balancer.
+
+    :param steps_by_lb: Iterable of :obj:`AddNodesToLoadBalancer`.
+    """
+    steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
+    return [
+        AddNodesToLoadBalancer(
+            lb_id=lbid,
+            address_configs=pset(reduce(lambda s, y: s.union(y),
+                                        [step.address_configs for step in steps])))
+        for lbid, steps in steps_by_lb.iteritems()
+    ]
+
+
+@_optimizer(AddNodesToRCv3LoadBalancer)
+def _optimize_rcv3_lb_adds(steps):
+    """
+    Merge :obj:`AddNodesToRCv3LoadBalancer` objects to a single
+    :obj:`AddNodesToRCv3LoadBalancers` step.
+
+    :param steps: Iterable of :obj:`AddNodesToRCv3LoadBalancer`.
+    """
+    pairs = pset([(step.lb_id, node_id)
+                  for step in steps
+                  for node_id in step.node_ids])
+    return [AddNodesToRCv3LoadBalancers(lb_node_pairs=pairs)]
+
+
+@_optimizer(RemoveNodeFromRCv3LoadBalancer)
+def _optimize_rcv3_lb_removes(steps):
+    """
+    Merge :obj:`RemoveNodeFromRCv3LoadBalancer` objects to a single
+    :obj:`RemoveNodesFromRCv3LoadBalancers` step.
+
+    :param steps: Iterable of :obj:`RemoveNodeFromRCv3LoadBalancer`.
+    """
+    pairs = pset((step.lb_id, step.node_id) for step in steps)
+    return [RemoveNodesFromRCv3LoadBalancers(lb_node_pairs=pairs)]
+
+
+def optimize_steps(steps):
+    """
+    Optimize steps.
+
+    Currently batches up groups of :obj:`AddNodesToLoadBalancer` steps into
+    one per load balancer.
+
+    :param pbag steps: Collection of steps.
+    :return: a pbag of steps.
+    """
+    def grouping_fn(step):
+        step_type = type(step)
+        if step_type in _optimizers:
+            return step_type
+        else:
+            return "unoptimizable"
+
+    steps_by_type = groupby(grouping_fn, steps)
+    unoptimizable = steps_by_type.pop("unoptimizable", [])
+    omg_optimized = concat(_optimizers[step_type](steps)
+                           for step_type, steps in steps_by_type.iteritems())
+    return pbag(concatv(omg_optimized, unoptimizable))
+
+
 class ServiceType(Names):
     """Constants representing Rackspace cloud services."""
     CLOUD_SERVERS = NamedConstant()
     CLOUD_LOAD_BALANCERS = NamedConstant()
+    RACKCONNECT_V3 = NamedConstant()
 
 
 @attributes(['service', 'method', 'path', 'headers', 'data'],
