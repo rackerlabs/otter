@@ -598,8 +598,8 @@ def optimize_steps(steps):
     """
     Optimize steps.
 
-    Currently batches up groups of :obj:`AddNodesToLoadBalancer` steps into
-    one per load balancer.
+    Currently only optimizes per step type. See the :func:`_optimizer`
+    decorator for more information on how to register an optimizer.
 
     :param pbag steps: Collection of steps.
     :return: a pbag of steps.
