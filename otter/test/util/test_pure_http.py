@@ -162,3 +162,12 @@ class BindRootTests(TestCase):
         request_ = bind_root(request, "http://slashdot.org/")
         self.assertEqual(request_("get", "foo").intent.url,
                          "http://slashdot.org/foo")
+
+    def test_bind_root_no_slashes(self):
+        """
+        Root URLs without a trailing slash will have one inserted
+        automatically.
+        """
+        request_ = bind_root(request, "http://slashdot.org")
+        self.assertEqual(request_("get", "foo").intent.url,
+                         "http://slashdot.org/foo")
