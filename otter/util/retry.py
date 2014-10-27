@@ -276,7 +276,7 @@ class TransientRetryError(Exception):
     """
 
 
-def should_retry_effect(can_retry, next_interval, e):
+def should_retry_effect(can_retry, next_interval, exc_info):
     """
     Determine whether an :class:`Effect` should be retried, with delay support.
 
@@ -292,9 +292,10 @@ def should_retry_effect(can_retry, next_interval, e):
         indicates whether a retry should be performed.
     :param next_interval: a potentially impure function that returns an
         interval to wait for the next retry attempt.
-    :param tuple e: an exception tuple
+    :param tuple exc_info: an exception tuple
     """
-    if can_retry(Failure(e[1], e[0], e[2])):
+    exc_type, exc_value, exc_traceback = exc_info
+    if can_retry(Failure(exc_value, exc_type, exc_traceback)):
         # ok, we can retry! sleep for an interval first.
         interval = next_interval()
         delay = Effect(Delay(interval))
