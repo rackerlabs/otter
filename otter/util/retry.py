@@ -4,7 +4,7 @@ Module that provides retrying-at-a-particular-interval functionality.
 
 import random
 
-from effect import Effect, Delay, ConstantIntent
+from effect import Effect, Delay, FuncIntent
 
 from twisted.internet import defer
 from twisted.python.failure import Failure
@@ -284,9 +284,8 @@ def should_retry_effect(can_retry, next_interval, exc_info):
     -- after partially applying all but the last argument, this function is
     suitable for the ``should_retry`` parameter of :func:`effect.retry.retry`.
 
-    Even though this function returns an Effect, it is impure,
-    since it calls ``can_retry`` and ``next_interval``, which themselves
-    are often impure. This could be made pure with FuncIntents but oh well.
+    This function is pure -- the Effect returned represents all side-effecting
+    operations.
 
     :param can_retry: a potentially impure function of Failure -> bool that
         indicates whether a retry should be performed.
@@ -294,11 +293,12 @@ def should_retry_effect(can_retry, next_interval, exc_info):
         interval to wait for the next retry attempt.
     :param tuple exc_info: an exception tuple
     """
+    def got_can_retry(bool):
+        if bool:
+            return Effect(FuncIntent(next_interval)).on(
+                lambda interval: Effect(Delay(interval))).on(lambda r: True)
+        else:
+            return False
     exc_type, exc_value, exc_traceback = exc_info
-    if can_retry(Failure(exc_value, exc_type, exc_traceback)):
-        # ok, we can retry! sleep for an interval first.
-        interval = next_interval()
-        delay = Effect(Delay(interval))
-        return delay.on(lambda r: True)
-    else:
-        return Effect(ConstantIntent(False))
+    eff = Effect(FuncIntent(lambda: can_retry(Failure(exc_value, exc_type, exc_traceback))))
+    return eff.on(got_can_retry)

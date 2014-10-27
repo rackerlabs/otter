@@ -3,7 +3,7 @@ Tests for :mod:`otter.utils.retry`
 """
 import sys
 
-from effect import Delay
+from effect import Delay, FuncIntent
 from effect.testing import resolve_effect
 
 import mock
@@ -411,7 +411,13 @@ class ShouldRetryEffectTests(SynchronousTestCase):
         True when retrying is allowed, after delaying based on the
         ``next_interval`` argument.
         """
-        eff = should_retry_effect(lambda f: True, lambda: 1, self._get_exc())
+        can_retry = lambda f: True
+        next_interval = lambda: 1
+        eff = should_retry_effect(can_retry, next_interval, self._get_exc())
+        self.assertIs(type(eff.intent), FuncIntent)  # can_retry
+        eff = resolve_effect(eff, eff.intent.perform_effect(None))
+        self.assertEqual(eff.intent, FuncIntent(next_interval))
+        eff = resolve_effect(eff, eff.intent.perform_effect(None))
         self.assertEqual(eff.intent, Delay(1))
         result = resolve_effect(eff, None)
         self.assertTrue(result)
@@ -422,14 +428,20 @@ class ShouldRetryEffectTests(SynchronousTestCase):
         out of the exception passed.
         """
         e = self._get_exc()
-        failures = []
 
         def can_retry(f):
-            failures.append(f)
-            return True
-        should_retry_effect(can_retry, lambda: 1, e)
-        [f] = failures
-        self.assertEqual((f.type, f.value, f.tb), e)
+            if (f.type, f.value, f.tb) == e:
+                return True
+            else:
+                return False
+        eff = should_retry_effect(can_retry, lambda: 1, e)
+        # can_retry
+        eff = resolve_effect(eff, eff.intent.perform_effect(None))
+        # next_interval
+        eff = resolve_effect(eff, eff.intent.perform_effect(None))
+        # Delay
+        result = resolve_effect(eff, None)
+        self.assertEqual(result, True)
 
     def test_no_retry(self):
         """
@@ -437,4 +449,5 @@ class ShouldRetryEffectTests(SynchronousTestCase):
         returns an effect of False.
         """
         eff = should_retry_effect(lambda f: False, lambda: 1, self._get_exc())
-        self.assertEqual(resolve_effect(eff, eff.intent.result), False)
+        self.assertEqual(resolve_effect(eff, eff.intent.perform_effect(None)),
+                         False)
