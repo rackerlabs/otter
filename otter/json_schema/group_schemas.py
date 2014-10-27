@@ -189,6 +189,13 @@ launch_server = {
                                     "servers will be added."),
                                 "required": True
                             },
+                            "rackConnect": {
+                                "type": "boolean",
+                                "description": (
+                                    "True if the load balancer is a RackConnect"
+                                    "v3 load balancer"),
+                                "required": False
+                            },
                             "port": {
                                 "type": "integer",
                                 "description": (
