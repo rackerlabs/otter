@@ -54,15 +54,16 @@ def get_request_func(authenticator, tenant_id, log):
         data = json.dumps(data) if data is not None else None
         request_with_headers = lambda h: request(method, url, headers=h,
                                                  data=data, log=log)
-        return request_with_auth(
-            request_with_headers,
-            auth_headers,
-            invalidate,
-            headers=headers,
-            reauth_codes=reauth_codes,
-        ).on(partial(check_status, success_codes)
-             ).on(lambda result: result[1]
-                  ).on(json.loads)
+        return (
+            request_with_auth(
+                request_with_headers,
+                auth_headers,
+                invalidate,
+                headers=headers,
+                reauth_codes=reauth_codes)
+            .on(partial(check_status, success_codes))
+            .on(lambda result: result[1])
+            .on(json.loads))
     return otter_request
 
 
