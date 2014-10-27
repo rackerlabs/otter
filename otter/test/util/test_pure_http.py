@@ -9,7 +9,7 @@ from effect.twisted import perform
 from effect import Effect, ConstantIntent, FuncIntent
 
 from otter.util.pure_http import (
-    request_with_auth, Request, check_status, bind_root, get_request)
+    request_with_auth, Request, check_status, bind_root, request)
 from otter.util.http import APIError
 from otter.test.utils import stub_pure_response, StubResponse, StubTreq
 
@@ -88,7 +88,7 @@ class RequestWithAuthTests(TestCase):
         authentication headers.
         """
         eff = request_with_auth(
-            lambda headers: get_request("m", "u", headers=headers),
+            lambda headers: request("m", "u", headers=headers),
             self.auth_effect,
             self.invalidate_effect,
             headers={"default": "headers"})
@@ -104,7 +104,7 @@ class RequestWithAuthTests(TestCase):
         When merging headers together, auth headers win.
         """
         eff = request_with_auth(
-            lambda headers: get_request("m", "u", headers=headers),
+            lambda headers: request("m", "u", headers=headers),
             self.auth_effect,
             self.invalidate_effect,
             headers={"x-auth-token": "fooey"})
@@ -159,6 +159,6 @@ class BindRootTests(TestCase):
         :func:`bind_root` returns a new request function that appends any
         passed URL paths onto the root URL.
         """
-        request = bind_root(get_request, "http://slashdot.org/")
-        self.assertEqual(request("get", "foo").intent.url,
+        request_ = bind_root(request, "http://slashdot.org/")
+        self.assertEqual(request_("get", "foo").intent.url,
                          "http://slashdot.org/foo")
