@@ -464,9 +464,9 @@ def _rackconnect_bulk_request(lb_node_pairs, method):
         method="POST",
         path=append_segments("load_balancer_pools",
                              "nodes"),
-        data = [{"cloud_server": {"id": node},
-                 "load_balancer_pool": {"id": lb}}
-                for (lb, node) in lb_node_pairs])
+        data=[{"cloud_server": {"id": node},
+               "load_balancer_pool": {"id": lb}}
+              for (lb, node) in lb_node_pairs])
 
 
 @implementer(IStep)
