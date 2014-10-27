@@ -22,12 +22,12 @@ def get_request_func(authenticator, tenant_id, log):
     - returning only content of the result, not response objects
     - logging
     """
-    def unsafe_auth():
+    def impure_auth():
         d = authenticator.authenticate_tenant(tenant_id, log=log)
         return d.addCallback(lambda r: r[0])
-    unsafe_invalidate = partial(authenticator.invalidate, tenant_id)
-    auth_headers = Effect(FuncIntent(unsafe_auth)).on(success=headers)
-    invalidate = Effect(FuncIntent(unsafe_invalidate))
+    impure_invalidate = partial(authenticator.invalidate, tenant_id)
+    auth_headers = Effect(FuncIntent(impure_auth)).on(success=headers)
+    invalidate = Effect(FuncIntent(impure_invalidate))
     default_log = log
 
     def otter_request(method, url, headers=None, data=None, log=default_log,
