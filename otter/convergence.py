@@ -24,6 +24,7 @@ from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
 from otter.util.retry import retry, retry_times, exponential_backoff_interval
+from otter.util import pure_http
 # TODO: I hate including this!
 from otter.worker.launch_server_v1 import public_endpoint_url
 
@@ -648,3 +649,14 @@ class Request(object):
     :ivar object data: a Python object that will be JSON-serialized as the body
         of the request.
     """
+
+
+def _convergence_request_to_http_request(request_fn, conv_request):
+    """
+    Turn a :class:`Request` into :class:`pure_http.Request`.
+    """
+    request_kwargs = {}
+    for shared_attr in ["method", "headers", "data"]:
+        request_kwargs[shared_attr] = getattr(conv_request, shared_attr)
+
+    return request_fn(**request_kwargs)
