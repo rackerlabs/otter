@@ -524,6 +524,15 @@ _optimizers = {}
 
 
 def _optimizer(step_type):
+    """
+    A decorator for a type-specific optimizer.
+
+    Usage::
+
+        @_optimizer(StepTypeToOptimize)
+        def optimizing_function(steps_of_that_type):
+           return iterable_of_optimized_steps
+    """
     def _add_to_optimizers(optimizer):
         _optimizers[step_type] = optimizer
         return optimizer
