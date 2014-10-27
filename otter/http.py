@@ -49,7 +49,7 @@ def get_request_func(authenticator, tenant_id, log):
             auth cache.
 
         :raise APIError: When the response HTTP code is not in success_codes.
-        :return: JSON-parsed object.
+        :return: Effect resulting in a JSON-parsed HTTP response body.
         """
         data = json.dumps(data) if data is not None else None
         request_with_headers = lambda h: request(method, url, headers=h,
