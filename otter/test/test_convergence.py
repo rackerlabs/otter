@@ -639,7 +639,6 @@ class OptimizerTests(SynchronousTestCase):
             optimize_steps(steps),
             steps)
 
-
     def test_optimize_rcv3_adds(self):
         """
         RackConnect v3.0 steps for adding nodes to load balancers are merged.
@@ -667,7 +666,6 @@ class OptimizerTests(SynchronousTestCase):
             ]))
         ])
         self.assertEqual(optimize_steps(unoptimized), optimized)
-
 
     def test_optimize_rcv3_removes(self):
         """
