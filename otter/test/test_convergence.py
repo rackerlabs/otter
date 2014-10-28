@@ -550,6 +550,22 @@ class RequestConversionTests(SynchronousTestCase):
                 data={'condition': 'DRAINING',
                       'weight': 50}))
 
+    def test_rcv3_dummy_steps(self):
+        """
+        RCv3 "dummy" steps, which are implemented only to fake API parity
+        with CLB, can not be turned into requests directly. This is
+        intentional: they are supposed to be optimized away.
+        """
+        step = AddNodesToRCv3LoadBalancer(
+            lb_id="a_lb",
+            node_ids=["larry", "moe", "curly"])
+        self.assertRaises(NotImplementedError, step.as_request)
+
+        step = RemoveNodeFromRCv3LoadBalancer(
+            lb_id="a_lb",
+            node_id="larry")
+        self.assertRaises(NotImplementedError, step.as_request)
+
 
 class OptimizerTests(SynchronousTestCase):
     """Tests for :func:`optimize_steps`."""
