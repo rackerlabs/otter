@@ -221,12 +221,14 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     1. If the timeout is greater than zero, and the node is ``ENABLED``, the
        node will be changed to ``DRAINING``.
 
-    2. If the node is ``DRAINING``, and the timeout has already expired or
-       there are no more active connections, the node will be removed from the
-       load balancer.
+    2. If the node is ``DRAINING``, and the timeout (greater than zero) has
+       already expired or there are no more active connections, the node will
+       be removed from the load balancer.  If the timeout (greater than zero)
+       has not expired and active connections != 0, then nothing is done to the
+       node.
 
-    3. If the node is in any other state, or if the timeout is zero, it will be
-       removed from the load balancer.
+    3. If the node is in any other state other than `DRAINING` or `ENABLED`, or
+       if the timeout is zero, it will be removed from the load balancer.
 
     :param float timeout: the time the node should remain in draining until
         removed
