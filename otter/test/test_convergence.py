@@ -19,9 +19,8 @@ from otter.convergence import (
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
     SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
-    ACTIVE, ERROR, BUILD,
-    ServiceType, NodeCondition, NodeType, optimize_steps, extract_drained_at,
-    get_load_balancer_contents)
+    ServerState, ServiceType, NodeCondition, NodeType, optimize_steps,
+    extract_drained_at, get_load_balancer_contents)
 
 from pyrsistent import pmap, pbag, s
 
