@@ -267,7 +267,7 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     return removes + changes
 
 
-def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
+def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     """
     Produce a series of steps to converge a server's current load balancer
     state towards its desired load balancer state.
@@ -277,7 +277,7 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     weight, and correct status, to the desired load balancers.
 
     :param dict desired_lb_state: As per :obj:`DesiredGroupState`.desired_lbs
-    :param list current_lb_state: `list` of :obj:`LBNode`
+    :param list current_lb_nodes: `list` of :obj:`LBNode`
     :param str ip_address: the IP address of the server to converge
 
     Note: this supports user customizable types (e.g. PRIMARY or SECONDARY), but
@@ -293,7 +293,7 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
         for config in configs}
     current = {
         (node.lb_id, node.config.port): node
-        for node in current_lb_state}
+        for node in current_lb_nodes}
     desired_idports = set(desired)
     current_idports = set(current)
 
@@ -323,17 +323,17 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     return adds + removes + changes
 
 
-def _drain_and_delete(server, timeout, current_lb_state, now):
+def _drain_and_delete(server, timeout, current_lb_nodes, now):
     """
     If server is not already in draining state, put it into draining state.
     If the server is free of load balancers, just delete it.
     """
-    lb_draining_steps = _remove_from_lb_with_draining(timeout, current_lb_state,
+    lb_draining_steps = _remove_from_lb_with_draining(timeout, current_lb_nodes,
                                                       now)
 
     # if there are no load balancers that are waiting on draining timeouts or
     # connections, just delete the server too
-    if (len(lb_draining_steps) == len(current_lb_state) and
+    if (len(lb_draining_steps) == len(current_lb_nodes) and
         all([isinstance(step, RemoveFromLoadBalancer)
              for step in lb_draining_steps])):
         return lb_draining_steps + [DeleteServer(server_id=server.id)]

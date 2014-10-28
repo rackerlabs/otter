@@ -305,7 +305,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         `converge_lb_state` returns a :class:`AddToLoadBalancer` object
         """
         result = _converge_lb_state(desired_lb_state={5: [LBConfig(port=80)]},
-                                    current_lb_state=[],
+                                    current_lb_nodes=[],
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
@@ -324,7 +324,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                           config=LBConfig(port=80, weight=5))]
 
         result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_state=current,
+                                    current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
@@ -341,7 +341,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                           config=LBConfig(port=80, weight=5))]
 
         result = _converge_lb_state(desired_lb_state={},
-                                    current_lb_state=current,
+                                    current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
@@ -357,7 +357,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                           config=LBConfig(port=80))]
 
         result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_state=current,
+                                    current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(list(result), [])
 
@@ -373,7 +373,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                           config=LBConfig(port=80))]
 
         result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_state=current,
+                                    current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(set(result), set([
             AddNodesToLoadBalancer(
