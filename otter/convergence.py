@@ -147,10 +147,10 @@ def get_load_balancer_contents(request):
     """
 
     def fetch_nodes(lbs):
-        ids = [lb['id'] for lb in json.loads(lbs)]
+        lb_ids = [lb['id'] for lb in json.loads(lbs)]
         return effect.parallel(
-            [request('GET', append_segments('loadbalancers', str(_id), 'nodes'))
-             for _id in ids]).on(lambda r: (ids, [json.loads(n) for n in r]))
+            [request('GET', append_segments('loadbalancers', str(lb_id), 'nodes')).on(json.loads)
+             for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
         nodes = [LBNode(lb_id=_id, node_id=node['id'], address=node['address'],
@@ -165,7 +165,7 @@ def get_load_balancer_contents(request):
                 'GET',
                 append_segments('loadbalancers', str(n.lb_id), 'nodes',
                                 '{}.atom'.format(n.node_id)))
-             for n in draining]).on(lambda r: (nodes, draining, r))
+             for n in draining]).on(lambda feeds: (nodes, draining, feeds))
 
     def fill_drained_at((nodes, draining, feeds)):
         for node, feed in zip(draining, feeds):
