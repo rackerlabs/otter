@@ -10,6 +10,7 @@ import treq
 from twisted.internet import defer
 
 from characteristic import attributes, Attribute
+from effect import ParallelEffects
 from pyrsistent import pbag, freeze, s, pset
 from zope.interface import Interface, implementer
 
@@ -20,6 +21,7 @@ from toolz.curried import filter, groupby
 from toolz.functoolz import compose
 from toolz.itertoolz import concat, concatv
 
+from otter.http import get_request_func, bind_service
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
@@ -651,12 +653,46 @@ class Request(object):
     """
 
 
-def _convergence_request_to_http_request(request_fn, conv_request):
+def _reqs_to_effect(authenticator, tenant_id, conv_requests, region, log):
     """
-    Turn a :class:`Request` into :class:`pure_http.Request`.
-    """
-    request_kwargs = {}
-    for shared_attr in ["method", "headers", "data"]:
-        request_kwargs[shared_attr] = getattr(conv_request, shared_attr)
+    Turns a collection of :class:`Request` objects into an effect.
 
-    return request_fn(**request_kwargs)
+    REVIEW: Should region be a param here, or should I steal it from config?
+
+    :param authenticator: An authenticator to authenticate the tenant.
+        This should be caching for efficiency reasons: the effect produced
+        by this function may authenticate authenticate a single tenant
+        multiple times.
+    :param str tenant_id: The id of the tenant to produce an effect for.
+    :param conv_requests: Convergence requests to turn into effects.
+    :param str region: The region in which the requests in the effect will
+        be.
+    :param log: The logger used for these requests.
+    """
+    base_request_fn = get_request_func(authenticator,
+                                       tenant_id,
+                                       log)
+
+    def _make_bound_request_fn(service_type):
+        """
+        Creates a request function bound to a given service and tenant.
+
+        This is also bound to a tenant, because it builds on top of a
+        base request function that is already bound to the tenant.
+
+        :param service_type: The specific service to bind.
+        :type service_type: One of the :class:`ServiceType` constants.
+        """
+        return bind_service(base_request_fn,
+                            tenant_id,
+                            authenticator,
+                            service_type.name,
+                            region,
+                            log)
+
+    effects = []
+    for svc_type, reqs in groupby(lambda r: r.service, conv_requests).iteritems():
+        bound_request_fn = _make_bound_request_fn(svc_type)
+        effects.extend([bound_request_fn()])
+
+    return ParallelEffects(effects)
