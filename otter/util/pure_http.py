@@ -42,27 +42,36 @@ def request(method, url, **kwargs):
     return Effect(Request(method=method, url=url, **kwargs))
 
 
-def auth_request(request, get_auth_headers, headers=None):
+def auth_request(request, auth_headers_effect):
     """
-    Performs an authenticated request, calling a function to get auth headers.
+    Authenticates a request, using an effect to produce authentication
+    headers.
 
-    :param request: A function which only accepts a 'headers' argument,
-        and returns an :obj:`Effect` of :obj:`Request`.
-    :param get_auth_headers: An Effect that returns auth-related headers as a dict.
+    :param Request request: the request.
+    :param Effect auth_headers_effect: An Effect that results in auth-related
+        headers as a dict.
+    :return: An :obj:`Effect` of :obj:`Request`, updated with the auth headers.
     """
-    headers = headers if headers is not None else {}
-    return get_auth_headers.on(
-        success=lambda auth_headers: request(merge(headers, auth_headers)))
+    def got_auth_headers(auth_headers):
+        return Effect(Request(
+            method=request.method,
+            url=request.url,
+            headers=merge(request.headers if request.headers else {},
+                          auth_headers),
+            data=request.data))
+    return auth_headers_effect.on(got_auth_headers)
 
 
 def invalidate_auth_on_error(reauth_codes, invalidate_auth, result):
     """
     Invalidates an auth cache if an HTTP response is an auth-related error.
 
-    :param invalidate_auth: An Effect that invalidates any cached auth
-        information that auth_request's get_auth_headers Effect returns.
     :param tuple reauth_codes: integer HTTP codes which should cause an auth
         invalidation.
+    :param invalidate_auth: An Effect that invalidates any cached auth
+        information that :func:`auth_request`'s' ``auth_headers_effect``
+        provides.
+    :param result: The result to inspect, from an Effect of :obj:`Request`.
     """
     response, content = result
     if response.code in reauth_codes:
@@ -74,18 +83,19 @@ def invalidate_auth_on_error(reauth_codes, invalidate_auth, result):
 def request_with_auth(request,
                       get_auth_headers,
                       invalidate_auth,
-                      headers=None, reauth_codes=(401, 403)):
+                      reauth_codes=(401, 403)):
     """
     Get a request that will perform book-keeping on cached auth info.
 
     This composes the :func:`auth_request` and :func:`invalidate_auth_on_error`
     functions.
 
-    :param get_auth_headers: As per :func:`auth_request`
+    :param request: As per :func:`auth_request`
+    :param auth_headers: As per :func:`auth_request`
     :param invalidate_auth: As per :func:`invalidate_auth_on_error`
     :param reauth_codes: As per :func:`invalidate_auth_on_error`.
     """
-    eff = auth_request(request, get_auth_headers, headers=headers)
+    eff = auth_request(request, get_auth_headers)
     return eff.on(success=partial(invalidate_auth_on_error, reauth_codes,
                                   invalidate_auth))
 
@@ -100,8 +110,9 @@ def check_status(success_codes, result):
 
 def bind_root(request_func, root):
     """
-    Given a request function, return a new request function that only takes a
-    relative path instead of an absolute URL.
+    Given a request function (similar to :func:`request`), return a new
+    request function that only takes a relative path instead of an absolute
+    URL.
     """
     @wraps(request_func)
     def request(method, url, *args, **kwargs):

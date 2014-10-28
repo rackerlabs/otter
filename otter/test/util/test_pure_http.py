@@ -4,7 +4,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from testtools import TestCase
 
-from effect.testing import StubIntent, resolve_stubs
+from effect.testing import StubIntent, resolve_stubs, resolve_effect
 from effect.twisted import perform
 from effect import Effect, ConstantIntent, FuncIntent
 
@@ -88,10 +88,9 @@ class RequestWithAuthTests(TestCase):
         authentication headers.
         """
         eff = request_with_auth(
-            lambda headers: request("m", "u", headers=headers),
+            Request(method='m', url='u', headers={"default": "headers"}),
             self.auth_effect,
-            self.invalidate_effect,
-            headers={"default": "headers"})
+            self.invalidate_effect)
         self.assertEqual(
             resolve_stubs(eff).intent,
             Request(method="m",
@@ -104,10 +103,9 @@ class RequestWithAuthTests(TestCase):
         When merging headers together, auth headers win.
         """
         eff = request_with_auth(
-            lambda headers: request("m", "u", headers=headers),
+            Request(method='m', url='u', headers={'x-auth-token': 'fooey'}),
             self.auth_effect,
-            self.invalidate_effect,
-            headers={"x-auth-token": "fooey"})
+            self.invalidate_effect)
         self.assertEqual(
             resolve_stubs(eff).intent,
             Request(method="m",
@@ -136,18 +134,18 @@ class RequestWithAuthTests(TestCase):
         return self._test_reauth(500, reauth_codes=(401, 403, 500))
 
     def _test_reauth(self, code, reauth_codes=None):
-        # First we try to make a simple request.
         kwargs = {}
         if reauth_codes is not None:
             kwargs['reauth_codes'] = reauth_codes
         badauth = stub_pure_response("badauth!", code=code)
-        eff = request_with_auth(
-            lambda headers: badauth,
+        auth_eff = request_with_auth(
+            Request(method='m', url='u'),
             self.auth_effect,
             self.invalidate_effect,
-            headers={"base": "header"},
             **kwargs)
-        self.assertEqual(resolve_stubs(eff), badauth)
+        request_eff = resolve_stubs(auth_eff)
+        invalidate_eff = resolve_effect(request_eff, badauth)
+        resolve_stubs(invalidate_eff)
         self.assertEqual(self.invalidations, [True])
 
 
