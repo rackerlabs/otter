@@ -653,21 +653,45 @@ class Request(object):
     """
 
 
-def _reqs_to_effect(authenticator, tenant_id, conv_requests, region, log):
-    """
-    Turns a collection of :class:`Request` objects into an effect.
+def _reqs_to_effect(make_bound_request_fn, conv_requests):
+    """Turns a collection of :class:`Request` objects into an effect.
 
-    REVIEW: Should region be a param here, or should I steal it from config?
+    :param make_bound_request_fn: A function that takes a service type
+       and produces a request function, bound to the tenant and that
+       request. See :func:`_make_bound_request_fn_maker` for a helper
+       function to produce such a function.
+    :param conv_requests: Convergence requests to turn into effects.
+    """
+    effects = []
+    for svc_type, reqs in groupby(lambda r: r.service, conv_requests).iteritems():
+        bound_request_fn = make_bound_request_fn(svc_type)
+        effects.extend([bound_request_fn(method=r.method,
+                                         url=r.path,
+                                         headers=r.headers,
+                                         data=r.data)
+                        for r in reqs])
+
+    return ParallelEffects(effects)
+
+
+def _make_bound_request_fn_maker(authenticator, tenant_id, region, log):
+    """
+    REVIEW: contender for worst function name in forever
+
+    Creates a function that produces tenant- and service-bound request
+    functions.
 
     :param authenticator: An authenticator to authenticate the tenant.
         This should be caching for efficiency reasons: the effect produced
         by this function may authenticate authenticate a single tenant
         multiple times.
     :param str tenant_id: The id of the tenant to produce an effect for.
-    :param conv_requests: Convergence requests to turn into effects.
     :param str region: The region in which the requests in the effect will
         be.
     :param log: The logger used for these requests.
+    :return: A function that takes a service type, and produces a request
+        function bound to the tenant.
+    :rtype: unary function
     """
     base_request_fn = get_request_func(authenticator,
                                        tenant_id,
@@ -675,7 +699,8 @@ def _reqs_to_effect(authenticator, tenant_id, conv_requests, region, log):
 
     def _make_bound_request_fn(service_type):
         """
-        Creates a request function bound to a given service and tenant.
+        Creates a request function for a given service type, already bound to
+        a tenant.
 
         This is also bound to a tenant, because it builds on top of a
         base request function that is already bound to the tenant.
@@ -690,9 +715,4 @@ def _reqs_to_effect(authenticator, tenant_id, conv_requests, region, log):
                             region,
                             log)
 
-    effects = []
-    for svc_type, reqs in groupby(lambda r: r.service, conv_requests).iteritems():
-        bound_request_fn = _make_bound_request_fn(svc_type)
-        effects.extend([bound_request_fn()])
-
-    return ParallelEffects(effects)
+    return _make_bound_request_fn
