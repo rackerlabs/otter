@@ -626,7 +626,7 @@ class ServiceType(Values):
     """Constants representing Rackspace cloud services."""
     CLOUD_SERVERS = ValueConstant('cloudServersOpenStack')
     CLOUD_LOAD_BALANCERS = ValueConstant('cloudLoadBalancers')
-    RACKCONNECT_V3 = ValueConstant('baconBaconBaconBacon')
+    RACKCONNECT_V3 = ValueConstant('rackconnect')
 
 
 @attributes(['service', 'method', 'path', 'headers', 'data'],
