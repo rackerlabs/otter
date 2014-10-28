@@ -108,12 +108,12 @@ _rcv3_lb = {
                 "The ID of the load balancer to which new "
                 "servers will be added."),
         },
-        "rackConnect": {
-            "type": "boolean",
+        "type": {
+            "type": "string",
             "description": (
-                "True if the load balancer is a RackConnect"
-                "v3 load balancer"),
-            "required": True
+                "What type of a load balancer is in use"),
+            "required": True,
+            "oneOf": ["RackConnectV3"]
         }
     },
     "additionalProperties": False
@@ -140,6 +140,13 @@ _clb_lb = {
                 "new servers) to load balance on for this "
                 "particular load balancer."),
             "required": True
+        },
+        "type": {
+            "type": "string",
+            "description": (
+                "What type of a load balancer is in use"),
+            "required": False,
+            "oneOf": ["CloudLoadBalancer"]
         }
     },
     "additionalProperties": False
