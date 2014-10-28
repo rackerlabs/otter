@@ -444,7 +444,12 @@ class AddNodesToRCv3LoadBalancer(object):
 
     def as_request(self):
         """
-        Produce a :obj:`Request` to add some servers to an RCv3 load balancer.
+        Not actually implemented.
+
+        This step is never intended to be reified as a request; it
+        should always be optimized away.
+
+        :raises: NotImplementedError
         """
         raise NotImplementedError()
 
@@ -500,8 +505,12 @@ class RemoveNodeFromRCv3LoadBalancer(object):
 
     def as_request(self):
         """
-        Produce a :obj:`Request` to remove some servers from an RCv3 load
-        balancer.
+        Not actually implemented.
+
+        This step is never intended to be reified as a request; it
+        should always be optimized away.
+
+        :raises: NotImplementedError
         """
         raise NotImplementedError()
 
