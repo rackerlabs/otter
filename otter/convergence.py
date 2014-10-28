@@ -42,18 +42,11 @@ class NodeCondition(Names):
                                 # Existing connections are permitted to continue.
 
 
-condition_map = {'ENABLED': NodeCondition.ENABLED, 'DISABLED': NodeCondition.DISABLED,
-                 'DRAINING': NodeCondition.DRAINING}
-
-
 class NodeType(Names):
     """Constants representing the type of a load balancer node"""
     PRIMARY = NamedConstant()    # Node in normal rotation
     SECONDARY = NamedConstant()  # Node only put into normal rotation if a
                                  # primary node fails.
-
-
-nodetype_map = {'PRIMARY': NodeType.PRIMARY, 'SECONDARY': NodeType.SECONDARY}
 
 
 @defer.inlineCallbacks
@@ -155,8 +148,8 @@ def get_load_balancer_contents(request):
     def fetch_drained_feeds((ids, all_lb_nodes)):
         nodes = [LBNode(lb_id=_id, node_id=node['id'], address=node['address'],
                         config=LBConfig(port=node['port'], weight=node['weight'],
-                                        condition=condition_map[node['condition']],
-                                        type=nodetype_map[node['type']]))
+                                        condition=NodeCondition.lookupByName(node['condition']),
+                                        type=NodeType.lookupByName(node['type'])))
                  for _id, nodes in zip(ids, all_lb_nodes)
                  for node in nodes]
         draining = [n for n in nodes if n.config.condition == NodeCondition.DRAINING]
