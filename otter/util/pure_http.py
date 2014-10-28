@@ -37,22 +37,22 @@ class Request(object):
         returnValue((response, content))
 
 
-def get_request(method, url, **kwargs):
+def request(method, url, **kwargs):
     """Return a Request wrapped in an Effect."""
     return Effect(Request(method=method, url=url, **kwargs))
 
 
-def auth_request(get_request, get_auth_headers, headers=None):
+def auth_request(request, get_auth_headers, headers=None):
     """
     Performs an authenticated request, calling a function to get auth headers.
 
-    :param get_request: A function which only accepts a 'headers' argument,
+    :param request: A function which only accepts a 'headers' argument,
         and returns an :obj:`Effect` of :obj:`Request`.
     :param get_auth_headers: An Effect that returns auth-related headers as a dict.
     """
     headers = headers if headers is not None else {}
     return get_auth_headers.on(
-        success=lambda auth_headers: get_request(merge(headers, auth_headers)))
+        success=lambda auth_headers: request(merge(headers, auth_headers)))
 
 
 def invalidate_auth_on_error(reauth_codes, invalidate_auth, result):
@@ -71,7 +71,7 @@ def invalidate_auth_on_error(reauth_codes, invalidate_auth, result):
         return result
 
 
-def request_with_auth(get_request,
+def request_with_auth(request,
                       get_auth_headers,
                       invalidate_auth,
                       headers=None, reauth_codes=(401, 403)):
@@ -85,14 +85,14 @@ def request_with_auth(get_request,
     :param invalidate_auth: As per :func:`invalidate_auth_on_error`
     :param reauth_codes: As per :func:`invalidate_auth_on_error`.
     """
-    eff = auth_request(get_request, get_auth_headers, headers=headers)
+    eff = auth_request(request, get_auth_headers, headers=headers)
     return eff.on(success=partial(invalidate_auth_on_error, reauth_codes,
                                   invalidate_auth))
 
 
 def check_status(success_codes, result):
     """Ensure that the response code is acceptable. If not, raise APIError."""
-    (response, content) = result
+    response, content = result
     if response.code not in success_codes:
         raise APIError(response.code, content, response.headers)
     return result
