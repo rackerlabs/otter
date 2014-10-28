@@ -445,9 +445,6 @@ class AddNodesToRCv3LoadBalancer(object):
     def as_request(self):
         """
         Produce a :obj:`Request` to add some servers to an RCv3 load balancer.
-
-        REVIEW: do we actually need to implement this, or is it okay to
-        rely on it always being optimized away?
         """
         raise NotImplementedError()
 
@@ -505,8 +502,6 @@ class RemoveNodeFromRCv3LoadBalancer(object):
         """
         Produce a :obj:`Request` to remove some servers from an RCv3 load
         balancer.
-
-        REVIEW: same comment as for AddNodesToRCv3LoadBalancer.as_request
         """
         raise NotImplementedError()
 
