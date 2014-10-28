@@ -17,9 +17,10 @@ from otter.convergence import (
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
+    SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ACTIVE, ERROR, BUILD,
-    ServiceType, NodeCondition, NodeType, extract_drained_at,
+    ServiceType, NodeCondition, NodeType, optimize_steps, extract_drained_at,
     get_load_balancer_contents)
 
 from pyrsistent import pmap, pbag, s
@@ -304,13 +305,6 @@ class ObjectStorageTests(SynchronousTestCase):
         self.assertEqual(lb.condition, NodeCondition.ENABLED)
         self.assertEqual(lb.type, NodeType.PRIMARY)
 
-    def test_lbconfig_not_cmp_draining(self):
-        """
-        :obj:`LBConfig.draining_timeout` is excluded from comparison
-        """
-        self.assertEqual(LBConfig(port=80, draining_timeout=2.4),
-                         LBConfig(port=80, draining_timeout=5.4))
-
 
 class ConvergeLBStateTests(SynchronousTestCase):
     """
@@ -441,8 +435,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [],
-                {},
+                set(),
+                set(),
                 0),
             Convergence(
                 steps=pbag([CreateServer(launch_config=pmap())])))
@@ -455,8 +449,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [],
-                {},
+                set(),
+                set(),
                 0),
             Convergence(
                 steps=pbag([
@@ -471,8 +465,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', BUILD)],
-                {},
+                set([server('abc', ServerState.BUILD)]),
+                set(),
                 0),
             Convergence(steps=pbag([])))
 
@@ -484,8 +478,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ERROR)],
-                {},
+                set([server('abc', ServerState.ERROR)]),
+                set(),
                 0),
             Convergence(
                 steps=pbag([
@@ -502,11 +496,11 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ERROR, servicenet_address='1.1.1.1')],
-                [LBNode(lb_id=5, address='1.1.1.1', node_id=3,
-                        config=LBConfig(port=80)),
-                 LBNode(lb_id=5, address='1.1.1.1', node_id=5,
-                        config=LBConfig(port=8080))],
+                set([server('abc', ServerState.ERROR, servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=5, address='1.1.1.1', node_id=3,
+                            config=LBConfig(port=80)),
+                     LBNode(lb_id=5, address='1.1.1.1', node_id=5,
+                            config=LBConfig(port=8080))]),
                 0),
             Convergence(
                 steps=pbag([
@@ -521,9 +515,9 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ACTIVE, created=0),
-                 server('def', ACTIVE, created=1)],
-                {},
+                set([server('abc', ServerState.ACTIVE, created=0),
+                     server('def', ServerState.ACTIVE, created=1)]),
+                set(),
                 0),
             Convergence(steps=pbag([DeleteServer(server_id='abc')])))
 
@@ -536,9 +530,10 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=0),
-                [server('abc', ACTIVE, servicenet_address='1.1.1.1', created=0)],
-                [LBNode(lb_id=5, address='1.1.1.1', node_id=3,
-                        config=LBConfig(port=80))],
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1', created=0)]),
+                set([LBNode(lb_id=5, address='1.1.1.1', node_id=3,
+                            config=LBConfig(port=80))]),
                 0),
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),
@@ -553,10 +548,10 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [server('abc', ACTIVE, created=0),
-                 server('def', BUILD, created=1),
-                 server('ghi', ACTIVE, created=2)],
-                {},
+                set([server('abc', ServerState.ACTIVE, created=0),
+                     server('def', ServerState.BUILD, created=1),
+                     server('ghi', ServerState.ACTIVE, created=2)]),
+                set(),
                 0),
             Convergence(
                 steps=pbag([DeleteServer(server_id='def')])))
@@ -569,9 +564,9 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [server('slowpoke', BUILD, created=0),
-                 server('ok', ACTIVE, created=0)],
-                {},
+                set([server('slowpoke', ServerState.BUILD, created=0),
+                     server('ok', ServerState.ACTIVE, created=0)]),
+                set(),
                 3600),
             Convergence(
                 steps=pbag([
@@ -586,10 +581,10 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [server('slowpoke', BUILD, created=0),
-                 server('old-ok', ACTIVE, created=0),
-                 server('new-ok', ACTIVE, created=3600)],
-                {},
+                set([server('slowpoke', ServerState.BUILD, created=0),
+                     server('old-ok', ServerState.ACTIVE, created=0),
+                     server('new-ok', ServerState.ACTIVE, created=3600)]),
+                set(),
                 3600),
             Convergence(steps=pbag([DeleteServer(server_id='slowpoke')])))
 
@@ -602,9 +597,11 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1, desired_lbs=desired_lbs),
-                [server('abc', ACTIVE, servicenet_address='1.1.1.1', created=0),
-                 server('bcd', ACTIVE, servicenet_address='2.2.2.2', created=1)],
-                [],
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1', created=0),
+                     server('bcd', ServerState.ACTIVE,
+                            servicenet_address='2.2.2.2', created=1)]),
+                set(),
                 0),
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),
@@ -612,8 +609,6 @@ class ConvergeTests(SynchronousTestCase):
                     lb_id=5,
                     address_configs=s(('2.2.2.2', LBConfig(port=80))))
             ])))
-
-# time out (delete) building servers
 
 
 class RequestConversionTests(SynchronousTestCase):
@@ -645,6 +640,21 @@ class RequestConversionTests(SynchronousTestCase):
                 service=ServiceType.CLOUD_SERVERS,
                 method='DELETE',
                 path='servers/abc123'))
+
+    def test_set_metadata_item(self):
+        """
+        :obj:`SetMetadataItemOnServer.as_request` produces a request for
+        setting a metadata item on a particular server.
+        """
+        meta = SetMetadataItemOnServer(server_id='abc123', key='metadata_key',
+                                       value='teapot')
+        self.assertEqual(
+            meta.as_request(),
+            Request(
+                service=ServiceType.CLOUD_SERVERS,
+                method='PUT',
+                path='servers/abc123/metadata/metadata_key',
+                data={'meta': {'metadata_key': 'teapot'}}))
 
     def test_remove_from_load_balancer(self):
         """
@@ -680,3 +690,92 @@ class RequestConversionTests(SynchronousTestCase):
                 path='loadbalancers/abc123/nodes/node1',
                 data={'condition': 'DRAINING',
                       'weight': 50}))
+
+
+class OptimizerTests(SynchronousTestCase):
+    """Tests for :func:`optimize_steps`."""
+
+    def test_optimize_lb_adds(self):
+        """
+        Multiple :class:`AddNodesToLoadBalancer` steps for the same LB
+        are merged into one.
+        """
+        steps = pbag([
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.2.3.4', LBConfig(port=80))))])
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    address_configs=s(
+                        ('1.1.1.1', LBConfig(port=80)),
+                        ('1.2.3.4', LBConfig(port=80)))
+                )]))
+
+    def test_optimize_maintain_unique_ports(self):
+        """
+        Multiple ports can be specified for the same address and LB ID.
+        """
+        steps = pbag([
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=8080))))])
+
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.1', LBConfig(port=8080))))]))
+
+    def test_multiple_load_balancers(self):
+        """Aggregation is done on a per-load-balancer basis."""
+        steps = pbag([
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=6,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=6,
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
+        ])
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.2', LBConfig(port=80)))),
+                AddNodesToLoadBalancer(
+                    lb_id=6,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.2', LBConfig(port=80)))),
+            ]))
+
+    def test_optimize_leaves_other_steps(self):
+        """
+        Non-LB steps are not touched by the optimizer.
+        """
+        steps = pbag([
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            CreateServer(launch_config=pmap({}))
+        ])
+        self.assertEqual(
+            optimize_steps(steps),
+            steps)

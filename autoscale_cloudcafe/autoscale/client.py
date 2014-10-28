@@ -56,6 +56,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                              gc_max_entities=None, gc_metadata=None,
                              lc_personality=None, lc_metadata=None,
                              lc_disk_config=None, lc_networks=None,
+                             lc_block_device_mapping=None,
                              lc_load_balancers=None, sp_list=None,
                              network_type=None, requestslib_kwargs=None):
         """
@@ -76,6 +77,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type lc_name: String
         :param lc_image_ref: The reference to the image used to build the server
         :type lc_image_ref: String
+        :param dict lc_block_device_mapping: Block device mapping data to be
+            passed to the server for mounting volumes
         :param lc_flavor_ref: The flavor used to build the server.
         :type lc_flavor_ref: String
         :param lc_metadata: A dictionary of values to be used as metadata.
@@ -123,6 +126,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                                              lc_metadata=lc_metadata,
                                              lc_disk_config=lc_disk_config,
                                              lc_networks=lc_networks,
+                                             lc_block_device_mapping=lc_block_device_mapping,
                                              lc_load_balancers=lc_load_balancers,
                                              sp_list=sp_list)
         return self.request('POST', url,
@@ -315,6 +319,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def update_launch_config(self, group_id, name, image_ref, flavor_ref,
                              personality=None, metadata=None,
                              disk_config=None, networks=None,
+                             block_device_mapping=None,
                              load_balancers=None,
                              requestslib_kwargs=None):
         """
@@ -331,6 +336,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                                 flavor_ref=flavor_ref,
                                 personality=personality, metadata=metadata,
                                 disk_config=disk_config, networks=networks,
+                                block_device_mapping=block_device_mapping,
                                 load_balancers=load_balancers)
         return self.request('PUT', url,
                             request_entity=config,

@@ -5,6 +5,7 @@ import mock
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed, fail, Deferred
+from twisted.python.failure import Failure
 from twisted.internet.task import Clock
 
 from testtools.matchers import IsInstance
@@ -297,21 +298,25 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         """
         verifyObject(IAuthenticator, self.ia)
 
-    def test_authenticate_tenant_auth_as_service_user(self):
+    def test_auth_me_auth_as_service_user(self):
         """
-        authenticate_tenant authenticates as the service user.
+        _auth_me authenticates as the service user.
         """
-        self.successResultOf(self.ia.authenticate_tenant(111111))
+        self.successResultOf(self.ia._auth_me(None))
         self.authenticate_user.assert_called_once_with(self.url, self.user,
                                                        self.password,
                                                        log=None)
+        self.assertEqual(self.ia._token, 'auth-token')
+        self.assertFalse(self.log.msg.called)
 
         self.authenticate_user.reset_mock()
 
-        self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
+        self.successResultOf(self.ia._auth_me(self.log))
         self.authenticate_user.assert_called_once_with(self.url, self.user,
                                                        self.password,
                                                        log=self.log)
+        self.log.msg.assert_called_once_with('Getting new identity admin token')
+        self.assertEqual(self.ia._token, 'auth-token')
 
     def test_authenticate_tenant_gets_user_for_specified_tenant(self):
         """
@@ -336,6 +341,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         authenticate_tenant impersonates the first user from the list of
         users for the tenant using the admin endpoint.
         """
+        self.ia._token = 'auth-token'
         self.successResultOf(self.ia.authenticate_tenant(111111))
         self.impersonate_user.assert_called_once_with(self.admin_url,
                                                       'auth-token',
@@ -348,20 +354,49 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
                                                       'auth-token',
                                                       'test_user', log=self.log)
 
+    def test_authenticate_tenant_retries_impersonates_first_user(self):
+        """
+        authenticate_tenant impersonates again with new auth if initial impersonation
+        fails with 401
+        """
+        self.impersonate_user.side_effect = [
+            fail(UpstreamError(Failure(APIError(401, '')), 'identity', 'o')),
+            succeed({'access': {'token': {'id': 'impersonation_token'}}})]
+        self.successResultOf(self.ia.authenticate_tenant(111111, self.log))
+        self.impersonate_user.assert_has_calls(
+            [mock.call(self.admin_url, None, 'test_user', log=self.log),
+             mock.call(self.admin_url, 'auth-token', 'test_user', log=self.log)])
+        self.authenticate_user.assert_called_once_with(self.url, self.user,
+                                                       self.password,
+                                                       log=self.log)
+        self.log.msg.assert_called_once_with('Getting new identity admin token')
+
     def test_authenticate_tenant_gets_endpoints_for_the_impersonation_token(self):
         """
-        authenticate_tenant fetches all the endpoints for the impersonation
-        token.
+        authenticate_tenant fetches all the endpoints for the impersonation with
+        cached token.
         """
-        self.successResultOf(self.ia.authenticate_tenant(111111))
-        self.endpoints_for_token.assert_called_once_with(
-            self.admin_url, 'auth-token', 'impersonation_token', log=None)
-
-        self.endpoints_for_token.reset_mock()
-
+        self.ia._token = 'auth-token'
         self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
         self.endpoints_for_token.assert_called_once_with(
             self.admin_url, 'auth-token', 'impersonation_token', log=self.log)
+
+    def test_authenticate_tenant_retries_getting_endpoints_for_the_impersonation_token(self):
+        """
+        authenticate_tenant fetches all the endpoints for the impersonation and
+        retries with new authentication token if it gets 401
+        """
+        self.endpoints_for_token.side_effect = [
+            fail(UpstreamError(Failure(APIError(401, '')), 'identity', 'o')),
+            succeed({'endpoints': [{'name': 'anEndpoint', 'type': 'anType'}]})]
+        self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
+        self.endpoints_for_token.assert_has_calls(
+            [mock.call(self.admin_url, None, 'impersonation_token', log=self.log),
+             mock.call(self.admin_url, 'auth-token', 'impersonation_token', log=self.log)])
+        self.authenticate_user.assert_called_once_with(self.url, self.user,
+                                                       self.password,
+                                                       log=self.log)
+        self.log.msg.assert_called_once_with('Getting new identity admin token')
 
     def test_authenticate_tenant_returns_impersonation_token_and_endpoint_list(self):
         """
@@ -381,37 +416,43 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         """
         authenticate_tenant propagates errors from authenticate_user.
         """
-        self.authenticate_user.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
+        self.impersonate_user.side_effect = lambda *a, **k: fail(
+            UpstreamError(Failure(APIError(401, '4')), 'identity', 'o'))
+        self.authenticate_user.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
+        f = self.failureResultOf(self.ia.authenticate_tenant(111111), UpstreamError)
+        self.assertEqual(f.value.reason.value.code, 500)
 
     def test_authenticate_tenant_propagates_user_list_errors(self):
         """
         authenticate_tenant propagates errors from user_for_tenant
         """
-        self.user_for_tenant.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
+        self.user_for_tenant.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
+        f = self.failureResultOf(self.ia.authenticate_tenant(111111), UpstreamError)
+        self.assertEqual(f.value.reason.value.code, 500)
 
     def test_authenticate_tenant_propagates_impersonation_errors(self):
         """
         authenticate_tenant propagates errors from impersonate_user
         """
-        self.impersonate_user.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
+        self.impersonate_user.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
+        f = self.failureResultOf(self.ia.authenticate_tenant(111111))
+        self.assertEqual(f.value.reason.value.code, 500)
 
     def test_authenticate_tenant_propagates_endpoint_list_errors(self):
         """
         authenticate_tenant propagates errors from endpoints_for_token
         """
-        self.endpoints_for_token.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
+        self.endpoints_for_token.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
+        f = self.failureResultOf(self.ia.authenticate_tenant(111111), UpstreamError)
+        self.assertEqual(f.value.reason.value.code, 500)
 
 
 class CachingAuthenticatorTests(SynchronousTestCase):

@@ -351,28 +351,45 @@ class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
         invalidates if imageRef is not a string
         """
         self.server['imageRef'] = 3
-        self.assertRaisesRegexp(ValidationError, "3 is not of type 'string'",
+        self.assertRaisesRegexp(ValidationError, "is not of type",
                                 validate, self.server, group_schemas.server)
 
-    def test_empty_image(self):
+    def test_empty_image_no_bfv(self):
         """
-        Empty string for ``imageRef`` is valid.
+        Empty string or null for ``imageRef`` is not valid, if no
+        ``block_device_mapping`` is provided.
         """
-        self.server['imageRef'] = ''
-        validate(self.server, group_schemas.server)
+        for ref in ('', None):
+            self.server['imageRef'] = ref
+            self.assertRaisesRegexp(ValidationError, "is not of type",
+                                    validate, self.server, group_schemas.server)
 
-    def test_null_image(self):
+    def test_null_image_no_bfv(self):
         """
-        Null for ``imageRef`` is valid.
-        """
-        self.server['imageRef'] = None
-        validate(self.server, group_schemas.server)
-
-    def test_no_image(self):
-        """
-        Not providing ``imageRef`` is valid.
+        Not providing ``imageRef`` is not valid, if no
+        ``block_device_mapping`` is provided.
         """
         self.server.pop('imageRef')
+        self.assertRaisesRegexp(ValidationError, "is not of type",
+                                validate, self.server, group_schemas.server)
+
+    def test_empty_image_bfv(self):
+        """
+        Empty string or null for ``imageRef`` is valid, if
+        ``block_device_mapping`` is provided.
+        """
+        for ref in ('', None):
+            self.server['imageRef'] = ref
+            self.server['block_device_mapping'] = [{'volume_id': '235'}]
+            validate(self.server, group_schemas.server)
+
+    def test_no_image_bfv(self):
+        """
+        Not providing ``imageRef`` is valid, if ``block_device_mapping`` is
+        provided.
+        """
+        self.server.pop('imageRef')
+        self.server['block_device_mapping'] = [{'volume_id': '235'}]
         validate(self.server, group_schemas.server)
 
     def test_blank_image(self):
@@ -380,7 +397,7 @@ class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
         invalidates if imageRef is just whitespace
         """
         self.server['imageRef'] = ' '
-        self.assertRaisesRegexp(ValidationError, "does not match",
+        self.assertRaisesRegexp(ValidationError, "is not of type",
                                 validate, self.server, group_schemas.server)
 
     def test_invalid_flavor(self):

@@ -13,7 +13,7 @@ import treq
 from twisted.internet import defer
 
 from characteristic import attributes, Attribute
-from pyrsistent import pbag, freeze, s
+from pyrsistent import pbag, freeze, s, pset
 from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
@@ -190,7 +190,8 @@ class IStep(Interface):
 
 
 @attributes(['launch_config', 'desired',
-             Attribute('desired_lbs', default_factory=dict, instance_of=dict)])
+             Attribute('desired_lbs', default_factory=dict, instance_of=dict),
+             Attribute('draining_timeout', default_value=0.0, instance_of=float)])
 class DesiredGroupState(object):
     """
     The desired state for a scaling group.
@@ -199,6 +200,10 @@ class DesiredGroupState(object):
     :ivar int desired: the number of desired servers within the group.
     :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
         :class:`LBConfig` instances.
+    :ivar float draining_timeout: If greater than zero, when the server is
+        scaled down it will be put into draining condition.  It will remain
+        in draining condition for a maximum of ``draining_timeout`` seconds
+        before being removed from the load balancer and then deleted.
     """
 
     def __init__(self):
@@ -224,9 +229,7 @@ class NovaServer(object):
              Attribute("condition", default_value=NodeCondition.ENABLED,
                        instance_of=NamedConstant),
              Attribute("type", default_value=NodeType.PRIMARY,
-                       instance_of=NamedConstant),
-             Attribute("draining_timeout", default_value=0.0, instance_of=float,
-                       exclude_from_cmp=True)])
+                       instance_of=NamedConstant)])
 class LBConfig(object):
     """
     Information representing a load balancer port mapping; how a particular
@@ -240,14 +243,6 @@ class LBConfig(object):
     :ivar str condition: One of ``ENABLED``, ``DISABLED``, or ``DRAINING`` -
         the default is ``ENABLED``
     :ivar str type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
-
-    TODO: this is not the ideal place for ``draining_timeout``, since
-    :class:`LBConfig` is more about what node on a CLB should look like.
-    And :class:`LBConfig` may not be applicable to a hardware LB.
-    So `draining_timeout` is here until other load balancer requirements are
-    understood and a better place is found for it.
-    :ivar float draining_timeout: Number of seconds node should be in DRAINING
-        state before being removed
     """
 
 
@@ -272,9 +267,11 @@ class LBNode(object):
     """
 
 
-ACTIVE = 'ACTIVE'
-ERROR = 'ERROR'
-BUILD = 'BUILD'
+class ServerState(Names):
+    """Constants representing the state cloud servers can have"""
+    ACTIVE = NamedConstant()    # corresponds to Nova "ACTIVE"
+    ERROR = NamedConstant()     # corresponds to Nova "ERROR"
+    BUILD = NamedConstant()     # corresponds to Nova "BUILD" or "BUILDING"
 
 
 def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
@@ -294,6 +291,8 @@ def _converge_lb_state(desired_lb_state, current_lb_state, ip_address):
     in practice it should probably only be added as PRIMARY.  SECONDARY can only
     be used if load balancer health monitoring is enabled, and would be used as
     backup servers anyway.
+
+    :rtype: `list` of :class:`IStep`
     """
     desired = {
         (lb_id, config.port): config
@@ -336,10 +335,10 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     by ``desired_state``.
 
     :param DesiredGroupState desired_state: The desired group state.
-    :param list servers_with_cheese: a list of :obj:`NovaServer` instances.
+    :param set servers_with_cheese: a list of :obj:`NovaServer` instances.
         This must only contain servers that are being managed for the specified
         group.
-    :param load_balancer_contents: a list of :obj:`LBNode` instances.  This must
+    :param load_balancer_contents: a set of :obj:`LBNode` instances.  This must
         contain all the load balancer mappings for all the load balancers on the
         tenant.
     :param float now: number of seconds since the POSIX epoch indicating the
@@ -353,7 +352,9 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
 
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
     servers_in_error, servers_in_active, servers_in_build = partition_groups(
-        lambda s: s.state, newest_to_oldest, [ERROR, ACTIVE, BUILD])
+        lambda s: s.state, newest_to_oldest, [ServerState.ERROR,
+                                              ServerState.ACTIVE,
+                                              ServerState.BUILD])
 
     building_too_long, waiting_for_build = partition_bool(
         lambda server: now - server.created >= timeout,
@@ -389,11 +390,11 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
          for lb_node in lbs_by_address.get(server.servicenet_address, [])])
 
     # converge all the servers that remain to their desired load balancer state
-    new_active_servers = filter(lambda s: s not in servers_to_delete,
-                                servers_in_active)
+    still_active_servers = filter(lambda s: s not in servers_to_delete,
+                                  servers_in_active)
     lb_converge_steps = [
         step
-        for server in new_active_servers
+        for server in still_active_servers
         for step in _converge_lb_state(
             desired_state.desired_lbs,
             lbs_by_address.get(server.servicenet_address, []),
@@ -407,6 +408,39 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                    + delete_timeout_steps
                    + lb_converge_steps
                    ))
+
+
+def _optimize_lb_adds(lb_add_steps):
+    """
+    Merge together multiple :obj:`AddNodesToLoadBalancer`, per load balancer.
+
+    :param steps_by_lb: Iterable of :obj:`AddNodesToLoadBalancer`.
+    """
+    steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
+    return [
+        AddNodesToLoadBalancer(
+            lb_id=lbid,
+            address_configs=pset(reduce(lambda s, y: s.union(y),
+                                        [step.address_configs for step in steps])))
+        for lbid, steps in steps_by_lb.iteritems()
+    ]
+
+
+def optimize_steps(steps):
+    """
+    Optimize steps.
+
+    Currently batches up groups of :obj:`AddNodesToLoadBalancer` steps into
+    one per load balancer.
+
+    :param pbag steps: Collection of steps.
+    :return: a pbag of steps.
+    """
+    lb_adds, other = partition_bool(
+        lambda s: type(s) is AddNodesToLoadBalancer,
+        steps)
+    merged_adds = _optimize_lb_adds(lb_adds)
+    return pbag(merged_adds + other)
 
 
 @attributes(['steps'])
@@ -426,7 +460,7 @@ class CreateServer(object):
     """
     A server must be created.
 
-    :ivar dict launch_config: Nova launch configuration.
+    :ivar pmap launch_config: Nova launch configuration.
     """
 
     def as_request(self):
@@ -453,6 +487,26 @@ class DeleteServer(object):
             service=ServiceType.CLOUD_SERVERS,
             method='DELETE',
             path=append_segments('servers', self.server_id))
+
+
+@implementer(IStep)
+@attributes(['server_id', 'key', 'value'])
+class SetMetadataItemOnServer(object):
+    """
+    A metadata key/value item must be set on a server.
+
+    :ivar str server_id: a Nova server ID.
+    :ivar str key: The metadata key to set (<=256 characters)
+    :ivar str value: The value to assign to the metadata key (<=256 characters)
+    """
+    def as_request(self):
+        """Produce a :obj:`Request` to set a metadata item on a server"""
+        return Request(
+            service=ServiceType.CLOUD_SERVERS,
+            method='PUT',
+            path=append_segments('servers', self.server_id, 'metadata',
+                                 self.key),
+            data={'meta': {self.key: self.value}})
 
 
 @implementer(IStep)
