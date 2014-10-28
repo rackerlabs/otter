@@ -71,6 +71,39 @@ def launch_server_config():
                 "server": {
                     "flavorRef": "2",
                     "name": "worker",
+                    "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
+                },
+                "loadBalancers": [
+                    {
+                        "loadBalancerId": "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2",
+                        "type": "RackConnectV3"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "launch_server",
+            "args": {
+                "server": {
+                    "flavorRef": "2",
+                    "name": "worker",
+                    "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
+                },
+                "loadBalancers": [
+                    {
+                        "loadBalancerId": 2200,
+                        "port": 8081,
+                        "type": "CloudLoadBalancer"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "launch_server",
+            "args": {
+                "server": {
+                    "flavorRef": "2",
+                    "name": "worker",
                     "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0",
                     "personality": [
                         {
