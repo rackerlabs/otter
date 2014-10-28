@@ -695,7 +695,3 @@ class OptimizerTests(SynchronousTestCase):
             ]))
         ])
         self.assertEqual(optimize_steps(unoptimized), optimized)
-
-    # TODO: Write a test that a set of AddNodesToRCv3LoadBalancer +
-    # some AddNodesToRCv3LoadBalancers all get coalesced into 1? That
-    # requires multiple optimization passes. Same thing for removing.
