@@ -372,11 +372,13 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     lbs_by_address = groupby(lambda n: n.address, load_balancer_contents)
 
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
-    servers_in_error, servers_in_active, servers_in_build, draining_servers = partition_groups(
-        lambda s: s.state, newest_to_oldest, [ServerState.ERROR,
-                                              ServerState.ACTIVE,
-                                              ServerState.BUILD,
-                                              ServerState.DRAINING])
+
+    servers_in_error, servers_in_active, servers_in_build, draining_servers = (
+        partition_groups(
+            lambda s: s.state, newest_to_oldest, [ServerState.ERROR,
+                                                  ServerState.ACTIVE,
+                                                  ServerState.BUILD,
+                                                  ServerState.DRAINING]))
 
     building_too_long, waiting_for_build = partition_bool(
         lambda server: now - server.created >= timeout,
