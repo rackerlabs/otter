@@ -119,7 +119,9 @@ def extract_drained_at(feed):
     Extract time when node was changed to DRAINING
 
     :param str feed: Atom feed of the node
-    :rtype float
+
+    :returns: EPOCH in seconds
+    :rtype: float
     """
     # TODO: This function temporarily only looks at last entry assuming that
     # it was draining operation. May need to look at all entries in reverse order
