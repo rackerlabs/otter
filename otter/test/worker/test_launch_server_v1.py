@@ -313,7 +313,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         clock.pump([self.retry_interval] * self.max_retries)
         return d
 
-    def test_addl_b_retries_times_out(self):
+    def test_add_lb_retries_times_out(self):
         """
         add_to_load_balancer will retry again and again for worker.lb_max_retries times.
         It will fail after that. This also checks that API failure is propogated
