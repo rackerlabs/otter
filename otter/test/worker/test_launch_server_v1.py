@@ -508,6 +508,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
                           new=mock_treq(code=200, content='{"message": "bad"}', method='delete'))
         patch(self, 'otter.util.http.treq', new=self.treq)
+        self.clock = Clock()
 
     def _remove_from_load_balancer(self):
         """
@@ -515,7 +516,8 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         lb_config = {"loadBalancerId": 12345}
         d = remove_from_load_balancer(
-            self.log, 'http://url/', 'my-auth-token', lb_config, 1)
+            self.log, 'http://url/', 'my-auth-token', lb_config, 1,
+            clock=self.clock)
         return d
 
     def test_remove_from_load_balancer(self):
@@ -614,12 +616,10 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
         self.treq.content.side_effect = lambda *a, **ka: succeed(
             json.dumps({'message': 'PENDING_UPDATE'}))
-        clock = Clock()
 
-        d = remove_from_load_balancer(
-            self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
+        d = self._remove_from_load_balancer()
 
-        clock.pump([self.retry_interval] * 11)
+        self.clock.pump([self.retry_interval] * 11)
         self.assertIsNone(self.successResultOf(d))
         # delete calls made?
         self.assertEqual(self.treq.delete.mock_calls,
@@ -645,12 +645,10 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=422))
         self.treq.content.side_effect = lambda *a, **ka: succeed(
             json.dumps({'message': 'PENDING_UPDATE'}))
-        clock = Clock()
 
-        d = remove_from_load_balancer(
-            self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
+        d = self._remove_from_load_balancer()
 
-        clock.pump([self.retry_interval] * self.max_retries)
+        self.clock.pump([self.retry_interval] * self.max_retries)
         # failed?
         failure = self.failureResultOf(d, RequestError)
         self.assertEqual(failure.value.reason.value.code, 422)
@@ -678,12 +676,10 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=422))
         self.treq.content.side_effect = lambda *a, **ka: succeed(
             json.dumps({'message': 'PENDING_UPDATE'}))
-        clock = Clock()
 
-        d = remove_from_load_balancer(
-            self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
+        d = self._remove_from_load_balancer()
 
-        clock.pump([self.retry_interval] * LB_MAX_RETRIES)
+        self.clock.pump([self.retry_interval] * LB_MAX_RETRIES)
         # failed?
         failure = self.failureResultOf(d, RequestError)
         self.assertEqual(failure.value.reason.value.code, 422)
@@ -711,12 +707,10 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
         self.treq.content.side_effect = lambda *a, **ka: succeed(
             json.dumps({'message': 'PENDING_UPDATE'}))
-        clock = Clock()
 
-        d = remove_from_load_balancer(
-            self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
+        d = self._remove_from_load_balancer()
 
-        clock.pump([self.retry_interval] * 6)
+        self.clock.pump([self.retry_interval] * 6)
         self.successResultOf(d)
         self.log.msg.assert_has_calls(
             [mock.call('Got unexpected LB status {status} while {msg}: {error}',
