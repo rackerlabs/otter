@@ -844,7 +844,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
                                           cloudServersOpenStack,
                                           region)
 
-    (server_id, loadbalancer_details) = instance_details
+    server_id, loadbalancer_details = instance_details
 
     node_info = itertools.chain(
         *[[(loadbalancer_id, node['id']) for node in node_details['nodes']]
