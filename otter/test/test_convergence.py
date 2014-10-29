@@ -245,7 +245,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
 
         self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
 
-    def test_draining_state_removed_if_connections_None_and_timeout_expired(self):
+    def test_draining_state_remains_if_connections_None_and_not_yet_timeout(self):
         """
         Nodes in draining state will be removed when the timeout expires if
         the number of active connections are not provided
@@ -256,6 +256,20 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                     config=LBConfig(port=80, condition=NodeCondition.DRAINING),
                     drained_at=0.0)],
             5)
+
+        self.assertEqual(result, [])
+
+    def test_draining_state_removed_if_connections_None_and_timeout_expired(self):
+        """
+        Nodes in draining state will be removed when the timeout expires if
+        the number of active connections are not provided
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0)],
+            15)
 
         self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
 
