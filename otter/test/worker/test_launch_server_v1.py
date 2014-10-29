@@ -513,7 +513,10 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         Helper function to call :func:`remove_from_load_balancer`.
         """
-        return remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+        lb_config = {"loadBalancerId": 12345}
+        d = remove_from_load_balancer(
+            self.log, 'http://url/', 'my-auth-token', lb_config, 1)
+        return d
 
     def test_remove_from_load_balancer(self):
         """
