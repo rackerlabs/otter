@@ -509,6 +509,12 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
                           new=mock_treq(code=200, content='{"message": "bad"}', method='delete'))
         patch(self, 'otter.util.http.treq', new=self.treq)
 
+    def _remove_from_load_balancer(self):
+        """
+        Helper function to call :func:`remove_from_load_balancer`.
+        """
+        return remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
     def test_remove_from_load_balancer(self):
         """
         remove_from_load_balancer makes a DELETE request against the
@@ -517,7 +523,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.treq.delete.return_value = succeed(mock.Mock(code=200))
         self.treq.content.return_value = succeed('')
 
-        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+        d = self._remove_from_load_balancer()
 
         self.assertEqual(self.successResultOf(d), None)
         self.treq.delete.assert_called_once_with(
@@ -533,7 +539,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
         self.treq.content.return_value = succeed(json.dumps({'message': 'LB does not exist'}))
 
-        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+        d = self._remove_from_load_balancer()
 
         self.assertEqual(self.successResultOf(d), None)
 
@@ -548,7 +554,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         body = {"message": message, "code": 422}
         mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
 
-        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+        d = self._remove_from_load_balancer()
 
         self.assertEqual(self.successResultOf(d), None)
         self.log.msg.assert_any_call(
@@ -567,7 +573,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         body = {"message": message, "code": 422}
         mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
 
-        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+        d = self._remove_from_load_balancer()
 
         self.assertEqual(self.successResultOf(d), None)
         self.log.msg.assert_any_call(
@@ -587,7 +593,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         }
         mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
 
-        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+        d = self._remove_from_load_balancer()
 
         self.failureResultOf(d, RequestError)
         self.log.msg.assert_any_call(
