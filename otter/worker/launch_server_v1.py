@@ -490,7 +490,8 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
     :param str endpoint: Load balancer endpoint URI.
     :param str auth_token: Keystone Auth Token.
     :param list lb_configs: List of lb_config dictionaries.
-    :param dict server: Server dict of the server to add.
+    :param dict server: Server dict of the server to add, as per server details
+        response from Nova.
     :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
     :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
