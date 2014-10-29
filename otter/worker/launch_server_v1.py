@@ -768,7 +768,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     return d
 
 
-def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
+def remove_from_load_balancer(log, endpoint, auth_token, lb_config,
                               node_id, clock=None):
     """
     Remove a node from a load balancer.
@@ -781,6 +781,7 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
     :returns: A Deferred that fires with None if the operation completed successfully,
         or errbacks with an RequestError.
     """
+    loadbalancer_id = lb_config["loadBalancerId"]
     lb_log = log.bind(loadbalancer_id=loadbalancer_id, node_id=node_id)
     # TODO: Will remove this once LB ERROR state is fixed and it is working fine
     lb_log.msg('Removing from load balancer')
