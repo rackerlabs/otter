@@ -251,8 +251,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
         # Nothing should be done to these, because the timeout has not expired
         # and there are still active connections
         in_drain = [node for node in draining
-                    if (node.connections > 0 and
-                        now - node.drained_at < timeout)]
+                    if (node.connections is not None and node.connections > 0
+                        and now - node.drained_at < timeout)]
 
     removes = [RemoveFromLoadBalancer(lb_id=node.lb_id, node_id=node.node_id)
                for node in (set(nodes) - set(to_drain) - set(in_drain))]
