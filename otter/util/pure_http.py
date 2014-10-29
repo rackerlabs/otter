@@ -88,13 +88,14 @@ def add_authentication(auth_headers_effect, request_func):
     :func:`authenticate_request`.
     """
     @wraps(request_func)
-    def request(method, url, headers=None, data=None):
+    def request(*args, **kwargs):
+        headers = kwargs.pop('headers')
         headers = headers if headers is not None else {}
 
         def got_auth_headers(auth_headers):
-            return request_func(method, url,
+            return request_func(*args,
                                 headers=merge(headers, auth_headers),
-                                data=data)
+                                **kwargs)
         return auth_headers_effect.on(got_auth_headers)
     return request
 
@@ -143,11 +144,13 @@ def add_json_request_data(request_func):
     """
     Decorate a request function so that it JSON-serializes the request body.
     """
-    request = lambda method, url, data=None, headers=None: (
-        request_func(method, url,
-                     data=json.dumps(data) if data is not None else None,
-                     headers=headers))
-    return wraps(request_func)(request)
+    @wraps(request_func)
+    def request(*args, **kwargs):
+        data = kwargs.pop('data')
+        return request_func(*args,
+                            data=json.dumps(data) if data is not None else None,
+                            **kwargs)
+    return request
 
 
 def add_bind_root(root, request_func):
