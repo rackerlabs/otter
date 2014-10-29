@@ -481,7 +481,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
     return d.addCallback(treq.json_content).addCallback(when_done)
 
 
-def add_to_load_balancers(log, endpoint, auth_token, lb_configs, ip_address, undo):
+def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
     """
     Add the specified IP to mulitple load balancer based on the configs in
     lb_configs.
@@ -490,12 +490,13 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, ip_address, und
     :param str endpoint: Load balancer endpoint URI.
     :param str auth_token: Keystone Auth Token.
     :param list lb_configs: List of lb_config dictionaries.
-    :param str ip_address: IP address of the node to add to the load balancer.
+    :param dict server: Server dict of the server to add.
     :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
     :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
         Add Node response.
     """
+    ip_address = private_ip_addresses(server)[0]
     lb_iter = iter(lb_configs)
 
     results = []
@@ -737,9 +738,8 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
 
     def add_lb(server):
         if lb_config:
-            ip_address = private_ip_addresses(server)[0]
             lbd = add_to_load_balancers(
-                ilog[0], lb_endpoint, auth_token, lb_config, ip_address, undo)
+                ilog[0], lb_endpoint, auth_token, lb_config, server, undo)
             lbd.addCallback(lambda lb_response: (server, lb_response))
             return lbd
 
