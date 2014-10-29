@@ -1,6 +1,9 @@
 """
 Purely functional HTTP client.
 """
+
+import json
+
 from functools import partial, wraps
 
 from effect import Effect
@@ -42,26 +45,6 @@ def request(method, url, **kwargs):
     return Effect(Request(method=method, url=url, **kwargs))
 
 
-def auth_request(request, auth_headers_effect):
-    """
-    Authenticates a request, using an effect to produce authentication
-    headers.
-
-    :param Request request: the request.
-    :param Effect auth_headers_effect: An Effect that results in auth-related
-        headers as a dict.
-    :return: An :obj:`Effect` of :obj:`Request`, updated with the auth headers.
-    """
-    def got_auth_headers(auth_headers):
-        return Effect(Request(
-            method=request.method,
-            url=request.url,
-            headers=merge(request.headers if request.headers else {},
-                          auth_headers),
-            data=request.data))
-    return auth_headers_effect.on(got_auth_headers)
-
-
 def invalidate_auth_on_error(reauth_codes, invalidate_auth, result):
     """
     Invalidates an auth cache if an HTTP response is an auth-related error.
@@ -69,7 +52,7 @@ def invalidate_auth_on_error(reauth_codes, invalidate_auth, result):
     :param tuple reauth_codes: integer HTTP codes which should cause an auth
         invalidation.
     :param invalidate_auth: An Effect that invalidates any cached auth
-        information that :func:`auth_request`'s' ``auth_headers_effect``
+        information that :func:`authenticate_request`'s' ``auth_headers_effect``
         provides.
     :param result: The result to inspect, from an Effect of :obj:`Request`.
     """
@@ -80,26 +63,6 @@ def invalidate_auth_on_error(reauth_codes, invalidate_auth, result):
         return result
 
 
-def request_with_auth(request,
-                      get_auth_headers,
-                      invalidate_auth,
-                      reauth_codes=(401, 403)):
-    """
-    Get a request that will perform book-keeping on cached auth info.
-
-    This composes the :func:`auth_request` and :func:`invalidate_auth_on_error`
-    functions.
-
-    :param request: As per :func:`auth_request`
-    :param auth_headers: As per :func:`auth_request`
-    :param invalidate_auth: As per :func:`invalidate_auth_on_error`
-    :param reauth_codes: As per :func:`invalidate_auth_on_error`.
-    """
-    eff = auth_request(request, get_auth_headers)
-    return eff.on(success=partial(invalidate_auth_on_error, reauth_codes,
-                                  invalidate_auth))
-
-
 def check_status(success_codes, result):
     """Ensure that the response code is acceptable. If not, raise APIError."""
     response, content = result
@@ -108,13 +71,89 @@ def check_status(success_codes, result):
     return result
 
 
-def bind_root(request_func, root):
+# Request function decorators! These make up the most common API exposed by this
+# module.
+
+# The request_func is the last argument of each function, for two reasons
+# 1. allows them to be used as decorators with @partial(foo, extra_args)
+# 2. it makes big nested constructs of wrappers cleaner, e.g.
+#       add_auth_invalidation(
+#           invalidate_effect, reauth_codes,
+#           add_authentication(auth_headers_effect, request))
+#    because the arguments for a function are closer to that function's name.
+
+def add_authentication(auth_headers_effect, request_func):
     """
-    Given a request function (similar to :func:`request`), return a new
-    request function that only takes a relative path instead of an absolute
-    URL.
+    Decorate a request function with authentication as per
+    :func:`authenticate_request`.
     """
     @wraps(request_func)
-    def request(method, url, *args, **kwargs):
-        return request_func(method, append_segments(root, url), *args, **kwargs)
+    def request(method, url, headers=None, data=None):
+        headers = headers if headers is not None else {}
+
+        def got_auth_headers(auth_headers):
+            return request_func(method, url,
+                                headers=merge(headers, auth_headers),
+                                data=data)
+        return auth_headers_effect.on(got_auth_headers)
     return request
+
+
+def add_auth_invalidation(invalidate_effect, reauth_codes, request_func):
+    """
+    Decorate a request function with auth invalidation as per
+    :func:`invalidate_auth_on_error`.
+    """
+    request = lambda *args, **kwargs: request_func(*args, **kwargs).on(
+        partial(invalidate_auth_on_error, reauth_codes, invalidate_effect))
+    return wraps(request_func)(request)
+
+
+def add_error_handling(success_codes, request_func):
+    """
+    Decorate a request function with response-code checking as per
+    :func:`check_status`.
+    """
+    request = lambda *args, **kwargs: request_func(*args, **kwargs).on(
+        partial(check_status, success_codes))
+    return wraps(request_func)(request)
+
+
+def add_content_only(request_func):
+    """
+    Decorate a request function so that it only returns content, not response
+    object.
+
+    This should be the last decorator added, since it changes the shape of
+    the result object from a (response, content) to a single string of content.
+    """
+    request = lambda *args, **kwargs: request_func(*args, **kwargs).on(
+        lambda r: r[1])
+    return wraps(request_func)(request)
+
+
+def add_json_response(request_func):
+    """Decorate a request function so that it parses JSON responses."""
+    request = lambda *args, **kwargs: request_func(*args, **kwargs).on(
+        lambda r: (r[0], json.loads(r[1])))
+    return wraps(request_func)(request)
+
+
+def add_json_request_data(request_func):
+    """
+    Decorate a request function so that it JSON-serializes the request body.
+    """
+    request = lambda method, url, data=None, headers=None: (
+        request_func(method, url,
+                     data=json.dumps(data) if data is not None else None,
+                     headers=headers))
+    return wraps(request_func)(request)
+
+
+def add_bind_root(root, request_func):
+    """
+    Decorate a request function so that it's URL is appended to a common root.
+    """
+    request = lambda method, url, *args, **kwargs: (
+        request_func(method, append_segments(root, url), *args, **kwargs))
+    return wraps(request_func)(request)
