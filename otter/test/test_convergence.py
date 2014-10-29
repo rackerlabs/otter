@@ -247,8 +247,8 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
 
     def test_draining_state_remains_if_connections_None_and_not_yet_timeout(self):
         """
-        Nodes in draining state will be removed when the timeout expires if
-        the number of active connections are not provided
+        Nodes in draining state will be ignored if timeout has not yet expired
+        and the number of active connections are not provided
         """
         result = _remove_from_lb_with_draining(
             10,
