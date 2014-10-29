@@ -14,7 +14,7 @@ class CreateScalingGroupTest(AutoscaleFixture):
     Verify create group.
     """
 
-    def _create_scaling_group(self):
+    def _create_scaling_group(self, block_device_mapping=None):
         """
         Create a scaling group with all the fields.
         """
@@ -37,6 +37,7 @@ class CreateScalingGroupTest(AutoscaleFixture):
             'cooldown': 0,
             'type': 'webhook'
         }]
+        self.lc_block_device_mapping = block_device_mapping
 
         self.create_resp = self.autoscale_client.create_scaling_group(
             gc_name=self.gc_name,
@@ -51,6 +52,7 @@ class CreateScalingGroupTest(AutoscaleFixture):
             lc_metadata=self.lc_metadata,
             lc_disk_config=self.lc_disk_config,
             lc_networks=self.lc_networks,
+            lc_block_device_mapping=block_device_mapping,
             lc_load_balancers=self.lc_load_balancers,
             sp_list=self.sp_list,
             network_type='public')
@@ -162,6 +164,13 @@ class CreateScalingGroupTest(AutoscaleFixture):
             msg='Scaling policies of the scaling group did not match'
             ' for group {0}'.format(self.scaling_group.id))
 
+        if self.lc_block_device_mapping is not None:
+            self.assertEqual(
+                self.lc_block_device_mapping,
+                self.scaling_group.launchConfiguration.server.block_device_mapping,
+                msg=('Block device mapping within the launch config did not '
+                     'match group {0}'.format(self.scaling_group.id)))
+
     def _test_created_scaling_group_state_fields(self):
         """
         Verify the state on the group is as expected.
@@ -184,16 +193,17 @@ class CreateScalingGroupTest(AutoscaleFixture):
         Create a scaling group with an empty image ID, and test that the
         response is successful and that all the launch config fields match
         what was created.
-
-        TODO: once block_device_mapping is validated (because image ID should
-        only be empty if ``block_device_mapping`` is specified), the create
-        scaling group function should take ``block_device_mapping`` (the
-        autoscale and nova fixtures should be updated), and
-        :func:`_test_created_scaling_group_launchconfig_scalingpolicy_fields`
-        should test whether ``block_device_mapping`` matches.
         """
+        device = {
+            "boot_index": "0",
+            "uuid": self.lc_image_ref,
+            "volume_size": "100",
+            "source_type": "image",
+            "destination_type": "volume",
+            "delete_on_termination": False
+        }
         self.lc_image_ref = ""
-        self._create_scaling_group()
+        self._create_scaling_group(block_device_mapping=[device])
         self._test_create_scaling_group_response()
         self._test_created_scaling_group_launchconfig_scalingpolicy_fields()
 
@@ -202,16 +212,17 @@ class CreateScalingGroupTest(AutoscaleFixture):
         Create a scaling group with a None image ID, and test that the
         response is successful and that all the launch config fields match
         what was created.
-
-        TODO: once block_device_mapping is validated (because image ID should
-        only be empty if ``block_device_mapping`` is specified), the create
-        scaling group function should take ``block_device_mapping`` (the
-        autoscale and nova fixtures should be updated), and
-        :func:`_test_created_scaling_group_launchconfig_scalingpolicy_fields`
-        should test whether ``block_device_mapping`` matches.
         """
+        device = {
+            "boot_index": "0",
+            "uuid": self.lc_image_ref,
+            "volume_size": "100",
+            "source_type": "image",
+            "destination_type": "volume",
+            "delete_on_termination": False
+        }
         self.lc_image_ref = null
-        self._create_scaling_group()
+        self._create_scaling_group(block_device_mapping=[device])
         self._test_create_scaling_group_response()
         self._test_created_scaling_group_launchconfig_scalingpolicy_fields()
 
@@ -220,15 +231,16 @@ class CreateScalingGroupTest(AutoscaleFixture):
         Create a scaling group with no image ID, and test that the
         response is successful and that all the launch config fields match
         what was created.
-
-        TODO: once block_device_mapping is validated (because image ID should
-        only be empty if ``block_device_mapping`` is specified), the create
-        scaling group function should take ``block_device_mapping`` (the
-        autoscale and nova fixtures should be updated), and
-        :func:`_test_created_scaling_group_launchconfig_scalingpolicy_fields`
-        should test whether ``block_device_mapping`` matches.
         """
+        device = {
+            "boot_index": "0",
+            "uuid": self.lc_image_ref,
+            "volume_size": "100",
+            "source_type": "image",
+            "destination_type": "volume",
+            "delete_on_termination": False
+        }
         self.lc_image_ref = None
-        self._create_scaling_group()
+        self._create_scaling_group(block_device_mapping=[device])
         self._test_create_scaling_group_response()
         self._test_created_scaling_group_launchconfig_scalingpolicy_fields()

@@ -67,8 +67,94 @@ server_metadata = {
 }
 
 # nova server payload
-server = {
+
+_bfv_server = {
     "type": "object",
+    "properties": {
+        "imageRef": {
+            "type": ["string", "null"],
+            "maxLength": 0
+        },
+        "block_device_mapping": {
+            "type": "array",
+            "items": {"type": "object"},
+            "required": True
+        }
+    }
+}
+
+_non_bfv_server = {
+    "type": "object",
+    "properties": {
+        "imageRef": {
+            "type": "string",
+            "pattern": "^\S+$",  # must contain non-whitespace
+            "required": True
+        }
+    }
+}
+
+_rcv3_lb = {
+    "type": "object",
+    "description": (
+        "One load balancer all new servers should be "
+        "added to."),
+    "properties": {
+        "loadBalancerId": {
+            "type": "string",
+            "pattern": "^\S+$",  # must contain non-whitespace
+            "required": True,
+            "description": (
+                "The ID of the load balancer to which new "
+                "servers will be added."),
+        },
+        "type": {
+            "type": "string",
+            "description": (
+                "What type of a load balancer is in use"),
+            "required": True,
+            "oneOf": ["RackConnectV3"]
+        }
+    },
+    "additionalProperties": False
+}
+
+_clb_lb = {
+    "type": "object",
+    "description": (
+        "One load balancer all new servers should be "
+        "added to."),
+    "properties": {
+        # load balancer id's are NOT uuid's.  just an int.
+        "loadBalancerId": {
+            "type": "integer",
+            "description": (
+                "The ID of the load balancer to which new "
+                "servers will be added."),
+            "required": True
+        },
+        "port": {
+            "type": "integer",
+            "description": (
+                "The port number of the service (on the "
+                "new servers) to load balance on for this "
+                "particular load balancer."),
+            "required": True
+        },
+        "type": {
+            "type": "string",
+            "description": (
+                "What type of a load balancer is in use"),
+            "required": False,
+            "oneOf": ["CloudLoadBalancer"]
+        }
+    },
+    "additionalProperties": False
+}
+
+
+server = {
+    "type": [_bfv_server, _non_bfv_server],
     # The schema for the create server attributes should come
     # from Nova, or Nova should provide some no-op method to
     # validate creating a server. Autoscale should not
@@ -82,14 +168,16 @@ server = {
                     "all new servers (including the name attribute)."),
     "properties": {
         "imageRef": {
-            "type": ["string", "null"],
-            "pattern": "^\S*$"  # must contain non-whitespace, if it's there
         },
         "flavorRef": {
             "type": "string",
             "required": True,
             "minLength": 1,
             "pattern": "^\S+$"  # must contain non-whitespace
+        },
+        "block_device_mapping": {
+            "type": "array",
+            "items": {"type": "object"}
         },
         "personality": {
             "type": "array",
@@ -147,29 +235,7 @@ launch_server = {
                     "maxItems": 5,
                     "uniqueItems": True,
                     "items": {
-                        "type": "object",
-                        "description": (
-                            "One load balancer all new servers should be "
-                            "added to."),
-                        "properties": {
-                            # load balancer id's are NOT uuid's.  just an int.
-                            "loadBalancerId": {
-                                "type": "integer",
-                                "description": (
-                                    "The ID of the load balancer to which new "
-                                    "servers will be added."),
-                                "required": True
-                            },
-                            "port": {
-                                "type": "integer",
-                                "description": (
-                                    "The port number of the service (on the "
-                                    "new servers) to load balance on for this "
-                                    "particular load balancer."),
-                                "required": True
-                            }
-                        },
-                        "additionalProperties": False
+                        "type": [_clb_lb, _rcv3_lb]
                     }
                 },
 
