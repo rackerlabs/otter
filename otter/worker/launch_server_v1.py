@@ -846,9 +846,9 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
 
     server_id, loadbalancer_details = instance_details
 
-    node_info = itertools.chain(
-        *[[(loadbalancer_id, node['id']) for node in node_details['nodes']]
-          for (loadbalancer_id, node_details) in loadbalancer_details])
+    node_info = itertools.chain.from_iterable(
+        [[(loadbalancer_id, node['id']) for node in node_details['nodes']]
+         for (loadbalancer_id, node_details) in loadbalancer_details])
 
     d = gatherResults(
         [remove_from_load_balancer(log, lb_endpoint, auth_token, loadbalancer_id, node_id)
