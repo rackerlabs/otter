@@ -2,16 +2,15 @@
 
 import json
 
-from effect import Effect, ConstantIntent
+from effect import Effect
 from effect.testing import StubIntent, resolve_stubs
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.task import Clock
 from twisted.internet.defer import succeed
 
-from otter.test.utils import StubTreq2, patch, iMock
-from otter.auth import IAuthenticator
-from otter.util.http import headers, APIError
+from otter.test.utils import StubTreq2, patch
+from otter.util.http import APIError
 from otter.convergence import (
     _converge_lb_state,
     get_all_server_details, get_scaling_group_servers,
@@ -29,10 +28,15 @@ class Sequence(object):
     An Effect intent that returns a different result each time it's performed.
     """
     def __init__(self, responses):
+        """
+        :param list responses: Responses to return in sequence. Instances of
+            exception will be raised.
+        """
         self.responses = responses
         self._index = 0
 
     def perform_effect(self, dispatcher):
+        """Return or raise the next result in sequence."""
         index = self._index
         self._index += 1
         response = self.responses[index]

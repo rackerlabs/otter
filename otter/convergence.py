@@ -7,10 +7,7 @@ from __future__ import print_function
 from functools import partial
 from urllib import urlencode
 
-from effect import Effect
 from effect.retry import retry
-
-from twisted.internet import defer
 
 from characteristic import attributes, Attribute
 from pyrsistent import pbag, freeze, s, pset
@@ -21,8 +18,7 @@ from twisted.python.constants import Names, NamedConstant
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
 
-from otter.log import log as default_log
-from otter.util.http import append_segments, check_success, headers
+from otter.util.http import append_segments
 from otter.util.fp import partition_bool, partition_groups
 from otter.util.retry import retry_times, exponential_backoff_interval, should_retry_effect
 
@@ -53,7 +49,6 @@ def get_all_server_details(request_func, limit=100, clock=None):
     NOTE: This really screams to be a independent effcloud-type API
     """
     url = append_segments('servers', 'detail')
-    all_servers = []
 
     def get_server_details(marker):
         # sort based on query name to make the tests predictable
@@ -61,8 +56,6 @@ def get_all_server_details(request_func, limit=100, clock=None):
         if marker is not None:
             query.update({'marker': marker})
         urlparams = sorted(query.items(), key=lambda e: e[0])
-        def raise_(e):
-            raise e
         eff = retry(
             request_func('GET', '{}?{}'.format(url, urlencode(urlparams))),
             partial(should_retry_effect,
