@@ -872,13 +872,14 @@ class RequestConversionTests(SynchronousTestCase):
             node_id="larry")
         self.assertRaises(NotImplementedError, step.as_request)
 
-    def test_add_nodes_to_rcv3_load_balancers(self):
+    def _generic_bulk_rcv3_step_test(self, step_class, expected_method):
         """
-        :obj:`AddNodesToRCv3LoadBalancers.as_request` produces a request for
-        adding any combination of nodes to any combination of RCv3 load
-        balancers.
+        A generic test for bulk RCv3 steps.
+
+        :param step_class: The step class under test.
+        :param str method: The expected HTTP method of the request.
         """
-        step = AddNodesToRCv3LoadBalancers(lb_node_pairs=pset([
+        step = step_class(lb_node_pairs=pset([
             ("lb-1", "node-a"),
             ("lb-1", "node-b"),
             ("lb-1", "node-c"),
@@ -890,7 +891,7 @@ class RequestConversionTests(SynchronousTestCase):
         ]))
         request = step.as_request()
         self.assertEqual(request.service, ServiceType.RACKCONNECT_V3)
-        self.assertEqual(request.method, "POST")
+        self.assertEqual(request.method, expected_method)
         self.assertEqual(request.path, "load_balancer_pools/nodes")
         self.assertEqual(request.headers, None)
 
@@ -912,9 +913,17 @@ class RequestConversionTests(SynchronousTestCase):
             {'load_balancer_pool': {'id': 'lb-3'},
              'cloud_server': {'id': 'node-d'}}
         ]
-        request_data = sorted(request.data, key=lambda e: (e["load_balancer_pool"]["id"],
-                                                      e["cloud_server"]["id"]))
+        key_fn = lambda e: (e["load_balancer_pool"]["id"], e["cloud_server"]["id"])
+        request_data = sorted(request.data, key=key_fn)
         self.assertEqual(request_data, expected_data)
+
+    def test_add_nodes_to_rcv3_load_balancers(self):
+        """
+        :obj:`AddNodesToRCv3LoadBalancers.as_request` produces a request for
+        adding any combination of nodes to any combination of RCv3 load
+        balancers.
+        """
+        self._generic_bulk_rcv3_step_test(AddNodesToRCv3LoadBalancers, "POST")
 
     def test_remove_nodes_from_rcv3_load_balancers(self):
         """
@@ -922,43 +931,8 @@ class RequestConversionTests(SynchronousTestCase):
         for removing any combination of nodes from any combination of RCv3
         load balancers.
         """
-        step = RemoveNodesFromRCv3LoadBalancers(lb_node_pairs=pset([
-            ("lb-1", "node-a"),
-            ("lb-1", "node-b"),
-            ("lb-1", "node-c"),
-            ("lb-1", "node-d"),
-            ("lb-2", "node-a"),
-            ("lb-2", "node-b"),
-            ("lb-3", "node-c"),
-            ("lb-3", "node-d")
-        ]))
-        request = step.as_request()
-        self.assertEqual(request.service, ServiceType.RACKCONNECT_V3)
-        self.assertEqual(request.method, "DELETE")
-        self.assertEqual(request.path, "load_balancer_pools/nodes")
-        self.assertEqual(request.headers, None)
-
-        expected_data = [
-            {'load_balancer_pool': {'id': 'lb-1'},
-             'cloud_server': {'id': 'node-a'}},
-            {'load_balancer_pool': {'id': 'lb-1'},
-             'cloud_server': {'id': 'node-b'}},
-            {'load_balancer_pool': {'id': 'lb-1'},
-             'cloud_server': {'id': 'node-c'}},
-            {'load_balancer_pool': {'id': 'lb-1'},
-             'cloud_server': {'id': 'node-d'}},
-            {'load_balancer_pool': {'id': 'lb-2'},
-             'cloud_server': {'id': 'node-a'}},
-            {'load_balancer_pool': {'id': 'lb-2'},
-             'cloud_server': {'id': 'node-b'}},
-            {'load_balancer_pool': {'id': 'lb-3'},
-             'cloud_server': {'id': 'node-c'}},
-            {'load_balancer_pool': {'id': 'lb-3'},
-             'cloud_server': {'id': 'node-d'}}
-        ]
-        request_data = sorted(request.data, key=lambda e: (e["load_balancer_pool"]["id"],
-                                                      e["cloud_server"]["id"]))
-        self.assertEqual(request_data, expected_data)
+        self._generic_bulk_rcv3_step_test(
+            RemoveNodesFromRCv3LoadBalancers, "DELETE")
 
 
 class OptimizerTests(SynchronousTestCase):
