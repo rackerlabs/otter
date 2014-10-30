@@ -1,7 +1,6 @@
 """
 Integration point for HTTP clients in otter.
 """
-import json
 from functools import partial, wraps
 
 from effect import Effect, FuncIntent
@@ -30,7 +29,6 @@ def get_request_func(authenticator, tenant_id, log):
     auth_headers = Effect(FuncIntent(impure_auth)).on(success=headers)
     invalidate = Effect(FuncIntent(impure_invalidate))
     default_log = log
-
 
     def otter_request(method, url, headers=None, data=None, log=default_log,
                       reauth_codes=(401, 403),
