@@ -872,6 +872,50 @@ class RequestConversionTests(SynchronousTestCase):
             node_id="larry")
         self.assertRaises(NotImplementedError, step.as_request)
 
+    def test_add_nodes_to_rcv3_load_balancers(self):
+        """
+        :obj:`AddNodesToRCv3LoadBalancers.as_request` produces a request for
+        adding any combination of nodes to any combination of RCv3 load
+        balancers.
+        """
+        step = AddNodesToRCv3LoadBalancers(lb_node_pairs=pset([
+            ("lb-1", "node-a"),
+            ("lb-1", "node-b"),
+            ("lb-1", "node-c"),
+            ("lb-1", "node-d"),
+            ("lb-2", "node-a"),
+            ("lb-2", "node-b"),
+            ("lb-3", "node-c"),
+            ("lb-3", "node-d")
+        ]))
+        request = step.as_request()
+        self.assertEqual(request.service, ServiceType.RACKCONNECT_V3)
+        self.assertEqual(request.method, "POST")
+        self.assertEqual(request.path, "load_balancer_pools/nodes")
+        self.assertEqual(request.headers, None)
+
+        expected_data = [
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-a'}},
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-b'}},
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-c'}},
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-d'}},
+            {'load_balancer_pool': {'id': 'lb-2'},
+             'cloud_server': {'id': 'node-a'}},
+            {'load_balancer_pool': {'id': 'lb-2'},
+             'cloud_server': {'id': 'node-b'}},
+            {'load_balancer_pool': {'id': 'lb-3'},
+             'cloud_server': {'id': 'node-c'}},
+            {'load_balancer_pool': {'id': 'lb-3'},
+             'cloud_server': {'id': 'node-d'}}
+        ]
+        request_data = sorted(request.data, key=lambda e: (e["load_balancer_pool"]["id"],
+                                                      e["cloud_server"]["id"]))
+        self.assertEqual(request_data, expected_data)
+
 
 class OptimizerTests(SynchronousTestCase):
     """Tests for :func:`optimize_steps`."""
