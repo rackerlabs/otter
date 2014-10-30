@@ -9,7 +9,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
 
 from otter.util.http import headers, APIError
-from otter.http import get_request_func, bind_service
+from otter.http import get_request_func, add_bind_service
 from otter.test.utils import stub_pure_response
 from otter.util.pure_http import Request
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
@@ -93,7 +93,7 @@ class GetRequestFuncTests(SynchronousTestCase):
 
 
 class BindServiceTests(SynchronousTestCase):
-    """Tests for :func:`bind_service`."""
+    """Tests for :func:`add_bind_service`."""
 
     def setUp(self):
         """Save some common parameters."""
@@ -101,13 +101,14 @@ class BindServiceTests(SynchronousTestCase):
         self.authenticator = FakeCachingAuthenticator()
         self.request = lambda method, url, headers=None, data=None: (method, url, headers, data)
 
-    def test_bind_service(self):
+    def test_add_bind_service(self):
         """
         URL paths passed to the request function are appended to the
         endpoint of the service in the specified region for the tenant.
         """
-        request = bind_service(self.request, '123', self.authenticator,
-                               'cloudServersOpenStack', 'DFW', self.log)
+        request = add_bind_service('123', self.authenticator,
+                                   'cloudServersOpenStack', 'DFW', self.log,
+                                   self.request)
         self.assertEqual(
             self.successResultOf(perform(None, request('get', 'foo'))),
             ('get', 'http://dfw.openstack/foo', None, None))
