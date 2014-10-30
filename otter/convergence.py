@@ -560,6 +560,9 @@ def _rackconnect_bulk_request(lb_node_pairs, method):
         connections to be made or broken.
     :param str method: The method of the request ``"DELETE"`` or
         ``"POST"``.
+    :return: A bulk RackConnect v3.0 request for the given load balancer,
+        node pairs.
+    :rtype: :class:`Request`
     """
     return Request(
         service=ServiceType.RACKCONNECT_V3,
