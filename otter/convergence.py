@@ -2,10 +2,13 @@
 Convergence.
 """
 
+from __future__ import print_function
+
 from functools import partial
 from urllib import urlencode
 
-import treq
+from effect import Effect
+from effect.retry import retry
 
 from twisted.internet import defer
 
@@ -21,9 +24,7 @@ from toolz.functoolz import compose
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
-from otter.util.retry import retry, retry_times, exponential_backoff_interval
-# TODO: I hate including this!
-from otter.worker.launch_server_v1 import public_endpoint_url
+from otter.util.retry import retry_times, exponential_backoff_interval, should_retry_effect
 
 
 class NodeCondition(Names):
@@ -42,45 +43,40 @@ class NodeType(Names):
                                  # primary node fails.
 
 
-@defer.inlineCallbacks
-def get_all_server_details(tenant_id, authenticator, service_name, region,
-                           limit=100, clock=None, _treq=None):
+def get_all_server_details(request_func, limit=100, clock=None):
     """
-    Return all servers of a tenant
-    TODO: service_name is possibly internal to this function but I don't want to pass config here?
-    NOTE: This really screams to be a independent txcloud-type API
+    Return all servers of a tenant.
+
+    :param request_func: a request function.
+    :param limit: number of servers to fetch *per batch*.
+
+    NOTE: This really screams to be a independent effcloud-type API
     """
-    token, catalog = yield authenticator.authenticate_tenant(tenant_id, log=default_log)
-    endpoint = public_endpoint_url(catalog, service_name, region)
-    url = append_segments(endpoint, 'servers', 'detail')
-    query = {'limit': limit}
+    url = append_segments('servers', 'detail')
     all_servers = []
 
-    if clock is None:  # pragma: no cover
-        from twisted.internet import reactor as clock
-
-    if _treq is None:  # pragma: no cover
-        _treq = treq
-
-    def fetch(url, headers):
-        d = _treq.get(url, headers=headers)
-        d.addCallback(check_success, [200], _treq=_treq)
-        d.addCallback(_treq.json_content)
-        return d
-
-    while True:
+    def get_server_details(marker):
         # sort based on query name to make the tests predictable
+        query = {'limit': limit}
+        if marker is not None:
+            query.update({'marker': marker})
         urlparams = sorted(query.items(), key=lambda e: e[0])
-        d = retry(partial(fetch, '{}?{}'.format(url, urlencode(urlparams)), headers(token)),
-                  can_retry=retry_times(5),
-                  next_interval=exponential_backoff_interval(2), clock=clock)
-        servers = (yield d)['servers']
-        all_servers.extend(servers)
-        if len(servers) < limit:
-            break
-        query.update({'marker': servers[-1]['id']})
+        def raise_(e):
+            raise e
+        eff = retry(
+            request_func('GET', '{}?{}'.format(url, urlencode(urlparams))),
+            partial(should_retry_effect,
+                    retry_times(5), exponential_backoff_interval(2)))
+        return eff.on(continue_)
 
-    defer.returnValue(all_servers)
+    def continue_(response):
+        servers = response['servers']
+        if len(servers) < limit:
+            return servers
+        else:
+            more_eff = get_server_details(servers[-1]['id'])
+            return more_eff.on(lambda more_servers: servers + more_servers)
+    return get_server_details(None)
 
 
 def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
