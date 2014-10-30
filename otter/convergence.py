@@ -566,7 +566,7 @@ def _rackconnect_bulk_request(lb_node_pairs, method):
     """
     return Request(
         service=ServiceType.RACKCONNECT_V3,
-        method="POST",
+        method=method,
         path=append_segments("load_balancer_pools",
                              "nodes"),
         data=[{"cloud_server": {"id": node},
