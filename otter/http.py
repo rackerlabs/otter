@@ -7,7 +7,7 @@ from functools import partial, wraps
 from effect import Effect, FuncIntent
 
 from otter.util.pure_http import (
-    request, add_authentication, add_auth_invalidation, add_error_handling,
+    request, add_effectful_headers, add_effect_on_response, add_error_handling,
     add_bind_root, add_content_only, add_json_response, add_json_request_data)
 from otter.util.http import headers
 from otter.worker.launch_server_v1 import public_endpoint_url
@@ -58,10 +58,10 @@ def get_request_func(authenticator, tenant_id, log):
                 add_json_response(
                     add_error_handling(
                         success_codes,
-                        add_auth_invalidation(
+                        add_effect_on_response(
                             invalidate,
                             reauth_codes,
-                            add_authentication(auth_headers, request))))))
+                            add_effectful_headers(auth_headers, request))))))
         return request_(method, url, headers=headers, data=data, log=log)
     return otter_request
 
