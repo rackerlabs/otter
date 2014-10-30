@@ -64,11 +64,11 @@ def get_request_func(authenticator, tenant_id, log):
     return otter_request
 
 
-def bind_service(request_func, tenant_id, authenticator, service_name, region,
-                 log):
+def add_bind_service(tenant_id, authenticator, service_name,
+                     region, log, request_func):
     """
-    Bind a request function to a particular Rackspace/OpenStack service and
-    tenant.
+    Decorate a request function so requests are relative to a particular
+    Rackspace/OpenStack endpoint found in the tenant's catalog.
     """
     # We authenticate_tenant here, which is a duplicate to the one in the
     # underlying request_func, but the authenticators are always caching in
