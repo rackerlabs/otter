@@ -14,7 +14,7 @@ from otter.convergence import (
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
-    AddNodesToRCv3LoadBalancer, AddNodesToRCv3LoadBalancers,
+    AddNodesToRCv3LoadBalancers,
     RemoveNodeFromRCv3LoadBalancer, RemoveNodesFromRCv3LoadBalancers,
     SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
@@ -867,11 +867,6 @@ class RequestConversionTests(SynchronousTestCase):
         with CLB, can not be turned into requests directly. This is
         intentional: they are supposed to be optimized away.
         """
-        step = AddNodesToRCv3LoadBalancer(
-            lb_id="a_lb",
-            node_ids=["larry", "moe", "curly"])
-        self.assertRaises(NotImplementedError, step.as_request)
-
         step = RemoveNodeFromRCv3LoadBalancer(
             lb_id="a_lb",
             node_id="larry")
@@ -965,34 +960,6 @@ class OptimizerTests(SynchronousTestCase):
         self.assertEqual(
             optimize_steps(steps),
             steps)
-
-    def test_optimize_rcv3_adds(self):
-        """
-        RackConnect v3.0 steps for adding nodes to load balancers are merged.
-        """
-        unoptimized = pbag([
-            AddNodesToRCv3LoadBalancer(
-                lb_id="lb-1", node_ids=pset(["node-a", "node-b"])),
-            AddNodesToRCv3LoadBalancer(
-                lb_id="lb-1", node_ids=pset(["node-c", "node-d"])),
-            AddNodesToRCv3LoadBalancer(
-                lb_id="lb-2", node_ids=pset(["node-a", "node-b"])),
-            AddNodesToRCv3LoadBalancer(
-                lb_id="lb-3", node_ids=pset(["node-c", "node-d"])),
-        ])
-        optimized = pbag([
-            AddNodesToRCv3LoadBalancers(lb_node_pairs=pset([
-                ("lb-1", "node-a"),
-                ("lb-1", "node-b"),
-                ("lb-1", "node-c"),
-                ("lb-1", "node-d"),
-                ("lb-2", "node-a"),
-                ("lb-2", "node-b"),
-                ("lb-3", "node-c"),
-                ("lb-3", "node-d")
-            ]))
-        ])
-        self.assertEqual(optimize_steps(unoptimized), optimized)
 
     def test_optimize_rcv3_removes(self):
         """

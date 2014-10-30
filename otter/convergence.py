@@ -552,25 +552,6 @@ class ChangeLoadBalancerNode(object):
                   'weight': self.weight})
 
 
-@implementer(IStep)
-@attributes(['lb_id', 'node_ids'])
-class AddNodesToRCv3LoadBalancer(object):
-    """
-    Multiple nodes must be added to a RackConnect v3.0 load balancer.
-    """
-
-    def as_request(self):
-        """
-        Not actually implemented.
-
-        This step is never intended to be reified as a request; it
-        should always be optimized away.
-
-        :raises: NotImplementedError
-        """
-        raise NotImplementedError()
-
-
 def _rackconnect_bulk_request(lb_node_pairs, method):
     """
     Creates a bulk request for RackConnect v3.0 load balancers.
@@ -687,20 +668,6 @@ def _optimize_lb_adds(lb_add_steps):
                                         [step.address_configs for step in steps])))
         for lbid, steps in steps_by_lb.iteritems()
     ]
-
-
-@_optimizer(AddNodesToRCv3LoadBalancer)
-def _optimize_rcv3_lb_adds(steps):
-    """
-    Merge :obj:`AddNodesToRCv3LoadBalancer` objects to a single
-    :obj:`AddNodesToRCv3LoadBalancers` step.
-
-    :param steps: Iterable of :obj:`AddNodesToRCv3LoadBalancer`.
-    """
-    pairs = pset([(step.lb_id, node_id)
-                  for step in steps
-                  for node_id in step.node_ids])
-    return [AddNodesToRCv3LoadBalancers(lb_node_pairs=pairs)]
 
 
 @_optimizer(RemoveNodeFromRCv3LoadBalancer)
