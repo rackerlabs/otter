@@ -45,20 +45,21 @@ def request(method, url, **kwargs):
     return Effect(Request(method=method, url=url, **kwargs))
 
 
-def invalidate_auth_on_error(reauth_codes, invalidate_auth, result):
+def effect_on_response(codes, effect, result):
     """
-    Invalidates an auth cache if an HTTP response is an auth-related error.
+    Returns the specified effect if the resulting HTTP response code is
+    in ``codes``.
 
-    :param tuple reauth_codes: integer HTTP codes which should cause an auth
-        invalidation.
-    :param invalidate_auth: An Effect that invalidates any cached auth
-        information that :func:`authenticate_request`'s' ``auth_headers_effect``
-        provides.
+    Useful for invalidating auth caches if an HTTP response is an auth-related
+    error.
+
+    :param tuple codes: integer HTTP codes
+    :param effect: An Effect to perform when response code is in ``codes``.
     :param result: The result to inspect, from an Effect of :obj:`Request`.
     """
     response, content = result
-    if response.code in reauth_codes:
-        return invalidate_auth.on(success=lambda ignored: result)
+    if response.code in codes:
+        return effect.on(success=lambda ignored: result)
     else:
         return result
 
@@ -77,36 +78,37 @@ def check_status(success_codes, result):
 # The request_func is the last argument of each function, for two reasons
 # 1. allows them to be used as decorators with @partial(foo, extra_args)
 # 2. it makes big nested constructs of wrappers cleaner, e.g.
-#       add_auth_invalidation(
-#           invalidate_effect, reauth_codes,
-#           add_authentication(auth_headers_effect, request))
+#       add_effect_on_response(
+#           invalidate_auth_effect, codes,
+#           add_effectful_headers(auth_headers_effect, request))
 #    because the arguments for a function are closer to that function's name.
 
-def add_authentication(auth_headers_effect, request_func):
+def add_effectful_headers(headers_effect, request_func):
     """
-    Decorate a request function with authentication as per
-    :func:`authenticate_request`.
+    Decorate a request function with so that headers are added based on an
+    Effect. Useful for authentication.
     """
     @wraps(request_func)
     def request(*args, **kwargs):
         headers = kwargs.pop('headers')
         headers = headers if headers is not None else {}
 
-        def got_auth_headers(auth_headers):
+        def got_additional_headers(additional_headers):
             return request_func(*args,
-                                headers=merge(headers, auth_headers),
+                                headers=merge(headers, additional_headers),
                                 **kwargs)
-        return auth_headers_effect.on(got_auth_headers)
+        return headers_effect.on(got_additional_headers)
     return request
 
 
-def add_auth_invalidation(invalidate_effect, reauth_codes, request_func):
+def add_effect_on_response(effect, codes, request_func):
     """
-    Decorate a request function with auth invalidation as per
-    :func:`invalidate_auth_on_error`.
+    Decorate a request function so an effect is invoked upon receipt of
+    specific HTTP response codes as per :func:`effect_on_response`. Useful
+    for invalidating authentication caches.
     """
     request = lambda *args, **kwargs: request_func(*args, **kwargs).on(
-        partial(invalidate_auth_on_error, reauth_codes, invalidate_effect))
+        partial(effect_on_response, codes, effect))
     return wraps(request_func)(request)
 
 

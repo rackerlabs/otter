@@ -12,8 +12,8 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.pure_http import (
     Request, request, check_status,
-    invalidate_auth_on_error,
-    add_authentication, add_auth_invalidation, add_bind_root, add_content_only,
+    effect_on_response,
+    add_effectful_headers, add_effect_on_response, add_bind_root, add_content_only,
     add_error_handling, add_json_response, add_json_request_data)
 from otter.util.http import APIError
 from otter.test.utils import stub_pure_response, StubResponse, StubTreq
@@ -89,19 +89,19 @@ class CheckStatusTests(TestCase):
         self.assertRaises(APIError, resolve_stubs, eff)
 
 
-class AuthenticateRequestTests(TestCase):
+class AddEffectfulHeadersTest(TestCase):
     """
-    Tests for :func:`add_authentication`.
+    Tests for :func:`add_effectful_headers`.
     """
 
     def setUp(self):
         """Save auth effect."""
-        super(AuthenticateRequestTests, self).setUp()
+        super(AddEffectfulHeadersTest, self).setUp()
         self.auth_effect = Effect(Constant({"x-auth-token": "abc123"}))
 
-    def test_auth_headers(self):
-        """Auth headers from the ``auth_effect`` are inserted."""
-        request_ = add_authentication(self.auth_effect, request)
+    def test_add_headers(self):
+        """Headers from the provided effect are inserted."""
+        request_ = add_effectful_headers(self.auth_effect, request)
         eff = request_('m', 'u', headers={'default': 'headers'})
         self.assertEqual(
             resolve_stubs(eff).intent,
@@ -110,9 +110,9 @@ class AuthenticateRequestTests(TestCase):
                     headers={"x-auth-token": "abc123",
                              "default": "headers"}))
 
-    def test_auth_headers_win(self):
-        """When merging headers together, auth headers win."""
-        request_ = add_authentication(self.auth_effect, request)
+    def test_added_headers_win(self):
+        """When merging headers together, headers from the effect win."""
+        request_ = add_effectful_headers(self.auth_effect, request)
         eff = request_('m', 'u', headers={'x-auth-token': 'fooey'})
         self.assertEqual(
             resolve_stubs(eff).intent,
@@ -121,41 +121,41 @@ class AuthenticateRequestTests(TestCase):
                     headers={"x-auth-token": "abc123"}))
 
 
-class InvalidateAuthOnErrorTests(TestCase):
-    """Tests for :func:`invalidate_auth_on_error`."""
+class EffectOnResponseTests(TestCase):
+    """Tests for :func:`effect_on_response`."""
 
     def setUp(self):
         """Set up an invalidation request ."""
-        super(InvalidateAuthOnErrorTests, self).setUp()
+        super(EffectOnResponseTests, self).setUp()
         self.invalidations = []
         invalidate = lambda: self.invalidations.append(True)
         self.invalidate_effect = Effect(StubIntent(FuncIntent(invalidate)))
 
     def test_invalidate(self):
         """
-        :func:`invalidate_auth_on_error` invokes the invalidation effect and
+        :func:`effect_on_response` invokes the provided effect and
         returns an Effect of the original response.
         """
         badauth = stub_pure_response("badauth!", code=401)
-        eff = invalidate_auth_on_error((401,), self.invalidate_effect, badauth)
+        eff = effect_on_response((401,), self.invalidate_effect, badauth)
         self.assertEqual(eff.intent, self.invalidate_effect.intent)
         self.assertEqual(resolve_stubs(eff), badauth)
         self.assertEqual(self.invalidations, [True])
 
     def test_invalidate_unnecessary(self):
         """
-        The result is returned immediately and no invalidation takes place
-        when the HTTP response code is not in ``reauth_codes``.
+        The result is returned immediately and the provided effect is not
+        invoked when the HTTP response code is not in ``codes``.
         """
         good = stub_pure_response("okay!", code=200)
-        result = invalidate_auth_on_error((401,), self.invalidate_effect, good)
+        result = effect_on_response((401,), self.invalidate_effect, good)
         self.assertEqual(result, good)
         self.assertEqual(self.invalidations, [])
 
-    def test_add_auth_invalidation(self):
-        """Test the decorator :func:`add_auth_invalidation`."""
+    def test_add_effect_on_response(self):
+        """Test the decorator :func:`add_effect_on_response`."""
         badauth = stub_pure_response("badauth!", code=401)
-        request_ = add_auth_invalidation(
+        request_ = add_effect_on_response(
             self.invalidate_effect, (401,), stub_request(badauth))
         eff = request_('m', 'u')
         self.assertEqual(resolve_stubs(eff), badauth)
