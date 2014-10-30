@@ -300,6 +300,5 @@ def should_retry_effect(can_retry, next_interval, exc_info):
         else:
             return False
     exc_type, exc_value, exc_traceback = exc_info
-    print "OH GOD", exc_info
     eff = Effect(FuncIntent(lambda: can_retry(Failure(exc_value, exc_type, exc_traceback))))
     return eff.on(got_can_retry)
