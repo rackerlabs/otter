@@ -217,7 +217,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
             'Added to load balancer', loadbalancer_id=12345,
             ip_address='192.168.1.1', node_id=1)
 
-    def test_add_lb_retries(self):
+    def test_add_to_clb_retries(self):
         """
         :func:`add_to_clb` will retry until it succeeds.
         """
@@ -234,7 +234,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
         self.rand_interval.assert_called_once_with(5, 7)
 
-    def test_add_lb_stops_retrying_on_404(self):
+    def test_add_to_clb_stops_retrying_on_404(self):
         """
         :func:`add_to_clb` will stop retrying if it encounters a 404.
         """
@@ -249,7 +249,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         f = self.failureResultOf(d, CLBOrNodeDeleted)
         self.assertEqual(f.value.clb_id, 12345)
 
-    def test_add_lb_stops_retrying_on_422_deleted_clb(self):
+    def test_add_to_clb_stops_retrying_on_422_deleted_clb(self):
         """
         :func:`add_to_clb` will stop retrying if it encounters 422 with deleted CLB.
         """
@@ -267,7 +267,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         f = self.failureResultOf(d, CLBOrNodeDeleted)
         self.assertEqual(f.value.clb_id, 12345)
 
-    def test_add_lb_defaults_retries_configs(self):
+    def test_add_to_clb_defaults_retries_configs(self):
         """
         :func:`add_to_clb` will use default :obj:`LB_RETRY_INTERVAL_RANGE`,
         :obj:`LB_MAX_RETRIES` values unless overridden.
@@ -285,17 +285,17 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
                          * (LB_MAX_RETRIES + 1))
         self.rand_interval.assert_called_once_with(*LB_RETRY_INTERVAL_RANGE)
 
-    def failed_add_to_lb(self, code=500):
+    def failed_add_to_clb(self, code=500):
         """
-        Helper function to ensure add_to_clb fails by returning failure
-        again and again until it times out
+        Helper function to ensure :func:`add_to_clb` fails by returning
+        failure again and again until it times out.
         """
         self.treq.post.side_effect = lambda *a, **kw: succeed(mock.Mock(code=code))
         d = self._add_to_clb()
         self.clock.pump([self.retry_interval] * self.max_retries)
         return d
 
-    def test_add_lb_retries_times_out(self):
+    def test_add_to_clb_retries_times_out(self):
         """
         :func:`add_to_clb` will retry up to ``worker.lb_max_retries`` times.
         It will fail after that. This also checks that API failure is propagated.
@@ -310,7 +310,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
                        headers=expected_headers, data=mock.ANY,
                        log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
 
-    def test_add_lb_retries_logs_unexpected_failure(self):
+    def test_add_to_clb_retries_logs_unexpected_failure(self):
         """
         :func:`add_to_clb` will log all unexpected failures while (re)trying.
         This includes any failure besides a 422 with the ``PENDING_UPDATE``
