@@ -1016,7 +1016,12 @@ class OptimizerTests(SynchronousTestCase):
             AddNodesToLoadBalancer(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
-            CreateServer(launch_config=pmap({}))
+            CreateServer(launch_config=pmap({})),
+            BulkRemoveFromRCv3(lb_node_pairs=pset([("lb-1", "node-a")])),
+            BulkAddToRCv3(lb_node_pairs=pset([("lb-2", "node-b")]))
+            # Note that the add & remove pair should not be the same;
+            # the optimizer might reasonably optimize opposite
+            # operations away in the future.
         ])
         self.assertEqual(
             optimize_steps(steps),
