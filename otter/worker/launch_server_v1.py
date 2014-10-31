@@ -426,7 +426,7 @@ def check_deleted_clb(f, clb_id, node_id=None):
 
 def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
     """
-    Add an IP addressed to a load balancer based on the lb_config.
+    Add an IP address to a Cloud Load Balancer based on the ``lb_config``.
 
     TODO: Handle load balancer node metadata.
 
