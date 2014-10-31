@@ -1147,7 +1147,8 @@ class RequestsToEffectTests(SynchronousTestCase):
 
     def assertCompilesTo(self, conv_requests, expected_effects):
         """
-        Assert that the given convergence requests, compile down to a parallel effect comprised of the given effects.
+        Assert that the given convergence requests, compile down to a parallel
+        effect comprised of the given effects.
         """
         parallel_effect = self._reqs_to_effect(conv_requests)
         self.assertEqual(expected_effects, set(parallel_effect.effects))
