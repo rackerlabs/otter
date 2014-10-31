@@ -576,9 +576,9 @@ def _rackconnect_bulk_request(lb_node_pairs, method):
 
 @implementer(IStep)
 @attributes(['lb_node_pairs'])
-class AddNodesToRCv3LoadBalancers(object):
+class BulkAddToRCv3(object):
     """
-    Some connections must be made between some combination of nodes
+    Some connections must be made between some combination of servers
     and RackConnect v3.0 load balancers.
 
     Each connection is independently specified.
@@ -599,9 +599,9 @@ class AddNodesToRCv3LoadBalancers(object):
 
 @implementer(IStep)
 @attributes(["lb_id", "node_id"])
-class RemoveNodeFromRCv3LoadBalancer(object):
+class RemoveFromRCv3(object):
     """
-    A node must be removed from a RackConnect v3.0 load balancer.
+    A server must be removed from a RackConnect v3.0 load balancer.
     """
 
     def as_request(self):
@@ -618,7 +618,7 @@ class RemoveNodeFromRCv3LoadBalancer(object):
 
 @implementer(IStep)
 @attributes(['lb_node_pairs'])
-class RemoveNodesFromRCv3LoadBalancers(object):
+class BulkRemoveFromRCv3(object):
     """
     Some connections must be removed between some combination of nodes
     and RackConnect v3.0 load balancers.
@@ -673,16 +673,16 @@ def _optimize_lb_adds(lb_add_steps):
     ]
 
 
-@_optimizer(RemoveNodeFromRCv3LoadBalancer)
+@_optimizer(RemoveFromRCv3)
 def _optimize_rcv3_lb_removes(steps):
     """
-    Merge :obj:`RemoveNodeFromRCv3LoadBalancer` objects to a single
-    :obj:`RemoveNodesFromRCv3LoadBalancers` step.
+    Merge :obj:`RemoveFromRCv3` objects to a single :obj:`BulkRemoveFromRCv3`
+    step.
 
-    :param steps: Iterable of :obj:`RemoveNodeFromRCv3LoadBalancer`.
+    :param steps: Iterable of :obj:`RemoveFromRCv3`.
     """
     pairs = pset((step.lb_id, step.node_id) for step in steps)
-    return [RemoveNodesFromRCv3LoadBalancers(lb_node_pairs=pairs)]
+    return [BulkRemoveFromRCv3(lb_node_pairs=pairs)]
 
 
 def optimize_steps(steps):

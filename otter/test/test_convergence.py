@@ -14,8 +14,7 @@ from otter.convergence import (
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
-    AddNodesToRCv3LoadBalancers,
-    RemoveNodeFromRCv3LoadBalancer, RemoveNodesFromRCv3LoadBalancers,
+    BulkAddToRCv3, RemoveFromRCv3, BulkRemoveFromRCv3,
     SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ServerState, ServiceType, NodeCondition, NodeType, optimize_steps)
@@ -867,7 +866,7 @@ class RequestConversionTests(SynchronousTestCase):
         with CLB, can not be turned into requests directly. This is
         intentional: they are supposed to be optimized away.
         """
-        step = RemoveNodeFromRCv3LoadBalancer(
+        step = RemoveFromRCv3(
             lb_id="a_lb",
             node_id="larry")
         self.assertRaises(NotImplementedError, step.as_request)
@@ -919,20 +918,20 @@ class RequestConversionTests(SynchronousTestCase):
 
     def test_add_nodes_to_rcv3_load_balancers(self):
         """
-        :obj:`AddNodesToRCv3LoadBalancers.as_request` produces a request for
+        :obj:`BulkAddToRCv3.as_request` produces a request for
         adding any combination of nodes to any combination of RCv3 load
         balancers.
         """
-        self._generic_bulk_rcv3_step_test(AddNodesToRCv3LoadBalancers, "POST")
+        self._generic_bulk_rcv3_step_test(BulkAddToRCv3, "POST")
 
     def test_remove_nodes_from_rcv3_load_balancers(self):
         """
-        :obj:`RemoveNodesFromRCv3LoadBalancers.as_request` produces a request
+        :obj:`BulkRemoveFromRCv3.as_request` produces a request
         for removing any combination of nodes from any combination of RCv3
         load balancers.
         """
         self._generic_bulk_rcv3_step_test(
-            RemoveNodesFromRCv3LoadBalancers, "DELETE")
+            BulkRemoveFromRCv3, "DELETE")
 
 
 class OptimizerTests(SynchronousTestCase):
@@ -1029,17 +1028,17 @@ class OptimizerTests(SynchronousTestCase):
         merged.
         """
         unoptimized = pbag([
-            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-1", node_id="node-a"),
-            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-1", node_id="node-b"),
-            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-1", node_id="node-c"),
-            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-1", node_id="node-d"),
-            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-2", node_id="node-a"),
-            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-2", node_id="node-b"),
-            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-3", node_id="node-c"),
-            RemoveNodeFromRCv3LoadBalancer(lb_id="lb-3", node_id="node-d")
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-a"),
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-b"),
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-c"),
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-d"),
+            RemoveFromRCv3(lb_id="lb-2", node_id="node-a"),
+            RemoveFromRCv3(lb_id="lb-2", node_id="node-b"),
+            RemoveFromRCv3(lb_id="lb-3", node_id="node-c"),
+            RemoveFromRCv3(lb_id="lb-3", node_id="node-d")
         ])
         optimized = pbag([
-            RemoveNodesFromRCv3LoadBalancers(lb_node_pairs=pset([
+            BulkRemoveFromRCv3(lb_node_pairs=pset([
                 ("lb-1", "node-a"),
                 ("lb-1", "node-b"),
                 ("lb-1", "node-c"),
