@@ -175,14 +175,14 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
                                         content='{"message": "bad"}', method='post'))
         patch(self, 'otter.util.http.treq', new=self.treq)
         self.clock = Clock()
+        self.lb_config = {'loadBalancerId': 12345, 'port': 80}
 
     def _add_to_load_balancer(self):
         """
         Helper function to call :func:`add_to_load_balancers`.
         """
         return add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
-                                    {'loadBalancerId': 12345,
-                                     'port': 80},
+                                    self.lb_config,
                                     '192.168.1.1',
                                     self.undo,
                                     clock=self.clock)
