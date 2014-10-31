@@ -15,7 +15,7 @@ from twisted.python.failure import Failure
 from otter.worker.launch_server_v1 import (
     private_ip_addresses,
     endpoints,
-    add_to_load_balancer,
+    add_to_clb,
     add_to_load_balancers,
     server_details,
     wait_for_active,
@@ -181,7 +181,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         Helper function to call :func:`add_to_load_balancers`.
         """
-        return add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+        return add_to_clb(self.log, 'http://url/', 'my-auth-token',
                                     self.lb_config,
                                     '192.168.1.1',
                                     self.undo,

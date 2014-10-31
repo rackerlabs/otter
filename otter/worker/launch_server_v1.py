@@ -424,7 +424,7 @@ def check_deleted_clb(f, clb_id, node_id=None):
     return f
 
 
-def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
+def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
     """
     Add an IP addressed to a load balancer based on the lb_config.
 
@@ -506,7 +506,7 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
         try:
             lb_config = lb_iter.next()
 
-            d = add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo)
+            d = add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo)
             d.addCallback(lambda response, lb_id: (lb_id, response), lb_config['loadBalancerId'])
             d.addCallback(results.append)
             d.addCallback(add_next)
