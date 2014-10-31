@@ -159,7 +159,7 @@ class LoadBalancersTestsMixin(object):
             return_value=self.retry_interval)
 
 
-class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
+class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
     """
     Tests for :func:`add_to_clb`.
     """
@@ -168,7 +168,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         Mock treq.post for adding nodes
         """
-        super(AddNodeTests, self).setUp()
+        super(AddToCLBTests, self).setUp()
         self.json_content = {'nodes': [{'id': 1}]}
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
                           new=mock_treq(code=200, json_content=self.json_content,
