@@ -1027,6 +1027,57 @@ class OptimizerTests(SynchronousTestCase):
             optimize_steps(steps),
             steps)
 
+    def test_mixed_optimization(self):
+        """
+        Mixes of optimizable and unoptimizable steps still get optimized
+        correctly.
+        """
+        steps = pbag([
+            # CLB adds
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=6,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=6,
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
+
+            # RCv3 removes
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-a"),
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-b"),
+
+            # Unoptimizable steps
+            CreateServer(launch_config=pmap({})),
+        ])
+
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                # Optimized CLB adds
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.2', LBConfig(port=80)))),
+                AddNodesToLoadBalancer(
+                    lb_id=6,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.2', LBConfig(port=80)))),
+
+                # Optimized RCv3 removes
+                BulkRemoveFromRCv3(lb_node_pairs=pset([
+                    ("lb-1", "node-a"),
+                    ("lb-1", "node-b"),
+                ])),
+
+                # Unoptimizable steps
+                CreateServer(launch_config=pmap({}))
+            ]))
+
     def test_optimize_rcv3_removes(self):
         """
         RackConnect v3.0 steps for removing nodes from load balancers are
