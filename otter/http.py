@@ -1,13 +1,13 @@
 """
 Integration point for HTTP clients in otter.
 """
-import json
 from functools import partial, wraps
 
 from effect import Effect, FuncIntent
 
 from otter.util.pure_http import (
-    request, request_with_auth, check_status, bind_root)
+    request, add_effectful_headers, add_effect_on_response, add_error_handling,
+    add_bind_root, add_content_only, add_json_response, add_json_request_data)
 from otter.util.http import headers
 from otter.worker.launch_server_v1 import public_endpoint_url
 
@@ -51,19 +51,16 @@ def get_request_func(authenticator, tenant_id, log):
         :raise APIError: When the response HTTP code is not in success_codes.
         :return: Effect resulting in a JSON-parsed HTTP response body.
         """
-        data = json.dumps(data) if data is not None else None
-        request_with_headers = lambda h: request(method, url, headers=h,
-                                                 data=data, log=log)
-        return (
-            request_with_auth(
-                request_with_headers,
-                auth_headers,
-                invalidate,
-                headers=headers,
-                reauth_codes=reauth_codes)
-            .on(partial(check_status, success_codes))
-            .on(lambda result: result[1])
-            .on(json.loads))
+        request_ = add_content_only(
+            add_json_request_data(
+                add_json_response(
+                    add_error_handling(
+                        success_codes,
+                        add_effect_on_response(
+                            invalidate,
+                            reauth_codes,
+                            add_effectful_headers(auth_headers, request))))))
+        return request_(method, url, headers=headers, data=data, log=log)
     return otter_request
 
 
@@ -88,7 +85,7 @@ def bind_service(request_func, tenant_id, authenticator, service_name, region,
         """
         def got_auth((token, catalog)):
             endpoint = public_endpoint_url(catalog, service_name, region)
-            bound_request = bind_root(request_func, endpoint)
+            bound_request = add_bind_root(endpoint, request_func)
             return bound_request(*args, **kwargs)
         return eff.on(got_auth)
     return service_request
