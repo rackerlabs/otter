@@ -298,7 +298,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
     def test_add_lb_retries_times_out(self):
         """
         :func:`add_to_clb` will retry up to ``worker.lb_max_retries`` times.
-        It will fail after that. This also checks that API failure is propogated.
+        It will fail after that. This also checks that API failure is propagated.
         """
         d = self.failed_add_to_lb(422)
 
