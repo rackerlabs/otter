@@ -780,7 +780,7 @@ class ConvergeTests(SynchronousTestCase):
             ])))
 
 
-class RequestConversionTests(SynchronousTestCase):
+class StepAsRequestTests(SynchronousTestCase):
     """
     Tests for converting :obj:`IStep` implementations to :obj:`Request`s.
     """
