@@ -300,7 +300,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         :func:`add_to_clb` will retry up to ``worker.lb_max_retries`` times.
         It will fail after that. This also checks that API failure is propagated.
         """
-        d = self.failed_add_to_lb(422)
+        d = self.failed_add_to_clb(422)
 
         f = self.failureResultOf(d, RequestError)
         self.assertEqual(f.value.reason.value.code, 422)
@@ -350,7 +350,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         add_to_clb doesn't push an operation onto the undo stack
         if it fails.
         """
-        d = self.failed_add_to_lb()
+        d = self.failed_add_to_clb()
         self.failureResultOf(d, RequestError)
         self.assertFalse(self.undo.push.called)
 
