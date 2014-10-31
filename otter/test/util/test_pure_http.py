@@ -1,19 +1,30 @@
 """Tests for otter.util.pure_http"""
 
-from twisted.trial.unittest import SynchronousTestCase
+import json
 
 from testtools import TestCase
 
-from effect.testing import StubIntent, resolve_effect, resolve_stubs
+from effect.testing import StubIntent, resolve_stubs
 from effect.twisted import perform
-from effect import Effect, ConstantIntent
+from effect import Effect, ConstantIntent, FuncIntent
 
-from otter.util.pure_http import request, Request
-from otter.util.http import APIError, headers
+from twisted.trial.unittest import SynchronousTestCase
+
+from otter.util.pure_http import (
+    Request, request, check_status,
+    effect_on_response,
+    add_effectful_headers, add_effect_on_response, add_bind_root, add_content_only,
+    add_error_handling, add_json_response, add_json_request_data)
+from otter.util.http import APIError
 from otter.test.utils import stub_pure_response, StubResponse, StubTreq
 
 
 Constant = lambda x: StubIntent(ConstantIntent(x))
+
+
+def stub_request(response):
+    """Create a request function that returns a stubbed response."""
+    return lambda method, url, headers=None, data=None: Effect(Constant(response))
 
 
 class RequestEffectTests(SynchronousTestCase):
@@ -32,7 +43,7 @@ class RequestEffectTests(SynchronousTestCase):
         req = Request(method="get", url="http://google.com/")
         req.treq = treq
         self.assertEqual(
-            self.successResultOf(perform(Effect(req))),
+            self.successResultOf(perform(None, Effect(req))),
             (response, "content"))
 
     def test_log(self):
@@ -46,141 +57,156 @@ class RequestEffectTests(SynchronousTestCase):
                         contents=[(response, "content")])
         req = Request(method="get", url="http://google.com/", log=log)
         req.treq = treq
-        self.assertEqual(self.successResultOf(perform(Effect(req))),
+        self.assertEqual(self.successResultOf(perform(None, Effect(req))),
                          (response, "content"))
 
 
-class PureHTTPClientTests(TestCase):
-    """Tests for the pure HTTP client functions."""
+class CheckStatusTests(TestCase):
+    """Tests :func:`check_status`"""
 
-    def _no_reauth_client(self):
-        def auth():
-            return Effect(Constant(headers("my-token")))
-        return (
-            lambda *args, **kwargs:
-            resolve_stubs(request(*args,
-                                  get_auth_headers=auth,
-                                  refresh_auth_info=lambda: None,
-                                  **kwargs)))
-
-    def test_json_request(self):
+    def test_check_status(self):
         """
-        The request we pass in is performed after adding some standard headers.
+        :func:`check_status` raises an APIError when HTTP codes don't match.
         """
-        request_ = self._no_reauth_client()
-        eff = request_("get", "/foo")
-        req = eff.intent
-        self.assertEqual(req.method, "get")
-        self.assertEqual(req.url, "/foo")
-        self.assertIs(req.data, None)
-        self.assertEqual(req.headers, headers('my-token'))
-
-    def test_json_response(self):
-        """The JSON response is decoded into Python objects."""
-        request_ = self._no_reauth_client()
-        eff = request_("get", "/foo")
-        self.assertEqual(
-            resolve_effect(eff, stub_pure_response({"foo": "bar"})),
-            {'foo': 'bar'})
-
-    def test_header_merging(self):
-        """
-        The headers passed in the original request are merged with a
-        pre-defined set.
-        """
-        request_ = self._no_reauth_client()
-        eff = request_("get", "/foo", headers={"x-mine": "abc123"})
-        req = eff.intent
-        expected_headers = headers('my-token')
-        expected_headers['x-mine'] = 'abc123'
-        self.assertEqual(req.headers, expected_headers)
-
-    def test_default_headers_win(self):
-        """
-        When merging headers together, the predefined set takes precedent
-        over any that are passed.
-        """
-        request_ = self._no_reauth_client()
-        eff = request_("get", "/foo", headers={"x-auth-token": "abc123"})
-        req = eff.intent
-        expected_headers = headers('my-token')
-        self.assertEqual(req.headers, expected_headers)
-
-    def test_data(self):
-        """The data member in the request is encoded with json."""
-        request_ = self._no_reauth_client()
-        eff = request_("get", "/foo", data={'foo': 'bar'})
-        req = eff.intent
-        self.assertEqual(req.data, '{"foo": "bar"}')
-
-    def test_api_error_default(self):
-        """
-        APIError is raised when the response code isn't 200, by default.
-        """
-        request_ = self._no_reauth_client()
-        eff = request_("get", "/foo")
         self.assertRaises(
             APIError,
-            resolve_effect, eff,
+            check_status,
+            (200,),
             stub_pure_response({"foo": "bar"}, code=404))
 
-    def test_api_error_specified(self):
-        """Any HTTP response code can be specified as being successful."""
-        request_ = self._no_reauth_client()
-        eff = request_("get", url="/foo", success_codes=[404])
-        stub_result = stub_pure_response({"foo": "bar"}, code=404)
-        self.assertEqual(resolve_effect(eff, stub_result), {"foo": "bar"})
+    def test_check_status_success(self):
+        """When the HTTP code matches, the response is returned."""
+        response = stub_pure_response({"foo": "bar"}, code=404)
+        result = check_status((404,),  response)
+        self.assertEqual(result, response)
 
-    def test_reauth_successful(self):
+    def test_add_error_handling(self):
         """
-        When an HTTP response code is 401, the reauth function is invoked.
-        When the reauth function's effect succeeds, the original request is
-        retried with the x-auth-token header updated to use the new auth
-        token.
+        :func:`add_error_handling` invokes :func:`check_status` as a callback.
         """
-        return self._test_reauth(401)
+        response = stub_pure_response("", code=404)
+        eff = add_error_handling((200,), stub_request(response))('m', 'u')
+        self.assertRaises(APIError, resolve_stubs, eff)
 
-    def test_reauth_on_403(self):
+
+class AddEffectfulHeadersTest(TestCase):
+    """
+    Tests for :func:`add_effectful_headers`.
+    """
+
+    def setUp(self):
+        """Save auth effect."""
+        super(AddEffectfulHeadersTest, self).setUp()
+        self.auth_effect = Effect(Constant({"x-auth-token": "abc123"}))
+
+    def test_add_headers(self):
+        """Headers from the provided effect are inserted."""
+        request_ = add_effectful_headers(self.auth_effect, request)
+        eff = request_('m', 'u', headers={'default': 'headers'})
+        self.assertEqual(
+            resolve_stubs(eff).intent,
+            Request(method="m",
+                    url="u",
+                    headers={"x-auth-token": "abc123",
+                             "default": "headers"}))
+
+    def test_added_headers_win(self):
+        """When merging headers together, headers from the effect win."""
+        request_ = add_effectful_headers(self.auth_effect, request)
+        eff = request_('m', 'u', headers={'x-auth-token': 'fooey'})
+        self.assertEqual(
+            resolve_stubs(eff).intent,
+            Request(method="m",
+                    url="u",
+                    headers={"x-auth-token": "abc123"}))
+
+
+class EffectOnResponseTests(TestCase):
+    """Tests for :func:`effect_on_response`."""
+
+    def setUp(self):
+        """Set up an invalidation request ."""
+        super(EffectOnResponseTests, self).setUp()
+        self.invalidations = []
+        invalidate = lambda: self.invalidations.append(True)
+        self.invalidate_effect = Effect(StubIntent(FuncIntent(invalidate)))
+
+    def test_invalidate(self):
         """
-        Reauthentication also automatically happens on a 403 response.
+        :func:`effect_on_response` invokes the provided effect and
+        returns an Effect of the original response.
         """
-        return self._test_reauth(403)
+        badauth = stub_pure_response("badauth!", code=401)
+        eff = effect_on_response((401,), self.invalidate_effect, badauth)
+        self.assertEqual(eff.intent, self.invalidate_effect.intent)
+        self.assertEqual(resolve_stubs(eff), badauth)
+        self.assertEqual(self.invalidations, [True])
 
-    def test_reauth_on_custom_code(self):
+    def test_invalidate_unnecessary(self):
         """
-        Reauthentication can happen on other codes too.
+        The result is returned immediately and the provided effect is not
+        invoked when the HTTP response code is not in ``codes``.
         """
-        return self._test_reauth(500, reauth_codes=(401, 403, 500))
+        good = stub_pure_response("okay!", code=200)
+        result = effect_on_response((401,), self.invalidate_effect, good)
+        self.assertEqual(result, good)
+        self.assertEqual(self.invalidations, [])
 
-    def _test_reauth(self, code, reauth_codes=None):
-        reauth_effect = Effect(Constant(None))
+    def test_add_effect_on_response(self):
+        """Test the decorator :func:`add_effect_on_response`."""
+        badauth = stub_pure_response("badauth!", code=401)
+        request_ = add_effect_on_response(
+            self.invalidate_effect, (401,), stub_request(badauth))
+        eff = request_('m', 'u')
+        self.assertEqual(resolve_stubs(eff), badauth)
+        self.assertEqual(self.invalidations, [True])
 
-        def get_auth_headers():
-            return Effect(Constant(headers("first-token")))
 
-        def refresh_auth_info():
-            return reauth_effect
+class BindRootTests(TestCase):
+    """Tests for :func:`add_bind_root`"""
 
-        # First we try to make a simple request.
-        kwargs = {}
-        if reauth_codes is not None:
-            kwargs['reauth_codes'] = reauth_codes
-        eff = request("get", "/foo",
-                      get_auth_headers=get_auth_headers,
-                      refresh_auth_info=refresh_auth_info,
-                      **kwargs)
+    def test_bind_root(self):
+        """
+        :func:`add_bind_root` decorates a request function to append any
+        passed URL paths onto the root URL.
+        """
+        request_ = add_bind_root("http://slashdot.org/", request)
+        self.assertEqual(request_("get", "foo").intent.url,
+                         "http://slashdot.org/foo")
 
-        # The initial (cached) auth headers are retrieved.
-        eff = resolve_stubs(eff)
+    def test_bind_root_no_slashes(self):
+        """
+        Root URLs without a trailing slash will have one inserted
+        automatically.
+        """
+        request_ = add_bind_root("http://slashdot.org", request)
+        self.assertEqual(request_("get", "foo").intent.url,
+                         "http://slashdot.org/foo")
 
-        # when an authentication error is returned from the HTTP server,
-        # the auth info is automitacally refreshed:
-        stub_result = stub_pure_response("badauth!", code=code)
-        reauth_effect_result = resolve_effect(eff, stub_result)
-        self.assertIs(reauth_effect_result.intent, reauth_effect.intent)
 
-        # And the original auth error HTTP response is still returned.
-        api_error = self.assertRaises(APIError, resolve_stubs, reauth_effect_result)
-        self.assertEqual(api_error.code, code)
-        self.assertEqual(api_error.body, "badauth!")
-        self.assertEqual(api_error.headers, {})
+class ContentOnlyTests(TestCase):
+    """Tests for :func:`add_content_only`"""
+
+    def test_add_content_only(self):
+        """The produced request function results in the content."""
+        request_ = add_content_only(stub_request(stub_pure_response('foo', 200)))
+        eff = request_('m', 'u')
+        self.assertEqual(resolve_stubs(eff), 'foo')
+
+
+class AddJsonResponseTests(TestCase):
+    """Tests for :func:`add_json_response`."""
+    def test_add_json_response(self):
+        """The produced request function results in a parsed data structure."""
+        response = stub_pure_response('{"a": "b"}', 200)
+        request_ = add_json_response(stub_request(response))
+        self.assertEqual(resolve_stubs(request_('m', 'u')),
+                         (response[0], {'a': 'b'}))
+
+
+class AddJsonRequestDataTests(TestCase):
+    """Tests for :func:`add_json_request_data`."""
+    def test_add_json_request_data(self):
+        """The produced request function serializes data to json."""
+        eff = add_json_request_data(request)('m', 'u', data={'a': 'b'})
+        self.assertEqual(eff.intent.data, json.dumps({'a': 'b'}))
