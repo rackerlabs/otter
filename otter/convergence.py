@@ -766,8 +766,6 @@ def _reqs_to_effect(make_bound_request_fn, conv_requests):
 
 def _make_bound_request_fn_maker(authenticator, tenant_id, region, log):
     """
-    REVIEW: contender for worst function name in forever
-
     Creates a function that produces tenant- and service-bound request
     functions.
 
