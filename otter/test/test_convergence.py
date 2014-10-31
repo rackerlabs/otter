@@ -6,6 +6,9 @@ from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.task import Clock
 from twisted.internet.defer import succeed
 
+from characteristic import attributes
+from functools import partial
+
 from otter.test.utils import StubTreq2, patch, iMock
 from otter.auth import IAuthenticator
 from otter.util.http import headers, APIError
@@ -17,7 +20,8 @@ from otter.convergence import (
     BulkAddToRCv3, RemoveFromRCv3, BulkRemoveFromRCv3,
     SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
-    ServerState, ServiceType, NodeCondition, NodeType, optimize_steps)
+    ServerState, ServiceType, NodeCondition, NodeType, optimize_steps,
+    _reqs_to_effect)
 
 from pyrsistent import pmap, pbag, pset, s
 
@@ -1106,3 +1110,60 @@ class OptimizerTests(SynchronousTestCase):
             ]))
         ])
         self.assertEqual(optimize_steps(unoptimized), optimized)
+
+
+@attributes(["service_type", "method", "url", "headers", "data"])
+class _BoundRequestStub(object):
+    """
+    A bound request stub, suitable for testing.
+    """
+
+
+class RequestsToEffectTests(SynchronousTestCase):
+    def _make_bound_request_fn(self, service_type):
+        """
+        A test double for a ``make_bound_request_fn``.
+
+        Takes a service type, returns a callable that stores the
+        details of the request in a :class:`_BoundRequestStub`.
+
+        :param ServiceType service_type: The service type.
+        """
+        return partial(_BoundRequestStub, service_type=service_type)
+
+    def _reqs_to_effect(self, conv_requests):
+        """
+        Helper function to call :func:`_reqs_to_effect`.
+
+        Simply returns the result of :func:`_reqs_to_effect`, partially
+        applied with the :meth:`_make_bound_request_fn` test double.
+
+        :param conv_requests: The convergence requests to be turned into an
+            effect.
+        :type conv_requests: iterable of :class:`Request`
+        :return: The return value of :func:`_reqs_to_effect`.
+        """
+        return _reqs_to_effect(self._make_bound_request_fn, conv_requests)
+
+    def assertCompilesTo(self, conv_requests, expected_effects):
+        """
+        Assert that the given convergence requests, compile down to a parallel effect comprised of the given effects.
+        """
+        parallel_effect = self._reqs_to_effect(conv_requests)
+        self.assertEqual(expected_effects, set(parallel_effect.effects))
+
+    def test_single_request(self):
+        """
+        A single request is correctly compiled down to an effect.
+        """
+        conv_requests = [
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever")]
+        expected_effects = set([
+            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                              method="GET",
+                              url="/whatever",
+                              headers=None,
+                              data=None)])
+        self.assertCompilesTo(conv_requests, expected_effects)
