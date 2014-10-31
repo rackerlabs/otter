@@ -1010,7 +1010,7 @@ class OptimizerTests(SynchronousTestCase):
 
     def test_optimize_leaves_other_steps(self):
         """
-        Non-LB steps are not touched by the optimizer.
+        Unoptimizable steps pass the optimizer unchanged.
         """
         steps = pbag([
             AddNodesToLoadBalancer(
