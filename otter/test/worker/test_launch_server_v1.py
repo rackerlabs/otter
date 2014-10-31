@@ -312,8 +312,9 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def test_add_lb_retries_logs_unexpected_failure(self):
         """
-        add_to_clb will log all unexpected failures while it is trying. This
-        includes any failure other than "422 PENDING_UPDATE"
+        :func:`add_to_clb` will log all unexpected failures while (re)trying.
+        This includes any failure besides a 422 with the ``PENDING_UPDATE``
+        error message.
         """
         codes = iter([500, 503, 422, 422, 401, 200])
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
@@ -333,7 +334,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def test_add_to_clb_pushes_remove_onto_undo_stack(self):
         """
-        add_to_clb pushes an inverse remove_from_load_balancer
+        :func:`add_to_clb` pushes an inverse :func:`remove_from_load_balancer`
         operation onto the undo stack.
         """
         d = self._add_to_clb()
