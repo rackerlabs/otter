@@ -10,7 +10,7 @@ from otter.test.utils import StubTreq2, patch, iMock
 from otter.auth import IAuthenticator
 from otter.util.http import headers, APIError
 from otter.convergence import (
-    _converge_lb_state,
+    _remove_from_lb_with_draining, _converge_lb_state,
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
@@ -172,6 +172,157 @@ class ObjectStorageTests(SynchronousTestCase):
         self.assertEqual(lb.type, NodeType.PRIMARY)
 
 
+class RemoveFromLBWithDrainingTests(SynchronousTestCase):
+    """
+    Tests for :func:`_remove_from_lb_with_draining`
+    """
+    def test_zero_timeout_remove_from_lb(self):
+        """
+        If the timeout is zero, all nodes are just removed
+        """
+        result = _remove_from_lb_with_draining(
+            0,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80))],
+            0)
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_disabled_state_is_removed(self):
+        """
+        Nodes in disabled state are just removed from the load balancer even
+        if the timeout is positive
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DISABLED))],
+            0)
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_enabled_state_is_drained(self):
+        """
+        Nodes in enabled state are put into draining.
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80))],
+            0)
+
+        self.assertEqual(
+            result,
+            [ChangeLoadBalancerNode(lb_id=5, node_id=123, weight=1,
+                                    condition=NodeCondition.DRAINING,
+                                    type=NodeType.PRIMARY)])
+
+    def test_draining_state_is_ignored_if_connections_and_not_yet_timeout(self):
+        """
+        Nodes in draining state will be ignored if they still have connections
+        and the timeout is not yet expired
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0, connections=1)],
+            5)
+
+        self.assertEqual(result, [])
+
+    def test_draining_state_removed_if_no_connections_and_not_yet_timeout(self):
+        """
+        Nodes in draining state will be removed if they have no more
+        connections, even if the timeout is not yet expired
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0, connections=0)],
+            5)
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_draining_state_remains_if_connections_None_and_not_yet_timeout(self):
+        """
+        Nodes in draining state will be ignored if timeout has not yet expired
+        and the number of active connections are not provided
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0)],
+            5)
+
+        self.assertEqual(result, [])
+
+    def test_draining_state_removed_if_connections_None_and_timeout_expired(self):
+        """
+        Nodes in draining state will be removed when the timeout expires if
+        the number of active connections are not provided
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0)],
+            15)
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_draining_state_removed_if_connections_and_timeout_expired(self):
+        """
+        Nodes in draining state will be removed when the timeout expires even
+        if they still have active connections
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0, connections=10)],
+            15)
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_all_changes_together(self):
+        """
+        Given all possible combination of load balancer states and timeouts,
+        ensure function produces the right set of step for all of them.
+        """
+        current = [
+            # enabled, should be drained
+            LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                   config=LBConfig(port=80)),
+            # disabled, should be removed
+            LBNode(lb_id=2, node_id=2, address='1.1.1.1',
+                   config=LBConfig(port=80, condition=NodeCondition.DISABLED)),
+            # draining, still connections, should be ignored
+            LBNode(lb_id=3, node_id=3, address='1.1.1.1',
+                   config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                   connections=3, drained_at=5.0),
+            # draining, no connections, should be removed
+            LBNode(lb_id=4, node_id=4, address='1.1.1.1',
+                   config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                   connections=0, drained_at=5.0),
+            # draining, timeout exired, should be removed
+            LBNode(lb_id=5, node_id=5, address='1.1.1.1',
+                   config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                   connections=10, drained_at=0.0)]
+
+        result = _remove_from_lb_with_draining(10, current, 10)
+        self.assertEqual(set(result), set([
+            ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
+                                   condition=NodeCondition.DRAINING,
+                                   type=NodeType.PRIMARY),
+            RemoveFromLoadBalancer(lb_id=2, node_id=2),
+            RemoveFromLoadBalancer(lb_id=4, node_id=4),
+            RemoveFromLoadBalancer(lb_id=5, node_id=5),
+        ]))
+
+
 class ConvergeLBStateTests(SynchronousTestCase):
     """
     Tests for :func:`_converge_lb_state`
@@ -182,7 +333,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         `converge_lb_state` returns a :class:`AddToLoadBalancer` object
         """
         result = _converge_lb_state(desired_lb_state={5: [LBConfig(port=80)]},
-                                    current_lb_state=[],
+                                    current_lb_nodes=[],
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
@@ -201,7 +352,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                           config=LBConfig(port=80, weight=5))]
 
         result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_state=current,
+                                    current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
@@ -218,7 +369,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                           config=LBConfig(port=80, weight=5))]
 
         result = _converge_lb_state(desired_lb_state={},
-                                    current_lb_state=current,
+                                    current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
@@ -234,7 +385,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                           config=LBConfig(port=80))]
 
         result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_state=current,
+                                    current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(list(result), [])
 
@@ -250,7 +401,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                           config=LBConfig(port=80))]
 
         result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_state=current,
+                                    current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(set(result), set([
             AddNodesToLoadBalancer(
@@ -288,6 +439,157 @@ class ConvergeLBStateTests(SynchronousTestCase):
 def server(id, state, created=0, **kwargs):
     """Convenience for creating a :obj:`NovaServer`."""
     return NovaServer(id=id, state=state, created=created, **kwargs)
+
+
+class DrainAndDeleteServerTests(SynchronousTestCase):
+    """
+    Tests for :func:`converge` having to do with draining and deleting servers.
+    """
+    def test_active_server_without_load_balancers_can_be_deleted(self):
+        """
+        If an active server to be scaled down is not attached to any load
+        balancers, it can be deleted. It is not first put into draining state.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.ACTIVE)]),
+                set(),
+                0),
+            Convergence(steps=pbag([DeleteServer(server_id='abc')])))
+
+    def test_active_server_can_be_deleted_if_all_lbs_can_be_removed(self):
+        """
+        If an active server to be scaled down can be removed from all the load
+        balancers, the server can be deleted.  It is not first put into
+        draining state.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0),
+                set([server('abc', state=ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80))]),
+                0),
+            Convergence(steps=pbag([
+                DeleteServer(server_id='abc'),
+                RemoveFromLoadBalancer(lb_id=1, node_id=1)
+            ])))
+
+    def test_draining_server_can_be_deleted_if_all_lbs_can_be_removed(self):
+        """
+        If draining server can be removed from all the load balancers, the
+        server can be deleted.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0),
+                set([server('abc', state=ServerState.DRAINING,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80,
+                            condition=NodeCondition.DRAINING))]),
+                0),
+            Convergence(steps=pbag([
+                DeleteServer(server_id='abc'),
+                RemoveFromLoadBalancer(lb_id=1, node_id=1)
+            ])))
+
+    def test_draining_server_ignored_if_waiting_for_timeout(self):
+        """
+        If the server already in draining state is waiting for the draining
+        timeout on some load balancers, nothing is done to it.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.DRAINING,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80,
+                            condition=NodeCondition.DRAINING),
+                            drained_at=1.0, connections=1)]),
+                2),
+            Convergence(steps=pbag([])))
+
+    def test_active_server_is_drained_if_not_all_lbs_can_be_removed(self):
+        """
+        If an active server to be deleted cannot be removed from all the load
+        balancers, it is set to draining state and all the nodes are set to
+        draining condition.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80))]),
+                0),
+            Convergence(steps=pbag([
+                ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
+                                       condition=NodeCondition.DRAINING,
+                                       type=NodeType.PRIMARY),
+                SetMetadataItemOnServer(server_id='abc',
+                                        key='rax:auto_scaling_draining',
+                                        value='draining')
+            ])))
+
+    def test_active_server_is_drained_even_if_all_already_in_draining(self):
+        """
+        If an active server already has all of its load balancers in draining,
+        but it cannot be removed from all of them yet, it is set to draining
+        state even though no load balancer actions need to be performed.
+
+        This can happen for instance if the server was supposed to be deleted
+        in a previous convergence run, and the load balancers were set to
+        draining but setting the server metadata failed.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80,
+                                            condition=NodeCondition.DRAINING),
+                            connections=1, drained_at=0.0)]),
+                1),
+            Convergence(steps=pbag([
+                SetMetadataItemOnServer(server_id='abc',
+                                        key='rax:auto_scaling_draining',
+                                        value='draining')
+            ])))
+
+    def test_draining_server_has_all_enabled_lb_set_to_draining(self):
+        """
+        If a draining server is enabled on any load balancers, it is set to
+        draining on those load balancers and it is not deleted.  The metadata
+        is not re-set to draining.
+
+        This can happen for instance if the server was supposed to be deleted
+        in a previous convergence run, and the server metadata was set but
+        the load balancers update failed.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.DRAINING,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80))]),
+                1),
+            Convergence(steps=pbag([
+                ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
+                                       condition=NodeCondition.DRAINING,
+                                       type=NodeType.PRIMARY)
+            ])))
 
 
 class ConvergeTests(SynchronousTestCase):
