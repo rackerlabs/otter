@@ -176,19 +176,21 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         patch(self, 'otter.util.http.treq', new=self.treq)
         self.clock = Clock()
 
+    def _add_to_load_balancer(self):
+        return add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+                                    {'loadBalancerId': 12345,
+                                     'port': 80},
+                                    '192.168.1.1',
+                                    self.undo,
+                                    clock=self.clock)
+
     def test_add_to_load_balancer(self):
         """
         add_to_load_balancer will make a properly formed post request to
         the specified load balancer endpoint witht he specified auth token,
         load balancer id, port, and ip address.
         """
-        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
-                                 {'loadBalancerId': 12345,
-                                  'port': 80},
-                                 '192.168.1.1',
-                                 self.undo)
-
-        result = self.successResultOf(d)
+        result = self.successResultOf(self._add_to_load_balancer())
         self.assertEqual(result, self.json_content)
 
         self.treq.post.assert_called_once_with(
@@ -219,11 +221,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.codes = [422] * 10 + [200]
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
 
-        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
-                                 {'loadBalancerId': 12345,
-                                  'port': 80},
-                                 '192.168.1.1',
-                                 self.undo, clock=self.clock)
+        d = self._add_to_load_balancer()
         self.clock.pump([self.retry_interval] * 11)
         result = self.successResultOf(d)
         self.assertEqual(result, self.json_content)
@@ -240,11 +238,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         codes = iter([422, 422, 404])
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
 
-        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
-                                 {'loadBalancerId': 12345,
-                                  'port': 80},
-                                 '192.168.1.1',
-                                 self.undo, clock=self.clock)
+        d = self._add_to_load_balancer()
         self.clock.advance(self.retry_interval)
         self.assertNoResult(d)
 
@@ -262,11 +256,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.treq.content.side_effect = lambda *a: succeed(
             json.dumps({"message": next(messages)}))
 
-        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
-                                 {'loadBalancerId': 12345,
-                                  'port': 80},
-                                 '192.168.1.1',
-                                 self.undo, clock=self.clock)
+        d = self._add_to_load_balancer()
         self.clock.advance(self.retry_interval)
         self.assertNoResult(d)
 
@@ -282,11 +272,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         set_config_data({})
         self.treq.post.side_effect = lambda *a, **kw: succeed(mock.Mock(code=422))
 
-        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
-                                 {'loadBalancerId': 12345,
-                                  'port': 80},
-                                 '192.168.1.1',
-                                 self.undo, clock=self.clock)
+        d = self._add_to_load_balancer()
         self.clock.pump([self.retry_interval] * LB_MAX_RETRIES)
         self.failureResultOf(d, RequestError)
         self.assertEqual(self.treq.post.mock_calls,
@@ -302,11 +288,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         again and again until it times out
         """
         self.treq.post.side_effect = lambda *a, **kw: succeed(mock.Mock(code=code))
-        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
-                                 {'loadBalancerId': 12345,
-                                  'port': 80},
-                                 '192.168.1.1',
-                                 self.undo, clock=self.clock)
+        d = self._add_to_load_balancer()
         self.clock.pump([self.retry_interval] * self.max_retries)
         return d
 
@@ -337,11 +319,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
             json.dumps({"message": next(messages)}))
         bad_codes = [500, 503, 422, 401]
 
-        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
-                                 {'loadBalancerId': 12345,
-                                  'port': 80},
-                                 '192.168.1.1',
-                                 self.undo, clock=self.clock)
+        d = self._add_to_load_balancer()
         self.clock.pump([self.retry_interval] * 6)
         self.successResultOf(d)
         self.assertEqual(
@@ -355,12 +333,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         add_to_load_balancer pushes an inverse remove_from_load_balancer
         operation onto the undo stack.
         """
-        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
-                                 {'loadBalancerId': 12345,
-                                  'port': 80},
-                                 '192.168.1.1',
-                                 self.undo)
-
+        d = self._add_to_load_balancer()
         self.successResultOf(d)
         self.undo.push.assert_called_once_with(
             remove_from_load_balancer, matches(IsInstance(self.log.__class__)),
