@@ -1120,6 +1120,10 @@ class _BoundRequestStub(object):
 
 
 class RequestsToEffectTests(SynchronousTestCase):
+    """
+    Tests for converting :class:`Request` into effects.
+    """
+
     def _make_bound_request_fn(self, service_type):
         """
         A test double for a ``make_bound_request_fn``.
