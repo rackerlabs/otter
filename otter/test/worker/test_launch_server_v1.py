@@ -313,7 +313,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         clock.pump([self.retry_interval] * self.max_retries)
         return d
 
-    def test_addl_b_retries_times_out(self):
+    def test_add_lb_retries_times_out(self):
         """
         add_to_load_balancer will retry again and again for worker.lb_max_retries times.
         It will fail after that. This also checks that API failure is propogated
@@ -381,6 +381,33 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.failureResultOf(d, RequestError)
         self.assertFalse(self.undo.push.called)
 
+    def _add_to_load_balancers(self, lb_config):
+        """
+        Helper function to call :func:`add_to_load_balancers`.
+        """
+        server_dict = {
+            'server': {
+                "addresses": {
+                    'private': [
+                        {'addr': '192.168.1.1', 'version': 4},
+                        {'addr': '192.168.1.2', 'version': 4},
+                        {'addr': '::1', 'version': 6}
+                    ],
+                    'public': [
+                        {'addr': '50.50.50.50', 'version': 4},
+                        {'addr': '::::', 'version': 6}
+                    ]
+                }
+            }
+        }
+
+        d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
+                                  lb_config,
+                                  server_dict,
+                                  self.undo)
+
+        return d
+
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
     def test_add_to_load_balancers(self, add_to_load_balancer):
         """
@@ -397,13 +424,10 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         add_to_load_balancer.side_effect = _add_to_load_balancer
 
-        d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
-                                  [{'loadBalancerId': 12345,
-                                    'port': 80},
-                                   {'loadBalancerId': 54321,
-                                    'port': 81}],
-                                  '192.168.1.1',
-                                  self.undo)
+        d = self._add_to_load_balancers([{'loadBalancerId': 12345,
+                                          'port': 80},
+                                         {'loadBalancerId': 54321,
+                                          'port': 81}])
 
         # Include the ID and port in the response so that we can verify
         # that add_to_load_balancers associates the response with the correct
@@ -432,14 +456,10 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         add_to_load_balancer.side_effect = _add_to_load_balancer
 
-        d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
-                                  [{'loadBalancerId': 12345,
-                                    'port': 80},
-                                   {'loadBalancerId': 54321,
-                                    'port': 81}],
-                                  '192.168.1.1',
-                                  self.undo)
-
+        d = self._add_to_load_balancers([{'loadBalancerId': 12345,
+                                          'port': 80},
+                                         {'loadBalancerId': 54321,
+                                          'port': 81}])
         self.assertNoResult(d)
 
         add_to_load_balancer.assert_called_once_with(
@@ -471,12 +491,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         add_to_load_balancers returns a Deferred that fires with an empty list
         when no load balancers are configured.
         """
-
-        d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
-                                  [],
-                                  '192.168.1.1',
-                                  self.undo)
-
+        d = self._add_to_load_balancers([])
         self.assertEqual(self.successResultOf(d), [])
 
 
@@ -1434,7 +1449,9 @@ class ServerTests(SynchronousTestCase):
         log.bind.assert_called_once_with(server_id='1')
         add_to_load_balancers.assert_called_once_with(
             log.bind.return_value, 'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
-            '10.0.0.1', self.undo)
+            {'server': {'id': '1',
+                        'addresses': {'private': [{'version': 4, 'addr': '10.0.0.1'}]}}},
+            self.undo)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
