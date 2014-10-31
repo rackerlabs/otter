@@ -26,7 +26,6 @@ from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
 from otter.util.retry import retry, retry_times, exponential_backoff_interval
-from otter.util import pure_http
 # TODO: I hate including this!
 from otter.worker.launch_server_v1 import public_endpoint_url
 
