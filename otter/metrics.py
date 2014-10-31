@@ -23,8 +23,8 @@ from toolz.dicttoolz import merge
 from toolz.functoolz import identity
 
 from otter.auth import (
-    RetryingAuthenticator, ImpersonatingAuthenticator, authenticate_user,
-    extract_token)
+    RetryingAuthenticator, ImpersonatingAuthenticator, CachingAuthenticator,
+    authenticate_user, extract_token)
 
 # TODO: Below function has knowledge of service catalog and is independent of
 # worker code. This and other similar code in worker should be moved to otter.auth
@@ -257,13 +257,16 @@ def get_authenticator(reactor, identity):
     """
     Return authenticator based on identity config
     """
-    return RetryingAuthenticator(
+    return CachingAuthenticator(
         reactor,
-        ImpersonatingAuthenticator(
-            identity['username'],
-            identity['password'],
-            identity['url'],
-            identity['admin_url']))
+        RetryingAuthenticator(
+            reactor,
+            ImpersonatingAuthenticator(
+                identity['username'],
+                identity['password'],
+                identity['url'],
+                identity['admin_url'])),
+        identity.get('cache_ttl', 300))
 
 
 def connect_cass_servers(reactor, config):
