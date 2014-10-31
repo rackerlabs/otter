@@ -177,6 +177,9 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.clock = Clock()
 
     def _add_to_load_balancer(self):
+        """
+        Helper function to call :func:`add_to_load_balancers`.
+        """
         return add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
                                     {'loadBalancerId': 12345,
                                      'port': 80},
