@@ -134,17 +134,19 @@ def extract_drained_at(feed):
         raise ValueError('Unexpected summary: {}'.format(summary))
 
 
-def get_load_balancer_contents(request):
+def get_load_balancer_contents(request_func):
     """
     Get load balancer contents as list of `LBNode`
 
-    :param request: A tenant-bound request function
+    :param request_func: A tenant-bound, CLB-bound, auth-retry based request function
     """
 
     def fetch_nodes(lbs):
         lb_ids = [lb['id'] for lb in json.loads(lbs)]
         return effect.parallel(
-            [request('GET', append_segments('loadbalancers', str(lb_id), 'nodes')).on(json.loads)
+            [request_func(
+                'GET',
+                append_segments('loadbalancers', str(lb_id), 'nodes')).on(json.loads)
              for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
@@ -156,7 +158,7 @@ def get_load_balancer_contents(request):
                  for node in nodes]
         draining = [n for n in nodes if n.config.condition == NodeCondition.DRAINING]
         return effect.parallel(
-            [request(
+            [request_func(
                 'GET',
                 append_segments('loadbalancers', str(n.lb_id), 'nodes',
                                 '{}.atom'.format(n.node_id)))
@@ -167,7 +169,7 @@ def get_load_balancer_contents(request):
             node.drained_at = extract_drained_at(feed)
         return nodes
 
-    return request('GET', 'loadbalancers').on(
+    return request_func('GET', 'loadbalancers').on(
         fetch_nodes).on(fetch_drained_feeds).on(fill_drained_at)
 
 
