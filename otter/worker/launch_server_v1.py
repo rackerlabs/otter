@@ -438,8 +438,8 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
         balancer.
     :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
-    :return: Deferred that fires with the Add Node to load balancer response
-        as a dict.
+    :return: Deferred that fires with the load balancer response. The
+        structure of this object depends on the load balancer type.
     """
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
