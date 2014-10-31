@@ -474,7 +474,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
                   lb_log,
                   endpoint,
                   auth_token,
-                  lb_id,
+                  lb_config,
                   result['nodes'][0]['id'])
         return result
 

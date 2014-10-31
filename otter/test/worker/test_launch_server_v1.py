@@ -341,7 +341,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.undo.push.assert_called_once_with(
             remove_from_load_balancer, matches(IsInstance(self.log.__class__)),
             'http://url/', 'my-auth-token',
-            12345,
+            self.lb_config,
             1)
 
     def test_add_to_load_balancer_doesnt_push_onto_undo_stack_on_failure(self):
