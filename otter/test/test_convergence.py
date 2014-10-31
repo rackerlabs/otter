@@ -782,7 +782,7 @@ class ConvergeTests(SynchronousTestCase):
 
 class RequestConversionTests(SynchronousTestCase):
     """
-    Tests for converting ISteps to :obj:`Request`s.
+    Tests for converting :obj:`IStep` implementations to :obj:`Request`s.
     """
 
     def test_create_server(self):
