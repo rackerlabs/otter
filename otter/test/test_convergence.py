@@ -1192,3 +1192,38 @@ class RequestsToEffectTests(SynchronousTestCase):
                               headers=None,
                               data=None)])
         self.assertCompilesTo(conv_requests, expected_effects)
+
+    def test_multiple_requests_of_different_type(self):
+        """
+        Multiple requests of different types are correctly compiled down to
+        an effect.
+        """
+        data_sentinel = object()
+        conv_requests = [
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever"),
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever/something/else"),
+            Request(service=ServiceType.CLOUD_SERVERS,
+                    method="POST",
+                    path="/xyzzy",
+                    data=data_sentinel)]
+        expected_effects = set([
+            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                              method="GET",
+                              url="/whatever",
+                              headers=None,
+                              data=None),
+            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                              method="GET",
+                              url="/whatever/something/else",
+                              headers=None,
+                              data=None),
+            _BoundRequestStub(service_type=ServiceType.CLOUD_SERVERS,
+                              method="POST",
+                              url="/xyzzy",
+                              headers=None,
+                              data=data_sentinel)])
+        self.assertCompilesTo(conv_requests, expected_effects)
