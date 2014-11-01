@@ -181,11 +181,13 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         Helper function to call :func:`add_to_clbs`.
         """
-        return add_to_clb(self.log, 'http://url/', 'my-auth-token',
-                                    self.lb_config,
-                                    '192.168.1.1',
-                                    self.undo,
-                                    clock=self.clock)
+        return add_to_clb(self.log,
+                          'http://url/',
+                          'my-auth-token',
+                          self.lb_config,
+                          '192.168.1.1',
+                          self.undo,
+                          clock=self.clock)
 
     def test_add_to_clb(self):
         """
