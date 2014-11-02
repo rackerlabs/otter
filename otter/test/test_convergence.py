@@ -14,11 +14,12 @@ from otter.convergence import (
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
+    BulkAddToRCv3, RemoveFromRCv3, BulkRemoveFromRCv3,
     SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ServerState, ServiceType, NodeCondition, NodeType, optimize_steps)
 
-from pyrsistent import pmap, pbag, s
+from pyrsistent import pmap, pbag, pset, s
 
 
 class GetAllServerDetailsTests(SynchronousTestCase):
@@ -859,6 +860,79 @@ class RequestConversionTests(SynchronousTestCase):
                 data={'condition': 'DRAINING',
                       'weight': 50}))
 
+    def test_rcv3_dummy_steps(self):
+        """
+        RCv3 "dummy" steps, which are implemented only to fake API parity
+        with CLB, can not be turned into requests directly. This is
+        intentional: they are supposed to be optimized away.
+        """
+        step = RemoveFromRCv3(
+            lb_id="a_lb",
+            node_id="larry")
+        self.assertRaises(NotImplementedError, step.as_request)
+
+    def _generic_bulk_rcv3_step_test(self, step_class, expected_method):
+        """
+        A generic test for bulk RCv3 steps.
+
+        :param step_class: The step class under test.
+        :param str method: The expected HTTP method of the request.
+        """
+        step = step_class(lb_node_pairs=pset([
+            ("lb-1", "node-a"),
+            ("lb-1", "node-b"),
+            ("lb-1", "node-c"),
+            ("lb-1", "node-d"),
+            ("lb-2", "node-a"),
+            ("lb-2", "node-b"),
+            ("lb-3", "node-c"),
+            ("lb-3", "node-d")
+        ]))
+        request = step.as_request()
+        self.assertEqual(request.service, ServiceType.RACKCONNECT_V3)
+        self.assertEqual(request.method, expected_method)
+        self.assertEqual(request.path, "load_balancer_pools/nodes")
+        self.assertEqual(request.headers, None)
+
+        expected_data = [
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-a'}},
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-b'}},
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-c'}},
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-d'}},
+            {'load_balancer_pool': {'id': 'lb-2'},
+             'cloud_server': {'id': 'node-a'}},
+            {'load_balancer_pool': {'id': 'lb-2'},
+             'cloud_server': {'id': 'node-b'}},
+            {'load_balancer_pool': {'id': 'lb-3'},
+             'cloud_server': {'id': 'node-c'}},
+            {'load_balancer_pool': {'id': 'lb-3'},
+             'cloud_server': {'id': 'node-d'}}
+        ]
+        key_fn = lambda e: (e["load_balancer_pool"]["id"], e["cloud_server"]["id"])
+        request_data = sorted(request.data, key=key_fn)
+        self.assertEqual(request_data, expected_data)
+
+    def test_add_nodes_to_rcv3_load_balancers(self):
+        """
+        :obj:`BulkAddToRCv3.as_request` produces a request for
+        adding any combination of nodes to any combination of RCv3 load
+        balancers.
+        """
+        self._generic_bulk_rcv3_step_test(BulkAddToRCv3, "POST")
+
+    def test_remove_nodes_from_rcv3_load_balancers(self):
+        """
+        :obj:`BulkRemoveFromRCv3.as_request` produces a request
+        for removing any combination of nodes from any combination of RCv3
+        load balancers.
+        """
+        self._generic_bulk_rcv3_step_test(
+            BulkRemoveFromRCv3, "DELETE")
+
 
 class OptimizerTests(SynchronousTestCase):
     """Tests for :func:`optimize_steps`."""
@@ -936,14 +1010,99 @@ class OptimizerTests(SynchronousTestCase):
 
     def test_optimize_leaves_other_steps(self):
         """
-        Non-LB steps are not touched by the optimizer.
+        Unoptimizable steps pass the optimizer unchanged.
         """
         steps = pbag([
             AddNodesToLoadBalancer(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
-            CreateServer(launch_config=pmap({}))
+            CreateServer(launch_config=pmap({})),
+            BulkRemoveFromRCv3(lb_node_pairs=pset([("lb-1", "node-a")])),
+            BulkAddToRCv3(lb_node_pairs=pset([("lb-2", "node-b")]))
+            # Note that the add & remove pair should not be the same;
+            # the optimizer might reasonably optimize opposite
+            # operations away in the future.
         ])
         self.assertEqual(
             optimize_steps(steps),
             steps)
+
+    def test_mixed_optimization(self):
+        """
+        Mixes of optimizable and unoptimizable steps still get optimized
+        correctly.
+        """
+        steps = pbag([
+            # CLB adds
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=6,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=6,
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
+
+            # RCv3 removes
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-a"),
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-b"),
+
+            # Unoptimizable steps
+            CreateServer(launch_config=pmap({})),
+        ])
+
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                # Optimized CLB adds
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.2', LBConfig(port=80)))),
+                AddNodesToLoadBalancer(
+                    lb_id=6,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.2', LBConfig(port=80)))),
+
+                # Optimized RCv3 removes
+                BulkRemoveFromRCv3(lb_node_pairs=pset([
+                    ("lb-1", "node-a"),
+                    ("lb-1", "node-b"),
+                ])),
+
+                # Unoptimizable steps
+                CreateServer(launch_config=pmap({}))
+            ]))
+
+    def test_optimize_rcv3_removes(self):
+        """
+        RackConnect v3.0 steps for removing nodes from load balancers are
+        merged.
+        """
+        unoptimized = pbag([
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-a"),
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-b"),
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-c"),
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-d"),
+            RemoveFromRCv3(lb_id="lb-2", node_id="node-a"),
+            RemoveFromRCv3(lb_id="lb-2", node_id="node-b"),
+            RemoveFromRCv3(lb_id="lb-3", node_id="node-c"),
+            RemoveFromRCv3(lb_id="lb-3", node_id="node-d")
+        ])
+        optimized = pbag([
+            BulkRemoveFromRCv3(lb_node_pairs=pset([
+                ("lb-1", "node-a"),
+                ("lb-1", "node-b"),
+                ("lb-1", "node-c"),
+                ("lb-1", "node-d"),
+                ("lb-2", "node-a"),
+                ("lb-2", "node-b"),
+                ("lb-3", "node-c"),
+                ("lb-3", "node-d")
+            ]))
+        ])
+        self.assertEqual(optimize_steps(unoptimized), optimized)
