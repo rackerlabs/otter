@@ -3,6 +3,7 @@ Unittests for the launch_server_v1 launch config.
 """
 import mock
 import json
+from functools import partial
 from toolz.dicttoolz import merge
 from urllib import urlencode
 from urlparse import urlunsplit
@@ -428,34 +429,21 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         add_to_load_balancer.side_effect = _add_to_load_balancer
 
-        d = self._add_to_load_balancers([{'loadBalancerId': 12345,
-                                          'port': 80},
-                                         {'loadBalancerId': 54321,
-                                          'port': 81}])
+        assert_added_to = partial(add_to_load_balancer.assert_called_with,
+                                  self.log,
+                                  'http://url/',
+                                  'my-auth-token',
+                                  ip_address='192.168.1.1',
+                                  undo=self.undo)
+
+        first_lb = {'loadBalancerId': 12345, 'port': 80}
+        second_lb = {'loadBalancerId': 54321, 'port': 81}
+        d = self._add_to_load_balancers([first_lb, second_lb])
         self.assertNoResult(d)
-
-        add_to_load_balancer.assert_called_once_with(
-            self.log,
-            'http://url/',
-            'my-auth-token',
-            {'loadBalancerId': 12345, 'port': 80},
-            '192.168.1.1',
-            self.undo
-        )
-
+        assert_added_to(first_lb)
         d1.callback(None)
-
-        add_to_load_balancer.assert_called_with(
-            self.log,
-            'http://url/',
-            'my-auth-token',
-            {'loadBalancerId': 54321, 'port': 81},
-            ip_address='192.168.1.1',
-            undo=self.undo
-        )
-
+        assert_added_to(second_lb)
         d2.callback(None)
-
         self.successResultOf(d)
 
     def test_add_to_load_balancers_no_lb_configs(self):
