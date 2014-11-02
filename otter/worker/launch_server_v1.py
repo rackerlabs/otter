@@ -25,7 +25,8 @@ from toolz import comp
 from urllib import urlencode
 
 from twisted.python.failure import Failure
-from twisted.internet.defer import gatherResults, maybeDeferred, DeferredSemaphore
+from twisted.internet.defer import (gatherResults, maybeDeferred,
+                                    DeferredSemaphore, DeferredLock)
 from twisted.internet.task import deferLater
 
 from otter.util import logging_treq as treq
@@ -497,24 +498,19 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
     :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
         Add Node response.
     """
-    ip_address = private_ip_addresses(server)[0]
-    lb_iter = iter(lb_configs)
+    _add_to_lb = partial(add_to_load_balancer, log, endpoint, auth_token,
+                         ip_address=private_ip_addresses(server)[0],
+                         undo=undo)
 
-    results = []
+    dl = DeferredLock()
+    ds = []
+    for lb_config in lb_configs:
+        d = dl.run(_add_to_lb, lb_config)
+        lb_id = lb_config["loadBalancerId"]
+        d.addCallback(lambda response, lb_id=lb_id: (lb_id, response))
+        ds.append(d)
 
-    def add_next(_):
-        try:
-            lb_config = lb_iter.next()
-
-            d = add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo)
-            d.addCallback(lambda response, lb_id: (lb_id, response), lb_config['loadBalancerId'])
-            d.addCallback(results.append)
-            d.addCallback(add_next)
-            return d
-        except StopIteration:
-            return results
-
-    return maybeDeferred(add_next, None)
+    return gatherResults(ds)
 
 
 def endpoints(service_catalog, service_name, region):
