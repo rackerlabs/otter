@@ -450,8 +450,8 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
             'http://url/',
             'my-auth-token',
             {'loadBalancerId': 54321, 'port': 81},
-            '192.168.1.1',
-            self.undo
+            ip_address='192.168.1.1',
+            undo=self.undo
         )
 
         d2.callback(None)
