@@ -10,15 +10,18 @@ import treq
 from twisted.internet import defer
 
 from characteristic import attributes, Attribute
+from effect import ParallelEffects
 from pyrsistent import pbag, freeze, s, pset
 from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
+from twisted.python.constants import Values, ValueConstant
 
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
 from toolz.itertoolz import concat, concatv, mapcat
 
+from otter.http import get_request_func, bind_service
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
@@ -709,11 +712,11 @@ def optimize_steps(steps):
     return pbag(concatv(omg_optimized, unoptimizable))
 
 
-class ServiceType(Names):
+class ServiceType(Values):
     """Constants representing Rackspace cloud services."""
-    CLOUD_SERVERS = NamedConstant()
-    CLOUD_LOAD_BALANCERS = NamedConstant()
-    RACKCONNECT_V3 = NamedConstant()
+    CLOUD_SERVERS = ValueConstant('cloudServersOpenStack')
+    CLOUD_LOAD_BALANCERS = ValueConstant('cloudLoadBalancers')
+    RACKCONNECT_V3 = ValueConstant('rackconnect')
 
 
 @attributes(['service', 'method', 'path', 'headers', 'data'],
@@ -738,3 +741,66 @@ class Request(object):
     :ivar object data: a Python object that will be JSON-serialized as the body
         of the request.
     """
+
+
+def _reqs_to_effect(make_bound_request_fn, conv_requests):
+    """Turns a collection of :class:`Request` objects into an effect.
+
+    :param make_bound_request_fn: A function that takes a service type
+       and produces a request function, bound to the tenant and that
+       request. See :func:`_make_bound_request_fn_maker` for a helper
+       function to produce such a function.
+    :param conv_requests: Convergence requests to turn into effects.
+    """
+    effects = []
+    for svc_type, reqs in groupby(lambda r: r.service, conv_requests).iteritems():
+        bound_request_fn = make_bound_request_fn(svc_type)
+        effects.extend([bound_request_fn(method=r.method,
+                                         url=r.path,
+                                         headers=r.headers,
+                                         data=r.data)
+                        for r in reqs])
+
+    return ParallelEffects(effects)
+
+
+def _make_bound_request_fn_maker(authenticator, tenant_id, region, log):
+    """
+    Creates a function that produces tenant- and service-bound request
+    functions.
+
+    :param authenticator: An authenticator to authenticate the tenant.
+        This should be caching for efficiency reasons: the effect produced
+        by this function may authenticate authenticate a single tenant
+        multiple times.
+    :param str tenant_id: The id of the tenant to produce an effect for.
+    :param str region: The region in which the requests in the effect will
+        be.
+    :param log: The logger used for these requests.
+    :return: A function that takes a service type, and produces a request
+        function bound to the tenant.
+    :rtype: unary function
+    """
+    base_request_fn = get_request_func(authenticator,
+                                       tenant_id,
+                                       log)
+
+    def _make_bound_request_fn(service_type):
+        """
+        Creates a request function for a given service type, already bound to
+        a tenant.
+
+        This is also bound to a tenant, because it builds on top of a
+        base request function that is already bound to the tenant.
+
+        :param service_type: The specific service to bind.
+        :type service_type: One of the :class:`ServiceType` constants.
+        """
+        return bind_service(base_request_fn,
+                            tenant_id,
+                            authenticator,
+                            service_type.name,
+                            region,
+                            log)
+
+    return _make_bound_request_fn
