@@ -424,9 +424,9 @@ def check_deleted_clb(f, clb_id, node_id=None):
     return f
 
 
-def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
+def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
     """
-    Add an IP addressed to a load balancer based on the lb_config.
+    Add an IP address to a Cloud Load Balancer based on the ``lb_config``.
 
     TODO: Handle load balancer node metadata.
 
@@ -438,8 +438,8 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
         balancer.
     :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
-    :return: Deferred that fires with the Add Node to load balancer response
-        as a dict.
+    :return: Deferred that fires with the load balancer response. The
+        structure of this object depends on the load balancer type.
     """
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
@@ -474,7 +474,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
                   lb_log,
                   endpoint,
                   auth_token,
-                  lb_id,
+                  lb_config,
                   result['nodes'][0]['id'])
         return result
 
@@ -506,7 +506,7 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
         try:
             lb_config = lb_iter.next()
 
-            d = add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo)
+            d = add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo)
             d.addCallback(lambda response, lb_id: (lb_id, response), lb_config['loadBalancerId'])
             d.addCallback(results.append)
             d.addCallback(add_next)
@@ -769,7 +769,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     return d
 
 
-def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
+def remove_from_load_balancer(log, endpoint, auth_token, lb_config,
                               node_id, clock=None):
     """
     Remove a node from a load balancer.
@@ -782,6 +782,7 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
     :returns: A Deferred that fires with None if the operation completed successfully,
         or errbacks with an RequestError.
     """
+    loadbalancer_id = lb_config["loadBalancerId"]
     lb_log = log.bind(loadbalancer_id=loadbalancer_id, node_id=node_id)
     # TODO: Will remove this once LB ERROR state is fixed and it is working fine
     lb_log.msg('Removing from load balancer')
@@ -820,10 +821,10 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     :param str region: A rackspace region as found in the service catalog.
     :param list service_catalog: A list of services as returned by the auth apis.
     :param str auth_token: The user's auth token.
-    :param tuple instance_details: A 2-tuple of server_id and a list of
-        load balancer Add Node responses.
+    :param tuple instance_details: A 2-tuple of the server_id and a list of
+        load balancer responses.
 
-        Example::
+        Example for some CLB load balancers::
 
         ('da08965f-4c2d-41aa-b492-a3c02706202f',
          [('12345',
