@@ -18,6 +18,7 @@ from twisted.python.constants import Names, NamedConstant
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
 
+from otter.constants import ServiceType
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
@@ -465,12 +466,6 @@ class ChangeLoadBalancerNode(object):
                                  'nodes', self.node_id),
             data={'condition': self.condition,
                   'weight': self.weight})
-
-
-class ServiceType(Names):
-    """Constants representing Rackspace cloud services."""
-    CLOUD_SERVERS = NamedConstant()
-    CLOUD_LOAD_BALANCERS = NamedConstant()
 
 
 @attributes(['service', 'method', 'path', 'headers', 'data'],

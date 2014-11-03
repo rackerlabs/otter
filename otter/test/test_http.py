@@ -3,11 +3,11 @@
 import json
 
 from effect.testing import resolve_effect
-from effect.twisted import perform
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
 
+from otter.constants import ServiceType
 from otter.util.http import headers, APIError
 from otter.http import get_request_func, add_bind_service
 from otter.test.utils import stub_pure_response
@@ -42,14 +42,17 @@ class GetRequestFuncTests(SynchronousTestCase):
         """Save some common parameters."""
         self.log = object()
         self.authenticator = FakeCachingAuthenticator()
-        self.request = get_request_func(self.authenticator, 1, self.log)
+        self.request = get_request_func(
+            self.authenticator, 1, self.log,
+            {ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'},
+            'DFW')
 
     def test_get_request_func_authenticates(self):
         """
         The request function returned from get_request_func performs
         authentication before making the request.
         """
-        eff = self.request('get', 'http://example.com/')
+        eff = self.request(ServiceType.CLOUD_SERVERS, 'get', 'servers')
         # First there's a FuncIntent for the authentication
         next_eff = resolve_effect(eff, self.successResultOf(eff.intent.func()))
         # which causes the token to be cached
@@ -59,14 +62,14 @@ class GetRequestFuncTests(SynchronousTestCase):
         # with appropriate auth headers
         self.assertEqual(
             next_eff.intent,
-            Request(method='get', url='http://example.com/',
+            Request(method='get', url='http://dfw.openstack/servers',
                     headers=headers('token'), log=self.log))
 
     def test_invalidate_on_auth_error_code(self):
         """
         Upon authentication error, the auth cache is invalidated.
         """
-        eff = self.request('get', 'http://example.com/')
+        eff = self.request(ServiceType.CLOUD_SERVERS, 'get', 'servers')
         # First there's a FuncIntent for the authentication
         next_eff = resolve_effect(eff, self.successResultOf(eff.intent.func()))
         # which causes the token to be cached
@@ -84,7 +87,7 @@ class GetRequestFuncTests(SynchronousTestCase):
         """
         input_json = {"a": 1}
         output_json = {"b": 2}
-        eff = self.request("get", "http://google.com/", data=input_json)
+        eff = self.request(ServiceType.CLOUD_SERVERS, "get", "servers", data=input_json)
         next_eff = resolve_effect(eff, self.successResultOf(eff.intent.func()))
         result = resolve_effect(next_eff,
                                 stub_pure_response(json.dumps(output_json)))
@@ -96,7 +99,7 @@ class GetRequestFuncTests(SynchronousTestCase):
         ``json_response`` can be specifies as False to get the plaintext
         response.
         """
-        eff = self.request("get", "http://google.com/", json_response=False)
+        eff = self.request(ServiceType.CLOUD_SERVERS, "get", "servers", json_response=False)
         next_eff = resolve_effect(eff, self.successResultOf(eff.intent.func()))
         result = resolve_effect(next_eff, stub_pure_response("foo"))
         self.assertEqual(result, "foo")
@@ -108,7 +111,6 @@ class BindServiceTests(SynchronousTestCase):
     def setUp(self):
         """Save some common parameters."""
         self.log = object()
-        self.authenticator = FakeCachingAuthenticator()
         self.request = lambda method, url, headers=None, data=None: (method, url, headers, data)
 
     def test_add_bind_service(self):
@@ -116,9 +118,9 @@ class BindServiceTests(SynchronousTestCase):
         URL paths passed to the request function are appended to the
         endpoint of the service in the specified region for the tenant.
         """
-        request = add_bind_service('123', self.authenticator,
+        request = add_bind_service(fake_service_catalog,
                                    'cloudServersOpenStack', 'DFW', self.log,
                                    self.request)
         self.assertEqual(
-            self.successResultOf(perform(None, request('get', 'foo'))),
+            request('get', 'foo'),
             ('get', 'http://dfw.openstack/foo', None, None))
