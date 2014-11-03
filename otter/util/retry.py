@@ -4,7 +4,10 @@ Module that provides retrying-at-a-particular-interval functionality.
 
 import random
 
+from effect import Effect, Delay, FuncIntent
+
 from twisted.internet import defer
+from twisted.python.failure import Failure
 
 
 class _Retrier(object):
@@ -271,3 +274,31 @@ class TransientRetryError(Exception):
     Exception that can be used to represent retry-able status in a
     retry-function.
     """
+
+
+def should_retry_effect(can_retry, next_interval, exc_info):
+    """
+    Determine whether an :class:`Effect` should be retried, with delay support.
+
+    This is basically glue between :obj:`otter.util.retry` and :obj:`effect.retry`
+    -- after partially applying all but the last argument, this function is
+    suitable for the ``should_retry`` parameter of :func:`effect.retry.retry`.
+
+    This function is pure -- the Effect returned represents all side-effecting
+    operations.
+
+    :param can_retry: a potentially impure function of Failure -> bool that
+        indicates whether a retry should be performed.
+    :param next_interval: a potentially impure function that returns an
+        interval to wait for the next retry attempt.
+    :param tuple exc_info: an exception tuple
+    """
+    def got_can_retry(bool):
+        if bool:
+            return Effect(FuncIntent(next_interval)).on(
+                lambda interval: Effect(Delay(interval))).on(lambda r: True)
+        else:
+            return False
+    exc_type, exc_value, exc_traceback = exc_info
+    eff = Effect(FuncIntent(lambda: can_retry(Failure(exc_value, exc_type, exc_traceback))))
+    return eff.on(got_can_retry)
