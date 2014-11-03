@@ -32,7 +32,8 @@ def get_request_func(authenticator, tenant_id, log):
 
     def otter_request(method, url, headers=None, data=None, log=default_log,
                       reauth_codes=(401, 403),
-                      success_codes=(200,)):
+                      success_codes=(200,),
+                      json_response=True):
         # TODO: We may want to parameterize some retry options *here*, but only
         # if it's really necessary.
         """
@@ -47,19 +48,22 @@ def get_request_func(authenticator, tenant_id, log):
         :param sequence success_codes: HTTP codes to consider successful.
         :param sequence reauth_codes: HTTP codes upon which to invalidate the
             auth cache.
+        :param bool json_response: Specifies whether the response should be
+            parsed as JSON.
 
         :raise APIError: When the response HTTP code is not in success_codes.
         :return: Effect resulting in a JSON-parsed HTTP response body.
         """
-        request_ = add_content_only(
-            add_json_request_data(
-                add_json_response(
-                    add_error_handling(
-                        success_codes,
-                        add_effect_on_response(
-                            invalidate,
-                            reauth_codes,
-                            add_effectful_headers(auth_headers, request))))))
+        request_ = add_json_request_data(
+            add_error_handling(
+                success_codes,
+                add_effect_on_response(
+                    invalidate,
+                    reauth_codes,
+                    add_effectful_headers(auth_headers, request))))
+        if json_response:
+            request_ = add_json_response(request_)
+        request_ = add_content_only(request_)
         return request_(method, url, headers=headers, data=data, log=log)
     return otter_request
 

@@ -91,6 +91,16 @@ class GetRequestFuncTests(SynchronousTestCase):
         self.assertEqual(next_eff.intent.data, json.dumps(input_json))
         self.assertEqual(result, output_json)
 
+    def test_no_json_response(self):
+        """
+        ``json_response`` can be specifies as False to get the plaintext
+        response.
+        """
+        eff = self.request("get", "http://google.com/", json_response=False)
+        next_eff = resolve_effect(eff, self.successResultOf(eff.intent.func()))
+        result = resolve_effect(next_eff, stub_pure_response("foo"))
+        self.assertEqual(result, "foo")
+
 
 class BindServiceTests(SynchronousTestCase):
     """Tests for :func:`add_bind_service`."""
