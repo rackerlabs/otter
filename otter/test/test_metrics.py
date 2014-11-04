@@ -363,7 +363,8 @@ class ServiceTests(SynchronousTestCase):
         c = {'a': 'v'}
         s = makeService(c)
         self.assertIs(s, mock_ms.return_value)
-        mock_ms.assert_called_once_with(matches(IsInstance(ReactorBase)), c)
+        from otter.metrics import metrics_log
+        mock_ms.assert_called_once_with(matches(IsInstance(ReactorBase)), c, metrics_log)
 
     def test_collect_metrics_called_again(self):
         """
