@@ -21,6 +21,12 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
     - JSON bodies and return values
     - returning only content of the result, not response objects
     - logging
+    - abstraction away from specific endpoints -- requests only need
+      to specify an :obj:`otter.constants.ServiceType` and a relative path.
+
+    :param ICachingAuthenticator authenticator: the caching authenticator
+    :param tenant_id: tenant ID.
+    :param BoundLog log: info about requests will be logged to this.
     :param service_mapping: A mapping of otter.constants.ServiceType constants
         to real service names as found in a tenant's catalog.
     :param region: The region of the Rackspace services which requests will
