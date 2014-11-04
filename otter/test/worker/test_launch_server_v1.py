@@ -2063,8 +2063,8 @@ class MetadataScrubbingTests(SynchronousTestCase):
         self.assertEqual(body, "")
 
 
-# An instance associated with a single load balancer.
-instance_details = (
+# An instance associated a with single load balancer.
+old_style_instance_details = (
     'a',
     [(12345, {'nodes': [{'id': 1}]}),
      (54321, {'nodes': [{'id': 2}]})])
@@ -2103,7 +2103,7 @@ class DeleteServerTests(SynchronousTestCase):
                           'DFW',
                           fake_service_catalog,
                           'my-auth-token',
-                          instance_details)
+                          old_style_instance_details)
         self.successResultOf(d)
 
         self.remove_from_load_balancer.assert_has_calls([
@@ -2119,7 +2119,7 @@ class DeleteServerTests(SynchronousTestCase):
         on the information in instance_details.
         """
         d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', instance_details)
+                          'my-auth-token', old_style_instance_details)
         self.successResultOf(d)
 
         self.treq.delete.assert_called_once_with(
@@ -2133,7 +2133,7 @@ class DeleteServerTests(SynchronousTestCase):
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
 
         d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', instance_details)
+                          'my-auth-token', old_style_instance_details)
         self.successResultOf(d)
 
     def test_delete_server_propagates_loadbalancer_failures(self):
@@ -2145,7 +2145,7 @@ class DeleteServerTests(SynchronousTestCase):
             APIError(500, '')).addErrback(wrap_request_error, 'url')
 
         d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', instance_details)
+                          'my-auth-token', old_style_instance_details)
         failure = unwrap_first_error(self.failureResultOf(d))
 
         self.assertEqual(failure.value.reason.value.code, 500)
@@ -2158,7 +2158,7 @@ class DeleteServerTests(SynchronousTestCase):
         deleter.return_value = fail(TimedOutError(3660, 'meh'))
 
         d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', instance_details)
+                          'my-auth-token', old_style_instance_details)
         self.failureResultOf(d, TimedOutError)
 
     def test_delete_and_verify_does_not_verify_if_404(self):
