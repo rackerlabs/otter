@@ -494,8 +494,8 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
         response from Nova.
     :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
-    :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
-        Add Node response.
+    :return: Deferred that fires with a list of 2-tuples of the load
+        balancer id, and that load balancer's respective response.
     """
     _add_to_lb = partial(add_to_load_balancer, log, endpoint, auth_token,
                          ip_address=private_ip_addresses(server)[0],
