@@ -59,7 +59,8 @@ def get_all_server_details(request_func, limit=100, clock=None):
             query.update({'marker': marker})
         urlparams = sorted(query.items(), key=lambda e: e[0])
         eff = retry(
-            request_func('GET', '{}?{}'.format(url, urlencode(urlparams))),
+            request_func(ServiceType.CLOUD_SERVERS,
+                         'GET', '{}?{}'.format(url, urlencode(urlparams))),
             partial(should_retry_effect,
                     retry_times(5), exponential_backoff_interval(2)))
         return eff.on(continue_)

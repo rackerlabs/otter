@@ -9,6 +9,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.task import Clock
 from twisted.internet.defer import succeed
 
+from otter.constants import ServiceType
 from otter.test.utils import StubTreq2, patch
 from otter.util.http import APIError
 from otter.convergence import (
@@ -60,7 +61,8 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         self.servers = [{'id': i} for i in range(9)]
 
     def _request(self, requests):
-        def request(method, url):
+        def request(service_type, method, url):
+            self.assertEqual(service_type, ServiceType.CLOUD_SERVERS)
             responses = requests.get((method, url))
             if responses is None:
                 raise KeyError("{} not in {}".format((method, url), requests.keys()))
