@@ -846,8 +846,10 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     server_id, loadbalancer_details = instance_details
 
     node_info = itertools.chain.from_iterable(
-        [[(loadbalancer_id, node['id']) for node in node_details['nodes']]
-         for (loadbalancer_id, node_details) in loadbalancer_details])
+        [[(_definitely_lb_config(probably_lb_config)["loadBalancerId"],
+           node['id'])
+          for node in node_details['nodes']]
+         for (probably_lb_config, node_details) in loadbalancer_details])
 
     d = gatherResults(
         [remove_from_load_balancer(log, lb_endpoint, auth_token, loadbalancer_id, node_id)
@@ -858,6 +860,22 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
 
     d.addCallback(when_removed_from_loadbalancers)
     return d
+
+
+def _definitely_lb_config(probably_lb_config):
+    """
+    Returns a load balancer configuration unscathed. If passed
+    something that looks like a CLB id, synthesizes a fake load
+    balancer configuration.
+
+    :param probably_lb_config: An object that is probably a load balancer
+        configuration, except maybe is just a CLB id.
+    :type probably_lb_config: probably :class:`dict`, maybe :class:`str`
+
+    :return: A load balancer configuration.
+    :rtype: `class`:dict:
+    """
+    return {"loadBalancerId": probably_lb_config}
 
 
 def delete_and_verify(log, server_endpoint, auth_token, server_id):
