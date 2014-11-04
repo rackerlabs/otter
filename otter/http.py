@@ -27,7 +27,7 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
     :param ICachingAuthenticator authenticator: the caching authenticator
     :param tenant_id: tenant ID.
     :param BoundLog log: info about requests will be logged to this.
-    :param service_mapping: A mapping of otter.constants.ServiceType constants
+    :param dict service_mapping: A mapping of otter.constants.ServiceType constants
         to real service names as found in a tenant's catalog.
     :param region: The region of the Rackspace services which requests will
         be made to.
@@ -40,15 +40,16 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
     default_log = log
 
     @wraps(request)
-    def otter_request(service_type, method, url, headers=None, data=None,
-                      log=default_log,
-                      reauth_codes=(401, 403),
-                      success_codes=(200,),
-                      json_response=True):
+    def service_request(service_type, method, url, headers=None, data=None,
+                        log=default_log,
+                        reauth_codes=(401, 403),
+                        success_codes=(200,),
+                        json_response=True):
         # TODO: We may want to parameterize some retry options *here*, but only
         # if it's really necessary.
         """
-        Make an HTTP request, with a bunch of awesome behavior!
+        Make an HTTP request to a Rackspace service, with a bunch of awesome
+        behavior!
 
         :param otter.constants.ServiceType service_type: The service against
             which the request should be made.
@@ -85,7 +86,7 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
             request_ = add_content_only(request_)
             return request_(method, url, headers=headers, data=data, log=log)
         return auth_eff.on(got_auth)
-    return otter_request
+    return service_request
 
 
 def add_bind_service(catalog, service_name, region, log, request_func):

@@ -90,7 +90,7 @@ def add_effectful_headers(headers_effect, request_func):
     """
     @wraps(request_func)
     def request(*args, **kwargs):
-        headers = kwargs.pop('headers')
+        headers = kwargs.pop('headers', {})
         headers = headers if headers is not None else {}
 
         def got_additional_headers(additional_headers):
@@ -111,7 +111,7 @@ def add_headers(fixed_headers, request_func):
     """
     @wraps(request_func)
     def request(*args, **kwargs):
-        headers = kwargs.pop('headers')
+        headers = kwargs.pop('headers', {})
         headers = headers if headers is not None else {}
         return request_func(*args, headers=merge(headers, fixed_headers),
                             **kwargs)
