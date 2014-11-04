@@ -177,16 +177,16 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
                                         content='{"message": "bad"}', method='post'))
         patch(self, 'otter.util.http.treq', new=self.treq)
         self.clock = Clock()
+        self.endpoint = 'http://url/'
+        self.auth_token = 'my-auth-token'
         self.lb_config = {'loadBalancerId': 12345, 'port': 80}
 
     def _add_to_load_balancer(self):
         """
         Helper function to call :func:`add_to_load_balancers`.
         """
-        return add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
-                                    self.lb_config,
-                                    '192.168.1.1',
-                                    self.undo,
+        return add_to_load_balancer(self.log, self.endpoint, self.auth_token,
+                                    self.lb_config, '192.168.1.1', self.undo,
                                     clock=self.clock)
 
     def test_add_to_load_balancer(self):
@@ -376,10 +376,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         }
 
         d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
-                                  lb_config,
-                                  server_dict,
-                                  self.undo)
-
+                                  lb_config, server_dict, self.undo)
         return d
 
     def test_add_to_load_balancers(self):
@@ -387,26 +384,36 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         Add to load balancers will call add_to_load_balancer multiple times and
         for each load balancer configuration and return all of the results.
         """
-        d1 = Deferred()
-        d2 = Deferred()
+        lb1 = {'loadBalancerId': 12345, 'port': 80}
+        lb2 = {'loadBalancerId': 54321, 'port': 81}
+        lb_response_1 = {'nodes': [{'id': 'a', 'address': '192.168.1.1'}]}
+        lb_response_2 = {'nodes': [{'id': 'b', 'address': '192.168.1.1'}]}
 
-        def _add_to_lb(*a, **kw):
-            for d in [d1, d2]:
-                return d
+        add_to_lb_responses = [
+            (lb1, lb_response_1),
+            (lb2, lb_response_2)
+        ]
 
-        self.patch(launch_server_v1, "add_to_load_balancer", _add_to_lb)
+        def _fake_add_to_lb(log, endpoint, auth_token, lb_config,
+                            ip_address, undo):
+            """
+            Assert that func:`add_to_load_balancer` is being called with the
+            right arguments, and returns an appropriate response.
+            """
+            self.assertEqual(log, self.log)
+            self.assertEqual(endpoint, self.endpoint)
+            self.assertEqual(auth_token, self.auth_token)
+            self.assertEqual(ip_address, '192.168.1.1')
+            self.assertEqual(undo, self.undo)
+            for (lb, response) in add_to_lb_responses:
+                if lb == lb_config:
+                    return succeed(response)
+            else:
+                raise RuntimeError("Unknown lb!")
 
-        d = self._add_to_load_balancers([{'loadBalancerId': 12345,
-                                          'port': 80},
-                                         {'loadBalancerId': 54321,
-                                          'port': 81}])
+        self.patch(launch_server_v1, "add_to_load_balancer", _fake_add_to_lb)
 
-        lb_response_1 = {'nodes': [{'id': 'a', 'address': "whatever"}]}
-        lb_response_2 = {'nodes': [{'id': 'b', 'address': "whatever"}]}
-
-        d2.callback(lb_response_1)
-        d1.callback(lb_response_2)
-
+        d = self._add_to_load_balancers([lb1, lb2])
         results = self.successResultOf(d)
 
         self.assertEqual(sorted(results), [(12345, lb_response_1),
