@@ -495,15 +495,14 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
     :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
     :return: Deferred that fires with a list of 2-tuples of the load
-        balancer id, and that load balancer's respective response.
+        balancer configuration, and that load balancer's respective response.
     """
     _add_to_lb = partial(add_to_load_balancer, log, endpoint, auth_token,
                          ip_address=private_ip_addresses(server)[0],
                          undo=undo)
     dl = DeferredLock()
     d = gatherResults(map(partial(dl.run, _add_to_lb), lb_configs))
-    lb_ids = (lb_config["loadBalancerId"] for lb_config in lb_configs)
-    return d.addCallback(partial(zip, lb_ids))
+    return d.addCallback(partial(zip, lb_configs))
 
 
 def endpoints(service_catalog, service_name, region):

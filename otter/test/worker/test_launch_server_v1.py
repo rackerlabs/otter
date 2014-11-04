@@ -416,8 +416,8 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         d = self._add_to_load_balancers([lb1, lb2])
         results = self.successResultOf(d)
 
-        self.assertEqual(sorted(results), [(12345, lb_response_1),
-                                           (54321, lb_response_2)])
+        self.assertEqual(sorted(results), [(lb1, lb_response_1),
+                                           (lb2, lb_response_2)])
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
     def test_add_to_load_balancers_is_serial(self, add_to_load_balancer):
