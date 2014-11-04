@@ -104,6 +104,9 @@ class GetRequestFuncTests(SynchronousTestCase):
         result = resolve_effect(next_eff, stub_pure_response("foo"))
         self.assertEqual(result, "foo")
 
+    def test_retry(self):
+        1 / 0
+
 
 class BindServiceTests(SynchronousTestCase):
     """Tests for :func:`add_bind_service`."""

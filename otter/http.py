@@ -4,10 +4,13 @@ Integration point for HTTP clients in otter.
 from functools import partial, wraps
 
 from effect import Effect, FuncIntent
+from effect.retry import retry as retry_effect
 
 from otter.util.pure_http import (
     request, add_headers, add_effect_on_response, add_error_handling,
     add_bind_root, add_content_only, add_json_response, add_json_request_data)
+from otter.util.retry import (
+    should_retry_effect, retry_times, exponential_backoff_interval)
 from otter.util.http import headers as otter_headers
 from otter.worker.launch_server_v1 import public_endpoint_url
 
@@ -38,9 +41,10 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
                       log=default_log,
                       reauth_codes=(401, 403),
                       success_codes=(200,),
-                      json_response=True):
-        # TODO: We may want to parameterize some retry options *here*, but only
-        # if it's really necessary.
+                      json_response=True,
+                      retry=False):
+        # TODO: We may want to parameterize some more retry options like number
+        # of retries and backoff policy, but only if it's really necessary.
         """
         Make an HTTP request, with a bunch of awesome behavior!
 
@@ -57,6 +61,7 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
             auth cache.
         :param bool json_response: Specifies whether the response should be
             parsed as JSON.
+        :param bool retry: Whether or not to retry.
 
         :raise APIError: When the response HTTP code is not in success_codes.
         :return: Effect resulting in a JSON-parsed HTTP response body.
@@ -77,9 +82,22 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
             if json_response:
                 request_ = add_json_response(request_)
             request_ = add_content_only(request_)
+            if retry:
+                request_ = add_retries(request_)
             return request_(method, url, headers=headers, data=data, log=log)
         return auth_eff.on(got_auth)
     return otter_request
+
+
+def add_retries(request_func):
+    # Note that this function is intentionally limited right now so use cases
+    # are vetted.
+    """Decorate a request function with retries."""
+    return lambda *args, **kwargs: retry_effect(
+        request_func(*args, **kwargs),
+        partial(should_retry_effect,
+                retry_times(5),
+                exponential_backoff_interval(2)))
 
 
 def add_bind_service(catalog, service_name, region, log, request_func):

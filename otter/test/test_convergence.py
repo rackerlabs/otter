@@ -61,8 +61,9 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         self.servers = [{'id': i} for i in range(9)]
 
     def _request(self, requests):
-        def request(service_type, method, url):
+        def request(service_type, method, url, retry):
             self.assertEqual(service_type, ServiceType.CLOUD_SERVERS)
+            self.assertEqual(retry, True)
             responses = requests.get((method, url))
             if responses is None:
                 raise KeyError("{} not in {}".format((method, url), requests.keys()))
@@ -91,37 +92,6 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                                  req2: {'servers': servers[10:]}})
         eff = get_all_server_details(request, limit=10)
         self.assertEqual(resolve_stubs(eff), servers)
-
-    def test_get_all_retries_exp(self):
-        """
-        `get_all_server_details` will fetch again in exponential backoff form
-        if request fails
-        """
-        # todo
-        # multiple requests for the same path should return different effects
-        # have to assert about the details of retrying :(
-        data = json.dumps({'servers': self.servers})
-        request = self._request(
-            {self.req: [APIError(500, 'bad data'), APIError(401, 'unauth'),
-                        data]})
-        eff = get_all_server_details(request, limit=10)
-        # self.assertNoResult(d)
-        # self.clock.advance(2)
-        # self.assertNoResult(d)
-        # self.clock.advance(4)
-        # self.assertEqual(self.successResultOf(d), self.servers)
-
-    def test_get_all_retries_times_out(self):
-        """
-        `get_all_server_details` will keep trying to fetch info and give up
-        eventually
-        """
-        treq = StubTreq2([(self.req, [(500, 'bad data') for i in range(6)])])
-        d = get_all_server_details('tid', self.auth, 'service', 'ord',
-                                   limit=10, clock=self.clock, _treq=treq)
-        self.assertNoResult(d)
-        self.clock.pump([2 ** i for i in range(1, 6)])
-        self.failureResultOf(d, APIError)
 
 
 class GetScalingGroupServersTests(SynchronousTestCase):
