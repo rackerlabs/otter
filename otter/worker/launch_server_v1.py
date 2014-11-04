@@ -501,16 +501,10 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
     _add_to_lb = partial(add_to_load_balancer, log, endpoint, auth_token,
                          ip_address=private_ip_addresses(server)[0],
                          undo=undo)
-
     dl = DeferredLock()
-    ds = []
-    for lb_config in lb_configs:
-        d = dl.run(_add_to_lb, lb_config)
-        lb_id = lb_config["loadBalancerId"]
-        d.addCallback(lambda response, lb_id=lb_id: (lb_id, response))
-        ds.append(d)
-
-    return gatherResults(ds)
+    d = gatherResults(map(partial(dl.run, _add_to_lb), lb_configs))
+    lb_ids = (lb_config["loadBalancerId"] for lb_config in lb_configs)
+    return d.addCallback(partial(zip, lb_ids))
 
 
 def endpoints(service_catalog, service_name, region):
