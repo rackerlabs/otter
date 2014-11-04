@@ -13,6 +13,7 @@ from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
 from twisted.python.failure import Failure
 
+from otter.worker import launch_server_v1
 from otter.worker.launch_server_v1 import (
     private_ip_addresses,
     endpoints,
@@ -381,38 +382,35 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         return d
 
-    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
-    def test_add_to_load_balancers(self, add_to_load_balancer):
+    def test_add_to_load_balancers(self):
         """
         Add to load balancers will call add_to_load_balancer multiple times and
         for each load balancer configuration and return all of the results.
         """
         d1 = Deferred()
         d2 = Deferred()
-        add_to_load_balancer_deferreds = [d1, d2]
 
-        def _add_to_load_balancer(
-                log, endpoint, auth_token, lb_config, ip_address, undo):
-            return add_to_load_balancer_deferreds.pop(0)
+        def _add_to_lb(*a, **kw):
+            for d in [d1, d2]:
+                return d
 
-        add_to_load_balancer.side_effect = _add_to_load_balancer
+        self.patch(launch_server_v1, "add_to_load_balancer", _add_to_lb)
 
         d = self._add_to_load_balancers([{'loadBalancerId': 12345,
                                           'port': 80},
                                          {'loadBalancerId': 54321,
                                           'port': 81}])
 
-        # Include the ID and port in the response so that we can verify
-        # that add_to_load_balancers associates the response with the correct
-        # load balancer.
+        lb_response_1 = {'nodes': [{'id': 'a', 'address': "whatever"}]}
+        lb_response_2 = {'nodes': [{'id': 'b', 'address': "whatever"}]}
 
-        d2.callback((54321, 81))
-        d1.callback((12345, 80))
+        d2.callback(lb_response_1)
+        d1.callback(lb_response_2)
 
         results = self.successResultOf(d)
 
-        self.assertEqual(sorted(results), [(12345, (12345, 80)),
-                                           (54321, (54321, 81))])
+        self.assertEqual(sorted(results), [(12345, lb_response_1),
+                                           (54321, lb_response_2)])
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
     def test_add_to_load_balancers_is_serial(self, add_to_load_balancer):
