@@ -811,9 +811,16 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     :param str auth_token: The user's auth token.
     :param tuple instance_details: A 2-tuple of the server_id and a list of
         2-tuples of load balancer configurations and respective load balancer
-        responses.
+        responses. Example for some CLB load balancers::
 
-        Example for some CLB load balancers::
+        ('da08965f-4c2d-41aa-b492-a3c02706202f',
+         [({"loadBalancerId": '12345'},
+           {'nodes': [{'id': 'a', 'address': ... }]}),
+          ({"loadBalancerId": '54321'},
+           {'nodes': [{'id': 'b', 'address': ... }]})])
+
+        Historically, these lode balancer configurations were just CLB
+        ids. This form is deprecated, but still supported::
 
         ('da08965f-4c2d-41aa-b492-a3c02706202f',
          [('12345',
@@ -822,6 +829,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
            {'nodes': [{'id': 'b', 'address': ... }]})])
 
     :return: TODO
+
     """
     lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
     cloudLoadBalancers = config_value('cloudLoadBalancers')
