@@ -25,8 +25,8 @@ from toolz import comp
 from urllib import urlencode
 
 from twisted.python.failure import Failure
-from twisted.internet.defer import (gatherResults, maybeDeferred,
-                                    DeferredSemaphore, DeferredLock)
+from twisted.internet.defer import (gatherResults, DeferredSemaphore,
+                                    DeferredLock)
 from twisted.internet.task import deferLater
 
 from otter.util import logging_treq as treq
