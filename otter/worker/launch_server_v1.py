@@ -484,10 +484,9 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
 
 def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
     """
-    Add the specified IP to mulitple load balancer based on the configs in
-    lb_configs.
+    Add the given server to the load balancers specified by ``lb_configs``.
 
-    :param log: A bound logger
+    :param log: A bound logger.
     :param str endpoint: Load balancer endpoint URI.
     :param str auth_token: Keystone Auth Token.
     :param list lb_configs: List of lb_config dictionaries.
