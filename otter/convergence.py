@@ -22,7 +22,7 @@ import effect
 
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
-from toolz.itertoolz import mapcat
+from toolz.itertoolz import concat, concatv, mapcat
 
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
@@ -504,39 +504,6 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                    ))
 
 
-def _optimize_lb_adds(lb_add_steps):
-    """
-    Merge together multiple :obj:`AddNodesToLoadBalancer`, per load balancer.
-
-    :param steps_by_lb: Iterable of :obj:`AddNodesToLoadBalancer`.
-    """
-    steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
-    return [
-        AddNodesToLoadBalancer(
-            lb_id=lbid,
-            address_configs=pset(reduce(lambda s, y: s.union(y),
-                                        [step.address_configs for step in steps])))
-        for lbid, steps in steps_by_lb.iteritems()
-    ]
-
-
-def optimize_steps(steps):
-    """
-    Optimize steps.
-
-    Currently batches up groups of :obj:`AddNodesToLoadBalancer` steps into
-    one per load balancer.
-
-    :param pbag steps: Collection of steps.
-    :return: a pbag of steps.
-    """
-    lb_adds, other = partition_bool(
-        lambda s: type(s) is AddNodesToLoadBalancer,
-        steps)
-    merged_adds = _optimize_lb_adds(lb_adds)
-    return pbag(merged_adds + other)
-
-
 @attributes(['steps'])
 class Convergence(object):
     """
@@ -651,10 +618,168 @@ class ChangeLoadBalancerNode(object):
                   'weight': self.weight})
 
 
+def _rackconnect_bulk_request(lb_node_pairs, method):
+    """
+    Creates a bulk request for RackConnect v3.0 load balancers.
+
+    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
+        connections to be made or broken.
+    :param str method: The method of the request ``"DELETE"`` or
+        ``"POST"``.
+    :return: A bulk RackConnect v3.0 request for the given load balancer,
+        node pairs.
+    :rtype: :class:`Request`
+    """
+    return Request(
+        service=ServiceType.RACKCONNECT_V3,
+        method=method,
+        path=append_segments("load_balancer_pools",
+                             "nodes"),
+        data=[{"cloud_server": {"id": node},
+               "load_balancer_pool": {"id": lb}}
+              for (lb, node) in lb_node_pairs])
+
+
+@implementer(IStep)
+@attributes(['lb_node_pairs'])
+class BulkAddToRCv3(object):
+    """
+    Some connections must be made between some combination of servers
+    and RackConnect v3.0 load balancers.
+
+    Each connection is independently specified.
+
+    See http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
+
+    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
+        connections to be made.
+    """
+
+    def as_request(self):
+        """
+        Produce a :obj:`Request` to add some nodes to some RCv3 load
+        balancers.
+        """
+        return _rackconnect_bulk_request(self.lb_node_pairs, "POST")
+
+
+@implementer(IStep)
+@attributes(["lb_id", "node_id"])
+class RemoveFromRCv3(object):
+    """
+    A server must be removed from a RackConnect v3.0 load balancer.
+    """
+
+    def as_request(self):
+        """
+        Not actually implemented.
+
+        This step is never intended to be reified as a request; it
+        should always be optimized away.
+
+        :raises: NotImplementedError
+        """
+        raise NotImplementedError()
+
+
+@implementer(IStep)
+@attributes(['lb_node_pairs'])
+class BulkRemoveFromRCv3(object):
+    """
+    Some connections must be removed between some combination of nodes
+    and RackConnect v3.0 load balancers.
+
+    See http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
+
+    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
+        connections to be removed.
+    """
+
+    def as_request(self):
+        """
+        Produce a :obj:`Request` to remove some nodes from some RCv3 load
+        balancers.
+        """
+        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE")
+
+
+_optimizers = {}
+
+
+def _optimizer(step_type):
+    """
+    A decorator for a type-specific optimizer.
+
+    Usage::
+
+        @_optimizer(StepTypeToOptimize)
+        def optimizing_function(steps_of_that_type):
+           return iterable_of_optimized_steps
+    """
+    def _add_to_optimizers(optimizer):
+        _optimizers[step_type] = optimizer
+        return optimizer
+    return _add_to_optimizers
+
+
+@_optimizer(AddNodesToLoadBalancer)
+def _optimize_lb_adds(lb_add_steps):
+    """
+    Merge together multiple :obj:`AddNodesToLoadBalancer`, per load balancer.
+
+    :param steps_by_lb: Iterable of :obj:`AddNodesToLoadBalancer`.
+    """
+    steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
+    return [
+        AddNodesToLoadBalancer(
+            lb_id=lbid,
+            address_configs=pset(reduce(lambda s, y: s.union(y),
+                                        [step.address_configs for step in steps])))
+        for lbid, steps in steps_by_lb.iteritems()
+    ]
+
+
+@_optimizer(RemoveFromRCv3)
+def _optimize_rcv3_lb_removes(steps):
+    """
+    Merge :obj:`RemoveFromRCv3` objects to a single :obj:`BulkRemoveFromRCv3`
+    step.
+
+    :param steps: Iterable of :obj:`RemoveFromRCv3`.
+    """
+    pairs = pset((step.lb_id, step.node_id) for step in steps)
+    return [BulkRemoveFromRCv3(lb_node_pairs=pairs)]
+
+
+def optimize_steps(steps):
+    """
+    Optimize steps.
+
+    Currently only optimizes per step type. See the :func:`_optimizer`
+    decorator for more information on how to register an optimizer.
+
+    :param pbag steps: Collection of steps.
+    :return: a pbag of steps.
+    """
+    def grouping_fn(step):
+        step_type = type(step)
+        if step_type in _optimizers:
+            return step_type
+        else:
+            return "unoptimizable"
+
+    steps_by_type = groupby(grouping_fn, steps)
+    unoptimizable = steps_by_type.pop("unoptimizable", [])
+    omg_optimized = concat(_optimizers[step_type](steps)
+                           for step_type, steps in steps_by_type.iteritems())
+    return pbag(concatv(omg_optimized, unoptimizable))
+
+
 class ServiceType(Names):
     """Constants representing Rackspace cloud services."""
     CLOUD_SERVERS = NamedConstant()
     CLOUD_LOAD_BALANCERS = NamedConstant()
+    RACKCONNECT_V3 = NamedConstant()
 
 
 @attributes(['service', 'method', 'path', 'headers', 'data'],
