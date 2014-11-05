@@ -355,7 +355,7 @@ class MetricsService(Service, object):
         :param reactor: Twisted reactor
         :param dict config: All the config necessary to run the service.
                             Comes from config file
-        :param :class:`IReactorTime` clock: Optional reactor for testing timer
+        :param IReactorTime clock: Optional reactor for testing timer
         """
         self._client = connect_cass_servers(reactor, config['cassandra'])
         collect = lambda *a, **k: collect_metrics(*a, **k).addErrback(log.err)
