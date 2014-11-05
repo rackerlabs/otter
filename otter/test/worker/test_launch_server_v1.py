@@ -2108,8 +2108,10 @@ class DeleteServerTests(SynchronousTestCase):
         self.successResultOf(d)
 
         self.remove_from_load_balancer.assert_has_calls([
-            mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token', 12345, 1),
-            mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token', 54321, 2)
+            mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token',
+                      _definitely_lb_config(12345), 1),
+            mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token',
+                      _definitely_lb_config(54321), 2)
         ], any_order=True)
 
         self.assertEqual(self.remove_from_load_balancer.call_count, 2)
