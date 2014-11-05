@@ -39,6 +39,7 @@ from otter.worker.launch_server_v1 import (
     generate_server_metadata,
     _without_otter_metadata,
     scrub_otter_metadata,
+    _definitely_lb_config
 )
 
 
@@ -2323,3 +2324,15 @@ class DeleteServerTests(SynchronousTestCase):
         # the loop has stopped
         self.clock.pump([16, 32])
         self.assertEqual(delete_and_verify.call_count, 3)
+
+
+class DefinitelyLBConfigTests(SynchronousTestCase):
+    """
+    Tests for (maybe) synthesizing load balancer configuration.
+    """
+    def test_lb_id(self):
+        """
+        When passed a load balancer id, a load balancer config is synthesized.
+        """
+        self.assertEqual(_definitely_lb_config("abcd"),
+                         {"loadBalancerId": "abcd"})
