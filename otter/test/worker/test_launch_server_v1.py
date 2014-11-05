@@ -2336,3 +2336,17 @@ class DefinitelyLBConfigTests(SynchronousTestCase):
         """
         self.assertEqual(_definitely_lb_config("abcd"),
                          {"loadBalancerId": "abcd"})
+
+    def test_clb_config(self):
+        """
+        When passed a CLB load balancer config, it is returned verbatim.
+        """
+        lb_config = {"loadBalancerId": "some-clb"}
+        self.assertEqual(_definitely_lb_config(lb_config), lb_config)
+
+    def test_rcv3_config(self):
+        """
+        When passed an RCv3 load balancer config, it is returned verbatim.
+        """
+        lb_config = {"loadBalancerId": "some-rcv3", "type": "RackConnectV3"}
+        self.assertEqual(_definitely_lb_config(lb_config), lb_config)
