@@ -1,6 +1,8 @@
 """Tests for convergence."""
 
 import json
+import calendar
+from functools import partial
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.task import Clock
@@ -9,16 +11,22 @@ from twisted.internet.defer import succeed
 from otter.test.utils import StubTreq2, patch, iMock
 from otter.auth import IAuthenticator
 from otter.util.http import headers, APIError
+from otter.util.timestamp import from_timestamp
 from otter.convergence import (
     _remove_from_lb_with_draining, _converge_lb_state,
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
+    BulkAddToRCv3, RemoveFromRCv3, BulkRemoveFromRCv3,
     SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
-    ServerState, ServiceType, NodeCondition, NodeType, optimize_steps)
+    ServerState, ServiceType, NodeCondition, NodeType, optimize_steps,
+    extract_drained_at, get_load_balancer_contents)
 
-from pyrsistent import pmap, pbag, s
+from pyrsistent import pmap, pbag, pset, s
+
+from effect import ConstantIntent, Effect
+from effect.testing import StubIntent, resolve_stubs
 
 
 class GetAllServerDetailsTests(SynchronousTestCase):
@@ -154,6 +162,132 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         self.assertEqual(
             self.successResultOf(d),
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
+
+
+class ExtractDrainedTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.convergence.extract_drained_at`
+    """
+    summary = ("Node successfully updated with address: " +
+               "'10.23.45.6', port: '8080', weight: '1', condition: 'DRAINING'")
+    updated = '2014-10-23T18:10:48.000Z'
+    feed = ('<feed xmlns="http://www.w3.org/2005/Atom">' +
+            '<entry><summary>{}</summary><updated>{}</updated></entry>' +
+            '<entry><summary>else</summary><updated>badtime</updated></entry>' +
+            '</feed>')
+
+    def test_first_entry(self):
+        """
+        Takes the first entry only
+        """
+        feed = self.feed.format(self.summary, self.updated)
+        self.assertEqual(extract_drained_at(feed),
+                         calendar.timegm(from_timestamp(self.updated).utctimetuple()))
+
+    def test_invalid_first_entry(self):
+        """
+        Raises error if first entry is not DRAINING entry
+        """
+        feed = self.feed.format("Node successfully updated with ENABLED", self.updated)
+        self.assertRaises(ValueError, extract_drained_at, feed)
+
+
+class GetLBContentsTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.convergence.get_load_balancer_contents`
+    """
+
+    def setUp(self):
+        """
+        Stub request function and mock `extract_drained_at`
+        """
+        self.reqs = {
+            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes'): [
+                {'id': '11', 'port': 20, 'address': 'a11',
+                 'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
+                {'id': '12', 'port': 20, 'address': 'a12',
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}],
+            ('GET', 'loadbalancers/2/nodes'): [
+                {'id': '21', 'port': 20, 'address': 'a21',
+                 'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
+                {'id': '22', 'port': 20, 'address': 'a22',
+                 'weight': 3, 'condition': 'DRAINING', 'type': 'PRIMARY'}],
+            ('GET', 'loadbalancers/1/nodes/11.atom'): '11feed',
+            ('GET', 'loadbalancers/2/nodes/22.atom'): '22feed'
+        }
+        self.feeds = {'11feed': 1.0, '22feed': 2.0}
+        self.mock_eda = patch(
+            self, 'otter.convergence.extract_drained_at',
+            side_effect=lambda f: self.feeds[f])
+
+    def _request(self):
+        def request(method, url):
+            body = self.reqs[(method, url)]
+            body = body if type(body) is str else json.dumps(body)
+            return Effect(StubIntent(ConstantIntent(body)))
+        return request
+
+    def test_success(self):
+        """
+        Gets LB contents with drained_at correctly
+        """
+        eff = get_load_balancer_contents(self._request())
+        draining, enabled = NodeCondition.DRAINING, NodeCondition.ENABLED
+        make_config = partial(LBConfig, port=20, type=NodeType.PRIMARY)
+        self.assertEqual(
+            resolve_stubs(eff),
+            [LBNode(lb_id=1, node_id='11', address='a11', drained_at=1.0,
+                    config=make_config(weight=2, condition=draining)),
+             LBNode(lb_id=1, node_id='12', address='a12',
+                    config=make_config(weight=2, condition=enabled)),
+             LBNode(lb_id=2, node_id='21', address='a21',
+                    config=make_config(weight=3, condition=enabled)),
+             LBNode(lb_id=2, node_id='22', address='a22', drained_at=2.0,
+                    config=make_config(weight=3, condition=draining))])
+
+    def test_no_lb(self):
+        """
+        Return empty list if there are no LB
+        """
+        self.reqs = {('GET', 'loadbalancers'): []}
+        eff = get_load_balancer_contents(self._request())
+        self.assertEqual(resolve_stubs(eff), [])
+
+    def test_no_nodes(self):
+        """
+        Return empty if there are LBs but no nodes in them
+        """
+        self.reqs = {
+            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes'): [],
+            ('GET', 'loadbalancers/2/nodes'): []
+        }
+        eff = get_load_balancer_contents(self._request())
+        self.assertEqual(resolve_stubs(eff), [])
+
+    def test_no_draining(self):
+        """
+        Doesnt fetch feeds if all nodes are ENABLED
+        """
+        self.reqs = {
+            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes'): [
+                {'id': '11', 'port': 20, 'address': 'a11',
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
+            ],
+            ('GET', 'loadbalancers/2/nodes'): [
+                {'id': '21', 'port': 20, 'address': 'a21',
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
+            ]
+        }
+        config = LBConfig(port=20, weight=2, condition=NodeCondition.ENABLED,
+                          type=NodeType.PRIMARY)
+        eff = get_load_balancer_contents(self._request())
+        self.assertEqual(
+            resolve_stubs(eff),
+            [LBNode(lb_id=1, node_id='11', address='a11', config=config),
+             LBNode(lb_id=2, node_id='21', address='a21', config=config)])
 
 
 class ObjectStorageTests(SynchronousTestCase):
@@ -859,6 +993,79 @@ class RequestConversionTests(SynchronousTestCase):
                 data={'condition': 'DRAINING',
                       'weight': 50}))
 
+    def test_rcv3_dummy_steps(self):
+        """
+        RCv3 "dummy" steps, which are implemented only to fake API parity
+        with CLB, can not be turned into requests directly. This is
+        intentional: they are supposed to be optimized away.
+        """
+        step = RemoveFromRCv3(
+            lb_id="a_lb",
+            node_id="larry")
+        self.assertRaises(NotImplementedError, step.as_request)
+
+    def _generic_bulk_rcv3_step_test(self, step_class, expected_method):
+        """
+        A generic test for bulk RCv3 steps.
+
+        :param step_class: The step class under test.
+        :param str method: The expected HTTP method of the request.
+        """
+        step = step_class(lb_node_pairs=pset([
+            ("lb-1", "node-a"),
+            ("lb-1", "node-b"),
+            ("lb-1", "node-c"),
+            ("lb-1", "node-d"),
+            ("lb-2", "node-a"),
+            ("lb-2", "node-b"),
+            ("lb-3", "node-c"),
+            ("lb-3", "node-d")
+        ]))
+        request = step.as_request()
+        self.assertEqual(request.service, ServiceType.RACKCONNECT_V3)
+        self.assertEqual(request.method, expected_method)
+        self.assertEqual(request.path, "load_balancer_pools/nodes")
+        self.assertEqual(request.headers, None)
+
+        expected_data = [
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-a'}},
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-b'}},
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-c'}},
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-d'}},
+            {'load_balancer_pool': {'id': 'lb-2'},
+             'cloud_server': {'id': 'node-a'}},
+            {'load_balancer_pool': {'id': 'lb-2'},
+             'cloud_server': {'id': 'node-b'}},
+            {'load_balancer_pool': {'id': 'lb-3'},
+             'cloud_server': {'id': 'node-c'}},
+            {'load_balancer_pool': {'id': 'lb-3'},
+             'cloud_server': {'id': 'node-d'}}
+        ]
+        key_fn = lambda e: (e["load_balancer_pool"]["id"], e["cloud_server"]["id"])
+        request_data = sorted(request.data, key=key_fn)
+        self.assertEqual(request_data, expected_data)
+
+    def test_add_nodes_to_rcv3_load_balancers(self):
+        """
+        :obj:`BulkAddToRCv3.as_request` produces a request for
+        adding any combination of nodes to any combination of RCv3 load
+        balancers.
+        """
+        self._generic_bulk_rcv3_step_test(BulkAddToRCv3, "POST")
+
+    def test_remove_nodes_from_rcv3_load_balancers(self):
+        """
+        :obj:`BulkRemoveFromRCv3.as_request` produces a request
+        for removing any combination of nodes from any combination of RCv3
+        load balancers.
+        """
+        self._generic_bulk_rcv3_step_test(
+            BulkRemoveFromRCv3, "DELETE")
+
 
 class OptimizerTests(SynchronousTestCase):
     """Tests for :func:`optimize_steps`."""
@@ -936,14 +1143,99 @@ class OptimizerTests(SynchronousTestCase):
 
     def test_optimize_leaves_other_steps(self):
         """
-        Non-LB steps are not touched by the optimizer.
+        Unoptimizable steps pass the optimizer unchanged.
         """
         steps = pbag([
             AddNodesToLoadBalancer(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
-            CreateServer(launch_config=pmap({}))
+            CreateServer(launch_config=pmap({})),
+            BulkRemoveFromRCv3(lb_node_pairs=pset([("lb-1", "node-a")])),
+            BulkAddToRCv3(lb_node_pairs=pset([("lb-2", "node-b")]))
+            # Note that the add & remove pair should not be the same;
+            # the optimizer might reasonably optimize opposite
+            # operations away in the future.
         ])
         self.assertEqual(
             optimize_steps(steps),
             steps)
+
+    def test_mixed_optimization(self):
+        """
+        Mixes of optimizable and unoptimizable steps still get optimized
+        correctly.
+        """
+        steps = pbag([
+            # CLB adds
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=6,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=6,
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
+
+            # RCv3 removes
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-a"),
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-b"),
+
+            # Unoptimizable steps
+            CreateServer(launch_config=pmap({})),
+        ])
+
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                # Optimized CLB adds
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.2', LBConfig(port=80)))),
+                AddNodesToLoadBalancer(
+                    lb_id=6,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.2', LBConfig(port=80)))),
+
+                # Optimized RCv3 removes
+                BulkRemoveFromRCv3(lb_node_pairs=pset([
+                    ("lb-1", "node-a"),
+                    ("lb-1", "node-b"),
+                ])),
+
+                # Unoptimizable steps
+                CreateServer(launch_config=pmap({}))
+            ]))
+
+    def test_optimize_rcv3_removes(self):
+        """
+        RackConnect v3.0 steps for removing nodes from load balancers are
+        merged.
+        """
+        unoptimized = pbag([
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-a"),
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-b"),
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-c"),
+            RemoveFromRCv3(lb_id="lb-1", node_id="node-d"),
+            RemoveFromRCv3(lb_id="lb-2", node_id="node-a"),
+            RemoveFromRCv3(lb_id="lb-2", node_id="node-b"),
+            RemoveFromRCv3(lb_id="lb-3", node_id="node-c"),
+            RemoveFromRCv3(lb_id="lb-3", node_id="node-d")
+        ])
+        optimized = pbag([
+            BulkRemoveFromRCv3(lb_node_pairs=pset([
+                ("lb-1", "node-a"),
+                ("lb-1", "node-b"),
+                ("lb-1", "node-c"),
+                ("lb-1", "node-d"),
+                ("lb-2", "node-a"),
+                ("lb-2", "node-b"),
+                ("lb-3", "node-c"),
+                ("lb-3", "node-d")
+            ]))
+        ])
+        self.assertEqual(optimize_steps(unoptimized), optimized)
