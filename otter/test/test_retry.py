@@ -412,17 +412,20 @@ class ShouldRetryEffectTests(SynchronousTestCase):
         ``next_interval`` argument.
         """
         can_retry = lambda f: True
-        next_interval = lambda: 1
+        next_interval = lambda f: 1
         eff = should_retry_effect(can_retry, next_interval, self._get_exc())
         self.assertIs(type(eff.intent), FuncIntent)  # can_retry
-        eff = resolve_effect(eff, eff.intent.perform_effect(None))
-        self.assertEqual(eff.intent, FuncIntent(next_interval))
-        eff = resolve_effect(eff, eff.intent.perform_effect(None))
+        can_retry_result = eff.intent.perform_effect(None)
+        self.assertEqual(can_retry_result, True)
+        eff = resolve_effect(eff, can_retry_result)
+        interval_result = eff.intent.perform_effect(None)
+        self.assertEqual(interval_result, 1)
+        eff = resolve_effect(eff, interval_result)
         self.assertEqual(eff.intent, Delay(1))
         result = resolve_effect(eff, None)
         self.assertTrue(result)
 
-    def test_failure_to_user_function(self):
+    def test_failure_to_user_functions(self):
         """
         The ``can_retry`` argument gets passed a failure correctly constructed
         out of the exception passed.
@@ -433,13 +436,20 @@ class ShouldRetryEffectTests(SynchronousTestCase):
             if (f.type, f.value, f.tb) == e:
                 return True
             else:
-                return False
-        eff = should_retry_effect(can_retry, lambda: 1, e)
+                raise RuntimeError("oops")
+
+        def next_interval(f):
+            if (f.type, f.value, f.tb) == e:
+                return 1
+            else:
+                raise RuntimeError("oops")
+        eff = should_retry_effect(can_retry, next_interval, e)
         # can_retry
         eff = resolve_effect(eff, eff.intent.perform_effect(None))
         # next_interval
         eff = resolve_effect(eff, eff.intent.perform_effect(None))
         # Delay
+        self.assertEqual(eff.intent, Delay(1))
         result = resolve_effect(eff, None)
         self.assertEqual(result, True)
 
@@ -448,6 +458,6 @@ class ShouldRetryEffectTests(SynchronousTestCase):
         When the can_retry function returns False, should_retry_effect
         returns an effect of False.
         """
-        eff = should_retry_effect(lambda f: False, lambda: 1, self._get_exc())
+        eff = should_retry_effect(lambda f: False, lambda f: 1, self._get_exc())
         self.assertEqual(resolve_effect(eff, eff.intent.perform_effect(None)),
                          False)

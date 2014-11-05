@@ -295,10 +295,11 @@ def should_retry_effect(can_retry, next_interval, exc_info):
     """
     def got_can_retry(bool):
         if bool:
-            return Effect(FuncIntent(next_interval)).on(
+            return Effect(FuncIntent(lambda: next_interval(failure))).on(
                 lambda interval: Effect(Delay(interval))).on(lambda r: True)
         else:
             return False
     exc_type, exc_value, exc_traceback = exc_info
-    eff = Effect(FuncIntent(lambda: can_retry(Failure(exc_value, exc_type, exc_traceback))))
+    failure = Failure(exc_value, exc_type, exc_traceback)
+    eff = Effect(FuncIntent(lambda: can_retry(failure)))
     return eff.on(got_can_retry)
