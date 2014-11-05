@@ -16,12 +16,11 @@ initiating a launch_server job.
 """
 
 import json
-import itertools
 import re
 
 from functools import partial
 from copy import deepcopy
-from toolz import comp
+from toolz import comp, groupby
 from urllib import urlencode
 
 from twisted.python.failure import Failure
@@ -843,17 +842,23 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
                                           cloudServersOpenStack,
                                           region)
 
-    server_id, loadbalancer_details = instance_details
+    server_id, lb_details = instance_details
 
-    node_info = itertools.chain.from_iterable(
-        [[(_definitely_lb_config(probably_lb_config)["loadBalancerId"],
-           node['id'])
-          for node in node_details['nodes']]
-         for (probably_lb_config, node_details) in loadbalancer_details])
+    lb_details = ((_definitely_lb_config(probably_lb_config), node_details)
+                  for (probably_lb_config, node_details) in lb_details)
 
-    d = gatherResults(
-        [remove_from_load_balancer(log, lb_endpoint, auth_token, loadbalancer_id, node_id)
-         for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
+    lb_type = lambda (lb_config, _): lb_config.get("type", "CloudLoadBalancer")
+    lbs_by_type = groupby(lb_type, lb_details)
+
+    clbs = lbs_by_type["CloudLoadBalancer"]
+    _remove_from_clb = partial(remove_from_load_balancer, log, lb_endpoint,
+                               auth_token)
+    clb_ds = []
+    for lb_config, lb_response in clbs:
+        for node_info in lb_response["nodes"]:
+            node_id = node_info["id"]
+            clb_ds.append(_remove_from_clb(lb_config, node_id))
+    d = gatherResults(clb_ds, consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
         return verified_delete(log, server_endpoint, auth_token, server_id)
@@ -875,7 +880,10 @@ def _definitely_lb_config(probably_lb_config):
     :return: A load balancer configuration.
     :rtype: `class`:dict:
     """
-    return {"loadBalancerId": probably_lb_config}
+    if isinstance(probably_lb_config, dict):
+        return probably_lb_config
+    else:
+        return {"loadBalancerId": probably_lb_config}
 
 
 def delete_and_verify(log, server_endpoint, auth_token, server_id):
