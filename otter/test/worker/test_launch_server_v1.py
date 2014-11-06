@@ -2151,14 +2151,34 @@ class DeleteServerTests(SynchronousTestCase):
         """
         self._test_delete_server_lb_removal(instance_details)
 
+    def _test_delete_server(self, instance_details):
+        """
+        Helper test to verify that :func:`delete_server` performs a
+        ``DELETE`` request against the instance URL based on the
+        information in ``instance_details``.
         """
         d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', old_style_instance_details)
+                          'my-auth-token', instance_details)
         self.successResultOf(d)
 
         self.treq.delete.assert_called_once_with(
             'http://dfw.openstack/servers/a',
             headers=expected_headers, log=mock.ANY)
+
+    def test_delete_server_old_style(self):
+        """
+        :func:`delete_server` performs a ``DELETE`` request against the
+        instance URL based on the information in ``instance_details``,
+        even when ``instance_details`` is old-style.
+        """
+        self._test_delete_server(old_style_instance_details)
+
+    def test_delete_server(self):
+        """
+        :func:`delete_server` performs a ``DELETE`` request against the
+        instance URL based on the information in ``instance_details``.
+        """
+        self._test_delete_server(instance_details)
 
     def test_delete_server_succeeds_on_unknown_server(self):
         """
