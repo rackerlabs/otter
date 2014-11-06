@@ -4,7 +4,10 @@ Module that provides retrying-at-a-particular-interval functionality.
 
 import random
 
+from characteristic import attributes, Attribute
+
 from effect import Effect, Delay, FuncIntent
+from effect.retry import retry
 
 from twisted.internet import defer
 from twisted.python.failure import Failure
@@ -158,13 +161,7 @@ def retry_times(max_tries):
     :return: a function that accepts a :class:`Failure` and returns ``True``
         until it has been called ``max_tries`` times. Otherwise, returns ``False``
     """
-    tries = [0]
-
-    def can_retry(f):
-        tries[0] += 1
-        return tries[0] <= max_tries
-
-    return can_retry
+    return RetryTimes(max_retries=max_tries)
 
 
 def compose_retries(*can_retry_funcs):
@@ -214,16 +211,7 @@ def exponential_backoff_interval(start=2):
     :param start: number of seconds > 0 to start with
     :return: a function that accepts a :class:`Failure` and returns ``interval``
     """
-    last_interval = [0]
-
-    def next_interval(f):
-        if last_interval[0]:
-            last_interval[0] *= 2
-        else:
-            last_interval[0] = start
-        return last_interval[0]
-
-    return next_interval
+    return ExponentialBackoffInterval(start=start)
 
 
 def retry(do_work, can_retry=None, next_interval=None, clock=None):
@@ -276,7 +264,7 @@ class TransientRetryError(Exception):
     """
 
 
-def should_retry_effect(can_retry, next_interval, exc_info):
+def should_retry_effect(can_retry, next_interval):
     """
     Determine whether an :class:`Effect` should be retried, with delay support.
 
@@ -293,13 +281,47 @@ def should_retry_effect(can_retry, next_interval, exc_info):
         interval to wait for the next retry attempt.
     :param tuple exc_info: an exception tuple
     """
-    def got_can_retry(bool):
-        if bool:
-            return Effect(FuncIntent(lambda: next_interval(failure))).on(
-                lambda interval: Effect(Delay(interval))).on(lambda r: True)
+    return ShouldRetryEffect(can_retry=can_retry, next_interval=next_interval)
+
+
+@attributes(['can_retry', 'next_interval'])
+class ShouldRetryEffect(object):
+    def __call__(self, exc_info):
+        exc_type, exc_value, exc_traceback = exc_info
+        failure = Failure(exc_value, exc_type, exc_traceback)
+
+        def doit():
+            if self.can_retry(failure):
+                interval = self.next_interval(self.failure)
+                return Effect(Delay(interval)).on(lambda r: True) 
+            else:
+                return False
+        return Effect(FuncIntent(doit))
+
+
+@attributes(['start', Attribute('last_interval', default_value=0)])
+class ExponentialBackoffInterval(object):
+
+    def __call__(self, failure):
+        if self.last_interval != 0:
+            self.last_interval *= 2
         else:
-            return False
-    exc_type, exc_value, exc_traceback = exc_info
-    failure = Failure(exc_value, exc_type, exc_traceback)
-    eff = Effect(FuncIntent(lambda: can_retry(failure)))
-    return eff.on(got_can_retry)
+            self.last_interval = self.start
+        return self.last_interval
+
+
+@attributes(['max_retries', Attribute('tries', default_value=0)])
+class RetryTimes(object):
+    def __call__(self, failure):
+        self.tries += 1
+        return self.tries <= self.max_retries
+
+
+def retry_effect(effect, can_retry, next_interval):
+    return Retry(effect, should_retry_effect(can_retry, next_interval))
+
+
+@attributes(['effect', 'should_retry_effect'])
+class Retry(object):
+    def perform_effect(self, dispatcher):
+        return retry(self.effect, self.should_retry_effect)
