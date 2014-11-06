@@ -10,7 +10,7 @@ from otter.util.pure_http import (
     request, add_headers, add_effect_on_response, add_error_handling,
     add_bind_root, add_content_only, add_json_response, add_json_request_data)
 from otter.util.retry import (
-    should_retry_effect, retry_times, exponential_backoff_interval)
+    should_retry_effect, RetryTimes, ExponentialBackoffInterval)
 from otter.util.http import headers as otter_headers
 from otter.worker.launch_server_v1 import public_endpoint_url
 
@@ -61,7 +61,7 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
             auth cache.
         :param bool json_response: Specifies whether the response should be
             parsed as JSON.
-        :param bool retry: Whether or not to retry.
+        :param bool retry: Whether or not to retry upon any APIError received.
 
         :raise APIError: When the response HTTP code is not in success_codes.
         :return: Effect resulting in a JSON-parsed HTTP response body.
@@ -96,8 +96,8 @@ def add_retries(request_func):
     return lambda *args, **kwargs: retry_effect(
         request_func(*args, **kwargs),
         partial(should_retry_effect,
-                retry_times(5),
-                exponential_backoff_interval(2)))
+                RetryTimes(max_retries=5),
+                ExponentialBackoffInterval(=2)))
 
 
 def add_bind_service(catalog, service_name, region, log, request_func):
