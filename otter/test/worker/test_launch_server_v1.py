@@ -2097,8 +2097,8 @@ class DeleteServerTests(SynchronousTestCase):
 
     def test_delete_server_deletes_load_balancer_node(self):
         """
-        delete_server removes the nodes specified in instance details from
-        the associated load balancers.
+        :func:`delete_server` removes the nodes specified in instance details
+        from the associated load balancers.
         """
         d = delete_server(self.log,
                           'DFW',
