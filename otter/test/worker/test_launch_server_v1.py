@@ -2115,16 +2115,16 @@ class DeleteServerTests(SynchronousTestCase):
 
         self.clock = Clock()
 
-    def test_delete_server_deletes_load_balancer_node(self):
+    def _test_delete_server_lb_removal(self, instance_details):
         """
-        :func:`delete_server` removes the nodes specified in instance details
-        from the associated load balancers.
+        Helper test to verify that :func:`delete_server` removes the nodes
+        specified in instance details from the associated load balancers.
         """
         d = delete_server(self.log,
                           'DFW',
                           fake_service_catalog,
                           'my-auth-token',
-                          old_style_instance_details)
+                          instance_details)
         self.successResultOf(d)
 
         self.remove_from_load_balancer.assert_has_calls([
@@ -2136,10 +2136,21 @@ class DeleteServerTests(SynchronousTestCase):
 
         self.assertEqual(self.remove_from_load_balancer.call_count, 2)
 
-    def test_delete_server(self):
+    def test_delete_servers_lb_removal_old_style(self):
         """
-        delete_server performs a DELETE request against the instance URL based
-        on the information in instance_details.
+        :func:`delete_server` removes the nodes specified in instance details
+        from the associated load balancers, even when ``instance_details`` is
+        old-style.
+        """
+        self._test_delete_server_lb_removal(old_style_instance_details)
+
+    def test_delete_servers_lb_removal(self):
+        """
+        :func:`delete_server` removes the nodes specified in instance details
+        from the associated load balancers.
+        """
+        self._test_delete_server_lb_removal(instance_details)
+
         """
         d = delete_server(self.log, 'DFW', fake_service_catalog,
                           'my-auth-token', old_style_instance_details)
