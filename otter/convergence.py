@@ -41,7 +41,7 @@ class NodeType(Names):
                                  # primary node fails.
 
 
-def get_all_server_details(request_func, limit=100, clock=None):
+def get_all_server_details(request_func, limit=100):
     """
     Return all servers of a tenant.
 
@@ -74,8 +74,7 @@ def get_all_server_details(request_func, limit=100, clock=None):
     return get_server_details(None)
 
 
-def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
-                              server_predicate=None, clock=None):
+def get_scaling_group_servers(request_func, server_predicate=None):
     """
     Return tenant's servers that belong to a scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
@@ -93,9 +92,8 @@ def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
     server_predicate = server_predicate if server_predicate is not None else lambda s: s
     servers_apply = compose(groupby(group_id), filter(server_predicate), filter(has_group_id))
 
-    d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
-    d.addCallback(servers_apply)
-    return d
+    eff = get_all_server_details(request_func)
+    return eff.on(servers_apply)
 
 
 class IStep(Interface):

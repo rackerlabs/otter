@@ -47,37 +47,34 @@ class Sequence(object):
             return response
 
 
+def _request(requests):
+    def request(service_type, method, url, retry):
+        responses = requests.get((service_type, method, url, retry))
+        if responses is None:
+            raise KeyError("{} not in {}".format((method, url), requests.keys()))
+        if not isinstance(responses, list):
+            responses = [responses]
+        return Effect(StubIntent(Sequence(responses)))
+    return request
+
+
 class GetAllServerDetailsTests(SynchronousTestCase):
     """
     Tests for :func:`get_all_server_details`
     """
 
     def setUp(self):
-        """
-        Setup stub clock, treq implementation and mock authenticator
-        """
-        self.clock = Clock()
-        self.req = ('GET', 'servers/detail?limit=10')
+        """Save basic reused data."""
+        self.req = (ServiceType.CLOUD_SERVERS, 'GET',
+                    'servers/detail?limit=10', True)
         self.servers = [{'id': i} for i in range(9)]
-
-    def _request(self, requests):
-        def request(service_type, method, url, retry):
-            self.assertEqual(service_type, ServiceType.CLOUD_SERVERS)
-            self.assertEqual(retry, True)
-            responses = requests.get((method, url))
-            if responses is None:
-                raise KeyError("{} not in {}".format((method, url), requests.keys()))
-            if not isinstance(responses, list):
-                responses = [responses]
-            return Effect(StubIntent(Sequence(responses)))
-        return request
 
     def test_get_all_less_limit(self):
         """
-        `get_all_server_details` will not fetch again if first get returns results
-        with size < limit
+        `get_all_server_details` will not fetch again if first get returns
+        results with size < limit
         """
-        request = self._request({self.req: {'servers': self.servers}})
+        request = _request({self.req: {'servers': self.servers}})
         eff = get_all_server_details(request, limit=10)
         self.assertEqual(resolve_stubs(eff), self.servers)
 
@@ -87,8 +84,9 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         """
         servers = [{'id': i} for i in range(19)]
 
-        req2 = ('GET', 'servers/detail?limit=10&marker=9')
-        request = self._request({self.req: {'servers': servers[:10]},
+        req2 = (ServiceType.CLOUD_SERVERS, 'GET',
+                'servers/detail?limit=10&marker=9', True)
+        request = _request({self.req: {'servers': servers[:10]},
                                  req2: {'servers': servers[10:]}})
         eff = get_all_server_details(request, limit=10)
         self.assertEqual(resolve_stubs(eff), servers)
@@ -100,37 +98,27 @@ class GetScalingGroupServersTests(SynchronousTestCase):
     """
 
     def setUp(self):
-        """
-        Mock and setup :func:`get_all_server_details`
-        """
-        self.mock_gasd = patch(self, 'otter.convergence.get_all_server_details')
-        self.servers = []
-        self.clock = None
-
-        def gasd(*args, **kwargs):
-            if args == ('t', 'a', 's', 'r') and kwargs == {'clock': self.clock}:
-                return succeed(self.servers)
-
-        # Setup function to return value only on expected args to avoid asserting
-        # its called every time
-        self.mock_gasd.side_effect = gasd
+        """Save basic reused data."""
+        self.req = (ServiceType.CLOUD_SERVERS, 'GET',
+                    'servers/detail?limit=100', True)
 
     def test_filters_no_metadata(self):
         """
         Does not include servers which do not have metadata in it
         """
-        self.servers = [{'id': i} for i in range(10)]
-        d = get_scaling_group_servers('t', 'a', 's', 'r')
-        self.assertEqual(self.successResultOf(d), {})
+        servers = [{'id': i} for i in range(10)]
+        request = _request({self.req: {'servers': servers}})
+        eff = get_scaling_group_servers(request)
+        self.assertEqual(resolve_stubs(eff), {})
 
     def test_filters_no_as_metadata(self):
         """
         Does not include servers which have metadata but does not have AS info in it
         """
-        self.servers = [{'id': i, 'metadata': {}} for i in range(10)]
-        self.clock = Clock()
-        d = get_scaling_group_servers('t', 'a', 's', 'r', clock=self.clock)
-        self.assertEqual(self.successResultOf(d), {})
+        servers = [{'id': i, 'metadata': {}} for i in range(10)]
+        request = _request({self.req: {'servers': servers}})
+        eff = get_scaling_group_servers(request)
+        self.assertEqual(resolve_stubs(eff), {})
 
     def test_returns_as_servers(self):
         """
@@ -140,10 +128,11 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i} for i in range(5)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i} for i in range(5, 8)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
-        self.servers = as_servers + [{'metadata': 'junk'}] * 3
-        d = get_scaling_group_servers('t', 'a', 's', 'r')
+        servers = as_servers + [{'metadata': 'junk'}] * 3
+        request = _request({self.req: {'servers': servers}})
+        eff = get_scaling_group_servers(request)
         self.assertEqual(
-            self.successResultOf(d),
+            resolve_stubs(eff),
             {'a': as_servers[:5] + [as_servers[-1]], 'b': as_servers[5:8]})
 
     def test_filters_on_user_criteria(self):
@@ -153,11 +142,11 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         as_servers = (
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i} for i in range(5)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i} for i in range(5, 8)])
-        self.servers = as_servers + [{'metadata': 'junk'}] * 3
-        d = get_scaling_group_servers('t', 'a', 's', 'r',
-                                      server_predicate=lambda s: s['id'] % 3 == 0)
+        servers = as_servers + [{'metadata': 'junk'}] * 3
+        request = _request({self.req: {'servers': servers}})
+        eff = get_scaling_group_servers(request, server_predicate=lambda s: s['id'] % 3 == 0)
         self.assertEqual(
-            self.successResultOf(d),
+            resolve_stubs(eff),
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
 
 
