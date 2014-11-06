@@ -2071,6 +2071,26 @@ old_style_instance_details = (
      (54321, {'nodes': [{'id': 2}]})])
 
 
+def _as_new_style_instance_details(old_style):
+    """
+    Converts an old-style ``instance_details`` (with just a CLB id) to a
+    new-style ``instance_details`` (with a load balancer configuration).
+
+    If the passed ``instance_details`` are already new-style, they are passed
+    unchanged.
+
+    :param old_style: As ``instance_details``.
+    :return: An ``instance_details``, definitely new-style.
+    """
+    server_id, lb_specs = old_style
+    updated_lb_specs = [(_definitely_lb_config(maybe_lb_conf), lb_response)
+                        for maybe_lb_conf, lb_response in lb_specs]
+    return server_id, updated_lb_specs
+
+
+instance_details = _as_new_style_instance_details(old_style_instance_details)
+
+
 class DeleteServerTests(SynchronousTestCase):
     """
     Test the delete server worker.
