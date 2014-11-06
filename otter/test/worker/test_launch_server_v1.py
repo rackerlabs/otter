@@ -2271,7 +2271,7 @@ class DeleteServerTests(SynchronousTestCase):
     def test_delete_and_verify_does_not_verify_if_404(self):
         """
         :func:`delete_and_verify` does not verify if the deletion response
-        code is a 404
+        code is a 404.
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
         d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
