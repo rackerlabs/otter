@@ -2180,15 +2180,32 @@ class DeleteServerTests(SynchronousTestCase):
         """
         self._test_delete_server(instance_details)
 
-    def test_delete_server_succeeds_on_unknown_server(self):
+    def _test_delete_server_succeeds_on_unknown_server(self, instance_details):
         """
-        delete_server succeeds and logs if delete calls return 404.
+        Helper test to check if :func:`delete_server` succeeds and logs if
+        delete calls return 404.
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
 
         d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', old_style_instance_details)
+                          'my-auth-token', instance_details)
         self.successResultOf(d)
+
+    def test_delete_server_succeeds_on_unknown_server_old_style(self):
+        """
+        :func:`delete_server` succeeds and logs if delete calls return
+        404, even if the ``instance`` details are old-style.
+        """
+        self._test_delete_server_succeeds_on_unknown_server(
+            old_style_instance_details)
+
+    def test_delete_server_succeeds_on_unknown_server(self):
+        """
+        :func:`delete_server` succeeds and logs if delete calls return
+        404.
+        """
+        self._test_delete_server_succeeds_on_unknown_server(
+            instance_details)
 
     def test_delete_server_propagates_loadbalancer_failures(self):
         """
