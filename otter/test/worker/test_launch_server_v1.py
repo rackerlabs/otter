@@ -2241,7 +2241,7 @@ class DeleteServerTests(SynchronousTestCase):
 
     @mock.patch('otter.worker.launch_server_v1.verified_delete')
     def _test_delete_server_propagates_verified_delete_failures(
-            self, deleter, instance_details):
+            self, instance_details, deleter):
         """
         Helper function to verify that :func:`delete_server` fails with an
         :exc:`APIError` if deleting the server fails.
