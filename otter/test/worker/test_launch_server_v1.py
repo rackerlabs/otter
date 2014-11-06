@@ -2207,19 +2207,37 @@ class DeleteServerTests(SynchronousTestCase):
         self._test_delete_server_succeeds_on_unknown_server(
             instance_details)
 
-    def test_delete_server_propagates_loadbalancer_failures(self):
+    def _test_delete_server_propagates_loadbalancer_failures(
+            self, instance_details):
         """
-        delete_server propagates any errors from removing server from load
-        balancers
+        :func:`delete_server` propagates any errors that occur when
+        removing server from load balancers.
         """
         self.remove_from_load_balancer.return_value = fail(
             APIError(500, '')).addErrback(wrap_request_error, 'url')
 
         d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', old_style_instance_details)
+                          'my-auth-token', instance_details)
         failure = unwrap_first_error(self.failureResultOf(d))
 
         self.assertEqual(failure.value.reason.value.code, 500)
+
+    def test_delete_server_propagates_loadbalancer_failures_old_style(self):
+        """
+        :func:`delete_server` propagates any errors that occur when
+        removing server from load balancers, even if the ``instance``
+        details are old-style.
+        """
+        self._test_delete_server_propagates_loadbalancer_failures(
+            old_style_instance_details)
+
+    def test_delete_server_propagates_loadbalancer_failures(self):
+        """
+        :func:`delete_server` propagates any errors that occur when
+        removing server from load balancers.
+        """
+        self._test_delete_server_propagates_loadbalancer_failures(
+            instance_details)
 
     @mock.patch('otter.worker.launch_server_v1.verified_delete')
     def test_delete_server_propagates_verified_delete_failures(self, deleter):
