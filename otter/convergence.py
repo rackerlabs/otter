@@ -7,8 +7,6 @@ from __future__ import print_function
 from functools import partial
 from urllib import urlencode
 
-from effect.retry import retry
-
 from characteristic import attributes, Attribute
 from pyrsistent import pbag, freeze, s, pset
 from zope.interface import Interface, implementer
@@ -22,7 +20,7 @@ from otter.constants import ServiceType
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
-from otter.util.retry import retry_times, exponential_backoff_interval, should_retry_effect
+from otter.util.retry import retry_times, exponential_backoff_interval, retry_effect
 
 
 class NodeCondition(Names):
@@ -58,10 +56,11 @@ def get_all_server_details(request_func, limit=100):
         if marker is not None:
             query.update({'marker': marker})
         urlparams = sorted(query.items(), key=lambda e: e[0])
-        eff = request_func(
-            ServiceType.CLOUD_SERVERS,
-            'GET', '{}?{}'.format(url, urlencode(urlparams)),
-            retry=True)
+        eff = retry_effect(
+            request_func(
+                ServiceType.CLOUD_SERVERS,
+                'GET', '{}?{}'.format(url, urlencode(urlparams))),
+            retry_times(5), exponential_backoff_interval(2))
         return eff.on(continue_)
 
     def continue_(response):

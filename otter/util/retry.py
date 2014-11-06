@@ -293,7 +293,7 @@ class ShouldRetryEffect(object):
         def doit():
             if self.can_retry(failure):
                 interval = self.next_interval(self.failure)
-                return Effect(Delay(interval)).on(lambda r: True) 
+                return Effect(Delay(interval)).on(lambda r: True)
             else:
                 return False
         return Effect(FuncIntent(doit))
@@ -318,7 +318,9 @@ class RetryTimes(object):
 
 
 def retry_effect(effect, can_retry, next_interval):
-    return Retry(effect, should_retry_effect(can_retry, next_interval))
+    return Effect(Retry(
+        effect=effect,
+        should_retry_effect=should_retry_effect(can_retry, next_interval)))
 
 
 @attributes(['effect', 'should_retry_effect'])

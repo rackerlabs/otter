@@ -3,12 +3,13 @@
 import json
 
 from effect import Effect
-from effect.testing import StubIntent, resolve_stubs
+from effect.testing import StubIntent, resolve_stubs, resolve_effect
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.task import Clock
 from twisted.internet.defer import succeed
 
+from otter.util.retry import Retry, ShouldRetryEffect, exponential_backoff_interval, retry_times
 from otter.constants import ServiceType
 from otter.test.utils import StubTreq2, patch
 from otter.util.http import APIError
@@ -48,8 +49,8 @@ class Sequence(object):
 
 
 def _request(requests):
-    def request(service_type, method, url, retry):
-        responses = requests.get((service_type, method, url, retry))
+    def request(service_type, method, url):
+        responses = requests.get((service_type, method, url))
         if responses is None:
             raise KeyError("{} not in {}".format((method, url), requests.keys()))
         if not isinstance(responses, list):
@@ -57,6 +58,10 @@ def _request(requests):
         return Effect(StubIntent(Sequence(responses)))
     return request
 
+
+def resolve_retry_stubs(eff):
+    assert type(eff.intent) is Retry
+    return resolve_effect(eff, resolve_stubs(eff.intent.effect))
 
 class GetAllServerDetailsTests(SynchronousTestCase):
     """
@@ -66,7 +71,7 @@ class GetAllServerDetailsTests(SynchronousTestCase):
     def setUp(self):
         """Save basic reused data."""
         self.req = (ServiceType.CLOUD_SERVERS, 'GET',
-                    'servers/detail?limit=10', True)
+                    'servers/detail?limit=10')
         self.servers = [{'id': i} for i in range(9)]
 
     def test_get_all_less_limit(self):
@@ -76,7 +81,8 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         """
         request = _request({self.req: {'servers': self.servers}})
         eff = get_all_server_details(request, limit=10)
-        self.assertEqual(resolve_stubs(eff), self.servers)
+        result = resolve_retry_stubs(eff)
+        self.assertEqual(result, self.servers)
 
     def test_get_all_above_limit(self):
         """
@@ -85,11 +91,22 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         servers = [{'id': i} for i in range(19)]
 
         req2 = (ServiceType.CLOUD_SERVERS, 'GET',
-                'servers/detail?limit=10&marker=9', True)
+                'servers/detail?limit=10&marker=9')
         request = _request({self.req: {'servers': servers[:10]},
-                                 req2: {'servers': servers[10:]}})
+                            req2: {'servers': servers[10:]}})
         eff = get_all_server_details(request, limit=10)
-        self.assertEqual(resolve_stubs(eff), servers)
+        self.assertEqual(resolve_retry_stubs(resolve_retry_stubs(eff)), servers)
+
+    def test_retry(self):
+        """The HTTP requests are retried with some appropriate parameters."""
+        request = _request({self.req: {'servers': self.servers}})
+        eff = get_all_server_details(request, limit=10)
+        self.assertEqual(
+            eff.intent.should_retry_effect,
+            ShouldRetryEffect(can_retry=retry_times(5),
+                              next_interval=exponential_backoff_interval(2)))
+        result = resolve_retry_stubs(eff)
+        self.assertEqual(result, self.servers)
 
 
 class GetScalingGroupServersTests(SynchronousTestCase):
@@ -100,7 +117,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
     def setUp(self):
         """Save basic reused data."""
         self.req = (ServiceType.CLOUD_SERVERS, 'GET',
-                    'servers/detail?limit=100', True)
+                    'servers/detail?limit=100')
 
     def test_filters_no_metadata(self):
         """
@@ -109,7 +126,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         servers = [{'id': i} for i in range(10)]
         request = _request({self.req: {'servers': servers}})
         eff = get_scaling_group_servers(request)
-        self.assertEqual(resolve_stubs(eff), {})
+        self.assertEqual(resolve_retry_stubs(eff), {})
 
     def test_filters_no_as_metadata(self):
         """
@@ -118,7 +135,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         servers = [{'id': i, 'metadata': {}} for i in range(10)]
         request = _request({self.req: {'servers': servers}})
         eff = get_scaling_group_servers(request)
-        self.assertEqual(resolve_stubs(eff), {})
+        self.assertEqual(resolve_retry_stubs(eff), {})
 
     def test_returns_as_servers(self):
         """
@@ -132,7 +149,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         request = _request({self.req: {'servers': servers}})
         eff = get_scaling_group_servers(request)
         self.assertEqual(
-            resolve_stubs(eff),
+            resolve_retry_stubs(eff),
             {'a': as_servers[:5] + [as_servers[-1]], 'b': as_servers[5:8]})
 
     def test_filters_on_user_criteria(self):
@@ -146,7 +163,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         request = _request({self.req: {'servers': servers}})
         eff = get_scaling_group_servers(request, server_predicate=lambda s: s['id'] % 3 == 0)
         self.assertEqual(
-            resolve_stubs(eff),
+            resolve_retry_stubs(eff),
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
 
 

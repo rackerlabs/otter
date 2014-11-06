@@ -41,8 +41,7 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
                       log=default_log,
                       reauth_codes=(401, 403),
                       success_codes=(200,),
-                      json_response=True,
-                      retry=False):
+                      json_response=True):
         # TODO: We may want to parameterize some more retry options like number
         # of retries and backoff policy, but only if it's really necessary.
         """
@@ -61,7 +60,6 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
             auth cache.
         :param bool json_response: Specifies whether the response should be
             parsed as JSON.
-        :param bool retry: Whether or not to retry upon any APIError received.
 
         :raise APIError: When the response HTTP code is not in success_codes.
         :return: Effect resulting in a JSON-parsed HTTP response body.
@@ -82,22 +80,9 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
             if json_response:
                 request_ = add_json_response(request_)
             request_ = add_content_only(request_)
-            if retry:
-                request_ = add_retries(request_)
             return request_(method, url, headers=headers, data=data, log=log)
         return auth_eff.on(got_auth)
     return otter_request
-
-
-def add_retries(request_func):
-    # Note that this function is intentionally limited right now so use cases
-    # are vetted.
-    """Decorate a request function with retries."""
-    return lambda *args, **kwargs: retry_effect(
-        request_func(*args, **kwargs),
-        partial(should_retry_effect,
-                RetryTimes(max_retries=5),
-                ExponentialBackoffInterval(=2)))
 
 
 def add_bind_service(catalog, service_name, region, log, request_func):

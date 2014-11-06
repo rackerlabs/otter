@@ -107,28 +107,6 @@ class GetRequestFuncTests(SynchronousTestCase):
         result = resolve_effect(next_eff, stub_pure_response("foo"))
         self.assertEqual(result, "foo")
 
-    def test_retry_no_retry(self):
-        """Retry doesn't change the behavior when there's no exception."""
-        eff = self.request(ServiceType.CLOUD_SERVERS, "get", "servers", retry=True)
-        next_eff = resolve_effect(eff, self.successResultOf(eff.intent.func()))
-        result = resolve_effect(next_eff, stub_pure_response({}))
-        self.assertEqual(result, {})
-
-    def test_retry(self):
-        """Retry on failure."""
-        eff = self.request(ServiceType.CLOUD_SERVERS, "get", "servers", retry=True)
-        request_eff = resolve_effect(eff, self.successResultOf(eff.intent.func()))
-        retry_eff = resolve_effect(request_eff, stub_pure_response("foo", code=500))
-        self.assertEqual(
-            retry_eff.intent,
-            ShouldRetryEffect(can_retry=retry_times(5),
-                              next_interval=exponential_backoff_interval(2),
-                              failure=CheckFailureValue(APIError(code=500, body="foo"))))
-        re_request_eff = resolve_effect(retry_eff, True)
-        self.assertEqual(
-            resolve_effect(re_request_eff, stub_pure_response({})),
-            {})
-
 
 class BindServiceTests(SynchronousTestCase):
     """Tests for :func:`add_bind_service`."""
