@@ -2240,15 +2240,33 @@ class DeleteServerTests(SynchronousTestCase):
             instance_details)
 
     @mock.patch('otter.worker.launch_server_v1.verified_delete')
-    def test_delete_server_propagates_verified_delete_failures(self, deleter):
+    def _test_delete_server_propagates_verified_delete_failures(
+            self, deleter, instance_details):
         """
-        delete_server fails with an APIError if deleting the server fails.
+        Helper function to verify that :func:`delete_server` fails with an
+        :exc:`APIError` if deleting the server fails.
         """
         deleter.return_value = fail(TimedOutError(3660, 'meh'))
 
         d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', old_style_instance_details)
+                          'my-auth-token', instance_details)
         self.failureResultOf(d, TimedOutError)
+
+    def test_delete_server_propagates_verified_delete_failures_old_style(self):
+        """
+        :func:`delete_server` fails with an :exc:`APIError` if deleting
+        the server fails, even if the ``instance`` details are old-style.
+        """
+        self._test_delete_server_propagates_verified_delete_failures(
+            instance_details)
+
+    def test_delete_server_propagates_verified_delete_failures(self):
+        """
+        :func:`delete_server` fails with an :exc:`APIError` if deleting
+        the server fails.
+        """
+        self._test_delete_server_propagates_verified_delete_failures(
+            instance_details)
 
     def test_delete_and_verify_does_not_verify_if_404(self):
         """
