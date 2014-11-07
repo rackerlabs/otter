@@ -15,7 +15,6 @@ from pyrsistent import pbag, freeze, s, pset
 from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
-from twisted.python.constants import Values, ValueConstant
 
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
