@@ -22,6 +22,7 @@ from toolz.functoolz import compose
 from toolz.itertoolz import concat, concatv, mapcat
 
 from otter.http import get_request_func, bind_service
+from otter.constants import ServiceType
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
@@ -712,13 +713,6 @@ def optimize_steps(steps):
     return pbag(concatv(omg_optimized, unoptimizable))
 
 
-class ServiceType(Values):
-    """Constants representing Rackspace cloud services."""
-    CLOUD_SERVERS = ValueConstant('cloudServersOpenStack')
-    CLOUD_LOAD_BALANCERS = ValueConstant('cloudLoadBalancers')
-    RACKCONNECT_V3 = ValueConstant('rackconnect')
-
-
 @attributes(['service', 'method', 'path', 'headers', 'data'],
             defaults={'headers': None, 'data': None})
 class Request(object):
@@ -799,7 +793,7 @@ def _make_bound_request_fn_maker(authenticator, tenant_id, region, log):
         return bind_service(base_request_fn,
                             tenant_id,
                             authenticator,
-                            service_type.name,
+                            service_type,
                             region,
                             log)
 
