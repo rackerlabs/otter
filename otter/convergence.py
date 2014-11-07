@@ -20,7 +20,7 @@ from toolz.curried import filter, groupby
 from toolz.functoolz import compose
 from toolz.itertoolz import concat, concatv, mapcat
 
-from otter.http import get_request_func, bind_service
+from otter.http import get_request_func, add_bind_service
 from otter.constants import ServiceType
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
@@ -789,11 +789,7 @@ def _make_bound_request_fn_maker(authenticator, tenant_id, region, log):
         :param service_type: The specific service to bind.
         :type service_type: One of the :class:`ServiceType` constants.
         """
-        return bind_service(base_request_fn,
-                            tenant_id,
-                            authenticator,
-                            service_type,
-                            region,
-                            log)
+        return add_bind_service(base_request_fn, tenant_id, authenticator,
+                                service_type, region, log)
 
     return _make_bound_request_fn
