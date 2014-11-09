@@ -468,8 +468,21 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def test_add_to_load_balancers_bails_on_errors(self):
         """
-        When one of the :func:`add_to_load_balancers`
+        When one of the underlying :func:`add_to_load_balancer` calls made by
+        :func:`add_to_load_balancers` fails, the error is returned, and no
+        further calls are made.
         """
+        d1, d2, = Deferred(), Deferred()
+        self._set_up_fake_add_to_lb([(lb_config_1, d1), (lb_config_2, d2)])
+
+        d = self._add_to_load_balancers([lb_config_1, lb_config_2])
+        self.assertNoResult(d)
+        self.assertEqual(self._added_lbs, [lb_config_1])
+
+        d1.errback(RuntimeError("welp!"))
+        self.failureResultOf(d)
+
+        self.assertEqual(self._added_lbs, [lb_config_1])
 
 
 class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
