@@ -162,6 +162,10 @@ class LoadBalancersTestsMixin(object):
             return_value=self.retry_interval)
 
 
+lb_config_1 = {'loadBalancerId': 12345, 'port': 80}
+lb_config_2 = {'loadBalancerId': 54321, 'port': 81}
+
+
 class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
     """
     Tests for :func:`add_to_load_balancer`
@@ -380,21 +384,18 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
                                   lb_config, server_dict, self.undo)
         return d
 
-    def test_add_to_load_balancers(self):
+    def _set_up_fake_add_to_lb(self, responses):
         """
-        Add to load balancers will call add_to_load_balancer multiple times and
-        for each load balancer configuration and return all of the results.
+        Creates a fake :func:`add_to_load_balancer` and sets up a patch for
+        it. The patch will be automatically cleaned up at the end of the test.
+
+        The fake will check that the arguments it is called with are
+        correct, and then return a response from the given list.
+
+        :param responses: Iterable of 2-tuples of ``lb_config`` and the desired
+            responses, which should be deferreds.
+        :return: :data:`None`
         """
-        lb1 = {'loadBalancerId': 12345, 'port': 80}
-        lb2 = {'loadBalancerId': 54321, 'port': 81}
-        lb_response_1 = {'nodes': [{'id': 'a', 'address': '192.168.1.1'}]}
-        lb_response_2 = {'nodes': [{'id': 'b', 'address': '192.168.1.1'}]}
-
-        add_to_lb_responses = [
-            (lb1, lb_response_1),
-            (lb2, lb_response_2)
-        ]
-
         def _fake_add_to_lb(log, endpoint, auth_token, lb_config,
                             ip_address, undo):
             """
@@ -406,7 +407,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
             self.assertEqual(auth_token, self.auth_token)
             self.assertEqual(ip_address, '192.168.1.1')
             self.assertEqual(undo, self.undo)
-            for (lb, response) in add_to_lb_responses:
+            for (lb, response) in responses:
                 if lb == lb_config:
                     return succeed(response)
             else:
@@ -414,11 +415,24 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         self.patch(launch_server_v1, "add_to_load_balancer", _fake_add_to_lb)
 
-        d = self._add_to_load_balancers([lb1, lb2])
+    def test_add_to_load_balancers(self):
+        """
+        Add to load balancers will call add_to_load_balancer multiple times and
+        for each load balancer configuration and return all of the results.
+        """
+        lb_response_1 = {'nodes': [{'id': 'a', 'address': '192.168.1.1'}]}
+        lb_response_2 = {'nodes': [{'id': 'b', 'address': '192.168.1.1'}]}
+
+        self._set_up_fake_add_to_lb([
+            (lb_config_1, lb_response_1),
+            (lb_config_2, lb_response_2)
+        ])
+
+        d = self._add_to_load_balancers([lb_config_1, lb_config_2])
         results = self.successResultOf(d)
 
-        self.assertEqual(sorted(results), [(lb1, lb_response_1),
-                                           (lb2, lb_response_2)])
+        self.assertEqual(sorted(results), [(lb_config_1, lb_response_1),
+                                           (lb_config_2, lb_response_2)])
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
     def test_add_to_load_balancers_is_serial(self, add_to_load_balancer):
