@@ -436,8 +436,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(sorted(results), [(lb_config_1, lb_response_1),
                                            (lb_config_2, lb_response_2)])
 
-    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
-    def test_add_to_load_balancers_is_serial(self, add_to_load_balancer):
+    def test_add_to_load_balancers_is_serial(self):
         """
         add_to_load_balancers calls add_to_load_balancer in series.
         """
