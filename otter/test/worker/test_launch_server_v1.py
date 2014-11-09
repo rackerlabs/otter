@@ -398,6 +398,8 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
             responses, which should be deferreds.
         :return: :data:`None`
         """
+        self._added_lbs = []
+
         def _fake_add_to_lb(log, endpoint, auth_token, lb_config,
                             ip_address, undo):
             """
@@ -411,6 +413,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
             self.assertEqual(undo, self.undo)
             for (lb, response) in responses:
                 if lb == lb_config:
+                    self._added_lbs.append(lb)
                     return response
             else:
                 raise RuntimeError("Unknown lb!")
@@ -438,31 +441,21 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         add_to_load_balancers calls add_to_load_balancer in series.
         """
-        d1 = Deferred()
-        d2 = Deferred()
+        d1, d2 = Deferred(), Deferred()
+        self._set_up_fake_add_to_lb([
+            (lb_config_1, d1),
+            (lb_config_2, d2)
+        ])
 
-        add_to_load_balancer_deferreds = [d1, d2]
-
-        def _add_to_load_balancer(*args, **kwargs):
-            return add_to_load_balancer_deferreds.pop(0)
-
-        add_to_load_balancer.side_effect = _add_to_load_balancer
-
-        assert_added_to = partial(add_to_load_balancer.assert_called_with,
-                                  self.log,
-                                  'http://url/',
-                                  'my-auth-token',
-                                  ip_address='192.168.1.1',
-                                  undo=self.undo)
-
-        first_lb = {'loadBalancerId': 12345, 'port': 80}
-        second_lb = {'loadBalancerId': 54321, 'port': 81}
-        d = self._add_to_load_balancers([first_lb, second_lb])
+        d = self._add_to_load_balancers([lb_config_1, lb_config_2])
         self.assertNoResult(d)
-        assert_added_to(first_lb)
-        d1.callback(None)
-        assert_added_to(second_lb)
-        d2.callback(None)
+
+        self.assertEqual(self._added_lbs, [lb_config_1])
+        d1.callback(lb_response_1)
+
+        self.assertEqual(self._added_lbs, [lb_config_1, lb_config_2])
+        d2.callback(lb_response_2)
+
         self.successResultOf(d)
 
     def test_add_to_load_balancers_no_lb_configs(self):
