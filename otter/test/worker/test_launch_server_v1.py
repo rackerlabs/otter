@@ -409,7 +409,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
             self.assertEqual(undo, self.undo)
             for (lb, response) in responses:
                 if lb == lb_config:
-                    return succeed(response)
+                    return response
             else:
                 raise RuntimeError("Unknown lb!")
 
@@ -424,8 +424,8 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         lb_response_2 = {'nodes': [{'id': 'b', 'address': '192.168.1.1'}]}
 
         self._set_up_fake_add_to_lb([
-            (lb_config_1, lb_response_1),
-            (lb_config_2, lb_response_2)
+            (lb_config_1, succeed(lb_response_1)),
+            (lb_config_2, succeed(lb_response_2))
         ])
 
         d = self._add_to_load_balancers([lb_config_1, lb_config_2])
@@ -473,6 +473,11 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         d = self._add_to_load_balancers([])
         self.assertEqual(self.successResultOf(d), [])
+
+    def test_add_to_load_balancers_bails_on_errors(self):
+        """
+        When one of the :func:`add_to_load_balancers`
+        """
 
 
 class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
