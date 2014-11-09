@@ -448,14 +448,18 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         ])
 
         d = self._add_to_load_balancers([lb_config_1, lb_config_2])
+
+        # No result, still waiting on d1:
         self.assertNoResult(d)
-
         self.assertEqual(self._added_lbs, [lb_config_1])
+
+        # d1 fires; still no result, waiting on d2:
         d1.callback(lb_response_1)
-
+        self.assertNoResult(d)
         self.assertEqual(self._added_lbs, [lb_config_1, lb_config_2])
-        d2.callback(lb_response_2)
 
+        # d2 fires, resulting cb fires too:
+        d2.callback(lb_response_2)
         self.successResultOf(d)
 
     def test_add_to_load_balancers_no_lb_configs(self):
