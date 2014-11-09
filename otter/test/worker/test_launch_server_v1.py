@@ -441,10 +441,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         add_to_load_balancers calls add_to_load_balancer in series.
         """
         d1, d2 = Deferred(), Deferred()
-        self._set_up_fake_add_to_lb([
-            (lb_config_1, d1),
-            (lb_config_2, d2)
-        ])
+        self._set_up_fake_add_to_lb([(lb_config_1, d1), (lb_config_2, d2)])
 
         d = self._add_to_load_balancers([lb_config_1, lb_config_2])
 
