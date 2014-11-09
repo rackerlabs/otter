@@ -1406,8 +1406,8 @@ class ServerTests(SynchronousTestCase):
         wait_for_active.return_value = succeed(server_details)
 
         add_to_load_balancers.return_value = succeed([
-            (12345, ('10.0.0.1', 80)),
-            (54321, ('10.0.0.1', 81))
+            (lb_config_1, ('10.0.0.1', 80)),
+            (lb_config_2, ('10.0.0.1', 81))
         ])
 
         log = mock.Mock()
@@ -1423,8 +1423,8 @@ class ServerTests(SynchronousTestCase):
         self.assertEqual(
             result,
             (server_details, [
-                (12345, ('10.0.0.1', 80)),
-                (54321, ('10.0.0.1', 81))]))
+                (lb_config_1, ('10.0.0.1', 80)),
+                (lb_config_2, ('10.0.0.1', 81))]))
 
         create_server.assert_called_once_with('http://dfw.openstack/',
                                               'my-auth-token',
@@ -1661,7 +1661,7 @@ class ServerTests(SynchronousTestCase):
         mock_server_response = {'server': {'id': '1',
                                            'addresses': {'private': [{'version': 4,
                                                                       'addr': '10.0.0.1'}]}}}
-        mock_lb_response = [(12345, ('10.0.0.1', 80)), (54321, ('10.0.0.1', 81))]
+        mock_lb_response = [(lb_config_1, ('10.0.0.1', 80)), (lb_config_2, ('10.0.0.1', 81))]
         add_to_load_balancers.return_value = succeed((mock_server_response, mock_lb_response))
 
         d = launch_server(self.log,
