@@ -25,7 +25,7 @@ from urllib import urlencode
 
 from twisted.python.failure import Failure
 from twisted.internet.defer import (gatherResults, DeferredSemaphore,
-                                    DeferredLock)
+                                    DeferredLock, inlineCallbacks, returnValue)
 from twisted.internet.task import deferLater
 
 from otter.util import logging_treq as treq
@@ -496,11 +496,18 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
     :return: Deferred that fires with a list of 2-tuples of the load
         balancer configuration, and that load balancer's respective response.
     """
-    _add_to_lb = partial(add_to_load_balancer, log, endpoint, auth_token,
-                         ip_address=private_ip_addresses(server)[0],
-                         undo=undo)
+    _add = partial(add_to_load_balancer, log, endpoint, auth_token,
+                   ip_address=private_ip_addresses(server)[0], undo=undo)
+
     dl = DeferredLock()
-    d = gatherResults(map(partial(dl.run, _add_to_lb), lb_configs))
+    @inlineCallbacks
+    def _serial_add(lb_config):
+        yield dl.acquire()
+        result = yield _add(lb_config)
+        yield dl.release()
+        returnValue(result)
+
+    d = gatherResults(map(_serial_add, lb_configs), consumeErrors=True)
     return d.addCallback(partial(zip, lb_configs))
 
 
