@@ -500,6 +500,7 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
                    ip_address=private_ip_addresses(server)[0], undo=undo)
 
     dl = DeferredLock()
+
     @inlineCallbacks
     def _serial_add(lb_config):
         yield dl.acquire()
