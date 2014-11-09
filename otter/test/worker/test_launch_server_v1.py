@@ -399,9 +399,11 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         :return: :data:`None`
         """
         self._added_lbs = []
+        self._fake_add_to_lb_responses = responses
+        self.patch(launch_server_v1, "add_to_load_balancer", self._fake_add_to_lb)
 
-        def _fake_add_to_lb(log, endpoint, auth_token, lb_config,
-                            ip_address, undo):
+    def _fake_add_to_lb(self, log, endpoint, auth_token, lb_config, ip_address,
+                        undo):
             """
             Assert that func:`add_to_load_balancer` is being called with the
             right arguments, and returns an appropriate response.
@@ -411,14 +413,12 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
             self.assertEqual(auth_token, self.auth_token)
             self.assertEqual(ip_address, '192.168.1.1')
             self.assertEqual(undo, self.undo)
-            for (lb, response) in responses:
+            for (lb, response) in self._fake_add_to_lb_responses:
                 if lb == lb_config:
                     self._added_lbs.append(lb)
                     return response
             else:
                 raise RuntimeError("Unknown lb!")
-
-        self.patch(launch_server_v1, "add_to_load_balancer", _fake_add_to_lb)
 
     def test_add_to_load_balancers(self):
         """
