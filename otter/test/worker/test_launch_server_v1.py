@@ -164,6 +164,8 @@ class LoadBalancersTestsMixin(object):
 
 lb_config_1 = {'loadBalancerId': 12345, 'port': 80}
 lb_config_2 = {'loadBalancerId': 54321, 'port': 81}
+lb_response_1 = {'nodes': [{'id': 'a', 'address': '192.168.1.1'}]}
+lb_response_2 = {'nodes': [{'id': 'b', 'address': '192.168.1.1'}]}
 
 
 class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
@@ -420,9 +422,6 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         Add to load balancers will call add_to_load_balancer multiple times and
         for each load balancer configuration and return all of the results.
         """
-        lb_response_1 = {'nodes': [{'id': 'a', 'address': '192.168.1.1'}]}
-        lb_response_2 = {'nodes': [{'id': 'b', 'address': '192.168.1.1'}]}
-
         self._set_up_fake_add_to_lb([
             (lb_config_1, succeed(lb_response_1)),
             (lb_config_2, succeed(lb_response_2))
