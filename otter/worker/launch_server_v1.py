@@ -424,6 +424,27 @@ def check_deleted_clb(f, clb_id, node_id=None):
     return f
 
 
+def add_to_load_balancer(log, endpoint, auth_token, lb_config, server_details,
+                         undo, clock=None):
+    """
+    Adds a given server to a given load balancer.
+
+    :param log: A bound logger.
+    :param str endpoint: Load balancer endpoint URI.
+    :param str auth_token: Keystone auth token.
+    :param str lb_config: An ``lb_config`` dictionary specifying which load
+        balancer to add the server to.
+    :param dict server_details: The server details, as returned by Nova.
+    :return: Deferred that fires with the load balancer response. The
+        structure of this object depends on the load balancer type.
+    """
+    lb_type = lb_config.get("type", "CloudLoadBalancer")
+    if lb_type == "CloudLoadBalancer":
+        ip_address = private_ip_addresses(server_details)[0]
+        return add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo,
+                          clock)
+
+
 def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
     """
     Add an IP address to a Cloud Load Balancer based on the ``lb_config``.
