@@ -9,7 +9,6 @@ from twisted.internet.task import Clock
 from twisted.internet.defer import succeed
 
 from characteristic import attributes
-from functools import partial
 
 from otter.test.utils import StubTreq2, patch, iMock
 from otter.auth import IAuthenticator
