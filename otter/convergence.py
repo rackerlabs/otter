@@ -24,6 +24,7 @@ from toolz.curried import filter, groupby
 from toolz.functoolz import compose
 from toolz.itertoolz import concat, concatv, mapcat
 
+from otter.constants import ServiceType
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
@@ -773,13 +774,6 @@ def optimize_steps(steps):
     omg_optimized = concat(_optimizers[step_type](steps)
                            for step_type, steps in steps_by_type.iteritems())
     return pbag(concatv(omg_optimized, unoptimizable))
-
-
-class ServiceType(Names):
-    """Constants representing Rackspace cloud services."""
-    CLOUD_SERVERS = NamedConstant()
-    CLOUD_LOAD_BALANCERS = NamedConstant()
-    RACKCONNECT_V3 = NamedConstant()
 
 
 @attributes(['service', 'method', 'path', 'headers', 'data'],
