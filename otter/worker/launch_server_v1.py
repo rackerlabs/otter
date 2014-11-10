@@ -490,9 +490,10 @@ def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=Non
         clock=clock)
 
     def when_done(result):
-        lb_log.msg('Added to load balancer', node_id=result['nodes'][0]['id'])
+        node_id = result['nodes'][0]['id']
+        lb_log.msg('Added to load balancer', node_id=node_id)
         undo.push(remove_from_load_balancer, lb_log, endpoint, auth_token,
-                  lb_config, result['nodes'][0]['id'])
+                  lb_config, node_id)
         return result
 
     return d.addCallback(treq.json_content).addCallback(when_done)
