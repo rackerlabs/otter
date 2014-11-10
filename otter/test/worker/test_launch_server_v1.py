@@ -370,6 +370,9 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
     Tests for :func:`add_to_load_balancers`.
     """
     def setUp(self):
+        """
+        Set up :class:`AddToLoadBalancersTests`.
+        """
         super(AddToLoadBalancersTests, self).setUp()
         self.server_details = {
             'server': {
