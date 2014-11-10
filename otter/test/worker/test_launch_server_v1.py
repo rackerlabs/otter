@@ -163,6 +163,21 @@ class LoadBalancersTestsMixin(object):
 
         self.endpoint = 'http://url/'
         self.auth_token = 'my-auth-token'
+        self.server_details = {
+            'server': {
+                "addresses": {
+                    'private': [
+                        {'addr': '192.168.1.1', 'version': 4},
+                        {'addr': '192.168.1.2', 'version': 4},
+                        {'addr': '::1', 'version': 6}
+                    ],
+                    'public': [
+                        {'addr': '50.50.50.50', 'version': 4},
+                        {'addr': '::::', 'version': 6}
+                    ]
+                }
+            }
+        }
 
 
 lb_config_1 = {'loadBalancerId': 12345, 'port': 80}
