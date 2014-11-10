@@ -443,6 +443,9 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, server_details,
         ip_address = private_ip_addresses(server_details)[0]
         return add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo,
                           clock)
+    else:
+        raise RuntimeError("Unknown cloud load balancer type! config: {}"
+                           .format(lb_config))
 
 
 def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
