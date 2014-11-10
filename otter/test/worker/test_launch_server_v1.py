@@ -363,7 +363,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.failureResultOf(d, RequestError)
         self.assertFalse(self.undo.push.called)
 
-    def _add_to_load_balancers(self, lb_config):
+    def _add_to_load_balancers(self, lb_configs):
         """
         Helper function to call :func:`add_to_load_balancers`.
         """
@@ -384,7 +384,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         }
 
         d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
-                                  lb_config, server_details, self.undo)
+                                  lb_configs, server_details, self.undo)
         return d
 
     def _set_up_fake_add_to_lb(self, responses):
