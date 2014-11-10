@@ -433,7 +433,7 @@ def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=Non
     :param log: A bound logger
     :param str endpoint: Load balancer endpoint URI.
     :param str auth_token: Keystone auth token.
-    :param str lb_config: An ``lb_config`` dictionary.
+    :param dict lb_config: An ``lb_config`` dictionary.
     :param str ip_address: The IP address of the node to add to the load
         balancer.
     :param IUndoStack undo: An IUndoStack to push any reversable operations
