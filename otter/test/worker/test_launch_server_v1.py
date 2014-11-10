@@ -2087,7 +2087,7 @@ class MetadataScrubbingTests(SynchronousTestCase):
         self.assertEqual(body, "")
 
 
-# An instance associated a with single load balancer.
+# An instance associated with a single load balancer.
 old_style_instance_details = (
     'a',
     [(12345, {'nodes': [{'id': 1}]}),
