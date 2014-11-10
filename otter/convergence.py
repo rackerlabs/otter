@@ -776,13 +776,6 @@ def optimize_steps(steps):
     return pbag(concatv(omg_optimized, unoptimizable))
 
 
-class ServiceType(Names):
-    """Constants representing Rackspace cloud services."""
-    CLOUD_SERVERS = NamedConstant()
-    CLOUD_LOAD_BALANCERS = NamedConstant()
-    RACKCONNECT_V3 = NamedConstant()
-
-
 @attributes(['service', 'method', 'path', 'headers', 'data'],
             defaults={'headers': None, 'data': None})
 class Request(object):
