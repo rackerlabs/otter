@@ -4,6 +4,9 @@ Convergence.
 
 from functools import partial
 from urllib import urlencode
+import calendar
+import json
+from itertools import izip as zip
 
 import treq
 
@@ -16,6 +19,8 @@ from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
 
+import effect
+
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
 from toolz.itertoolz import concat, concatv, mapcat
@@ -26,6 +31,8 @@ from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
 from otter.util.retry import retry, retry_times, exponential_backoff_interval
+from otter.util.timestamp import from_timestamp
+from otter.indexer import atom
 # TODO: I hate including this!
 from otter.worker.launch_server_v1 import public_endpoint_url
 
@@ -109,6 +116,65 @@ def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
     d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
     d.addCallback(servers_apply)
     return d
+
+
+def extract_drained_at(feed):
+    """
+    Extract time when node was changed to DRAINING
+
+    :param str feed: Atom feed of the node
+
+    :returns: EPOCH in seconds
+    :rtype: float
+    """
+    # TODO: This function temporarily only looks at last entry assuming that
+    # it was draining operation. May need to look at all entries in reverse order
+    # and check for draining operation. This could include paging to further entries
+    entry = atom.entries(atom.parse(feed))[0]
+    summary = atom.summary(entry)
+    if 'Node successfully updated' in summary and 'DRAINING' in summary:
+        return calendar.timegm(from_timestamp(atom.updated(entry)).utctimetuple())
+    else:
+        raise ValueError('Unexpected summary: {}'.format(summary))
+
+
+def get_load_balancer_contents(request_func):
+    """
+    Get load balancer contents as list of `LBNode`
+
+    :param request_func: A tenant-bound, CLB-bound, auth-retry based request function
+    """
+
+    def fetch_nodes(lbs):
+        lb_ids = [lb['id'] for lb in json.loads(lbs)]
+        return effect.parallel(
+            [request_func(
+                'GET',
+                append_segments('loadbalancers', str(lb_id), 'nodes')).on(json.loads)
+             for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
+
+    def fetch_drained_feeds((ids, all_lb_nodes)):
+        nodes = [LBNode(lb_id=_id, node_id=node['id'], address=node['address'],
+                        config=LBConfig(port=node['port'], weight=node['weight'],
+                                        condition=NodeCondition.lookupByName(node['condition']),
+                                        type=NodeType.lookupByName(node['type'])))
+                 for _id, nodes in zip(ids, all_lb_nodes)
+                 for node in nodes]
+        draining = [n for n in nodes if n.config.condition == NodeCondition.DRAINING]
+        return effect.parallel(
+            [request_func(
+                'GET',
+                append_segments('loadbalancers', str(n.lb_id), 'nodes',
+                                '{}.atom'.format(n.node_id)))
+             for n in draining]).on(lambda feeds: (nodes, draining, feeds))
+
+    def fill_drained_at((nodes, draining, feeds)):
+        for node, feed in zip(draining, feeds):
+            node.drained_at = extract_drained_at(feed)
+        return nodes
+
+    return request_func('GET', 'loadbalancers').on(
+        fetch_nodes).on(fetch_drained_feeds).on(fill_drained_at)
 
 
 class IStep(Interface):
