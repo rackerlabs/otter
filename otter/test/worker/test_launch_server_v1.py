@@ -17,6 +17,7 @@ from otter.worker.launch_server_v1 import (
     private_ip_addresses,
     endpoints,
     add_to_clb,
+    add_to_load_balancer,
     add_to_load_balancers,
     server_details,
     wait_for_active,
@@ -380,31 +381,30 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertFalse(self.undo.push.called)
 
 
+class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
+    """
+    Tests for :func:`add_to_load_balancer`.
+
+    This is really just a dispatch function towards specialized
+    implementations. This tests that dispatching behavior.
+    """
+    def test_unknown_type(self):
+        """
+        :func:`add_to_load_balancer` synchronously raises an exception when
+        given an unknown load balancer type.
+        """
+        bogus_lb_config = {"type": "TOTALLY BOGUS LB TYPE",
+                           "transmogrification": "quantum"}
+        self.assertRaises(RuntimeError,
+                          add_to_load_balancer, object(), self.endpoint,
+                          self.auth_token, bogus_lb_config,
+                          self.server_details, self.undo)
+
+
 class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
     """
     Tests for :func:`add_to_load_balancers`.
     """
-
-    def setUp(self):
-        """
-        Set up :class:`AddToLoadBalancersTests`.
-        """
-        super(AddToLoadBalancersTests, self).setUp()
-        self.server_details = {
-            'server': {
-                "addresses": {
-                    'private': [
-                        {'addr': '192.168.1.1', 'version': 4},
-                        {'addr': '192.168.1.2', 'version': 4},
-                        {'addr': '::1', 'version': 6}
-                    ],
-                    'public': [
-                        {'addr': '50.50.50.50', 'version': 4},
-                        {'addr': '::::', 'version': 6}
-                    ]
-                }
-            }
-        }
 
     def _add_to_load_balancers(self, lb_configs):
         """
