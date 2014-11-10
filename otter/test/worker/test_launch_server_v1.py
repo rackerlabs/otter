@@ -391,7 +391,7 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         Helper function to call :func:`add_to_load_balancers`.
         """
-        return add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
+        return add_to_load_balancers(self.log, self.endpoint, self.auth_token,
                                      lb_configs, self.server_details, self.undo)
 
     def _set_up_fake_add_to_lb(self, responses):
