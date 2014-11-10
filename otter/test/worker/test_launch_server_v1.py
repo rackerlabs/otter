@@ -472,8 +472,8 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def test_add_to_load_balancers_no_lb_configs(self):
         """
-        add_to_load_balancers returns a Deferred that fires with an empty list
-        when no load balancers are configured.
+        :func:`add_to_load_balancers` returns a Deferred that fires with an
+        empty list when no load balancers are configured.
         """
         d = self._add_to_load_balancers([])
         self.assertEqual(self.successResultOf(d), [])
