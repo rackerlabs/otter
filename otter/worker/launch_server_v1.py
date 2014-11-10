@@ -850,10 +850,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
                                           cloudServersOpenStack,
                                           region)
 
-    server_id, lb_details = instance_details
-
-    lb_details = ((_definitely_lb_config(probably_lb_config), node_details)
-                  for (probably_lb_config, node_details) in lb_details)
+    server_id, lb_details = _as_new_style_instance_details(instance_details)
 
     lb_type = lambda (lb_config, _): lb_config.get("type", "CloudLoadBalancer")
     lbs_by_type = groupby(lb_type, lb_details)
@@ -892,6 +889,25 @@ def _definitely_lb_config(probably_lb_config):
         return probably_lb_config
     else:
         return {"loadBalancerId": probably_lb_config}
+
+
+def _as_new_style_instance_details(maybe_old_style):
+    """
+    Converts possibly old-style ``instance_details`` (with just a CLB
+    id) to a new-style ``instance_details`` (with a load balancer
+    configuration).
+
+    If the passed ``instance_details`` are already new-style, they are passed
+    unchanged.
+
+    :param maybe_old_style: As ``instance_details``.
+    :return: An ``instance_details``, definitely new-style.
+
+    """
+    server_id, lb_specs = maybe_old_style
+    updated_lb_specs = [(_definitely_lb_config(maybe_lb_conf), lb_response)
+                        for maybe_lb_conf, lb_response in lb_specs]
+    return server_id, updated_lb_specs
 
 
 def delete_and_verify(log, server_endpoint, auth_token, server_id):
