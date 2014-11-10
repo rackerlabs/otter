@@ -371,7 +371,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         Helper function to call :func:`add_to_load_balancers`.
         """
-        server_dict = {
+        server_details = {
             'server': {
                 "addresses": {
                     'private': [
@@ -388,7 +388,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         }
 
         d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
-                                  lb_config, server_dict, self.undo)
+                                  lb_config, server_details, self.undo)
         return d
 
     def _set_up_fake_add_to_lb(self, responses):
