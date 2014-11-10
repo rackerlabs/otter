@@ -450,7 +450,7 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def test_add_to_load_balancers_is_serial(self):
         """
-        add_to_load_balancers calls add_to_clb in series.
+        :func:`add_to_load_balancers` calls :func:`add_to_clb` in series.
         """
         d1, d2 = Deferred(), Deferred()
         self._set_up_fake_add_to_lb([(lb_config_1, d1), (lb_config_2, d2)])
