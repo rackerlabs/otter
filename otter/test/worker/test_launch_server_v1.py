@@ -392,6 +392,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def setUp(self):
         super(AddToLoadBalancerTests, self).setUp()
+        self.lb_config = None
         self.patch(launch_server_v1, "add_to_clb", self._fake_add_to_clb)
 
     def _fake_add_to_clb(self, log, endpoint, auth_token, lb_config,
@@ -406,24 +407,35 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(undo, self.undo)
         self.assertEqual(clock, self.clock)
 
-        self.assertEqual(lb_config, lb_config_1)
+        self.assertEqual(lb_config, self.lb_config)
         return succeed(lb_response_1)
 
     def _add_to_load_balancer(self, lb_config):
         """
-        Helper function for calling :func:`add_to_load_balancer`.
+        Test for :func:`add_to_load_balancer`.
+
+        Synchronously gets the deferred's result.
         """
-        return add_to_load_balancer(self.log, self.endpoint, self.auth_token,
-                                    lb_config, self.server_details, self.undo,
-                                    self.clock)
+        self.lb_config = lb_config
+        d = add_to_load_balancer(self.log, self.endpoint, self.auth_token,
+                                 self.lb_config, self.server_details,
+                                 self.undo, self.clock)
+        return self.successResultOf(d)
 
     def test_implicit_clb(self):
         """
         When given an implicit CLB config (i.e. without explicit type) to
         add to, :func:`add_to_clb` is called.
         """
-        d = self._add_to_load_balancer(lb_config_1)
-        self.assertEqual(self.successResultOf(d), lb_response_1)
+        self.assertEqual(self._add_to_load_balancer(lb_config_1), lb_response_1)
+
+    def test_explicit_clb(self):
+        """
+        When given an explicit CLB config (i.e. with explicit
+        ``CloudLoadBalancer`` type) to add to, :func:`add_to_clb` is called.
+        """
+        lb_config = dict(type="CloudLoadBalancer", **lb_config_1)
+        self.assertEqual(self._add_to_load_balancer(lb_config), lb_response_1)
 
     def test_unknown_type(self):
         """
