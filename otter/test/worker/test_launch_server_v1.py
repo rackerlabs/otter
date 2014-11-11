@@ -16,6 +16,7 @@ from otter.worker import launch_server_v1
 from otter.worker.launch_server_v1 import (
     private_ip_addresses,
     endpoints,
+    add_to_clb,
     add_to_load_balancer,
     add_to_load_balancers,
     server_details,
@@ -152,7 +153,8 @@ class LoadBalancersTestsMixin(object):
 
         self.max_retries = 12
         set_config_data({'worker': {'lb_max_retries': self.max_retries,
-                                    'lb_retry_interval_range': [5, 7]}})
+                                    'lb_retry_interval_range': [5, 7]},
+                         "cloudLoadBalancers": "cloudLoadBalancers"})
         self.addCleanup(set_config_data, {})
 
         # patch random_interval
@@ -161,6 +163,30 @@ class LoadBalancersTestsMixin(object):
         self.rand_interval.return_value = self.interval_func = mock.Mock(
             return_value=self.retry_interval)
 
+        self.clock = Clock()
+
+        self.auth_token = 'my-auth-token'
+        self.request_func = lambda *a, **kw: None
+        self.request_func.auth_token = self.auth_token
+        self.request_func.lb_region = "DFW"
+        self.request_func.service_catalog = fake_service_catalog
+
+        self.server_details = {
+            'server': {
+                "addresses": {
+                    'private': [
+                        {'addr': '192.168.1.1', 'version': 4},
+                        {'addr': '192.168.1.2', 'version': 4},
+                        {'addr': '::1', 'version': 6}
+                    ],
+                    'public': [
+                        {'addr': '50.50.50.50', 'version': 4},
+                        {'addr': '::::', 'version': 6}
+                    ]
+                }
+            }
+        }
+
 
 lb_config_1 = {'loadBalancerId': 12345, 'port': 80}
 lb_config_2 = {'loadBalancerId': 54321, 'port': 81}
@@ -168,45 +194,42 @@ lb_response_1 = {'nodes': [{'id': 'a', 'address': '192.168.1.1'}]}
 lb_response_2 = {'nodes': [{'id': 'b', 'address': '192.168.1.1'}]}
 
 
-class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
+class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
     """
-    Tests for :func:`add_to_load_balancer`
+    Tests for :func:`add_to_clb`.
     """
 
     def setUp(self):
         """
         Mock treq.post for adding nodes
         """
-        super(AddNodeTests, self).setUp()
+        super(AddToCLBTests, self).setUp()
         self.json_content = {'nodes': [{'id': 1}]}
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
                           new=mock_treq(code=200, json_content=self.json_content,
                                         content='{"message": "bad"}', method='post'))
         patch(self, 'otter.util.http.treq', new=self.treq)
-        self.clock = Clock()
-        self.endpoint = 'http://url/'
-        self.auth_token = 'my-auth-token'
         self.lb_config = {'loadBalancerId': 12345, 'port': 80}
 
-    def _add_to_load_balancer(self):
+    def _add_to_clb(self):
         """
-        Helper function to call :func:`add_to_load_balancers`.
+        Helper function to call :func:`add_to_clb`.
         """
-        return add_to_load_balancer(self.log, self.endpoint, self.auth_token,
-                                    self.lb_config, '192.168.1.1', self.undo,
-                                    clock=self.clock)
+        return add_to_clb(self.log, 'http://dfw.lbaas/', self.auth_token,
+                          self.lb_config, '192.168.1.1', self.undo,
+                          clock=self.clock)
 
-    def test_add_to_load_balancer(self):
+    def test_add_to_clb(self):
         """
-        add_to_load_balancer will make a properly formed post request to
-        the specified load balancer endpoint witht he specified auth token,
+        :func:`add_to_clb` will make a properly formed post request to
+        the specified load balancer endpoint with the specified auth token,
         load balancer id, port, and ip address.
         """
-        result = self.successResultOf(self._add_to_load_balancer())
+        result = self.successResultOf(self._add_to_clb())
         self.assertEqual(result, self.json_content)
 
         self.treq.post.assert_called_once_with(
-            'http://url/loadbalancers/12345/nodes',
+            'http://dfw.lbaas/loadbalancers/12345/nodes',
             headers=expected_headers,
             data=mock.ANY,
             log=matches(IsInstance(self.log.__class__))
@@ -226,31 +249,31 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
             'Added to load balancer', loadbalancer_id=12345,
             ip_address='192.168.1.1', node_id=1)
 
-    def test_add_lb_retries(self):
+    def test_add_to_clb_retries(self):
         """
-        add_to_load_balancer will retry again until it succeeds
+        :func:`add_to_clb` will retry until it succeeds.
         """
         self.codes = [422] * 10 + [200]
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
 
-        d = self._add_to_load_balancer()
+        d = self._add_to_clb()
         self.clock.pump([self.retry_interval] * 11)
         result = self.successResultOf(d)
         self.assertEqual(result, self.json_content)
         self.assertEqual(self.treq.post.mock_calls,
-                         [mock.call('http://url/loadbalancers/12345/nodes',
+                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes',
                                     headers=expected_headers, data=mock.ANY,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
         self.rand_interval.assert_called_once_with(5, 7)
 
-    def test_add_lb_stops_retrying_on_404(self):
+    def test_add_to_clb_stops_retrying_on_404(self):
         """
-        add_to_load_balancer will stop retrying if it encounters 404
+        :func:`add_to_clb` will stop retrying if it encounters a 404.
         """
         codes = iter([422, 422, 404])
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
 
-        d = self._add_to_load_balancer()
+        d = self._add_to_clb()
         self.clock.advance(self.retry_interval)
         self.assertNoResult(d)
 
@@ -258,9 +281,9 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         f = self.failureResultOf(d, CLBOrNodeDeleted)
         self.assertEqual(f.value.clb_id, 12345)
 
-    def test_add_lb_stops_retrying_on_422_deleted_clb(self):
+    def test_add_to_clb_stops_retrying_on_422_deleted_clb(self):
         """
-        add_to_load_balancer will stop retrying if it encounters 422 with deleted CLB
+        :func:`add_to_clb` will stop retrying if it encounters 422 with deleted CLB.
         """
         codes = iter([422, 422, 422])
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
@@ -268,7 +291,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.treq.content.side_effect = lambda *a: succeed(
             json.dumps({"message": next(messages)}))
 
-        d = self._add_to_load_balancer()
+        d = self._add_to_clb()
         self.clock.advance(self.retry_interval)
         self.assertNoResult(d)
 
@@ -276,53 +299,54 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         f = self.failureResultOf(d, CLBOrNodeDeleted)
         self.assertEqual(f.value.clb_id, 12345)
 
-    def test_add_lb_defaults_retries_configs(self):
+    def test_add_to_clb_defaults_retries_configs(self):
         """
-        add_to_load_balancer will use defaults LB_RETRY_INTERVAL_RANGE, LB_MAX_RETRIES
-        when not configured
+        :func:`add_to_clb` will use default :obj:`LB_RETRY_INTERVAL_RANGE`,
+        :obj:`LB_MAX_RETRIES` values unless overridden.
         """
         set_config_data({})
         self.treq.post.side_effect = lambda *a, **kw: succeed(mock.Mock(code=422))
 
-        d = self._add_to_load_balancer()
+        d = self._add_to_clb()
         self.clock.pump([self.retry_interval] * LB_MAX_RETRIES)
         self.failureResultOf(d, RequestError)
         self.assertEqual(self.treq.post.mock_calls,
-                         [mock.call('http://url/loadbalancers/12345/nodes',
+                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes',
                                     headers=expected_headers, data=mock.ANY,
                                     log=matches(IsInstance(self.log.__class__)))]
                          * (LB_MAX_RETRIES + 1))
         self.rand_interval.assert_called_once_with(*LB_RETRY_INTERVAL_RANGE)
 
-    def failed_add_to_lb(self, code=500):
+    def failed_add_to_clb(self, code=500):
         """
-        Helper function to ensure add_to_load_balancer fails by returning failure
-        again and again until it times out
+        Helper function to ensure :func:`add_to_clb` fails by returning
+        failure again and again until it times out.
         """
         self.treq.post.side_effect = lambda *a, **kw: succeed(mock.Mock(code=code))
-        d = self._add_to_load_balancer()
+        d = self._add_to_clb()
         self.clock.pump([self.retry_interval] * self.max_retries)
         return d
 
-    def test_add_lb_retries_times_out(self):
+    def test_add_to_clb_retries_times_out(self):
         """
-        add_to_load_balancer will retry again and again for worker.lb_max_retries times.
-        It will fail after that. This also checks that API failure is propogated
+        :func:`add_to_clb` will retry up to ``worker.lb_max_retries`` times.
+        It will fail after that. This also checks that API failure is propagated.
         """
-        d = self.failed_add_to_lb(422)
+        d = self.failed_add_to_clb(422)
 
         f = self.failureResultOf(d, RequestError)
         self.assertEqual(f.value.reason.value.code, 422)
         self.assertEqual(
             self.treq.post.mock_calls,
-            [mock.call('http://url/loadbalancers/12345/nodes',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes',
                        headers=expected_headers, data=mock.ANY,
                        log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
 
-    def test_add_lb_retries_logs_unexpected_failure(self):
+    def test_add_to_clb_retries_logs_unexpected_failure(self):
         """
-        add_to_load_balancer will log all unexpected failures while it is trying. This
-        includes any failure other than "422 PENDING_UPDATE"
+        :func:`add_to_clb` will log all unexpected failures while (re)trying.
+        This includes any failure besides a 422 with the ``PENDING_UPDATE``
+        error message.
         """
         codes = iter([500, 503, 422, 422, 401, 200])
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=next(codes)))
@@ -331,7 +355,7 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
             json.dumps({"message": next(messages)}))
         bad_codes = [500, 503, 422, 401]
 
-        d = self._add_to_load_balancer()
+        d = self._add_to_clb()
         self.clock.pump([self.retry_interval] * 6)
         self.successResultOf(d)
         self.assertEqual(
@@ -340,51 +364,109 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
                        status=bad_code, loadbalancer_id=12345, ip_address='192.168.1.1', msg='add_node',
                        error=matches(IsInstance(APIError))) for bad_code in bad_codes])
 
-    def test_add_to_load_balancer_pushes_remove_onto_undo_stack(self):
+    def test_add_to_clb_pushes_remove_onto_undo_stack(self):
         """
-        add_to_load_balancer pushes an inverse remove_from_load_balancer
+        :func:`add_to_clb` pushes an inverse :func:`remove_from_load_balancer`
         operation onto the undo stack.
         """
-        d = self._add_to_load_balancer()
+        d = self._add_to_clb()
         self.successResultOf(d)
         self.undo.push.assert_called_once_with(
             remove_from_load_balancer, matches(IsInstance(self.log.__class__)),
-            'http://url/', 'my-auth-token',
+            'http://dfw.lbaas/', 'my-auth-token',
             self.lb_config,
             1)
 
-    def test_add_to_load_balancer_doesnt_push_onto_undo_stack_on_failure(self):
+    def test_add_to_clb_doesnt_push_onto_undo_stack_on_failure(self):
         """
-        add_to_load_balancer doesn't push an operation onto the undo stack
+        add_to_clb doesn't push an operation onto the undo stack
         if it fails.
         """
-        d = self.failed_add_to_lb()
+        d = self.failed_add_to_clb()
         self.failureResultOf(d, RequestError)
         self.assertFalse(self.undo.push.called)
 
-    def _add_to_load_balancers(self, lb_config):
+
+class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
+    """
+    Tests for :func:`add_to_load_balancer`.
+
+    This is really just a dispatch function towards specialized
+    implementations. This tests that dispatching behavior.
+    """
+
+    def setUp(self):
+        """
+        Set up :class:`AddToLoadBalancerTests`.
+        """
+        super(AddToLoadBalancerTests, self).setUp()
+        self.lb_config = None
+        self.patch(launch_server_v1, "add_to_clb", self._fake_add_to_clb)
+
+    def _fake_add_to_clb(self, log, endpoint, auth_token, lb_config,
+                         ip_address, undo, clock):
+        """
+        A test double for :func:`add_to_clb`.
+        """
+        self.assertEqual(log, self.log)
+        self.assertEqual(endpoint, 'http://dfw.lbaas/')
+        self.assertEqual(auth_token, self.auth_token)
+        self.assertEqual(ip_address, "192.168.1.1")
+        self.assertEqual(undo, self.undo)
+        self.assertEqual(clock, self.clock)
+
+        self.assertEqual(lb_config, self.lb_config)
+        return succeed(lb_response_1)
+
+    def _add_to_load_balancer(self, lb_config):
+        """
+        Test for :func:`add_to_load_balancer`.
+
+        Synchronously gets the deferred's result.
+        """
+        self.lb_config = lb_config
+        d = add_to_load_balancer(self.log, self.request_func,
+                                 self.lb_config, self.server_details,
+                                 self.undo, self.clock)
+        return self.successResultOf(d)
+
+    def test_implicit_clb(self):
+        """
+        When given an implicit CLB config (i.e. without explicit type) to
+        add to, :func:`add_to_clb` is called.
+        """
+        self.assertEqual(self._add_to_load_balancer(lb_config_1), lb_response_1)
+
+    def test_explicit_clb(self):
+        """
+        When given an explicit CLB config (i.e. with explicit
+        ``CloudLoadBalancer`` type) to add to, :func:`add_to_clb` is called.
+        """
+        lb_config = dict(type="CloudLoadBalancer", **lb_config_1)
+        self.assertEqual(self._add_to_load_balancer(lb_config), lb_response_1)
+
+    def test_unknown_type(self):
+        """
+        :func:`add_to_load_balancer` synchronously raises an exception when
+        given an unknown load balancer type.
+        """
+        bogus_lb_config = {"type": "TOTALLY BOGUS LB TYPE",
+                           "transmogrification": "quantum"}
+        self.assertRaises(RuntimeError,
+                          self._add_to_load_balancer, bogus_lb_config)
+
+
+class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
+    """
+    Tests for :func:`add_to_load_balancers`.
+    """
+
+    def _add_to_load_balancers(self, lb_configs):
         """
         Helper function to call :func:`add_to_load_balancers`.
         """
-        server_dict = {
-            'server': {
-                "addresses": {
-                    'private': [
-                        {'addr': '192.168.1.1', 'version': 4},
-                        {'addr': '192.168.1.2', 'version': 4},
-                        {'addr': '::1', 'version': 6}
-                    ],
-                    'public': [
-                        {'addr': '50.50.50.50', 'version': 4},
-                        {'addr': '::::', 'version': 6}
-                    ]
-                }
-            }
-        }
-
-        d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
-                                  lb_config, server_dict, self.undo)
-        return d
+        return add_to_load_balancers(self.log, self.request_func, lb_configs,
+                                     self.server_details, self.undo)
 
     def _set_up_fake_add_to_lb(self, responses):
         """
@@ -402,27 +484,24 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self._fake_add_to_lb_responses = responses
         self.patch(launch_server_v1, "add_to_load_balancer", self._fake_add_to_lb)
 
-    def _fake_add_to_lb(self, log, endpoint, auth_token, lb_config, ip_address,
-                        undo):
-            """
-            Assert that func:`add_to_load_balancer` is being called with the
-            right arguments, and returns an appropriate response.
-            """
-            self.assertEqual(log, self.log)
-            self.assertEqual(endpoint, self.endpoint)
-            self.assertEqual(auth_token, self.auth_token)
-            self.assertEqual(ip_address, '192.168.1.1')
-            self.assertEqual(undo, self.undo)
-            for (lb, response) in self._fake_add_to_lb_responses:
-                if lb == lb_config:
-                    self._added_lbs.append(lb)
-                    return response
-            else:
-                raise RuntimeError("Unknown lb!")
+    def _fake_add_to_lb(self, log, request_func, lb_config, server_details, undo):
+        """
+        Assert that func:`add_to_load_balancer` is being called with the
+        right arguments, and returns an appropriate response.
+        """
+        self.assertEqual(log, self.log)
+        self.assertEqual(request_func, self.request_func)
+        self.assertEqual(server_details, self.server_details)
+        self.assertEqual(undo, self.undo)
+        for (lb, response) in self._fake_add_to_lb_responses:
+            if lb == lb_config:
+                self._added_lbs.append(lb)
+                return response
+        raise RuntimeError("Unknown lb_config: {}!".format(lb_config))
 
     def test_add_to_load_balancers(self):
         """
-        Add to load balancers will call add_to_load_balancer multiple times and
+        Add to load balancers will call add_to_clb multiple times and
         for each load balancer configuration and return all of the results.
         """
         self._set_up_fake_add_to_lb([
@@ -438,7 +517,8 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def test_add_to_load_balancers_is_serial(self):
         """
-        add_to_load_balancers calls add_to_load_balancer in series.
+        :func:`add_to_load_balancers` calls :func:`add_to_load_balancer` in
+        series.
         """
         d1, d2 = Deferred(), Deferred()
         self._set_up_fake_add_to_lb([(lb_config_1, d1), (lb_config_2, d2)])
@@ -460,8 +540,8 @@ class AddNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def test_add_to_load_balancers_no_lb_configs(self):
         """
-        add_to_load_balancers returns a Deferred that fires with an empty list
-        when no load balancers are configured.
+        :func:`add_to_load_balancers` returns a Deferred that fires with an
+        empty list when no load balancers are configured.
         """
         d = self._add_to_load_balancers([])
         self.assertEqual(self.successResultOf(d), [])
@@ -506,7 +586,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         lb_config = {"loadBalancerId": 12345}
         d = remove_from_load_balancer(
-            self.log, 'http://url/', 'my-auth-token', lb_config, 1,
+            self.log, 'http://dfw.lbaas/', 'my-auth-token', lb_config, 1,
             clock=self.clock)
         return d
 
@@ -522,7 +602,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         self.assertEqual(self.successResultOf(d), None)
         self.treq.delete.assert_called_once_with(
-            'http://url/loadbalancers/12345/nodes/1',
+            'http://dfw.lbaas/loadbalancers/12345/nodes/1',
             headers=expected_headers, log=matches(IsInstance(self.log.__class__)))
 
     def test_remove_from_load_balancer_on_404(self):
@@ -613,7 +693,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertIsNone(self.successResultOf(d))
         # delete calls made?
         self.assertEqual(self.treq.delete.mock_calls,
-                         [mock.call('http://url/loadbalancers/12345/nodes/1',
+                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
                                     headers=expected_headers,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
         # Expected logs?
@@ -645,7 +725,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         # delete calls made?
         self.assertEqual(
             self.treq.delete.mock_calls,
-            [mock.call('http://url/loadbalancers/12345/nodes/1',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
                        headers=expected_headers,
                        log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
         # Expected logs?
@@ -676,7 +756,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         # delete calls made?
         self.assertEqual(
             self.treq.delete.mock_calls,
-            [mock.call('http://url/loadbalancers/12345/nodes/1',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
                        headers=expected_headers,
                        log=matches(IsInstance(self.log.__class__)))] * (LB_MAX_RETRIES + 1))
         # Expected logs?
@@ -690,7 +770,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def test_removelb_retries_logs_unexpected_errors(self):
         """
-        add_to_load_balancer will log unexpeted failures while it is trying
+        add_to_clb will log unexpeted failures while it is trying
         """
         self.codes = [500, 503, 422, 422, 401, 200]
         bad_codes = [500, 503, 401]
@@ -1364,7 +1444,7 @@ class ServerTests(SynchronousTestCase):
         """
         Helper method for calling :func:`launch_server`.
         """
-        request_func = lambda *a, **kw: None
+        self.request_func = request_func = lambda *a, **kw: None
         request_func.region = request_func.lb_region = "DFW"
         request_func.service_catalog = fake_service_catalog
         request_func.auth_token = 'my-auth-token'
@@ -1448,7 +1528,7 @@ class ServerTests(SynchronousTestCase):
         log = log.bind.return_value
         log.bind.assert_called_once_with(server_id='1')
         add_to_load_balancers.assert_called_once_with(
-            log.bind.return_value, 'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
+            log.bind.return_value, self.request_func, prepared_load_balancers,
             {'server': {'id': '1',
                         'addresses': {'private': [{'version': 4, 'addr': '10.0.0.1'}]}}},
             self.undo)

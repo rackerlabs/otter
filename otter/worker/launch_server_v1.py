@@ -424,22 +424,50 @@ def check_deleted_clb(f, clb_id, node_id=None):
     return f
 
 
-def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
+def add_to_load_balancer(log, request_func, lb_config, server_details, undo,
+                         clock=None):
     """
-    Add an IP addressed to a load balancer based on the lb_config.
+    Adds a given server to a given load balancer.
+
+    :param log: A bound logger.
+    :param callable request_func: A request function.
+    :param str lb_config: An ``lb_config`` dictionary specifying which load
+        balancer to add the server to.
+    :param dict server_details: The server details, as returned by Nova.
+    :return: Deferred that fires with the load balancer response. The
+        structure of this object depends on the load balancer type.
+    """
+    lb_type = lb_config.get("type", "CloudLoadBalancer")
+    if lb_type == "CloudLoadBalancer":
+        cloudLoadBalancers = config_value('cloudLoadBalancers')
+        endpoint = public_endpoint_url(request_func.service_catalog,
+                                       cloudLoadBalancers,
+                                       request_func.lb_region)
+        auth_token = request_func.auth_token
+        ip_address = private_ip_addresses(server_details)[0]
+        return add_to_clb(log, endpoint, auth_token, lb_config, ip_address,
+                          undo, clock)
+    else:
+        raise RuntimeError("Unknown cloud load balancer type! config: {}"
+                           .format(lb_config))
+
+
+def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
+    """
+    Add an IP address to a Cloud Load Balancer based on the ``lb_config``.
 
     TODO: Handle load balancer node metadata.
 
     :param log: A bound logger
     :param str endpoint: Load balancer endpoint URI.
-    :param str auth_token: Keystone Auth Token.
-    :param str lb_config: An lb_config dictionary.
-    :param str ip_address: The IP Address of the node to add to the load
+    :param str auth_token: Keystone auth token.
+    :param dict lb_config: An ``lb_config`` dictionary.
+    :param str ip_address: The IP address of the node to add to the load
         balancer.
-    :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
+    :param IUndoStack undo: An IUndoStack to push any reversable operations
+        onto.
 
-    :return: Deferred that fires with the load balancer response. The
-        structure of this object depends on the load balancer type.
+    :return: Deferred that fires with the load balancer response.
     """
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
@@ -469,25 +497,21 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
         clock=clock)
 
     def when_done(result):
-        lb_log.msg('Added to load balancer', node_id=result['nodes'][0]['id'])
-        undo.push(remove_from_load_balancer,
-                  lb_log,
-                  endpoint,
-                  auth_token,
-                  lb_config,
-                  result['nodes'][0]['id'])
+        node_id = result['nodes'][0]['id']
+        lb_log.msg('Added to load balancer', node_id=node_id)
+        undo.push(remove_from_load_balancer, lb_log, endpoint, auth_token,
+                  lb_config, node_id)
         return result
 
     return d.addCallback(treq.json_content).addCallback(when_done)
 
 
-def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
+def add_to_load_balancers(log, request_func, lb_configs, server, undo):
     """
     Add the given server to the load balancers specified by ``lb_configs``.
 
     :param log: A bound logger.
-    :param str endpoint: Load balancer endpoint URI.
-    :param str auth_token: Keystone Auth Token.
+    :param callable request_func: A request function.
     :param list lb_configs: List of lb_config dictionaries.
     :param dict server: Server dict of the server to add, as per server details
         response from Nova.
@@ -496,8 +520,8 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
     :return: Deferred that fires with a list of 2-tuples of the load
         balancer configuration, and that load balancer's respective response.
     """
-    _add = partial(add_to_load_balancer, log, endpoint, auth_token,
-                   ip_address=private_ip_addresses(server)[0], undo=undo)
+    _add = partial(add_to_load_balancer, log, request_func,
+                   server_details=server, undo=undo)
 
     dl = DeferredLock()
 
@@ -543,7 +567,8 @@ def public_endpoint_url(service_catalog, service_name, region):
 
     :return: URL as a string.
     """
-    return list(endpoints(service_catalog, service_name, region))[0]['publicURL']
+    first_endpoint = next(endpoints(service_catalog, service_name, region))
+    return first_endpoint['publicURL']
 
 
 def private_ip_addresses(server):
@@ -681,13 +706,8 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
     """
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
-    cloudLoadBalancers = config_value('cloudLoadBalancers')
+
     cloudServersOpenStack = config_value('cloudServersOpenStack')
-
-    lb_endpoint = public_endpoint_url(request_func.service_catalog,
-                                      cloudLoadBalancers,
-                                      request_func.lb_region)
-
     server_endpoint = public_endpoint_url(request_func.service_catalog,
                                           cloudServersOpenStack,
                                           request_func.region)
@@ -731,7 +751,7 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
     def add_lb(server):
         if lb_config:
             lbd = add_to_load_balancers(
-                ilog[0], lb_endpoint, auth_token, lb_config, server, undo)
+                ilog[0], request_func, lb_config, server, undo)
             lbd.addCallback(lambda lb_response: (server, lb_response))
             return lbd
 
