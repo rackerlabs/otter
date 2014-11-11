@@ -391,6 +391,9 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
     """
 
     def setUp(self):
+        """
+        Set up :class:`AddToLoadBalancerTests`.
+        """
         super(AddToLoadBalancerTests, self).setUp()
         self.lb_config = None
         self.patch(launch_server_v1, "add_to_clb", self._fake_add_to_clb)
