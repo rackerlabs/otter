@@ -162,6 +162,8 @@ class LoadBalancersTestsMixin(object):
         self.rand_interval.return_value = self.interval_func = mock.Mock(
             return_value=self.retry_interval)
 
+        self.clock = Clock()
+
         self.endpoint = 'http://url/'
         self.auth_token = 'my-auth-token'
         self.server_details = {
@@ -202,7 +204,6 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
                           new=mock_treq(code=200, json_content=self.json_content,
                                         content='{"message": "bad"}', method='post'))
         patch(self, 'otter.util.http.treq', new=self.treq)
-        self.clock = Clock()
         self.lb_config = {'loadBalancerId': 12345, 'port': 80}
 
     def _add_to_clb(self):
