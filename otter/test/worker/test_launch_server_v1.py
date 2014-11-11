@@ -402,10 +402,11 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(log, self.log)
         self.assertEqual(endpoint, self.endpoint)
         self.assertEqual(auth_token, self.auth_token)
-        self.assertEqual(lb_config, lb_config_1)
         self.assertEqual(ip_address, "192.168.1.1")
         self.assertEqual(undo, self.undo)
         self.assertEqual(clock, self.clock)
+
+        self.assertEqual(lb_config, lb_config_1)
         return succeed(lb_response_1)
 
     def _add_to_load_balancer(self, lb_config):
