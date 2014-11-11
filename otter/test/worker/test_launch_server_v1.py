@@ -229,7 +229,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(result, self.json_content)
 
         self.treq.post.assert_called_once_with(
-            'http://url/loadbalancers/12345/nodes',
+            'http://dfw.lbaas/loadbalancers/12345/nodes',
             headers=expected_headers,
             data=mock.ANY,
             log=matches(IsInstance(self.log.__class__))
@@ -261,7 +261,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         result = self.successResultOf(d)
         self.assertEqual(result, self.json_content)
         self.assertEqual(self.treq.post.mock_calls,
-                         [mock.call('http://url/loadbalancers/12345/nodes',
+                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes',
                                     headers=expected_headers, data=mock.ANY,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
         self.rand_interval.assert_called_once_with(5, 7)
@@ -311,7 +311,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.clock.pump([self.retry_interval] * LB_MAX_RETRIES)
         self.failureResultOf(d, RequestError)
         self.assertEqual(self.treq.post.mock_calls,
-                         [mock.call('http://url/loadbalancers/12345/nodes',
+                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes',
                                     headers=expected_headers, data=mock.ANY,
                                     log=matches(IsInstance(self.log.__class__)))]
                          * (LB_MAX_RETRIES + 1))
@@ -338,7 +338,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(f.value.reason.value.code, 422)
         self.assertEqual(
             self.treq.post.mock_calls,
-            [mock.call('http://url/loadbalancers/12345/nodes',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes',
                        headers=expected_headers, data=mock.ANY,
                        log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
 
@@ -373,7 +373,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.successResultOf(d)
         self.undo.push.assert_called_once_with(
             remove_from_load_balancer, matches(IsInstance(self.log.__class__)),
-            'http://url/', 'my-auth-token',
+            'http://dfw.lbaas/', 'my-auth-token',
             self.lb_config,
             1)
 
@@ -587,7 +587,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         lb_config = {"loadBalancerId": 12345}
         d = remove_from_load_balancer(
-            self.log, 'http://url/', 'my-auth-token', lb_config, 1,
+            self.log, 'http://dfw.lbaas/', 'my-auth-token', lb_config, 1,
             clock=self.clock)
         return d
 
@@ -603,7 +603,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         self.assertEqual(self.successResultOf(d), None)
         self.treq.delete.assert_called_once_with(
-            'http://url/loadbalancers/12345/nodes/1',
+            'http://dfw.lbaas/loadbalancers/12345/nodes/1',
             headers=expected_headers, log=matches(IsInstance(self.log.__class__)))
 
     def test_remove_from_load_balancer_on_404(self):
@@ -694,7 +694,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertIsNone(self.successResultOf(d))
         # delete calls made?
         self.assertEqual(self.treq.delete.mock_calls,
-                         [mock.call('http://url/loadbalancers/12345/nodes/1',
+                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
                                     headers=expected_headers,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
         # Expected logs?
@@ -726,7 +726,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         # delete calls made?
         self.assertEqual(
             self.treq.delete.mock_calls,
-            [mock.call('http://url/loadbalancers/12345/nodes/1',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
                        headers=expected_headers,
                        log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
         # Expected logs?
@@ -757,7 +757,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         # delete calls made?
         self.assertEqual(
             self.treq.delete.mock_calls,
-            [mock.call('http://url/loadbalancers/12345/nodes/1',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
                        headers=expected_headers,
                        log=matches(IsInstance(self.log.__class__)))] * (LB_MAX_RETRIES + 1))
         # Expected logs?
