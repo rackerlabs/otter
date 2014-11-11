@@ -483,19 +483,19 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def _fake_add_to_lb(self, log, endpoint, auth_token, lb_config,
                         server_details, undo):
-            """
-            Assert that func:`add_to_load_balancer` is being called with the
-            right arguments, and returns an appropriate response.
-            """
-            self.assertEqual(log, self.log)
-            self.assertEqual(endpoint, self.endpoint)
-            self.assertEqual(auth_token, self.auth_token)
-            self.assertEqual(server_details, self.server_details)
-            self.assertEqual(undo, self.undo)
-            for (lb, response) in self._fake_add_to_lb_responses:
-                if lb == lb_config:
-                    self._added_lbs.append(lb)
-                    return response
+        """
+        Assert that func:`add_to_load_balancer` is being called with the
+        right arguments, and returns an appropriate response.
+        """
+        self.assertEqual(log, self.log)
+        self.assertEqual(endpoint, self.endpoint)
+        self.assertEqual(auth_token, self.auth_token)
+        self.assertEqual(server_details, self.server_details)
+        self.assertEqual(undo, self.undo)
+        for (lb, response) in self._fake_add_to_lb_responses:
+            if lb == lb_config:
+                self._added_lbs.append(lb)
+                return response
             else:
                 raise RuntimeError("Unknown lb!")
 
