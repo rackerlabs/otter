@@ -1427,6 +1427,7 @@ class ServerTests(SynchronousTestCase):
 
         log = mock.Mock()
         result = self.successResultOf(self._launch_server(launch_config, log))
+
         self.assertEqual(
             result,
             (server_details, [
