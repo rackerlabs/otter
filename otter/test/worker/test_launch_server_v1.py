@@ -1360,6 +1360,20 @@ class ServerTests(SynchronousTestCase):
         clock.advance(5)
         self.assertEqual(server_details.call_count, 2)
 
+    def _launch_server(self, launch_config, log=None):
+        """
+        Helper method for calling :func:`launch_server`.
+        """
+        request_func = lambda *a, **kw: None
+        request_func.region = request_func.lb_region = "DFW"
+        request_func.service_catalog = fake_service_catalog
+        request_func.auth_token = 'my-auth-token'
+
+        d = launch_server(log if log is not None else self.log,
+                          request_func, self.scaling_group,
+                          launch_config, self.undo)
+        return d
+
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_active')
@@ -1412,15 +1426,7 @@ class ServerTests(SynchronousTestCase):
         ])
 
         log = mock.Mock()
-        d = launch_server(log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          launch_config,
-                          self.undo)
-
-        result = self.successResultOf(d)
+        result = self.successResultOf(self._launch_server(launch_config, log))
         self.assertEqual(
             result,
             (server_details, [
