@@ -1254,31 +1254,18 @@ class RequestsToEffectTests(SynchronousTestCase):
     """
     Tests for converting :class:`Request` into effects.
     """
-
-    def _make_bound_request_fn(self, service_type):
-        """
-        A test double for a ``make_bound_request_fn``.
-
-        Takes a service type, returns a callable that stores the
-        details of the request in a :class:`_BoundRequestStub`.
-
-        :param ServiceType service_type: The service type.
-        """
-        return partial(_BoundRequestStub, service_type=service_type)
-
     def _reqs_to_effect(self, conv_requests):
         """
         Helper function to call :func:`_reqs_to_effect`.
 
-        Simply returns the result of :func:`_reqs_to_effect`, partially
-        applied with the :meth:`_make_bound_request_fn` test double.
+        Uses :class:`_BoundRequestStub` test double for easy introspection.
 
         :param conv_requests: The convergence requests to be turned into an
             effect.
         :type conv_requests: iterable of :class:`Request`
         :return: The return value of :func:`_reqs_to_effect`.
         """
-        return _reqs_to_effect(self._make_bound_request_fn, conv_requests)
+        return _reqs_to_effect(_BoundRequestStub, conv_requests)
 
     def assertCompilesTo(self, conv_requests, expected_effects):
         """
