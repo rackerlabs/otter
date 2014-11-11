@@ -424,14 +424,13 @@ def check_deleted_clb(f, clb_id, node_id=None):
     return f
 
 
-def add_to_load_balancer(log, endpoint, auth_token, lb_config, server_details,
-                         undo, clock=None):
+def add_to_load_balancer(log, request_func, lb_config, server_details, undo,
+                         clock=None):
     """
     Adds a given server to a given load balancer.
 
     :param log: A bound logger.
-    :param str endpoint: Load balancer endpoint URI.
-    :param str auth_token: Keystone auth token.
+    :param callable request_func: A request function.
     :param str lb_config: An ``lb_config`` dictionary specifying which load
         balancer to add the server to.
     :param dict server_details: The server details, as returned by Nova.
@@ -440,9 +439,14 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, server_details,
     """
     lb_type = lb_config.get("type", "CloudLoadBalancer")
     if lb_type == "CloudLoadBalancer":
+        cloudLoadBalancers = config_value('cloudLoadBalancers')
+        endpoint = public_endpoint_url(request_func.service_catalog,
+                                       cloudLoadBalancers,
+                                       request_func.lb_region)
+        auth_token = request_func.auth_token
         ip_address = private_ip_addresses(server_details)[0]
-        return add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo,
-                          clock)
+        return add_to_clb(log, endpoint, auth_token, lb_config, ip_address,
+                          undo, clock)
     else:
         raise RuntimeError("Unknown cloud load balancer type! config: {}"
                            .format(lb_config))
@@ -502,13 +506,12 @@ def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=Non
     return d.addCallback(treq.json_content).addCallback(when_done)
 
 
-def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
+def add_to_load_balancers(log, request_func, lb_configs, server, undo):
     """
     Add the given server to the load balancers specified by ``lb_configs``.
 
     :param log: A bound logger.
-    :param str endpoint: Load balancer endpoint URI.
-    :param str auth_token: Keystone Auth Token.
+    :param callable request_func: A request function.
     :param list lb_configs: List of lb_config dictionaries.
     :param dict server: Server dict of the server to add, as per server details
         response from Nova.
@@ -517,7 +520,7 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
     :return: Deferred that fires with a list of 2-tuples of the load
         balancer configuration, and that load balancer's respective response.
     """
-    _add = partial(add_to_load_balancer, log, endpoint, auth_token,
+    _add = partial(add_to_load_balancer, log, request_func,
                    server_details=server, undo=undo)
 
     dl = DeferredLock()
@@ -703,10 +706,6 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
     """
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
-    cloudLoadBalancers = config_value('cloudLoadBalancers')
-    lb_endpoint = public_endpoint_url(request_func.service_catalog,
-                                      cloudLoadBalancers,
-                                      request_func.lb_region)
 
     cloudServersOpenStack = config_value('cloudServersOpenStack')
     server_endpoint = public_endpoint_url(request_func.service_catalog,
@@ -752,7 +751,7 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
     def add_lb(server):
         if lb_config:
             lbd = add_to_load_balancers(
-                ilog[0], lb_endpoint, auth_token, lb_config, server, undo)
+                ilog[0], request_func, lb_config, server, undo)
             lbd.addCallback(lambda lb_response: (server, lb_response))
             return lbd
 
