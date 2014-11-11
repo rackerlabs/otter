@@ -153,7 +153,8 @@ class LoadBalancersTestsMixin(object):
 
         self.max_retries = 12
         set_config_data({'worker': {'lb_max_retries': self.max_retries,
-                                    'lb_retry_interval_range': [5, 7]}})
+                                    'lb_retry_interval_range': [5, 7]},
+                         "cloudLoadBalancers": "cloudLoadBalancers"})
         self.addCleanup(set_config_data, {})
 
         # patch random_interval
