@@ -1244,7 +1244,7 @@ class OptimizerTests(SynchronousTestCase):
 
 
 @attributes(["service_type", "method", "url", "headers", "data"])
-class _BoundRequestStub(object):
+class _PureRequestStub(object):
     """
     A bound request stub, suitable for testing.
     """
@@ -1258,14 +1258,14 @@ class RequestsToEffectTests(SynchronousTestCase):
         """
         Helper function to call :func:`_reqs_to_effect`.
 
-        Uses :class:`_BoundRequestStub` test double for easy introspection.
+        Uses :class:`_PureRequestStub` test double for easy introspection.
 
         :param conv_requests: The convergence requests to be turned into an
             effect.
         :type conv_requests: iterable of :class:`Request`
         :return: The return value of :func:`_reqs_to_effect`.
         """
-        return _reqs_to_effect(_BoundRequestStub, conv_requests)
+        return _reqs_to_effect(_PureRequestStub, conv_requests)
 
     def assertCompilesTo(self, conv_requests, expected_effects):
         """
@@ -1284,11 +1284,11 @@ class RequestsToEffectTests(SynchronousTestCase):
                     method="GET",
                     path="/whatever")]
         expected_effects = set([
-            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                              method="GET",
-                              url="/whatever",
-                              headers=None,
-                              data=None)])
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever",
+                             headers=None,
+                             data=None)])
         self.assertCompilesTo(conv_requests, expected_effects)
 
     def test_multiple_requests(self):
@@ -1304,16 +1304,16 @@ class RequestsToEffectTests(SynchronousTestCase):
                     method="GET",
                     path="/whatever/something/else")]
         expected_effects = set([
-            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                              method="GET",
-                              url="/whatever",
-                              headers=None,
-                              data=None),
-            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                              method="GET",
-                              url="/whatever/something/else",
-                              headers=None,
-                              data=None)])
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever",
+                             headers=None,
+                             data=None),
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever/something/else",
+                             headers=None,
+                             data=None)])
         self.assertCompilesTo(conv_requests, expected_effects)
 
     def test_multiple_requests_of_different_type(self):
@@ -1334,19 +1334,19 @@ class RequestsToEffectTests(SynchronousTestCase):
                     path="/xyzzy",
                     data=data_sentinel)]
         expected_effects = set([
-            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                              method="GET",
-                              url="/whatever",
-                              headers=None,
-                              data=None),
-            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                              method="GET",
-                              url="/whatever/something/else",
-                              headers=None,
-                              data=None),
-            _BoundRequestStub(service_type=ServiceType.CLOUD_SERVERS,
-                              method="POST",
-                              url="/xyzzy",
-                              headers=None,
-                              data=data_sentinel)])
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever",
+                             headers=None,
+                             data=None),
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever/something/else",
+                             headers=None,
+                             data=None),
+            _PureRequestStub(service_type=ServiceType.CLOUD_SERVERS,
+                             method="POST",
+                             url="/xyzzy",
+                             headers=None,
+                             data=data_sentinel)])
         self.assertCompilesTo(conv_requests, expected_effects)
