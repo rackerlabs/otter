@@ -858,7 +858,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     _remove_from_clb = partial(remove_from_load_balancer, log, lb_endpoint,
                                auth_token)
 
-    clbs = lbs_by_type["CloudLoadBalancer"]
+    clbs = lbs_by_type.get("CloudLoadBalancer", [])
     clb_ds = []
     for lb_config, lb_response in clbs:
         for node_info in lb_response["nodes"]:
