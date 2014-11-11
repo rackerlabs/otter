@@ -495,7 +495,7 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
                 self._added_lbs.append(lb)
                 return response
             else:
-                raise RuntimeError("Unknown lb!")
+                raise RuntimeError("Unknown lb_config: {}!".format(lb_config))
 
     def test_add_to_load_balancers(self):
         """
