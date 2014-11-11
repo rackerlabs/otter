@@ -240,8 +240,7 @@ def makeService(config):
         set_bobby(BobbyClient(bobby_url))
 
     authenticator = generate_authenticator(reactor)
-    supervisor = SupervisorService(authenticator.authenticate_tenant,
-                                   region, coiterate)
+    supervisor = SupervisorService(authenticator, region, coiterate)
     supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
