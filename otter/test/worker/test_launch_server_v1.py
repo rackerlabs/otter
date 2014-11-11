@@ -166,6 +166,11 @@ class LoadBalancersTestsMixin(object):
         self.clock = Clock()
 
         self.auth_token = 'my-auth-token'
+        self.request_func = lambda *a, **kw: None
+        self.request_func.auth_token = self.auth_token
+        self.request_func.lb_region = "DFW"
+        self.request_func.service_catalog = fake_service_catalog
+
         self.server_details = {
             'server': {
                 "addresses": {
@@ -420,7 +425,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         Synchronously gets the deferred's result.
         """
         self.lb_config = lb_config
-        d = add_to_load_balancer(self.log, self.endpoint, self.auth_token,
+        d = add_to_load_balancer(self.log, self.request_func,
                                  self.lb_config, self.server_details,
                                  self.undo, self.clock)
         return self.successResultOf(d)
@@ -460,8 +465,8 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         Helper function to call :func:`add_to_load_balancers`.
         """
-        return add_to_load_balancers(self.log, self.endpoint, self.auth_token,
-                                     lb_configs, self.server_details, self.undo)
+        return add_to_load_balancers(self.log, self.request_func, lb_configs,
+                                     self.server_details, self.undo)
 
     def _set_up_fake_add_to_lb(self, responses):
         """
@@ -479,15 +484,13 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self._fake_add_to_lb_responses = responses
         self.patch(launch_server_v1, "add_to_load_balancer", self._fake_add_to_lb)
 
-    def _fake_add_to_lb(self, log, endpoint, auth_token, lb_config,
-                        server_details, undo):
+    def _fake_add_to_lb(self, log, request_func, lb_config, server_details, undo):
         """
         Assert that func:`add_to_load_balancer` is being called with the
         right arguments, and returns an appropriate response.
         """
         self.assertEqual(log, self.log)
-        self.assertEqual(endpoint, self.endpoint)
-        self.assertEqual(auth_token, self.auth_token)
+        self.assertEqual(request_func, self.request_func)
         self.assertEqual(server_details, self.server_details)
         self.assertEqual(undo, self.undo)
         for (lb, response) in self._fake_add_to_lb_responses:
@@ -1442,7 +1445,7 @@ class ServerTests(SynchronousTestCase):
         """
         Helper method for calling :func:`launch_server`.
         """
-        request_func = lambda *a, **kw: None
+        self.request_func = request_func = lambda *a, **kw: None
         request_func.region = request_func.lb_region = "DFW"
         request_func.service_catalog = fake_service_catalog
         request_func.auth_token = 'my-auth-token'
