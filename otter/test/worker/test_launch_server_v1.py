@@ -419,8 +419,8 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def test_implicit_clb(self):
         """
-        When given an implicitly CLB config (i.e. without explicit type) to add
-        to, :func:`add_to_clb` is called.
+        When given an implicit CLB config (i.e. without explicit type) to
+        add to, :func:`add_to_clb` is called.
         """
         d = self._add_to_load_balancer(lb_config_1)
         self.assertEqual(self.successResultOf(d), lb_response_1)
