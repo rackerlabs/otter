@@ -564,7 +564,8 @@ def public_endpoint_url(service_catalog, service_name, region):
 
     :return: URL as a string.
     """
-    return list(endpoints(service_catalog, service_name, region))[0]['publicURL']
+    first_endpoint = next(endpoints(service_catalog, service_name, region))
+    return first_endpoint['publicURL']
 
 
 def private_ip_addresses(server):
