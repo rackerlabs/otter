@@ -389,6 +389,41 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
     This is really just a dispatch function towards specialized
     implementations. This tests that dispatching behavior.
     """
+
+    def setUp(self):
+        super(AddToLoadBalancerTests, self).setUp()
+        self.patch(launch_server_v1, "add_to_clb", self._fake_add_to_clb)
+
+    def _fake_add_to_clb(self, log, endpoint, auth_token, lb_config,
+                         ip_address, undo, clock):
+        """
+        A test double for :func:`add_to_clb`.
+        """
+        self.assertEqual(log, self.log)
+        self.assertEqual(endpoint, self.endpoint)
+        self.assertEqual(auth_token, self.auth_token)
+        self.assertEqual(lb_config, lb_config_1)
+        self.assertEqual(ip_address, "192.168.1.1")
+        self.assertEqual(undo, self.undo)
+        self.assertEqual(clock, self.clock)
+        return succeed(lb_response_1)
+
+    def _add_to_load_balancer(self, lb_config):
+        """
+        Helper function for calling :func:`add_to_load_balancer`.
+        """
+        return add_to_load_balancer(self.log, self.endpoint, self.auth_token,
+                                    lb_config, self.server_details, self.undo,
+                                    self.clock)
+
+    def test_implicit_clb(self):
+        """
+        When given an implicitly CLB config (i.e. without explicit type) to add
+        to, :func:`add_to_clb` is called.
+        """
+        d = self._add_to_load_balancer(lb_config_1)
+        self.assertEqual(self.successResultOf(d), lb_response_1)
+
     def test_unknown_type(self):
         """
         :func:`add_to_load_balancer` synchronously raises an exception when
