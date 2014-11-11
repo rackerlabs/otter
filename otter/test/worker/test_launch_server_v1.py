@@ -1360,7 +1360,7 @@ class ServerTests(SynchronousTestCase):
         clock.advance(5)
         self.assertEqual(server_details.call_count, 2)
 
-    def _launch_server(self, launch_config, log=None):
+    def _launch_server(self, launch_config, log=None, clock=None):
         """
         Helper method for calling :func:`launch_server`.
         """
@@ -1371,7 +1371,7 @@ class ServerTests(SynchronousTestCase):
 
         d = launch_server(log if log is not None else self.log,
                           request_func, self.scaling_group,
-                          launch_config, self.undo)
+                          launch_config, self.undo, clock=clock)
         return d
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
@@ -1475,15 +1475,8 @@ class ServerTests(SynchronousTestCase):
         wait_for_active.return_value = succeed(server_details)
 
         log = mock.Mock()
-        d = launch_server(log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          launch_config,
-                          self.undo)
+        result = self.successResultOf(self._launch_server(launch_config, log))
 
-        result = self.successResultOf(d)
         self.assertEqual(result, (server_details, []))
 
         self.assertFalse(add_to_load_balancers.called)
@@ -1514,14 +1507,7 @@ class ServerTests(SynchronousTestCase):
         create_server.return_value = succeed(server_details)
         wait_for_active.return_value = succeed(server_details)
 
-        d = launch_server(self.log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          launch_config,
-                          self.undo)
-
+        d = self._launch_server(launch_config)
         expected_metadata = generate_server_metadata(self.scaling_group.uuid,
                                                      launch_config)
 
@@ -1546,14 +1532,7 @@ class ServerTests(SynchronousTestCase):
         create_server.return_value = fail(
             APIError(500, "Oh noes")).addErrback(wrap_request_error, 'url')
 
-        d = launch_server(self.log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          {'server': {}},
-                          self.undo)
-
+        d = self._launch_server({'server': {}})
         failure = self.failureResultOf(d)
         failure.trap(RequestError)
         real_failure = failure.value.reason
@@ -1584,14 +1563,7 @@ class ServerTests(SynchronousTestCase):
         wait_for_active.return_value = fail(
             APIError(500, "Oh noes")).addErrback(wrap_request_error, 'url')
 
-        d = launch_server(self.log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          launch_config,
-                          self.undo)
-
+        d = self._launch_server(launch_config)
         failure = self.failureResultOf(d)
         failure.trap(RequestError)
         real_failure = failure.value.reason
@@ -1626,14 +1598,7 @@ class ServerTests(SynchronousTestCase):
         add_to_load_balancers.return_value = fail(
             APIError(500, "Oh noes")).addErrback(wrap_request_error, 'url')
 
-        d = launch_server(self.log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          launch_config,
-                          self.undo)
-
+        d = self._launch_server(launch_config)
         failure = self.failureResultOf(d)
         failure.trap(RequestError)
         real_failure = failure.value.reason
@@ -1672,13 +1637,7 @@ class ServerTests(SynchronousTestCase):
         mock_lb_response = [(lb_config_1, ('10.0.0.1', 80)), (lb_config_2, ('10.0.0.1', 81))]
         add_to_load_balancers.return_value = succeed((mock_server_response, mock_lb_response))
 
-        d = launch_server(self.log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          launch_config,
-                          self.undo)
+        d = self._launch_server(launch_config)
 
         # Check that the push hasn't happened because create_server hasn't
         # succeeded yet.
@@ -1707,16 +1666,8 @@ class ServerTests(SynchronousTestCase):
 
         create_server.return_value = fail(APIError(500, ''))
 
-        d = launch_server(self.log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          launch_config,
-                          self.undo)
-
+        d = self._launch_server(launch_config)
         self.failureResultOf(d, APIError)
-
         self.assertEqual(self.undo.push.call_count, 0)
 
     @mock.patch('otter.worker.launch_server_v1.verified_delete')
@@ -1751,13 +1702,7 @@ class ServerTests(SynchronousTestCase):
         mock_vd.side_effect = lambda *a: Deferred()
 
         clock = Clock()
-        d = launch_server(self.log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          launch_config,
-                          self.undo, clock=clock)
+        d = self._launch_server(launch_config, clock=clock)
 
         # No result, create_server and wait_for_active called once, server deletion
         # was started and it wasn't added to clb
@@ -1825,13 +1770,7 @@ class ServerTests(SynchronousTestCase):
         mock_wfa.side_effect = lambda *a: wfa_returns.pop(0)
 
         clock = Clock()
-        d = launch_server(self.log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          launch_config,
-                          self.undo, clock=clock)
+        d = self._launch_server(launch_config, clock=clock)
 
         self.failureResultOf(d, UnexpectedServerStatus)
         self.assertEqual(mock_cs.call_count, 1)
@@ -1867,13 +1806,7 @@ class ServerTests(SynchronousTestCase):
         mock_wfa.side_effect = lambda *a: wfa_returns.pop(0)
 
         clock = Clock()
-        d = launch_server(self.log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          launch_config,
-                          self.undo, clock=clock)
+        d = self._launch_server(launch_config, clock=clock)
 
         clock.pump([15] * 3)
         self.failureResultOf(d, UnexpectedServerStatus)
