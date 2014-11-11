@@ -663,18 +663,15 @@ def scrub_otter_metadata(log, auth_token, service_catalog, region, server_id,
             .addCallback(_treq.content))
 
 
-def launch_server(log, region, scaling_group, service_catalog, auth_token,
-                  launch_config, undo, clock=None):
+def launch_server(log, request_func, scaling_group, launch_config, undo, clock=None):
     """
     Launch a new server given the launch config auth tokens and service catalog.
     Possibly adding the newly launched server to a load balancer.
 
     :param BoundLog log: A bound logger.
-    :param str region: A rackspace region as found in the service catalog.
+    :param callable request_func: A request function.
     :param IScalingGroup scaling_group: The scaling group to add the launched
         server to.
-    :param list service_catalog: A list of services as returned by the auth apis.
-    :param str auth_token: The user's auth token.
     :param dict launch_config: A launch_config args structure as defined for
         the launch_server_v1 type.
     :param IUndoStack undo: The stack that will be rewound if undo fails.
@@ -684,20 +681,19 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     """
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
-    lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
 
-    lb_endpoint = public_endpoint_url(service_catalog,
+    lb_endpoint = public_endpoint_url(request_func.service_catalog,
                                       cloudLoadBalancers,
-                                      lb_region)
+                                      request_func.lb_region)
 
-    server_endpoint = public_endpoint_url(service_catalog,
+    server_endpoint = public_endpoint_url(request_func.service_catalog,
                                           cloudServersOpenStack,
-                                          region)
+                                          request_func.region)
 
+    auth_token = request_func.auth_token
     lb_config = launch_config.get('loadBalancers', [])
-
     server_config = launch_config['server']
 
     log = log.bind(server_name=server_config['name'])
