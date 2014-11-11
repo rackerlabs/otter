@@ -165,7 +165,6 @@ class LoadBalancersTestsMixin(object):
 
         self.clock = Clock()
 
-        self.endpoint = 'http://url/'
         self.auth_token = 'my-auth-token'
         self.server_details = {
             'server': {
@@ -211,7 +210,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         Helper function to call :func:`add_to_clb`.
         """
-        return add_to_clb(self.log, self.endpoint, self.auth_token,
+        return add_to_clb(self.log, 'http://dfw.lbaas/', self.auth_token,
                           self.lb_config, '192.168.1.1', self.undo,
                           clock=self.clock)
 
@@ -405,7 +404,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         A test double for :func:`add_to_clb`.
         """
         self.assertEqual(log, self.log)
-        self.assertEqual(endpoint, self.endpoint)
+        self.assertEqual(endpoint, 'http://dfw.lbaas/')
         self.assertEqual(auth_token, self.auth_token)
         self.assertEqual(ip_address, "192.168.1.1")
         self.assertEqual(undo, self.undo)
