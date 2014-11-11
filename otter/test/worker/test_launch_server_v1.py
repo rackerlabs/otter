@@ -2120,6 +2120,19 @@ class DeleteServerTests(SynchronousTestCase):
 
         self.clock = Clock()
 
+    def test_delete_server_no_lbs(self):
+        """
+        :func:`delete_server` removes the nodes specified in instance details
+        when there are no associated load balancers
+        """
+        d = delete_server(self.log,
+                          'DFW',
+                          fake_service_catalog,
+                          'my-auth-token',
+                          ('a', []))
+        self.successResultOf(d)
+        self.assertFalse(self.remove_from_load_balancer.called)
+
     def _test_delete_server_lb_removal(self, instance_details):
         """
         Helper test to verify that :func:`delete_server` removes the nodes
