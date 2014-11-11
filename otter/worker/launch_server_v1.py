@@ -682,12 +682,11 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
     cloudLoadBalancers = config_value('cloudLoadBalancers')
-    cloudServersOpenStack = config_value('cloudServersOpenStack')
-
     lb_endpoint = public_endpoint_url(request_func.service_catalog,
                                       cloudLoadBalancers,
                                       request_func.lb_region)
 
+    cloudServersOpenStack = config_value('cloudServersOpenStack')
     server_endpoint = public_endpoint_url(request_func.service_catalog,
                                           cloudServersOpenStack,
                                           request_func.region)
