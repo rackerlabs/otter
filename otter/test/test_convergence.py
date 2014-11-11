@@ -8,6 +8,8 @@ from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.task import Clock
 from twisted.internet.defer import succeed
 
+from characteristic import attributes
+
 from otter.test.utils import StubTreq2, patch, iMock
 from otter.auth import IAuthenticator
 from otter.util.http import headers, APIError
@@ -21,7 +23,7 @@ from otter.convergence import (
     SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ServerState, ServiceType, NodeCondition, NodeType, optimize_steps,
-    extract_drained_at, get_load_balancer_contents)
+    extract_drained_at, get_load_balancer_contents, _reqs_to_effect)
 
 from pyrsistent import pmap, pbag, pset, s
 
@@ -913,9 +915,9 @@ class ConvergeTests(SynchronousTestCase):
             ])))
 
 
-class RequestConversionTests(SynchronousTestCase):
+class StepAsRequestTests(SynchronousTestCase):
     """
-    Tests for converting ISteps to :obj:`Request`s.
+    Tests for converting :obj:`IStep` implementations to :obj:`Request`s.
     """
 
     def test_create_server(self):
@@ -1239,3 +1241,112 @@ class OptimizerTests(SynchronousTestCase):
             ]))
         ])
         self.assertEqual(optimize_steps(unoptimized), optimized)
+
+
+@attributes(["service_type", "method", "url", "headers", "data"])
+class _PureRequestStub(object):
+    """
+    A bound request stub, suitable for testing.
+    """
+
+
+class RequestsToEffectTests(SynchronousTestCase):
+    """
+    Tests for converting :class:`Request` into effects.
+    """
+    def _reqs_to_effect(self, conv_requests):
+        """
+        Helper function to call :func:`_reqs_to_effect`.
+
+        Uses :class:`_PureRequestStub` test double for easy introspection.
+
+        :param conv_requests: The convergence requests to be turned into an
+            effect.
+        :type conv_requests: iterable of :class:`Request`
+        :return: The return value of :func:`_reqs_to_effect`.
+        """
+        return _reqs_to_effect(_PureRequestStub, conv_requests)
+
+    def assertCompilesTo(self, conv_requests, expected_effects):
+        """
+        Assert that the given convergence requests, compile down to a parallel
+        effect comprised of the given effects.
+        """
+        parallel_effect = self._reqs_to_effect(conv_requests)
+        self.assertEqual(expected_effects, set(parallel_effect.effects))
+
+    def test_single_request(self):
+        """
+        A single request is correctly compiled down to an effect.
+        """
+        conv_requests = [
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever")]
+        expected_effects = set([
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever",
+                             headers=None,
+                             data=None)])
+        self.assertCompilesTo(conv_requests, expected_effects)
+
+    def test_multiple_requests(self):
+        """
+        Multiple requests of the same type are correctly compiled down to an
+        effect.
+        """
+        conv_requests = [
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever"),
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever/something/else")]
+        expected_effects = set([
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever",
+                             headers=None,
+                             data=None),
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever/something/else",
+                             headers=None,
+                             data=None)])
+        self.assertCompilesTo(conv_requests, expected_effects)
+
+    def test_multiple_requests_of_different_type(self):
+        """
+        Multiple requests of different types are correctly compiled down to
+        an effect.
+        """
+        data_sentinel = object()
+        conv_requests = [
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever"),
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever/something/else"),
+            Request(service=ServiceType.CLOUD_SERVERS,
+                    method="POST",
+                    path="/xyzzy",
+                    data=data_sentinel)]
+        expected_effects = set([
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever",
+                             headers=None,
+                             data=None),
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever/something/else",
+                             headers=None,
+                             data=None),
+            _PureRequestStub(service_type=ServiceType.CLOUD_SERVERS,
+                             method="POST",
+                             url="/xyzzy",
+                             headers=None,
+                             data=data_sentinel)])
+        self.assertCompilesTo(conv_requests, expected_effects)
