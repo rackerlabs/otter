@@ -1529,7 +1529,7 @@ class ServerTests(SynchronousTestCase):
         log = log.bind.return_value
         log.bind.assert_called_once_with(server_id='1')
         add_to_load_balancers.assert_called_once_with(
-            log.bind.return_value, 'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
+            log.bind.return_value, self.request_func, prepared_load_balancers,
             {'server': {'id': '1',
                         'addresses': {'private': [{'version': 4, 'addr': '10.0.0.1'}]}}},
             self.undo)
