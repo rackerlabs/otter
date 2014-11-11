@@ -448,9 +448,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         bogus_lb_config = {"type": "TOTALLY BOGUS LB TYPE",
                            "transmogrification": "quantum"}
         self.assertRaises(RuntimeError,
-                          add_to_load_balancer, object(), self.endpoint,
-                          self.auth_token, bogus_lb_config,
-                          self.server_details, self.undo)
+                          self._add_to_load_balancer, bogus_lb_config)
 
 
 class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
