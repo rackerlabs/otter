@@ -256,7 +256,12 @@ class DeleteServerTests(SupervisorTests):
             return_value=succeed(None))
 
         self.fake_server = self.fake_server_details['server']
-        self.fake_server['lb_info'] = {}
+        self.fake_server['lb_info'] = [({"loadBalancerId": '12345'},
+                                        {'nodes': [{'id': 'a',
+                                                    'address': "1.1.1.1" }]}),
+                                       ({"loadBalancerId": '54321'},
+                                        {'nodes': [{'id': 'b',
+                                                    'address': "1.1.1.2" }]})]
 
     def test_execute_delete_calls_delete_worker(self):
         """
