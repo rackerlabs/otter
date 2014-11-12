@@ -620,7 +620,7 @@ class ChangeLoadBalancerNode(object):
                   'weight': self.weight})
 
 
-def _rackconnect_bulk_request(lb_node_pairs, method):
+def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
     """
     Creates a bulk request for RackConnect v3.0 load balancers.
 
@@ -628,6 +628,7 @@ def _rackconnect_bulk_request(lb_node_pairs, method):
         connections to be made or broken.
     :param str method: The method of the request ``"DELETE"`` or
         ``"POST"``.
+    :param iterable success_codes: Status codes considered successful for this request.
     :return: A bulk RackConnect v3.0 request for the given load balancer,
         node pairs.
     :rtype: :class:`Request`
@@ -639,7 +640,8 @@ def _rackconnect_bulk_request(lb_node_pairs, method):
                              "nodes"),
         data=[{"cloud_server": {"id": node},
                "load_balancer_pool": {"id": lb}}
-              for (lb, node) in lb_node_pairs])
+              for (lb, node) in lb_node_pairs],
+        success_codes=success_codes)
 
 
 @implementer(IStep)
@@ -662,7 +664,7 @@ class BulkAddToRCv3(object):
         Produce a :obj:`Request` to add some nodes to some RCv3 load
         balancers.
         """
-        return _rackconnect_bulk_request(self.lb_node_pairs, "POST")
+        return _rackconnect_bulk_request(self.lb_node_pairs, "POST", (201,))
 
 
 @implementer(IStep)
@@ -702,7 +704,7 @@ class BulkRemoveFromRCv3(object):
         Produce a :obj:`Request` to remove some nodes from some RCv3 load
         balancers.
         """
-        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE")
+        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE", (204,))
 
 
 _optimizers = {}
@@ -777,8 +779,8 @@ def optimize_steps(steps):
     return pbag(concatv(omg_optimized, unoptimizable))
 
 
-@attributes(['service', 'method', 'path', 'headers', 'data'],
-            defaults={'headers': None, 'data': None})
+@attributes(['service', 'method', 'path', 'headers', 'data', 'success_codes'],
+            defaults={'headers': None, 'data': None, 'success_codes': (200,)})
 class Request(object):
     """
     An object representing a Rackspace API request that must be performed.
@@ -798,20 +800,25 @@ class Request(object):
     :ivar dict headers: a dict mapping bytes to lists of bytes.
     :ivar object data: a Python object that will be JSON-serialized as the body
         of the request.
+    :ivar iterable<int> success_codes: The status codes that will be considered
+        successful. Defaults to just 200 (OK). Requests that expect other codes,
+        such as 201 (Created) for most ``POST`` requests or 204 (No content)
+        for most ``DELETE`` requests should specify that through this argument.
     """
 
 
-def _reqs_to_effect(request_fn, conv_requests):
+def _reqs_to_effect(request_func, conv_requests):
     """Turns a collection of :class:`Request` objects into an effect.
 
-    :param request_fn: A pure-http request function, as produced by
+    :param request_func: A pure-http request function, as produced by
         :func:`otter.http.get_request_func`.
     :param conv_requests: Convergence requests to turn into effects.
     """
-    effects = [request_fn(service_type=r.service,
-                          method=r.method,
-                          url=r.path,
-                          headers=r.headers,
-                          data=r.data)
+    effects = [request_func(service_type=r.service,
+                            method=r.method,
+                            url=r.path,
+                            headers=r.headers,
+                            data=r.data,
+                            success_codes=r.success_codes)
                for r in conv_requests]
     return ParallelEffects(effects)
