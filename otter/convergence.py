@@ -620,7 +620,7 @@ class ChangeLoadBalancerNode(object):
                   'weight': self.weight})
 
 
-def _rackconnect_bulk_request(lb_node_pairs, method):
+def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
     """
     Creates a bulk request for RackConnect v3.0 load balancers.
 
@@ -639,7 +639,8 @@ def _rackconnect_bulk_request(lb_node_pairs, method):
                              "nodes"),
         data=[{"cloud_server": {"id": node},
                "load_balancer_pool": {"id": lb}}
-              for (lb, node) in lb_node_pairs])
+              for (lb, node) in lb_node_pairs],
+        success_codes=success_codes)
 
 
 @implementer(IStep)
