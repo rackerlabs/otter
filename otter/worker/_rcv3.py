@@ -19,6 +19,7 @@ def _generic_rcv3_request(step_class, request_func, lb_id, server_id,
     :param callable request_func: A request function.
     :param str lb_id: The id of the RCv3 load balancer to act on.
     :param str server_id: The Nova server id to act on.
+    :param _reactor: The reactor used to perform the effects.
     :return: A deferred that will fire when the
     """
     step = step_class(lb_node_pairs=[(lb_id, server_id)])
