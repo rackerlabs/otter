@@ -597,7 +597,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         lb_config = {"loadBalancerId": 12345}
         d = remove_from_load_balancer(
-            self.log, 'http://dfw.lbaas/', 'my-auth-token', lb_config, 1,
+            self.log, self.request_func, lb_config, 1,
             clock=self.clock)
         return d
 
