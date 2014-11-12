@@ -15,7 +15,7 @@ def _generic_rcv3_request(step_class, request_func, lb_id, server_id,
     """
     Perform a generic RCv3 bulk step on a single (lb, server) pair.
 
-    :param IStep step_class: The step class to perform the action. Should be either
+    :param IStep step_class: The step class to perform the action.
     :param callable request_func: A request function.
     :param str lb_id: The id of the RCv3 load balancer to act on.
     :param str server_id: The Nova server id to act on.
