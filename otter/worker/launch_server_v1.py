@@ -855,13 +855,13 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
 
     """
     lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
-    cloudLoadBalancers = config_value('cloudLoadBalancers')
-    cloudServersOpenStack = config_value('cloudServersOpenStack')
 
+    cloudLoadBalancers = config_value('cloudLoadBalancers')
     lb_endpoint = public_endpoint_url(service_catalog,
                                       cloudLoadBalancers,
                                       lb_region)
 
+    cloudServersOpenStack = config_value('cloudServersOpenStack')
     server_endpoint = public_endpoint_url(service_catalog,
                                           cloudServersOpenStack,
                                           region)
