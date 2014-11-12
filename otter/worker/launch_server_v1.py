@@ -779,8 +779,7 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
     return d
 
 
-def remove_from_load_balancer(log, endpoint, auth_token, lb_config,
-                              node_id, clock=None):
+def remove_from_load_balancer(log, request_func, lb_config, node_id, clock=None):
     """
     Remove a node from a load balancer.
 
@@ -792,7 +791,33 @@ def remove_from_load_balancer(log, endpoint, auth_token, lb_config,
     :returns: A Deferred that fires with None if the operation completed successfully,
         or errbacks with an RequestError.
     """
-    loadbalancer_id = lb_config["loadBalancerId"]
+    lb_type = lb_config.get("type", "CloudLoadBalancer")
+    if lb_type == "CloudLoadBalancer":
+        loadbalancer_id = lb_config["loadBalancerId"]
+        cloudLoadBalancers = config_value('cloudLoadBalancers')
+        endpoint = public_endpoint_url(request_func.service_catalog,
+                                       cloudLoadBalancers,
+                                       request_func.lb_region)
+        auth_token = request_func.auth_token
+        return _remove_from_clb(log, endpoint, auth_token, loadbalancer_id,
+                                node_id, clock)
+    else:
+        raise RuntimeError("Unknown cloud load balancer type! config: {}"
+                           .format(lb_config))
+
+
+def _remove_from_clb(log, endpoint, auth_token, loadbalancer_id, node_id, clock=None):
+    """
+    Remove a node from a CLB load balancer.
+
+    :param str endpoint: Load balancer endpoint URI.
+    :param str auth_token: Keystone authentication token.
+    :param str loadbalancer_id: The ID for a Cloud Load Balancer.
+    :param str node_id: The ID for a node in that Cloud Load Balancer.
+
+    :returns: A Deferred that fires with None if the operation completed successfully,
+        or errbacks with an RequestError.
+    """
     lb_log = log.bind(loadbalancer_id=loadbalancer_id, node_id=node_id)
     # TODO: Will remove this once LB ERROR state is fixed and it is working fine
     lb_log.msg('Removing from load balancer')
