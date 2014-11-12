@@ -2,6 +2,7 @@
 Tests for RCv3-specific worker code.
 """
 from effect import ParallelEffects
+from otter.constants import ServiceType
 from otter.worker import _rcv3
 from otter.test.test_convergence import _PureRequestStub
 from twisted.internet.defer import succeed
@@ -44,7 +45,20 @@ class RCv3Tests(SynchronousTestCase):
         """
         self.effect = effect
         self.assertTrue(isinstance(effect, ParallelEffects))
-        return succeed([_rcv3_add_response("lb_id", "server_id")])
+        (sub_effect,) = effect.effects
+
+        self.assertEqual(sub_effect.service_type, ServiceType.RACKCONNECT_V3)
+        self.assertEqual(sub_effect.data,
+                         [{'load_balancer_pool': {'id': 'lb_id'},
+                           'cloud_server': {'id': 'server_id'}}])
+        # The URL is actually a relative URL path. This is intentional,
+        # because the real request_func is service-bound.
+        self.assertEqual(sub_effect.url, 'load_balancer_pools/nodes')
+        # The headers are None (== unspecified). This is intentional,
+        # because the real request func injects auth headers.
+        self.assertEqual(sub_effect.headers, None)
+        # The method is either POST (add) or DELETE (remove).
+        self.assertIn(sub_effect.method, ["POST", "DELETE"])
 
     def test_add_to_rcv3(self):
         """
