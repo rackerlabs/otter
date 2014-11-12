@@ -2157,8 +2157,7 @@ class DeleteServerTests(RequestFuncTestMixin, SynchronousTestCase):
         """
         Helper method to call :func:`delete_server`.
         """
-        return delete_server(self.log, 'DFW', fake_service_catalog,
-                             'my-auth-token', instance_details)
+        return delete_server(self.log, self.request_func, instance_details)
 
     def test_delete_server_no_lbs(self):
         """
