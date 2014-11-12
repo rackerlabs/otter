@@ -1243,7 +1243,8 @@ class OptimizerTests(SynchronousTestCase):
         self.assertEqual(optimize_steps(unoptimized), optimized)
 
 
-@attributes(["service_type", "method", "url", "headers", "data"])
+@attributes(["service_type", "method", "url", "headers", "data", "success_codes"],
+            defaults={"success_codes": (200,)})
 class _PureRequestStub(object):
     """
     A bound request stub, suitable for testing.
