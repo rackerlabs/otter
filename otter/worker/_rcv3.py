@@ -10,7 +10,8 @@ from otter.convergence import BulkAddToRCv3, BulkRemoveFromRCv3, _reqs_to_effect
 from twisted.internet import reactor
 
 
-def _generic_rcv3_request(step_class, request_func, lb_id, server_id):
+def _generic_rcv3_request(step_class, request_func, lb_id, server_id,
+                          _reactor=reactor):
     """
     Perform a generic RCv3 bulk step on a single (lb, server) pair.
 
@@ -22,7 +23,7 @@ def _generic_rcv3_request(step_class, request_func, lb_id, server_id):
     """
     step = step_class(lb_node_pairs=[(lb_id, server_id)])
     effect = _reqs_to_effect(request_func, [step.as_request()])
-    return perform(reactor, effect).addCallback(itemgetter(0))
+    return perform(_reactor, effect).addCallback(itemgetter(0))
 
 
 add_to_rcv3 = partial(_generic_rcv3_request, BulkAddToRCv3)
