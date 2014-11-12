@@ -2175,9 +2175,9 @@ class DeleteServerTests(RequestFuncTestMixin, SynchronousTestCase):
         self.successResultOf(self._delete_server(instance_details))
 
         self.remove_from_load_balancer.assert_has_calls([
-            mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token',
+            mock.call(self.log, self.request_func,
                       _definitely_lb_config(12345), 1),
-            mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token',
+            mock.call(self.log, self.request_func,
                       _definitely_lb_config(54321), 2)
         ], any_order=True)
 
