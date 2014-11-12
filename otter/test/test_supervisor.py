@@ -263,12 +263,12 @@ class DeleteServerTests(SupervisorTests):
         """
         self.supervisor.execute_delete_server(self.log, 'transaction-id',
                                               self.group, self.fake_server)
-        self.delete_server.assert_called_once_with(
-            self.log.bind.return_value,
-            'ORD',
-            self.service_catalog,
-            self.auth_token,
-            (self.fake_server['id'], self.fake_server['lb_info']))
+        (args, _kwargs), = self.delete_server.call_args_list
+        log, request_func, instance_details = args
+        self.assertEqual(log, self.log.bind.return_value)
+        self.assertCorrectRequestFunc(request_func)
+        expected_details = self.fake_server['id'], self.fake_server['lb_info']
+        self.assertEqual(instance_details, expected_details)
 
     def test_execute_delete_auths(self):
         """
