@@ -153,7 +153,8 @@ class LoadBalancersTestsMixin(object):
 
         self.max_retries = 12
         set_config_data({'worker': {'lb_max_retries': self.max_retries,
-                                    'lb_retry_interval_range': [5, 7]}})
+                                    'lb_retry_interval_range': [5, 7]},
+                         "cloudLoadBalancers": "cloudLoadBalancers"})
         self.addCleanup(set_config_data, {})
 
         # patch random_interval
@@ -164,8 +165,12 @@ class LoadBalancersTestsMixin(object):
 
         self.clock = Clock()
 
-        self.endpoint = 'http://url/'
         self.auth_token = 'my-auth-token'
+        self.request_func = lambda *a, **kw: None
+        self.request_func.auth_token = self.auth_token
+        self.request_func.lb_region = "DFW"
+        self.request_func.service_catalog = fake_service_catalog
+
         self.server_details = {
             'server': {
                 "addresses": {
@@ -210,7 +215,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         Helper function to call :func:`add_to_clb`.
         """
-        return add_to_clb(self.log, self.endpoint, self.auth_token,
+        return add_to_clb(self.log, 'http://dfw.lbaas/', self.auth_token,
                           self.lb_config, '192.168.1.1', self.undo,
                           clock=self.clock)
 
@@ -224,7 +229,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(result, self.json_content)
 
         self.treq.post.assert_called_once_with(
-            'http://url/loadbalancers/12345/nodes',
+            'http://dfw.lbaas/loadbalancers/12345/nodes',
             headers=expected_headers,
             data=mock.ANY,
             log=matches(IsInstance(self.log.__class__))
@@ -256,7 +261,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         result = self.successResultOf(d)
         self.assertEqual(result, self.json_content)
         self.assertEqual(self.treq.post.mock_calls,
-                         [mock.call('http://url/loadbalancers/12345/nodes',
+                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes',
                                     headers=expected_headers, data=mock.ANY,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
         self.rand_interval.assert_called_once_with(5, 7)
@@ -306,7 +311,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.clock.pump([self.retry_interval] * LB_MAX_RETRIES)
         self.failureResultOf(d, RequestError)
         self.assertEqual(self.treq.post.mock_calls,
-                         [mock.call('http://url/loadbalancers/12345/nodes',
+                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes',
                                     headers=expected_headers, data=mock.ANY,
                                     log=matches(IsInstance(self.log.__class__)))]
                          * (LB_MAX_RETRIES + 1))
@@ -333,7 +338,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(f.value.reason.value.code, 422)
         self.assertEqual(
             self.treq.post.mock_calls,
-            [mock.call('http://url/loadbalancers/12345/nodes',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes',
                        headers=expected_headers, data=mock.ANY,
                        log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
 
@@ -368,7 +373,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.successResultOf(d)
         self.undo.push.assert_called_once_with(
             remove_from_load_balancer, matches(IsInstance(self.log.__class__)),
-            'http://url/', 'my-auth-token',
+            'http://dfw.lbaas/', 'my-auth-token',
             self.lb_config,
             1)
 
@@ -404,7 +409,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         A test double for :func:`add_to_clb`.
         """
         self.assertEqual(log, self.log)
-        self.assertEqual(endpoint, self.endpoint)
+        self.assertEqual(endpoint, 'http://dfw.lbaas/')
         self.assertEqual(auth_token, self.auth_token)
         self.assertEqual(ip_address, "192.168.1.1")
         self.assertEqual(undo, self.undo)
@@ -420,7 +425,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         Synchronously gets the deferred's result.
         """
         self.lb_config = lb_config
-        d = add_to_load_balancer(self.log, self.endpoint, self.auth_token,
+        d = add_to_load_balancer(self.log, self.request_func,
                                  self.lb_config, self.server_details,
                                  self.undo, self.clock)
         return self.successResultOf(d)
@@ -448,9 +453,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         bogus_lb_config = {"type": "TOTALLY BOGUS LB TYPE",
                            "transmogrification": "quantum"}
         self.assertRaises(RuntimeError,
-                          add_to_load_balancer, object(), self.endpoint,
-                          self.auth_token, bogus_lb_config,
-                          self.server_details, self.undo)
+                          self._add_to_load_balancer, bogus_lb_config)
 
 
 class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
@@ -462,8 +465,8 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         Helper function to call :func:`add_to_load_balancers`.
         """
-        return add_to_load_balancers(self.log, self.endpoint, self.auth_token,
-                                     lb_configs, self.server_details, self.undo)
+        return add_to_load_balancers(self.log, self.request_func, lb_configs,
+                                     self.server_details, self.undo)
 
     def _set_up_fake_add_to_lb(self, responses):
         """
@@ -481,23 +484,20 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self._fake_add_to_lb_responses = responses
         self.patch(launch_server_v1, "add_to_load_balancer", self._fake_add_to_lb)
 
-    def _fake_add_to_lb(self, log, endpoint, auth_token, lb_config,
-                        server_details, undo):
-            """
-            Assert that func:`add_to_load_balancer` is being called with the
-            right arguments, and returns an appropriate response.
-            """
-            self.assertEqual(log, self.log)
-            self.assertEqual(endpoint, self.endpoint)
-            self.assertEqual(auth_token, self.auth_token)
-            self.assertEqual(server_details, self.server_details)
-            self.assertEqual(undo, self.undo)
-            for (lb, response) in self._fake_add_to_lb_responses:
-                if lb == lb_config:
-                    self._added_lbs.append(lb)
-                    return response
-            else:
-                raise RuntimeError("Unknown lb!")
+    def _fake_add_to_lb(self, log, request_func, lb_config, server_details, undo):
+        """
+        Assert that func:`add_to_load_balancer` is being called with the
+        right arguments, and returns an appropriate response.
+        """
+        self.assertEqual(log, self.log)
+        self.assertEqual(request_func, self.request_func)
+        self.assertEqual(server_details, self.server_details)
+        self.assertEqual(undo, self.undo)
+        for (lb, response) in self._fake_add_to_lb_responses:
+            if lb == lb_config:
+                self._added_lbs.append(lb)
+                return response
+        raise RuntimeError("Unknown lb_config: {}!".format(lb_config))
 
     def test_add_to_load_balancers(self):
         """
@@ -586,7 +586,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         lb_config = {"loadBalancerId": 12345}
         d = remove_from_load_balancer(
-            self.log, 'http://url/', 'my-auth-token', lb_config, 1,
+            self.log, 'http://dfw.lbaas/', 'my-auth-token', lb_config, 1,
             clock=self.clock)
         return d
 
@@ -602,7 +602,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         self.assertEqual(self.successResultOf(d), None)
         self.treq.delete.assert_called_once_with(
-            'http://url/loadbalancers/12345/nodes/1',
+            'http://dfw.lbaas/loadbalancers/12345/nodes/1',
             headers=expected_headers, log=matches(IsInstance(self.log.__class__)))
 
     def test_remove_from_load_balancer_on_404(self):
@@ -693,7 +693,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertIsNone(self.successResultOf(d))
         # delete calls made?
         self.assertEqual(self.treq.delete.mock_calls,
-                         [mock.call('http://url/loadbalancers/12345/nodes/1',
+                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
                                     headers=expected_headers,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
         # Expected logs?
@@ -725,7 +725,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         # delete calls made?
         self.assertEqual(
             self.treq.delete.mock_calls,
-            [mock.call('http://url/loadbalancers/12345/nodes/1',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
                        headers=expected_headers,
                        log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
         # Expected logs?
@@ -756,7 +756,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         # delete calls made?
         self.assertEqual(
             self.treq.delete.mock_calls,
-            [mock.call('http://url/loadbalancers/12345/nodes/1',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
                        headers=expected_headers,
                        log=matches(IsInstance(self.log.__class__)))] * (LB_MAX_RETRIES + 1))
         # Expected logs?
@@ -1444,7 +1444,7 @@ class ServerTests(SynchronousTestCase):
         """
         Helper method for calling :func:`launch_server`.
         """
-        request_func = lambda *a, **kw: None
+        self.request_func = request_func = lambda *a, **kw: None
         request_func.region = request_func.lb_region = "DFW"
         request_func.service_catalog = fake_service_catalog
         request_func.auth_token = 'my-auth-token'
@@ -1528,7 +1528,7 @@ class ServerTests(SynchronousTestCase):
         log = log.bind.return_value
         log.bind.assert_called_once_with(server_id='1')
         add_to_load_balancers.assert_called_once_with(
-            log.bind.return_value, 'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
+            log.bind.return_value, self.request_func, prepared_load_balancers,
             {'server': {'id': '1',
                         'addresses': {'private': [{'version': 4, 'addr': '10.0.0.1'}]}}},
             self.undo)
