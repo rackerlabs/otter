@@ -76,6 +76,20 @@ class SupervisorTests(SynchronousTestCase):
         """
         verifyObject(ISupervisor, self.supervisor)
 
+    def assertCorrectRequestFunc(self, request_func):
+        """
+        Asserts that the given request_func is correct.
+
+        "Correct" here is mutable: ideally it will eventually mean "it is
+        literally the return value of ``get_request_func``", but for now it
+        needs a few arguments to support old code that hasn't been updated
+        to use pure_http yet.
+
+        :param callable request_func: The request function to check.
+        """
+        self.assertEqual(request_func.auth_token, self.auth_token)
+        self.assertEqual(request_func.service_catalog, self.service_catalog)
+
 
 class HealthCheckTests(SupervisorTests):
     """
@@ -175,8 +189,7 @@ class LaunchConfigTests(SupervisorTests):
         (args, _kwargs), = self.launch_server.call_args_list
         log, request_func, scaling_group, launch_config, undo = args
         # TODO: Wasn't there a fancy thing for checking bound loggers?
-        self.assertEqual(request_func.auth_token, self.auth_token)
-        self.assertEqual(request_func.service_catalog, self.service_catalog)
+        self.assertCorrectRequestFunc(request_func)
         self.assertEqual(scaling_group, self.group)
         self.assertEqual(launch_config, {'server': {}})
         self.assertEqual(undo, self.undo)
