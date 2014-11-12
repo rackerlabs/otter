@@ -777,8 +777,8 @@ def optimize_steps(steps):
     return pbag(concatv(omg_optimized, unoptimizable))
 
 
-@attributes(['service', 'method', 'path', 'headers', 'data'],
-            defaults={'headers': None, 'data': None})
+@attributes(['service', 'method', 'path', 'headers', 'data', 'success_codes'],
+            defaults={'headers': None, 'data': None, 'success_codes': (200,)})
 class Request(object):
     """
     An object representing a Rackspace API request that must be performed.
@@ -798,20 +798,25 @@ class Request(object):
     :ivar dict headers: a dict mapping bytes to lists of bytes.
     :ivar object data: a Python object that will be JSON-serialized as the body
         of the request.
+    :ivar iterable<int> success_codes: The status codes that will be considered
+        successful. Defaults to just 200 (OK). Requests that expect other codes,
+        such as 201 (Created) for most ``POST`` requests or 204 (No content)
+        for most ``DELETE`` requests should specify that through this argument.
     """
 
 
-def _reqs_to_effect(request_fn, conv_requests):
+def _reqs_to_effect(request_func, conv_requests):
     """Turns a collection of :class:`Request` objects into an effect.
 
-    :param request_fn: A pure-http request function, as produced by
+    :param request_func: A pure-http request function, as produced by
         :func:`otter.http.get_request_func`.
     :param conv_requests: Convergence requests to turn into effects.
     """
-    effects = [request_fn(service_type=r.service,
-                          method=r.method,
-                          url=r.path,
-                          headers=r.headers,
-                          data=r.data)
+    effects = [request_func(service_type=r.service,
+                            method=r.method,
+                            url=r.path,
+                            headers=r.headers,
+                            data=r.data,
+                            success_codes=r.success_codes)
                for r in conv_requests]
     return ParallelEffects(effects)

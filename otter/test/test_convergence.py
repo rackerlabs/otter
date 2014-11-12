@@ -1243,7 +1243,8 @@ class OptimizerTests(SynchronousTestCase):
         self.assertEqual(optimize_steps(unoptimized), optimized)
 
 
-@attributes(["service_type", "method", "url", "headers", "data"])
+@attributes(["service_type", "method", "url", "headers", "data", "success_codes"],
+            defaults={"success_codes": (200,)})
 class _PureRequestStub(object):
     """
     A bound request stub, suitable for testing.
@@ -1282,13 +1283,15 @@ class RequestsToEffectTests(SynchronousTestCase):
         conv_requests = [
             Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
                     method="GET",
-                    path="/whatever")]
+                    path="/whatever",
+                    success_codes=(999,))]
         expected_effects = set([
             _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
                              method="GET",
                              url="/whatever",
                              headers=None,
-                             data=None)])
+                             data=None,
+                             success_codes=(999,))])
         self.assertCompilesTo(conv_requests, expected_effects)
 
     def test_multiple_requests(self):
@@ -1302,7 +1305,8 @@ class RequestsToEffectTests(SynchronousTestCase):
                     path="/whatever"),
             Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
                     method="GET",
-                    path="/whatever/something/else")]
+                    path="/whatever/something/else",
+                    success_codes=(231,))]
         expected_effects = set([
             _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
                              method="GET",
@@ -1313,7 +1317,8 @@ class RequestsToEffectTests(SynchronousTestCase):
                              method="GET",
                              url="/whatever/something/else",
                              headers=None,
-                             data=None)])
+                             data=None,
+                             success_codes=(231,))])
         self.assertCompilesTo(conv_requests, expected_effects)
 
     def test_multiple_requests_of_different_type(self):
@@ -1328,7 +1333,8 @@ class RequestsToEffectTests(SynchronousTestCase):
                     path="/whatever"),
             Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
                     method="GET",
-                    path="/whatever/something/else"),
+                    path="/whatever/something/else",
+                    success_codes=(231,)),
             Request(service=ServiceType.CLOUD_SERVERS,
                     method="POST",
                     path="/xyzzy",
@@ -1343,7 +1349,8 @@ class RequestsToEffectTests(SynchronousTestCase):
                              method="GET",
                              url="/whatever/something/else",
                              headers=None,
-                             data=None),
+                             data=None,
+                             success_codes=(231,)),
             _PureRequestStub(service_type=ServiceType.CLOUD_SERVERS,
                              method="POST",
                              url="/xyzzy",
