@@ -185,9 +185,9 @@ class LoadBalancersTestsMixin(RequestFuncTestMixin):
         self.undo = iMock(IUndoStack)
 
         self.max_retries = 12
-        set_config_data({'worker': {'lb_max_retries': self.max_retries,
-                                    'lb_retry_interval_range': [5, 7]},
-                         "cloudLoadBalancers": "cloudLoadBalancers"})
+        set_config_data(merge({'worker': {'lb_max_retries': self.max_retries,
+                                          'lb_retry_interval_range': [5, 7]}},
+                              fake_config))
         self.addCleanup(set_config_data, {})
 
         # patch random_interval
@@ -315,7 +315,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         :func:`add_to_clb` will use default :obj:`LB_RETRY_INTERVAL_RANGE`,
         :obj:`LB_MAX_RETRIES` values unless overridden.
         """
-        set_config_data({})
+        set_config_data(fake_config)
         self.treq.post.side_effect = lambda *a, **kw: succeed(mock.Mock(code=422))
 
         d = self._add_to_clb()
@@ -753,7 +753,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         remove_from_load_balancer will retry based on default config if lb_max_retries
         or lb_retry_interval_range is not found
         """
-        set_config_data({})
+        set_config_data(fake_config)
         self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=422))
         self.treq.content.side_effect = lambda *a, **ka: succeed(
             json.dumps({'message': 'PENDING_UPDATE'}))
@@ -2092,7 +2092,7 @@ class MetadataScrubbingTests(SynchronousTestCase):
         """
         Scrubbing otter metadata works correctly.
         """
-        set_config_data({"cloudServersOpenStack": "cloudServersOpenStack"})
+        set_config_data(fake_config)
         self.addCleanup(set_config_data, {})
 
         log = mock.Mock()
