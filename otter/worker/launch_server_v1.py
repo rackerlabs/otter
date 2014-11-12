@@ -20,7 +20,7 @@ import re
 
 from functools import partial
 from copy import deepcopy
-from toolz import comp, groupby
+from toolz import comp
 from urllib import urlencode
 
 from twisted.python.failure import Failure
@@ -877,30 +877,27 @@ def delete_server(log, request_func, instance_details):
     :return: TODO
 
     """
-    cloudLoadBalancers = config_value('cloudLoadBalancers')
-    clb_endpoint = public_endpoint_url(request_func.service_catalog,
-                                       cloudLoadBalancers,
-                                       request_func.lb_region)
-
     cloudServersOpenStack = config_value('cloudServersOpenStack')
     server_endpoint = public_endpoint_url(request_func.service_catalog,
                                           cloudServersOpenStack,
                                           request_func.region)
 
+    _remove_from_lb = partial(remove_from_load_balancer, log, request_func)
     server_id, lb_details = _as_new_style_instance_details(instance_details)
 
-    lb_type = lambda (lb_config, _): lb_config.get("type", "CloudLoadBalancer")
-    lbs_by_type = groupby(lb_type, lb_details)
-
-    _remove_from_clb = partial(remove_from_load_balancer, log, request_func)
-
-    clbs = lbs_by_type.get("CloudLoadBalancer", [])
-    clb_ds = []
-    for lb_config, lb_response in clbs:
-        for node_info in lb_response["nodes"]:
-            node_id = node_info["id"]
-            clb_ds.append(_remove_from_clb(lb_config, node_id))
-    d = gatherResults(clb_ds, consumeErrors=True)
+    lb_ds = []
+    for lb_config, lb_response in lb_details:
+        lb_type = lb_config.get("type", "CloudLoadBalancer")
+        if lb_type == "CloudLoadBalancer":
+            node_ids = [node_info["id"] for node_info in lb_response["nodes"]]
+        # elif lb_type == "RackConnectV3":
+        #     node_ids = [pair["cloud_server"]["id"] for pair in lb_response]
+        else:
+            raise RuntimeError("Unknown cloud load balancer type! config: {}"
+                               .format(lb_config))
+        for node_id in node_ids:
+            lb_ds.append(_remove_from_lb(lb_config, node_id))
+    d = gatherResults(lb_ds, consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
         auth_token = request_func.auth_token
