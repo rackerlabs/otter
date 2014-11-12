@@ -2140,17 +2140,19 @@ class DeleteServerTests(SynchronousTestCase):
 
         self.clock = Clock()
 
+    def _delete_server(self, instance_details):
+        """
+        Helper method to call :func:`delete_server`.
+        """
+        return delete_server(self.log, 'DFW', fake_service_catalog,
+                             'my-auth-token', instance_details)
+
     def test_delete_server_no_lbs(self):
         """
         :func:`delete_server` removes the nodes specified in instance details
         when there are no associated load balancers
         """
-        d = delete_server(self.log,
-                          'DFW',
-                          fake_service_catalog,
-                          'my-auth-token',
-                          ('a', []))
-        self.successResultOf(d)
+        self.successResultOf(self._delete_server(instance_details=('a', [])))
         self.assertFalse(self.remove_from_load_balancer.called)
 
     def _test_delete_server_lb_removal(self, instance_details):
@@ -2158,12 +2160,7 @@ class DeleteServerTests(SynchronousTestCase):
         Helper test to verify that :func:`delete_server` removes the nodes
         specified in instance details from the associated load balancers.
         """
-        d = delete_server(self.log,
-                          'DFW',
-                          fake_service_catalog,
-                          'my-auth-token',
-                          instance_details)
-        self.successResultOf(d)
+        self.successResultOf(self._delete_server(instance_details))
 
         self.remove_from_load_balancer.assert_has_calls([
             mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token',
@@ -2195,9 +2192,7 @@ class DeleteServerTests(SynchronousTestCase):
         ``DELETE`` request against the instance URL based on the
         information in ``instance_details``.
         """
-        d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', instance_details)
-        self.successResultOf(d)
+        self.successResultOf(self._delete_server(instance_details))
 
         self.treq.delete.assert_called_once_with(
             'http://dfw.openstack/servers/a',
@@ -2224,10 +2219,7 @@ class DeleteServerTests(SynchronousTestCase):
         delete calls return 404.
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
-
-        d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', instance_details)
-        self.successResultOf(d)
+        self.successResultOf(self._delete_server(instance_details))
 
     def test_delete_server_succeeds_on_unknown_server_old_style(self):
         """
@@ -2254,8 +2246,7 @@ class DeleteServerTests(SynchronousTestCase):
         self.remove_from_load_balancer.return_value = fail(
             APIError(500, '')).addErrback(wrap_request_error, 'url')
 
-        d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', instance_details)
+        d = self._delete_server(instance_details)
         failure = unwrap_first_error(self.failureResultOf(d))
 
         self.assertEqual(failure.value.reason.value.code, 500)
@@ -2286,8 +2277,7 @@ class DeleteServerTests(SynchronousTestCase):
         """
         deleter.return_value = fail(TimedOutError(3660, 'meh'))
 
-        d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', instance_details)
+        d = self._delete_server(instance_details)
         self.failureResultOf(d, TimedOutError)
 
     def test_delete_server_propagates_verified_delete_failures_old_style(self):
