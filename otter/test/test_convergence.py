@@ -1026,6 +1026,8 @@ class StepAsRequestTests(SynchronousTestCase):
         request = step.as_request()
         self.assertEqual(request.service, ServiceType.RACKCONNECT_V3)
         self.assertEqual(request.method, expected_method)
+        self.assertEqual(request.success_codes,
+                         (201,) if request.method == "POST" else (204,))
         self.assertEqual(request.path, "load_balancer_pools/nodes")
         self.assertEqual(request.headers, None)
 
