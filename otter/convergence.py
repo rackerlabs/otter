@@ -664,7 +664,7 @@ class BulkAddToRCv3(object):
         Produce a :obj:`Request` to add some nodes to some RCv3 load
         balancers.
         """
-        return _rackconnect_bulk_request(self.lb_node_pairs, "POST")
+        return _rackconnect_bulk_request(self.lb_node_pairs, "POST", (201,))
 
 
 @implementer(IStep)
@@ -704,7 +704,7 @@ class BulkRemoveFromRCv3(object):
         Produce a :obj:`Request` to remove some nodes from some RCv3 load
         balancers.
         """
-        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE")
+        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE", (204,))
 
 
 _optimizers = {}
