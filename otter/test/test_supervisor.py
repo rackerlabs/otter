@@ -172,14 +172,14 @@ class LaunchConfigTests(SupervisorTests):
         self.assertEqual(result, {'id': 'server_id', 'links': ['links'],
                                   'name': 'meh', 'lb_info': {}})
 
-        self.launch_server.assert_called_once_with(
-            mock.ANY,
-            'ORD',
-            self.group,
-            self.service_catalog,
-            self.auth_token,
-            {'server': {}},
-            self.undo)
+        (args, _kwargs), = self.launch_server.call_args_list
+        log, request_func, scaling_group, launch_config, undo = args
+        # TODO: Wasn't there a fancy thing for checking bound loggers?
+        self.assertEqual(request_func.auth_token, self.auth_token)
+        self.assertEqual(request_func.service_catalog, self.service_catalog)
+        self.assertEqual(scaling_group, self.group)
+        self.assertEqual(launch_config, {'server': {}})
+        self.assertEqual(undo, self.undo)
 
     def test_execute_config_rewinds_undo_stack_on_failure(self):
         """

@@ -11,6 +11,7 @@ from zope.interface import Interface, implementer
 
 from otter.models.interface import NoSuchScalingGroupError
 from otter.log import audit
+from otter.util.config import config_value
 from otter.util.deferredutils import DeferredPool
 from otter.util.hashkey import generate_job_id
 from otter.util.timestamp import from_timestamp
@@ -86,6 +87,27 @@ class SupervisorService(object, Service):
         self.coiterate = coiterate
         self.deferred_pool = DeferredPool()
 
+    def _get_request_func(self, log, scaling_group):
+        """
+        Builds a request function for the given scaling group.
+        """
+        request_func = lambda *a, **kw: None
+
+        lb_region = config_value('regionOverrides.cloudLoadBalancers')
+        request_func.lb_region = lb_region or self.region
+        request_func.region = self.region
+
+        log.msg("Authenticating for tenant")
+        d = self.authenticator.authenticate_tenant(scaling_group.tenant_id,
+                                                   log=log)
+
+        def when_authenticated((auth_token, service_catalog)):
+            request_func.auth_token = auth_token
+            request_func.service_catalog = service_catalog
+            return request_func
+
+        return d.addCallback(when_authenticated)
+
     def execute_config(self, log, transaction_id, scaling_group, launch_config):
         """
         see :meth:`ISupervisor.execute_config`
@@ -97,22 +119,17 @@ class SupervisorService(object, Service):
 
         undo = InMemoryUndoStack(self.coiterate)
 
-        log.msg("Authenticating for tenant")
+        d = self._get_request_func(log, scaling_group)
 
-        d = self.authenticator.authenticate_tenant(scaling_group.tenant_id,
-                                                   log=log)
-
-        def when_authenticated((auth_token, service_catalog)):
+        def got_request_func(request_func):
             log.msg("Executing launch config.")
-            return launch_server_v1.launch_server(
-                log,
-                self.region,
-                scaling_group,
-                service_catalog,
-                auth_token,
-                launch_config['args'], undo)
+            return launch_server_v1.launch_server(log,
+                                                  request_func,
+                                                  scaling_group,
+                                                  launch_config['args'],
+                                                  undo)
 
-        d.addCallback(when_authenticated)
+        d.addCallback(got_request_func)
 
         def when_launch_server_completed(result):
             # XXX: Something should be done with this data. Currently only enough
