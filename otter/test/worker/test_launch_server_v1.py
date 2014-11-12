@@ -2127,7 +2127,7 @@ old_style_instance_details = (
 instance_details = _as_new_style_instance_details(old_style_instance_details)
 
 
-class DeleteServerTests(SynchronousTestCase):
+class DeleteServerTests(RequestFuncTestMixin, SynchronousTestCase):
     """
     Test the delete server worker.
     """
@@ -2135,6 +2135,8 @@ class DeleteServerTests(SynchronousTestCase):
         """
         Set up some mocks.
         """
+        super(DeleteServerTests, self).setUp()
+
         set_config_data(fake_config)
         self.addCleanup(set_config_data, {})
 
