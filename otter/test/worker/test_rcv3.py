@@ -62,7 +62,7 @@ class RCv3Tests(SynchronousTestCase):
 
     def test_add_to_rcv3(self):
         """
-        :func:`add_to_rcv3` attempts to perform the correct effect.
+        :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
         """
         d = _rcv3.add_to_rcv3(_PureRequestStub, "lb_id", "server_id")
         (add_result,) = self.successResultOf(d)
