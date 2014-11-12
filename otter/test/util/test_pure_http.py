@@ -13,8 +13,9 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.util.pure_http import (
     Request, request, check_status,
     effect_on_response,
-    add_effectful_headers, add_effect_on_response, add_bind_root, add_content_only,
-    add_error_handling, add_json_response, add_json_request_data)
+    add_effectful_headers, add_headers, add_effect_on_response, add_bind_root,
+    add_content_only, add_error_handling, add_json_response,
+    add_json_request_data)
 from otter.util.http import APIError
 from otter.test.utils import stub_pure_response, StubResponse, StubTreq
 
@@ -119,6 +120,40 @@ class AddEffectfulHeadersTest(TestCase):
             Request(method="m",
                     url="u",
                     headers={"x-auth-token": "abc123"}))
+
+    def test_add_headers_optional(self):
+        """It's okay if no headers are passed."""
+        request_ = add_effectful_headers(self.auth_effect, request)
+        eff = request_('m', 'u')
+        self.assertEqual(
+            resolve_stubs(eff).intent,
+            Request(method='m',
+                    url='u',
+                    headers={'x-auth-token': 'abc123'}))
+
+
+class AddHeadersTest(TestCase):
+    """Tests for :func:`add_headers`."""
+
+    def test_add_headers(self):
+        """Headers are merged, with fixed headers taking precedence."""
+        request_ = add_headers({'one': '1', 'two': '2'}, request)
+        eff = request_('m', 'u', headers={'one': 'hey', 'three': '3'})
+        self.assertEqual(
+            resolve_stubs(eff).intent,
+            Request(method='m',
+                    url='u',
+                    headers={'one': '1', 'two': '2', 'three': '3'}))
+
+    def test_add_headers_optional(self):
+        """It's okay if no headers are passed."""
+        request_ = add_headers({'one': '1'}, request)
+        eff = request_('m', 'u')
+        self.assertEqual(
+            resolve_stubs(eff).intent,
+            Request(method='m',
+                    url='u',
+                    headers={'one': '1'}))
 
 
 class EffectOnResponseTests(TestCase):

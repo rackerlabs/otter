@@ -51,8 +51,10 @@ class SupervisorTests(SynchronousTestCase):
 
         self.auth_token = 'auth-token'
         self.service_catalog = {}
-        self.auth_function = mock.Mock(
-            return_value=succeed((self.auth_token, self.service_catalog)))
+        self.authenticator = mock.Mock()
+        self.auth_function = self.authenticator.authenticate_tenant
+        self.auth_function.return_value = succeed((self.auth_token,
+                                                   self.service_catalog))
 
         self.fake_server_details = {
             'server': {'id': 'server_id', 'links': ['links'], 'name': 'meh',
@@ -62,7 +64,7 @@ class SupervisorTests(SynchronousTestCase):
         self.cooperator = mock.Mock(spec=Cooperator)
 
         self.supervisor = SupervisorService(
-            self.auth_function, 'ORD', self.cooperator.coiterate)
+            self.authenticator, 'ORD', self.cooperator.coiterate)
 
         self.InMemoryUndoStack = patch(self, 'otter.supervisor.InMemoryUndoStack')
         self.undo = self.InMemoryUndoStack.return_value

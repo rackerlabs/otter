@@ -4,6 +4,9 @@ Convergence.
 
 from functools import partial
 from urllib import urlencode
+import calendar
+import json
+from itertools import izip as zip
 
 import treq
 
@@ -15,17 +18,20 @@ from pyrsistent import pbag, freeze, s, pset
 from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
-from twisted.python.constants import Values, ValueConstant
+
+import effect
 
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
 from toolz.itertoolz import concat, concatv, mapcat
 
-from otter.http import get_request_func, bind_service
+from otter.constants import ServiceType
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
 from otter.util.retry import retry, retry_times, exponential_backoff_interval
+from otter.util.timestamp import from_timestamp
+from otter.indexer import atom
 # TODO: I hate including this!
 from otter.worker.launch_server_v1 import public_endpoint_url
 
@@ -109,6 +115,65 @@ def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
     d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
     d.addCallback(servers_apply)
     return d
+
+
+def extract_drained_at(feed):
+    """
+    Extract time when node was changed to DRAINING
+
+    :param str feed: Atom feed of the node
+
+    :returns: EPOCH in seconds
+    :rtype: float
+    """
+    # TODO: This function temporarily only looks at last entry assuming that
+    # it was draining operation. May need to look at all entries in reverse order
+    # and check for draining operation. This could include paging to further entries
+    entry = atom.entries(atom.parse(feed))[0]
+    summary = atom.summary(entry)
+    if 'Node successfully updated' in summary and 'DRAINING' in summary:
+        return calendar.timegm(from_timestamp(atom.updated(entry)).utctimetuple())
+    else:
+        raise ValueError('Unexpected summary: {}'.format(summary))
+
+
+def get_load_balancer_contents(request_func):
+    """
+    Get load balancer contents as list of `LBNode`
+
+    :param request_func: A tenant-bound, CLB-bound, auth-retry based request function
+    """
+
+    def fetch_nodes(lbs):
+        lb_ids = [lb['id'] for lb in json.loads(lbs)]
+        return effect.parallel(
+            [request_func(
+                'GET',
+                append_segments('loadbalancers', str(lb_id), 'nodes')).on(json.loads)
+             for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
+
+    def fetch_drained_feeds((ids, all_lb_nodes)):
+        nodes = [LBNode(lb_id=_id, node_id=node['id'], address=node['address'],
+                        config=LBConfig(port=node['port'], weight=node['weight'],
+                                        condition=NodeCondition.lookupByName(node['condition']),
+                                        type=NodeType.lookupByName(node['type'])))
+                 for _id, nodes in zip(ids, all_lb_nodes)
+                 for node in nodes]
+        draining = [n for n in nodes if n.config.condition == NodeCondition.DRAINING]
+        return effect.parallel(
+            [request_func(
+                'GET',
+                append_segments('loadbalancers', str(n.lb_id), 'nodes',
+                                '{}.atom'.format(n.node_id)))
+             for n in draining]).on(lambda feeds: (nodes, draining, feeds))
+
+    def fill_drained_at((nodes, draining, feeds)):
+        for node, feed in zip(draining, feeds):
+            node.drained_at = extract_drained_at(feed)
+        return nodes
+
+    return request_func('GET', 'loadbalancers').on(
+        fetch_nodes).on(fetch_drained_feeds).on(fill_drained_at)
 
 
 class IStep(Interface):
@@ -712,13 +777,6 @@ def optimize_steps(steps):
     return pbag(concatv(omg_optimized, unoptimizable))
 
 
-class ServiceType(Values):
-    """Constants representing Rackspace cloud services."""
-    CLOUD_SERVERS = ValueConstant('cloudServersOpenStack')
-    CLOUD_LOAD_BALANCERS = ValueConstant('cloudLoadBalancers')
-    RACKCONNECT_V3 = ValueConstant('rackconnect')
-
-
 @attributes(['service', 'method', 'path', 'headers', 'data'],
             defaults={'headers': None, 'data': None})
 class Request(object):
@@ -743,64 +801,17 @@ class Request(object):
     """
 
 
-def _reqs_to_effect(make_bound_request_fn, conv_requests):
+def _reqs_to_effect(request_fn, conv_requests):
     """Turns a collection of :class:`Request` objects into an effect.
 
-    :param make_bound_request_fn: A function that takes a service type
-       and produces a request function, bound to the tenant and that
-       request. See :func:`_make_bound_request_fn_maker` for a helper
-       function to produce such a function.
+    :param request_fn: A pure-http request function, as produced by
+        :func:`otter.http.get_request_func`.
     :param conv_requests: Convergence requests to turn into effects.
     """
-    effects = []
-    for svc_type, reqs in groupby(lambda r: r.service, conv_requests).iteritems():
-        bound_request_fn = make_bound_request_fn(svc_type)
-        effects.extend([bound_request_fn(method=r.method,
-                                         url=r.path,
-                                         headers=r.headers,
-                                         data=r.data)
-                        for r in reqs])
-
+    effects = [request_fn(service_type=r.service,
+                          method=r.method,
+                          url=r.path,
+                          headers=r.headers,
+                          data=r.data)
+               for r in conv_requests]
     return ParallelEffects(effects)
-
-
-def _make_bound_request_fn_maker(authenticator, tenant_id, region, log):
-    """
-    Creates a function that produces tenant- and service-bound request
-    functions.
-
-    :param authenticator: An authenticator to authenticate the tenant.
-        This should be caching for efficiency reasons: the effect produced
-        by this function may authenticate authenticate a single tenant
-        multiple times.
-    :param str tenant_id: The id of the tenant to produce an effect for.
-    :param str region: The region in which the requests in the effect will
-        be.
-    :param log: The logger used for these requests.
-    :return: A function that takes a service type, and produces a request
-        function bound to the tenant.
-    :rtype: unary function
-    """
-    base_request_fn = get_request_func(authenticator,
-                                       tenant_id,
-                                       log)
-
-    def _make_bound_request_fn(service_type):
-        """
-        Creates a request function for a given service type, already bound to
-        a tenant.
-
-        This is also bound to a tenant, because it builds on top of a
-        base request function that is already bound to the tenant.
-
-        :param service_type: The specific service to bind.
-        :type service_type: One of the :class:`ServiceType` constants.
-        """
-        return bind_service(base_request_fn,
-                            tenant_id,
-                            authenticator,
-                            service_type.name,
-                            region,
-                            log)
-
-    return _make_bound_request_fn

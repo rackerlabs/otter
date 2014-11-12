@@ -1,17 +1,19 @@
 """Tests for convergence."""
 
 import json
+import calendar
+from functools import partial
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.task import Clock
 from twisted.internet.defer import succeed
 
 from characteristic import attributes
-from functools import partial
 
 from otter.test.utils import StubTreq2, patch, iMock
 from otter.auth import IAuthenticator
 from otter.util.http import headers, APIError
+from otter.util.timestamp import from_timestamp
 from otter.convergence import (
     _remove_from_lb_with_draining, _converge_lb_state,
     get_all_server_details, get_scaling_group_servers,
@@ -21,9 +23,12 @@ from otter.convergence import (
     SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ServerState, ServiceType, NodeCondition, NodeType, optimize_steps,
-    _reqs_to_effect)
+    extract_drained_at, get_load_balancer_contents, _reqs_to_effect)
 
 from pyrsistent import pmap, pbag, pset, s
+
+from effect import ConstantIntent, Effect
+from effect.testing import StubIntent, resolve_stubs
 
 
 class GetAllServerDetailsTests(SynchronousTestCase):
@@ -159,6 +164,132 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         self.assertEqual(
             self.successResultOf(d),
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
+
+
+class ExtractDrainedTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.convergence.extract_drained_at`
+    """
+    summary = ("Node successfully updated with address: " +
+               "'10.23.45.6', port: '8080', weight: '1', condition: 'DRAINING'")
+    updated = '2014-10-23T18:10:48.000Z'
+    feed = ('<feed xmlns="http://www.w3.org/2005/Atom">' +
+            '<entry><summary>{}</summary><updated>{}</updated></entry>' +
+            '<entry><summary>else</summary><updated>badtime</updated></entry>' +
+            '</feed>')
+
+    def test_first_entry(self):
+        """
+        Takes the first entry only
+        """
+        feed = self.feed.format(self.summary, self.updated)
+        self.assertEqual(extract_drained_at(feed),
+                         calendar.timegm(from_timestamp(self.updated).utctimetuple()))
+
+    def test_invalid_first_entry(self):
+        """
+        Raises error if first entry is not DRAINING entry
+        """
+        feed = self.feed.format("Node successfully updated with ENABLED", self.updated)
+        self.assertRaises(ValueError, extract_drained_at, feed)
+
+
+class GetLBContentsTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.convergence.get_load_balancer_contents`
+    """
+
+    def setUp(self):
+        """
+        Stub request function and mock `extract_drained_at`
+        """
+        self.reqs = {
+            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes'): [
+                {'id': '11', 'port': 20, 'address': 'a11',
+                 'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
+                {'id': '12', 'port': 20, 'address': 'a12',
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}],
+            ('GET', 'loadbalancers/2/nodes'): [
+                {'id': '21', 'port': 20, 'address': 'a21',
+                 'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
+                {'id': '22', 'port': 20, 'address': 'a22',
+                 'weight': 3, 'condition': 'DRAINING', 'type': 'PRIMARY'}],
+            ('GET', 'loadbalancers/1/nodes/11.atom'): '11feed',
+            ('GET', 'loadbalancers/2/nodes/22.atom'): '22feed'
+        }
+        self.feeds = {'11feed': 1.0, '22feed': 2.0}
+        self.mock_eda = patch(
+            self, 'otter.convergence.extract_drained_at',
+            side_effect=lambda f: self.feeds[f])
+
+    def _request(self):
+        def request(method, url):
+            body = self.reqs[(method, url)]
+            body = body if type(body) is str else json.dumps(body)
+            return Effect(StubIntent(ConstantIntent(body)))
+        return request
+
+    def test_success(self):
+        """
+        Gets LB contents with drained_at correctly
+        """
+        eff = get_load_balancer_contents(self._request())
+        draining, enabled = NodeCondition.DRAINING, NodeCondition.ENABLED
+        make_config = partial(LBConfig, port=20, type=NodeType.PRIMARY)
+        self.assertEqual(
+            resolve_stubs(eff),
+            [LBNode(lb_id=1, node_id='11', address='a11', drained_at=1.0,
+                    config=make_config(weight=2, condition=draining)),
+             LBNode(lb_id=1, node_id='12', address='a12',
+                    config=make_config(weight=2, condition=enabled)),
+             LBNode(lb_id=2, node_id='21', address='a21',
+                    config=make_config(weight=3, condition=enabled)),
+             LBNode(lb_id=2, node_id='22', address='a22', drained_at=2.0,
+                    config=make_config(weight=3, condition=draining))])
+
+    def test_no_lb(self):
+        """
+        Return empty list if there are no LB
+        """
+        self.reqs = {('GET', 'loadbalancers'): []}
+        eff = get_load_balancer_contents(self._request())
+        self.assertEqual(resolve_stubs(eff), [])
+
+    def test_no_nodes(self):
+        """
+        Return empty if there are LBs but no nodes in them
+        """
+        self.reqs = {
+            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes'): [],
+            ('GET', 'loadbalancers/2/nodes'): []
+        }
+        eff = get_load_balancer_contents(self._request())
+        self.assertEqual(resolve_stubs(eff), [])
+
+    def test_no_draining(self):
+        """
+        Doesnt fetch feeds if all nodes are ENABLED
+        """
+        self.reqs = {
+            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes'): [
+                {'id': '11', 'port': 20, 'address': 'a11',
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
+            ],
+            ('GET', 'loadbalancers/2/nodes'): [
+                {'id': '21', 'port': 20, 'address': 'a21',
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
+            ]
+        }
+        config = LBConfig(port=20, weight=2, condition=NodeCondition.ENABLED,
+                          type=NodeType.PRIMARY)
+        eff = get_load_balancer_contents(self._request())
+        self.assertEqual(
+            resolve_stubs(eff),
+            [LBNode(lb_id=1, node_id='11', address='a11', config=config),
+             LBNode(lb_id=2, node_id='21', address='a21', config=config)])
 
 
 class ObjectStorageTests(SynchronousTestCase):
@@ -1113,7 +1244,7 @@ class OptimizerTests(SynchronousTestCase):
 
 
 @attributes(["service_type", "method", "url", "headers", "data"])
-class _BoundRequestStub(object):
+class _PureRequestStub(object):
     """
     A bound request stub, suitable for testing.
     """
@@ -1123,31 +1254,18 @@ class RequestsToEffectTests(SynchronousTestCase):
     """
     Tests for converting :class:`Request` into effects.
     """
-
-    def _make_bound_request_fn(self, service_type):
-        """
-        A test double for a ``make_bound_request_fn``.
-
-        Takes a service type, returns a callable that stores the
-        details of the request in a :class:`_BoundRequestStub`.
-
-        :param ServiceType service_type: The service type.
-        """
-        return partial(_BoundRequestStub, service_type=service_type)
-
     def _reqs_to_effect(self, conv_requests):
         """
         Helper function to call :func:`_reqs_to_effect`.
 
-        Simply returns the result of :func:`_reqs_to_effect`, partially
-        applied with the :meth:`_make_bound_request_fn` test double.
+        Uses :class:`_PureRequestStub` test double for easy introspection.
 
         :param conv_requests: The convergence requests to be turned into an
             effect.
         :type conv_requests: iterable of :class:`Request`
         :return: The return value of :func:`_reqs_to_effect`.
         """
-        return _reqs_to_effect(self._make_bound_request_fn, conv_requests)
+        return _reqs_to_effect(_PureRequestStub, conv_requests)
 
     def assertCompilesTo(self, conv_requests, expected_effects):
         """
@@ -1166,11 +1284,11 @@ class RequestsToEffectTests(SynchronousTestCase):
                     method="GET",
                     path="/whatever")]
         expected_effects = set([
-            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                              method="GET",
-                              url="/whatever",
-                              headers=None,
-                              data=None)])
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever",
+                             headers=None,
+                             data=None)])
         self.assertCompilesTo(conv_requests, expected_effects)
 
     def test_multiple_requests(self):
@@ -1186,16 +1304,16 @@ class RequestsToEffectTests(SynchronousTestCase):
                     method="GET",
                     path="/whatever/something/else")]
         expected_effects = set([
-            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                              method="GET",
-                              url="/whatever",
-                              headers=None,
-                              data=None),
-            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                              method="GET",
-                              url="/whatever/something/else",
-                              headers=None,
-                              data=None)])
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever",
+                             headers=None,
+                             data=None),
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever/something/else",
+                             headers=None,
+                             data=None)])
         self.assertCompilesTo(conv_requests, expected_effects)
 
     def test_multiple_requests_of_different_type(self):
@@ -1216,19 +1334,19 @@ class RequestsToEffectTests(SynchronousTestCase):
                     path="/xyzzy",
                     data=data_sentinel)]
         expected_effects = set([
-            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                              method="GET",
-                              url="/whatever",
-                              headers=None,
-                              data=None),
-            _BoundRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                              method="GET",
-                              url="/whatever/something/else",
-                              headers=None,
-                              data=None),
-            _BoundRequestStub(service_type=ServiceType.CLOUD_SERVERS,
-                              method="POST",
-                              url="/xyzzy",
-                              headers=None,
-                              data=data_sentinel)])
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever",
+                             headers=None,
+                             data=None),
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever/something/else",
+                             headers=None,
+                             data=None),
+            _PureRequestStub(service_type=ServiceType.CLOUD_SERVERS,
+                             method="POST",
+                             url="/xyzzy",
+                             headers=None,
+                             data=data_sentinel)])
         self.assertCompilesTo(conv_requests, expected_effects)

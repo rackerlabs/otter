@@ -16,16 +16,16 @@ initiating a launch_server job.
 """
 
 import json
-import itertools
 import re
 
 from functools import partial
 from copy import deepcopy
-from toolz import comp
+from toolz import comp, groupby
 from urllib import urlencode
 
 from twisted.python.failure import Failure
-from twisted.internet.defer import gatherResults, maybeDeferred, DeferredSemaphore
+from twisted.internet.defer import (gatherResults, DeferredSemaphore,
+                                    DeferredLock, inlineCallbacks, returnValue)
 from twisted.internet.task import deferLater
 
 from otter.util import logging_treq as treq
@@ -424,6 +424,30 @@ def check_deleted_clb(f, clb_id, node_id=None):
     return f
 
 
+def add_to_load_balancer(log, endpoint, auth_token, lb_config, server_details,
+                         undo, clock=None):
+    """
+    Adds a given server to a given load balancer.
+
+    :param log: A bound logger.
+    :param str endpoint: Load balancer endpoint URI.
+    :param str auth_token: Keystone auth token.
+    :param str lb_config: An ``lb_config`` dictionary specifying which load
+        balancer to add the server to.
+    :param dict server_details: The server details, as returned by Nova.
+    :return: Deferred that fires with the load balancer response. The
+        structure of this object depends on the load balancer type.
+    """
+    lb_type = lb_config.get("type", "CloudLoadBalancer")
+    if lb_type == "CloudLoadBalancer":
+        ip_address = private_ip_addresses(server_details)[0]
+        return add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo,
+                          clock)
+    else:
+        raise RuntimeError("Unknown cloud load balancer type! config: {}"
+                           .format(lb_config))
+
+
 def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
     """
     Add an IP address to a Cloud Load Balancer based on the ``lb_config``.
@@ -432,14 +456,14 @@ def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=Non
 
     :param log: A bound logger
     :param str endpoint: Load balancer endpoint URI.
-    :param str auth_token: Keystone Auth Token.
-    :param str lb_config: An lb_config dictionary.
-    :param str ip_address: The IP Address of the node to add to the load
+    :param str auth_token: Keystone auth token.
+    :param dict lb_config: An ``lb_config`` dictionary.
+    :param str ip_address: The IP address of the node to add to the load
         balancer.
-    :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
+    :param IUndoStack undo: An IUndoStack to push any reversable operations
+        onto.
 
-    :return: Deferred that fires with the load balancer response. The
-        structure of this object depends on the load balancer type.
+    :return: Deferred that fires with the load balancer response.
     """
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
@@ -469,13 +493,10 @@ def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=Non
         clock=clock)
 
     def when_done(result):
-        lb_log.msg('Added to load balancer', node_id=result['nodes'][0]['id'])
-        undo.push(remove_from_load_balancer,
-                  lb_log,
-                  endpoint,
-                  auth_token,
-                  lb_config,
-                  result['nodes'][0]['id'])
+        node_id = result['nodes'][0]['id']
+        lb_log.msg('Added to load balancer', node_id=node_id)
+        undo.push(remove_from_load_balancer, lb_log, endpoint, auth_token,
+                  lb_config, node_id)
         return result
 
     return d.addCallback(treq.json_content).addCallback(when_done)
@@ -483,10 +504,9 @@ def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=Non
 
 def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
     """
-    Add the specified IP to mulitple load balancer based on the configs in
-    lb_configs.
+    Add the given server to the load balancers specified by ``lb_configs``.
 
-    :param log: A bound logger
+    :param log: A bound logger.
     :param str endpoint: Load balancer endpoint URI.
     :param str auth_token: Keystone Auth Token.
     :param list lb_configs: List of lb_config dictionaries.
@@ -494,27 +514,23 @@ def add_to_load_balancers(log, endpoint, auth_token, lb_configs, server, undo):
         response from Nova.
     :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
-    :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
-        Add Node response.
+    :return: Deferred that fires with a list of 2-tuples of the load
+        balancer configuration, and that load balancer's respective response.
     """
-    ip_address = private_ip_addresses(server)[0]
-    lb_iter = iter(lb_configs)
+    _add = partial(add_to_load_balancer, log, endpoint, auth_token,
+                   server_details=server, undo=undo)
 
-    results = []
+    dl = DeferredLock()
 
-    def add_next(_):
-        try:
-            lb_config = lb_iter.next()
+    @inlineCallbacks
+    def _serial_add(lb_config):
+        yield dl.acquire()
+        result = yield _add(lb_config)
+        yield dl.release()
+        returnValue(result)
 
-            d = add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo)
-            d.addCallback(lambda response, lb_id: (lb_id, response), lb_config['loadBalancerId'])
-            d.addCallback(results.append)
-            d.addCallback(add_next)
-            return d
-        except StopIteration:
-            return results
-
-    return maybeDeferred(add_next, None)
+    d = gatherResults(map(_serial_add, lb_configs), consumeErrors=True)
+    return d.addCallback(partial(zip, lb_configs))
 
 
 def endpoints(service_catalog, service_name, region):
@@ -822,9 +838,17 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     :param list service_catalog: A list of services as returned by the auth apis.
     :param str auth_token: The user's auth token.
     :param tuple instance_details: A 2-tuple of the server_id and a list of
-        load balancer responses.
+        2-tuples of load balancer configurations and respective load balancer
+        responses. Example for some CLB load balancers::
 
-        Example for some CLB load balancers::
+        ('da08965f-4c2d-41aa-b492-a3c02706202f',
+         [({"loadBalancerId": '12345'},
+           {'nodes': [{'id': 'a', 'address': ... }]}),
+          ({"loadBalancerId": '54321'},
+           {'nodes': [{'id': 'b', 'address': ... }]})])
+
+        Historically, these lode balancer configurations were just CLB
+        ids. This form is deprecated, but still supported::
 
         ('da08965f-4c2d-41aa-b492-a3c02706202f',
          [('12345',
@@ -833,6 +857,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
            {'nodes': [{'id': 'b', 'address': ... }]})])
 
     :return: TODO
+
     """
     lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
     cloudLoadBalancers = config_value('cloudLoadBalancers')
@@ -846,21 +871,65 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
                                           cloudServersOpenStack,
                                           region)
 
-    server_id, loadbalancer_details = instance_details
+    server_id, lb_details = _as_new_style_instance_details(instance_details)
 
-    node_info = itertools.chain.from_iterable(
-        [[(loadbalancer_id, node['id']) for node in node_details['nodes']]
-         for (loadbalancer_id, node_details) in loadbalancer_details])
+    lb_type = lambda (lb_config, _): lb_config.get("type", "CloudLoadBalancer")
+    lbs_by_type = groupby(lb_type, lb_details)
 
-    d = gatherResults(
-        [remove_from_load_balancer(log, lb_endpoint, auth_token, loadbalancer_id, node_id)
-         for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
+    _remove_from_clb = partial(remove_from_load_balancer, log, lb_endpoint,
+                               auth_token)
+
+    clbs = lbs_by_type.get("CloudLoadBalancer", [])
+    clb_ds = []
+    for lb_config, lb_response in clbs:
+        for node_info in lb_response["nodes"]:
+            node_id = node_info["id"]
+            clb_ds.append(_remove_from_clb(lb_config, node_id))
+    d = gatherResults(clb_ds, consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
         return verified_delete(log, server_endpoint, auth_token, server_id)
 
     d.addCallback(when_removed_from_loadbalancers)
     return d
+
+
+def _definitely_lb_config(probably_lb_config):
+    """
+    Returns a load balancer configuration unscathed. If passed
+    something that looks like a CLB id, synthesizes a fake load
+    balancer configuration.
+
+    :param probably_lb_config: An object that is probably a load balancer
+        configuration, except maybe is just a CLB id.
+    :type probably_lb_config: probably :class:`dict`, maybe :class:`str`
+
+    :return: A load balancer configuration.
+    :rtype: `class`:dict:
+    """
+    if isinstance(probably_lb_config, dict):
+        return probably_lb_config
+    else:
+        return {"loadBalancerId": probably_lb_config}
+
+
+def _as_new_style_instance_details(maybe_old_style):
+    """
+    Converts possibly old-style ``instance_details`` (with just a CLB
+    id) to a new-style ``instance_details`` (with a load balancer
+    configuration).
+
+    If the passed ``instance_details`` are already new-style, they are passed
+    unchanged.
+
+    :param maybe_old_style: As ``instance_details``.
+    :return: An ``instance_details``, definitely new-style.
+
+    """
+    server_id, lb_specs = maybe_old_style
+    updated_lb_specs = [(_definitely_lb_config(maybe_lb_conf), lb_response)
+                        for maybe_lb_conf, lb_response in lb_specs]
+    return server_id, updated_lb_specs
 
 
 def delete_and_verify(log, server_endpoint, auth_token, server_id):

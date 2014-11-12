@@ -70,8 +70,8 @@ class SupervisorService(object, Service):
     """
     A service which manages execution of launch configurations.
 
-    :ivar callable auth_function: authentication function to use to obtain an
-        auth token and service catalog.  Should accept a tenant ID.
+    :ivar IAuthenticator authenticator: Authenticator to use to obtain an
+        auth token and service catalog.
     :ivar callable coiterate: coiterate function that will be passed to
         InMemoryUndoStack.
     :ivar str region: The region in which this supervisor is operating.
@@ -80,8 +80,8 @@ class SupervisorService(object, Service):
     """
     name = "supervisor"
 
-    def __init__(self, auth_function, region, coiterate):
-        self.auth_function = auth_function
+    def __init__(self, authenticator, region, coiterate):
+        self.authenticator = authenticator
         self.region = region
         self.coiterate = coiterate
         self.deferred_pool = DeferredPool()
@@ -99,7 +99,8 @@ class SupervisorService(object, Service):
 
         log.msg("Authenticating for tenant")
 
-        d = self.auth_function(scaling_group.tenant_id, log=log)
+        d = self.authenticator.authenticate_tenant(scaling_group.tenant_id,
+                                                   log=log)
 
         def when_authenticated((auth_token, service_catalog)):
             log.msg("Executing launch config.")
@@ -153,7 +154,7 @@ class SupervisorService(object, Service):
                 auth_token,
                 (server['id'], server['lb_info']))
 
-        d = self.auth_function(scaling_group.tenant_id, log=log)
+        d = self.authenticator.authenticate_tenant(scaling_group.tenant_id, log=log)
         log.msg("Authenticating for tenant")
         d.addCallback(when_authenticated)
 
@@ -165,7 +166,7 @@ class SupervisorService(object, Service):
         """
         log = log.bind(server_id=server_id, tenant_id=tenant_id)
 
-        d = self.auth_function(tenant_id, log=log)
+        d = self.authenticator.authenticate_tenant(tenant_id, log=log)
         log.msg("Authenticating for tenant")
 
         def when_authenticated((auth_token, service_catalog)):
@@ -197,7 +198,7 @@ class SupervisorService(object, Service):
 
         log = log.bind(system='otter.supervisor.validate_launch_config',
                        tenant_id=tenant_id)
-        d = self.auth_function(tenant_id, log=log)
+        d = self.authenticator.authenticate_tenant(tenant_id, log=log)
         log.msg('Authenticating for tenant')
         return d.addCallback(when_authenticated)
 
