@@ -853,9 +853,9 @@ def delete_server(log, request_func, instance_details):
 
     """
     cloudLoadBalancers = config_value('cloudLoadBalancers')
-    lb_endpoint = public_endpoint_url(request_func.service_catalog,
-                                      cloudLoadBalancers,
-                                      request_func.lb_region)
+    clb_endpoint = public_endpoint_url(request_func.service_catalog,
+                                       cloudLoadBalancers,
+                                       request_func.lb_region)
 
     cloudServersOpenStack = config_value('cloudServersOpenStack')
     server_endpoint = public_endpoint_url(request_func.service_catalog,
