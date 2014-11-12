@@ -40,7 +40,8 @@ from otter.worker.launch_server_v1 import (
     _without_otter_metadata,
     scrub_otter_metadata,
     _definitely_lb_config,
-    _as_new_style_instance_details
+    _as_new_style_instance_details,
+    _remove_from_clb
 )
 
 
@@ -377,16 +378,15 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def test_add_to_clb_pushes_remove_onto_undo_stack(self):
         """
-        :func:`add_to_clb` pushes an inverse :func:`remove_from_load_balancer`
+        :func:`add_to_clb` pushes an inverse :func:`_remove_from_clb`
         operation onto the undo stack.
         """
         d = self._add_to_clb()
         self.successResultOf(d)
         self.undo.push.assert_called_once_with(
-            remove_from_load_balancer, matches(IsInstance(self.log.__class__)),
+            _remove_from_clb, matches(IsInstance(self.log.__class__)),
             'http://dfw.lbaas/', 'my-auth-token',
-            self.lb_config,
-            1)
+            self.lb_config["loadBalancerId"], 1)
 
     def test_add_to_clb_doesnt_push_onto_undo_stack_on_failure(self):
         """
