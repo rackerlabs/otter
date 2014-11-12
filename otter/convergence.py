@@ -628,6 +628,7 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
         connections to be made or broken.
     :param str method: The method of the request ``"DELETE"`` or
         ``"POST"``.
+    :param iterable success_codes: Status codes considered successful for this request.
     :return: A bulk RackConnect v3.0 request for the given load balancer,
         node pairs.
     :rtype: :class:`Request`
