@@ -1,9 +1,10 @@
 """
-Deletes.
+Delete resources created during tests which may not have been cleaned up.
 """
+import json
+
 from cafe.drivers.unittest.decorators import tags
 from test_repo.autoscale.fixtures import AutoscaleFixture
-import unittest
 
 
 class DeleteAll(AutoscaleFixture):
@@ -41,20 +42,15 @@ class DeleteAll(AutoscaleFixture):
         print 'Deleting {0} servers, {1} still exist'.format(len(all_servers), len(list_servers))\
             if len(list_servers) is not 0 else "Deleted {0} servers".format(len(all_servers))
 
-    @unittest.skip("Preexisting LB no longer exist as part of Otter tests")
-    @tags(type='nodes')
-    def test_delete_all_but_one_node_on_all_loadbalancers_on_the_account(self):
+    @tags(type='loadbalancers')
+    def test_delete_all_test_loadbalancers(self):
         """
-        Deletes all nodes on load balancers except one, on the account
+        Deletes all load balancers on the account named 'test', which are
+        created by these tests.
         """
+        lb_response = self.lbaas_client.request('GET', self.lbaas_client.url)
+        lbs = json.loads(lb_response.content).get('loadBalancers', ())
+        lbs_named_test = [lb for lb in lbs if lb['name'] == 'test']
 
-        loadbalancer_id_list = [self.load_balancer_1, self.load_balancer_2, self.load_balancer_3]
-        for each_load_balancer in loadbalancer_id_list:
-            nodes = self.lbaas_client.list_nodes(each_load_balancer).entity
-            if len(nodes) is not 0:
-                node_id_list = [each_node.id for each_node in nodes]
-                self.delete_nodes_in_loadbalancer(node_id_list, each_load_balancer)
-                list_nodes = (self.lbaas_client.list_nodes(each_load_balancer)).entity
-                print 'Deleted {0} nodes'.format(len(node_id_list))\
-                    if len(list_nodes) is 0 else 'Deleted {0} nodes {1}remain'.format(len(node_id_list),
-                                                                                      len(list_nodes))
+        for lb in lbs_named_test:
+            self.lbaas_client.delete_load_balancer(lb['id'])
