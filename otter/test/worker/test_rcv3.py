@@ -34,15 +34,18 @@ class RCv3Tests(SynchronousTestCase):
         """
         Set up :class:`RCv3Tests`.
         """
+        self.reactor = object()
         self.patch(_rcv3, "perform", self._fake_perform)
 
-    def _fake_perform(self, _reactor, effect):
+    def _fake_perform(self, reactor, effect):
         """
         A test double for :func:`effect.twisted.perform`.
 
         :param IReactorCore _reactor: The reactor used to "execute".
         :param effect: The effect to "execute".
         """
+        self.assertIdentical(self.reactor, reactor)
+
         self.effect = effect
         self.assertTrue(isinstance(effect, ParallelEffects))
         (sub_effect,) = effect.effects
@@ -73,7 +76,8 @@ class RCv3Tests(SynchronousTestCase):
         """
         :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
         """
-        d = _rcv3.add_to_rcv3(_PureRequestStub, "lb_id", "server_id")
+        d = _rcv3.add_to_rcv3(_PureRequestStub, "lb_id", "server_id",
+                              _reactor=self.reactor)
         (add_result,) = self.successResultOf(d)
         self.assertEqual(add_result["cloud_server"], {"id": "server_id"})
         self.assertEqual(add_result["load_balancer_pool"], {"id": "lb_id"})
@@ -82,5 +86,6 @@ class RCv3Tests(SynchronousTestCase):
         """
         :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
         """
-        d = _rcv3.remove_from_rcv3(_PureRequestStub, "lb_id", "server_id")
+        d = _rcv3.remove_from_rcv3(_PureRequestStub, "lb_id", "server_id",
+                                   _reactor=self.reactor)
         self.assertIdentical(self.successResultOf(d), None)
