@@ -162,20 +162,15 @@ class SupervisorService(object, Service):
         """
         log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
 
-        # authenticate for tenant
-        def when_authenticated((auth_token, service_catalog)):
-            return launch_server_v1.delete_server(
-                log,
-                self.region,
-                service_catalog,
-                auth_token,
-                (server['id'], server['lb_info']))
+        d = self._get_request_func(log, scaling_group)
 
-        d = self.authenticator.authenticate_tenant(scaling_group.tenant_id, log=log)
-        log.msg("Authenticating for tenant")
-        d.addCallback(when_authenticated)
+        def got_request_func(request_func):
+            log.msg("Executing delete server.")
+            instance_details = server['id'], server['lb_info']
+            return launch_server_v1.delete_server(log, request_func,
+                                                  instance_details)
 
-        return d
+        return d.addCallback(got_request_func)
 
     def scrub_otter_metadata(self, log, transaction_id, tenant_id, server_id):
         """
