@@ -89,6 +89,8 @@ class SupervisorTests(SynchronousTestCase):
         """
         self.assertEqual(request_func.auth_token, self.auth_token)
         self.assertEqual(request_func.service_catalog, self.service_catalog)
+        self.assertEqual(request_func.region, "ORD")
+        self.assertEqual(request_func.lb_region, "ORD")
 
 
 class HealthCheckTests(SupervisorTests):
