@@ -60,6 +60,15 @@ class RCv3Tests(SynchronousTestCase):
         # The method is either POST (add) or DELETE (remove).
         self.assertIn(sub_effect.method, ["POST", "DELETE"])
 
+        if sub_effect.method == "POST":
+            # http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes
+            response = _rcv3_add_response("lb_id", "server_id")
+        elif sub_effect.method == "DELETE":
+            # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes
+            response = None
+
+        return succeed([response])
+
     def test_add_to_rcv3(self):
         """
         :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
@@ -68,3 +77,10 @@ class RCv3Tests(SynchronousTestCase):
         (add_result,) = self.successResultOf(d)
         self.assertEqual(add_result["cloud_server"], {"id": "server_id"})
         self.assertEqual(add_result["load_balancer_pool"], {"id": "lb_id"})
+
+    def test_remove_from_rcv3(self):
+        """
+        :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
+        """
+        d = _rcv3.remove_from_rcv3(_PureRequestStub, "lb_id", "server_id")
+        self.assertIdentical(self.successResultOf(d), None)
