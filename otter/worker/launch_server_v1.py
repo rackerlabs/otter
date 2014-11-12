@@ -822,16 +822,14 @@ def remove_from_load_balancer(log, endpoint, auth_token, lb_config,
     return d
 
 
-def delete_server(log, region, service_catalog, auth_token, instance_details):
+def delete_server(log, request_func, instance_details):
     """
     Delete the server specified by instance_details.
 
     TODO: Load balancer draining.
 
-    :param str region: A rackspace region as found in the service catalog.
-    :param list service_catalog: A list of services as returned by the auth apis.
-    :param str auth_token: The user's auth token.
     :param BoundLog log: A bound logger.
+    :param callable request_func: A request function.
     :param tuple instance_details: A 2-tuple of the server_id and a list of
         2-tuples of load balancer configurations and respective load balancer
         responses. Example for some CLB load balancers::
@@ -854,25 +852,22 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     :return: TODO
 
     """
-    lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
-
     cloudLoadBalancers = config_value('cloudLoadBalancers')
-    lb_endpoint = public_endpoint_url(service_catalog,
+    lb_endpoint = public_endpoint_url(request_func.service_catalog,
                                       cloudLoadBalancers,
-                                      lb_region)
+                                      request_func.lb_region)
 
     cloudServersOpenStack = config_value('cloudServersOpenStack')
-    server_endpoint = public_endpoint_url(service_catalog,
+    server_endpoint = public_endpoint_url(request_func.service_catalog,
                                           cloudServersOpenStack,
-                                          region)
+                                          request_func.region)
 
     server_id, lb_details = _as_new_style_instance_details(instance_details)
 
     lb_type = lambda (lb_config, _): lb_config.get("type", "CloudLoadBalancer")
     lbs_by_type = groupby(lb_type, lb_details)
 
-    _remove_from_clb = partial(remove_from_load_balancer, log, lb_endpoint,
-                               auth_token)
+    _remove_from_clb = partial(remove_from_load_balancer, log, request_func)
 
     clbs = lbs_by_type.get("CloudLoadBalancer", [])
     clb_ds = []
@@ -883,6 +878,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     d = gatherResults(clb_ds, consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
+        auth_token = request_func.auth_token
         return verified_delete(log, server_endpoint, auth_token, server_id)
 
     d.addCallback(when_removed_from_loadbalancers)
