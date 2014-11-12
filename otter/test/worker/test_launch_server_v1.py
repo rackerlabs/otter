@@ -136,7 +136,40 @@ expected_headers = {
 error_body = '{"code": 500, "message": "Internal Server Error"}'
 
 
-class LoadBalancersTestsMixin(object):
+class RequestFuncTestMixin(object):
+    """
+    A test case mixin for test cases that require a request function, and its
+    associated attrs.
+    """
+    def setUp(self):
+        """
+        Do the necessary set-up for a request_func-using test case.
+        """
+        super(RequestFuncTestMixin, self).setUp()
+        self.auth_token = 'my-auth-token'
+        self.request_func = lambda *a, **kw: None
+        self.request_func.auth_token = self.auth_token
+        self.request_func.lb_region = "DFW"
+        self.request_func.service_catalog = fake_service_catalog
+
+        self.server_details = {
+            'server': {
+                "addresses": {
+                    'private': [
+                        {'addr': '192.168.1.1', 'version': 4},
+                        {'addr': '192.168.1.2', 'version': 4},
+                        {'addr': '::1', 'version': 6}
+                    ],
+                    'public': [
+                        {'addr': '50.50.50.50', 'version': 4},
+                        {'addr': '::::', 'version': 6}
+                    ]
+                }
+            }
+        }
+
+
+class LoadBalancersTestsMixin(RequestFuncTestMixin):
     """
     Test adding and removing nodes from load balancers
     """
@@ -164,28 +197,6 @@ class LoadBalancersTestsMixin(object):
             return_value=self.retry_interval)
 
         self.clock = Clock()
-
-        self.auth_token = 'my-auth-token'
-        self.request_func = lambda *a, **kw: None
-        self.request_func.auth_token = self.auth_token
-        self.request_func.lb_region = "DFW"
-        self.request_func.service_catalog = fake_service_catalog
-
-        self.server_details = {
-            'server': {
-                "addresses": {
-                    'private': [
-                        {'addr': '192.168.1.1', 'version': 4},
-                        {'addr': '192.168.1.2', 'version': 4},
-                        {'addr': '::1', 'version': 6}
-                    ],
-                    'public': [
-                        {'addr': '50.50.50.50', 'version': 4},
-                        {'addr': '::::', 'version': 6}
-                    ]
-                }
-            }
-        }
 
 
 lb_config_1 = {'loadBalancerId': 12345, 'port': 80}
