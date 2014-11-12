@@ -831,6 +831,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     :param str region: A rackspace region as found in the service catalog.
     :param list service_catalog: A list of services as returned by the auth apis.
     :param str auth_token: The user's auth token.
+    :param BoundLog log: A bound logger.
     :param tuple instance_details: A 2-tuple of the server_id and a list of
         2-tuples of load balancer configurations and respective load balancer
         responses. Example for some CLB load balancers::
