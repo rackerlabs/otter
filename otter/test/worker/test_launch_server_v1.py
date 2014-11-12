@@ -149,7 +149,7 @@ class RequestFuncTestMixin(object):
         self.auth_token = 'my-auth-token'
         self.request_func = lambda *a, **kw: None
         self.request_func.auth_token = self.auth_token
-        self.request_func.lb_region = "DFW"
+        self.request_func.region = self.request_func.lb_region = "DFW"
         self.request_func.service_catalog = fake_service_catalog
 
         self.server_details = {
