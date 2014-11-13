@@ -19,7 +19,7 @@ fsargent, wirehead_, oubiwann, dreid, cyli, rockstar
 ## Make Tasks:
 
 - make coverage
-- make docs 
+- make docs
 - make cleandocs
 - make schema
 - make schema-setup
