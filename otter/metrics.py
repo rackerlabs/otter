@@ -26,9 +26,7 @@ from otter.auth import (
     RetryingAuthenticator, ImpersonatingAuthenticator, authenticate_user,
     extract_token)
 
-# TODO: Below function has knowledge of service catalog and is independent of
-# worker code. This and other similar code in worker should be moved to otter.auth
-from otter.worker.launch_server_v1 import public_endpoint_url
+from otter.auth import public_endpoint_url
 
 from otter.convergence import get_scaling_group_servers
 from otter.util.http import append_segments, headers, check_success
