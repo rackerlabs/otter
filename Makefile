@@ -16,6 +16,11 @@ CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
 CLOUDCAFE ?= $(shell which cafe-runner)
 
+.PHONY: targets
+
+targets:
+	@cat README.md
+
 test: unit integration
 
 run:
@@ -40,10 +45,13 @@ ifneq ($(JENKINS_URL), )
 ifneq ($(CLOUDCAFE), )
 	cafe-runner autoscale dev -p functional --parallel
 else
-	@echo "Waiting on preprod node before running tests here."
+	@echo "Environment variable CLOUDCAFE appears to not be set; is it installed"
+	@echo "correctly and are you on the correct environment?"
+	@echo "Invoke `make envcheck' to double-check your environment compatibility."
 endif
 else
-	@echo "Cloudcafe is not set up as desired, so can't run those tests."
+	@echo "Cloudcafe is not set up as desired, so can't run integration tests:"
+	@echo "- Missing JENKINS_URL environment setting."
 endif
 
 coverage:

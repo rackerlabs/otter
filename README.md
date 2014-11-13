@@ -13,15 +13,29 @@ Talk with us! Join us in:
 
 irc.freenode.net #rackspace
 
-fsargent, wirehead_, oubiwann, dreid, cyli, rockstar
+fsargent, wirehead\_, oubiwann, dreid, cyli, rockstar
 
 
 ## Make Tasks:
 
-- make coverage
-- make docs 
-- make cleandocs
-- make schema
-- make schema-setup
-- make schema-teardown
-- make clean
+In alphabetical order.  You probably will only need a select few of these.
+
+- `make bundle` builds a "bundle" appropriate for deployment (Ubuntu only).  For Jenkins and Chef use only.
+- `make cleandocs` removes customer-facing documentation without removing other artifacts.
+- `make clean` removes all build-time artifacts, leaving the repository in a distributable state.
+- `make clear-dev-schema` first removes any existing development schema, then re-installs a fresh schema.
+- `make coverage` performs coverage analysis.
+- `make docs` builds customer-facing documentation.
+- `make env` creates and switches into the Python virtualenv environment.  It'll also pip-install development requirements.
+- `make integration` runs integration tests.
+- `make lint` performs a lint (PEP8, et. al.) check on the source code.
+- `make load-dev-schema` will attempt to load the development schema into Cassandra.
+- `make migrate-dev-schema` will attempt to update the development schema on an existing Cassandra instance.
+- `make run` starts up an instance of the Otter API.
+- `make schema` generates the CQL files corresponding to setting up and tearing down Otter's Cassandra schema.  Equivalent to running `make schema-setup schema-teardown` manually.
+- `make schema-setup` generates the setup CQL files.
+- `make schema-teardown` generates the teardown CQL files.
+- `make teardown-dev-schema` will attempt to remove a development schema from an existing Cassandra instance.
+- `make test` runs both unit and integration tests.
+- `make unit` runs unit tests.
+
