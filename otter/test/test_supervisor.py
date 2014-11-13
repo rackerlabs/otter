@@ -48,6 +48,7 @@ class SupervisorTests(SynchronousTestCase):
         self.group = iMock(IScalingGroup)
         self.group.tenant_id = 11111
         self.group.uuid = 'group-id'
+        self.region = "ORD"
 
         self.auth_token = 'auth-token'
         self.service_catalog = {}
@@ -64,7 +65,7 @@ class SupervisorTests(SynchronousTestCase):
         self.cooperator = mock.Mock(spec=Cooperator)
 
         self.supervisor = SupervisorService(
-            self.authenticator, 'ORD', self.cooperator.coiterate)
+            self.authenticator, self.region, self.cooperator.coiterate)
 
         self.InMemoryUndoStack = patch(self, 'otter.supervisor.InMemoryUndoStack')
         self.undo = self.InMemoryUndoStack.return_value
