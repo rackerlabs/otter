@@ -576,16 +576,17 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(self._added_lbs, [lb_config_1])
 
 
-class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
+class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
     """
-    :func:`remove_from_load_balancer` tests
+    Tests for removing nodes from CLB load balancers, through the generic
+    :func:`remove_from_load_balancer` API.
     """
 
     def setUp(self):
         """
         Mock treq.delete for deleting nodes
         """
-        super(RemoveNodeTests, self).setUp()
+        super(RemoveFromCLBTests, self).setUp()
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
                           new=mock_treq(code=200, content='{"message": "bad"}', method='delete'))
         patch(self, 'otter.util.http.treq', new=self.treq)
