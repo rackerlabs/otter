@@ -1,7 +1,7 @@
 """
 Tests for RCv3-specific worker code.
 """
-from effect import ParallelEffects
+from effect import Effect
 from otter.constants import ServiceType
 from otter.worker import _rcv3
 from otter.test.test_convergence import _PureRequestStub
@@ -47,8 +47,8 @@ class RCv3Tests(SynchronousTestCase):
         self.assertIdentical(self.reactor, reactor)
 
         self.effect = effect
-        self.assertTrue(isinstance(effect, ParallelEffects))
-        (sub_effect,) = effect.effects
+        self.assertTrue(isinstance(effect, Effect))
+        (sub_effect,) = effect.intent.effects
 
         self.assertEqual(sub_effect.service_type, ServiceType.RACKCONNECT_V3)
         self.assertEqual(sub_effect.data,
