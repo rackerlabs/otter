@@ -584,7 +584,8 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def setUp(self):
         """
-        Mock treq.delete for deleting nodes
+        Mock :func:`treq.delete` for deleting nodes and set up a :class:`Clock`
+        for simulating the passage of time for the retry tests.
         """
         super(RemoveFromCLBTests, self).setUp()
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
