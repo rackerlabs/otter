@@ -8,6 +8,7 @@ import os
 import treq
 
 from zope.interface import implementer, directlyProvides
+from zope.interface.verify import verifyObject
 
 from testtools.matchers import Mismatch
 
@@ -104,6 +105,24 @@ class IsBoundWith(object):
             return None
         else:
             return Mismatch('Expected kwargs {} but got {} instead'.format(self.kwargs, kwargs))
+
+
+class Implements(object):
+    """
+    Match if instance implementes given interface
+    """
+    def __init__(self, intf):
+        self.intf = intf
+
+    def __str__(self):
+        return 'Implements {}'.format(self.intf)
+
+    def match(self, inst):
+        """
+        Return None if inst implements given interface. Otherwise return Mismatch
+        """
+        return None if verifyObject(self.intf, inst) else Mismatch(
+            'Expected instance implementing interface {}'.format(self.intf))
 
 
 class CheckFailure(object):
