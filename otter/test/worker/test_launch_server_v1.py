@@ -15,7 +15,6 @@ from twisted.python.failure import Failure
 from otter.worker import launch_server_v1
 from otter.worker.launch_server_v1 import (
     private_ip_addresses,
-    endpoints,
     add_to_clb,
     add_to_load_balancer,
     add_to_load_balancers,
@@ -26,7 +25,6 @@ from otter.worker.launch_server_v1 import (
     prepare_launch_config,
     delete_server,
     remove_from_load_balancer,
-    public_endpoint_url,
     UnexpectedServerStatus,
     ServerDeleted,
     delete_and_verify,
@@ -104,26 +102,6 @@ class UtilityTests(SynchronousTestCase):
 
         result = private_ip_addresses({'server': {'addresses': addresses}})
         self.assertEqual(result, ['10.0.0.1', '10.0.0.2'])
-
-    def test_endpoints(self):
-        """
-        endpoints will return only the named endpoint in a specific region.
-        """
-        self.assertEqual(
-            sorted(endpoints(fake_service_catalog,
-                             'cloudServersOpenStack',
-                             'DFW')),
-            [{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'}])
-
-    def test_public_endpoint_url(self):
-        """
-        public_endpoint_url returns the first publicURL for the named service
-        in a specific region.
-        """
-        self.assertEqual(
-            public_endpoint_url(fake_service_catalog, 'cloudServersOpenStack',
-                                'DFW'),
-            'http://dfw.openstack/')
 
 
 expected_headers = {

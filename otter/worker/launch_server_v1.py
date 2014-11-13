@@ -28,8 +28,8 @@ from twisted.internet.defer import (gatherResults, DeferredSemaphore,
                                     DeferredLock, inlineCallbacks, returnValue)
 from twisted.internet.task import deferLater
 
+from otter.auth import public_endpoint_url
 from otter.util import logging_treq as treq
-
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error, raise_error_on_code,
@@ -534,41 +534,6 @@ def add_to_load_balancers(log, request_func, lb_configs, server, undo):
 
     d = gatherResults(map(_serial_add, lb_configs), consumeErrors=True)
     return d.addCallback(partial(zip, lb_configs))
-
-
-def endpoints(service_catalog, service_name, region):
-    """
-    Search a service catalog for matching endpoints.
-
-    :param list service_catalog: List of services.
-    :param str service_name: Name of service.  Example: 'cloudServersOpenStack'
-    :param str region: Region of service.  Example: 'ORD'
-
-    :return: Iterable of endpoints.
-    """
-    for service in service_catalog:
-        if service_name != service['name']:
-            continue
-
-        for endpoint in service['endpoints']:
-            if region != endpoint['region']:
-                continue
-
-            yield endpoint
-
-
-def public_endpoint_url(service_catalog, service_name, region):
-    """
-    Return the first publicURL for a given service in a given region.
-
-    :param list service_catalog: List of services.
-    :param str service_name: Name of service.  Example: 'cloudServersOpenStack'
-    :param str region: Region of service.  Example: 'ORD'
-
-    :return: URL as a string.
-    """
-    first_endpoint = next(endpoints(service_catalog, service_name, region))
-    return first_endpoint['publicURL']
 
 
 def private_ip_addresses(server):
