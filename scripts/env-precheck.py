@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+"""env-precheck checks to see if we have the minimum set of requirements needed
+to build Otter's environment via "make env".
+"""
+
 import subprocess
 import sys
 
