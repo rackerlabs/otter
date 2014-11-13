@@ -13,7 +13,7 @@ import treq
 from twisted.internet import defer
 
 from characteristic import attributes, Attribute
-from effect import ParallelEffects
+from effect import parallel
 from pyrsistent import pbag, freeze, s, pset
 from zope.interface import Interface, implementer
 
@@ -812,6 +812,8 @@ def _reqs_to_effect(request_func, conv_requests):
     :param request_func: A pure-http request function, as produced by
         :func:`otter.http.get_request_func`.
     :param conv_requests: Convergence requests to turn into effects.
+    :return: An effect which will perform all the requests in parallel.
+    :rtype: :class:`Effect`
     """
     effects = [request_func(service_type=r.service,
                             method=r.method,
@@ -820,4 +822,4 @@ def _reqs_to_effect(request_func, conv_requests):
                             data=r.data,
                             success_codes=r.success_codes)
                for r in conv_requests]
-    return ParallelEffects(effects)
+    return parallel(effects)
