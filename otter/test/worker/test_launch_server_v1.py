@@ -40,7 +40,8 @@ from otter.worker.launch_server_v1 import (
     _without_otter_metadata,
     scrub_otter_metadata,
     _definitely_lb_config,
-    _as_new_style_instance_details
+    _as_new_style_instance_details,
+    _remove_from_clb
 )
 
 
@@ -136,39 +137,20 @@ expected_headers = {
 error_body = '{"code": 500, "message": "Internal Server Error"}'
 
 
-class LoadBalancersTestsMixin(object):
+class RequestFuncTestMixin(object):
     """
-    Test adding and removing nodes from load balancers
+    A test case mixin for test cases that require a request function, and its
+    associated attrs.
     """
-
     def setUp(self):
         """
-        set up test dependencies for load balancers.
+        Do the necessary set-up for a request_func-using test case.
         """
-        super(LoadBalancersTestsMixin, self).setUp()
-        self.log = mock_log()
-        self.log.msg.return_value = None
-
-        self.undo = iMock(IUndoStack)
-
-        self.max_retries = 12
-        set_config_data({'worker': {'lb_max_retries': self.max_retries,
-                                    'lb_retry_interval_range': [5, 7]},
-                         "cloudLoadBalancers": "cloudLoadBalancers"})
-        self.addCleanup(set_config_data, {})
-
-        # patch random_interval
-        self.retry_interval = 6
-        self.rand_interval = patch(self, 'otter.worker.launch_server_v1.random_interval')
-        self.rand_interval.return_value = self.interval_func = mock.Mock(
-            return_value=self.retry_interval)
-
-        self.clock = Clock()
-
+        super(RequestFuncTestMixin, self).setUp()
         self.auth_token = 'my-auth-token'
         self.request_func = lambda *a, **kw: None
         self.request_func.auth_token = self.auth_token
-        self.request_func.lb_region = "DFW"
+        self.request_func.region = self.request_func.lb_region = "DFW"
         self.request_func.service_catalog = fake_service_catalog
 
         self.server_details = {
@@ -186,6 +168,36 @@ class LoadBalancersTestsMixin(object):
                 }
             }
         }
+
+
+class LoadBalancersTestsMixin(RequestFuncTestMixin):
+    """
+    Test adding and removing nodes from load balancers
+    """
+
+    def setUp(self):
+        """
+        set up test dependencies for load balancers.
+        """
+        super(LoadBalancersTestsMixin, self).setUp()
+        self.log = mock_log()
+        self.log.msg.return_value = None
+
+        self.undo = iMock(IUndoStack)
+
+        self.max_retries = 12
+        set_config_data(merge({'worker': {'lb_max_retries': self.max_retries,
+                                          'lb_retry_interval_range': [5, 7]}},
+                              fake_config))
+        self.addCleanup(set_config_data, {})
+
+        # patch random_interval
+        self.retry_interval = 6
+        self.rand_interval = patch(self, 'otter.worker.launch_server_v1.random_interval')
+        self.rand_interval.return_value = self.interval_func = mock.Mock(
+            return_value=self.retry_interval)
+
+        self.clock = Clock()
 
 
 lb_config_1 = {'loadBalancerId': 12345, 'port': 80}
@@ -304,7 +316,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         :func:`add_to_clb` will use default :obj:`LB_RETRY_INTERVAL_RANGE`,
         :obj:`LB_MAX_RETRIES` values unless overridden.
         """
-        set_config_data({})
+        set_config_data(fake_config)
         self.treq.post.side_effect = lambda *a, **kw: succeed(mock.Mock(code=422))
 
         d = self._add_to_clb()
@@ -366,16 +378,15 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
     def test_add_to_clb_pushes_remove_onto_undo_stack(self):
         """
-        :func:`add_to_clb` pushes an inverse :func:`remove_from_load_balancer`
+        :func:`add_to_clb` pushes an inverse :func:`_remove_from_clb`
         operation onto the undo stack.
         """
         d = self._add_to_clb()
         self.successResultOf(d)
         self.undo.push.assert_called_once_with(
-            remove_from_load_balancer, matches(IsInstance(self.log.__class__)),
+            _remove_from_clb, matches(IsInstance(self.log.__class__)),
             'http://dfw.lbaas/', 'my-auth-token',
-            self.lb_config,
-            1)
+            self.lb_config["loadBalancerId"], 1)
 
     def test_add_to_clb_doesnt_push_onto_undo_stack_on_failure(self):
         """
@@ -586,7 +597,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         lb_config = {"loadBalancerId": 12345}
         d = remove_from_load_balancer(
-            self.log, 'http://dfw.lbaas/', 'my-auth-token', lb_config, 1,
+            self.log, self.request_func, lb_config, 1,
             clock=self.clock)
         return d
 
@@ -742,7 +753,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         remove_from_load_balancer will retry based on default config if lb_max_retries
         or lb_retry_interval_range is not found
         """
-        set_config_data({})
+        set_config_data(fake_config)
         self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=422))
         self.treq.content.side_effect = lambda *a, **ka: succeed(
             json.dumps({'message': 'PENDING_UPDATE'}))
@@ -2081,7 +2092,7 @@ class MetadataScrubbingTests(SynchronousTestCase):
         """
         Scrubbing otter metadata works correctly.
         """
-        set_config_data({"cloudServersOpenStack": "cloudServersOpenStack"})
+        set_config_data(fake_config)
         self.addCleanup(set_config_data, {})
 
         log = mock.Mock()
@@ -2116,7 +2127,7 @@ old_style_instance_details = (
 instance_details = _as_new_style_instance_details(old_style_instance_details)
 
 
-class DeleteServerTests(SynchronousTestCase):
+class DeleteServerTests(RequestFuncTestMixin, SynchronousTestCase):
     """
     Test the delete server worker.
     """
@@ -2124,6 +2135,8 @@ class DeleteServerTests(SynchronousTestCase):
         """
         Set up some mocks.
         """
+        super(DeleteServerTests, self).setUp()
+
         set_config_data(fake_config)
         self.addCleanup(set_config_data, {})
 
@@ -2140,17 +2153,18 @@ class DeleteServerTests(SynchronousTestCase):
 
         self.clock = Clock()
 
+    def _delete_server(self, instance_details):
+        """
+        Helper method to call :func:`delete_server`.
+        """
+        return delete_server(self.log, self.request_func, instance_details)
+
     def test_delete_server_no_lbs(self):
         """
         :func:`delete_server` removes the nodes specified in instance details
         when there are no associated load balancers
         """
-        d = delete_server(self.log,
-                          'DFW',
-                          fake_service_catalog,
-                          'my-auth-token',
-                          ('a', []))
-        self.successResultOf(d)
+        self.successResultOf(self._delete_server(instance_details=('a', [])))
         self.assertFalse(self.remove_from_load_balancer.called)
 
     def _test_delete_server_lb_removal(self, instance_details):
@@ -2158,17 +2172,12 @@ class DeleteServerTests(SynchronousTestCase):
         Helper test to verify that :func:`delete_server` removes the nodes
         specified in instance details from the associated load balancers.
         """
-        d = delete_server(self.log,
-                          'DFW',
-                          fake_service_catalog,
-                          'my-auth-token',
-                          instance_details)
-        self.successResultOf(d)
+        self.successResultOf(self._delete_server(instance_details))
 
         self.remove_from_load_balancer.assert_has_calls([
-            mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token',
+            mock.call(self.log, self.request_func,
                       _definitely_lb_config(12345), 1),
-            mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token',
+            mock.call(self.log, self.request_func,
                       _definitely_lb_config(54321), 2)
         ], any_order=True)
 
@@ -2195,9 +2204,7 @@ class DeleteServerTests(SynchronousTestCase):
         ``DELETE`` request against the instance URL based on the
         information in ``instance_details``.
         """
-        d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', instance_details)
-        self.successResultOf(d)
+        self.successResultOf(self._delete_server(instance_details))
 
         self.treq.delete.assert_called_once_with(
             'http://dfw.openstack/servers/a',
@@ -2224,10 +2231,7 @@ class DeleteServerTests(SynchronousTestCase):
         delete calls return 404.
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
-
-        d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', instance_details)
-        self.successResultOf(d)
+        self.successResultOf(self._delete_server(instance_details))
 
     def test_delete_server_succeeds_on_unknown_server_old_style(self):
         """
@@ -2254,8 +2258,7 @@ class DeleteServerTests(SynchronousTestCase):
         self.remove_from_load_balancer.return_value = fail(
             APIError(500, '')).addErrback(wrap_request_error, 'url')
 
-        d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', instance_details)
+        d = self._delete_server(instance_details)
         failure = unwrap_first_error(self.failureResultOf(d))
 
         self.assertEqual(failure.value.reason.value.code, 500)
@@ -2286,8 +2289,7 @@ class DeleteServerTests(SynchronousTestCase):
         """
         deleter.return_value = fail(TimedOutError(3660, 'meh'))
 
-        d = delete_server(self.log, 'DFW', fake_service_catalog,
-                          'my-auth-token', instance_details)
+        d = self._delete_server(instance_details)
         self.failureResultOf(d, TimedOutError)
 
     def test_delete_server_propagates_verified_delete_failures_old_style(self):

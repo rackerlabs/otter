@@ -20,7 +20,7 @@ import re
 
 from functools import partial
 from copy import deepcopy
-from toolz import comp, groupby
+from toolz import comp
 from urllib import urlencode
 
 from twisted.python.failure import Failure
@@ -499,8 +499,8 @@ def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=Non
     def when_done(result):
         node_id = result['nodes'][0]['id']
         lb_log.msg('Added to load balancer', node_id=node_id)
-        undo.push(remove_from_load_balancer, lb_log, endpoint, auth_token,
-                  lb_config, node_id)
+        undo.push(_remove_from_clb, lb_log, endpoint, auth_token, lb_id,
+                  node_id)
         return result
 
     return d.addCallback(treq.json_content).addCallback(when_done)
@@ -779,8 +779,7 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
     return d
 
 
-def remove_from_load_balancer(log, endpoint, auth_token, lb_config,
-                              node_id, clock=None):
+def remove_from_load_balancer(log, request_func, lb_config, node_id, clock=None):
     """
     Remove a node from a load balancer.
 
@@ -792,7 +791,33 @@ def remove_from_load_balancer(log, endpoint, auth_token, lb_config,
     :returns: A Deferred that fires with None if the operation completed successfully,
         or errbacks with an RequestError.
     """
-    loadbalancer_id = lb_config["loadBalancerId"]
+    lb_type = lb_config.get("type", "CloudLoadBalancer")
+    if lb_type == "CloudLoadBalancer":
+        loadbalancer_id = lb_config["loadBalancerId"]
+        cloudLoadBalancers = config_value('cloudLoadBalancers')
+        endpoint = public_endpoint_url(request_func.service_catalog,
+                                       cloudLoadBalancers,
+                                       request_func.lb_region)
+        auth_token = request_func.auth_token
+        return _remove_from_clb(log, endpoint, auth_token, loadbalancer_id,
+                                node_id, clock)
+    else:
+        raise RuntimeError("Unknown cloud load balancer type! config: {}"
+                           .format(lb_config))
+
+
+def _remove_from_clb(log, endpoint, auth_token, loadbalancer_id, node_id, clock=None):
+    """
+    Remove a node from a CLB load balancer.
+
+    :param str endpoint: Load balancer endpoint URI.
+    :param str auth_token: Keystone authentication token.
+    :param str loadbalancer_id: The ID for a Cloud Load Balancer.
+    :param str node_id: The ID for a node in that Cloud Load Balancer.
+
+    :returns: A Deferred that fires with None if the operation completed successfully,
+        or errbacks with an RequestError.
+    """
     lb_log = log.bind(loadbalancer_id=loadbalancer_id, node_id=node_id)
     # TODO: Will remove this once LB ERROR state is fixed and it is working fine
     lb_log.msg('Removing from load balancer')
@@ -822,15 +847,14 @@ def remove_from_load_balancer(log, endpoint, auth_token, lb_config,
     return d
 
 
-def delete_server(log, region, service_catalog, auth_token, instance_details):
+def delete_server(log, request_func, instance_details):
     """
     Delete the server specified by instance_details.
 
     TODO: Load balancer draining.
 
-    :param str region: A rackspace region as found in the service catalog.
-    :param list service_catalog: A list of services as returned by the auth apis.
-    :param str auth_token: The user's auth token.
+    :param BoundLog log: A bound logger.
+    :param callable request_func: A request function.
     :param tuple instance_details: A 2-tuple of the server_id and a list of
         2-tuples of load balancer configurations and respective load balancer
         responses. Example for some CLB load balancers::
@@ -853,35 +877,30 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     :return: TODO
 
     """
-    lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
-    cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
-
-    lb_endpoint = public_endpoint_url(service_catalog,
-                                      cloudLoadBalancers,
-                                      lb_region)
-
-    server_endpoint = public_endpoint_url(service_catalog,
+    server_endpoint = public_endpoint_url(request_func.service_catalog,
                                           cloudServersOpenStack,
-                                          region)
+                                          request_func.region)
 
+    _remove_from_lb = partial(remove_from_load_balancer, log, request_func)
     server_id, lb_details = _as_new_style_instance_details(instance_details)
 
-    lb_type = lambda (lb_config, _): lb_config.get("type", "CloudLoadBalancer")
-    lbs_by_type = groupby(lb_type, lb_details)
-
-    _remove_from_clb = partial(remove_from_load_balancer, log, lb_endpoint,
-                               auth_token)
-
-    clbs = lbs_by_type.get("CloudLoadBalancer", [])
-    clb_ds = []
-    for lb_config, lb_response in clbs:
-        for node_info in lb_response["nodes"]:
-            node_id = node_info["id"]
-            clb_ds.append(_remove_from_clb(lb_config, node_id))
-    d = gatherResults(clb_ds, consumeErrors=True)
+    lb_ds = []
+    for lb_config, lb_response in lb_details:
+        lb_type = lb_config.get("type", "CloudLoadBalancer")
+        if lb_type == "CloudLoadBalancer":
+            node_ids = [node_info["id"] for node_info in lb_response["nodes"]]
+        # elif lb_type == "RackConnectV3":
+        #     node_ids = [pair["cloud_server"]["id"] for pair in lb_response]
+        else:
+            raise RuntimeError("Unknown cloud load balancer type! config: {}"
+                               .format(lb_config))
+        for node_id in node_ids:
+            lb_ds.append(_remove_from_lb(lb_config, node_id))
+    d = gatherResults(lb_ds, consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
+        auth_token = request_func.auth_token
         return verified_delete(log, server_endpoint, auth_token, server_id)
 
     d.addCallback(when_removed_from_loadbalancers)

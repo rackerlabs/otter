@@ -76,6 +76,22 @@ class SupervisorTests(SynchronousTestCase):
         """
         verifyObject(ISupervisor, self.supervisor)
 
+    def assertCorrectRequestFunc(self, request_func):
+        """
+        Asserts that the given request_func is correct.
+
+        "Correct" here is mutable: ideally it will eventually mean "it is
+        literally the return value of ``get_request_func``", but for now it
+        needs a few arguments to support old code that hasn't been updated
+        to use pure_http yet.
+
+        :param callable request_func: The request function to check.
+        """
+        self.assertEqual(request_func.auth_token, self.auth_token)
+        self.assertEqual(request_func.service_catalog, self.service_catalog)
+        self.assertEqual(request_func.region, "ORD")
+        self.assertEqual(request_func.lb_region, "ORD")
+
 
 class HealthCheckTests(SupervisorTests):
     """
@@ -175,8 +191,7 @@ class LaunchConfigTests(SupervisorTests):
         (args, _kwargs), = self.launch_server.call_args_list
         log, request_func, scaling_group, launch_config, undo = args
         # TODO: Wasn't there a fancy thing for checking bound loggers?
-        self.assertEqual(request_func.auth_token, self.auth_token)
-        self.assertEqual(request_func.service_catalog, self.service_catalog)
+        self.assertCorrectRequestFunc(request_func)
         self.assertEqual(scaling_group, self.group)
         self.assertEqual(launch_config, {'server': {}})
         self.assertEqual(undo, self.undo)
@@ -241,7 +256,12 @@ class DeleteServerTests(SupervisorTests):
             return_value=succeed(None))
 
         self.fake_server = self.fake_server_details['server']
-        self.fake_server['lb_info'] = {}
+        self.fake_server['lb_info'] = [({"loadBalancerId": '12345'},
+                                        {'nodes': [{'id': 'a',
+                                                    'address': "1.1.1.1"}]}),
+                                       ({"loadBalancerId": '54321'},
+                                        {'nodes': [{'id': 'b',
+                                                    'address': "1.1.1.2"}]})]
 
     def test_execute_delete_calls_delete_worker(self):
         """
@@ -250,12 +270,12 @@ class DeleteServerTests(SupervisorTests):
         """
         self.supervisor.execute_delete_server(self.log, 'transaction-id',
                                               self.group, self.fake_server)
-        self.delete_server.assert_called_once_with(
-            self.log.bind.return_value,
-            'ORD',
-            self.service_catalog,
-            self.auth_token,
-            (self.fake_server['id'], self.fake_server['lb_info']))
+        (args, _kwargs), = self.delete_server.call_args_list
+        log, request_func, instance_details = args
+        self.assertEqual(log, self.log.bind.return_value)
+        self.assertCorrectRequestFunc(request_func)
+        expected_details = self.fake_server['id'], self.fake_server['lb_info']
+        self.assertEqual(instance_details, expected_details)
 
     def test_execute_delete_auths(self):
         """
