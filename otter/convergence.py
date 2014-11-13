@@ -32,8 +32,7 @@ from otter.util.fp import partition_bool, partition_groups
 from otter.util.retry import retry, retry_times, exponential_backoff_interval
 from otter.util.timestamp import from_timestamp
 from otter.indexer import atom
-# TODO: I hate including this!
-from otter.worker.launch_server_v1 import public_endpoint_url
+from otter.auth import public_endpoint_url
 
 
 class NodeCondition(Names):
