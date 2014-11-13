@@ -17,7 +17,9 @@ from twisted.internet.base import ReactorBase
 from otter.metrics import (
     get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
     add_to_cloud_metrics, collect_metrics, MetricsService, makeService, Options)
-from otter.test.utils import patch, StubTreq2, matches, IsCallable
+from otter.test.utils import patch, StubTreq2, matches, IsCallable, Implements
+from otter.test.test_auth import identity_config
+from otter.auth import IAuthenticator
 from otter.util.http import headers
 from otter.log import BoundLog
 
@@ -248,10 +250,6 @@ class CollectMetricsTests(SynchronousTestCase):
         self.client.disconnect.return_value = succeed(None)
         self.connect_cass_servers.return_value = self.client
 
-        self.auth = mock.Mock()
-        self.get_authenticator = patch(self, 'otter.metrics.get_authenticator',
-                                       return_value=self.auth)
-
         self.groups = mock.Mock()
         self.get_scaling_groups = patch(self, 'otter.metrics.get_scaling_groups',
                                         return_value=succeed(self.groups))
@@ -265,7 +263,7 @@ class CollectMetricsTests(SynchronousTestCase):
         self.add_to_cloud_metrics = patch(self, 'otter.metrics.add_to_cloud_metrics',
                                           return_value=succeed(None))
 
-        self.config = {'cassandra': 'c', 'identity': {'url': 'id'}, 'metrics': 'm',
+        self.config = {'cassandra': 'c', 'identity': identity_config, 'metrics': 'm',
                        'region': 'r', 'services': {'nova': 'cloudServersOpenStack'}}
 
     def test_metrics_collected(self):
@@ -278,14 +276,13 @@ class CollectMetricsTests(SynchronousTestCase):
         self.assertIsNone(self.successResultOf(d))
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
-        self.get_authenticator.assert_called_once_with(_reactor, {'url': 'id'})
         self.get_scaling_groups.assert_called_once_with(
             self.client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
-            self.groups, self.auth, 'cloudServersOpenStack', 'r',
-            clock=_reactor, _print=False)
+            self.groups, matches(Implements(IAuthenticator)), 'cloudServersOpenStack',
+            'r', clock=_reactor, _print=False)
         self.add_to_cloud_metrics.assert_called_once_with(
-            'm', 'id', 'r', 107, 26, 1)
+            'm', identity_config['url'], 'r', 107, 26, 1)
         self.client.disconnect.assert_called_once_with()
 
     def test_with_client(self):
@@ -305,7 +302,6 @@ class CollectMetricsTests(SynchronousTestCase):
         _reactor, auth = mock.Mock(), mock.Mock()
         d = collect_metrics(_reactor, self.config, authenticator=auth)
         self.assertIsNone(self.successResultOf(d))
-        self.assertFalse(self.get_authenticator.called)
         self.get_all_metrics.assert_called_once_with(
             self.groups, auth, 'cloudServersOpenStack', 'r', clock=_reactor, _print=False)
 
@@ -338,8 +334,7 @@ class ServiceTests(SynchronousTestCase):
         """
         self.client = mock.Mock(spec=['disconnect'])
         self.mock_ccs = patch(self, 'otter.metrics.connect_cass_servers', return_value=self.client)
-        self.mock_ga = patch(self, 'otter.metrics.get_authenticator', return_value='auth')
-        self.config = {'cassandra': 'c', 'identity': 'i', 'metrics': {'interval': 20}}
+        self.config = {'cassandra': 'c', 'identity': identity_config, 'metrics': {'interval': 20}}
         self.mock_cm = patch(self, 'otter.metrics.collect_metrics')
 
     @mock.patch('otter.metrics.MetricsService')
@@ -358,12 +353,11 @@ class ServiceTests(SynchronousTestCase):
         """
         s = MetricsService(self.config)
         self.mock_ccs.assert_called_once_with(matches(IsInstance(ReactorBase)), 'c')
-        self.mock_ga.assert_called_once_with(matches(IsInstance(ReactorBase)), 'i')
         self.assertEqual(s.step, 20)
         self.assertEqual(
             s.call,
             (self.mock_cm, (matches(IsInstance(ReactorBase)), self.config),
-             dict(client=self.client, authenticator='auth')))
+             dict(client=self.client, authenticator=matches(Implements(IAuthenticator)))))
 
     def test_stop_service(self):
         """
