@@ -9,7 +9,7 @@ from otter.util.pure_http import (
     request, add_headers, add_effect_on_response, add_error_handling,
     add_bind_root, add_content_only, add_json_response, add_json_request_data)
 from otter.util.http import headers as otter_headers
-from otter.worker.launch_server_v1 import public_endpoint_url
+from otter.auth import public_endpoint_url
 
 
 def get_request_func(authenticator, tenant_id, log, service_mapping, region):
