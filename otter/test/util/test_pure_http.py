@@ -249,7 +249,6 @@ class AddJsonResponseTests(TestCase):
                          (response[0], None))
 
 
-
 class AddJsonRequestDataTests(TestCase):
     """Tests for :func:`add_json_request_data`."""
     def test_add_json_request_data(self):
