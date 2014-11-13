@@ -80,10 +80,11 @@ class SupervisorTests(SynchronousTestCase):
         """
         Asserts that the given request_func is correct.
 
-        "Correct" here is mutable: ideally it will eventually mean "it is
-        literally the return value of ``get_request_func``", but for now it
-        needs a few arguments to support old code that hasn't been updated
-        to use pure_http yet.
+        "Correct" here is mutable: ideally it will eventually mean "it
+        is literally the return value of ``get_request_func``", but
+        for now it is that return value, plus a few attributes to
+        support old code that hasn't been updated to use pure_http
+        yet.
 
         :param callable request_func: The request function to check.
         """
