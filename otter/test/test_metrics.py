@@ -18,7 +18,6 @@ from twisted.internet.base import ReactorBase
 from otter.metrics import (
     get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
     add_to_cloud_metrics, collect_metrics, MetricsService, makeService, Options)
-from otter.test.utils import patch, StubTreq2, matches, IsCallable, Implements
 from otter.test.test_auth import identity_config
 from otter.auth import IAuthenticator
 from otter.test.utils import (
