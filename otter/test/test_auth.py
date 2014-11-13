@@ -18,16 +18,11 @@ from otter.util.http import APIError, UpstreamError
 
 from otter.log import log as default_log
 
-from otter.auth import authenticate_user
-from otter.auth import extract_token
-from otter.auth import impersonate_user
-from otter.auth import endpoints_for_token
-from otter.auth import user_for_tenant
-from otter.auth import ImpersonatingAuthenticator
-from otter.auth import CachingAuthenticator
-from otter.auth import RetryingAuthenticator
-from otter.auth import WaitingAuthenticator
-from otter.auth import IAuthenticator
+from otter.auth import (authenticate_user, extract_token, impersonate_user,
+                        endpoints_for_token, user_for_tenant,
+                        ImpersonatingAuthenticator,
+                        CachingAuthenticator, RetryingAuthenticator,
+                        WaitingAuthenticator, IAuthenticator)
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],
