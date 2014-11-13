@@ -386,6 +386,7 @@ class ConfigTest(SynchronousTestCase):
             'foo': 'bar',
             'baz': {'bax': 'quux'}
         })
+        self.addCleanup(config.set_config_data, {})
 
     def test_top_level_value(self):
         """
