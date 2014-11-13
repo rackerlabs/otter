@@ -93,7 +93,6 @@ class SupervisorService(object, Service):
         """
         Builds a request function for the given scaling group.
         """
-        import pudb; pudb.set_trace()
         tenant_id = scaling_group.tenant_id
         service_mapping = {
             ServiceType.CLOUD_SERVERS: config_value('cloudServersOpenStack'),
