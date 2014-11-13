@@ -408,6 +408,16 @@ class ConfigTest(SynchronousTestCase):
         """
         self.assertIdentical(config.config_value('baz.blah'), None)
 
+    def test_nonexistent_value_with_shared_key_part_at_toplevel(self):
+        """
+        :func:`~config.config_value` will return :data`None` if the path does
+        not exist in the nested dictionaries, even if some part of the path
+        does. I.e. config_value is not allowed to ignore arbitrary path
+        prefixes.
+        """
+        value = config.config_value('prefix.shouldnt.be.ignored.foo')
+        self.assertIdentical(value, None)
+
 
 class WithLockTests(SynchronousTestCase):
     """
