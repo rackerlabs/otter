@@ -12,6 +12,7 @@ from twisted.internet.task import Cooperator
 from zope.interface.verify import verifyObject
 
 from otter import supervisor
+from otter.constants import ServiceType
 from otter.models.interface import (
     IScalingGroup, GroupState, NoSuchScalingGroupError)
 from otter.supervisor import (
@@ -20,6 +21,7 @@ from otter.supervisor import (
 from otter.test.utils import (
     iMock, patch, mock_log, CheckFailure, matches, FakeSupervisor, IsBoundWith,
     DummyException, mock_group)
+from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
 
 
@@ -71,6 +73,16 @@ class SupervisorTests(SynchronousTestCase):
         self.undo = self.InMemoryUndoStack.return_value
         self.undo.rewind.return_value = succeed(None)
 
+        self.service_name_config = {
+            'cloudServersOpenStack': "SUPERVISOR_CS",
+            "cloudLoadBalancers": "SUPERVISOR_CLB",
+            'rackconnect': "SUPERVISOR_RCV3"
+        }
+        set_config_data(self.service_name_config)
+        self.addCleanup(set_config_data, {})
+
+        self.get_request_func = patch(self, 'otter.supervisor.get_request_func')
+
     def test_provides_ISupervisor(self):
         """
         SupervisorService provides ISupervisor
@@ -91,6 +103,18 @@ class SupervisorTests(SynchronousTestCase):
 
         :param callable request_func: The request function to check.
         """
+        self.assertIdentical(request_func, self.get_request_func.return_value)
+        expected_service_mapping = {
+            ServiceType.CLOUD_SERVERS: 'SUPERVISOR_CS',
+            ServiceType.CLOUD_LOAD_BALANCERS: 'SUPERVISOR_CLB',
+            ServiceType.RACKCONNECT_V3: 'SUPERVISOR_RCV3'
+        }
+        self.get_request_func.assert_called_with(self.authenticator,
+                                                 self.group.tenant_id,
+                                                 self.log.bind.return_value,
+                                                 expected_service_mapping,
+                                                 self.region)
+
         self.assertEqual(request_func.auth_token, self.auth_token)
         self.assertEqual(request_func.service_catalog, self.service_catalog)
         self.assertEqual(request_func.region, "ORD")
