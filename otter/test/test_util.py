@@ -403,8 +403,8 @@ class ConfigTest(SynchronousTestCase):
 
     def test_non_existent_value(self):
         """
-        :func:`~config.config_value` will return None if the path does not exist in
-        the nested dictionaries.
+        :func:`~config.config_value` will return :data`None` if the path does
+        not exist in the nested dictionaries.
         """
         self.assertIdentical(config.config_value('baz.blah'), None)
 
