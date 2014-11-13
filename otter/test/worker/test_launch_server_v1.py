@@ -133,6 +133,7 @@ class RequestFuncTestMixin(object):
 
         self.server_details = {
             'server': {
+                "id": "my-server-id",
                 "addresses": {
                     'private': [
                         {'addr': '192.168.1.1', 'version': 4},
