@@ -390,20 +390,21 @@ class ConfigTest(SynchronousTestCase):
 
     def test_top_level_value(self):
         """
-        config_value returns the value stored at the top level key.
+        :func:`~config.config_value` returns the value stored at the top level key.
         """
         self.assertEqual(config.config_value('foo'), 'bar')
 
     def test_nested_value(self):
         """
-        config_value returns the value stored at a . separated path.
+        :func:`~config.config_value` returns the value stored at a . separated
+        path.
         """
         self.assertEqual(config.config_value('baz.bax'), 'quux')
 
     def test_non_existent_value(self):
         """
-        config_value will return None if the path does not exist in the
-        nested dictionaries.
+        :func:`~config.config_value` will return None if the path does not exist in
+        the nested dictionaries.
         """
         self.assertIdentical(config.config_value('baz.blah'), None)
 
