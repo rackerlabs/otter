@@ -16,10 +16,13 @@ CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
 CLOUDCAFE ?= $(shell which cafe-runner)
 
-.PHONY: targets
+.PHONY: targets env-precheck
 
 targets:
 	@cat README.md
+
+env-precheck:
+	./scripts/env-precheck.py
 
 test: unit integration
 

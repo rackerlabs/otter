@@ -27,6 +27,7 @@ In alphabetical order.  You probably will only need a select few of these.
 - `make coverage` performs coverage analysis.
 - `make docs` builds customer-facing documentation.
 - `make env` creates and switches into the Python virtualenv environment.  It'll also pip-install development requirements.
+- `make env-precheck` makes sure you have enough pre-existing infrastructure to be able to run `make env` to begin with.
 - `make integration` runs integration tests.
 - `make lint` performs a lint (PEP8, et. al.) check on the source code.
 - `make load-dev-schema` will attempt to load the development schema into Cassandra.
