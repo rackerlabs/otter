@@ -84,7 +84,9 @@ class SupervisorTests(SynchronousTestCase):
         is literally the return value of :func:`get_request_func`", but
         for now it is that return value, plus a few attributes to
         support old code that hasn't been updated to use pure_http
-        yet.
+        yet. This also verifies that :func:`get_request_func` was called
+        with the appropriate arguments, since that obviously also
+        determines if the given ``request_func`` will work correctly.
 
         :param callable request_func: The request function to check.
         """
