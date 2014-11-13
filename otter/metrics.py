@@ -12,6 +12,7 @@ import time
 
 from twisted.internet import task, defer
 from twisted.internet.endpoints import clientFromString
+from twisted.application.service import Service
 from twisted.application.internet import TimerService
 from twisted.python import usage
 
@@ -24,9 +25,7 @@ from toolz.functoolz import identity
 
 from otter.auth import generate_authenticator, authenticate_user, extract_token
 
-# TODO: Below function has knowledge of service catalog and is independent of
-# worker code. This and other similar code in worker should be moved to otter.auth
-from otter.worker.launch_server_v1 import public_endpoint_url
+from otter.auth import public_endpoint_url
 
 from otter.convergence import get_scaling_group_servers
 from otter.util.http import append_segments, headers, check_success
@@ -34,6 +33,7 @@ from otter.util.fp import predicate_all
 from otter.log import log as otter_log
 
 
+# TODO: Remove this and pass it from service to other functions
 metrics_log = otter_log.bind(system='otter.metrics')
 
 
@@ -325,40 +325,51 @@ class Options(usage.Options):
         self.update({'services': {'nova': 'cloudServersOpenStack'}})
 
 
-class MetricsService(TimerService, object):
+class MetricsService(Service, object):
     """
     Service collects metrics on continuous basis
     """
 
-    def __init__(self, config):
+    def __init__(self, reactor, config, log, clock=None):
         """
         Initialize the service by connecting to Cassandra and setting up
         authenticator
 
+        :param reactor: Twisted reactor
         :param dict config: All the config necessary to run the service.
                             Comes from config file
+        :param IReactorTime clock: Optional reactor for testing timer
         """
-        from twisted.internet import reactor
-        self.client = connect_cass_servers(reactor, config['cassandra'])
-        authenticator = generate_authenticator(reactor, config['identity'])
-        TimerService.__init__(
-            self, get_in(['metrics', 'interval'], config, default=60),
-            collect_metrics, reactor, config, client=self.client,
-            authenticator=authenticator)
+        self._client = connect_cass_servers(reactor, config['cassandra'])
+        collect = lambda *a, **k: collect_metrics(*a, **k).addErrback(log.err)
+        self._service = TimerService(
+            get_in(['metrics', 'interval'], config, default=60), collect,
+            reactor, config, client=self._client,
+            authenticator=generate_authenticator(reactor, config['identity']))
+        self._service.clock = clock or reactor
+
+    def startService(self):
+        """
+        Start this service by starting internal TimerService
+        """
+        Service.startService(self)
+        return self._service.startService()
 
     def stopService(self):
         """
-        Stop service by stopping the timer and disconnecting cass client
+        Stop service by stopping the timerservice and disconnecting cass client
         """
-        TimerService.stopService(self)
-        return self.client.disconnect()
+        Service.stopService(self)
+        d = self._service.stopService()
+        return d.addCallback(lambda _: self._client.disconnect())
 
 
 def makeService(config):
     """
     Set up the otter-metrics service.
     """
-    return MetricsService(dict(config))
+    from twisted.internet import reactor
+    return MetricsService(reactor, dict(config), metrics_log)
 
 
 if __name__ == '__main__':

@@ -19,23 +19,32 @@ from otter.util.http import APIError, UpstreamError
 
 from otter.log import log as default_log
 
-from otter.auth import authenticate_user
-from otter.auth import extract_token
-from otter.auth import impersonate_user
-from otter.auth import endpoints_for_token
-from otter.auth import user_for_tenant
-from otter.auth import ImpersonatingAuthenticator
-from otter.auth import CachingAuthenticator
-from otter.auth import RetryingAuthenticator
-from otter.auth import WaitingAuthenticator
-from otter.auth import IAuthenticator
-from otter.auth import generate_authenticator
+from otter.auth import (authenticate_user, extract_token, impersonate_user,
+                        endpoints_for_token, user_for_tenant,
+                        ImpersonatingAuthenticator,
+                        CachingAuthenticator, RetryingAuthenticator,
+                        WaitingAuthenticator, IAuthenticator,
+                        endpoints, public_endpoint_url, generate_authenticator)
 
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],
                     'x-auth-token': ['auth-token'],
                     'User-Agent': ['OtterScale/0.0']}
+
+fake_service_catalog = [
+    {'type': 'compute',
+     'name': 'cloudServersOpenStack',
+     'endpoints': [
+         {'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
+         {'region': 'ORD', 'publicURL': 'http://ord.openstack/'}
+     ]},
+    {'type': 'lb',
+     'name': 'cloudLoadBalancers',
+     'endpoints': [
+         {'region': 'DFW', 'publicURL': 'http://dfw.lbaas/'},
+     ]}
+]
 
 
 class HelperTests(SynchronousTestCase):
@@ -263,6 +272,26 @@ class HelperTests(SynchronousTestCase):
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
         self.assertEqual(real_failure.value.body, 'error_body')
+
+    def test_endpoints(self):
+        """
+        endpoints will return only the named endpoint in a specific region.
+        """
+        self.assertEqual(
+            sorted(endpoints(fake_service_catalog,
+                             'cloudServersOpenStack',
+                             'DFW')),
+            [{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'}])
+
+    def test_public_endpoint_url(self):
+        """
+        public_endpoint_url returns the first publicURL for the named service
+        in a specific region.
+        """
+        self.assertEqual(
+            public_endpoint_url(fake_service_catalog, 'cloudServersOpenStack',
+                                'DFW'),
+            'http://dfw.openstack/')
 
 
 class ImpersonatingAuthenticatorTests(SynchronousTestCase):

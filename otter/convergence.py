@@ -4,27 +4,35 @@ Convergence.
 
 from functools import partial
 from urllib import urlencode
+import calendar
+import json
+from itertools import izip as zip
 
 import treq
 
 from twisted.internet import defer
 
 from characteristic import attributes, Attribute
+from effect import parallel
 from pyrsistent import pbag, freeze, s, pset
 from zope.interface import Interface, implementer
 
 from twisted.python.constants import Names, NamedConstant
 
+import effect
+
 from toolz.curried import filter, groupby
 from toolz.functoolz import compose
-from toolz.itertoolz import mapcat
+from toolz.itertoolz import concat, concatv, mapcat
 
+from otter.constants import ServiceType
 from otter.log import log as default_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.fp import partition_bool, partition_groups
 from otter.util.retry import retry, retry_times, exponential_backoff_interval
-# TODO: I hate including this!
-from otter.worker.launch_server_v1 import public_endpoint_url
+from otter.util.timestamp import from_timestamp
+from otter.indexer import atom
+from otter.auth import public_endpoint_url
 
 
 class NodeCondition(Names):
@@ -106,6 +114,65 @@ def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
     d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
     d.addCallback(servers_apply)
     return d
+
+
+def extract_drained_at(feed):
+    """
+    Extract time when node was changed to DRAINING
+
+    :param str feed: Atom feed of the node
+
+    :returns: EPOCH in seconds
+    :rtype: float
+    """
+    # TODO: This function temporarily only looks at last entry assuming that
+    # it was draining operation. May need to look at all entries in reverse order
+    # and check for draining operation. This could include paging to further entries
+    entry = atom.entries(atom.parse(feed))[0]
+    summary = atom.summary(entry)
+    if 'Node successfully updated' in summary and 'DRAINING' in summary:
+        return calendar.timegm(from_timestamp(atom.updated(entry)).utctimetuple())
+    else:
+        raise ValueError('Unexpected summary: {}'.format(summary))
+
+
+def get_load_balancer_contents(request_func):
+    """
+    Get load balancer contents as list of `LBNode`
+
+    :param request_func: A tenant-bound, CLB-bound, auth-retry based request function
+    """
+
+    def fetch_nodes(lbs):
+        lb_ids = [lb['id'] for lb in json.loads(lbs)]
+        return effect.parallel(
+            [request_func(
+                'GET',
+                append_segments('loadbalancers', str(lb_id), 'nodes')).on(json.loads)
+             for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
+
+    def fetch_drained_feeds((ids, all_lb_nodes)):
+        nodes = [LBNode(lb_id=_id, node_id=node['id'], address=node['address'],
+                        config=LBConfig(port=node['port'], weight=node['weight'],
+                                        condition=NodeCondition.lookupByName(node['condition']),
+                                        type=NodeType.lookupByName(node['type'])))
+                 for _id, nodes in zip(ids, all_lb_nodes)
+                 for node in nodes]
+        draining = [n for n in nodes if n.config.condition == NodeCondition.DRAINING]
+        return effect.parallel(
+            [request_func(
+                'GET',
+                append_segments('loadbalancers', str(n.lb_id), 'nodes',
+                                '{}.atom'.format(n.node_id)))
+             for n in draining]).on(lambda feeds: (nodes, draining, feeds))
+
+    def fill_drained_at((nodes, draining, feeds)):
+        for node, feed in zip(draining, feeds):
+            node.drained_at = extract_drained_at(feed)
+        return nodes
+
+    return request_func('GET', 'loadbalancers').on(
+        fetch_nodes).on(fetch_drained_feeds).on(fill_drained_at)
 
 
 class IStep(Interface):
@@ -438,39 +505,6 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                    ))
 
 
-def _optimize_lb_adds(lb_add_steps):
-    """
-    Merge together multiple :obj:`AddNodesToLoadBalancer`, per load balancer.
-
-    :param steps_by_lb: Iterable of :obj:`AddNodesToLoadBalancer`.
-    """
-    steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
-    return [
-        AddNodesToLoadBalancer(
-            lb_id=lbid,
-            address_configs=pset(reduce(lambda s, y: s.union(y),
-                                        [step.address_configs for step in steps])))
-        for lbid, steps in steps_by_lb.iteritems()
-    ]
-
-
-def optimize_steps(steps):
-    """
-    Optimize steps.
-
-    Currently batches up groups of :obj:`AddNodesToLoadBalancer` steps into
-    one per load balancer.
-
-    :param pbag steps: Collection of steps.
-    :return: a pbag of steps.
-    """
-    lb_adds, other = partition_bool(
-        lambda s: type(s) is AddNodesToLoadBalancer,
-        steps)
-    merged_adds = _optimize_lb_adds(lb_adds)
-    return pbag(merged_adds + other)
-
-
 @attributes(['steps'])
 class Convergence(object):
     """
@@ -585,14 +619,167 @@ class ChangeLoadBalancerNode(object):
                   'weight': self.weight})
 
 
-class ServiceType(Names):
-    """Constants representing Rackspace cloud services."""
-    CLOUD_SERVERS = NamedConstant()
-    CLOUD_LOAD_BALANCERS = NamedConstant()
+def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
+    """
+    Creates a bulk request for RackConnect v3.0 load balancers.
+
+    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
+        connections to be made or broken.
+    :param str method: The method of the request ``"DELETE"`` or
+        ``"POST"``.
+    :param iterable success_codes: Status codes considered successful for this request.
+    :return: A bulk RackConnect v3.0 request for the given load balancer,
+        node pairs.
+    :rtype: :class:`Request`
+    """
+    return Request(
+        service=ServiceType.RACKCONNECT_V3,
+        method=method,
+        path=append_segments("load_balancer_pools",
+                             "nodes"),
+        data=[{"cloud_server": {"id": node},
+               "load_balancer_pool": {"id": lb}}
+              for (lb, node) in lb_node_pairs],
+        success_codes=success_codes)
 
 
-@attributes(['service', 'method', 'path', 'headers', 'data'],
-            defaults={'headers': None, 'data': None})
+@implementer(IStep)
+@attributes(['lb_node_pairs'])
+class BulkAddToRCv3(object):
+    """
+    Some connections must be made between some combination of servers
+    and RackConnect v3.0 load balancers.
+
+    Each connection is independently specified.
+
+    See http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
+
+    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
+        connections to be made.
+    """
+
+    def as_request(self):
+        """
+        Produce a :obj:`Request` to add some nodes to some RCv3 load
+        balancers.
+        """
+        return _rackconnect_bulk_request(self.lb_node_pairs, "POST", (201,))
+
+
+@implementer(IStep)
+@attributes(["lb_id", "node_id"])
+class RemoveFromRCv3(object):
+    """
+    A server must be removed from a RackConnect v3.0 load balancer.
+    """
+
+    def as_request(self):
+        """
+        Not actually implemented.
+
+        This step is never intended to be reified as a request; it
+        should always be optimized away.
+
+        :raises: NotImplementedError
+        """
+        raise NotImplementedError()
+
+
+@implementer(IStep)
+@attributes(['lb_node_pairs'])
+class BulkRemoveFromRCv3(object):
+    """
+    Some connections must be removed between some combination of nodes
+    and RackConnect v3.0 load balancers.
+
+    See http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
+
+    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
+        connections to be removed.
+    """
+
+    def as_request(self):
+        """
+        Produce a :obj:`Request` to remove some nodes from some RCv3 load
+        balancers.
+        """
+        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE", (204,))
+
+
+_optimizers = {}
+
+
+def _optimizer(step_type):
+    """
+    A decorator for a type-specific optimizer.
+
+    Usage::
+
+        @_optimizer(StepTypeToOptimize)
+        def optimizing_function(steps_of_that_type):
+           return iterable_of_optimized_steps
+    """
+    def _add_to_optimizers(optimizer):
+        _optimizers[step_type] = optimizer
+        return optimizer
+    return _add_to_optimizers
+
+
+@_optimizer(AddNodesToLoadBalancer)
+def _optimize_lb_adds(lb_add_steps):
+    """
+    Merge together multiple :obj:`AddNodesToLoadBalancer`, per load balancer.
+
+    :param steps_by_lb: Iterable of :obj:`AddNodesToLoadBalancer`.
+    """
+    steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
+    return [
+        AddNodesToLoadBalancer(
+            lb_id=lbid,
+            address_configs=pset(reduce(lambda s, y: s.union(y),
+                                        [step.address_configs for step in steps])))
+        for lbid, steps in steps_by_lb.iteritems()
+    ]
+
+
+@_optimizer(RemoveFromRCv3)
+def _optimize_rcv3_lb_removes(steps):
+    """
+    Merge :obj:`RemoveFromRCv3` objects to a single :obj:`BulkRemoveFromRCv3`
+    step.
+
+    :param steps: Iterable of :obj:`RemoveFromRCv3`.
+    """
+    pairs = pset((step.lb_id, step.node_id) for step in steps)
+    return [BulkRemoveFromRCv3(lb_node_pairs=pairs)]
+
+
+def optimize_steps(steps):
+    """
+    Optimize steps.
+
+    Currently only optimizes per step type. See the :func:`_optimizer`
+    decorator for more information on how to register an optimizer.
+
+    :param pbag steps: Collection of steps.
+    :return: a pbag of steps.
+    """
+    def grouping_fn(step):
+        step_type = type(step)
+        if step_type in _optimizers:
+            return step_type
+        else:
+            return "unoptimizable"
+
+    steps_by_type = groupby(grouping_fn, steps)
+    unoptimizable = steps_by_type.pop("unoptimizable", [])
+    omg_optimized = concat(_optimizers[step_type](steps)
+                           for step_type, steps in steps_by_type.iteritems())
+    return pbag(concatv(omg_optimized, unoptimizable))
+
+
+@attributes(['service', 'method', 'path', 'headers', 'data', 'success_codes'],
+            defaults={'headers': None, 'data': None, 'success_codes': (200,)})
 class Request(object):
     """
     An object representing a Rackspace API request that must be performed.
@@ -612,4 +799,27 @@ class Request(object):
     :ivar dict headers: a dict mapping bytes to lists of bytes.
     :ivar object data: a Python object that will be JSON-serialized as the body
         of the request.
+    :ivar iterable<int> success_codes: The status codes that will be considered
+        successful. Defaults to just 200 (OK). Requests that expect other codes,
+        such as 201 (Created) for most ``POST`` requests or 204 (No content)
+        for most ``DELETE`` requests should specify that through this argument.
     """
+
+
+def _reqs_to_effect(request_func, conv_requests):
+    """Turns a collection of :class:`Request` objects into an effect.
+
+    :param request_func: A pure-http request function, as produced by
+        :func:`otter.http.get_request_func`.
+    :param conv_requests: Convergence requests to turn into effects.
+    :return: An effect which will perform all the requests in parallel.
+    :rtype: :class:`Effect`
+    """
+    effects = [request_func(service_type=r.service,
+                            method=r.method,
+                            url=r.path,
+                            headers=r.headers,
+                            data=r.data,
+                            success_codes=r.success_codes)
+               for r in conv_requests]
+    return parallel(effects)

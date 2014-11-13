@@ -12,6 +12,7 @@ from twisted.internet.task import Cooperator
 from zope.interface.verify import verifyObject
 
 from otter import supervisor
+from otter.constants import ServiceType
 from otter.models.interface import (
     IScalingGroup, GroupState, NoSuchScalingGroupError)
 from otter.supervisor import (
@@ -20,6 +21,7 @@ from otter.supervisor import (
 from otter.test.utils import (
     iMock, patch, mock_log, CheckFailure, matches, FakeSupervisor, IsBoundWith,
     DummyException, mock_group)
+from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
 
 
@@ -48,11 +50,14 @@ class SupervisorTests(SynchronousTestCase):
         self.group = iMock(IScalingGroup)
         self.group.tenant_id = 11111
         self.group.uuid = 'group-id'
+        self.region = "ORD"
 
         self.auth_token = 'auth-token'
         self.service_catalog = {}
-        self.auth_function = mock.Mock(
-            return_value=succeed((self.auth_token, self.service_catalog)))
+        self.authenticator = mock.Mock()
+        self.auth_function = self.authenticator.authenticate_tenant
+        self.auth_function.return_value = succeed((self.auth_token,
+                                                   self.service_catalog))
 
         self.fake_server_details = {
             'server': {'id': 'server_id', 'links': ['links'], 'name': 'meh',
@@ -62,17 +67,58 @@ class SupervisorTests(SynchronousTestCase):
         self.cooperator = mock.Mock(spec=Cooperator)
 
         self.supervisor = SupervisorService(
-            self.auth_function, 'ORD', self.cooperator.coiterate)
+            self.authenticator, self.region, self.cooperator.coiterate)
 
         self.InMemoryUndoStack = patch(self, 'otter.supervisor.InMemoryUndoStack')
         self.undo = self.InMemoryUndoStack.return_value
         self.undo.rewind.return_value = succeed(None)
+
+        self.service_name_config = {
+            'cloudServersOpenStack': "SUPERVISOR_CS",
+            "cloudLoadBalancers": "SUPERVISOR_CLB",
+            'rackconnect': "SUPERVISOR_RCV3"
+        }
+        set_config_data(self.service_name_config)
+        self.addCleanup(set_config_data, {})
+
+        self.get_request_func = patch(self, 'otter.supervisor.get_request_func')
 
     def test_provides_ISupervisor(self):
         """
         SupervisorService provides ISupervisor
         """
         verifyObject(ISupervisor, self.supervisor)
+
+    def assertCorrectRequestFunc(self, request_func):
+        """
+        Asserts that the given request_func is correct.
+
+        "Correct" here is mutable: ideally it will eventually mean "it
+        is literally the return value of :func:`get_request_func`", but
+        for now it is that return value, plus a few attributes to
+        support old code that hasn't been updated to use pure_http
+        yet. This also verifies that :func:`get_request_func` was called
+        with the appropriate arguments, since that obviously also
+        determines if the given ``request_func`` will work correctly.
+
+        :param callable request_func: The request function to check.
+        """
+        self.assertIdentical(request_func, self.get_request_func.return_value)
+        expected_service_mapping = {
+            ServiceType.CLOUD_SERVERS: 'SUPERVISOR_CS',
+            ServiceType.CLOUD_LOAD_BALANCERS: 'SUPERVISOR_CLB',
+            ServiceType.RACKCONNECT_V3: 'SUPERVISOR_RCV3'
+        }
+        self.get_request_func.assert_called_with(self.authenticator,
+                                                 self.group.tenant_id,
+                                                 self.log.bind.return_value,
+                                                 expected_service_mapping,
+                                                 self.region)
+
+        self.assertEqual(request_func.auth_token, self.auth_token)
+        self.assertEqual(request_func.service_catalog, self.service_catalog)
+        self.assertEqual(request_func.region, "ORD")
+        self.assertEqual(request_func.lb_region, "ORD")
 
 
 class HealthCheckTests(SupervisorTests):
@@ -170,14 +216,13 @@ class LaunchConfigTests(SupervisorTests):
         self.assertEqual(result, {'id': 'server_id', 'links': ['links'],
                                   'name': 'meh', 'lb_info': {}})
 
-        self.launch_server.assert_called_once_with(
-            mock.ANY,
-            'ORD',
-            self.group,
-            self.service_catalog,
-            self.auth_token,
-            {'server': {}},
-            self.undo)
+        (args, _kwargs), = self.launch_server.call_args_list
+        log, request_func, scaling_group, launch_config, undo = args
+        # TODO: Wasn't there a fancy thing for checking bound loggers?
+        self.assertCorrectRequestFunc(request_func)
+        self.assertEqual(scaling_group, self.group)
+        self.assertEqual(launch_config, {'server': {}})
+        self.assertEqual(undo, self.undo)
 
     def test_execute_config_rewinds_undo_stack_on_failure(self):
         """
@@ -239,7 +284,12 @@ class DeleteServerTests(SupervisorTests):
             return_value=succeed(None))
 
         self.fake_server = self.fake_server_details['server']
-        self.fake_server['lb_info'] = {}
+        self.fake_server['lb_info'] = [({"loadBalancerId": '12345'},
+                                        {'nodes': [{'id': 'a',
+                                                    'address': "1.1.1.1"}]}),
+                                       ({"loadBalancerId": '54321'},
+                                        {'nodes': [{'id': 'b',
+                                                    'address': "1.1.1.2"}]})]
 
     def test_execute_delete_calls_delete_worker(self):
         """
@@ -248,12 +298,12 @@ class DeleteServerTests(SupervisorTests):
         """
         self.supervisor.execute_delete_server(self.log, 'transaction-id',
                                               self.group, self.fake_server)
-        self.delete_server.assert_called_once_with(
-            self.log.bind.return_value,
-            'ORD',
-            self.service_catalog,
-            self.auth_token,
-            (self.fake_server['id'], self.fake_server['lb_info']))
+        (args, _kwargs), = self.delete_server.call_args_list
+        log, request_func, instance_details = args
+        self.assertEqual(log, self.log.bind.return_value)
+        self.assertCorrectRequestFunc(request_func)
+        expected_details = self.fake_server['id'], self.fake_server['lb_info']
+        self.assertEqual(instance_details, expected_details)
 
     def test_execute_delete_auths(self):
         """

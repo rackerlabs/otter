@@ -393,6 +393,41 @@ def _endpoints_to_service_catalog(endpoints):
             for (n, t), e in groupby(endpoints['endpoints'], lambda i: (i['name'], i['type']))]
 
 
+def endpoints(service_catalog, service_name, region):
+    """
+    Search a service catalog for matching endpoints.
+
+    :param list service_catalog: List of services.
+    :param str service_name: Name of service.  Example: 'cloudServersOpenStack'
+    :param str region: Region of service.  Example: 'ORD'
+
+    :return: Iterable of endpoints.
+    """
+    for service in service_catalog:
+        if service_name != service['name']:
+            continue
+
+        for endpoint in service['endpoints']:
+            if region != endpoint['region']:
+                continue
+
+            yield endpoint
+
+
+def public_endpoint_url(service_catalog, service_name, region):
+    """
+    Return the first publicURL for a given service in a given region.
+
+    :param list service_catalog: List of services.
+    :param str service_name: Name of service.  Example: 'cloudServersOpenStack'
+    :param str region: Region of service.  Example: 'ORD'
+
+    :return: URL as a string.
+    """
+    first_endpoint = next(endpoints(service_catalog, service_name, region))
+    return first_endpoint['publicURL']
+
+
 def generate_authenticator(reactor, config):
     """
     Generate authenticator based on settings in config
