@@ -81,7 +81,7 @@ class SupervisorTests(SynchronousTestCase):
         Asserts that the given request_func is correct.
 
         "Correct" here is mutable: ideally it will eventually mean "it
-        is literally the return value of ``get_request_func``", but
+        is literally the return value of :func:`get_request_func`", but
         for now it is that return value, plus a few attributes to
         support old code that hasn't been updated to use pure_http
         yet.
