@@ -763,12 +763,12 @@ def remove_from_load_balancer(log, request_func, lb_config, node_id, clock=None)
     """
     lb_type = lb_config.get("type", "CloudLoadBalancer")
     if lb_type == "CloudLoadBalancer":
-        loadbalancer_id = lb_config["loadBalancerId"]
         cloudLoadBalancers = config_value('cloudLoadBalancers')
         endpoint = public_endpoint_url(request_func.service_catalog,
                                        cloudLoadBalancers,
                                        request_func.lb_region)
         auth_token = request_func.auth_token
+        loadbalancer_id = lb_config["loadBalancerId"]
         return _remove_from_clb(log, endpoint, auth_token, loadbalancer_id,
                                 node_id, clock)
     elif lb_type == "RackConnectV3":
