@@ -403,7 +403,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(lb_id, self.lb_config["loadBalancerId"])
         self.assertEqual(server_id, self.server_details["server"]["id"])
         rcv3_add_response = _rcv3_add_response(lb_id, server_id)
-        return succeed(rcv3_add_response[0])
+        return succeed(rcv3_add_response)
 
     def _fake_add_to_clb(self, log, endpoint, auth_token, lb_config,
                          ip_address, undo, clock):
@@ -452,9 +452,9 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         lb_config = {"type": "RackConnectV3", "loadBalancerId": "my-rcv3-lb-id"}
         response = self._add_to_load_balancer(lb_config)
-        self.assertEqual(response["status"], "ADDING")
-        self.assertEqual(response["load_balancer_pool"]["id"], "my-rcv3-lb-id")
-        self.assertEqual(response["cloud_server"]["id"], "my-server-id")
+        self.assertEqual(response[0]["status"], "ADDING")
+        self.assertEqual(response[0]["load_balancer_pool"]["id"], "my-rcv3-lb-id")
+        self.assertEqual(response[0]["cloud_server"]["id"], "my-server-id")
 
     def test_unknown_type(self):
         """
