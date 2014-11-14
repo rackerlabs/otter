@@ -46,6 +46,7 @@ from otter.worker.launch_server_v1 import (
 from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
                               matches, DummyException, IsBoundWith,
                               StubTreq, StubTreq2, StubResponse)
+from otter.test.worker.test_rcv3 import _rcv3_add_response
 from testtools.matchers import IsInstance, StartsWith, MatchesRegex
 
 from otter.auth import headers
@@ -133,6 +134,7 @@ class RequestFuncTestMixin(object):
 
         self.server_details = {
             'server': {
+                "id": "my-server-id",
                 "addresses": {
                     'private': [
                         {'addr': '192.168.1.1', 'version': 4},
@@ -390,7 +392,18 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         super(AddToLoadBalancerTests, self).setUp()
         self.lb_config = None
+        self.patch(launch_server_v1, "add_to_rcv3", self._fake_add_to_rcv3)
         self.patch(launch_server_v1, "add_to_clb", self._fake_add_to_clb)
+
+    def _fake_add_to_rcv3(self, request_func, lb_id, server_id):
+        """
+        A test double for :func:`add_to_rcv3`.
+        """
+        self.assertIdentical(request_func, self.request_func)
+        self.assertEqual(lb_id, self.lb_config["loadBalancerId"])
+        self.assertEqual(server_id, self.server_details["server"]["id"])
+        rcv3_add_response = _rcv3_add_response(lb_id, server_id)
+        return succeed(rcv3_add_response[0])
 
     def _fake_add_to_clb(self, log, endpoint, auth_token, lb_config,
                          ip_address, undo, clock):
@@ -403,7 +416,6 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(ip_address, "192.168.1.1")
         self.assertEqual(undo, self.undo)
         self.assertEqual(clock, self.clock)
-
         self.assertEqual(lb_config, self.lb_config)
         return succeed(lb_response_1)
 
@@ -433,6 +445,16 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         lb_config = dict(type="CloudLoadBalancer", **lb_config_1)
         self.assertEqual(self._add_to_load_balancer(lb_config), lb_response_1)
+
+    def test_rcv3(self):
+        """
+        When given an RCv3 config to add to, :func:`add_to_rcv3` is called.
+        """
+        lb_config = {"type": "RackConnectV3", "loadBalancerId": "my-rcv3-lb-id"}
+        response = self._add_to_load_balancer(lb_config)
+        self.assertEqual(response["status"], "ADDING")
+        self.assertEqual(response["load_balancer_pool"]["id"], "my-rcv3-lb-id")
+        self.assertEqual(response["cloud_server"]["id"], "my-server-id")
 
     def test_unknown_type(self):
         """
@@ -554,16 +576,18 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(self._added_lbs, [lb_config_1])
 
 
-class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
+class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
     """
-    :func:`remove_from_load_balancer` tests
+    Tests for removing nodes from CLB load balancers, through the generic
+    :func:`remove_from_load_balancer` API.
     """
 
     def setUp(self):
         """
-        Mock treq.delete for deleting nodes
+        Mock :func:`treq.delete` for deleting nodes and set up a :class:`Clock`
+        for simulating the passage of time for the retry tests.
         """
-        super(RemoveNodeTests, self).setUp()
+        super(RemoveFromCLBTests, self).setUp()
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
                           new=mock_treq(code=200, content='{"message": "bad"}', method='delete'))
         patch(self, 'otter.util.http.treq', new=self.treq)
@@ -572,10 +596,12 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
     def _remove_from_load_balancer(self):
         """
         Helper function to call :func:`remove_from_load_balancer`.
+
+        This will call it with a CLB load balancer configuration, and a CLB
+        load balancer response.
         """
-        lb_config = {"loadBalancerId": 12345}
         d = remove_from_load_balancer(
-            self.log, self.request_func, lb_config, 1,
+            self.log, self.request_func, lb_config_1, lb_response_1,
             clock=self.clock)
         return d
 
@@ -591,7 +617,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         self.assertEqual(self.successResultOf(d), None)
         self.treq.delete.assert_called_once_with(
-            'http://dfw.lbaas/loadbalancers/12345/nodes/1',
+            'http://dfw.lbaas/loadbalancers/12345/nodes/a',
             headers=expected_headers, log=matches(IsInstance(self.log.__class__)))
 
     def test_remove_from_load_balancer_on_404(self):
@@ -622,8 +648,8 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         self.assertEqual(self.successResultOf(d), None)
         self.log.msg.assert_any_call(
-            matches(StartsWith('CLB 12345 or node 1 deleted due to RequestError')),
-            loadbalancer_id=12345, node_id=1)
+            matches(StartsWith('CLB 12345 or node a deleted due to RequestError')),
+            loadbalancer_id=12345, node_id="a")
 
     def test_remove_from_load_balancer_on_422_Pending_delete(self):
         """
@@ -641,8 +667,8 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         self.assertEqual(self.successResultOf(d), None)
         self.log.msg.assert_any_call(
-            matches(StartsWith('CLB 12345 or node 1 deleted due to RequestError')),
-            loadbalancer_id=12345, node_id=1)
+            matches(StartsWith('CLB 12345 or node a deleted due to RequestError')),
+            loadbalancer_id=12345, node_id="a")
 
     def test_remove_from_load_balancer_fails_on_422_LB_other(self):
         """
@@ -662,7 +688,7 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.failureResultOf(d, RequestError)
         self.log.msg.assert_any_call(
             'Got LB error while {m}: {e}', m='remove_node', e=mock.ANY,
-            loadbalancer_id=12345, node_id=1)
+            loadbalancer_id=12345, node_id="a")
 
     test_remove_from_load_balancer_fails_on_422_LB_other.skip = 'Until we bail out early on ERROR'
 
@@ -682,16 +708,16 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertIsNone(self.successResultOf(d))
         # delete calls made?
         self.assertEqual(self.treq.delete.mock_calls,
-                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
+                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/a',
                                     headers=expected_headers,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
         # Expected logs?
         self.assertEqual(self.log.msg.mock_calls[0],
                          mock.call('Removing from load balancer',
-                                   loadbalancer_id=12345, node_id=1))
+                                   loadbalancer_id=12345, node_id="a"))
         self.assertEqual(self.log.msg.mock_calls[-1],
                          mock.call('Removed from load balancer',
-                                   loadbalancer_id=12345, node_id=1))
+                                   loadbalancer_id=12345, node_id="a"))
         # Random interval from config
         self.rand_interval.assert_called_once_with(5, 7)
         self.interval_func.assert_has_calls([mock.call(CheckFailure(RequestError))] * 10)
@@ -714,13 +740,13 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         # delete calls made?
         self.assertEqual(
             self.treq.delete.mock_calls,
-            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/a',
                        headers=expected_headers,
                        log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
         # Expected logs?
         self.assertEqual(self.log.msg.mock_calls[0],
                          mock.call('Removing from load balancer',
-                                   loadbalancer_id=12345, node_id=1))
+                                   loadbalancer_id=12345, node_id="a"))
         # Interval func call max times?
         self.rand_interval.assert_called_once_with(5, 7)
         self.interval_func.assert_has_calls(
@@ -745,13 +771,13 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
         # delete calls made?
         self.assertEqual(
             self.treq.delete.mock_calls,
-            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/a',
                        headers=expected_headers,
                        log=matches(IsInstance(self.log.__class__)))] * (LB_MAX_RETRIES + 1))
         # Expected logs?
         self.assertEqual(self.log.msg.mock_calls[0],
                          mock.call('Removing from load balancer',
-                                   loadbalancer_id=12345, node_id=1))
+                                   loadbalancer_id=12345, node_id="a"))
         # Interval func call max times?
         self.rand_interval.assert_called_once_with(*LB_RETRY_INTERVAL_RANGE)
         self.interval_func.assert_has_calls(
@@ -775,8 +801,50 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
             [mock.call('Got unexpected LB status {status} while {msg}: {error}',
                        status=code, msg='remove_node',
                        error=matches(IsInstance(APIError)), loadbalancer_id=12345,
-                       node_id=1)
+                       node_id="a")
              for code in bad_codes])
+
+
+class RemoveFromRCv3Tests(LoadBalancersTestsMixin, SynchronousTestCase):
+    """
+    Tests for removing nodes from RCv3 load balancers, through the generic
+    :func:`remove_from_load_balancer` API.
+    """
+
+    def setUp(self):
+        """
+        Set up a test double for :func:`remove_from_rcv3`.
+        """
+        super(RemoveFromRCv3Tests, self).setUp()
+        self.patch(launch_server_v1, "remove_from_rcv3",
+                   self._fake_remove_from_rcv3)
+
+    def _fake_remove_from_rcv3(self, request_func, lb_id, server_id):
+        """
+        A test double for :func`remove_from_rcv3`.
+
+        Asserts that it was called appropriately, and then issues an
+        appropriate response.
+
+        :return: Deferred :data:`None`.
+
+        """
+        self.assertIdentical(request_func, self.request_func)
+        self.assertEqual(lb_id, "my-rcv3-lb-id")
+        self.assertEqual(server_id, "my-server-id")
+        return succeed(None)
+
+    def test_remove_from_rcv3(self):
+        """
+        :func:`remove_from_load_balancer` correctly defers to
+        :func:`remove_from_rcv3`.
+        """
+        lb_id = "my-rcv3-lb-id"
+        rcv3_config = {"type": "RackConnectV3", "loadBalancerId": lb_id}
+        rcv3_response = _rcv3_add_response(lb_id, "my-server-id")
+        d = remove_from_load_balancer(self.log, self.request_func,
+                                      rcv3_config, rcv3_response)
+        self.assertIdentical(self.successResultOf(d), None)
 
 
 def _get_server_info(metadata=None, created=None):
@@ -2152,13 +2220,12 @@ class DeleteServerTests(RequestFuncTestMixin, SynchronousTestCase):
         """
         self.successResultOf(self._delete_server(instance_details))
 
-        self.remove_from_load_balancer.assert_has_calls([
-            mock.call(self.log, self.request_func,
-                      _definitely_lb_config(12345), 1),
-            mock.call(self.log, self.request_func,
-                      _definitely_lb_config(54321), 2)
-        ], any_order=True)
-
+        lb_details = _as_new_style_instance_details(instance_details)[1]
+        expected_calls = [mock.call(self.log, self.request_func,
+                                    lb_config, lb_response)
+                          for (lb_config, lb_response) in lb_details]
+        self.remove_from_load_balancer.assert_has_calls(expected_calls,
+                                                        any_order=True)
         self.assertEqual(self.remove_from_load_balancer.call_count, 2)
 
     def test_delete_servers_lb_removal_old_style(self):

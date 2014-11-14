@@ -41,6 +41,7 @@ from otter.util.retry import (retry, retry_times, repeating_interval,
                               random_interval, compose_retries,
                               exponential_backoff_interval,
                               terminal_errors_except)
+from otter.worker._rcv3 import add_to_rcv3, remove_from_rcv3
 
 # Number of times to retry when adding/removing nodes from LB
 LB_MAX_RETRIES = 10
@@ -447,6 +448,10 @@ def add_to_load_balancer(log, request_func, lb_config, server_details, undo,
         ip_address = private_ip_addresses(server_details)[0]
         return add_to_clb(log, endpoint, auth_token, lb_config, ip_address,
                           undo, clock)
+    elif lb_type == "RackConnectV3":
+        lb_id = lb_config["loadBalancerId"]
+        server_id = server_details["server"]["id"]
+        return add_to_rcv3(request_func, lb_id, server_id)
     else:
         raise RuntimeError("Unknown cloud load balancer type! config: {}"
                            .format(lb_config))
@@ -744,12 +749,13 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
     return d
 
 
-def remove_from_load_balancer(log, request_func, lb_config, node_id, clock=None):
+def remove_from_load_balancer(log, request_func, lb_config, lb_response,
+                              clock=None):
     """
     Remove a node from a load balancer.
 
     :param str endpoint: Load balancer endpoint URI.
-    :param str auth_token: Keystone Auth Token.
+    :param str auth_token: Keystone auth token.
     :param str loadbalancer_id: The ID for a cloud loadbalancer.
     :param str node_id: The ID for a node in that cloudloadbalancer.
 
@@ -758,14 +764,19 @@ def remove_from_load_balancer(log, request_func, lb_config, node_id, clock=None)
     """
     lb_type = lb_config.get("type", "CloudLoadBalancer")
     if lb_type == "CloudLoadBalancer":
-        loadbalancer_id = lb_config["loadBalancerId"]
         cloudLoadBalancers = config_value('cloudLoadBalancers')
         endpoint = public_endpoint_url(request_func.service_catalog,
                                        cloudLoadBalancers,
                                        request_func.lb_region)
         auth_token = request_func.auth_token
+        loadbalancer_id = lb_config["loadBalancerId"]
+        node_id = next(node_info["id"] for node_info in lb_response["nodes"])
         return _remove_from_clb(log, endpoint, auth_token, loadbalancer_id,
                                 node_id, clock)
+    elif lb_type == "RackConnectV3":
+        lb_id = lb_config["loadBalancerId"]
+        node_id = next(pair["cloud_server"]["id"] for pair in lb_response)
+        return remove_from_rcv3(request_func, lb_id, node_id)
     else:
         raise RuntimeError("Unknown cloud load balancer type! config: {}"
                            .format(lb_config))
@@ -842,29 +853,17 @@ def delete_server(log, request_func, instance_details):
     :return: TODO
 
     """
-    cloudServersOpenStack = config_value('cloudServersOpenStack')
-    server_endpoint = public_endpoint_url(request_func.service_catalog,
-                                          cloudServersOpenStack,
-                                          request_func.region)
-
     _remove_from_lb = partial(remove_from_load_balancer, log, request_func)
     server_id, lb_details = _as_new_style_instance_details(instance_details)
-
-    lb_ds = []
-    for lb_config, lb_response in lb_details:
-        lb_type = lb_config.get("type", "CloudLoadBalancer")
-        if lb_type == "CloudLoadBalancer":
-            node_ids = [node_info["id"] for node_info in lb_response["nodes"]]
-        # elif lb_type == "RackConnectV3":
-        #     node_ids = [pair["cloud_server"]["id"] for pair in lb_response]
-        else:
-            raise RuntimeError("Unknown cloud load balancer type! config: {}"
-                               .format(lb_config))
-        for node_id in node_ids:
-            lb_ds.append(_remove_from_lb(lb_config, node_id))
-    d = gatherResults(lb_ds, consumeErrors=True)
+    d = gatherResults([_remove_from_lb(lb_config, lb_response)
+                       for (lb_config, lb_response) in lb_details],
+                      consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
+        cloudServersOpenStack = config_value('cloudServersOpenStack')
+        server_endpoint = public_endpoint_url(request_func.service_catalog,
+                                              cloudServersOpenStack,
+                                              request_func.region)
         auth_token = request_func.auth_token
         return verified_delete(log, server_endpoint, auth_token, server_id)
 
