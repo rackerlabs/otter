@@ -749,7 +749,8 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
     return d
 
 
-def remove_from_load_balancer(log, request_func, lb_config, node_id, clock=None):
+def remove_from_load_balancer(log, request_func, lb_config, lb_response,
+                              clock=None):
     """
     Remove a node from a load balancer.
 
@@ -769,10 +770,12 @@ def remove_from_load_balancer(log, request_func, lb_config, node_id, clock=None)
                                        request_func.lb_region)
         auth_token = request_func.auth_token
         loadbalancer_id = lb_config["loadBalancerId"]
+        node_id = next(node_info["id"] for node_info in lb_response["nodes"])
         return _remove_from_clb(log, endpoint, auth_token, loadbalancer_id,
                                 node_id, clock)
     elif lb_type == "RackConnectV3":
         lb_id = lb_config["loadBalancerId"]
+        node_id = next(pair["cloud_server"]["id"] for pair in lb_response)
         return remove_from_rcv3(request_func, lb_id, node_id)
     else:
         raise RuntimeError("Unknown cloud load balancer type! config: {}"
