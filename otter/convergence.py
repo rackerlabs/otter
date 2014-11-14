@@ -13,7 +13,7 @@ import treq
 from twisted.internet import defer
 
 from characteristic import attributes, Attribute
-from effect import ParallelEffects
+from effect import parallel
 from pyrsistent import pbag, freeze, s, pset
 from zope.interface import Interface, implementer
 
@@ -667,25 +667,6 @@ class BulkAddToRCv3(object):
 
 
 @implementer(IStep)
-@attributes(["lb_id", "node_id"])
-class RemoveFromRCv3(object):
-    """
-    A server must be removed from a RackConnect v3.0 load balancer.
-    """
-
-    def as_request(self):
-        """
-        Not actually implemented.
-
-        This step is never intended to be reified as a request; it
-        should always be optimized away.
-
-        :raises: NotImplementedError
-        """
-        raise NotImplementedError()
-
-
-@implementer(IStep)
 @attributes(['lb_node_pairs'])
 class BulkRemoveFromRCv3(object):
     """
@@ -740,18 +721,6 @@ def _optimize_lb_adds(lb_add_steps):
                                         [step.address_configs for step in steps])))
         for lbid, steps in steps_by_lb.iteritems()
     ]
-
-
-@_optimizer(RemoveFromRCv3)
-def _optimize_rcv3_lb_removes(steps):
-    """
-    Merge :obj:`RemoveFromRCv3` objects to a single :obj:`BulkRemoveFromRCv3`
-    step.
-
-    :param steps: Iterable of :obj:`RemoveFromRCv3`.
-    """
-    pairs = pset((step.lb_id, step.node_id) for step in steps)
-    return [BulkRemoveFromRCv3(lb_node_pairs=pairs)]
 
 
 def optimize_steps(steps):
@@ -812,6 +781,8 @@ def _reqs_to_effect(request_func, conv_requests):
     :param request_func: A pure-http request function, as produced by
         :func:`otter.http.get_request_func`.
     :param conv_requests: Convergence requests to turn into effects.
+    :return: An effect which will perform all the requests in parallel.
+    :rtype: :class:`Effect`
     """
     effects = [request_func(service_type=r.service,
                             method=r.method,
@@ -820,4 +791,4 @@ def _reqs_to_effect(request_func, conv_requests):
                             data=r.data,
                             success_codes=r.success_codes)
                for r in conv_requests]
-    return ParallelEffects(effects)
+    return parallel(effects)
