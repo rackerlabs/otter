@@ -301,7 +301,8 @@ class DeleteServerTests(SupervisorTests):
                                               self.group, self.fake_server)
         (args, _kwargs), = self.delete_server.call_args_list
         log, request_func, instance_details = args
-        self.assertEqual(log, self.log.bind.return_value)
+        self.assertEqual(log, matches(IsBoundWith(tenant_id=11111,
+                                                  server_id='server_id')))
         self.assertCorrectRequestFunc(request_func)
         expected_details = self.fake_server['id'], self.fake_server['lb_info']
         self.assertEqual(instance_details, expected_details)
