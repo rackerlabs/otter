@@ -41,7 +41,7 @@ from otter.util.retry import (retry, retry_times, repeating_interval,
                               random_interval, compose_retries,
                               exponential_backoff_interval,
                               terminal_errors_except)
-from otter.worker._rcv3 import add_to_rcv3
+from otter.worker._rcv3 import add_to_rcv3, remove_from_rcv3
 
 # Number of times to retry when adding/removing nodes from LB
 LB_MAX_RETRIES = 10
@@ -771,6 +771,9 @@ def remove_from_load_balancer(log, request_func, lb_config, node_id, clock=None)
         auth_token = request_func.auth_token
         return _remove_from_clb(log, endpoint, auth_token, loadbalancer_id,
                                 node_id, clock)
+    elif lb_type == "RackConnectV3":
+        lb_id = lb_config["loadBalancerId"]
+        return remove_from_rcv3(request_func, lb_id, node_id)
     else:
         raise RuntimeError("Unknown cloud load balancer type! config: {}"
                            .format(lb_config))

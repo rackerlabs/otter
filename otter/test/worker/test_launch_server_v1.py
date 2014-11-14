@@ -576,16 +576,18 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(self._added_lbs, [lb_config_1])
 
 
-class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
+class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
     """
-    :func:`remove_from_load_balancer` tests
+    Tests for removing nodes from CLB load balancers, through the generic
+    :func:`remove_from_load_balancer` API.
     """
 
     def setUp(self):
         """
-        Mock treq.delete for deleting nodes
+        Mock :func:`treq.delete` for deleting nodes and set up a :class:`Clock`
+        for simulating the passage of time for the retry tests.
         """
-        super(RemoveNodeTests, self).setUp()
+        super(RemoveFromCLBTests, self).setUp()
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
                           new=mock_treq(code=200, content='{"message": "bad"}', method='delete'))
         patch(self, 'otter.util.http.treq', new=self.treq)
@@ -799,6 +801,45 @@ class RemoveNodeTests(LoadBalancersTestsMixin, SynchronousTestCase):
                        error=matches(IsInstance(APIError)), loadbalancer_id=12345,
                        node_id=1)
              for code in bad_codes])
+
+
+class RemoveFromRCv3Tests(LoadBalancersTestsMixin, SynchronousTestCase):
+    """
+    Tests for removing nodes from RCv3 load balancers, through the generic
+    :func:`remove_from_load_balancer` API.
+    """
+
+    def setUp(self):
+        """
+        Set up a test double for :func:`remove_from_rcv3`.
+        """
+        super(RemoveFromRCv3Tests, self).setUp()
+        self.patch(launch_server_v1, "remove_from_rcv3",
+                   self._fake_remove_from_rcv3)
+
+    def _fake_remove_from_rcv3(self, request_func, lb_id, server_id):
+        """
+        A test double for :func`remove_from_rcv3`.
+
+        Asserts that it was called appropriately, and then issues an
+        appropriate response.
+
+        :return: Deferred :data:`None`.
+
+        """
+        self.assertIdentical(request_func, self.request_func)
+        self.assertEqual(lb_id, "my-rcv3-lb-id")
+        self.assertEqual(server_id, 1)
+        return succeed(None)
+
+    def test_remove_from_rcv3(self):
+        """
+        :func:`remove_from_load_balancer` correctly defers to
+        :func:`remove_from_rcv3`.
+        """
+        lb_config = {"type": "RackConnectV3", "loadBalancerId": "my-rcv3-lb-id"}
+        d = remove_from_load_balancer(self.log, self.request_func, lb_config, 1)
+        self.assertIdentical(self.successResultOf(d), None)
 
 
 def _get_server_info(metadata=None, created=None):
