@@ -667,25 +667,6 @@ class BulkAddToRCv3(object):
 
 
 @implementer(IStep)
-@attributes(["lb_id", "node_id"])
-class RemoveFromRCv3(object):
-    """
-    A server must be removed from a RackConnect v3.0 load balancer.
-    """
-
-    def as_request(self):
-        """
-        Not actually implemented.
-
-        This step is never intended to be reified as a request; it
-        should always be optimized away.
-
-        :raises: NotImplementedError
-        """
-        raise NotImplementedError()
-
-
-@implementer(IStep)
 @attributes(['lb_node_pairs'])
 class BulkRemoveFromRCv3(object):
     """
@@ -740,18 +721,6 @@ def _optimize_lb_adds(lb_add_steps):
                                         [step.address_configs for step in steps])))
         for lbid, steps in steps_by_lb.iteritems()
     ]
-
-
-@_optimizer(RemoveFromRCv3)
-def _optimize_rcv3_lb_removes(steps):
-    """
-    Merge :obj:`RemoveFromRCv3` objects to a single :obj:`BulkRemoveFromRCv3`
-    step.
-
-    :param steps: Iterable of :obj:`RemoveFromRCv3`.
-    """
-    pairs = pset((step.lb_id, step.node_id) for step in steps)
-    return [BulkRemoveFromRCv3(lb_node_pairs=pairs)]
 
 
 def optimize_steps(steps):
