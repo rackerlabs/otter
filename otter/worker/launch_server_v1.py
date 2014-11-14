@@ -754,13 +754,17 @@ def remove_from_load_balancer(log, request_func, lb_config, lb_response,
     """
     Remove a node from a load balancer.
 
-    :param str endpoint: Load balancer endpoint URI.
-    :param str auth_token: Keystone auth token.
-    :param str loadbalancer_id: The ID for a cloud loadbalancer.
-    :param str node_id: The ID for a node in that cloudloadbalancer.
-
-    :returns: A Deferred that fires with None if the operation completed successfully,
-        or errbacks with an RequestError.
+    :param BoundLog log: A bound logger.
+    :param callable request_func: A request function.
+    :param dict lb_config: An ``lb_config`` dictionary.
+    :param lb_response: The response the load balancer provided when the server
+        being removed was added. Type and shape is dependant on type of load
+        balancer.
+    :param IReactorTime clock: An optional clock, for testing. Will be passed
+        on to implementations of node removal logic for specific load balancer
+        APIs, if they support a clock.
+    :returns: A Deferred that fires with :data:`None` if the operation
+        completed successfully, or errbacks with an RequestError.
     """
     lb_type = lb_config.get("type", "CloudLoadBalancer")
     if lb_type == "CloudLoadBalancer":
