@@ -46,7 +46,7 @@ class SupervisorTests(SynchronousTestCase):
         """
         Configure test resources.
         """
-        self.log = mock.Mock()
+        self.log = mock_log()
         self.group = iMock(IScalingGroup)
         self.group.tenant_id = 11111
         self.group.uuid = 'group-id'
