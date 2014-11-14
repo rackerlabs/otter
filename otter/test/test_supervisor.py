@@ -111,7 +111,7 @@ class SupervisorTests(SynchronousTestCase):
         }
         self.get_request_func.assert_called_with(self.authenticator,
                                                  self.group.tenant_id,
-                                                 self.log.bind.return_value,
+                                                 mock.ANY,
                                                  expected_service_mapping,
                                                  self.region)
 
