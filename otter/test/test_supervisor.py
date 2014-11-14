@@ -355,10 +355,12 @@ class ScrubMetadataTests(SupervisorTests):
         d = self.supervisor.scrub_otter_metadata(
             self.log, "txn-id", "tenant-id", "server-id")
         self.successResultOf(d)
+        smells_like_log = matches(IsBoundWith(tenant_id='tenant-id',
+                                              server_id='server-id'))
         self.auth_function.assert_called_once_with(
-            "tenant-id", log=self.log.bind.return_value)
+            "tenant-id", log=smells_like_log)
         self.scrub_otter_metadata.assert_called_once_with(
-            self.log.bind.return_value,
+            smells_like_log,
             self.auth_token,
             self.service_catalog,
             self.supervisor.region,
