@@ -754,7 +754,7 @@ def remove_from_load_balancer(log, request_func, lb_config, node_id, clock=None)
     Remove a node from a load balancer.
 
     :param str endpoint: Load balancer endpoint URI.
-    :param str auth_token: Keystone Auth Token.
+    :param str auth_token: Keystone auth token.
     :param str loadbalancer_id: The ID for a cloud loadbalancer.
     :param str node_id: The ID for a node in that cloudloadbalancer.
 
