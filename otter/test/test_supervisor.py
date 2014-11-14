@@ -46,7 +46,7 @@ class SupervisorTests(SynchronousTestCase):
         """
         Configure test resources.
         """
-        self.log = mock.Mock()
+        self.log = mock_log()
         self.group = iMock(IScalingGroup)
         self.group.tenant_id = 11111
         self.group.uuid = 'group-id'
@@ -111,7 +111,7 @@ class SupervisorTests(SynchronousTestCase):
         }
         self.get_request_func.assert_called_with(self.authenticator,
                                                  self.group.tenant_id,
-                                                 self.log.bind.return_value,
+                                                 mock.ANY,
                                                  expected_service_mapping,
                                                  self.region)
 
@@ -187,7 +187,8 @@ class LaunchConfigTests(SupervisorTests):
                                        self.group, self.launch_config)
 
         self.auth_function.assert_called_once_with(
-            11111, log=self.log.bind.return_value)
+            11111, log=matches(IsBoundWith(tenant_id=11111,
+                                           worker='launch_server')))
 
     def test_execute_config_propagates_auth_error(self):
         """
@@ -218,7 +219,8 @@ class LaunchConfigTests(SupervisorTests):
 
         (args, _kwargs), = self.launch_server.call_args_list
         log, request_func, scaling_group, launch_config, undo = args
-        # TODO: Wasn't there a fancy thing for checking bound loggers?
+        self.assertEqual(log, matches(IsBoundWith(tenant_id=11111,
+                                                  worker='launch_server')))
         self.assertCorrectRequestFunc(request_func)
         self.assertEqual(scaling_group, self.group)
         self.assertEqual(launch_config, {'server': {}})
@@ -300,7 +302,8 @@ class DeleteServerTests(SupervisorTests):
                                               self.group, self.fake_server)
         (args, _kwargs), = self.delete_server.call_args_list
         log, request_func, instance_details = args
-        self.assertEqual(log, self.log.bind.return_value)
+        self.assertEqual(log, matches(IsBoundWith(tenant_id=11111,
+                                                  server_id='server_id')))
         self.assertCorrectRequestFunc(request_func)
         expected_details = self.fake_server['id'], self.fake_server['lb_info']
         self.assertEqual(instance_details, expected_details)
@@ -312,9 +315,9 @@ class DeleteServerTests(SupervisorTests):
         """
         self.supervisor.execute_delete_server(self.log, 'transaction-id',
                                               self.group, self.fake_server)
-
         self.auth_function.assert_called_once_with(
-            11111, log=self.log.bind.return_value)
+            11111, log=matches(IsBoundWith(tenant_id=11111,
+                                           server_id='server_id')))
 
     def test_execute_delete_propagates_auth_error(self):
         """
@@ -352,10 +355,12 @@ class ScrubMetadataTests(SupervisorTests):
         d = self.supervisor.scrub_otter_metadata(
             self.log, "txn-id", "tenant-id", "server-id")
         self.successResultOf(d)
+        smells_like_log = matches(IsBoundWith(tenant_id='tenant-id',
+                                              server_id='server-id'))
         self.auth_function.assert_called_once_with(
-            "tenant-id", log=self.log.bind.return_value)
+            "tenant-id", log=smells_like_log)
         self.scrub_otter_metadata.assert_called_once_with(
-            self.log.bind.return_value,
+            smells_like_log,
             self.auth_token,
             self.service_catalog,
             self.supervisor.region,
