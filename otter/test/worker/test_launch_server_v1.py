@@ -601,7 +601,7 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         load balancer response.
         """
         d = remove_from_load_balancer(
-            self.log, self.request_func, lb_config_1, 1,
+            self.log, self.request_func, lb_config_1, lb_response_1,
             clock=self.clock)
         return d
 
@@ -617,7 +617,7 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         self.assertEqual(self.successResultOf(d), None)
         self.treq.delete.assert_called_once_with(
-            'http://dfw.lbaas/loadbalancers/12345/nodes/1',
+            'http://dfw.lbaas/loadbalancers/12345/nodes/a',
             headers=expected_headers, log=matches(IsInstance(self.log.__class__)))
 
     def test_remove_from_load_balancer_on_404(self):
@@ -648,7 +648,7 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         self.assertEqual(self.successResultOf(d), None)
         self.log.msg.assert_any_call(
-            matches(StartsWith('CLB 12345 or node 1 deleted due to RequestError')),
+            matches(StartsWith('CLB 12345 or node a deleted due to RequestError')),
             loadbalancer_id=12345, node_id=1)
 
     def test_remove_from_load_balancer_on_422_Pending_delete(self):
