@@ -315,9 +315,9 @@ class DeleteServerTests(SupervisorTests):
         """
         self.supervisor.execute_delete_server(self.log, 'transaction-id',
                                               self.group, self.fake_server)
-
         self.auth_function.assert_called_once_with(
-            11111, log=self.log.bind.return_value)
+            11111, log=matches(IsBoundWith(tenant_id=11111,
+                                           server_id='server_id')))
 
     def test_execute_delete_propagates_auth_error(self):
         """
