@@ -2215,13 +2215,12 @@ class DeleteServerTests(RequestFuncTestMixin, SynchronousTestCase):
         """
         self.successResultOf(self._delete_server(instance_details))
 
-        self.remove_from_load_balancer.assert_has_calls([
-            mock.call(self.log, self.request_func,
-                      _definitely_lb_config(12345), 1),
-            mock.call(self.log, self.request_func,
-                      _definitely_lb_config(54321), 2)
-        ], any_order=True)
-
+        lb_details = _as_new_style_instance_details(instance_details)[1]
+        expected_calls = [mock.call(self.log, self.request_func,
+                                    lb_config, lb_response)
+                            for (lb_config, lb_response) in lb_details]
+        self.remove_from_load_balancer.assert_has_calls(expected_calls,
+                                                        any_order=True)
         self.assertEqual(self.remove_from_load_balancer.call_count, 2)
 
     def test_delete_servers_lb_removal_old_style(self):
