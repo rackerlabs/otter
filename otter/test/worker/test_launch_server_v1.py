@@ -600,9 +600,8 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         This will call it with a CLB load balancer configuration, and a CLB
         load balancer response.
         """
-        lb_config = {"loadBalancerId": 12345}
         d = remove_from_load_balancer(
-            self.log, self.request_func, lb_config, 1,
+            self.log, self.request_func, lb_config_1, 1,
             clock=self.clock)
         return d
 
