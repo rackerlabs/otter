@@ -67,6 +67,14 @@ class APIOptionsTests(SynchronousTestCase):
         config.parseOptions(['-p', 'tcp:9999'])
         self.assertEqual(config['port'], 'tcp:9999')
 
+    def test_hardcoded_service_names(self):
+        """
+        Several hardcoded service names are injected.
+        """
+        config = Options()
+        config.parseOptions([])
+        self.assertEqual(config['cloudLoadBalancers'], 'cloudLoadBalancers')
+        self.assertEqual(config['cloudServersOpenStack'], 'cloudServersOpenStack')
 
 class HealthCheckerTests(SynchronousTestCase):
     """
