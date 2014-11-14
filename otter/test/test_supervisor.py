@@ -218,7 +218,8 @@ class LaunchConfigTests(SupervisorTests):
 
         (args, _kwargs), = self.launch_server.call_args_list
         log, request_func, scaling_group, launch_config, undo = args
-        # TODO: Wasn't there a fancy thing for checking bound loggers?
+        self.assertEqual(log, matches(IsBoundWith(tenant_id=11111,
+                                                  worker='launch_server')))
         self.assertCorrectRequestFunc(request_func)
         self.assertEqual(scaling_group, self.group)
         self.assertEqual(launch_config, {'server': {}})
