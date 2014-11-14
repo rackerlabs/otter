@@ -6,14 +6,14 @@
 ![Otter Cups](https://i.chzbgr.com/completestore/12/8/19/AjXtHogT4UqgJwDJsq7igA2.gif)
 
 
-This codebase is not able to be deployed independently. 
+This codebase is not able to be deployed independently.
 The code is open source as a reference, but requires dependencies not available within this repository.
 
 Talk with us! Join us in:
 
 irc.freenode.net #rackspace
 
-fsargent, wirehead\_, oubiwann, dreid, cyli, rockstar
+fsargent, wirehead\_, oubiwann, dreid, cyli, rockstar, lvh
 
 
 ## Make Tasks:
@@ -39,4 +39,3 @@ In alphabetical order.  You probably will only need a select few of these.
 - `make teardown-dev-schema` will attempt to remove a development schema from an existing Cassandra instance.
 - `make test` runs both unit and integration tests.
 - `make unit` runs unit tests.
-
