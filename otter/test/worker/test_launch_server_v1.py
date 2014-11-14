@@ -46,6 +46,7 @@ from otter.worker.launch_server_v1 import (
 from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
                               matches, DummyException, IsBoundWith,
                               StubTreq, StubTreq2, StubResponse)
+from otter.test.worker.test_rcv3 import _rcv3_add_response
 from testtools.matchers import IsInstance, StartsWith, MatchesRegex
 
 from otter.auth import headers
@@ -133,6 +134,7 @@ class RequestFuncTestMixin(object):
 
         self.server_details = {
             'server': {
+                "id": "my-server-id",
                 "addresses": {
                     'private': [
                         {'addr': '192.168.1.1', 'version': 4},
@@ -390,7 +392,18 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         super(AddToLoadBalancerTests, self).setUp()
         self.lb_config = None
+        self.patch(launch_server_v1, "add_to_rcv3", self._fake_add_to_rcv3)
         self.patch(launch_server_v1, "add_to_clb", self._fake_add_to_clb)
+
+    def _fake_add_to_rcv3(self, request_func, lb_id, server_id):
+        """
+        A test double for :func:`add_to_rcv3`.
+        """
+        self.assertIdentical(request_func, self.request_func)
+        self.assertEqual(lb_id, self.lb_config["loadBalancerId"])
+        self.assertEqual(server_id, self.server_details["server"]["id"])
+        rcv3_add_response = _rcv3_add_response(lb_id, server_id)
+        return succeed(rcv3_add_response[0])
 
     def _fake_add_to_clb(self, log, endpoint, auth_token, lb_config,
                          ip_address, undo, clock):
@@ -403,7 +416,6 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(ip_address, "192.168.1.1")
         self.assertEqual(undo, self.undo)
         self.assertEqual(clock, self.clock)
-
         self.assertEqual(lb_config, self.lb_config)
         return succeed(lb_response_1)
 
@@ -433,6 +445,16 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         lb_config = dict(type="CloudLoadBalancer", **lb_config_1)
         self.assertEqual(self._add_to_load_balancer(lb_config), lb_response_1)
+
+    def test_rcv3(self):
+        """
+        When given an RCv3 config to add to, :func:`add_to_rcv3` is called.
+        """
+        lb_config = {"type": "RackConnectV3", "loadBalancerId": "my-rcv3-lb-id"}
+        response = self._add_to_load_balancer(lb_config)
+        self.assertEqual(response["status"], "ADDING")
+        self.assertEqual(response["load_balancer_pool"]["id"], "my-rcv3-lb-id")
+        self.assertEqual(response["cloud_server"]["id"], "my-server-id")
 
     def test_unknown_type(self):
         """
