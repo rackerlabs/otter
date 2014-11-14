@@ -649,7 +649,7 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(self.successResultOf(d), None)
         self.log.msg.assert_any_call(
             matches(StartsWith('CLB 12345 or node a deleted due to RequestError')),
-            loadbalancer_id=12345, node_id=1)
+            loadbalancer_id=12345, node_id="a")
 
     def test_remove_from_load_balancer_on_422_Pending_delete(self):
         """
@@ -667,8 +667,8 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
 
         self.assertEqual(self.successResultOf(d), None)
         self.log.msg.assert_any_call(
-            matches(StartsWith('CLB 12345 or node 1 deleted due to RequestError')),
-            loadbalancer_id=12345, node_id=1)
+            matches(StartsWith('CLB 12345 or node a deleted due to RequestError')),
+            loadbalancer_id=12345, node_id="a")
 
     def test_remove_from_load_balancer_fails_on_422_LB_other(self):
         """
@@ -688,7 +688,7 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.failureResultOf(d, RequestError)
         self.log.msg.assert_any_call(
             'Got LB error while {m}: {e}', m='remove_node', e=mock.ANY,
-            loadbalancer_id=12345, node_id=1)
+            loadbalancer_id=12345, node_id="a")
 
     test_remove_from_load_balancer_fails_on_422_LB_other.skip = 'Until we bail out early on ERROR'
 
@@ -708,16 +708,16 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertIsNone(self.successResultOf(d))
         # delete calls made?
         self.assertEqual(self.treq.delete.mock_calls,
-                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
+                         [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/a',
                                     headers=expected_headers,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
         # Expected logs?
         self.assertEqual(self.log.msg.mock_calls[0],
                          mock.call('Removing from load balancer',
-                                   loadbalancer_id=12345, node_id=1))
+                                   loadbalancer_id=12345, node_id="a"))
         self.assertEqual(self.log.msg.mock_calls[-1],
                          mock.call('Removed from load balancer',
-                                   loadbalancer_id=12345, node_id=1))
+                                   loadbalancer_id=12345, node_id="a"))
         # Random interval from config
         self.rand_interval.assert_called_once_with(5, 7)
         self.interval_func.assert_has_calls([mock.call(CheckFailure(RequestError))] * 10)
@@ -740,13 +740,13 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         # delete calls made?
         self.assertEqual(
             self.treq.delete.mock_calls,
-            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/a',
                        headers=expected_headers,
                        log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
         # Expected logs?
         self.assertEqual(self.log.msg.mock_calls[0],
                          mock.call('Removing from load balancer',
-                                   loadbalancer_id=12345, node_id=1))
+                                   loadbalancer_id=12345, node_id="a"))
         # Interval func call max times?
         self.rand_interval.assert_called_once_with(5, 7)
         self.interval_func.assert_has_calls(
@@ -771,13 +771,13 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         # delete calls made?
         self.assertEqual(
             self.treq.delete.mock_calls,
-            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/1',
+            [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/a',
                        headers=expected_headers,
                        log=matches(IsInstance(self.log.__class__)))] * (LB_MAX_RETRIES + 1))
         # Expected logs?
         self.assertEqual(self.log.msg.mock_calls[0],
                          mock.call('Removing from load balancer',
-                                   loadbalancer_id=12345, node_id=1))
+                                   loadbalancer_id=12345, node_id="a"))
         # Interval func call max times?
         self.rand_interval.assert_called_once_with(*LB_RETRY_INTERVAL_RANGE)
         self.interval_func.assert_has_calls(
@@ -801,7 +801,7 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
             [mock.call('Got unexpected LB status {status} while {msg}: {error}',
                        status=code, msg='remove_node',
                        error=matches(IsInstance(APIError)), loadbalancer_id=12345,
-                       node_id=1)
+                       node_id="a")
              for code in bad_codes])
 
 
