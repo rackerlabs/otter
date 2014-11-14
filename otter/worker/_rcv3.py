@@ -20,10 +20,17 @@ def _generic_rcv3_request(step_class, request_func, lb_id, server_id,
     :param str lb_id: The id of the RCv3 load balancer to act on.
     :param str server_id: The Nova server id to act on.
     :param _reactor: The reactor used to perform the effects.
-    :return: A deferred that will fire when the
+    :return: A deferred that will fire when the request has been performed,
+        firing with the parsed result of the request, or :data:`None` if the
+        request has no body.
     """
     step = step_class(lb_node_pairs=[(lb_id, server_id)])
     effect = _reqs_to_effect(request_func, [step.as_request()])
+    # The result will be a list (added by ParallelEffects) of
+    # results. In this code, we're only performing one request, so we
+    # know there will only be one element in that list. Our contract
+    # is that we return the result of the request, so we discard the
+    # outer list.
     return perform(_reactor, effect).addCallback(itemgetter(0))
 
 
