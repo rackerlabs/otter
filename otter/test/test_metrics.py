@@ -11,13 +11,15 @@ from pyrsistent import freeze
 from toolz.dicttoolz import merge
 
 from twisted.trial.unittest import SynchronousTestCase
-from twisted.internet.defer import succeed
+from twisted.internet.defer import succeed, fail
+from twisted.internet.task import Clock
 from twisted.internet.base import ReactorBase
 
 from otter.metrics import (
     get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
     add_to_cloud_metrics, collect_metrics, MetricsService, makeService, Options)
-from otter.test.utils import patch, StubTreq2, matches, IsCallable
+from otter.test.utils import (
+    patch, StubTreq2, matches, IsCallable, CheckFailure, mock_log)
 from otter.util.http import headers
 from otter.log import BoundLog
 
@@ -337,10 +339,21 @@ class ServiceTests(SynchronousTestCase):
         Mock cass connection and authenticator
         """
         self.client = mock.Mock(spec=['disconnect'])
+        self.client.disconnect.return_value = succeed('disconnected')
         self.mock_ccs = patch(self, 'otter.metrics.connect_cass_servers', return_value=self.client)
         self.mock_ga = patch(self, 'otter.metrics.get_authenticator', return_value='auth')
         self.config = {'cassandra': 'c', 'identity': 'i', 'metrics': {'interval': 20}}
-        self.mock_cm = patch(self, 'otter.metrics.collect_metrics')
+        self.mock_cm = patch(self, 'otter.metrics.collect_metrics', return_value=succeed(None))
+        self.log = mock_log()
+        self.clock = Clock()
+
+    def _service(self):
+        return MetricsService('r', self.config, self.log, self.clock)
+
+    def _cm_called(self, calls):
+        self.assertEqual(len(self.mock_cm.mock_calls), calls)
+        self.mock_cm.assert_called_with('r', self.config, client=self.client,
+                                        authenticator='auth')
 
     @mock.patch('otter.metrics.MetricsService')
     def test_make_service(self, mock_ms):
@@ -350,27 +363,46 @@ class ServiceTests(SynchronousTestCase):
         c = {'a': 'v'}
         s = makeService(c)
         self.assertIs(s, mock_ms.return_value)
-        mock_ms.assert_called_once_with(c)
+        from otter.metrics import metrics_log
+        mock_ms.assert_called_once_with(matches(IsInstance(ReactorBase)), c, metrics_log)
 
-    def test_service_init(self):
+    def test_collect_metrics_called_again(self):
         """
-        MetricsService is initialized with connected cass client and authenticator
+        `collect_metrics` is called again based on interval given in config
         """
-        s = MetricsService(self.config)
-        self.mock_ccs.assert_called_once_with(matches(IsInstance(ReactorBase)), 'c')
-        self.mock_ga.assert_called_once_with(matches(IsInstance(ReactorBase)), 'i')
-        self.assertEqual(s.step, 20)
-        self.assertEqual(
-            s.call,
-            (self.mock_cm, (matches(IsInstance(ReactorBase)), self.config),
-             dict(client=self.client, authenticator='auth')))
+        s = self._service()
+        s.startService()
+        self.assertTrue(s.running)
+        self._cm_called(1)
+        self.clock.advance(20)
+        self._cm_called(2)
+
+    def test_collect_metrics_called_again_on_error(self):
+        """
+        `collect_metrics` is called again even if one of the previous call fails
+        """
+        s = self._service()
+        self.mock_cm.return_value = fail(ValueError('a'))
+        s.startService()
+        self._cm_called(1)
+        self.log.err.assert_called_once_with(CheckFailure(ValueError))
+        # Service is still running
+        self.assertTrue(s.running)
+        # And collect_metrics is called again after interval is passed
+        self.clock.advance(20)
+        self._cm_called(2)
 
     def test_stop_service(self):
         """
         Client is disconnected when service is stopped
         """
-        s = MetricsService(self.config)
+        s = self._service()
         s.startService()
-        r = s.stopService()
-        self.assertIs(r, self.client.disconnect.return_value)
+        self.assertTrue(s.running)
+        self._cm_called(1)
+        d = s.stopService()
+        self.assertEqual(self.successResultOf(d), 'disconnected')
         self.assertFalse(s.running)
+        # collect_metrics is not called again
+        self.clock.advance(20)
+        self._cm_called(1)
