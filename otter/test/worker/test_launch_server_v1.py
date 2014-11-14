@@ -596,6 +596,9 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
     def _remove_from_load_balancer(self):
         """
         Helper function to call :func:`remove_from_load_balancer`.
+
+        This will call it with a CLB load balancer configuration, and a CLB
+        load balancer response.
         """
         lb_config = {"loadBalancerId": 12345}
         d = remove_from_load_balancer(
