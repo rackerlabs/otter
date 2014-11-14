@@ -850,11 +850,6 @@ def delete_server(log, request_func, instance_details):
     :return: TODO
 
     """
-    cloudServersOpenStack = config_value('cloudServersOpenStack')
-    server_endpoint = public_endpoint_url(request_func.service_catalog,
-                                          cloudServersOpenStack,
-                                          request_func.region)
-
     _remove_from_lb = partial(remove_from_load_balancer, log, request_func)
     server_id, lb_details = _as_new_style_instance_details(instance_details)
 
@@ -873,6 +868,10 @@ def delete_server(log, request_func, instance_details):
     d = gatherResults(lb_ds, consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
+        cloudServersOpenStack = config_value('cloudServersOpenStack')
+        server_endpoint = public_endpoint_url(request_func.service_catalog,
+                                              cloudServersOpenStack,
+                                              request_func.region)
         auth_token = request_func.auth_token
         return verified_delete(log, server_endpoint, auth_token, server_id)
 
