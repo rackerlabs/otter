@@ -187,7 +187,8 @@ class LaunchConfigTests(SupervisorTests):
                                        self.group, self.launch_config)
 
         self.auth_function.assert_called_once_with(
-            11111, log=self.log.bind.return_value)
+            11111, log=matches(IsBoundWith(tenant_id=11111,
+                                           worker='launch_server')))
 
     def test_execute_config_propagates_auth_error(self):
         """
