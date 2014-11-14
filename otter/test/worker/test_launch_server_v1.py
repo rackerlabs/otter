@@ -831,7 +831,7 @@ class RemoveFromRCv3Tests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         self.assertIdentical(request_func, self.request_func)
         self.assertEqual(lb_id, "my-rcv3-lb-id")
-        self.assertEqual(server_id, 1)
+        self.assertEqual(server_id, "my-server-id")
         return succeed(None)
 
     def test_remove_from_rcv3(self):
@@ -839,8 +839,11 @@ class RemoveFromRCv3Tests(LoadBalancersTestsMixin, SynchronousTestCase):
         :func:`remove_from_load_balancer` correctly defers to
         :func:`remove_from_rcv3`.
         """
-        lb_config = {"type": "RackConnectV3", "loadBalancerId": "my-rcv3-lb-id"}
-        d = remove_from_load_balancer(self.log, self.request_func, lb_config, 1)
+        lb_id = "my-rcv3-lb-id"
+        rcv3_config = {"type": "RackConnectV3", "loadBalancerId": lb_id}
+        rcv3_response = _rcv3_add_response(lb_id, "my-server-id")
+        d = remove_from_load_balancer(self.log, self.request_func,
+                                      rcv3_config, rcv3_response)
         self.assertIdentical(self.successResultOf(d), None)
 
 
