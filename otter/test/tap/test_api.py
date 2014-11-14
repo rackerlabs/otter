@@ -75,6 +75,8 @@ class APIOptionsTests(SynchronousTestCase):
         config.parseOptions([])
         self.assertEqual(config['cloudLoadBalancers'], 'cloudLoadBalancers')
         self.assertEqual(config['cloudServersOpenStack'], 'cloudServersOpenStack')
+        self.assertEqual(config['rackconnect'], 'rackconnect')
+
 
 class HealthCheckerTests(SynchronousTestCase):
     """
