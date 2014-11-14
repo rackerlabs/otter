@@ -69,7 +69,8 @@ class Options(usage.Options):
         self.update({
             'regionOverrides': {},
             'cloudServersOpenStack': 'cloudServersOpenStack',
-            'cloudLoadBalancers': 'cloudLoadBalancers'
+            'cloudLoadBalancers': 'cloudLoadBalancers',
+            'rackconnect': 'rackconnect'
         })
 
         self.update(jsonfig.from_path(self['config']))
