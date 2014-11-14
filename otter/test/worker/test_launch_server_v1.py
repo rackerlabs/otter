@@ -2223,7 +2223,7 @@ class DeleteServerTests(RequestFuncTestMixin, SynchronousTestCase):
         lb_details = _as_new_style_instance_details(instance_details)[1]
         expected_calls = [mock.call(self.log, self.request_func,
                                     lb_config, lb_response)
-                            for (lb_config, lb_response) in lb_details]
+                          for (lb_config, lb_response) in lb_details]
         self.remove_from_load_balancer.assert_has_calls(expected_calls,
                                                         any_order=True)
         self.assertEqual(self.remove_from_load_balancer.call_count, 2)
