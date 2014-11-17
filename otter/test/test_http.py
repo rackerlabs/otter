@@ -16,8 +16,6 @@ from otter.util.http import headers, APIError
 from otter.http import get_request_func, add_bind_service
 from otter.test.utils import stub_pure_response, CheckFailureValue
 from otter.util.pure_http import Request
-from otter.util.retry import (
-    ShouldRetryEffect, retry_times, exponential_backoff_interval)
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 
 

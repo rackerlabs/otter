@@ -413,7 +413,7 @@ class ShouldRetryEffectTests(SynchronousTestCase):
         """
         can_retry = lambda f: True
         next_interval = lambda f: 1
-        eff = should_retry_effect(can_retry, next_interval, self._get_exc())
+        eff = should_retry_effect(can_retry, next_interval)(self._get_exc())
         self.assertIs(type(eff.intent), FuncIntent)  # can_retry
         can_retry_result = eff.intent.perform_effect(None)
         self.assertEqual(can_retry_result, True)
@@ -443,7 +443,7 @@ class ShouldRetryEffectTests(SynchronousTestCase):
                 return 1
             else:
                 raise RuntimeError("oops")
-        eff = should_retry_effect(can_retry, next_interval, e)
+        eff = should_retry_effect(can_retry, next_interval)(e)
         # can_retry
         eff = resolve_effect(eff, eff.intent.perform_effect(None))
         # next_interval
@@ -458,6 +458,6 @@ class ShouldRetryEffectTests(SynchronousTestCase):
         When the can_retry function returns False, should_retry_effect
         returns an effect of False.
         """
-        eff = should_retry_effect(lambda f: False, lambda f: 1, self._get_exc())
+        eff = should_retry_effect(lambda f: False, lambda f: 1)(self._get_exc())
         self.assertEqual(resolve_effect(eff, eff.intent.perform_effect(None)),
                          False)
