@@ -21,7 +21,7 @@ from otter.metrics import (
 from otter.test.test_auth import identity_config
 from otter.auth import IAuthenticator
 from otter.test.utils import (
-    patch, StubTreq2, matches, IsCallable, CheckFailure, mock_log, Implements)
+    patch, StubTreq2, matches, IsCallable, CheckFailure, mock_log, Provides)
 from otter.util.http import headers
 from otter.log import BoundLog
 
@@ -281,7 +281,7 @@ class CollectMetricsTests(SynchronousTestCase):
         self.get_scaling_groups.assert_called_once_with(
             self.client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
-            self.groups, matches(Implements(IAuthenticator)), 'cloudServersOpenStack',
+            self.groups, matches(Provides(IAuthenticator)), 'cloudServersOpenStack',
             'r', clock=_reactor, _print=False)
         self.add_to_cloud_metrics.assert_called_once_with(
             'm', identity_config['url'], 'r', 107, 26, 1)
@@ -348,7 +348,7 @@ class ServiceTests(SynchronousTestCase):
     def _cm_called(self, calls):
         self.assertEqual(len(self.mock_cm.mock_calls), calls)
         self.mock_cm.assert_called_with('r', self.config, client=self.client,
-                                        authenticator=matches(Implements(IAuthenticator)))
+                                        authenticator=matches(Provides(IAuthenticator)))
 
     @mock.patch('otter.metrics.MetricsService')
     def test_make_service(self, mock_ms):
