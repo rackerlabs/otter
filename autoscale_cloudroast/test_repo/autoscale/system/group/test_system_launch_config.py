@@ -1,6 +1,8 @@
 """
 System tests for launch config
 """
+import unittest
+
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 from cloudcafe.common.tools.datagen import rand_name
@@ -168,6 +170,7 @@ class LaunchConfigTest(AutoscaleFixture):
         self.verify_group_state(group.id, self.gc_min_entities_alt)
         self.verify_server_count_using_server_metadata(group.id, self.gc_min_entities_alt)
 
+    @unittest.skip('Requires an upgrade of cloudcafe to handle empty images')
     @tags(requires='mimic')
     def test_system_launchconfig_with_boot_from_volume(self):
         """
