@@ -4,13 +4,10 @@ Integration point for HTTP clients in otter.
 from functools import partial, wraps
 
 from effect import Effect, FuncIntent
-from effect.retry import retry as retry_effect
 
 from otter.util.pure_http import (
     request, add_headers, add_effect_on_response, add_error_handling,
     add_bind_root, add_content_only, add_json_response, add_json_request_data)
-from otter.util.retry import (
-    should_retry_effect, RetryTimes, ExponentialBackoffInterval)
 from otter.util.http import headers as otter_headers
 from otter.auth import public_endpoint_url
 

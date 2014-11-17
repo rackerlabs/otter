@@ -7,7 +7,7 @@ import random
 from characteristic import attributes, Attribute
 
 from effect import Effect, Delay, FuncIntent
-from effect.retry import retry
+from effect.retry import retry as effect_retry
 
 from twisted.internet import defer
 from twisted.python.failure import Failure
@@ -264,46 +264,7 @@ class TransientRetryError(Exception):
     """
 
 
-def should_retry_effect(can_retry, next_interval):
-    """
-    Returns a callable which can be used as the should_retry argument to
-    :func:`effect.retry.retry`.
-
-    :param can_retry: a potentially impure function of Failure -> bool that
-        indicates whether a retry should be performed.
-    :param next_interval: a potentially impure function that returns an
-        interval to wait for the next retry attempt.
-    """
-    return ShouldRetry(can_retry=can_retry, next_interval=next_interval)
-
-
-@attributes(['can_retry', 'next_interval'])
-class ShouldRetry(object):
-    """
-    A callable which can be passed as the should_retry argument to
-    :func:`effect.retry.retry`. Determines whether to retry and also causes
-    a delay before retrying.
-
-    :param can_retry: A callable of Failure -> Bool, indicating whether retry
-        should occur
-    :param next_interval: A callable of Failure -> interval to wait
-    """
-
-    def __call__(self, exc_info):
-        """
-        Determine whether retry should occur, based on the exception info.
-        """
-        exc_type, exc_value, exc_traceback = exc_info
-        failure = Failure(exc_value, exc_type, exc_traceback)
-
-        def doit():
-            if self.can_retry(failure):
-                interval = self.next_interval(self.failure)
-                return Effect(Delay(interval)).on(lambda r: True)
-            else:
-                return False
-        return Effect(FuncIntent(doit))
-
+# TODO: The following code should be moved to effect.retry if it proves out.
 
 @attributes(['start', Attribute('last_interval', default_value=0)])
 class ExponentialBackoffInterval(object):
@@ -336,6 +297,53 @@ class RetryTimes(object):
         return self.tries <= self.max_retries
 
 
+@attributes(['can_retry', 'next_interval'])
+class ShouldDelayAndRetry(object):
+    """
+    A callable which can be passed as the should_retry argument to
+    :func:`effect.retry.retry`. Determines whether to retry and also causes
+    a delay before retrying.
+
+    :param can_retry: A callable of Failure -> Bool, indicating whether retry
+        should occur
+    :param next_interval: A callable of Failure -> interval to wait
+    """
+
+    def __call__(self, exc_info):
+        """
+        Determine whether retry should occur, based on the exception info.
+        """
+        exc_type, exc_value, exc_traceback = exc_info
+        failure = Failure(exc_value, exc_type, exc_traceback)
+
+        def doit():
+            if self.can_retry(failure):
+                interval = self.next_interval(failure)
+                return Effect(Delay(interval)).on(lambda r: True)
+            else:
+                return False
+        return Effect(FuncIntent(doit))
+
+
+@attributes(['effect', 'should_retry'])
+class Retry(object):
+    """
+    An effect intent that, when performed, executes another effect and
+    potentially retries it.
+
+    The main reason this class exists is to transparently represent the
+    retryable effect and its retry policy as public attributes, making it
+    easy to test that some effect should be retried, without actually running
+    a bunch of imperative code to test it's retried correctly.
+
+    :param effect: The effect to perform.
+    :param should_retry: The function to call to determine whether retry
+    should occur (usually an instance of :obj:`ShouldDelayAndRetry`).
+    """
+    def perform_effect(self, dispatcher):
+        return effect_retry(self.effect, self.should_retry)
+
+
 def retry_effect(effect, can_retry, next_interval):
     """
     Convenience function for wrapping an effect in a :obj:`Retry`.
@@ -344,25 +352,5 @@ def retry_effect(effect, can_retry, next_interval):
     """
     return Effect(Retry(
         effect=effect,
-        should_retry=should_retry_effect(can_retry, next_interval)))
-
-
-@attributes(['effect', 'should_retry'])
-class Retry(object):
-    """
-    An effect that, when performed, executes another effect and potentially
-    retries it.
-
-    The main reason this class exists is to transparently represent the
-    retryable effect and its retry policy as public attributes, making it
-    easy to test that some effect should be retried, without actually running
-    a bunch of imperative code to test it's retried correctly.
-
-    TODO: Move this to Effect if it proves out.
-
-    :param effect: The effect to perform.
-    :param should_retry: The function to call to determine whether retry
-    should occur (usually an instance of :obj:`ShouldRetry`).
-    """
-    def perform_effect(self, dispatcher):
-        return retry(self.effect, self.should_retry)
+        should_retry=ShouldDelayAndRetry(can_retry=can_retry,
+                                         next_interval=next_interval)))

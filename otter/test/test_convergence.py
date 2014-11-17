@@ -15,7 +15,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.task import Clock
 from twisted.internet.defer import succeed
 
-from otter.util.retry import Retry, ShouldRetry, exponential_backoff_interval, retry_times
+from otter.util.retry import Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times
 from otter.constants import ServiceType
 from otter.test.utils import StubTreq2, patch, iMock
 from otter.auth import IAuthenticator
@@ -106,13 +106,14 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         self.assertEqual(resolve_retry_stubs(resolve_retry_stubs(eff)), servers)
 
     def test_retry(self):
-        """The HTTP requests are retried with some appropriate parameters."""
+        """The HTTP requests are retried with some appropriate policy."""
         request = _request({self.req: {'servers': self.servers}})
         eff = get_all_server_details(request, limit=10)
+        print eff.intent
         self.assertEqual(
             eff.intent.should_retry,
-            ShouldRetry(can_retry=retry_times(5),
-                        next_interval=exponential_backoff_interval(2)))
+            ShouldDelayAndRetry(can_retry=retry_times(5),
+                                next_interval=exponential_backoff_interval(2)))
         result = resolve_retry_stubs(eff)
         self.assertEqual(result, self.servers)
 
