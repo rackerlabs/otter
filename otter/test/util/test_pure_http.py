@@ -121,6 +121,16 @@ class AddEffectfulHeadersTest(TestCase):
                     url="u",
                     headers={"x-auth-token": "abc123"}))
 
+    def test_add_headers_optional(self):
+        """It's okay if no headers are passed."""
+        request_ = add_effectful_headers(self.auth_effect, request)
+        eff = request_('m', 'u')
+        self.assertEqual(
+            resolve_stubs(eff).intent,
+            Request(method='m',
+                    url='u',
+                    headers={'x-auth-token': 'abc123'}))
+
 
 class AddHeadersTest(TestCase):
     """Tests for :func:`add_headers`."""
@@ -134,6 +144,16 @@ class AddHeadersTest(TestCase):
             Request(method='m',
                     url='u',
                     headers={'one': '1', 'two': '2', 'three': '3'}))
+
+    def test_add_headers_optional(self):
+        """It's okay if no headers are passed."""
+        request_ = add_headers({'one': '1'}, request)
+        eff = request_('m', 'u')
+        self.assertEqual(
+            resolve_stubs(eff).intent,
+            Request(method='m',
+                    url='u',
+                    headers={'one': '1'}))
 
 
 class EffectOnResponseTests(TestCase):
@@ -217,6 +237,16 @@ class AddJsonResponseTests(TestCase):
         request_ = add_json_response(stub_request(response))
         self.assertEqual(resolve_stubs(request_('m', 'u')),
                          (response[0], {'a': 'b'}))
+
+    def test_empty_json_response(self):
+        """
+        If the body is empty, it will be turned into :data:`None`, and not
+        passed to the JSON parser.
+        """
+        response = stub_pure_response('', 204)
+        request_ = add_json_response(stub_request(response))
+        self.assertEqual(resolve_stubs(request_('m', 'u')),
+                         (response[0], None))
 
 
 class AddJsonRequestDataTests(TestCase):

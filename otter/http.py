@@ -12,7 +12,7 @@ from otter.util.pure_http import (
 from otter.util.retry import (
     should_retry_effect, RetryTimes, ExponentialBackoffInterval)
 from otter.util.http import headers as otter_headers
-from otter.worker.launch_server_v1 import public_endpoint_url
+from otter.auth import public_endpoint_url
 
 
 def get_request_func(authenticator, tenant_id, log, service_mapping, region):
@@ -24,7 +24,13 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
     - JSON bodies and return values
     - returning only content of the result, not response objects
     - logging
-    :param service_mapping: A mapping of otter.constants.ServiceType constants
+    - abstraction away from specific endpoints -- requests only need
+      to specify an :obj:`otter.constants.ServiceType` and a relative path.
+
+    :param ICachingAuthenticator authenticator: the caching authenticator
+    :param tenant_id: tenant ID.
+    :param BoundLog log: info about requests will be logged to this.
+    :param dict service_mapping: A mapping of otter.constants.ServiceType constants
         to real service names as found in a tenant's catalog.
     :param region: The region of the Rackspace services which requests will
         be made to.
@@ -37,15 +43,16 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
     default_log = log
 
     @wraps(request)
-    def otter_request(service_type, method, url, headers=None, data=None,
-                      log=default_log,
-                      reauth_codes=(401, 403),
-                      success_codes=(200,),
-                      json_response=True):
-        # TODO: We may want to parameterize some more retry options like number
-        # of retries and backoff policy, but only if it's really necessary.
+    def service_request(service_type, method, url, headers=None, data=None,
+                        log=default_log,
+                        reauth_codes=(401, 403),
+                        success_codes=(200,),
+                        json_response=True):
+        # TODO: We may want to parameterize some retry options *here*, but only
+        # if it's really necessary.
         """
-        Make an HTTP request, with a bunch of awesome behavior!
+        Make an HTTP request to a Rackspace service, with a bunch of awesome
+        behavior!
 
         :param otter.constants.ServiceType service_type: The service against
             which the request should be made.
@@ -82,7 +89,7 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
             request_ = add_content_only(request_)
             return request_(method, url, headers=headers, data=data, log=log)
         return auth_eff.on(got_auth)
-    return otter_request
+    return service_request
 
 
 def add_bind_service(catalog, service_name, region, log, request_func):

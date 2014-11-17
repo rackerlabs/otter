@@ -386,25 +386,37 @@ class ConfigTest(SynchronousTestCase):
             'foo': 'bar',
             'baz': {'bax': 'quux'}
         })
+        self.addCleanup(config.set_config_data, {})
 
     def test_top_level_value(self):
         """
-        config_value returns the value stored at the top level key.
+        :func:`~config.config_value` returns the value stored at the top level key.
         """
         self.assertEqual(config.config_value('foo'), 'bar')
 
     def test_nested_value(self):
         """
-        config_value returns the value stored at a . separated path.
+        :func:`~config.config_value` returns the value stored at a . separated
+        path.
         """
         self.assertEqual(config.config_value('baz.bax'), 'quux')
 
     def test_non_existent_value(self):
         """
-        config_value will return None if the path does not exist in the
-        nested dictionaries.
+        :func:`~config.config_value` will return :data`None` if the path does
+        not exist in the nested dictionaries.
         """
         self.assertIdentical(config.config_value('baz.blah'), None)
+
+    def test_nonexistent_value_with_shared_key_part_at_toplevel(self):
+        """
+        :func:`~config.config_value` will return :data`None` if the path does
+        not exist in the nested dictionaries, even if some part of the path
+        does. I.e. config_value is not allowed to ignore arbitrary path
+        prefixes.
+        """
+        value = config.config_value('prefix.shouldnt.be.ignored.foo')
+        self.assertIdentical(value, None)
 
 
 class WithLockTests(SynchronousTestCase):

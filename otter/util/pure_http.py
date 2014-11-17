@@ -90,7 +90,7 @@ def add_effectful_headers(headers_effect, request_func):
     """
     @wraps(request_func)
     def request(*args, **kwargs):
-        headers = kwargs.pop('headers')
+        headers = kwargs.pop('headers', {})
         headers = headers if headers is not None else {}
 
         def got_additional_headers(additional_headers):
@@ -111,7 +111,7 @@ def add_headers(fixed_headers, request_func):
     """
     @wraps(request_func)
     def request(*args, **kwargs):
-        headers = kwargs.pop('headers')
+        headers = kwargs.pop('headers', {})
         headers = headers if headers is not None else {}
         return request_func(*args, headers=merge(headers, fixed_headers),
                             **kwargs)
@@ -153,9 +153,14 @@ def add_content_only(request_func):
 
 
 def add_json_response(request_func):
-    """Decorate a request function so that it parses JSON responses."""
+    """
+    Decorate a request function so that it parses JSON responses.
+
+    If the body is empty, will make the body :data`None`, and not attempt to
+    parse it with a JSON parser, since that would produce an exception.
+    """
     request = lambda *args, **kwargs: request_func(*args, **kwargs).on(
-        lambda r: (r[0], json.loads(r[1])))
+        lambda r: (r[0], json.loads(r[1]) if r[1] else None))
     return wraps(request_func)(request)
 
 

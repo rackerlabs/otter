@@ -1,9 +1,15 @@
 """Tests for convergence."""
 
 import json
+import calendar
+from functools import partial
 
-from effect import Effect
+from characteristic import attributes
+
+from effect import Effect, ConstantIntent
 from effect.testing import StubIntent, resolve_stubs, resolve_effect
+
+from pyrsistent import pmap, pbag, pset, s
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.task import Clock
@@ -11,18 +17,20 @@ from twisted.internet.defer import succeed
 
 from otter.util.retry import Retry, ShouldRetryEffect, exponential_backoff_interval, retry_times
 from otter.constants import ServiceType
-from otter.test.utils import StubTreq2, patch
-from otter.util.http import APIError
+from otter.test.utils import StubTreq2, patch, iMock
+from otter.auth import IAuthenticator
+from otter.util.http import headers, APIError
+from otter.util.timestamp import from_timestamp
 from otter.convergence import (
-    _converge_lb_state,
+    _remove_from_lb_with_draining, _converge_lb_state,
     get_all_server_details, get_scaling_group_servers,
     converge, Convergence, CreateServer, DeleteServer,
     RemoveFromLoadBalancer, ChangeLoadBalancerNode, AddNodesToLoadBalancer,
+    BulkAddToRCv3, BulkRemoveFromRCv3,
+    SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
-    ACTIVE, ERROR, BUILD,
-    ServiceType, NodeCondition, NodeType, optimize_steps)
-
-from pyrsistent import pmap, pbag, s
+    ServerState, ServiceType, NodeCondition, NodeType, optimize_steps,
+    extract_drained_at, get_load_balancer_contents, _reqs_to_effect)
 
 
 class Sequence(object):
@@ -167,6 +175,132 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
 
 
+class ExtractDrainedTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.convergence.extract_drained_at`
+    """
+    summary = ("Node successfully updated with address: " +
+               "'10.23.45.6', port: '8080', weight: '1', condition: 'DRAINING'")
+    updated = '2014-10-23T18:10:48.000Z'
+    feed = ('<feed xmlns="http://www.w3.org/2005/Atom">' +
+            '<entry><summary>{}</summary><updated>{}</updated></entry>' +
+            '<entry><summary>else</summary><updated>badtime</updated></entry>' +
+            '</feed>')
+
+    def test_first_entry(self):
+        """
+        Takes the first entry only
+        """
+        feed = self.feed.format(self.summary, self.updated)
+        self.assertEqual(extract_drained_at(feed),
+                         calendar.timegm(from_timestamp(self.updated).utctimetuple()))
+
+    def test_invalid_first_entry(self):
+        """
+        Raises error if first entry is not DRAINING entry
+        """
+        feed = self.feed.format("Node successfully updated with ENABLED", self.updated)
+        self.assertRaises(ValueError, extract_drained_at, feed)
+
+
+class GetLBContentsTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.convergence.get_load_balancer_contents`
+    """
+
+    def setUp(self):
+        """
+        Stub request function and mock `extract_drained_at`
+        """
+        self.reqs = {
+            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes'): [
+                {'id': '11', 'port': 20, 'address': 'a11',
+                 'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
+                {'id': '12', 'port': 20, 'address': 'a12',
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}],
+            ('GET', 'loadbalancers/2/nodes'): [
+                {'id': '21', 'port': 20, 'address': 'a21',
+                 'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
+                {'id': '22', 'port': 20, 'address': 'a22',
+                 'weight': 3, 'condition': 'DRAINING', 'type': 'PRIMARY'}],
+            ('GET', 'loadbalancers/1/nodes/11.atom'): '11feed',
+            ('GET', 'loadbalancers/2/nodes/22.atom'): '22feed'
+        }
+        self.feeds = {'11feed': 1.0, '22feed': 2.0}
+        self.mock_eda = patch(
+            self, 'otter.convergence.extract_drained_at',
+            side_effect=lambda f: self.feeds[f])
+
+    def _request(self):
+        def request(method, url):
+            body = self.reqs[(method, url)]
+            body = body if type(body) is str else json.dumps(body)
+            return Effect(StubIntent(ConstantIntent(body)))
+        return request
+
+    def test_success(self):
+        """
+        Gets LB contents with drained_at correctly
+        """
+        eff = get_load_balancer_contents(self._request())
+        draining, enabled = NodeCondition.DRAINING, NodeCondition.ENABLED
+        make_config = partial(LBConfig, port=20, type=NodeType.PRIMARY)
+        self.assertEqual(
+            resolve_stubs(eff),
+            [LBNode(lb_id=1, node_id='11', address='a11', drained_at=1.0,
+                    config=make_config(weight=2, condition=draining)),
+             LBNode(lb_id=1, node_id='12', address='a12',
+                    config=make_config(weight=2, condition=enabled)),
+             LBNode(lb_id=2, node_id='21', address='a21',
+                    config=make_config(weight=3, condition=enabled)),
+             LBNode(lb_id=2, node_id='22', address='a22', drained_at=2.0,
+                    config=make_config(weight=3, condition=draining))])
+
+    def test_no_lb(self):
+        """
+        Return empty list if there are no LB
+        """
+        self.reqs = {('GET', 'loadbalancers'): []}
+        eff = get_load_balancer_contents(self._request())
+        self.assertEqual(resolve_stubs(eff), [])
+
+    def test_no_nodes(self):
+        """
+        Return empty if there are LBs but no nodes in them
+        """
+        self.reqs = {
+            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes'): [],
+            ('GET', 'loadbalancers/2/nodes'): []
+        }
+        eff = get_load_balancer_contents(self._request())
+        self.assertEqual(resolve_stubs(eff), [])
+
+    def test_no_draining(self):
+        """
+        Doesnt fetch feeds if all nodes are ENABLED
+        """
+        self.reqs = {
+            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes'): [
+                {'id': '11', 'port': 20, 'address': 'a11',
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
+            ],
+            ('GET', 'loadbalancers/2/nodes'): [
+                {'id': '21', 'port': 20, 'address': 'a21',
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
+            ]
+        }
+        config = LBConfig(port=20, weight=2, condition=NodeCondition.ENABLED,
+                          type=NodeType.PRIMARY)
+        eff = get_load_balancer_contents(self._request())
+        self.assertEqual(
+            resolve_stubs(eff),
+            [LBNode(lb_id=1, node_id='11', address='a11', config=config),
+             LBNode(lb_id=2, node_id='21', address='a21', config=config)])
+
+
 class ObjectStorageTests(SynchronousTestCase):
     """
     Tests for objects that store data such as :class:`LBConfig`
@@ -182,12 +316,156 @@ class ObjectStorageTests(SynchronousTestCase):
         self.assertEqual(lb.condition, NodeCondition.ENABLED)
         self.assertEqual(lb.type, NodeType.PRIMARY)
 
-    def test_lbconfig_not_cmp_draining(self):
+
+class RemoveFromLBWithDrainingTests(SynchronousTestCase):
+    """
+    Tests for :func:`_remove_from_lb_with_draining`
+    """
+    def test_zero_timeout_remove_from_lb(self):
         """
-        :obj:`LBConfig.draining_timeout` is excluded from comparison
+        If the timeout is zero, all nodes are just removed
         """
-        self.assertEqual(LBConfig(port=80, draining_timeout=2.4),
-                         LBConfig(port=80, draining_timeout=5.4))
+        result = _remove_from_lb_with_draining(
+            0,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80))],
+            0)
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_disabled_state_is_removed(self):
+        """
+        Nodes in disabled state are just removed from the load balancer even
+        if the timeout is positive
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DISABLED))],
+            0)
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_enabled_state_is_drained(self):
+        """
+        Nodes in enabled state are put into draining.
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80))],
+            0)
+
+        self.assertEqual(
+            result,
+            [ChangeLoadBalancerNode(lb_id=5, node_id=123, weight=1,
+                                    condition=NodeCondition.DRAINING,
+                                    type=NodeType.PRIMARY)])
+
+    def test_draining_state_is_ignored_if_connections_and_not_yet_timeout(self):
+        """
+        Nodes in draining state will be ignored if they still have connections
+        and the timeout is not yet expired
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0, connections=1)],
+            5)
+
+        self.assertEqual(result, [])
+
+    def test_draining_state_removed_if_no_connections_and_not_yet_timeout(self):
+        """
+        Nodes in draining state will be removed if they have no more
+        connections, even if the timeout is not yet expired
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0, connections=0)],
+            5)
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_draining_state_remains_if_connections_None_and_not_yet_timeout(self):
+        """
+        Nodes in draining state will be ignored if timeout has not yet expired
+        and the number of active connections are not provided
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0)],
+            5)
+
+        self.assertEqual(result, [])
+
+    def test_draining_state_removed_if_connections_None_and_timeout_expired(self):
+        """
+        Nodes in draining state will be removed when the timeout expires if
+        the number of active connections are not provided
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0)],
+            15)
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_draining_state_removed_if_connections_and_timeout_expired(self):
+        """
+        Nodes in draining state will be removed when the timeout expires even
+        if they still have active connections
+        """
+        result = _remove_from_lb_with_draining(
+            10,
+            [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
+                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    drained_at=0.0, connections=10)],
+            15)
+
+        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+
+    def test_all_changes_together(self):
+        """
+        Given all possible combination of load balancer states and timeouts,
+        ensure function produces the right set of step for all of them.
+        """
+        current = [
+            # enabled, should be drained
+            LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                   config=LBConfig(port=80)),
+            # disabled, should be removed
+            LBNode(lb_id=2, node_id=2, address='1.1.1.1',
+                   config=LBConfig(port=80, condition=NodeCondition.DISABLED)),
+            # draining, still connections, should be ignored
+            LBNode(lb_id=3, node_id=3, address='1.1.1.1',
+                   config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                   connections=3, drained_at=5.0),
+            # draining, no connections, should be removed
+            LBNode(lb_id=4, node_id=4, address='1.1.1.1',
+                   config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                   connections=0, drained_at=5.0),
+            # draining, timeout exired, should be removed
+            LBNode(lb_id=5, node_id=5, address='1.1.1.1',
+                   config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                   connections=10, drained_at=0.0)]
+
+        result = _remove_from_lb_with_draining(10, current, 10)
+        self.assertEqual(set(result), set([
+            ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
+                                   condition=NodeCondition.DRAINING,
+                                   type=NodeType.PRIMARY),
+            RemoveFromLoadBalancer(lb_id=2, node_id=2),
+            RemoveFromLoadBalancer(lb_id=4, node_id=4),
+            RemoveFromLoadBalancer(lb_id=5, node_id=5),
+        ]))
 
 
 class ConvergeLBStateTests(SynchronousTestCase):
@@ -200,7 +478,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         `converge_lb_state` returns a :class:`AddToLoadBalancer` object
         """
         result = _converge_lb_state(desired_lb_state={5: [LBConfig(port=80)]},
-                                    current_lb_state=[],
+                                    current_lb_nodes=[],
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
@@ -219,7 +497,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                           config=LBConfig(port=80, weight=5))]
 
         result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_state=current,
+                                    current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
@@ -236,7 +514,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                           config=LBConfig(port=80, weight=5))]
 
         result = _converge_lb_state(desired_lb_state={},
-                                    current_lb_state=current,
+                                    current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
@@ -252,7 +530,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                           config=LBConfig(port=80))]
 
         result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_state=current,
+                                    current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(list(result), [])
 
@@ -268,7 +546,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                           config=LBConfig(port=80))]
 
         result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_state=current,
+                                    current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(set(result), set([
             AddNodesToLoadBalancer(
@@ -308,6 +586,157 @@ def server(id, state, created=0, **kwargs):
     return NovaServer(id=id, state=state, created=created, **kwargs)
 
 
+class DrainAndDeleteServerTests(SynchronousTestCase):
+    """
+    Tests for :func:`converge` having to do with draining and deleting servers.
+    """
+    def test_active_server_without_load_balancers_can_be_deleted(self):
+        """
+        If an active server to be scaled down is not attached to any load
+        balancers, it can be deleted. It is not first put into draining state.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.ACTIVE)]),
+                set(),
+                0),
+            Convergence(steps=pbag([DeleteServer(server_id='abc')])))
+
+    def test_active_server_can_be_deleted_if_all_lbs_can_be_removed(self):
+        """
+        If an active server to be scaled down can be removed from all the load
+        balancers, the server can be deleted.  It is not first put into
+        draining state.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0),
+                set([server('abc', state=ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80))]),
+                0),
+            Convergence(steps=pbag([
+                DeleteServer(server_id='abc'),
+                RemoveFromLoadBalancer(lb_id=1, node_id=1)
+            ])))
+
+    def test_draining_server_can_be_deleted_if_all_lbs_can_be_removed(self):
+        """
+        If draining server can be removed from all the load balancers, the
+        server can be deleted.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0),
+                set([server('abc', state=ServerState.DRAINING,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80,
+                            condition=NodeCondition.DRAINING))]),
+                0),
+            Convergence(steps=pbag([
+                DeleteServer(server_id='abc'),
+                RemoveFromLoadBalancer(lb_id=1, node_id=1)
+            ])))
+
+    def test_draining_server_ignored_if_waiting_for_timeout(self):
+        """
+        If the server already in draining state is waiting for the draining
+        timeout on some load balancers, nothing is done to it.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.DRAINING,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80,
+                            condition=NodeCondition.DRAINING),
+                            drained_at=1.0, connections=1)]),
+                2),
+            Convergence(steps=pbag([])))
+
+    def test_active_server_is_drained_if_not_all_lbs_can_be_removed(self):
+        """
+        If an active server to be deleted cannot be removed from all the load
+        balancers, it is set to draining state and all the nodes are set to
+        draining condition.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80))]),
+                0),
+            Convergence(steps=pbag([
+                ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
+                                       condition=NodeCondition.DRAINING,
+                                       type=NodeType.PRIMARY),
+                SetMetadataItemOnServer(server_id='abc',
+                                        key='rax:auto_scaling_draining',
+                                        value='draining')
+            ])))
+
+    def test_active_server_is_drained_even_if_all_already_in_draining(self):
+        """
+        If an active server already has all of its load balancers in draining,
+        but it cannot be removed from all of them yet, it is set to draining
+        state even though no load balancer actions need to be performed.
+
+        This can happen for instance if the server was supposed to be deleted
+        in a previous convergence run, and the load balancers were set to
+        draining but setting the server metadata failed.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80,
+                                            condition=NodeCondition.DRAINING),
+                            connections=1, drained_at=0.0)]),
+                1),
+            Convergence(steps=pbag([
+                SetMetadataItemOnServer(server_id='abc',
+                                        key='rax:auto_scaling_draining',
+                                        value='draining')
+            ])))
+
+    def test_draining_server_has_all_enabled_lb_set_to_draining(self):
+        """
+        If a draining server is enabled on any load balancers, it is set to
+        draining on those load balancers and it is not deleted.  The metadata
+        is not re-set to draining.
+
+        This can happen for instance if the server was supposed to be deleted
+        in a previous convergence run, and the server metadata was set but
+        the load balancers update failed.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(launch_config={}, desired=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.DRAINING,
+                            servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
+                            config=LBConfig(port=80))]),
+                1),
+            Convergence(steps=pbag([
+                ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
+                                       condition=NodeCondition.DRAINING,
+                                       type=NodeType.PRIMARY)
+            ])))
+
+
 class ConvergeTests(SynchronousTestCase):
     """Tests for :func:`converge`."""
 
@@ -319,8 +748,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [],
-                {},
+                set(),
+                set(),
                 0),
             Convergence(
                 steps=pbag([CreateServer(launch_config=pmap())])))
@@ -333,8 +762,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [],
-                {},
+                set(),
+                set(),
                 0),
             Convergence(
                 steps=pbag([
@@ -349,8 +778,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', BUILD)],
-                {},
+                set([server('abc', ServerState.BUILD)]),
+                set(),
                 0),
             Convergence(steps=pbag([])))
 
@@ -362,8 +791,8 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ERROR)],
-                {},
+                set([server('abc', ServerState.ERROR)]),
+                set(),
                 0),
             Convergence(
                 steps=pbag([
@@ -380,11 +809,11 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ERROR, servicenet_address='1.1.1.1')],
-                [LBNode(lb_id=5, address='1.1.1.1', node_id=3,
-                        config=LBConfig(port=80)),
-                 LBNode(lb_id=5, address='1.1.1.1', node_id=5,
-                        config=LBConfig(port=8080))],
+                set([server('abc', ServerState.ERROR, servicenet_address='1.1.1.1')]),
+                set([LBNode(lb_id=5, address='1.1.1.1', node_id=3,
+                            config=LBConfig(port=80)),
+                     LBNode(lb_id=5, address='1.1.1.1', node_id=5,
+                            config=LBConfig(port=8080))]),
                 0),
             Convergence(
                 steps=pbag([
@@ -399,9 +828,9 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                [server('abc', ACTIVE, created=0),
-                 server('def', ACTIVE, created=1)],
-                {},
+                set([server('abc', ServerState.ACTIVE, created=0),
+                     server('def', ServerState.ACTIVE, created=1)]),
+                set(),
                 0),
             Convergence(steps=pbag([DeleteServer(server_id='abc')])))
 
@@ -414,9 +843,10 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=0),
-                [server('abc', ACTIVE, servicenet_address='1.1.1.1', created=0)],
-                [LBNode(lb_id=5, address='1.1.1.1', node_id=3,
-                        config=LBConfig(port=80))],
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1', created=0)]),
+                set([LBNode(lb_id=5, address='1.1.1.1', node_id=3,
+                            config=LBConfig(port=80))]),
                 0),
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),
@@ -431,10 +861,10 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [server('abc', ACTIVE, created=0),
-                 server('def', BUILD, created=1),
-                 server('ghi', ACTIVE, created=2)],
-                {},
+                set([server('abc', ServerState.ACTIVE, created=0),
+                     server('def', ServerState.BUILD, created=1),
+                     server('ghi', ServerState.ACTIVE, created=2)]),
+                set(),
                 0),
             Convergence(
                 steps=pbag([DeleteServer(server_id='def')])))
@@ -447,9 +877,9 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [server('slowpoke', BUILD, created=0),
-                 server('ok', ACTIVE, created=0)],
-                {},
+                set([server('slowpoke', ServerState.BUILD, created=0),
+                     server('ok', ServerState.ACTIVE, created=0)]),
+                set(),
                 3600),
             Convergence(
                 steps=pbag([
@@ -464,10 +894,10 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=2),
-                [server('slowpoke', BUILD, created=0),
-                 server('old-ok', ACTIVE, created=0),
-                 server('new-ok', ACTIVE, created=3600)],
-                {},
+                set([server('slowpoke', ServerState.BUILD, created=0),
+                     server('old-ok', ServerState.ACTIVE, created=0),
+                     server('new-ok', ServerState.ACTIVE, created=3600)]),
+                set(),
                 3600),
             Convergence(steps=pbag([DeleteServer(server_id='slowpoke')])))
 
@@ -480,9 +910,11 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1, desired_lbs=desired_lbs),
-                [server('abc', ACTIVE, servicenet_address='1.1.1.1', created=0),
-                 server('bcd', ACTIVE, servicenet_address='2.2.2.2', created=1)],
-                [],
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1', created=0),
+                     server('bcd', ServerState.ACTIVE,
+                            servicenet_address='2.2.2.2', created=1)]),
+                set(),
                 0),
             Convergence(steps=pbag([
                 DeleteServer(server_id='abc'),
@@ -491,12 +923,10 @@ class ConvergeTests(SynchronousTestCase):
                     address_configs=s(('2.2.2.2', LBConfig(port=80))))
             ])))
 
-# time out (delete) building servers
 
-
-class RequestConversionTests(SynchronousTestCase):
+class StepAsRequestTests(SynchronousTestCase):
     """
-    Tests for converting ISteps to :obj:`Request`s.
+    Tests for converting :obj:`IStep` implementations to :obj:`Request`s.
     """
 
     def test_create_server(self):
@@ -523,6 +953,21 @@ class RequestConversionTests(SynchronousTestCase):
                 service=ServiceType.CLOUD_SERVERS,
                 method='DELETE',
                 path='servers/abc123'))
+
+    def test_set_metadata_item(self):
+        """
+        :obj:`SetMetadataItemOnServer.as_request` produces a request for
+        setting a metadata item on a particular server.
+        """
+        meta = SetMetadataItemOnServer(server_id='abc123', key='metadata_key',
+                                       value='teapot')
+        self.assertEqual(
+            meta.as_request(),
+            Request(
+                service=ServiceType.CLOUD_SERVERS,
+                method='PUT',
+                path='servers/abc123/metadata/metadata_key',
+                data={'meta': {'metadata_key': 'teapot'}}))
 
     def test_remove_from_load_balancer(self):
         """
@@ -558,6 +1003,70 @@ class RequestConversionTests(SynchronousTestCase):
                 path='loadbalancers/abc123/nodes/node1',
                 data={'condition': 'DRAINING',
                       'weight': 50}))
+
+    def _generic_bulk_rcv3_step_test(self, step_class, expected_method):
+        """
+        A generic test for bulk RCv3 steps.
+
+        :param step_class: The step class under test.
+        :param str method: The expected HTTP method of the request.
+        """
+        step = step_class(lb_node_pairs=pset([
+            ("lb-1", "node-a"),
+            ("lb-1", "node-b"),
+            ("lb-1", "node-c"),
+            ("lb-1", "node-d"),
+            ("lb-2", "node-a"),
+            ("lb-2", "node-b"),
+            ("lb-3", "node-c"),
+            ("lb-3", "node-d")
+        ]))
+        request = step.as_request()
+        self.assertEqual(request.service, ServiceType.RACKCONNECT_V3)
+        self.assertEqual(request.method, expected_method)
+        self.assertEqual(request.success_codes,
+                         (201,) if request.method == "POST" else (204,))
+        self.assertEqual(request.path, "load_balancer_pools/nodes")
+        self.assertEqual(request.headers, None)
+
+        expected_data = [
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-a'}},
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-b'}},
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-c'}},
+            {'load_balancer_pool': {'id': 'lb-1'},
+             'cloud_server': {'id': 'node-d'}},
+            {'load_balancer_pool': {'id': 'lb-2'},
+             'cloud_server': {'id': 'node-a'}},
+            {'load_balancer_pool': {'id': 'lb-2'},
+             'cloud_server': {'id': 'node-b'}},
+            {'load_balancer_pool': {'id': 'lb-3'},
+             'cloud_server': {'id': 'node-c'}},
+            {'load_balancer_pool': {'id': 'lb-3'},
+             'cloud_server': {'id': 'node-d'}}
+        ]
+        key_fn = lambda e: (e["load_balancer_pool"]["id"], e["cloud_server"]["id"])
+        request_data = sorted(request.data, key=key_fn)
+        self.assertEqual(request_data, expected_data)
+
+    def test_add_nodes_to_rcv3_load_balancers(self):
+        """
+        :obj:`BulkAddToRCv3.as_request` produces a request for
+        adding any combination of nodes to any combination of RCv3 load
+        balancers.
+        """
+        self._generic_bulk_rcv3_step_test(BulkAddToRCv3, "POST")
+
+    def test_remove_nodes_from_rcv3_load_balancers(self):
+        """
+        :obj:`BulkRemoveFromRCv3.as_request` produces a request
+        for removing any combination of nodes from any combination of RCv3
+        load balancers.
+        """
+        self._generic_bulk_rcv3_step_test(
+            BulkRemoveFromRCv3, "DELETE")
 
 
 class OptimizerTests(SynchronousTestCase):
@@ -636,14 +1145,178 @@ class OptimizerTests(SynchronousTestCase):
 
     def test_optimize_leaves_other_steps(self):
         """
-        Non-LB steps are not touched by the optimizer.
+        Unoptimizable steps pass the optimizer unchanged.
         """
         steps = pbag([
             AddNodesToLoadBalancer(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
-            CreateServer(launch_config=pmap({}))
+            CreateServer(launch_config=pmap({})),
+            BulkRemoveFromRCv3(lb_node_pairs=pset([("lb-1", "node-a")])),
+            BulkAddToRCv3(lb_node_pairs=pset([("lb-2", "node-b")]))
+            # Note that the add & remove pair should not be the same;
+            # the optimizer might reasonably optimize opposite
+            # operations away in the future.
         ])
         self.assertEqual(
             optimize_steps(steps),
             steps)
+
+    def test_mixed_optimization(self):
+        """
+        Mixes of optimizable and unoptimizable steps still get optimized
+        correctly.
+        """
+        steps = pbag([
+            # CLB adds
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=5,
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=6,
+                address_configs=s(('1.1.1.1', LBConfig(port=80)))),
+            AddNodesToLoadBalancer(
+                lb_id=6,
+                address_configs=s(('1.1.1.2', LBConfig(port=80)))),
+
+            # Unoptimizable steps
+            CreateServer(launch_config=pmap({})),
+        ])
+
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                # Optimized CLB adds
+                AddNodesToLoadBalancer(
+                    lb_id=5,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.2', LBConfig(port=80)))),
+                AddNodesToLoadBalancer(
+                    lb_id=6,
+                    address_configs=s(('1.1.1.1', LBConfig(port=80)),
+                                      ('1.1.1.2', LBConfig(port=80)))),
+
+                # Unoptimizable steps
+                CreateServer(launch_config=pmap({}))
+            ]))
+
+
+@attributes(["service_type", "method", "url", "headers", "data", "success_codes"],
+            defaults={"success_codes": (200,)})
+class _PureRequestStub(object):
+    """
+    A bound request stub, suitable for testing.
+    """
+
+
+class RequestsToEffectTests(SynchronousTestCase):
+    """
+    Tests for converting :class:`Request` into effects.
+    """
+    def _reqs_to_effect(self, conv_requests):
+        """
+        Helper function to call :func:`_reqs_to_effect`.
+
+        Uses :class:`_PureRequestStub` test double for easy introspection.
+
+        :param conv_requests: The convergence requests to be turned into an
+            effect.
+        :type conv_requests: iterable of :class:`Request`
+        :return: The return value of :func:`_reqs_to_effect`.
+        """
+        return _reqs_to_effect(_PureRequestStub, conv_requests)
+
+    def assertCompilesTo(self, conv_requests, expected_effects):
+        """
+        Assert that the given convergence requests, compile down to a parallel
+        effect comprised of the given effects.
+        """
+        effect = self._reqs_to_effect(conv_requests)
+        self.assertTrue(isinstance(effect, Effect))
+        individual_effects = effect.intent.effects
+        self.assertEqual(expected_effects, set(individual_effects))
+
+    def test_single_request(self):
+        """
+        A single request is correctly compiled down to an effect.
+        """
+        conv_requests = [
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever",
+                    success_codes=(999,))]
+        expected_effects = set([
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever",
+                             headers=None,
+                             data=None,
+                             success_codes=(999,))])
+        self.assertCompilesTo(conv_requests, expected_effects)
+
+    def test_multiple_requests(self):
+        """
+        Multiple requests of the same type are correctly compiled down to an
+        effect.
+        """
+        conv_requests = [
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever"),
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever/something/else",
+                    success_codes=(231,))]
+        expected_effects = set([
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever",
+                             headers=None,
+                             data=None),
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever/something/else",
+                             headers=None,
+                             data=None,
+                             success_codes=(231,))])
+        self.assertCompilesTo(conv_requests, expected_effects)
+
+    def test_multiple_requests_of_different_type(self):
+        """
+        Multiple requests of different types are correctly compiled down to
+        an effect.
+        """
+        data_sentinel = object()
+        conv_requests = [
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever"),
+            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                    method="GET",
+                    path="/whatever/something/else",
+                    success_codes=(231,)),
+            Request(service=ServiceType.CLOUD_SERVERS,
+                    method="POST",
+                    path="/xyzzy",
+                    data=data_sentinel)]
+        expected_effects = set([
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever",
+                             headers=None,
+                             data=None),
+            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                             method="GET",
+                             url="/whatever/something/else",
+                             headers=None,
+                             data=None,
+                             success_codes=(231,)),
+            _PureRequestStub(service_type=ServiceType.CLOUD_SERVERS,
+                             method="POST",
+                             url="/xyzzy",
+                             headers=None,
+                             data=data_sentinel)])
+        self.assertCompilesTo(conv_requests, expected_effects)

@@ -70,7 +70,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         lb = self.lbaas_client.create_load_balancer('test', [], 'HTTP', 80, "PUBLIC")
         lb_id = lb.entity.id
         policy_up_data = {'change': self.gc_min_entities_alt}
-        group = self._create_group_given_lbaas_id(lb_id)
+        group = self._create_group_given_lbaas_id(lb_id, server_building="3")
         servers_on_create_group = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
@@ -334,15 +334,18 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         nodes_on_lb = self._get_node_list_from_lb(self.load_balancer_3)
         self.assertEquals(len(nodes_on_lb), 0)
 
-    def _create_group_given_lbaas_id(self, *lbaas_ids):
+    def _create_group_given_lbaas_id(self, *lbaas_ids, **kwargs):
         """
         Given the args, creates a group with minentities > 0 and the given number of lbaas
         Note: The lbaas are excepted to be present on the account
+
+        Any kwargs passed are used as the metadata for the server being built.
         """
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
             lc_load_balancers=self._create_lbaas_list(*lbaas_ids),
-            gc_cooldown=0, network_type='public')
+            gc_cooldown=0, network_type='public',
+            lc_metadata=kwargs)
         group = create_group_response.entity
         self.resources.add(group, self.empty_scaling_group)
         return group

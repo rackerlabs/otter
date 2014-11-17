@@ -431,8 +431,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.addCleanup(lambda: set_supervisor(None))
         makeService(test_config)
         mock_ga.assert_called_once_with(mock_reactor)
-        self.assertIdentical(get_supervisor().auth_function,
-                             mock_ga.return_value.authenticate_tenant)
+        self.assertIdentical(get_supervisor().authenticator,
+                             mock_ga.return_value)
 
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_health_checker_no_zookeeper(self, supervisor):

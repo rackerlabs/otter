@@ -1,4 +1,4 @@
-"""Tests for otter.auth_http."""
+"""Tests for otter.http."""
 
 import json
 
@@ -8,6 +8,9 @@ from effect import Delay
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
 
+from zope.interface import implementer
+
+from otter.auth import ICachingAuthenticator
 from otter.constants import ServiceType
 from otter.util.http import headers, APIError
 from otter.http import get_request_func, add_bind_service
@@ -18,6 +21,7 @@ from otter.util.retry import (
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 
 
+@implementer(ICachingAuthenticator)
 class FakeCachingAuthenticator(object):
     """
     Fake object that exposes caching side-effects.
