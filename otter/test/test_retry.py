@@ -3,7 +3,7 @@ Tests for :mod:`otter.utils.retry`
 """
 import sys
 
-from effect import Effect, Delay, FuncIntent, ConstantIntent, ErrorIntent
+from effect import Effect, Delay, FuncIntent, ConstantIntent
 from effect.testing import resolve_effect, StubIntent, resolve_stubs
 
 import mock
