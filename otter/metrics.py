@@ -10,6 +10,8 @@ import json
 from collections import namedtuple
 import time
 
+from effect.twisted import perform
+
 from twisted.internet import task, defer
 from twisted.internet.endpoints import clientFromString
 from twisted.application.service import Service
@@ -26,9 +28,9 @@ from toolz.functoolz import identity
 from otter.auth import (
     RetryingAuthenticator, ImpersonatingAuthenticator, authenticate_user,
     extract_token)
-
 from otter.auth import public_endpoint_url
-
+from otter.constants import get_service_mapping
+from otter.http import get_request_func
 from otter.convergence import get_scaling_group_servers
 from otter.util.http import append_segments, headers, check_success
 from otter.util.fp import predicate_all
@@ -127,28 +129,6 @@ def check_tenant_config(tenant_id, groups, grouped_servers):
             print('tenant {} group {} diff types: {}'.format(tenant_id, group_id, uniques))
 
 
-@defer.inlineCallbacks
-def check_diff_configs(client, authenticator, nova_service, region, clock=None):
-    """
-    Find groups having servers with different launch config in them
-    """
-    cass_groups = yield get_scaling_groups(client)
-    tenanted_groups = groupby(lambda g: g['tenantId'], cass_groups)
-    print('got tenants', len(tenanted_groups))
-
-    defs = []
-    sem = defer.DeferredSemaphore(10)
-    for tenant_id, groups in tenanted_groups.iteritems():
-        d = sem.run(
-            get_scaling_group_servers, tenant_id, authenticator,
-            nova_service, region, server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
-            clock=clock)
-        d.addCallback(partial(check_tenant_config, tenant_id, groups))
-        defs.append(d)
-
-    yield defer.gatherResults(defs)
-
-
 GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual pending')
 
 
@@ -176,7 +156,7 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
     return metrics
 
 
-def get_all_metrics(cass_groups, authenticator, nova_service, region,
+def get_all_metrics(cass_groups, authenticator, services, region,
                     clock=None, _print=False):
     """
     Gather server data for and produce metrics for all groups across all tenants
@@ -184,9 +164,8 @@ def get_all_metrics(cass_groups, authenticator, nova_service, region,
 
     :param iterable cass_groups: Groups got from cassandra as
     :param :class:`otter.auth.IAuthenticator` authenticator: object that impersonates a tenant
-    :param str nova_service: Nova service name in service catalog
+    :param str services: service mapping from config
     :param str region: DC region
-    :param :class:`twisted.internet.IReactorTime` clock: IReactorTime provider
     :param bool _print: Should the function print while processing?
 
     :return: ``list`` of `GroupMetrics` as `Deferred`
@@ -197,11 +176,12 @@ def get_all_metrics(cass_groups, authenticator, nova_service, region,
     defs = []
     group_metrics = []
     for tenant_id, groups in tenanted_groups.iteritems():
-        d = sem.run(
-            get_scaling_group_servers, tenant_id, authenticator,
-            nova_service, region,
-            server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
-            clock=clock)
+        request_func = get_request_func(authenticator, tenant_id, metrics_log,
+                                        services.get, region)
+        eff = get_scaling_group_servers(
+            request_func,
+            server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'))
+        d = sem.run(perform, clock, eff)
         d.addCallback(partial(get_tenant_metrics, tenant_id, groups, _print=_print))
         d.addCallback(group_metrics.extend)
         defs.append(d)
@@ -297,7 +277,7 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
     cass_groups = yield get_scaling_groups(_client, props=['status'],
                                            group_pred=lambda g: g['status'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
-        cass_groups, authenticator, config['services']['nova'], config['region'],
+        cass_groups, authenticator, config['services'], config['region'],
         clock=reactor, _print=_print)
 
     total_desired, total_actual, total_pending = reduce(
@@ -337,7 +317,7 @@ class Options(usage.Options):
         self.update(json.load(self.open(self['config'])))
         # TODO: This is hard-coded here and in tap/api.py. Should be there in
         # config file only
-        self.update({'services': {'nova': 'cloudServersOpenStack'}})
+        self.update({'services': {'cloudServersOpenStack': 'cloudServersOpenStack'}})
 
 
 class MetricsService(Service, object):
@@ -389,6 +369,6 @@ def makeService(config):
 
 if __name__ == '__main__':
     config = json.load(open(sys.argv[1]))
-    config['services'] = {'nova': 'cloudServersOpenStack'}
+    config['services'] = {'cloudServersOpenStack': 'cloudServersOpenStack'}
     # TODO: Take _print as cmd-line arg and pass it.
     task.react(collect_metrics, (config, None, None, True))

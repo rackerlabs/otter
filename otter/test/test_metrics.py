@@ -6,6 +6,8 @@ import mock
 import json
 from io import StringIO
 
+from effect import Effect, ConstantIntent
+
 from pyrsistent import freeze
 
 from toolz.dicttoolz import merge
@@ -150,9 +152,13 @@ class GetMetricsTests(SynchronousTestCase):
         Mock get_scaling_group_servers
         """
         self.tenant_servers = {}
+        # NO, RADIX, NO!!!!!
+        self.mock_get_request_func = patch(
+            self, 'otter.metrics.get_request_func',
+            side_effect=lambda a, tenant_id, *args, **kwargs: tenant_id)
         self.mock_gsgs = patch(
             self, 'otter.metrics.get_scaling_group_servers',
-            side_effect=lambda t, *a, **k: succeed(self.tenant_servers[t]))
+            side_effect=lambda rf, server_predicate: Effect(ConstantIntent(self.tenant_servers[rf])))
 
     def test_get_tenant_metrics(self):
         """
@@ -178,16 +184,14 @@ class GetMetricsTests(SynchronousTestCase):
         self.tenant_servers['t1'] = servers_t1
         self.tenant_servers['t2'] = servers_t2
 
-        d = get_all_metrics(groups, 'a', 'n', 'r', clock='c')
+        d = get_all_metrics(groups, mock.Mock(), {'cloudServersOpenStack': 'cloudServersOpenStack'}, 'r', clock='c')
 
         self.assertEqual(
             set(self.successResultOf(d)),
             set([GroupMetrics('t1', 'g1', 3, 3, 2), GroupMetrics('t1', 'g2', 4, 1, 0),
                  GroupMetrics('t2', 'g4', 2, 1, 1)]))
-        self.mock_gsgs.assert_any_call(
-            't1', 'a', 'n', 'r', server_predicate=IsCallable(), clock='c')
-        self.mock_gsgs.assert_any_call(
-            't2', 'a', 'n', 'r', server_predicate=IsCallable(), clock='c')
+        self.mock_gsgs.assert_any_call('t1', server_predicate=IsCallable())
+        self.mock_gsgs.assert_any_call('t2', server_predicate=IsCallable())
 
 
 class AddToCloudMetricsTests(SynchronousTestCase):
@@ -268,7 +272,7 @@ class CollectMetricsTests(SynchronousTestCase):
                                           return_value=succeed(None))
 
         self.config = {'cassandra': 'c', 'identity': {'url': 'id'}, 'metrics': 'm',
-                       'region': 'r', 'services': {'nova': 'cloudServersOpenStack'}}
+                       'region': 'r', 'services': {'cloudServersOpenStack': 'cloudServersOpenStack'}}
 
     def test_metrics_collected(self):
         """
@@ -284,7 +288,7 @@ class CollectMetricsTests(SynchronousTestCase):
         self.get_scaling_groups.assert_called_once_with(
             self.client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
-            self.groups, self.auth, 'cloudServersOpenStack', 'r',
+            self.groups, self.auth, {'cloudServersOpenStack': 'cloudServersOpenStack'}, 'r',
             clock=_reactor, _print=False)
         self.add_to_cloud_metrics.assert_called_once_with(
             'm', 'id', 'r', 107, 26, 1)
@@ -309,7 +313,8 @@ class CollectMetricsTests(SynchronousTestCase):
         self.assertIsNone(self.successResultOf(d))
         self.assertFalse(self.get_authenticator.called)
         self.get_all_metrics.assert_called_once_with(
-            self.groups, auth, 'cloudServersOpenStack', 'r', clock=_reactor, _print=False)
+            self.groups, auth, {'cloudServersOpenStack': 'cloudServersOpenStack'},
+            'r', clock=_reactor, _print=False)
 
 
 class APIOptionsTests(SynchronousTestCase):
@@ -326,7 +331,7 @@ class APIOptionsTests(SynchronousTestCase):
         config.open = mock.Mock(return_value=StringIO(u'{"a": "b"}'))
         config.parseOptions(['--config=file.json'])
         self.assertEqual(config, {'a': 'b', 'config': 'file.json',
-                                  'services': {'nova': 'cloudServersOpenStack'}})
+                                  'services': {'cloudServersOpenStack': 'cloudServersOpenStack'}})
 
 
 class ServiceTests(SynchronousTestCase):
