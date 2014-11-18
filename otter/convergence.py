@@ -2,8 +2,6 @@
 Convergence.
 """
 
-from __future__ import print_function
-
 from urllib import urlencode
 import calendar
 import json
