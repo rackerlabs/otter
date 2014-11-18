@@ -18,7 +18,7 @@ from otter.util.retry import (retry, repeating_interval, random_interval,
                               compose_retries, exponential_backoff_interval,
                               terminal_errors_except, retry_effect, Retry,
                               ShouldDelayAndRetry)
-from otter.test.utils import CheckFailure, DummyException
+from otter.test.utils import CheckFailure, DummyException, CheckFailureValue
 
 
 class RetryTests(SynchronousTestCase):
@@ -412,14 +412,15 @@ class RetryEffectTests(SynchronousTestCase):
         can_retry = lambda f: True
         next_interval = lambda f: 1
         eff = retry_effect(STUB, can_retry, next_interval)
-        self.assertEqual(eff,
+        self.assertEqual(
+            eff,
             Effect(Retry(
                 effect=STUB,
                 should_retry=ShouldDelayAndRetry(can_retry=can_retry,
                                                  next_interval=next_interval))))
 
 
-def raise_(exc):
+def _raise(exc):
     raise exc
 
 
@@ -458,7 +459,7 @@ class EffectfulRetryTests(SynchronousTestCase):
         returns an Effect of True.
         """
         func = _repeated_effect_func(
-            lambda: raise_(RuntimeError("foo")),
+            lambda: _raise(RuntimeError("foo")),
             lambda: "final")
 
         def should_retry(exc_info):
@@ -475,10 +476,12 @@ class EffectfulRetryTests(SynchronousTestCase):
 
 
 def get_exc_info():
+    """Get the exc_info tuple representing a ZeroDivisionError('foo')"""
     try:
         raise ZeroDivisionError("foo")
     except:
         return sys.exc_info()
+
 
 class ShouldDelayAndRetryTests(SynchronousTestCase):
     """Tests for :obj:`ShouldDelayAndRetry`."""
@@ -509,6 +512,10 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
                          True)
 
     def test_failure_passed_correctly(self):
+        """
+        The failure argument to can_retry and next_interval represents the
+        error that occurred.
+        """
         can_retry_failures = []
         next_interval_failures = []
 
@@ -523,7 +530,6 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=can_retry,
                                    next_interval=next_interval)
         eff = sdar(get_exc_info())
-        next_eff = resolve_effect(eff, eff.intent.perform_effect(None))
+        resolve_effect(eff, eff.intent.perform_effect(None))
         self.assertEqual(can_retry_failures, next_interval_failures)
-        from otter.test.utils import CheckFailureValue
         self.assertEqual(can_retry_failures[0], CheckFailureValue(ZeroDivisionError("foo")))

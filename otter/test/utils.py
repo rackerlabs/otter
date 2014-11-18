@@ -7,7 +7,6 @@ import mock
 import os
 import treq
 
-from characteristic import attributes, Attribute
 from zope.interface import implementer, directlyProvides
 
 from testtools.matchers import Mismatch, MatchesException

@@ -4,7 +4,6 @@ Convergence.
 
 from __future__ import print_function
 
-from functools import partial
 from urllib import urlencode
 import calendar
 import json
@@ -24,13 +23,11 @@ from toolz.functoolz import compose
 from toolz.itertoolz import concat, concatv, mapcat
 
 from otter.constants import ServiceType
-from otter.log import log as default_log
-from otter.util.http import append_segments, check_success, headers
+from otter.util.http import append_segments
 from otter.util.fp import partition_bool, partition_groups
 from otter.util.retry import retry_times, exponential_backoff_interval, retry_effect
 from otter.util.timestamp import from_timestamp
 from otter.indexer import atom
-from otter.auth import public_endpoint_url
 
 
 class NodeCondition(Names):

@@ -341,6 +341,10 @@ class Retry(object):
     should occur (usually an instance of :obj:`ShouldDelayAndRetry`).
     """
     def perform_effect(self, dispatcher):
+        """
+        Invoke :func:`effect.retry.retry` with the effect and the
+        should_retry function.
+        """
         return effect_retry(self.effect, self.should_retry)
 
 
