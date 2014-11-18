@@ -397,7 +397,6 @@ class NextIntervalHelperTests(SynchronousTestCase):
 
 
 STUB = Effect(StubIntent(ConstantIntent("foo")))
-STUB_ERROR = Effect(StubIntent(ErrorIntent(ZeroDivisionError("foo"))))
 
 
 class RetryEffectTests(SynchronousTestCase):
