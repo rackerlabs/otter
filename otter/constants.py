@@ -23,4 +23,3 @@ def get_service_mapping(service_config):
         ServiceType.CLOUD_LOAD_BALANCERS: service_config("cloudLoadBalancers"),
         ServiceType.RACKCONNECT_V3: service_config('rackconnect'),
     }
-

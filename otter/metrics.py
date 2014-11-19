@@ -9,6 +9,7 @@ import sys
 import json
 from collections import namedtuple
 import time
+import operator
 
 from effect.twisted import perform
 
@@ -156,37 +157,62 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
     return metrics
 
 
-def get_all_metrics(cass_groups, authenticator, services, region,
-                    clock=None, _print=False):
+def get_all_metrics_effects(cass_groups, get_request_func_for_tenant,
+                            _print=False):
     """
     Gather server data for and produce metrics for all groups across all tenants
     in a region
 
     :param iterable cass_groups: Groups got from cassandra as
-    :param :class:`otter.auth.IAuthenticator` authenticator: object that impersonates a tenant
+    :param get_request_func_for_tenant: Function of tenant_id -> request function
+    :param bool _print: Should the function print while processing?
+
+    :return: :obj:`Effect` of ``list`` of :obj:`GroupMetrics`
+    """
+    tenanted_groups = groupby(lambda g: g['tenantId'], cass_groups)
+    effs = []
+    for tenant_id, groups in tenanted_groups.iteritems():
+        request_func = get_request_func_for_tenant(tenant_id)
+        eff = get_scaling_group_servers(
+            request_func,
+            server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'))
+        eff = eff.on(partial(get_tenant_metrics, tenant_id, groups, _print=_print))
+        effs.append(eff)
+    return effs
+
+
+def _perform_limited_effects(effects, clock, limit):
+    """
+    Perform the effects in parallel up to a limit.
+
+    It'd be nice if effect.parallel had a "limit" parameter.
+    """
+    # TODO: Use cooperator instead
+    sem = defer.DeferredSemaphore(limit)
+    defs = [sem.run(perform, clock, eff) for eff in effects]
+    return defer.gatherResults(defs)
+
+
+def get_all_metrics(cass_groups, authenticator, services, region,
+                    clock=None, _print=False):
+    """
+    Gather server data and produce metrics for all groups across all tenants
+    in a region.
+
+    :param iterable cass_groups: Groups got from cassandra as
+    :param otter.auth.IAuthenticator authenticator: object that impersonates a tenant
     :param str services: service mapping from config
     :param str region: DC region
     :param bool _print: Should the function print while processing?
 
     :return: ``list`` of `GroupMetrics` as `Deferred`
     """
-    # TODO: Use cooperator instead
-    sem = defer.DeferredSemaphore(10)
-    tenanted_groups = groupby(lambda g: g['tenantId'], cass_groups)
-    defs = []
-    group_metrics = []
-    for tenant_id, groups in tenanted_groups.iteritems():
-        request_func = get_request_func(authenticator, tenant_id, metrics_log,
-                                        services.get, region)
-        eff = get_scaling_group_servers(
-            request_func,
-            server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'))
-        d = sem.run(perform, clock, eff)
-        d.addCallback(partial(get_tenant_metrics, tenant_id, groups, _print=_print))
-        d.addCallback(group_metrics.extend)
-        defs.append(d)
-
-    return defer.gatherResults(defs).addCallback(lambda _: group_metrics)
+    def req_func_for_tenant(tenant_id):
+        return get_request_func(authenticator, tenant_id, metrics_log,
+                                get_service_mapping(services.get), region)
+    effs = get_all_metrics_effects(cass_groups, req_func_for_tenant, _print=_print)
+    d = _perform_limited_effects(effs, clock, 10)
+    return d.addCallback(lambda r: reduce(operator.add, r))
 
 
 @defer.inlineCallbacks

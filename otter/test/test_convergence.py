@@ -7,15 +7,15 @@ from functools import partial
 from characteristic import attributes
 
 from effect import Effect, ConstantIntent
-from effect.testing import StubIntent, resolve_stubs, resolve_effect
+from effect.testing import StubIntent, resolve_stubs
 
 from pyrsistent import pmap, pbag, pset, s
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.util.retry import Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times
+from otter.util.retry import ShouldDelayAndRetry, exponential_backoff_interval, retry_times
 from otter.constants import ServiceType
-from otter.test.utils import patch
+from otter.test.utils import patch, resolve_retry_stubs
 from otter.util.timestamp import from_timestamp
 from otter.convergence import (
     _remove_from_lb_with_draining, _converge_lb_state,
@@ -61,19 +61,6 @@ def _request(requests):
             responses = [responses]
         return Effect(StubIntent(Sequence(responses)))
     return request
-
-
-def resolve_retry_stubs(eff):
-    """
-    Ensure that the passed effect has a Retry intent, and then resolve it
-    successfully (so no retry occurs).
-
-    This should be used in the positive cases of any retry-using effects.
-    The *value* of the Retry (or at least, Retry.should_retry) should be tested
-    separately to determine that the policy is as expected.
-    """
-    assert type(eff.intent) is Retry
-    return resolve_effect(eff, resolve_stubs(eff.intent.effect))
 
 
 class GetAllServerDetailsTests(SynchronousTestCase):
