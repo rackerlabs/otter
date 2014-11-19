@@ -9,7 +9,7 @@ import treq
 
 from zope.interface import implementer, directlyProvides
 
-from testtools.matchers import Mismatch
+from testtools.matchers import Mismatch, MatchesException
 
 from twisted.internet import defer
 from twisted.internet.defer import succeed, Deferred, maybeDeferred
@@ -118,6 +118,24 @@ class CheckFailure(object):
     def __eq__(self, other):
         return isinstance(other, Failure) and other.check(
             self.exception_type)
+
+
+class CheckFailureValue(object):
+    """
+    Class whose instances compare equal to a Failure wrapping an equivalent
+    exception, based on :obj:`MatchesException`.
+    """
+    def __init__(self, exception):
+        self.exception = exception
+
+    def __repr__(self):
+        return "CheckFailureValue(%r)" % (self.exception,)
+
+    def __eq__(self, other):
+        matcher = MatchesException(self.exception)
+        return (isinstance(other, Failure)
+                and other.check(type(self.exception)) is not None
+                and matcher.match((type(other.value), other.value, None)) is None)
 
 
 class IsCallable(object):
