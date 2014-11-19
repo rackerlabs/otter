@@ -526,10 +526,10 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(sorted(results), [(lb_config_1, lb_response_1),
                                            (lb_config_2, lb_response_2)])
 
-    def test_add_to_load_balancers_is_serial(self):
+    def test_serial_execution(self):
         """
-        :func:`add_to_load_balancers` calls :func:`add_to_load_balancer` in
-        series.
+        :func:`add_to_load_balancers` calls :func:`add_to_load_balancer`
+        serially.
         """
         d1, d2 = Deferred(), Deferred()
         self._set_up_fake_add_to_lb([(lb_config_1, d1), (lb_config_2, d2)])
@@ -549,7 +549,7 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
         d2.callback(lb_response_2)
         self.successResultOf(d)
 
-    def test_add_to_load_balancers_no_lb_configs(self):
+    def test_no_lb_configs(self):
         """
         :func:`add_to_load_balancers` returns a Deferred that fires with an
         empty list when no load balancers are configured.
@@ -557,7 +557,7 @@ class AddToLoadBalancersTests(LoadBalancersTestsMixin, SynchronousTestCase):
         d = self._add_to_load_balancers([])
         self.assertEqual(self.successResultOf(d), [])
 
-    def test_add_to_load_balancers_bails_on_errors(self):
+    def test_bail_on_errors(self):
         """
         When one of the underlying :func:`add_to_load_balancer` calls made by
         :func:`add_to_load_balancers` fails, the error is returned, and no
