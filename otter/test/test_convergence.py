@@ -29,37 +29,12 @@ from otter.convergence import (
     extract_drained_at, get_load_balancer_contents, _reqs_to_effect)
 
 
-class Sequence(object):
-    """
-    An Effect intent that returns a different result each time it's performed.
-    """
-    def __init__(self, responses):
-        """
-        :param list responses: Responses to return in sequence. Instances of
-            exception will be raised.
-        """
-        self.responses = responses
-        self._index = 0
-
-    def perform_effect(self, dispatcher):
-        """Return or raise the next result in sequence."""
-        index = self._index
-        self._index += 1
-        response = self.responses[index]
-        if isinstance(response, Exception):
-            raise response
-        else:
-            return response
-
-
 def _request(requests):
     def request(service_type, method, url):
-        responses = requests.get((service_type, method, url))
-        if responses is None:
+        response = requests.get((service_type, method, url))
+        if response is None:
             raise KeyError("{} not in {}".format((method, url), requests.keys()))
-        if not isinstance(responses, list):
-            responses = [responses]
-        return Effect(StubIntent(Sequence(responses)))
+        return Effect(StubIntent(ConstantIntent(response)))
     return request
 
 
