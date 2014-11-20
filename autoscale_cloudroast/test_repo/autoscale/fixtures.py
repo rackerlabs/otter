@@ -35,6 +35,7 @@ class AutoscaleFixture(BaseTestFixture):
         user_config = UserConfig()
         access_data = AuthProvider.get_access_data(cls.endpoint_config,
                                                    user_config)
+        #print "access_data ::::::::::::::::::::::::::: \n", access_data
         server_service = access_data.get_service(
             cls.autoscale_config.server_endpoint_name)
         load_balancer_service = access_data.get_service(
@@ -116,6 +117,8 @@ class AutoscaleFixture(BaseTestFixture):
         cls.non_autoscale_username = cls.autoscale_config.non_autoscale_username
         cls.non_autoscale_password = cls.autoscale_config.non_autoscale_password
         cls.non_autoscale_tenant = cls.autoscale_config.non_autoscale_tenant
+        # cls.rc_load_balancer_pool_1 = cls.autoscale_config.rc_load_balancer_pool_1
+        # cls.rc_load_balancer_pool_2 = cls.autoscale_config.rc_load_balancer_pool_2
 
     def validate_headers(self, headers):
         """

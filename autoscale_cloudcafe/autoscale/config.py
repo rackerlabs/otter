@@ -369,3 +369,18 @@ class AutoscaleConfig(ConfigSectionInterface):
         no access for autoscale.
         """
         return self.get('autoscale_nno_lno_aa')
+
+    @property
+    def rc_load_balancer_pool_1(self):
+        """
+        Name and id of the first shared RCV3 LB
+        """
+        print "Get rc_load_balancer_pool_1 ..... "
+        return self.get('rc_load_balancer_pool_1')
+
+    @property
+    def rc_load_balancer_pool_2(self):
+        """
+        Name and id of the second shared RCV3 LB
+        """
+        return self.get('rc_load_balancer_pool_2')

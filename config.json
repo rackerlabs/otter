@@ -1,63 +1,48 @@
 {
-    "environment": "staging",
-    "region": "ORD",
-    "url_root": "http://127.0.0.1:9000",
-    "cassandra": {
-        "seed_hosts": ["tcp:127.0.0.1:9160"],
-        "keyspace": "otter",
-        "timeout": 30,
-        "default_consistency": 1,
-        "consistency_exceptions": null
-    },
-    "identity": {
-        "username": "autoscale",
-        "password": "REPLACE_WITH_REAL_PASSWORD",
-        "url": "https://staging.identity.api.rackspacecloud.com/v2.0",
-        "admin_url": "https://staging.identity.api.rackspacecloud.com/v2.0",
-        "max_retries": 10,
-        "retry_interval": 10,
-        "wait": 3
-    },
-    "zookeeper": {
-        "hosts": "127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183",
-        "threads": 100
-    },
-    "scheduler": {
-        "interval": 10,
-        "batchsize": 100,
-        "buckets": 10,
-        "partition": {
-            "path": "/scheduler_partition",
-            "time_boundary": 15
-        }
-    },
-    "worker": {
-        "lb_max_retries": 10,
-        "lb_retry_interval_range": [10, 15],
-        "lb_delete_timeout": 600
-    },
-    "limits": {
-        "pagination": 100,
-        "absolute": {
-          "maxGroups": 1000,
-          "maxPoliciesPerGroup": 100,
-          "maxWebhooksPerPolicy": 25
-        }
-    },
-    "root": {
-      "code": 301,
-      "headers": ["http://autoscale.api.rackspacecloud.com"],
-      "body": "Moved to http://autoscale.api.rackspacecloud.com"
-    },
-    "elasticsearch": {
-      "host": "http://127.0.0.1:9200"
-    },
-    "metrics": {
-        "service": "cloudMetricsIngest",
-        "region": "IAD",
-        "username": "REPLACE_WITH_REAL_USERNAME",
-        "password": "REPLACE_WITH_REAL_PASSWORD",
-        "ttl": 432000,
-        "interval": 60
+  "environment": "production",
+  "region": "ORD",
+  "url_root": "http://127.0.0.1:9000",
+  "port": "tcp:9000",
+  "keyspace": "otter",
+  "scheduler": {
+    "batchsize": 10,
+    "buckets": 10,
+    "interval": 10,
+    "partition": {
+      "path": "/scheduler_partition",
+      "time_boundary": 15
     }
+  },
+  "zookeeper": {
+    "hosts": "127.0.0.1:2181",
+    "threads": 10
+  },
+  "identity": {
+    "username": "autoscale",
+    "password": "JLz90p3LnTr5DiXN",
+    "url": "http://localhost:8900/identity/v2.0",
+    "admin_url": "http://localhost:8900/identity/v2.0"
+  },
+  "limits": {
+    "pagination": 100,
+    "absolute": {
+      "maxGroups": 1000,
+      "maxPoliciesPerGroup": 100,
+      "maxWebhooksPerPolicy": 25
+    }
+  },
+  "root": {
+    "code": 301,
+    "headers": {
+      "location": [
+        "http://autoscale.api.rackspacecloud.com"
+      ]
+    }
+  },
+  "cassandra": {
+    "seed_hosts": [
+      "tcp:127.0.0.1:9160"
+    ],
+    "keyspace": "otter"
+  }
 }
