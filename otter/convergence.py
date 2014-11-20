@@ -792,3 +792,40 @@ def _reqs_to_effect(request_func, conv_requests):
                             success_codes=r.success_codes)
                for r in conv_requests]
     return parallel(effects)
+
+
+def execute_convergence(log, trans_id, tenant_id, group_id, desired, launch_config,
+                        authenticator, service_mapping, region):
+    """
+    Execute convergence. This function will do following:
+    1. Get state of the nova, CLB and RCv3.
+    2. Call `converge` with above info and get steps to execute
+    3. Execute these steps
+    This is in effect single cycle execution. A layer above this is expected
+    to keep calling this until :func:`converge` doesn't return any steps
+
+    :param log: A bound logger
+    :param bytes trans_id: Transaction ID triggerring this convergence.
+    TODO: This may not make sense since converger in reality is decoupled from
+    its caller. It is possible, that desired can be different between subsequent
+    converge calls
+
+    :return: An effect when performed will execute all the steps
+    :rtype: :class:`Effect`
+    """
+
+    request_func = get_request_func(authenticator, tenant_id, log,
+                                    service_mapping, region)
+    nova_eff = get_scaling_group_servers(partial(request_func, ServiceType.CLOUD_SERVERS))
+    clb_eff = get_load_balancer_contents(
+        partial(request_func, ServiceType.CLOUD_LOAD_BALANCERS))
+    eff = effect.parallel([nova_eff, clb_eff])
+
+    lbs = list_to_LBConfigs(launch_config['args']['loadBalancers'])
+    desired_state = DesiredGroupState(launch_config=launch_config, desired=desired,
+                                      desired_lbs=lbs)
+
+    conv_eff = eff.on(lambda (servers, clb_nodes): converge(desired_state, servers, lb_nodes,
+                                                            time.time()))
+    return conv_eff.on(lambda c: optimize_steps(c.steps)).on(
+        lambda steps: _reqs_to_effect(request_func, [s.as_request() for s in steps]))
