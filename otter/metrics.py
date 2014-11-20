@@ -163,7 +163,7 @@ def get_all_metrics_effects(cass_groups, get_request_func_for_tenant,
     Gather server data for and produce metrics for all groups across all tenants
     in a region
 
-    :param iterable cass_groups: Groups got from cassandra as
+    :param iterable cass_groups: Groups as retrieved from cassandra
     :param get_request_func_for_tenant: Function of tenant_id -> request function
     :param bool _print: Should the function print while processing?
 
@@ -199,7 +199,7 @@ def get_all_metrics(cass_groups, authenticator, services, region,
     Gather server data and produce metrics for all groups across all tenants
     in a region.
 
-    :param iterable cass_groups: Groups got from cassandra as
+    :param iterable cass_groups: Groups as retrieved from cassandra
     :param otter.auth.IAuthenticator authenticator: object that impersonates a tenant
     :param str services: service mapping from config
     :param str region: DC region

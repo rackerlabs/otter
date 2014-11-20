@@ -44,12 +44,12 @@ class NodeType(Names):
                                  # primary node fails.
 
 
-def get_all_server_details(request_func, limit=100):
+def get_all_server_details(request_func, batch_size=100):
     """
     Return all servers of a tenant.
 
     :param request_func: a request function.
-    :param limit: number of servers to fetch *per batch*.
+    :param batch_size: number of servers to fetch *per batch*.
 
     NOTE: This really screams to be a independent effcloud-type API
     """
@@ -57,10 +57,10 @@ def get_all_server_details(request_func, limit=100):
 
     def get_server_details(marker):
         # sort based on query name to make the tests predictable
-        query = {'limit': limit}
+        query = {'limit': batch_size}
         if marker is not None:
             query.update({'marker': marker})
-        urlparams = sorted(query.items(), key=lambda e: e[0])
+        urlparams = sorted(query.items())
         eff = retry_effect(
             request_func(
                 ServiceType.CLOUD_SERVERS,
@@ -70,7 +70,7 @@ def get_all_server_details(request_func, limit=100):
 
     def continue_(response):
         servers = response['servers']
-        if len(servers) < limit:
+        if len(servers) < batch_size:
             return servers
         else:
             more_eff = get_server_details(servers[-1]['id'])
@@ -78,7 +78,7 @@ def get_all_server_details(request_func, limit=100):
     return get_server_details(None)
 
 
-def get_scaling_group_servers(request_func, server_predicate=None):
+def get_scaling_group_servers(request_func, server_predicate=lambda s: s):
     """
     Return tenant's servers that belong to a scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
@@ -93,7 +93,6 @@ def get_scaling_group_servers(request_func, server_predicate=None):
     def group_id(s):
         return s['metadata']['rax:auto_scaling_group_id']
 
-    server_predicate = server_predicate if server_predicate is not None else lambda s: s
     servers_apply = compose(groupby(group_id), filter(server_predicate), filter(has_group_id))
 
     eff = get_all_server_details(request_func)
