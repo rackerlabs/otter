@@ -4,7 +4,6 @@ Convergence.
 
 from urllib import urlencode
 import calendar
-import json
 from itertools import izip as zip
 
 from characteristic import attributes, Attribute
@@ -127,15 +126,23 @@ def get_load_balancer_contents(request_func):
     :param request_func: A tenant-bound, CLB-bound, auth-retry based request function
     """
 
+    def lb_req(method, url, json_response=True):
+        """Make a request to the LB service with retries."""
+        return retry_effect(
+            request_func(
+                ServiceType.CLOUD_LOAD_BALANCERS,
+                method, url, json_response=json_response),
+            retry_times(5), exponential_backoff_interval(2))
+
     def fetch_nodes(lbs):
-        lb_ids = [lb['id'] for lb in json.loads(lbs)]
+        print "lbs?", lbs
+        lb_ids = [lb['id'] for lb in lbs]
         return effect.parallel(
-            [request_func(
-                'GET',
-                append_segments('loadbalancers', str(lb_id), 'nodes')).on(json.loads)
+            [lb_req('GET', append_segments('loadbalancers', str(lb_id), 'nodes'))
              for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
+        print "all_lb_nodes", all_lb_nodes
         nodes = [LBNode(lb_id=_id, node_id=node['id'], address=node['address'],
                         config=LBConfig(port=node['port'], weight=node['weight'],
                                         condition=NodeCondition.lookupByName(node['condition']),
@@ -144,10 +151,11 @@ def get_load_balancer_contents(request_func):
                  for node in nodes]
         draining = [n for n in nodes if n.config.condition == NodeCondition.DRAINING]
         return effect.parallel(
-            [request_func(
+            [lb_req(
                 'GET',
                 append_segments('loadbalancers', str(n.lb_id), 'nodes',
-                                '{}.atom'.format(n.node_id)))
+                                '{}.atom'.format(n.node_id)),
+                json_response=False)
              for n in draining]).on(lambda feeds: (nodes, draining, feeds))
 
     def fill_drained_at((nodes, draining, feeds)):
@@ -155,7 +163,7 @@ def get_load_balancer_contents(request_func):
             node.drained_at = extract_drained_at(feed)
         return nodes
 
-    return request_func('GET', 'loadbalancers').on(
+    return lb_req('GET', 'loadbalancers').on(
         fetch_nodes).on(fetch_drained_feeds).on(fill_drained_at)
 
 
