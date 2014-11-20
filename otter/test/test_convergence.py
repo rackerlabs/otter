@@ -76,7 +76,6 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         """The HTTP requests are retried with some appropriate policy."""
         request = _request({self.req: {'servers': self.servers}})
         eff = get_all_server_details(request, limit=10)
-        print eff.intent
         self.assertEqual(
             eff.intent.should_retry,
             ShouldDelayAndRetry(can_retry=retry_times(5),
