@@ -48,19 +48,20 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                     'servers/detail?limit=10')
         self.servers = [{'id': i} for i in range(9)]
 
-    def test_get_all_less_limit(self):
+    def test_get_all_less_batch_size(self):
         """
         `get_all_server_details` will not fetch again if first get returns
-        results with size < limit
+        results with size < batch_size
         """
         request = _request({self.req: {'servers': self.servers}})
-        eff = get_all_server_details(request, limit=10)
+        eff = get_all_server_details(request, batch_size=10)
         result = resolve_retry_stubs(eff)
         self.assertEqual(result, self.servers)
 
-    def test_get_all_above_limit(self):
+    def test_get_all_above_batch_size(self):
         """
-        `get_all_server_details` will fetch again until batch returned has size < limit
+        `get_all_server_details` will fetch again until batch returned has
+        size < batch_size
         """
         servers = [{'id': i} for i in range(19)]
 
@@ -68,14 +69,13 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                 'servers/detail?limit=10&marker=9')
         request = _request({self.req: {'servers': servers[:10]},
                             req2: {'servers': servers[10:]}})
-        eff = get_all_server_details(request, limit=10)
+        eff = get_all_server_details(request, batch_size=10)
         self.assertEqual(resolve_retry_stubs(resolve_retry_stubs(eff)), servers)
 
     def test_retry(self):
         """The HTTP requests are retried with some appropriate policy."""
         request = _request({self.req: {'servers': self.servers}})
-        eff = get_all_server_details(request, limit=10)
-        print eff.intent
+        eff = get_all_server_details(request, batch_size=10)
         self.assertEqual(
             eff.intent.should_retry,
             ShouldDelayAndRetry(can_retry=retry_times(5),
@@ -96,7 +96,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
 
     def test_filters_no_metadata(self):
         """
-        Does not include servers which do not have metadata in it
+        Servers without metadata are not included in the result.
         """
         servers = [{'id': i} for i in range(10)]
         request = _request({self.req: {'servers': servers}})

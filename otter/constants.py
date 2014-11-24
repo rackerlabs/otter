@@ -10,7 +10,7 @@ class ServiceType(Names):
     RACKCONNECT_V3 = NamedConstant()
 
 
-def get_service_mapping(service_config):
+def get_service_mapping(get_service_name):
     """
     Return a mapping of :class:`ServiceType` members to the actual configured
     service names to look up in tenant catalogs.
@@ -19,7 +19,7 @@ def get_service_mapping(service_config):
         deployment-specific service name
     """
     return {
-        ServiceType.CLOUD_SERVERS: service_config('cloudServersOpenStack'),
-        ServiceType.CLOUD_LOAD_BALANCERS: service_config("cloudLoadBalancers"),
-        ServiceType.RACKCONNECT_V3: service_config('rackconnect'),
+        ServiceType.CLOUD_SERVERS: get_service_name('cloudServersOpenStack'),
+        ServiceType.CLOUD_LOAD_BALANCERS: get_service_name("cloudLoadBalancers"),
+        ServiceType.RACKCONNECT_V3: get_service_name('rackconnect'),
     }

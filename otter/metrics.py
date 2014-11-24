@@ -22,7 +22,7 @@ from twisted.python import usage
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
-from toolz.curried import groupby, filter, get_in
+from toolz.curried import groupby, filter, get_in, reduce
 from toolz.dicttoolz import merge
 from toolz.functoolz import identity
 
@@ -100,36 +100,6 @@ def get_scaling_groups(client, props=None, batch_size=100, group_pred=None):
     defer.returnValue(group_filter(groups))
 
 
-@defer.inlineCallbacks
-def check_rackconnect(client):
-    """
-    Rackconnect metrics
-    """
-    groups = yield get_scaling_groups(client, props=['launch_config'])
-    for group in groups:
-        lbpool = get_in(['args', 'server', 'metadata', 'RackConnectLBPool'],
-                        json.loads(group['launch_config']))
-        if lbpool is not None:
-            print('Tenant: {} Group: {} RackconnectLBPool: {}'.format(
-                  group['tenantId'], group['groupId'], lbpool))
-
-
-def check_tenant_config(tenant_id, groups, grouped_servers):
-    """
-    Check if servers in the tenant's groups are different, i.e. have different flavor
-    or image
-    """
-    props = (['flavor', 'id'], ['image', 'id'])
-    for group in groups:
-        group_id = group['groupId']
-        if group_id not in grouped_servers:
-            continue
-        uniques = set(map(lambda s: tuple(get_in(p, s) for p in props),
-                          grouped_servers[group_id]))
-        if len(uniques) > 1:
-            print('tenant {} group {} diff types: {}'.format(tenant_id, group_id, uniques))
-
-
 GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual pending')
 
 
@@ -163,7 +133,7 @@ def get_all_metrics_effects(cass_groups, get_request_func_for_tenant,
     Gather server data for and produce metrics for all groups across all tenants
     in a region
 
-    :param iterable cass_groups: Groups got from cassandra as
+    :param iterable cass_groups: Groups as retrieved from cassandra
     :param get_request_func_for_tenant: Function of tenant_id -> request function
     :param bool _print: Should the function print while processing?
 
@@ -199,7 +169,7 @@ def get_all_metrics(cass_groups, authenticator, services, region,
     Gather server data and produce metrics for all groups across all tenants
     in a region.
 
-    :param iterable cass_groups: Groups got from cassandra as
+    :param iterable cass_groups: Groups as retrieved from cassandra
     :param otter.auth.IAuthenticator authenticator: object that impersonates a tenant
     :param str services: service mapping from config
     :param str region: DC region
@@ -212,7 +182,7 @@ def get_all_metrics(cass_groups, authenticator, services, region,
                                 get_service_mapping(services.get), region)
     effs = get_all_metrics_effects(cass_groups, req_func_for_tenant, _print=_print)
     d = _perform_limited_effects(effs, clock, 10)
-    return d.addCallback(lambda r: reduce(operator.add, r))
+    return d.addCallback(reduce(operator.add))
 
 
 @defer.inlineCallbacks
