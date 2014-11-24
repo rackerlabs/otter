@@ -6,7 +6,7 @@ from functools import partial
 
 from characteristic import attributes
 
-from effect import Effect, ConstantIntent
+from effect import Effect, ConstantIntent, parallel
 from effect.testing import StubIntent, resolve_stubs
 
 from pyrsistent import pmap, pbag, pset, s
@@ -1184,28 +1184,14 @@ class RequestsToEffectTests(SynchronousTestCase):
     """
     Tests for converting :class:`Request` into effects.
     """
-    def _reqs_to_effect(self, conv_requests):
-        """
-        Helper function to call :func:`_reqs_to_effect`.
 
-        Uses :class:`_PureRequestStub` test double for easy introspection.
-
-        :param conv_requests: The convergence requests to be turned into an
-            effect.
-        :type conv_requests: iterable of :class:`Request`
-        :return: The return value of :func:`_reqs_to_effect`.
+    def assertCompileTo(self, conv_requests, expected_effects):
         """
-        return _reqs_to_effect(_PureRequestStub, conv_requests)
-
-    def assertCompilesTo(self, conv_requests, expected_effects):
-        """
-        Assert that the given convergence requests, compile down to a parallel
+        Assert that the given convergence requests compile down to a parallel
         effect comprised of the given effects.
         """
-        effect = self._reqs_to_effect(conv_requests)
-        self.assertTrue(isinstance(effect, Effect))
-        individual_effects = effect.intent.effects
-        self.assertEqual(expected_effects, set(individual_effects))
+        effect = _reqs_to_effect(_PureRequestStub, conv_requests)
+        self.assertEqual(effect, parallel(expected_effects))
 
     def test_single_request(self):
         """
@@ -1216,14 +1202,14 @@ class RequestsToEffectTests(SynchronousTestCase):
                     method="GET",
                     path="/whatever",
                     success_codes=(999,))]
-        expected_effects = set([
+        expected_effects = [
             _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
                              method="GET",
                              url="/whatever",
                              headers=None,
                              data=None,
-                             success_codes=(999,))])
-        self.assertCompilesTo(conv_requests, expected_effects)
+                             success_codes=(999,))]
+        self.assertCompileTo(conv_requests, expected_effects)
 
     def test_multiple_requests(self):
         """
@@ -1238,7 +1224,7 @@ class RequestsToEffectTests(SynchronousTestCase):
                     method="GET",
                     path="/whatever/something/else",
                     success_codes=(231,))]
-        expected_effects = set([
+        expected_effects = [
             _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
                              method="GET",
                              url="/whatever",
@@ -1249,8 +1235,8 @@ class RequestsToEffectTests(SynchronousTestCase):
                              url="/whatever/something/else",
                              headers=None,
                              data=None,
-                             success_codes=(231,))])
-        self.assertCompilesTo(conv_requests, expected_effects)
+                             success_codes=(231,))]
+        self.assertCompileTo(conv_requests, expected_effects)
 
     def test_multiple_requests_of_different_type(self):
         """
@@ -1270,7 +1256,7 @@ class RequestsToEffectTests(SynchronousTestCase):
                     method="POST",
                     path="/xyzzy",
                     data=data_sentinel)]
-        expected_effects = set([
+        expected_effects = [
             _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
                              method="GET",
                              url="/whatever",
@@ -1286,5 +1272,5 @@ class RequestsToEffectTests(SynchronousTestCase):
                              method="POST",
                              url="/xyzzy",
                              headers=None,
-                             data=data_sentinel)])
-        self.assertCompilesTo(conv_requests, expected_effects)
+                             data=data_sentinel)]
+        self.assertCompileTo(conv_requests, expected_effects)
