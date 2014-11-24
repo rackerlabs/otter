@@ -134,14 +134,12 @@ def get_load_balancer_contents(request_func):
             retry_times(5), exponential_backoff_interval(2))
 
     def fetch_nodes(lbs):
-        print "lbs?", lbs
         lb_ids = [lb['id'] for lb in lbs]
         return effect.parallel(
             [lb_req('GET', append_segments('loadbalancers', str(lb_id), 'nodes'))
              for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
-        print "all_lb_nodes", all_lb_nodes
         nodes = [LBNode(lb_id=_id, node_id=node['id'], address=node['address'],
                         config=LBConfig(port=node['port'], weight=node['weight'],
                                         condition=NodeCondition.lookupByName(node['condition']),
