@@ -100,36 +100,6 @@ def get_scaling_groups(client, props=None, batch_size=100, group_pred=None):
     defer.returnValue(group_filter(groups))
 
 
-@defer.inlineCallbacks
-def check_rackconnect(client):
-    """
-    Rackconnect metrics
-    """
-    groups = yield get_scaling_groups(client, props=['launch_config'])
-    for group in groups:
-        lbpool = get_in(['args', 'server', 'metadata', 'RackConnectLBPool'],
-                        json.loads(group['launch_config']))
-        if lbpool is not None:
-            print('Tenant: {} Group: {} RackconnectLBPool: {}'.format(
-                  group['tenantId'], group['groupId'], lbpool))
-
-
-def check_tenant_config(tenant_id, groups, grouped_servers):
-    """
-    Check if servers in the tenant's groups are different, i.e. have different flavor
-    or image
-    """
-    props = (['flavor', 'id'], ['image', 'id'])
-    for group in groups:
-        group_id = group['groupId']
-        if group_id not in grouped_servers:
-            continue
-        uniques = set(map(lambda s: tuple(get_in(p, s) for p in props),
-                          grouped_servers[group_id]))
-        if len(uniques) > 1:
-            print('tenant {} group {} diff types: {}'.format(tenant_id, group_id, uniques))
-
-
 GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual pending')
 
 
