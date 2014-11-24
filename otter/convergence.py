@@ -17,7 +17,7 @@ from twisted.python.constants import Names, NamedConstant
 import effect
 
 from toolz.curried import filter, groupby
-from toolz.functoolz import compose
+from toolz.functoolz import compose, identity
 from toolz.itertoolz import concat, concatv, mapcat
 
 from otter.constants import ServiceType
@@ -78,13 +78,13 @@ def get_all_server_details(request_func, batch_size=100):
     return get_server_details(None)
 
 
-def get_scaling_group_servers(request_func, server_predicate=lambda s: s):
+def get_scaling_group_servers(request_func, server_predicate=identity):
     """
     Return tenant's servers that belong to a scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
 
-    :param server_predicate: `callable` taking single server as arg and returns True
-                              if the server should be included, False otherwise
+    :param server_predicate: function of server -> bool that determines whether
+        the server should be included in the result.
     """
 
     def has_group_id(s):

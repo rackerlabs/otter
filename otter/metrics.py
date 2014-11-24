@@ -22,7 +22,7 @@ from twisted.python import usage
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
-from toolz.curried import groupby, filter, get_in
+from toolz.curried import groupby, filter, get_in, reduce
 from toolz.dicttoolz import merge
 from toolz.functoolz import identity
 
@@ -212,7 +212,7 @@ def get_all_metrics(cass_groups, authenticator, services, region,
                                 get_service_mapping(services.get), region)
     effs = get_all_metrics_effects(cass_groups, req_func_for_tenant, _print=_print)
     d = _perform_limited_effects(effs, clock, 10)
-    return d.addCallback(lambda r: reduce(operator.add, r))
+    return d.addCallback(reduce(operator.add))
 
 
 @defer.inlineCallbacks
