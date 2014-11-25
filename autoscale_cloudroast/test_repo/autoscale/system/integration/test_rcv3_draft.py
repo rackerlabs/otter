@@ -19,7 +19,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         Capture the initial state of the shared load balancer pools
         """
 
-        #super(AutoscaleRackConnectFixture, cls).setUpClass()
+        super(AutoscaleRackConnectFixture, self).setUp()
         # cls.load_balancer_1_response = cls.lbaas_client.create_load_balancer('test', [],
         #                                                                      'HTTP', 80, "PUBLIC")
         # cls.load_balancer_1 = cls.load_balancer_1_response.entity.id
@@ -60,8 +60,11 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.lc_metadata = {'meta_key_1': 'meta_value_1',
                             'meta_key_2': 'meta_value_2'}
         self.lc_disk_config = 'AUTO'
+        # self.lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'},
+        #                     {'uuid': '00000000-0000-0000-0000-000000000000'}]
         self.lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'},
-                            {'uuid': '00000000-0000-0000-0000-000000000000'}]
+                            {'uuid': '07426958-1ebf-4c38-b032-d456820ca21a'}]
+                            #{'uuid': '00000000-0000-0000-0000-000000000000'}]
         #self.lc_load_balancers = [{'loadBalancerId': 9099, 'port': 8080}]
         self.lc_load_balancers = [{'loadBalancerId': "364b6c45-914d-422f-be30-3d18d612ecf4",
                                    'type': 'RackConnectV3'}]
@@ -77,7 +80,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.create_resp = self.autoscale_client.create_scaling_group(
             gc_name=self.gc_name,
             gc_cooldown=self.gc_cooldown,
-            gc_min_entities=self.gc_min_entities,
+            #gc_min_entities=self.gc_min_entities,
+            gc_min_entities=1,
             gc_max_entities=self.gc_max_entities,
             gc_metadata=self.gc_metadata,
             lc_name=self.lc_name,
@@ -89,12 +93,12 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             lc_networks=self.lc_networks,
             #lc_block_device_mapping=block_device_mapping,
             lc_load_balancers=self.lc_load_balancers,
-            sp_list=self.sp_list,
-            network_type='public')
+            sp_list=self.sp_list)
+            #network_type='public')
         self.scaling_group = self.create_resp.entity
         print self.scaling_group
-        self.resources.add(self.scaling_group.id,
-                           self.autoscale_client.delete_scaling_group)
+        # self.resources.add(self.scaling_group.id,
+        #                    self.autoscale_client.delete_scaling_group)
 
         self.assertTrue(self.create_resp.ok,
                         msg='Create scaling group call failed with API Response: {0} for '
@@ -103,14 +107,11 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           msg='The create failed with {0} for group '
                           '{1}'.format(self.create_resp.status_code, self.scaling_group.id))
 
-
-
-
-    # def _get_node_list_from_rc(self, pool_id):
-    #     """
-    #     Returns the list of nodes on the load balancer pool
-    #     """
-    #     return self.lbaas_client.list_nodes(load_balancer_id).entity
+    def _get_node_list_from_rc(self, pool_id):
+        """
+        Returns the list of nodes on the load balancer pool
+        """
+        return self.rcv3_client.list_nodes(pool_id).entity
 
     # @tags(speed='slow', type='lbaas')
     # def test_delete_server_if_deleted_load_balancer_during_scale_up(self):

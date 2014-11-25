@@ -371,6 +371,13 @@ class AutoscaleConfig(ConfigSectionInterface):
         return self.get('autoscale_nno_lno_aa')
 
     @property
+    def rcv3_endpoint_name(self):
+        """
+        Get the catalog name of the RCV3 endpoint
+        """
+        return self.get('rcv3_endpoint_name')
+
+    @property
     def rc_load_balancer_pool_1(self):
         """
         Name and id of the first shared RCV3 LB

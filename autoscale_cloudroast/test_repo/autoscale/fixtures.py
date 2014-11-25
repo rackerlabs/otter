@@ -7,7 +7,7 @@ from cloudcafe.common.resources import ResourcePool
 from cloudcafe.common.tools.datagen import rand_name
 from autoscale.config import AutoscaleConfig
 from cloudcafe.auth.config import UserAuthConfig, UserConfig
-from autoscale.client import AutoscalingAPIClient, LbaasAPIClient
+from autoscale.client import AutoscalingAPIClient, LbaasAPIClient, Rcv3APIClient
 from cloudcafe.auth.provider import AuthProvider
 from cloudcafe.compute.servers_api.client import ServersClient
 from autoscale.otter_constants import OtterConstants
@@ -46,6 +46,12 @@ class AutoscaleFixture(BaseTestFixture):
         lbaas_url = load_balancer_service.get_endpoint(
             cls.autoscale_config.lbaas_region_override or
             cls.autoscale_config.region).public_url
+        # Get the name of the RCV3 service catalog entry from the config file
+        rcv3_service = access_data.get_service(cls.autoscale_config.rcve_endpoint_name)
+        # Use the region of the config to get the url
+        rcv3_url = rcv3_service.get_endpoint(
+            cls.autoscale_config.rcv3_region_override or
+            cls.autoscale_config.region).public_url
 
         cls.tenant_id = cls.autoscale_config.tenant_id
 
@@ -67,6 +73,10 @@ class AutoscaleFixture(BaseTestFixture):
             'json', 'json')
         cls.lbaas_client = LbaasAPIClient(
             lbaas_url, access_data.token.id_,
+            'json', 'json')
+        # Instantiate an RCV3 client using the url from the catalog
+        cls.rcv3_client = Rcv3APIClient(
+            rcv3_url, access_data.token.id_,
             'json', 'json')
         cls.autoscale_behaviors = AutoscaleBehaviors(cls.autoscale_config,
                                                      cls.autoscale_client)
@@ -117,8 +127,13 @@ class AutoscaleFixture(BaseTestFixture):
         cls.non_autoscale_username = cls.autoscale_config.non_autoscale_username
         cls.non_autoscale_password = cls.autoscale_config.non_autoscale_password
         cls.non_autoscale_tenant = cls.autoscale_config.non_autoscale_tenant
-        # cls.rc_load_balancer_pool_1 = cls.autoscale_config.rc_load_balancer_pool_1
-        # cls.rc_load_balancer_pool_2 = cls.autoscale_config.rc_load_balancer_pool_2
+        try:
+            print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+            print cls.autoscale_config.rc_load_balancer_pool_1
+        except:
+            pass
+        cls.rc_load_balancer_pool_1 = cls.autoscale_config.rc_load_balancer_pool_1
+        cls.rc_load_balancer_pool_2 = cls.autoscale_config.rc_load_balancer_pool_2
 
     def validate_headers(self, headers):
         """
