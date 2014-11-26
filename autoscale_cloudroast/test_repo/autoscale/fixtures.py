@@ -7,7 +7,7 @@ from cloudcafe.common.resources import ResourcePool
 from cloudcafe.common.tools.datagen import rand_name
 from autoscale.config import AutoscaleConfig
 from cloudcafe.auth.config import UserAuthConfig, UserConfig
-from autoscale.client import AutoscalingAPIClient, LbaasAPIClient, Rcv3APIClient
+from autoscale.client import AutoscalingAPIClient, LbaasAPIClient, RackConnectV3APIClient
 from cloudcafe.auth.provider import AuthProvider
 from cloudcafe.compute.servers_api.client import ServersClient
 from autoscale.otter_constants import OtterConstants
@@ -15,6 +15,7 @@ from autoscale.otter_constants import OtterConstants
 import os
 import time
 from functools import partial
+import json
 
 
 class AutoscaleFixture(BaseTestFixture):
@@ -35,7 +36,7 @@ class AutoscaleFixture(BaseTestFixture):
         user_config = UserConfig()
         access_data = AuthProvider.get_access_data(cls.endpoint_config,
                                                    user_config)
-        #print "access_data ::::::::::::::::::::::::::: \n", access_data
+        print "access_data ::::::::::::::::::::::::::: \n", access_data
         server_service = access_data.get_service(
             cls.autoscale_config.server_endpoint_name)
         load_balancer_service = access_data.get_service(
@@ -47,11 +48,20 @@ class AutoscaleFixture(BaseTestFixture):
             cls.autoscale_config.lbaas_region_override or
             cls.autoscale_config.region).public_url
         # Get the name of the RCV3 service catalog entry from the config file
-        rcv3_service = access_data.get_service(cls.autoscale_config.rcve_endpoint_name)
+        rcv3_service = access_data.get_service(cls.autoscale_config.rcv3_endpoint_name)
         # Use the region of the config to get the url
-        rcv3_url = rcv3_service.get_endpoint(
-            cls.autoscale_config.rcv3_region_override or
-            cls.autoscale_config.region).public_url
+        try:
+            rcv3_url = rcv3_service.get_endpoint(
+                cls.autoscale_config.rcv3_region_override or
+                cls.autoscale_config.region).public_url
+            # Instantiate an RCV3 client using the url from the catalog
+            cls.rcv3_client = RackConnectV3APIClient(
+                rcv3_url, access_data.token.id_,
+                'json', 'json')
+            print "RCV3 URL: {}".format(rcv3_url)
+        except:
+            print "This account does not support rackconnect"
+            # Skip rackconnect test? TO_DO
 
         cls.tenant_id = cls.autoscale_config.tenant_id
 
@@ -74,10 +84,7 @@ class AutoscaleFixture(BaseTestFixture):
         cls.lbaas_client = LbaasAPIClient(
             lbaas_url, access_data.token.id_,
             'json', 'json')
-        # Instantiate an RCV3 client using the url from the catalog
-        cls.rcv3_client = Rcv3APIClient(
-            rcv3_url, access_data.token.id_,
-            'json', 'json')
+
         cls.autoscale_behaviors = AutoscaleBehaviors(cls.autoscale_config,
                                                      cls.autoscale_client)
         cls.gc_name = cls.autoscale_config.gc_name
@@ -130,10 +137,10 @@ class AutoscaleFixture(BaseTestFixture):
         try:
             print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
             print cls.autoscale_config.rc_load_balancer_pool_1
+            cls.rc_load_balancer_pool_1 = json.loads(cls.autoscale_config.rc_load_balancer_pool_1)
+            cls.rc_load_balancer_pool_2 = json.loads(cls.autoscale_config.rc_load_balancer_pool_2)
         except:
             pass
-        cls.rc_load_balancer_pool_1 = cls.autoscale_config.rc_load_balancer_pool_1
-        cls.rc_load_balancer_pool_2 = cls.autoscale_config.rc_load_balancer_pool_2
 
     def validate_headers(self, headers):
         """

@@ -5,7 +5,8 @@ from autoscale.models.response.autoscale_response import (Group, Config,
                                                           Policy, Webhook,
                                                           ScalingGroup, Groups,
                                                           Policies, Webhooks,
-                                                          Audit)
+                                                          Audit, RackConnectLBPool,
+                                                          RackConnectLBPools)
 from autoscale.models.response.limits_response import Limits
 from autoscale.models.request.autoscale_requests import (
     Group_Request, Policy_Request, Webhook_Request, Config_Request,
@@ -14,7 +15,6 @@ from autoscale.models.request.autoscale_requests import (
     Webhook_Multi_Request)
 from autoscale.models.lbaas import NodeList, LoadBalancer
 from cafe.engine.clients.rest import AutoMarshallingRestClient
-from cafe.engine.clients.rest import RestClient
 from urlparse import urlparse
 
 
@@ -116,7 +116,6 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
             lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'}]
         if network_type is 'public':
             lc_networks.append({'uuid': '00000000-0000-0000-0000-000000000000'})
-        print "VVVVVVVVVVVV -- lc_networks: %s".format(lc_networks)
         scaling_group = ScalingGroup_Request(gc_name=gc_name,
                                              gc_cooldown=gc_cooldown,
                                              gc_min_entities=gc_min_entities,
@@ -803,7 +802,7 @@ class LbaasAPIClient(AutoMarshallingRestClient):
         :param virtualIps: The virtualIps of the load balancer
         :type virtualIps: string
         :return: Response Object containing response code 202
-        on success and returns created load balancer json
+         on success and returns created load balancer json
         :rtype: Response Object
         """
         lb = LoadBalancer(name=name, nodes=nodes, protocol=protocol,
@@ -868,57 +867,93 @@ class LbaasAPIClient(AutoMarshallingRestClient):
                             requestslib_kwargs=requestslib_kwargs)
 
 
-class Rcv3APIClient(AutoMarshallingRestClient):
-
+class RackConnectV3APIClient(AutoMarshallingRestClient):
     """
-    Client object for the list node lbaas api call
+    Client objects for all Rackconnect V3 API calls.
     """
 
-    def __init__(self, url, auth_token, serialize_format=None,
-                 deserialize_format=None):
-        super(Rcv3APIClient, self).__init__(serialize_format,
-                                             deserialize_format)
-        self.url = ''.join([url, '/load_balancer_pools'])
+    def __init__(self, url, auth_token, serialize_format=None, deserialize_format=None):
+        super(RackConnectV3APIClient, self).__init__(serialize_format, deserialize_format)
+        self.url = url
         self.auth_token = auth_token
         self.default_headers['X-Auth-Token'] = auth_token
-        self.default_headers['Content-Type'] = 'application/%s' % \
-                                               self.serialize_format
+        self.default_headers['Content-Type'] = 'application/%s' % (self.serialize_format,)
+        self.default_headers['Accept'] = 'application/%s' % (self.deserialize_format,)
 
-    def list_nodes(self, load_balancer_id, limit=None, marker=None,
-                   offset=None, requestslib_kwargs=None):
+    def list_pools(self):
         """
-        :summary: Get the list of nodes for the given load balancer id
-        :param load_balancer_id: The id of an existing load balancer
-        :type load_balancer_id: Integer
+        :summary: Get the list of pools for the tenant's RCV3 account
         :return: Response Object containing response code 202
-        on success and list of nodes
+        on success and list of pools
         :rtype: Response Object
         """
-        params = {}
-        if limit is not None:
-            params['limit'] = str(limit)
-        if marker is not None:
-            params['marker'] = str(marker)
-        if offset is not None:
-            params['offset'] = str(offset)
-        full_url = '/'.join([self.url, str(load_balancer_id), 'nodes'])
-        return self.request('GET', full_url, params=params,
-                            response_entity_type=NodeList,
-                            requestslib_kwargs=requestslib_kwargs)
+        url = self.url + "/load_balancer_pools"
+        return self.request('GET', url, response_entity_type=RackConnectLBPools)
 
-    def delete_node(self, load_balancer_id, node_id, requestslib_kwargs=None):
+    def get_pool_info(self, pool_id):
         """
-        :summary: Delete a node. This removes the node from the load balancer pool
-            but not from the scaling group.
-        :param load_balancer_id: The id of an existing load balancer.
-        :type load_balancer_id: String
-        :param node_id: The id of an existing node.
-        :type node_id: String
-        :return: Response Object containing response code 204
-         on success and empty body
+        :summary: Get information on a given load_balancer_pool
+        :return: Response Object
         :rtype: Response Object
         """
-        full_url = '/'.join([self.url, str(load_balancer_id), 'nodes',
-                             str(node_id)])
-        return self.request('DELETE', full_url,
-                            requestslib_kwargs=requestslib_kwargs)
+        url = self.url + '/load_balancer_pools/{0}'.format(pool_id)
+        return self.request('GET', url, response_entity_type=RackConnectLBPool)
+
+    def try_marshalling(self, url=None, requestslib_kwargs=None):
+        url = url or (self.url + "/load_balancer_pools")
+        return self.request('GET', url, response_entity_type=RackConnectLBPools)
+
+# class Rcv3APIClient(AutoMarshallingRestClient):
+
+#     """
+#     Client object for the list node lbaas api call
+#     """
+
+#     def __init__(self, url, auth_token, serialize_format=None,
+#                  deserialize_format=None):
+#         super(Rcv3APIClient, self).__init__(serialize_format,
+#                                             deserialize_format)
+#         self.url = ''.join([url, '/load_balancer_pools'])
+#         self.auth_token = auth_token
+#         self.default_headers['X-Auth-Token'] = auth_token
+#         self.default_headers['Content-Type'] = 'application/%s' % \
+#                                                self.serialize_format
+
+#     def list_nodes(self, load_balancer_id, limit=None, marker=None,
+#                    offset=None, requestslib_kwargs=None):
+#         """
+#         :summary: Get the list of nodes for the given load balancer id
+#         :param load_balancer_id: The id of an existing load balancer
+#         :type load_balancer_id: Integer
+#         :return: Response Object containing response code 202
+#         on success and list of nodes
+#         :rtype: Response Object
+#         """
+#         params = {}
+#         if limit is not None:
+#             params['limit'] = str(limit)
+#         if marker is not None:
+#             params['marker'] = str(marker)
+#         if offset is not None:
+#             params['offset'] = str(offset)
+#         full_url = '/'.join([self.url, str(load_balancer_id), 'nodes'])
+#         return self.request('GET', full_url, params=params,
+#                             response_entity_type=NodeList,
+#                             requestslib_kwargs=requestslib_kwargs)
+
+#     def delete_node(self, load_balancer_id, node_id, requestslib_kwargs=None):
+#         """
+#         :summary: Delete a node. This removes the node from the load balancer pool
+#             but not from the scaling group.
+#         :param load_balancer_id: The id of an existing load balancer.
+#         :type load_balancer_id: String
+#         :param node_id: The id of an existing node.
+#         :type node_id: String
+#         :return: Response Object containing response code 204
+#          on success and empty body
+#         :rtype: Response Object
+#         """
+#         full_url = '/'.join([self.url, str(load_balancer_id), 'nodes',
+#                              str(node_id)])
+#         return self.request('DELETE', full_url,
+#                             requestslib_kwargs=requestslib_kwargs)

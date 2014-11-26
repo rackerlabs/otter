@@ -20,6 +20,36 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         """
 
         super(AutoscaleRackConnectFixture, self).setUp()
+        # Get list of available pools
+        self.pool_1 = None
+        self.pool_2 = None
+        tenant_pools = self._get_available_pools()
+        # Since RCV3 pools must be created by human intervention,
+        # verify that at least one exists before proceeding with tests
+        if len(tenant_pools) == 0:
+            raise Exception("NoLBPoolsError")
+        else:
+            print tenant_pools
+            print "lb 1 : {}".format(self.rc_load_balancer_pool_1)
+            if self.rc_load_balancer_pool_1['type'] == 'mimic':
+                # Mimic should have a single pool out of the box
+                self.pool_1 = tenant_pools[0]
+                try:
+                    # Create a second pool for advanced testing TODO
+                    self.pool_2 = tenant_pools[1]
+                except:
+                    print "Error: No second RCV3 pool configured in Mimic"
+            else:   # Check that the pool in the config exists
+                for pool in tenant_pools:
+                    if pool.id == self.rc_load_balancer_pool_1['loadBalancerId']:
+                        self.pool_1 = pool
+                    if pool.id == self.rc_load_balancer_pool_2['loadBalancerId']:
+                        self.pool_2 = pool
+
+        # if type of rc_load_balancer_pool_1 is mimic, use the first available pool as pool 1
+        # else if pool from config is in list, use as pool 1, if not abort
+        # same for pool 2
+
         # cls.load_balancer_1_response = cls.lbaas_client.create_load_balancer('test', [],
         #                                                                      'HTTP', 80, "PUBLIC")
         # cls.load_balancer_1 = cls.load_balancer_1_response.entity.id
@@ -50,6 +80,85 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         Test that it is possible to create a scaling group with 0 entities
         connected to an RCV3 LB pool
         """
+        # Create a scaling group with zero servers
+        lb_pools = [{'loadBalancerId': self.pool_1.id, 'type': 'RackConnectV3'}]
+        pool_group_resp = self._create_rcv3_group(lb_list=lb_pools, group_min=0)
+
+        pool_group = pool_group_resp.entity
+        print pool_group
+        self.resources.add(pool_group.id,
+                           self.autoscale_client.delete_scaling_group)
+
+        self.assertTrue(pool_group_resp.ok,
+                        msg='Create scaling group call failed with API Response: {0} for '
+                        'group {1}'.format(pool_group_resp.content, pool_group.id))
+        self.assertEquals(self.create_resp.status_code, 201,
+                          msg='The create failed with {0} for group '
+                          '{1}'.format(pool_group_resp.status_code, pool_group.id))
+        self.assertEquals(pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
+                          self.pool_1.id,
+                          msg='The launchConfig for group {0} did not contain the load balancer'
+                          .format(pool_group.id))
+        self.assertEquals(pool_group.launchConfiguration.loadBalancers[0].type, "RackConnectV3",
+                          msg='Load balancer type {0} is not correct for RackConnect pools'
+                          .format(pool_group.launchConfiguration.loadBalancers[0].type))
+
+    @tags(speed='slow', type='rcv3')
+    def test_create_scaling_group_with_pool_default_1(self):
+        """
+        Test that it is possible to create a scaling group with 0 entities
+        connected to an RCV3 LB pool
+        """
+        # Create a scaling group with zero servers
+        lb_pools = [{'loadBalancerId': self.pool_1.id, 'type': 'RackConnectV3'}]
+        pool_group_resp = self._create_rcv3_group(lb_list=lb_pools, group_min=1)
+
+        pool_group = pool_group_resp.entity
+        print pool_group
+        self.resources.add(pool_group.id,
+                           self.autoscale_client.delete_scaling_group)
+
+        # Wait for an active server according to autoscale
+        self.wait_for_expected_number_of_active_servers(pool_group.id, 1, timeout=600)
+
+        # Check that there is a server on the LB_Pools
+        init_cloud_servers = self.pool_1.node_counts['cloud_servers']
+        new_counts = self._get_node_counts_on_pool(self.pool_1.id)
+        print new_counts
+        expected_count = init_cloud_servers + 1
+
+        self.assertEqual(new_counts['cloud_servers'], expected_count, msg=' count {0}'
+                         ' is not equal to 1'.format(new_counts['cloud_servers']))
+
+    def _get_available_pools(self):
+        """
+        List the rcv3 pools on the tenant
+        """
+        pools = self.rcv3_client.list_pools().entity.pools
+        return pools
+
+    def _get_node_counts_on_pool(self, pool_id):
+        """
+        Get the node counts on a given pool
+        """
+        pool_list = self._get_available_pools()
+        for pool in pool_list:
+            print pool
+            if pool.id == pool_id:
+                return pool.node_counts
+
+    # def _get_node_list_from_rc(self, pool_id):
+    #     """
+    #     Returns the list of nodes on the load balancer pool
+    #     """
+    #     return self.rcv3_client.list_nodes(pool_id).entity
+
+    def _create_rcv3_group(self, lb_list=None, group_min=None):
+        """
+        Create a scaling group
+        """
+        if group_min is None:
+            group_min = self.gc_min_entities
         self.gc_name = rand_name('rcv3_test_group')
         self.gc_max_entities = 10
         self.gc_metadata = {'gc_meta_key_1': 'gc_meta_value_1',
@@ -66,8 +175,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                             {'uuid': '07426958-1ebf-4c38-b032-d456820ca21a'}]
                             #{'uuid': '00000000-0000-0000-0000-000000000000'}]
         #self.lc_load_balancers = [{'loadBalancerId': 9099, 'port': 8080}]
-        self.lc_load_balancers = [{'loadBalancerId': "364b6c45-914d-422f-be30-3d18d612ecf4",
-                                   'type': 'RackConnectV3'}]
+        # self.lc_load_balancers = [{'loadBalancerId': "364b6c45-914d-422f-be30-3d18d612ecf4",
+        #                            'type': 'RackConnectV3'}]
 
         self.sp_list = [{
             'name': 'scale up by 1',
@@ -76,12 +185,12 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             'type': 'webhook'
         }]
         #self.lc_block_device_mapping = block_device_mapping
-
+        # Create a scaling group with zero servers
         self.create_resp = self.autoscale_client.create_scaling_group(
             gc_name=self.gc_name,
             gc_cooldown=self.gc_cooldown,
+            gc_min_entities=group_min,
             #gc_min_entities=self.gc_min_entities,
-            gc_min_entities=1,
             gc_max_entities=self.gc_max_entities,
             gc_metadata=self.gc_metadata,
             lc_name=self.lc_name,
@@ -92,26 +201,10 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             lc_disk_config=self.lc_disk_config,
             lc_networks=self.lc_networks,
             #lc_block_device_mapping=block_device_mapping,
-            lc_load_balancers=self.lc_load_balancers,
+            lc_load_balancers=lb_list,
             sp_list=self.sp_list)
             #network_type='public')
-        self.scaling_group = self.create_resp.entity
-        print self.scaling_group
-        # self.resources.add(self.scaling_group.id,
-        #                    self.autoscale_client.delete_scaling_group)
-
-        self.assertTrue(self.create_resp.ok,
-                        msg='Create scaling group call failed with API Response: {0} for '
-                        'group {1}'.format(self.create_resp.content, self.scaling_group.id))
-        self.assertEquals(self.create_resp.status_code, 201,
-                          msg='The create failed with {0} for group '
-                          '{1}'.format(self.create_resp.status_code, self.scaling_group.id))
-
-    def _get_node_list_from_rc(self, pool_id):
-        """
-        Returns the list of nodes on the load balancer pool
-        """
-        return self.rcv3_client.list_nodes(pool_id).entity
+        return self.create_resp
 
     # @tags(speed='slow', type='lbaas')
     # def test_delete_server_if_deleted_load_balancer_during_scale_up(self):
