@@ -1,15 +1,15 @@
 """
 Integration point for HTTP clients in otter.
 """
-from functools import partial, wraps
+from functools import wraps
 
-from effect import Effect, FuncIntent
+from effect import Effect
 
 from otter.util.pure_http import (
     request, add_headers, add_effect_on_response, add_error_handling,
     add_bind_root, add_content_only, add_json_response, add_json_request_data)
 from otter.util.http import headers as otter_headers
-from otter.auth import public_endpoint_url
+from otter.auth import public_endpoint_url, Authenticate, InvalidateToken
 
 
 def get_request_func(authenticator, tenant_id, log, service_mapping, region):
@@ -32,11 +32,8 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
     :param region: The region of the Rackspace services which requests will
         be made to.
     """
-    def impure_auth():
-        return authenticator.authenticate_tenant(tenant_id, log=log)
-    impure_invalidate = partial(authenticator.invalidate, tenant_id)
-    auth_eff = Effect(FuncIntent(impure_auth))
-    invalidate_eff = Effect(FuncIntent(impure_invalidate))
+    auth_eff = Effect(Authenticate(authenticator, tenant_id, log))
+    invalidate_eff = Effect(InvalidateToken(authenticator, tenant_id))
     default_log = log
 
     @wraps(request)

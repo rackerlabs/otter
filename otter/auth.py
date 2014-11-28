@@ -40,6 +40,8 @@ import json
 from itertools import groupby
 from functools import partial
 
+from characteristic import attributes
+
 from twisted.internet.defer import succeed, Deferred
 
 from zope.interface import Interface, implementer
@@ -84,6 +86,7 @@ class ICachingAuthenticator(IAuthenticator):
 
 
 @implementer(IAuthenticator)
+@attributes(['reactor', 'authenticator', 'max_retries', 'retry_interval'], apply_with_init=False)
 class RetryingAuthenticator(object):
     """
     An authenticator that retries the provided auth_function if it fails
@@ -109,6 +112,7 @@ class RetryingAuthenticator(object):
 
 
 @implementer(IAuthenticator)
+@attributes(['reactor', 'authenticator', 'wait'], apply_with_init=False)
 class WaitingAuthenticator(object):
     """
     An authenticator that waits after getting the token and before returning it
@@ -132,6 +136,7 @@ class WaitingAuthenticator(object):
 
 
 @implementer(ICachingAuthenticator)
+@attributes(['reactor', 'authenticator', 'ttl'], apply_with_init=False)
 class CachingAuthenticator(object):
     """
     An authenticator which cases the result of the provided auth_function
@@ -217,6 +222,8 @@ class CachingAuthenticator(object):
 
 
 @implementer(IAuthenticator)
+@attributes(['identity_admin_user', 'identity_admin_password', 'url', 'admin_url'],
+            apply_with_init=False)
 class ImpersonatingAuthenticator(object):
     """
     An authentication handler that first uses a identity admin account to authenticate
@@ -426,3 +433,36 @@ def public_endpoint_url(service_catalog, service_name, region):
     """
     first_endpoint = next(endpoints(service_catalog, service_name, region))
     return first_endpoint['publicURL']
+
+
+@attributes(['authenticator', 'tenant_id', 'log'], apply_with_init=False)
+class Authenticate(object):
+    """
+    An Effect intent that represents authentication.
+
+    The result type is (auth_token, service_catalog).
+    """
+    def __init__(self, authenticator, tenant_id, log):
+        self.authenticator = authenticator
+        self.tenant_id = tenant_id
+        self.log = log
+
+    def perform_effect(self, dispatcher):
+        """Authenticate."""
+        return self.authenticator.authenticate_tenant(self.tenant_id, log=self.log)
+
+
+@attributes(['authenticator', 'tenant_id'], apply_with_init=False)
+class InvalidateToken(object):
+    """
+    An Effect intent that represents the invalidation of a token from a local cache.
+
+    The result type is None.
+    """
+    def __init__(self, authenticator, tenant_id):
+        self.authenticator = authenticator
+        self.tenant_id = tenant_id
+
+    def perform_effect(self, dispatcher):
+        """Invalidate the credential cache."""
+        return self.authenticator.invalidate(self.tenant_id)

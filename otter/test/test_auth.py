@@ -23,7 +23,9 @@ from otter.auth import (authenticate_user, extract_token, impersonate_user,
                         ImpersonatingAuthenticator,
                         CachingAuthenticator, RetryingAuthenticator,
                         WaitingAuthenticator, IAuthenticator,
-                        endpoints, public_endpoint_url)
+                        ICachingAuthenticator,
+                        endpoints, public_endpoint_url,
+                        Authenticate, InvalidateToken)
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],
@@ -723,3 +725,29 @@ class WaitingAuthenticatorTests(SynchronousTestCase):
         self.mock_auth.authenticate_tenant.return_value = fail(ValueError('e'))
         d = self.authenticator.authenticate_tenant('t1', 'log')
         self.failureResultOf(d, ValueError)
+
+
+class AuthenticateTests(SynchronousTestCase):
+    """Tests for :obj:`Authenticate`."""
+
+    def test_authenticate(self):
+        """Performing causes a call to authenticator.authenticate_tenant."""
+        result = ('token', {'catalog': 'foo'})
+        mock_auth = iMock(IAuthenticator)
+        mock_auth.authenticate_tenant.return_value = succeed(result)
+        log = object()
+        intent = Authenticate(mock_auth, 'tenant_id1', log)
+        self.assertEqual(self.successResultOf(intent.perform_effect(None)), result)
+        mock_auth.authenticate_tenant.assert_called_once_with('tenant_id1', log=log)
+
+
+class InvalidateTokenTests(SynchronousTestCase):
+    """Tests for :obj:`InvalidateToken`."""
+
+    def test_invalidate_token(self):
+        """Performig causes a call to authenticator.invalidate."""
+        mock_auth = iMock(ICachingAuthenticator)
+        mock_auth.invalidate.return_value = None
+        intent = InvalidateToken(mock_auth, 'tenant_id1')
+        self.assertEqual(intent.perform_effect(None), None)
+        mock_auth.invalidate.assert_called_once_with('tenant_id1')
