@@ -4,6 +4,7 @@ Utilities for consistently handling timestamp formats in otter
 
 from datetime import datetime
 import iso8601
+import calendar
 
 
 MIN = "{0}Z".format(datetime.min.isoformat())
@@ -30,3 +31,13 @@ def from_timestamp(timestamp):
     :return: a timezone-aware ``datetime`` object
     """
     return iso8601.parse_date(timestamp)
+
+
+def timestamp_to_epoch(timestamp):
+    """
+    Convert UTC datetime string to EPOCH seconds
+
+    :param str timestamp: A UTC timestamp string
+    :return: EPOCH seconds as float
+    """
+    return calendar.timegm(from_timestamp(timestamp).utctimetuple())
