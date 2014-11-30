@@ -123,12 +123,11 @@ def to_nova_server(server_json):
     """
     Convert from JSON format to :obj:`NovaServer` instance
     """
-    s = server_json
-    ip = get_in(['addresses', 'private'], s, default='')
+    ip = get_in(['addresses', 'private'], server_json, default='')
     if ip is not '':
         ip = [addr['addr'] for addr in ip if addr['version'] == 4][0]
-    return NovaServer(id=s['id'], state=ServerState.lookupByName(s['state']),
-                      created=timestamp_to_epoch(s['created']),
+    return NovaServer(id=server_json['id'], state=ServerState.lookupByName(server_json['state']),
+                      created=timestamp_to_epoch(server_json['created']),
                       servicenet_address=ip)
 
 
