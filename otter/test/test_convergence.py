@@ -26,10 +26,12 @@ from otter.convergence import (
     extract_drained_at, get_load_balancer_contents, _reqs_to_effect,
     execute_convergence, to_nova_server, json_to_LBConfigs)
 
-from pyrsistent import pmap, pbag, pset, s
+from pyrsistent import pmap, pbag, pset, s, freeze
 
 from effect import ConstantIntent, Effect, parallel, ParallelEffects
 from effect.testing import StubIntent, resolve_stubs, resolve_effect
+
+import mock
 
 
 class GetAllServerDetailsTests(SynchronousTestCase):
@@ -1406,11 +1408,15 @@ class ExecConvergenceTests(SynchronousTestCase):
             eff.intent.effects[0].intent,
             {'url': 'loadbalancers/23', 'headers': None,
              'service_type': ServiceType.CLOUD_LOAD_BALANCERS,
-             'data': {'nodes': [{'weight': 1, 'type': 'PRIMARY', 'port': 80,
-                                 'condition': 'ENABLED', 'address': 'ip2'},
-                                {'weight': 1, 'type': 'PRIMARY', 'port': 80,
-                                 'condition': 'ENABLED', 'address': 'ip1'}]},
+             'data': {'nodes': mock.ANY},
              'method': 'POST', 'success_codes': (200,)})
+        # separate check for nodes as it can be in any order but content is unique
+        self.assertEqual(
+            freeze(eff.intent.effects[0].intent['data']['nodes']),
+            freeze([{'weight': 1, 'type': 'PRIMARY', 'port': 80,
+                     'condition': 'ENABLED', 'address': 'ip2'},
+                    {'weight': 1, 'type': 'PRIMARY', 'port': 80,
+                     'condition': 'ENABLED', 'address': 'ip1'}]))
 
         r = resolve_effect(eff, [{'nodes': [{'address': 'ip'}]}])
         # Returns true to be called again
