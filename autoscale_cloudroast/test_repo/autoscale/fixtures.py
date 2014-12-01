@@ -36,7 +36,7 @@ class AutoscaleFixture(BaseTestFixture):
         user_config = UserConfig()
         access_data = AuthProvider.get_access_data(cls.endpoint_config,
                                                    user_config)
-        print "access_data ::::::::::::::::::::::::::: \n", access_data
+        #print "access_data ::::::::::::::::::::::::::: \n", access_data
         server_service = access_data.get_service(
             cls.autoscale_config.server_endpoint_name)
         load_balancer_service = access_data.get_service(
@@ -134,12 +134,17 @@ class AutoscaleFixture(BaseTestFixture):
         cls.non_autoscale_username = cls.autoscale_config.non_autoscale_username
         cls.non_autoscale_password = cls.autoscale_config.non_autoscale_password
         cls.non_autoscale_tenant = cls.autoscale_config.non_autoscale_tenant
+        # Initialize optional values to None
+        cls.rc_load_balancer_pool_1 = None
+        cls.rc_load_balancer_pool_2 = None
+        cls.rcv3_cloud_network = None
+        # Get optional RCV3 values - These might not be present in the config file
         try:
-            print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
-            print cls.autoscale_config.rc_load_balancer_pool_1
             cls.rc_load_balancer_pool_1 = json.loads(cls.autoscale_config.rc_load_balancer_pool_1)
             cls.rc_load_balancer_pool_2 = json.loads(cls.autoscale_config.rc_load_balancer_pool_2)
+            cls.rcv3_cloud_network = cls.autoscale_config.rcv3_cloud_network
         except:
+            # Skip all RCV3 testing
             pass
 
     def validate_headers(self, headers):

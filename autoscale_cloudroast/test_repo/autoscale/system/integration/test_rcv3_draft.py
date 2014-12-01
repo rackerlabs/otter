@@ -87,7 +87,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         pool_group = pool_group_resp.entity
         print pool_group
         self.resources.add(pool_group.id,
-                           self.autoscale_client.delete_scaling_group)
+                           self.autoscale_client.delete_scaling_group_with_force)
 
         self.assertTrue(pool_group_resp.ok,
                         msg='Create scaling group call failed with API Response: {0} for '
@@ -116,7 +116,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         pool_group = pool_group_resp.entity
         print pool_group
         self.resources.add(pool_group.id,
-                           self.autoscale_client.delete_scaling_group)
+                           self.autoscale_client.delete_scaling_group_with_force)
 
         # Wait for an active server according to autoscale
         self.wait_for_expected_number_of_active_servers(pool_group.id, 1, timeout=600)
@@ -128,7 +128,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         expected_count = init_cloud_servers + 1
 
         self.assertEqual(new_counts['cloud_servers'], expected_count, msg=' count {0}'
-                         ' is not equal to 1'.format(new_counts['cloud_servers']))
+                         ' is not equal to initial count [{1}] + 1'.format(new_counts['cloud_servers'],
+                                                                           init_cloud_servers))
 
     def _get_available_pools(self):
         """

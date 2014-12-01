@@ -498,3 +498,99 @@ class RackConnectLBPools(AutoMarshallingModel):
         Despite the method's name, the parameter actually will be a list.
         """
         return RackConnectLBPools(pool_list)
+
+
+class RackConnectLBNode(AutoMarshallingModel):
+    """
+    Works for a RackConnect V3 Load Balancer Node (note singular!) See also
+    RackConnectLBNodes if you need to touch multiple instances.
+    """
+
+    def __init__(self, **kwargs):
+        super(RackConnectLBNode, self).__init__()
+        for key, value in kwargs.iteritems():
+                setattr(self, key, value)
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        """
+        Returns a RackConnectLBPool instance based on the json serialized
+        string passed in.
+        """
+        json_dict = json.loads(serialized_str)
+        return cls._dict_to_obj(json_dict)
+
+    @classmethod
+    def _dict_to_obj(cls, node_dict):
+        """
+        Converts the dictionary representing a single RackConnectLBPool into an
+        object.
+        """
+        return RackConnectLBNode(**node_dict)
+
+
+class RackConnectLBNodes(AutoMarshallingModel):
+    """
+    Works for RackConnect V3 Load Balancer Nodes (note plural!) The
+    member nodes will contain a list of RackConnectLBNode objects.  See also
+    RackConnectLBNode.
+    """
+
+    def __init__(self, node_list):
+        """
+        The constructor actually performs the unmarshalling.
+        It's used by the _dict_to_obj() class method.
+        """
+        # Note that we must implicitly assume type knowledge of the JSON data
+        # we receive.  If types don't match expectations, it's expected to
+        # throw a TypeError or related exception.  Since CloudCafe always
+        # expects an object, we assign the actual list of sub-objects to the
+        # pools member.
+        super(RackConnectLBNodes, self).__init__()
+        self.nodes = [RackConnectLBNode._dict_to_obj(n) for n in node_list]
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        """
+        Returns an instance of a RackConnectLBPools based on the json
+        serialized_str passed in.
+        """
+        json_list = json.loads(serialized_str)
+        return cls._dict_to_obj(json_list)
+
+    @classmethod
+    def _dict_to_obj(cls, node_list):
+        """
+        Helper method to turn dictionary into RackConnectLBPools instance.
+        Despite the method's name, the parameter actually will be a list.
+        """
+        return RackConnectLBNodes(node_list)
+
+
+class RackConnectLBNodeDetail(AutoMarshallingModel):
+    """
+    Works for a RackConnect V3 Load Balancer Node (note singular!) See also
+    RackConnectLBNodes if you need to touch multiple instances.
+    """
+
+    def __init__(self, **kwargs):
+        super(RackConnectLBNodeDetail, self).__init__()
+        for key, value in kwargs.iteritems():
+                setattr(self, key, value)
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        """
+        Returns a RackConnectLBPool instance based on the json serialized
+        string passed in.
+        """
+        json_dict = json.loads(serialized_str)
+        return cls._dict_to_obj(json_dict)
+
+    @classmethod
+    def _dict_to_obj(cls, node_dict):
+        """
+        Converts the dictionary representing a single RackConnectLBPool into an
+        object.
+        """
+        return RackConnectLBNodeDetail(**node_dict)

@@ -6,7 +6,9 @@ from autoscale.models.response.autoscale_response import (Group, Config,
                                                           ScalingGroup, Groups,
                                                           Policies, Webhooks,
                                                           Audit, RackConnectLBPool,
-                                                          RackConnectLBPools)
+                                                          RackConnectLBPools,
+                                                          RackConnectLBNodes,
+                                                          RackConnectLBNodeDetail)
 from autoscale.models.response.limits_response import Limits
 from autoscale.models.request.autoscale_requests import (
     Group_Request, Policy_Request, Webhook_Request, Config_Request,
@@ -228,6 +230,25 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
         self.group_id = group_id
         params = {'force': force}
+        url = '%s/groups/%s/' % (self.url, self.group_id)
+        return self.request('DELETE', url, params=params,
+                            requestslib_kwargs=requestslib_kwargs)
+
+    def delete_scaling_group_with_force(self, group_id, requestslib_kwargs=None):
+        """
+        :summary: Deletes the scaling group even when there are servers on the group
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+        :return: Response Object containing response code 204
+                 on success and empty body
+        :rtype: Response Object
+
+            DELETE
+            '/{tenantId}/groups/{groupId}?force=true'
+        """
+
+        self.group_id = group_id
+        params = {'force': True}
         url = '%s/groups/%s/' % (self.url, self.group_id)
         return self.request('DELETE', url, params=params,
                             requestslib_kwargs=requestslib_kwargs)
@@ -898,6 +919,31 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         """
         url = self.url + '/load_balancer_pools/{0}'.format(pool_id)
         return self.request('GET', url, response_entity_type=RackConnectLBPool)
+
+    def get_nodes_on_pool(self, pool_id):
+        """
+        :summary: Get the list of nodes on a given load balancer pool
+        :return: List of RC Node objects
+        :rtype: Response Object
+        """
+        url = self.url + '/load_balancer_pools/{0}/nodes'.format(pool_id)
+        return self.request('GET', url, response_entity_type=RackConnectLBNodes)
+
+    def get_node_info_detail(self, pool_id, node_id):
+        """
+        :summary: Get the detailed information on a specific node on a pool
+        :return: List of RC Node objects
+        :rtype: Response Object
+        """
+        url = self.url + '/load_balancer_pools/{0}/nodes/{1}/details'.format(pool_id, node_id)
+        return self.request('GET', url, response_entity_type=RackConnectLBNodeDetail)
+
+    def remove_node_from_pool(self, pool_id, node_id, requestslib_kwargs=None):
+        """
+        :summary: Remove a node from a lb pool
+        """
+        url = self.url + '/load_balancer_pools/{0}/nodes/{1}'.format(pool_id, node_id)
+        return self.request('DELETE', url, requestslib_kwargs=requestslib_kwargs)
 
     def try_marshalling(self, url=None, requestslib_kwargs=None):
         url = url or (self.url + "/load_balancer_pools")

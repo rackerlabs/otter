@@ -403,3 +403,10 @@ class AutoscaleConfig(ConfigSectionInterface):
         Allow override of the rcv3 region from the config file
         """
         return self.get('rcv3_region_override')
+
+    @property
+    def rcv3_cloud_network(self):
+        """
+        Specify the cloud network to use with RackConnect
+        """
+        return self.get('rcv3_cloud_network')
