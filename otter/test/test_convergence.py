@@ -23,12 +23,12 @@ from otter.convergence import (
     SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ServerState, ServiceType, NodeCondition, NodeType, optimize_steps,
-    extract_drained_at, get_load_balancer_contents, _reqs_to_effect)
+    extract_drained_at, get_load_balancer_contents, _reqs_to_effect,
+    tenant_is_enabled)
 
 from pyrsistent import pmap, pbag, pset, s
 
 from effect import ConstantIntent, Effect, parallel
-from otter.convergence import tenant_is_enabled
 from effect.testing import StubIntent, resolve_stubs
 
 
