@@ -1,3 +1,4 @@
+# -*- test-case-name: otter.test.test_convergence -*-
 """
 Convergence.
 """
@@ -792,3 +793,16 @@ def _reqs_to_effect(request_func, conv_requests):
                             success_codes=r.success_codes)
                for r in conv_requests]
     return parallel(effects)
+
+
+def tenant_is_enabled(tenant_id, get_config_value):
+    """
+    Feature-flag test: is the given tenant enabled for convergence?
+
+    :param str tenant_id: A tenant's ID, which may or may not be present in the
+        "convergence-tenants" portion of the configuration file.
+    :param callable get_config_value: config key -> config value.
+    """
+    return True
+
+
