@@ -18,11 +18,12 @@ from twisted.internet.endpoints import clientFromString
 from twisted.application.service import Service
 from twisted.application.internet import TimerService
 from twisted.python import usage
+from twisted.python.failure import Failure
 
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
-from toolz.curried import groupby, filter, get_in, reduce
+from toolz.curried import groupby, filter, get_in
 from toolz.dicttoolz import merge
 from toolz.functoolz import identity
 
@@ -128,7 +129,7 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
 
 
 def get_all_metrics_effects(cass_groups, get_request_func_for_tenant,
-                            _print=False):
+                            log, _print=False):
     """
     Gather server data for and produce metrics for all groups across all tenants
     in a region
@@ -137,7 +138,7 @@ def get_all_metrics_effects(cass_groups, get_request_func_for_tenant,
     :param get_request_func_for_tenant: Function of tenant_id -> request function
     :param bool _print: Should the function print while processing?
 
-    :return: :obj:`Effect` of ``list`` of :obj:`GroupMetrics`
+    :return: ``list`` of :obj:`Effect` of (``list`` of :obj:`GroupMetrics`) or None
     """
     tenanted_groups = groupby(lambda g: g['tenantId'], cass_groups)
     effs = []
@@ -147,6 +148,8 @@ def get_all_metrics_effects(cass_groups, get_request_func_for_tenant,
             request_func,
             server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'))
         eff = eff.on(partial(get_tenant_metrics, tenant_id, groups, _print=_print))
+        eff = eff.on(
+            error=lambda exc_info: log.err(Failure(exc_info[1], exc_info[0], exc_info[2])))
         effs.append(eff)
     return effs
 
@@ -180,9 +183,10 @@ def get_all_metrics(cass_groups, authenticator, services, region,
     def req_func_for_tenant(tenant_id):
         return get_request_func(authenticator, tenant_id, metrics_log,
                                 get_service_mapping(services.get), region)
-    effs = get_all_metrics_effects(cass_groups, req_func_for_tenant, _print=_print)
+    effs = get_all_metrics_effects(cass_groups, req_func_for_tenant, metrics_log, _print=_print)
     d = _perform_limited_effects(effs, clock, 10)
-    return d.addCallback(reduce(operator.add))
+    d.addCallback(filter(lambda x: x is not None))
+    return d.addCallback(lambda x: reduce(operator.add, x, []))
 
 
 @defer.inlineCallbacks
