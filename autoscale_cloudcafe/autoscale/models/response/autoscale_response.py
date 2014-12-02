@@ -594,3 +594,31 @@ class RackConnectLBNodeDetail(AutoMarshallingModel):
         object.
         """
         return RackConnectLBNodeDetail(**node_dict)
+
+
+class RackConnectNetworkInfo(AutoMarshallingModel):
+    """
+    Works for a RackConnect V3 cloud network.
+    """
+
+    def __init__(self, **kwargs):
+        super(RackConnectNetworkInfo, self).__init__()
+        for key, value in kwargs.iteritems():
+                setattr(self, key, value)
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        """
+        Returns a RackConnectNetworkInfo instance based on the json serialized
+        string passed in.
+        """
+        network_dict = json.loads(serialized_str)
+        return cls._dict_to_obj(network_dict)
+
+    @classmethod
+    def _dict_to_obj(cls, network_dict):
+        """
+        Converts the dictionary representing a single RackConnectLBPool into an
+        object.
+        """
+        return RackConnectNetworkInfo(**network_dict)

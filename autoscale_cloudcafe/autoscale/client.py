@@ -8,7 +8,8 @@ from autoscale.models.response.autoscale_response import (Group, Config,
                                                           Audit, RackConnectLBPool,
                                                           RackConnectLBPools,
                                                           RackConnectLBNodes,
-                                                          RackConnectLBNodeDetail)
+                                                          RackConnectLBNodeDetail,
+                                                          RackConnectNetworkInfo)
 from autoscale.models.response.limits_response import Limits
 from autoscale.models.request.autoscale_requests import (
     Group_Request, Policy_Request, Webhook_Request, Config_Request,
@@ -910,6 +911,16 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         """
         url = self.url + "/load_balancer_pools"
         return self.request('GET', url, response_entity_type=RackConnectLBPools)
+
+    def get_cloud_network_info(self, cloud_network_id):
+        """
+        :summary: Get information on a given cloud_network
+        :return: Response Object
+        :rtype: Response Object
+        """
+        url = self.url + '/cloud_networks/{0}'.format(cloud_network_id)
+        print "### GETTING NETWORK INFO FROM: " + url
+        return self.request('GET', url, response_entity_type=RackConnectNetworkInfo)
 
     def get_pool_info(self, pool_id):
         """
