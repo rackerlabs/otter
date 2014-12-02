@@ -1311,6 +1311,7 @@ class FeatureFlagTest(SynchronousTestCase):
         given tenant ID has convergence behavior turned on.
         """
         enabled_tenant_id = "some-tenant"
+
         def get_config_value(config_key):
             self.assertEqual(config_key, "convergence-tenants")
             return [enabled_tenant_id]
@@ -1324,6 +1325,7 @@ class FeatureFlagTest(SynchronousTestCase):
         given tenant ID has convergence behavior turned off.
         """
         enabled_tenant_id = "some-tenant"
+
         def get_config_value(config_key):
             self.assertEqual(config_key, "convergence-tenants")
             return [enabled_tenant_id + "-nope"]

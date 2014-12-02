@@ -805,5 +805,3 @@ def tenant_is_enabled(tenant_id, get_config_value):
     """
     enabled_tenant_ids = get_config_value("convergence-tenants")
     return (tenant_id in enabled_tenant_ids)
-
-
