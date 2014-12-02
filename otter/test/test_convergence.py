@@ -1317,3 +1317,16 @@ class FeatureFlagTest(SynchronousTestCase):
         self.assertEqual(tenant_is_enabled(enabled_tenant_id,
                                            get_config_value),
                          True)
+
+    def test_tenant_is_not_enabled(self):
+        """
+        :obj:`convergence.tenant_is_enabled` should return ``False`` when a
+        given tenant ID has convergence behavior turned off.
+        """
+        enabled_tenant_id = "some-tenant"
+        def get_config_value(config_key):
+            self.assertEqual(config_key, "convergence-tenants")
+            return [enabled_tenant_id + "-nope"]
+        self.assertEqual(tenant_is_enabled(enabled_tenant_id,
+                                           get_config_value),
+                         False)
