@@ -28,6 +28,7 @@ from otter.convergence import (
 from pyrsistent import pmap, pbag, pset, s
 
 from effect import ConstantIntent, Effect, parallel
+from otter.convergence import tenant_is_enabled
 from effect.testing import StubIntent, resolve_stubs
 
 
@@ -1297,3 +1298,22 @@ class RequestsToEffectTests(SynchronousTestCase):
                              headers=None,
                              data=data_sentinel)]
         self.assertCompileTo(conv_requests, expected_effects)
+
+
+class FeatureFlagTest(SynchronousTestCase):
+    """
+    Tests for determining which tenants should have convergence enabled.
+    """
+
+    def test_tenant_is_enabled(self):
+        """
+        :obj:`convergence.tenant_is_enabled` should return ``True`` when a
+        given tenant ID has convergence behavior turned on.
+        """
+        enabled_tenant_id = "some-tenant"
+        def get_config_value(config_key):
+            self.assertEqual(config_key, "convergence-tenants")
+            return [enabled_tenant_id]
+        self.assertEqual(tenant_is_enabled(enabled_tenant_id,
+                                           get_config_value),
+                         True)
