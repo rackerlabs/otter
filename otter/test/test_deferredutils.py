@@ -8,7 +8,7 @@ from twisted.internet.defer import CancelledError, Deferred
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.deferredutils import (
-    timeout_deferred, retry_and_timeout, TimedOutError, DeferredPool)
+    timeout_deferred, retry_and_timeout, TimedOutError, DeferredPool, wait)
 from otter.test.utils import DummyException, patch
 
 
@@ -275,3 +275,126 @@ class DeferredPoolTests(SynchronousTestCase):
         self.assertEqual(len(self.pool), 1)
         d.callback(None)
         self.assertEqual(len(self.pool), 0)
+
+
+class WaitTests(SynchronousTestCase):
+    """
+    Tests for :func:`wait`
+    """
+
+    def setUp(self):
+        """
+        Sample function being decorated
+        """
+
+        @wait()
+        def f(n):
+            return self.returns.pop(0)
+
+        self.f = f
+
+    def _test_success_waits(self):
+        self.returns = [Deferred()]
+        fd = self.returns[0]
+        d1 = self.f(1)
+        d2 = self.f(1)
+        d3 = self.f(1)
+        # Actual f called only once otherwise f would've errored
+        self.assertIs(fd, d1)
+        self.assertNoResult(d2)
+        self.assertNoResult(d3)
+        fd.callback(2)
+        self.assertEqual(self.successResultOf(d2), 2)
+        self.assertEqual(self.successResultOf(d3), 2)
+
+    def test_success_waits(self):
+        """
+        Calling decorated function again with same arg calls wrapped function only once
+        and returns result to all callers
+        """
+        self._test_success_waits()
+
+    def test_success_waits_again(self):
+        """
+        Calling decorated function again after previous wait has completed calls
+        wrapped function again
+        """
+        self._test_success_waits()
+        self.assertEqual(self.returns, [])
+        self._test_success_waits()
+
+    def test_success_diff_args(self):
+        """
+        Calling decorated function again with diff arg calls wrapped function only once
+        for specific argument
+        """
+        self.returns = [Deferred(), Deferred()]
+        a1d, a2d = self.returns
+        d11 = self.f(1)
+        d12 = self.f(1)
+        d2 = self.f(2)
+        self.assertIs(a1d, d11)
+        a1d.callback(3)
+        self.assertEqual(self.successResultOf(d12), 3)
+        self.assertNoResult(d2)
+        a2d.callback(4)
+        self.assertEqual(self.successResultOf(d2), 4)
+
+    def test_err_waits(self):
+        """
+        Calling decorated function again with same arg calls wrapped function only once
+        and errors to all callers if original call errors
+        """
+        self.returns = [Deferred()]
+        fd = self.returns[0]
+        d1 = self.f(1)
+        d2 = self.f(1)
+        d3 = self.f(1)
+        # Actual f called only once otherwise f would've errored
+        self.assertIs(fd, d1)
+        self.assertNoResult(d2)
+        self.assertNoResult(d3)
+        fd.errback(ValueError('oops'))
+        self.failureResultOf(d2, ValueError)
+        self.failureResultOf(d3, ValueError)
+        self.failureResultOf(fd)  # Clear error
+
+    def test_err_diff_args(self):
+        """
+        Calling decorated function again with diff arg calls wrapped function only once
+        for specific argument and returns result to all callers from original call
+        """
+        self.returns = [Deferred(), Deferred()]
+        a1d, a2d = self.returns
+        d11 = self.f(1)
+        d12 = self.f(1)
+        d2 = self.f(2)
+        self.assertIs(a1d, d11)
+        a1d.errback(ValueError('a'))
+        self.failureResultOf(d12, ValueError)
+        self.failureResultOf(a1d)  # Clear error
+        self.assertNoResult(d2)  # Deferred w.r.t 2 is not fired yet
+        a2d.errback(NotImplementedError('a'))
+        self.failureResultOf(d2, NotImplementedError)
+
+    def test_with_kwargs(self):
+        """
+        If function is decorated by considering keyword arguments, then multiple
+        calls to decorated function with same args is called only once
+        """
+
+        @wait(ignore_kwargs=False)
+        def f(n, k=None):
+            return self.returns.pop(0)
+
+        self.returns = [Deferred(), Deferred()]
+        fd = self.returns[0]
+        d1 = f(1, k=11)
+        d2 = f(1, k=11)
+        d3 = f(1, k=15)
+        fd.callback('r')
+        self.assertEqual(self.successResultOf(d1), 'r')
+        self.assertEqual(self.successResultOf(d2), 'r')
+        self.assertNoResult(d3)
+        d3.callback('a')
+        self.assertEqual(self.successResultOf(d3), 'a')

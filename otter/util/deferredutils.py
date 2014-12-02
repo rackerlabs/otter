@@ -6,6 +6,11 @@ from twisted.internet import defer
 
 from otter.util.retry import retry
 
+from pyrsistent import freeze
+
+from functools import wraps
+from collections import defaultdict
+
 
 def unwrap_first_error(possible_first_error):
     """
@@ -255,3 +260,41 @@ def delay(result, reactor, seconds):
     d = defer.Deferred()
     reactor.callLater(seconds, d.callback, result)
     return d
+
+
+def wait(ignore_kwargs=True):
+    """
+    Return decorator that wraps a function by waiting for its result when its called
+    multiple times and its result from first call is not yet ready. Basically disallows
+    re-entrancy for Deferred returning functions
+
+    :param bool ignore_kwargs: Ignore keyword arguments of wrapped function when waiting
+    :return: A decorator that can wrap function to wait
+    """
+    waiters = defaultdict(list)
+    waiting = {}
+
+    def release_waiters(r, method, k):
+        for waiter in waiters[k]:
+            method(waiter, r)
+        del waiters[k], waiting[k]
+        return r
+
+    def wrap(func):
+
+        @wraps(func)
+        def wrapped_f(*args, **kwargs):
+            k = freeze(args) if ignore_kwargs else freeze((args, kwargs))
+            if k in waiting:
+                d = defer.Deferred()
+                waiters[k].append(d)
+            else:
+                d = defer.maybeDeferred(func, *args, **kwargs)
+                waiting[k] = d
+                d.addCallback(release_waiters, defer.Deferred.callback, k)
+                d.addErrback(release_waiters, defer.Deferred.errback, k)
+            return d
+
+        return wrapped_f
+
+    return wrap
