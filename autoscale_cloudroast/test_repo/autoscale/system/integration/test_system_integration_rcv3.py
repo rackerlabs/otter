@@ -358,8 +358,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
         # Capture a list of the node_ids of all nodes on the pool after scaling
         final_node_ids = []
-        initial_node_list = self.rcv3_client.get_nodes_on_pool(self.pool_1.id).entity.nodes
-        for each_node in initial_node_list:
+        final_node_list = self.rcv3_client.get_nodes_on_pool(self.pool_1.id).entity.nodes
+        for each_node in final_node_list:
             print '\n ------'
             print each_node
             final_node_ids.append(each_node.id)

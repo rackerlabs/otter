@@ -567,7 +567,7 @@ class AutoscaleBehaviors(BaseBehavior):
                 print('Group Id {0} failed to attempt server creation. Group has no'
                       ' servers'.format(group_id))
                 return ret_val
-            if (group_state.desiredCapacity == expected_servers):
+            if (group_state.desiredCapacity != expected_servers):
                 print('Group {0} should have {1} servers, but has reduced the build {2}'
                       'servers'.format(group_id, expected_servers, group_state.desiredCapacity))
                 return ret_val
