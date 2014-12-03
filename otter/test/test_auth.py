@@ -518,11 +518,8 @@ class CachingAuthenticatorTests(SynchronousTestCase):
                     return r
                 return fail(r) if isinstance(r, Exception) else succeed(r)
 
-        self.authenticator = FakeAuthenticator()
-        #self.auth_function = authenticator.authenticate_tenant
-
         self.clock = Clock()
-        self.ca = CachingAuthenticator(self.clock, self.authenticator, 10)
+        self.ca = CachingAuthenticator(self.clock, FakeAuthenticator(), 10)
 
     def test_verifyObject(self):
         """
