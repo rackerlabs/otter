@@ -150,6 +150,7 @@ class CachingAuthenticator(object):
         self._waiters = {}
         self._cache = {}
         self._log = self._bind_log(default_log)
+        self._auth_func = wait()(self._authenticator.authenticate_tenant)
 
     def _bind_log(self, log, **kwargs):
         """
@@ -179,35 +180,14 @@ class CachingAuthenticator(object):
 
             log.msg('otter.auth.cache.expired', age=now - created)
 
-        if tenant_id in self._waiters:
-            d = Deferred()
-            self._waiters[tenant_id].append(d)
-            log.msg('otter.auth.cache.waiting',
-                    waiters=len(self._waiters[tenant_id]))
-            return d
-
         def when_authenticated(result):
             log.msg('otter.auth.cache.populate')
             self._cache[tenant_id] = (self._reactor.seconds(), result)
-
-            waiters = self._waiters.pop(tenant_id, [])
-            for waiter in waiters:
-                waiter.callback(result)
-
             return result
 
-        def when_auth_fails(failure):
-            waiters = self._waiters.pop(tenant_id, [])
-            for waiter in waiters:
-                waiter.errback(failure)
-
-            return failure
-
         log.msg('otter.auth.cache.miss')
-        self._waiters[tenant_id] = []
-        d = self._authenticator.authenticate_tenant(tenant_id, log=log)
+        d = self._auth_func(tenant_id, log=log)
         d.addCallback(when_authenticated)
-        d.addErrback(when_auth_fails)
 
         return d
 
