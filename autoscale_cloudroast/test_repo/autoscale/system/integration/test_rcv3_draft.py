@@ -154,7 +154,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
     #     """
     #     return self.rcv3_client.list_nodes(pool_id).entity
 
-    def _create_rcv3_group(self, lb_list=None, group_min=None):
+    def _create_rcv3_group(self, lb_list=None, group_min=None,
+                           net1='00000000-0000-0000-0000-000000000000',
+                           net2='11111111-1111-1111-1111-111111111111'):
         """
         Create a scaling group
         """
@@ -172,9 +174,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.lc_disk_config = 'AUTO'
         # self.lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'},
         #                     {'uuid': '00000000-0000-0000-0000-000000000000'}]
-        self.lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'},
-                            {'uuid': '07426958-1ebf-4c38-b032-d456820ca21a'}]
-                            #{'uuid': '00000000-0000-0000-0000-000000000000'}]
+        self.lc_networks = [{'uuid': net1}, {'uuid': net2}]
         #self.lc_load_balancers = [{'loadBalancerId': 9099, 'port': 8080}]
         # self.lc_load_balancers = [{'loadBalancerId': "364b6c45-914d-422f-be30-3d18d612ecf4",
         #                            'type': 'RackConnectV3'}]
