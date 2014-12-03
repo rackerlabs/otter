@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from cafe.engine.behaviors import BaseBehavior
 from cloudcafe.common.tools.datagen import rand_name
 from autoscale.models.servers import Metadata
+import time
 
 
 class AutoscaleBehaviors(BaseBehavior):
@@ -538,3 +539,40 @@ class AutoscaleBehaviors(BaseBehavior):
                 pass
             webhook['count'] = len(webhook_list)
             return webhook
+
+    def wait_for_servers_to_build(self, group_id, expected_servers,
+                                  interval_time=None, timeout=None):
+        """
+        Copy of wait_for_expected_number_of_servers without asserts
+        """
+        ret_val = []
+        interval_time = interval_time or int(
+            self.autoscale_config.interval_time)
+        timeout = timeout or int(self.autoscale_config.timeout)
+        end_time = time.time() + timeout
+
+        group_state_response = self.autoscale_client.list_status_entities_sgroups(
+            group_id)
+        group_state = group_state_response.entity
+        if (group_state.desiredCapacity != expected_servers):
+            print('Group {0} should have {1} servers, but is trying to '
+                  'build {2} servers'.format(group_id, expected_servers,
+                                             group_state.desiredCapacity))
+            return ret_val
+        while time.time() < end_time:
+            resp = self.autoscale_client.list_status_entities_sgroups(group_id)
+            group_state = resp.entity
+            active_list = group_state.active
+            if (group_state.activeCapacity + group_state.pendingCapacity == 0):
+                print('Group Id {0} failed to attempt server creation. Group has no'
+                      ' servers'.format(group_id))
+                return ret_val
+            if (group_state.desiredCapacity == expected_servers):
+                print('Group {0} should have {1} servers, but has reduced the build {2}'
+                      'servers'.format(group_id, expected_servers, group_state.desiredCapacity))
+                return ret_val
+            if len(active_list) == expected_servers:
+                return [server.id for server in active_list]
+            time.sleep(interval_time)
+        else:
+            return ret_val

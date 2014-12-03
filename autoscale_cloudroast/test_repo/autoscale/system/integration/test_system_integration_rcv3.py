@@ -15,22 +15,23 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
     """
     System tests to verify lbaas integration with autoscale
     """
-    #@classmethod
-    def setUp(self):
+
+    @classmethod
+    def setUpClass(cls):
         """
         Capture the initial state of the shared load balancer pools
         """
 
-        super(AutoscaleRackConnectFixture, self).setUp()
+        super(AutoscaleRackConnectFixture, cls).setUpClass()
         # Get list of available pools
-        self.pool_1 = None
-        self.pool_2 = None
-        tenant_pools = self._get_available_pools()
-        self.cloud_servers_on_node = []
-        self.private_network = {'uuid': '11111111-1111-1111-1111-111111111111'}
-        self.public_network = {'uuid': '00000000-0000-0000-0000-000000000000'}
-        self.rackconnect_network = {'uuid': self.rcv3_cloud_network}
-        self.min_servers = 1
+        cls.pool_1 = None
+        cls.pool_2 = None
+        tenant_pools = cls.rcv3_client.list_pools().entity.pools
+        cls.cloud_servers_on_node = []
+        cls.private_network = {'uuid': '11111111-1111-1111-1111-111111111111'}
+        cls.public_network = {'uuid': '00000000-0000-0000-0000-000000000000'}
+        cls.rackconnect_network = {'uuid': cls.rcv3_cloud_network}
+        cls.min_servers = 1
 
         # Since RCV3 pools must be created by human intervention,
         # verify that at least one exists before proceeding with tests
@@ -38,21 +39,65 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             raise Exception("NoLBPoolsError")
         else:
             #print tenant_pools
-            #print "lb 1 : {}".format(self.rc_load_balancer_pool_1)
-            if self.rc_load_balancer_pool_1['type'] == 'mimic':
+            #print "lb 1 : {}".format(cls.rc_load_balancer_pool_1)
+            if cls.rc_load_balancer_pool_1['type'] == 'mimic':
                 # Mimic should have a single pool out of the box
-                self.pool_1 = tenant_pools[0]
+                cls.pool_1 = tenant_pools[0]
                 try:
                     # Create a second pool for advanced testing TODO
-                    self.pool_2 = tenant_pools[1]
+                    cls.pool_2 = tenant_pools[1]
                 except:
                     print "Error: No second RCV3 pool configured in Mimic"
             else:   # Check that the pool in the config exists
                 for pool in tenant_pools:
-                    if pool.id == self.rc_load_balancer_pool_1['loadBalancerId']:
-                        self.pool_1 = pool
-                    if pool.id == self.rc_load_balancer_pool_2['loadBalancerId']:
-                        self.pool_2 = pool
+                    if pool.id == cls.rc_load_balancer_pool_1['loadBalancerId']:
+                        cls.pool_1 = pool
+                    if pool.id == cls.rc_load_balancer_pool_2['loadBalancerId']:
+                        cls.pool_2 = pool
+
+        lb_pools = [{'loadBalancerId': cls.pool_1.id, 'type': 'RackConnectV3'}]
+        # background_group_resp = cls._create_rcv3_group(lb_list=lb_pools,
+        #                                                 group_min=2,
+        #                                                 network_list=[cls.rackconnect_network])
+
+        background_group_resp = cls.autoscale_behaviors.create_scaling_group_given(
+            gc_name='background_group',
+            gc_cooldown=0,
+            gc_min_entities=2,
+            lc_load_balancers=lb_pools,
+            lc_networks=[cls.rackconnect_network, cls.private_network])
+        cls.resources.add(background_group_resp.entity.id,
+                          cls.autoscale_client.delete_scaling_group_with_force)
+        cls.load_balancer_1_response = cls.lbaas_client.create_load_balancer('test', [],
+                                                                             'HTTP', 80, "PUBLIC")
+        cls.load_balancer_1 = cls.load_balancer_1_response.entity.id
+        cls.resources.add(cls.load_balancer_1, cls.lbaas_client.delete_load_balancer)
+        cls.load_balancer_2_response = cls.lbaas_client.create_load_balancer('test', [],
+                                                                             'HTTP', 80, "PUBLIC")
+        cls.load_balancer_2 = cls.load_balancer_2_response.entity.id
+        cls.resources.add(cls.load_balancer_2, cls.lbaas_client.delete_load_balancer)
+        cls.lb_other_region = 0000
+        # Create a group to add 2 servers to the load_balancer_pool. This is done
+        # to provide a guarenteed initial state of at least 2 nodes in order to confirm
+        # that scaling operations do not affect pre-existing nodes on a pool.
+        # try:
+        background_servers = cls.autoscale_behaviors.wait_for_servers_to_build(
+            background_group_resp.entity.id,
+            2,
+            timeout=600)
+        print '\n ........ background servers ....... \n'
+        print background_servers
+        time.sleep(60)
+        # except Exception, err:
+        #     print " Try 1 failed"
+            # print Exception, err
+        # try:
+        #     wait_for_expected_number_of_active_servers(
+        #         background_group_resp.entity.id,
+        #         2)
+        # except Exception as f:
+        #     print '-- Try 2 failed'
+        #     print f.msg
 
         # if type of rc_load_balancer_pool_1 is mimic, use the first available pool as pool 1
         # else if pool from config is in list, use as pool 1, if not abort
@@ -134,9 +179,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                          ' is not equal to initial count [{1}] + 1'.format(new_counts['cloud_servers'],
                                                                            init_cloud_servers))
 
-    #@unittest.skip("Skipping")
+    @unittest.skip("Skipping")
     @tags(speed='slow', type='rcv3')
-    def test_dodo_create_scaling_group_with_pool_and_nonzero_min(self):
+    def test_create_scaling_group_with_pool_and_nonzero_min(self):
         """
         3.) Create group with the following:
         - min_entities = 1
@@ -206,47 +251,150 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.assertEquals(status, "ACTIVE",
                           msg='LB Pool status {0} is not in expected ACTIVE state'.format(status))
 
-    @unittest.skip("Skipping")
+    # @unittest.skip("Skipping")
     @tags(speed='slow', type='rcv3')
-    def test_scale_up_server(self):
+    def test_scale_up_down_on_rcv3_pool(self):
         """
-        This DOES NOT TEST ANYTHING
+        Scale up and down
+        For each of the following configurations:
+        - Scaling group with 1 min_entities, single rcv3 lb, internal & private network
+
+        Steps:
+        - Get initial nodes on each of the group's load balancers after group creation
+        - create and execute policy to scale up by 1
+        - wait for expected number of active servers
+        - verify servers added by scaling up are present on all LBs as reflected in node_counts
+        - Create and execute policy to scale down
+        - verify that the initial nodes were unchanged by the scale up and down operations
+        - verify that the servers added by scaling up were removed (Assumes that newest
+                                                                    servers are removed first)
         """
         lb_pools = [{'loadBalancerId': self.pool_1.id, 'type': 'RackConnectV3'}]
+
+        # Capture a list of the node_ids of all nodes on the pool before doing anything
+        initial_node_ids = []
+        initial_node_list = self.rcv3_client.get_nodes_on_pool(self.pool_1.id).entity.nodes
+        for each_node in initial_node_list:
+            print '\n ------'
+            print each_node
+            initial_node_ids.append(each_node.id)
+        print 'initial_node_ids: ', initial_node_ids
+
+        #Create the group used for testing
         pool_group_resp = self._create_rcv3_group(lb_list=lb_pools,
-                                                  group_min=1,
+                                                  group_min=self.min_servers,
                                                   network_list=[self.rackconnect_network])
 
         pool_group = pool_group_resp.entity
         #print pool_group
-        self.wait_for_expected_number_of_active_servers(pool_group.id, 1, timeout=600)
+        # The timeout bounds the length of time needed to create the servers
+        # in Nova.  However....
+        self.wait_for_expected_number_of_active_servers(
+            pool_group.id, self.min_servers, timeout=600)
 
+        # ..., we still need to wait some more to allow their existence to
+        # propegate through the rest of Autoscale's and Rackconnect V3's
+        # infrastructure.  One minute ought to be enough for anyone.(tm)
         time.sleep(60)
-        my_node_id = None
 
-        before_nodes = self._get_nodes_on_pool(self.pool_1.id)
-        print "self.cloud_servers_on_node::: ", self.cloud_servers_on_node
-        print "Cloud Servers on Node: ", self.cloud_servers_on_node
-        try:
-            my_node_id = self.cloud_servers_on_node[0]["node_id"]
-            print "TRY: print node_id_1: ", my_node_id
-        except:
-            pass
-        self.assertTrue(True)
-        s = self.rcv3_client.get_node_info_detail(self.pool_1.id, my_node_id)
-        print s
+        # Next, we get the initial nodes on each of the group's load balancers.
+        # For this code to have any meaning, we assume EITHER (1) nobody else
+        # uses the Rackconnect load balancer pool for the duration of this test,
+        # or (2) the Rackconnect hardware belongs exclusively to the QE team
+        # running this test (essentially fulfilling #1 anyway).
+        initial_node_count = self._get_node_counts_on_pool(self.pool_1.id)['cloud_servers']
+        print "\n ...... initial_node_count ", initial_node_count
 
-        del_resp = self.rcv3_client.remove_node_from_pool(self.pool_1.id, my_node_id)
-        print "&&&&&&&&&&&&&&& delete ", del_resp
-        time.sleep(30)
-        s = self.rcv3_client.get_node_info_detail(self.pool_1.id, my_node_id)
-        print s
-        print "Test Case self.cloud_servers_on_node ", self.cloud_servers_on_node
 
-        after_nodes = self._get_nodes_on_pool(self.pool_1.id)
-        print "before_nodes: ", before_nodes
-        print "-------------"
-        print "after_nodes: ", after_nodes
+        # Since at least the group_min node should be on the load_balancer, check that
+        # the initial list of node ids is not empty
+    #    self.assertTrue(initial_node_ids, msg='There were no initial nodes present on the loadbalancer')
+
+        # Define a policy to scale up
+        scale_amt = 2
+        policy_up_data = {'change': scale_amt, 'cooldown': 0}
+        expected_server_count = initial_node_count + scale_amt
+        as_server_count = self.min_servers + scale_amt
+        # Create the policy and execute it immediately
+        self.autoscale_behaviors.create_policy_webhook(pool_group.id,
+                                                       policy_up_data,
+                                                       execute_policy=True)
+        self.wait_for_expected_number_of_active_servers(
+            pool_group.id,
+            as_server_count)
+        # Wait for propogation again
+        time.sleep(60)
+        # self._assert_lb_nodes_before_scale_persists_after_scale(lb_node_list_before_scale,
+        #                                                         load_balancer)
+
+        # Get node count after scaling and confirm that the expected number of nodes are
+        # present on the load_balancer_pool
+        scale_up_node_count = self._get_node_counts_on_pool(self.pool_1.id)['cloud_servers']
+        self.assertEquals(scale_up_node_count, expected_server_count, msg='The actual '
+                          'cloud_server count of [{0}] does not match the expected count '
+                          'of [{1}]'.format(scale_up_node_count, expected_server_count))
+
+        # Define a policy to scale down
+        policy_down_data = {'change': -scale_amt, 'cooldown': 0}
+        expected_server_count = expected_server_count - scale_amt
+        as_server_count = as_server_count - scale_amt
+        # Create the policy and execute it immediately
+        self.autoscale_behaviors.create_policy_webhook(pool_group.id,
+                                                       policy_down_data,
+                                                       execute_policy=True)
+        self.wait_for_expected_number_of_active_servers(
+            pool_group.id,
+            as_server_count)
+        # Wait for propogation again
+        time.sleep(60)
+
+        # Get node count after scaling and confirm that the expected number of nodes are
+        # present on the load_balancer_pool
+        scale_down_node_count = self._get_node_counts_on_pool(self.pool_1.id)['cloud_servers']
+        self.assertEquals(scale_down_node_count, expected_server_count, msg='The actual '
+                          'cloud_server count of [{0}] does not match the expected count '
+                          'of [{1}]'.format(scale_up_node_count, expected_server_count))
+
+
+        # Capture a list of the node_ids of all nodes on the pool after scaling
+        final_node_ids = []
+        initial_node_list = self.rcv3_client.get_nodes_on_pool(self.pool_1.id).entity.nodes
+        for each_node in initial_node_list:
+            print '\n ------'
+            print each_node
+            final_node_ids.append(each_node.id)
+        print 'final_node_ids: ', final_node_ids
+
+        for nid in initial_node_ids:
+            self.assertTrue(nid in final_node_ids, msg='Initial node {0} was not in '
+                            'the final list'.format(nid))
+            print 'node_id::: ', nid
+
+
+
+        # before_nodes = self._get_cloud_servers_on_pool(self.pool_1.id)
+        # print "self.cloud_servers_on_node::: ", self.cloud_servers_on_node
+        # print "Cloud Servers on Node: ", self.cloud_servers_on_node
+        # try:
+        #     my_node_id = self.cloud_servers_on_node[0]["node_id"]
+        #     print "TRY: print node_id_1: ", my_node_id
+        # except:
+        #     pass
+        # self.assertTrue(True)
+        # s = self.rcv3_client.get_node_info_detail(self.pool_1.id, my_node_id)
+        # print s
+
+        # del_resp = self.rcv3_client.remove_node_from_pool(self.pool_1.id, my_node_id)
+        # print "&&&&&&&&&&&&&&& delete ", del_resp
+        # time.sleep(30)
+        # s = self.rcv3_client.get_node_info_detail(self.pool_1.id, my_node_id)
+        # print s
+        # print "Test Case self.cloud_servers_on_node ", self.cloud_servers_on_node
+
+        # after_nodes = self._get_cloud_servers_on_pool(self.pool_1.id)
+        # print "before_nodes: ", before_nodes
+        # print "-------------"
+        # print "after_nodes: ", after_nodes
 
     # @tags(speed='slow', type='lbaas')
     # def test_existing_nodes_on_lb_unaffected_by_scaling(self):
@@ -283,21 +431,23 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
     def _get_node_counts_on_pool(self, pool_id):
         """
-        Get the node counts on a given pool
+        Get the node counts on a given pool.  Takes an ID string.
+        Returns a dictionary with cloud_servers, external, and total
+        members.  Total contains the sum of the former two fields.
+        cloud_servers counts the number of Rackspace cloud servers, while
+        external counts everything but (e.g., dedicated servers).
         """
         return self.rcv3_client.get_pool_info(pool_id).entity.node_counts
 
-    def _get_nodes_on_pool(self, pool_id):
+    def _get_cloud_servers_on_pool(self, pool_id):
         """
-        Return a list of nodes on the given pool
+        Return a list of the cloud server nodes on the pool.
+        The dictionary contains a 'server_id' and 'node_id'.
         """
-        print "((((((((( - get_nodes_on_pool"
         node_list = self.rcv3_client.get_nodes_on_pool(pool_id).entity.nodes
         servers_on_node = []
         print "Length of node_list: {0}".format(len(node_list))
         for node in node_list:
-            print "------- Item in node_list ----------"
-            print node
             if hasattr(node, 'cloud_server'):
                 servers_on_node.append({'server_id': node.cloud_server['id'],
                                         'node_id': node.id})
@@ -309,7 +459,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         Return a list of all cloud server ids on the given lb_pool's nodes_on_lb
         """
         id_list = []
-        servers_on_node = self._get_nodes_on_pool(pool_id)
+        servers_on_node = self._get_cloud_servers_on_pool(pool_id)
         for server in servers_on_node:
             print "\n.........server.... ", server
             id_list.append(server['server_id'])
@@ -355,7 +505,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         # Create a scaling group with zero servers
         self.create_resp = self.autoscale_client.create_scaling_group(
             gc_name=self.gc_name,
-            gc_cooldown=self.gc_cooldown,
+            #gc_cooldown=self.gc_cooldown,
+            gc_cooldown=0,
             gc_min_entities=group_min,
             #gc_min_entities=self.gc_min_entities,
             gc_max_entities=self.gc_max_entities,
