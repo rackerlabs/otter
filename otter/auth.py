@@ -86,7 +86,6 @@ class ICachingAuthenticator(IAuthenticator):
 
 
 @implementer(IAuthenticator)
-@attributes(['reactor', 'authenticator', 'max_retries', 'retry_interval'], apply_with_init=False)
 class RetryingAuthenticator(object):
     """
     An authenticator that retries the provided auth_function if it fails
@@ -112,7 +111,6 @@ class RetryingAuthenticator(object):
 
 
 @implementer(IAuthenticator)
-@attributes(['reactor', 'authenticator', 'wait'], apply_with_init=False)
 class WaitingAuthenticator(object):
     """
     An authenticator that waits after getting the token and before returning it
@@ -136,7 +134,6 @@ class WaitingAuthenticator(object):
 
 
 @implementer(ICachingAuthenticator)
-@attributes(['reactor', 'authenticator', 'ttl'], apply_with_init=False)
 class CachingAuthenticator(object):
     """
     An authenticator which cases the result of the provided auth_function
@@ -222,8 +219,6 @@ class CachingAuthenticator(object):
 
 
 @implementer(IAuthenticator)
-@attributes(['identity_admin_user', 'identity_admin_password', 'url', 'admin_url'],
-            apply_with_init=False)
 class ImpersonatingAuthenticator(object):
     """
     An authentication handler that first uses a identity admin account to authenticate
