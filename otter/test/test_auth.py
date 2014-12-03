@@ -12,7 +12,7 @@ from testtools.matchers import IsInstance
 
 from zope.interface.verify import verifyObject
 
-from otter.test.utils import patch, SameJSON, iMock, matches
+from otter.test.utils import patch, SameJSON, iMock, matches, mock_log
 
 from otter.util.http import APIError, UpstreamError
 
@@ -346,6 +346,25 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
                                                        self.password,
                                                        log=self.log)
         self.log.msg.assert_called_once_with('Getting new identity admin token')
+        self.assertEqual(self.ia._token, 'auth-token')
+
+    def test_auth_me_waits(self):
+        """
+        _auth_me is called only once if its called again while its previous call
+        has not returned
+        """
+        aud = Deferred()
+        self.authenticate_user.side_effect = lambda *a, **k: aud
+
+        log = mock_log()
+
+        self.ia._auth_me(log=log)
+        self.ia._auth_me(log=log)
+        self.assertEqual(len(self.authenticate_user.mock_calls), 1)
+        log.msg.assert_called_once_with('Getting new identity admin token')
+
+        aud.callback({'access': {'token': {'id': 'auth-token'}}})
+        self.assertEqual(len(self.authenticate_user.mock_calls), 1)
         self.assertEqual(self.ia._token, 'auth-token')
 
     def test_authenticate_tenant_gets_user_for_specified_tenant(self):

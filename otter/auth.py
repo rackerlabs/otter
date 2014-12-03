@@ -40,7 +40,7 @@ import json
 from itertools import groupby
 from functools import partial
 
-from twisted.internet.defer import succeed, Deferred
+from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
@@ -50,7 +50,7 @@ from otter.util.retry import retry, retry_times, repeating_interval
 from otter.log import log as default_log
 from otter.util.http import (
     headers, check_success, append_segments, wrap_upstream_error, retry_on_unauth)
-from otter.util.deferredutils import delay
+from otter.util.deferredutils import delay, wait
 
 
 class IAuthenticator(Interface):
@@ -230,7 +230,8 @@ class ImpersonatingAuthenticator(object):
         # cached token to admin identity
         self._token = None
 
-    def _auth_me(self, log):
+    @wait()
+    def _auth_me(self, log=None):
         if log:
             log.msg('Getting new identity admin token')
         d = authenticate_user(self._url,
@@ -245,7 +246,7 @@ class ImpersonatingAuthenticator(object):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
-        auth = partial(self._auth_me, log)
+        auth = partial(self._auth_me, log=log)
 
         d = user_for_tenant(self._admin_url,
                             self._identity_admin_user,
@@ -270,6 +271,14 @@ class ImpersonatingAuthenticator(object):
         d.addCallback(lambda token: retry_on_unauth(partial(endpoints, token), auth))
 
         return d
+
+    def __hash__(self):
+        """
+        Return hash of the object. Required for this to be stored in dict to
+        make wait() decorator work
+        """
+        return hash((self._identity_admin_user, self._identity_admin_password,
+                     self._url, self._admin_url))
 
 
 def extract_token(auth_response):
