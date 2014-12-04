@@ -12,6 +12,7 @@ from toolz.dicttoolz import merge
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 from otter.util import logging_treq
+from otter.util.http import APIError
 
 
 @attributes(['method', 'url', 'headers', 'data', 'log'],
