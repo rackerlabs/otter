@@ -23,9 +23,7 @@ from toolz.curried import groupby, filter, get_in
 from toolz.dicttoolz import merge
 from toolz.functoolz import identity
 
-from otter.auth import (
-    RetryingAuthenticator, ImpersonatingAuthenticator, authenticate_user,
-    extract_token)
+from otter.auth import generate_authenticator, authenticate_user, extract_token
 
 from otter.auth import public_endpoint_url
 
@@ -253,19 +251,6 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
     yield d
 
 
-def get_authenticator(reactor, identity):
-    """
-    Return authenticator based on identity config
-    """
-    return RetryingAuthenticator(
-        reactor,
-        ImpersonatingAuthenticator(
-            identity['username'],
-            identity['password'],
-            identity['url'],
-            identity['admin_url']))
-
-
 def connect_cass_servers(reactor, config):
     """
     Connect to Cassandra servers and return the connection
@@ -292,7 +277,7 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
     :return: :class:`Deferred` with None
     """
     _client = client or connect_cass_servers(reactor, config['cassandra'])
-    authenticator = authenticator or get_authenticator(reactor, config['identity'])
+    authenticator = authenticator or generate_authenticator(reactor, config['identity'])
 
     cass_groups = yield get_scaling_groups(_client, props=['status'],
                                            group_pred=lambda g: g['status'] != 'DISABLED')
@@ -360,7 +345,7 @@ class MetricsService(Service, object):
         self._service = TimerService(
             get_in(['metrics', 'interval'], config, default=60), collect,
             reactor, config, client=self._client,
-            authenticator=get_authenticator(reactor, config['identity']))
+            authenticator=generate_authenticator(reactor, config['identity']))
         self._service.clock = clock or reactor
 
     def startService(self):

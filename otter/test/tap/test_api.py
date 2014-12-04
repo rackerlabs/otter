@@ -23,6 +23,8 @@ from otter.test.utils import matches, patch, CheckFailure
 from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
 
+from otter.test.test_auth import identity_config
+
 
 test_config = {
     'port': 'tcp:9999',
@@ -33,7 +35,8 @@ test_config = {
         'timeout': 10
     },
     'environment': 'prod',
-    'region': 'ord'
+    'region': 'ord',
+    'identity': identity_config
 }
 
 
@@ -440,7 +443,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         """
         self.addCleanup(lambda: set_supervisor(None))
         makeService(test_config)
-        mock_ga.assert_called_once_with(mock_reactor)
+        mock_ga.assert_called_once_with(mock_reactor, test_config['identity'])
         self.assertIdentical(get_supervisor().authenticator,
                              mock_ga.return_value)
 
@@ -579,78 +582,6 @@ class APIMakeServiceTests(SynchronousTestCase):
         sd.callback(None)
         self.successResultOf(d)
         self.assertTrue(kz_client.stop.called)
-
-
-from otter.auth import ImpersonatingAuthenticator
-from otter.auth import CachingAuthenticator
-from otter.auth import RetryingAuthenticator
-from otter.auth import WaitingAuthenticator
-from otter.tap.api import generate_authenticator
-
-
-class AuthenticatorTests(SynchronousTestCase):
-    """
-    Check if authenticators are instantiated in right composition
-    """
-
-    def setUp(self):
-        """
-        Config with identity settings
-        """
-        self.config = test_config.copy()
-        self.config['identity'] = {
-            'username': 'uname', 'password': 'pwd', 'url': 'htp',
-            'admin_url': 'ad', 'max_retries': 3, 'retry_interval': 5,
-            'wait': 4, 'cache_ttl': 50
-        }
-        set_config_data(self.config)
-        self.addCleanup(set_config_data, None)
-
-    def test_composition(self):
-        """
-        authenticator is composed correctly with values from config
-        """
-        r = mock.Mock()
-        a = generate_authenticator(r)
-        self.assertIsInstance(a, CachingAuthenticator)
-        self.assertIdentical(a._reactor, r)
-        self.assertEqual(a._ttl, 50)
-
-        wa = a._authenticator
-        self.assertIsInstance(wa, WaitingAuthenticator)
-        self.assertIdentical(wa._reactor, r)
-        self.assertEqual(wa._wait, 4)
-
-        ra = wa._authenticator
-        self.assertIsInstance(ra, RetryingAuthenticator)
-        self.assertIdentical(ra._reactor, r)
-        self.assertEqual(ra._max_retries, 3)
-        self.assertEqual(ra._retry_interval, 5)
-
-        ia = ra._authenticator
-        self.assertIsInstance(ia, ImpersonatingAuthenticator)
-        self.assertEqual(ia._identity_admin_user, 'uname')
-        self.assertEqual(ia._identity_admin_password, 'pwd')
-        self.assertEqual(ia._url, 'htp')
-        self.assertEqual(ia._admin_url, 'ad')
-
-    def test_wait_defaults(self):
-        """
-        WaitingAuthenticator is created with default of 5 if not given
-        """
-        del self.config['identity']['wait']
-        r = mock.Mock()
-        a = generate_authenticator(r)
-        self.assertEqual(a._authenticator._wait, 5)
-
-    def test_cache_ttl_defaults(self):
-        """
-        CachingAuthenticator is created with default of 300 if not given
-        """
-        del self.config['identity']['cache_ttl']
-        r = mock.Mock()
-        a = generate_authenticator(r)
-        self.assertEqual(a._ttl, 300)
 
 
 class SchedulerSetupTests(SynchronousTestCase):
