@@ -12,7 +12,6 @@ from toolz.dicttoolz import merge
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 from otter.util import logging_treq
-from otter.util.http import APIError, append_segments
 
 
 @attributes(['method', 'url', 'headers', 'data', 'log'],
@@ -180,7 +179,8 @@ def add_json_request_data(request_func):
 def add_bind_root(root, request_func):
     """
     Decorate a request function so that it's URL is appended to a common root.
+    The URL given is expected to be quoted. This decorator does not quote the URL.
     """
     request = lambda method, url, *args, **kwargs: (
-        request_func(method, append_segments(root, url), *args, **kwargs))
+        request_func(method, '{}/{}'.format(root.rstrip('/'), url), *args, **kwargs))
     return wraps(request_func)(request)

@@ -218,6 +218,14 @@ class BindRootTests(TestCase):
         self.assertEqual(request_("get", "foo").intent.url,
                          "http://slashdot.org/foo")
 
+    def test_bind_root_does_not_quote(self):
+        """
+        Appending URL is not quoted
+        """
+        request_ = add_bind_root("http://slashdot.org", request)
+        self.assertEqual(request_("get", "foo~").intent.url,
+                         "http://slashdot.org/foo~")
+
 
 class ContentOnlyTests(TestCase):
     """Tests for :func:`add_content_only`"""
