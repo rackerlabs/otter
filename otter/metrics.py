@@ -9,6 +9,9 @@ import sys
 import json
 from collections import namedtuple
 import time
+import operator
+
+from effect.twisted import perform
 
 from twisted.internet import task, defer
 from twisted.internet.endpoints import clientFromString
@@ -19,14 +22,15 @@ from twisted.python import usage
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
-from toolz.curried import groupby, filter, get_in
+from toolz.curried import groupby, filter, get_in, reduce
 from toolz.dicttoolz import merge
 from toolz.functoolz import identity
 
 from otter.auth import generate_authenticator, authenticate_user, extract_token
 
 from otter.auth import public_endpoint_url
-
+from otter.constants import get_service_mapping
+from otter.http import get_request_func
 from otter.convergence import get_scaling_group_servers
 from otter.util.http import append_segments, headers, check_success
 from otter.util.fp import predicate_all
@@ -95,58 +99,6 @@ def get_scaling_groups(client, props=None, batch_size=100, group_pred=None):
     defer.returnValue(group_filter(groups))
 
 
-@defer.inlineCallbacks
-def check_rackconnect(client):
-    """
-    Rackconnect metrics
-    """
-    groups = yield get_scaling_groups(client, props=['launch_config'])
-    for group in groups:
-        lbpool = get_in(['args', 'server', 'metadata', 'RackConnectLBPool'],
-                        json.loads(group['launch_config']))
-        if lbpool is not None:
-            print('Tenant: {} Group: {} RackconnectLBPool: {}'.format(
-                  group['tenantId'], group['groupId'], lbpool))
-
-
-def check_tenant_config(tenant_id, groups, grouped_servers):
-    """
-    Check if servers in the tenant's groups are different, i.e. have different flavor
-    or image
-    """
-    props = (['flavor', 'id'], ['image', 'id'])
-    for group in groups:
-        group_id = group['groupId']
-        if group_id not in grouped_servers:
-            continue
-        uniques = set(map(lambda s: tuple(get_in(p, s) for p in props),
-                          grouped_servers[group_id]))
-        if len(uniques) > 1:
-            print('tenant {} group {} diff types: {}'.format(tenant_id, group_id, uniques))
-
-
-@defer.inlineCallbacks
-def check_diff_configs(client, authenticator, nova_service, region, clock=None):
-    """
-    Find groups having servers with different launch config in them
-    """
-    cass_groups = yield get_scaling_groups(client)
-    tenanted_groups = groupby(lambda g: g['tenantId'], cass_groups)
-    print('got tenants', len(tenanted_groups))
-
-    defs = []
-    sem = defer.DeferredSemaphore(10)
-    for tenant_id, groups in tenanted_groups.iteritems():
-        d = sem.run(
-            get_scaling_group_servers, tenant_id, authenticator,
-            nova_service, region, server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
-            clock=clock)
-        d.addCallback(partial(check_tenant_config, tenant_id, groups))
-        defs.append(d)
-
-    yield defer.gatherResults(defs)
-
-
 GroupMetrics = namedtuple('GroupMetrics', 'tenant_id group_id desired actual pending')
 
 
@@ -174,37 +126,62 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
     return metrics
 
 
-def get_all_metrics(cass_groups, authenticator, nova_service, region,
-                    clock=None, _print=False):
+def get_all_metrics_effects(cass_groups, get_request_func_for_tenant,
+                            _print=False):
     """
     Gather server data for and produce metrics for all groups across all tenants
     in a region
 
-    :param iterable cass_groups: Groups got from cassandra as
-    :param :class:`otter.auth.IAuthenticator` authenticator: object that impersonates a tenant
-    :param str nova_service: Nova service name in service catalog
+    :param iterable cass_groups: Groups as retrieved from cassandra
+    :param get_request_func_for_tenant: Function of tenant_id -> request function
+    :param bool _print: Should the function print while processing?
+
+    :return: :obj:`Effect` of ``list`` of :obj:`GroupMetrics`
+    """
+    tenanted_groups = groupby(lambda g: g['tenantId'], cass_groups)
+    effs = []
+    for tenant_id, groups in tenanted_groups.iteritems():
+        request_func = get_request_func_for_tenant(tenant_id)
+        eff = get_scaling_group_servers(
+            request_func,
+            server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'))
+        eff = eff.on(partial(get_tenant_metrics, tenant_id, groups, _print=_print))
+        effs.append(eff)
+    return effs
+
+
+def _perform_limited_effects(effects, clock, limit):
+    """
+    Perform the effects in parallel up to a limit.
+
+    It'd be nice if effect.parallel had a "limit" parameter.
+    """
+    # TODO: Use cooperator instead
+    sem = defer.DeferredSemaphore(limit)
+    defs = [sem.run(perform, clock, eff) for eff in effects]
+    return defer.gatherResults(defs)
+
+
+def get_all_metrics(cass_groups, authenticator, services, region,
+                    clock=None, _print=False):
+    """
+    Gather server data and produce metrics for all groups across all tenants
+    in a region.
+
+    :param iterable cass_groups: Groups as retrieved from cassandra
+    :param otter.auth.IAuthenticator authenticator: object that impersonates a tenant
+    :param str services: service mapping from config
     :param str region: DC region
-    :param :class:`twisted.internet.IReactorTime` clock: IReactorTime provider
     :param bool _print: Should the function print while processing?
 
     :return: ``list`` of `GroupMetrics` as `Deferred`
     """
-    # TODO: Use cooperator instead
-    sem = defer.DeferredSemaphore(10)
-    tenanted_groups = groupby(lambda g: g['tenantId'], cass_groups)
-    defs = []
-    group_metrics = []
-    for tenant_id, groups in tenanted_groups.iteritems():
-        d = sem.run(
-            get_scaling_group_servers, tenant_id, authenticator,
-            nova_service, region,
-            server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'),
-            clock=clock)
-        d.addCallback(partial(get_tenant_metrics, tenant_id, groups, _print=_print))
-        d.addCallback(group_metrics.extend)
-        defs.append(d)
-
-    return defer.gatherResults(defs).addCallback(lambda _: group_metrics)
+    def req_func_for_tenant(tenant_id):
+        return get_request_func(authenticator, tenant_id, metrics_log,
+                                get_service_mapping(services.get), region)
+    effs = get_all_metrics_effects(cass_groups, req_func_for_tenant, _print=_print)
+    d = _perform_limited_effects(effs, clock, 10)
+    return d.addCallback(reduce(operator.add))
 
 
 @defer.inlineCallbacks
@@ -282,7 +259,7 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
     cass_groups = yield get_scaling_groups(_client, props=['status'],
                                            group_pred=lambda g: g['status'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
-        cass_groups, authenticator, config['services']['nova'], config['region'],
+        cass_groups, authenticator, config['services'], config['region'],
         clock=reactor, _print=_print)
 
     total_desired, total_actual, total_pending = reduce(
@@ -322,7 +299,7 @@ class Options(usage.Options):
         self.update(json.load(self.open(self['config'])))
         # TODO: This is hard-coded here and in tap/api.py. Should be there in
         # config file only
-        self.update({'services': {'nova': 'cloudServersOpenStack'}})
+        self.update({'services': {'cloudServersOpenStack': 'cloudServersOpenStack'}})
 
 
 class MetricsService(Service, object):
@@ -374,6 +351,6 @@ def makeService(config):
 
 if __name__ == '__main__':
     config = json.load(open(sys.argv[1]))
-    config['services'] = {'nova': 'cloudServersOpenStack'}
+    config['services'] = {'cloudServersOpenStack': 'cloudServersOpenStack'}
     # TODO: Take _print as cmd-line arg and pass it.
     task.react(collect_metrics, (config, None, None, True))

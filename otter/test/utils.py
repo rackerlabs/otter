@@ -7,6 +7,8 @@ import mock
 import os
 import treq
 
+from effect.testing import resolve_effect, resolve_stubs
+
 from zope.interface import implementer, directlyProvides
 from zope.interface.verify import verifyObject
 
@@ -21,6 +23,7 @@ from otter.log.bound import BoundLog
 from otter.supervisor import ISupervisor
 from otter.models.interface import IScalingGroup
 from otter.util.deferredutils import DeferredPool
+from otter.util.retry import Retry
 
 from pyrsistent import freeze
 
@@ -583,3 +586,16 @@ def alist_get(data, key):
         if dkey == key:
             return dvalue
     raise KeyError(key)
+
+
+def resolve_retry_stubs(eff):
+    """
+    Ensure that the passed effect has a Retry intent, and then resolve it
+    successfully (so no retry occurs).
+
+    This should be used in the positive cases of any retry-using effects.
+    The *value* of the Retry (or at least, Retry.should_retry) should be tested
+    separately to determine that the policy is as expected.
+    """
+    assert type(eff.intent) is Retry
+    return resolve_effect(eff, resolve_stubs(eff.intent.effect))
