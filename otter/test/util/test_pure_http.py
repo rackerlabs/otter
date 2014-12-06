@@ -226,6 +226,22 @@ class BindRootTests(TestCase):
         self.assertEqual(request_("get", "foo~").intent.url,
                          "http://slashdot.org/foo~")
 
+    def test_root_unicode(self):
+        """
+        If root is unicode, it is encoded as ascii before appending
+        """
+        request_ = add_bind_root(u'http://example.com', request)
+        self.assertEqual(request_("get", "foo").intent.url,
+                         "http://example.com/foo")
+
+    def test_url_unicode(self):
+        """
+        If url is unicode, it is encoded as utf-8 before appending
+        """
+        request_ = add_bind_root('http://example.com', request)
+        self.assertEqual(request_("get", u"foo\u0100").intent.url,
+                         "http://example.com/foo\xc4\x80")
+
 
 class ContentOnlyTests(TestCase):
     """Tests for :func:`add_content_only`"""
