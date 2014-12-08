@@ -29,10 +29,7 @@ from otter.models.cass import (
 from otter.scheduler import SchedulerService
 
 from otter.supervisor import SupervisorService, set_supervisor
-from otter.auth import ImpersonatingAuthenticator
-from otter.auth import RetryingAuthenticator
-from otter.auth import CachingAuthenticator
-from otter.auth import WaitingAuthenticator
+from otter.auth import generate_authenticator
 
 from otter.log import log
 from silverberg.cluster import RoundRobinCassandraCluster
@@ -175,39 +172,12 @@ class HealthChecker(object):
         return d.addCallback(assembleResults)
 
 
-def generate_authenticator(reactor):
-    """
-    Generate authenticator
-    """
-    # REVIEW: Seperating out to test. Have any better idea?
-    cache_ttl = config_value('identity.cache_ttl')
-    if cache_ttl is None:
-        # FIXME: Pick an arbitrary cache ttl value based on absolutely no
-        # science.
-        cache_ttl = 300
-
-    return CachingAuthenticator(
-        reactor,
-        WaitingAuthenticator(
-            reactor,
-            RetryingAuthenticator(
-                reactor,
-                ImpersonatingAuthenticator(
-                    config_value('identity.username'),
-                    config_value('identity.password'),
-                    config_value('identity.url'),
-                    config_value('identity.admin_url')),
-                max_retries=config_value('identity.max_retries'),
-                retry_interval=config_value('identity.retry_interval')),
-            config_value('identity.wait') or 5),
-        cache_ttl)
-
-
 def makeService(config):
     """
     Set up the otter-api service.
     """
-    set_config_data(dict(config))
+    config = dict(config)
+    set_config_data(config)
 
     s = MultiService()
 
@@ -240,7 +210,7 @@ def makeService(config):
     if bobby_url is not None:
         set_bobby(BobbyClient(bobby_url))
 
-    authenticator = generate_authenticator(reactor)
+    authenticator = generate_authenticator(reactor, config['identity'])
     supervisor = SupervisorService(authenticator, region, coiterate)
     supervisor.setServiceParent(s)
 
