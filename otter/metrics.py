@@ -11,14 +11,13 @@ from collections import namedtuple
 import time
 import operator
 
-from effect.twisted import perform
+from effect.twisted import perform, exc_info_to_failure
 
 from twisted.internet import task, defer
 from twisted.internet.endpoints import clientFromString
 from twisted.application.service import Service
 from twisted.application.internet import TimerService
 from twisted.python import usage
-from twisted.python.failure import Failure
 
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
@@ -148,7 +147,7 @@ def get_all_metrics_effects(cass_groups, get_request_func_for_tenant,
             server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'))
         eff = eff.on(partial(get_tenant_metrics, tenant_id, groups, _print=_print))
         eff = eff.on(
-            error=lambda exc_info: log.err(Failure(exc_info[1], exc_info[0], exc_info[2])))
+            error=lambda exc_info: log.err(exc_info_to_failure(exc_info)))
         effs.append(eff)
     return effs
 
