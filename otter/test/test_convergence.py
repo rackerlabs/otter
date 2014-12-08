@@ -1,13 +1,12 @@
 """Tests for convergence."""
 
-import json
 import calendar
 from functools import partial
 
 from characteristic import attributes
 
 from effect import Effect, ConstantIntent, parallel
-from effect.testing import StubIntent, resolve_stubs
+from effect.testing import StubIntent, resolve_effect
 
 from pyrsistent import pmap, pbag, pset, s
 
@@ -181,19 +180,19 @@ class GetLBContentsTests(SynchronousTestCase):
         Stub request function and mock `extract_drained_at`
         """
         self.reqs = {
-            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
-            ('GET', 'loadbalancers/1/nodes'): [
+            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes', True): [
                 {'id': '11', 'port': 20, 'address': 'a11',
                  'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
                 {'id': '12', 'port': 20, 'address': 'a12',
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}],
-            ('GET', 'loadbalancers/2/nodes'): [
+            ('GET', 'loadbalancers/2/nodes', True): [
                 {'id': '21', 'port': 20, 'address': 'a21',
                  'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
                 {'id': '22', 'port': 20, 'address': 'a22',
                  'weight': 3, 'condition': 'DRAINING', 'type': 'PRIMARY'}],
-            ('GET', 'loadbalancers/1/nodes/11.atom'): '11feed',
-            ('GET', 'loadbalancers/2/nodes/22.atom'): '22feed'
+            ('GET', 'loadbalancers/1/nodes/11.atom', False): '11feed',
+            ('GET', 'loadbalancers/2/nodes/22.atom', False): '22feed'
         }
         self.feeds = {'11feed': 1.0, '22feed': 2.0}
         self.mock_eda = patch(
@@ -201,11 +200,37 @@ class GetLBContentsTests(SynchronousTestCase):
             side_effect=lambda f: self.feeds[f])
 
     def _request(self):
-        def request(method, url):
-            body = self.reqs[(method, url)]
-            body = body if type(body) is str else json.dumps(body)
-            return Effect(StubIntent(ConstantIntent(body)))
+        def request(service_type, method, url, json_response=False):
+            assert service_type is ServiceType.CLOUD_LOAD_BALANCERS
+            response = self.reqs[(method, url, json_response)]
+            return Effect(StubIntent(ConstantIntent(response)))
         return request
+
+    def _resolve_retry_stubs(self, eff):
+        """
+        Like :func:`resolve_retry_stub`, but assert what we expect to be the
+        correct policy.
+        """
+        self.assertEqual(
+            eff.intent.should_retry,
+            ShouldDelayAndRetry(can_retry=retry_times(5),
+                                next_interval=exponential_backoff_interval(2)))
+        return resolve_retry_stubs(eff)
+
+    def _resolve_lb(self, eff):
+        """Resolve the tree of effects used to fetch LB information."""
+        # first resolve the request to list LBs
+        lb_nodes_fetch = self._resolve_retry_stubs(eff)
+        # which results in a parallel fetch of all nodes from all LBs
+        feed_fetches = resolve_effect(
+            lb_nodes_fetch,
+            map(self._resolve_retry_stubs, lb_nodes_fetch.intent.effects))
+        # which results in a list parallel fetch of feeds for the nodes
+        lbnodes = resolve_effect(
+            feed_fetches,
+            map(self._resolve_retry_stubs, feed_fetches.intent.effects))
+        # and we finally have the LBNodes.
+        return lbnodes
 
     def test_success(self):
         """
@@ -215,7 +240,7 @@ class GetLBContentsTests(SynchronousTestCase):
         draining, enabled = NodeCondition.DRAINING, NodeCondition.ENABLED
         make_config = partial(LBConfig, port=20, type=NodeType.PRIMARY)
         self.assertEqual(
-            resolve_stubs(eff),
+            self._resolve_lb(eff),
             [LBNode(lb_id=1, node_id='11', address='a11', drained_at=1.0,
                     config=make_config(weight=2, condition=draining)),
              LBNode(lb_id=1, node_id='12', address='a12',
@@ -229,33 +254,33 @@ class GetLBContentsTests(SynchronousTestCase):
         """
         Return empty list if there are no LB
         """
-        self.reqs = {('GET', 'loadbalancers'): []}
+        self.reqs = {('GET', 'loadbalancers', True): []}
         eff = get_load_balancer_contents(self._request())
-        self.assertEqual(resolve_stubs(eff), [])
+        self.assertEqual(self._resolve_lb(eff), [])
 
     def test_no_nodes(self):
         """
         Return empty if there are LBs but no nodes in them
         """
         self.reqs = {
-            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
-            ('GET', 'loadbalancers/1/nodes'): [],
-            ('GET', 'loadbalancers/2/nodes'): []
+            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes', True): [],
+            ('GET', 'loadbalancers/2/nodes', True): []
         }
         eff = get_load_balancer_contents(self._request())
-        self.assertEqual(resolve_stubs(eff), [])
+        self.assertEqual(self._resolve_lb(eff), [])
 
     def test_no_draining(self):
         """
         Doesnt fetch feeds if all nodes are ENABLED
         """
         self.reqs = {
-            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
-            ('GET', 'loadbalancers/1/nodes'): [
+            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes', True): [
                 {'id': '11', 'port': 20, 'address': 'a11',
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
             ],
-            ('GET', 'loadbalancers/2/nodes'): [
+            ('GET', 'loadbalancers/2/nodes', True): [
                 {'id': '21', 'port': 20, 'address': 'a21',
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
             ]
@@ -264,7 +289,7 @@ class GetLBContentsTests(SynchronousTestCase):
                           type=NodeType.PRIMARY)
         eff = get_load_balancer_contents(self._request())
         self.assertEqual(
-            resolve_stubs(eff),
+            self._resolve_lb(eff),
             [LBNode(lb_id=1, node_id='11', address='a11', config=config),
              LBNode(lb_id=2, node_id='21', address='a21', config=config)])
 
