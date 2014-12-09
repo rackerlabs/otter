@@ -346,7 +346,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
 
     def test_auth_me_waits(self):
         """
-        _auth_me is called only once if its called again while its previous call
+        _auth_me is called only once if it is called again while its previous call
         has not returned
         """
         aud = Deferred()
