@@ -75,15 +75,28 @@
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Added new <code>purge</code> option to <methodname>Delete server from group</methodname> operation. 
-                                Updated links to Cloud Identity Guide in RBAC section 
-                                and moved RBAC section to General API information section. 
-                                Added <xref linkend="createServerTemplate"></xref> information to 
-                                <link linkend="Launch_Configuration">Launch configuration </link>section in support of using Boot from Volume. Added 
-                                <link linkend="RCv3">Cloud Bursting with RackConnect v3</link> concept and information about using the 
-                            <parameter>launchConfiguration loadBalancers type</parameter> parameter to configure RackConnect v3 for Auto Scale. See also 
-                                <link linkend="Launch_Configuration">Launch configurations</link>. 
-                                </para>
+                            <para>Added new <code>purge</code> option
+                                to <methodname>Delete server from
+                                   group</methodname> operation.
+                                Updated links to Cloud Identity Guide
+                                in RBAC section and moved RBAC section
+                                to General API information section.
+                                Added <xref
+                                   linkend="createServerTemplate"/>
+                                information to <link
+                                   linkend="Launch_Configuration"
+                                   >Launch configuration
+                                </link>section in support of using
+                                Boot from Volume. Added <link
+                                   linkend="RCv3">Cloud Bursting with
+                                   RackConnectV3</link> concept and
+                                information about using the
+                                   <parameter>launchConfiguration
+                                   loadBalancers type</parameter>
+                                parameter to configure RackConnectV3
+                                for Auto Scale. See also <link
+                                   linkend="Launch_Configuration"
+                                   >Launch configurations</link>. </para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
@@ -309,16 +322,17 @@
             and the thresholds in Cloud Monitoring that trigger the
             scaling activities.</para>
         <para> To use &PROD;, you define a scaling group consisting of
-            cloud servers and cloud load balancers or RackConnect v3. Then you define
-            policies, either schedule-based or monitoring-based. For
-            monitoring-based policies, you define cloud monitoring
-            alerts to watch the group's activity, and you define
-            scaling rules to change the scaling group's configuration
-            in response to alerts. For schedule-based policies, you
-            simply set a schedule. Because you can change a scaling
-            group's configuration in response to changing workloads,
-            you can begin with a minimal cloud configuration and grow
-            only when the cost of that growth is justified.</para>
+            cloud servers and cloud load balancers or RackConnectV3.
+            Then you define policies, either schedule-based or
+            monitoring-based. For monitoring-based policies, you
+            define cloud monitoring alerts to watch the group's
+            activity, and you define scaling rules to change the
+            scaling group's configuration in response to alerts. For
+            schedule-based policies, you simply set a schedule.
+            Because you can change a scaling group's configuration in
+            response to changing workloads, you can begin with a
+            minimal cloud configuration and grow only when the cost of
+            that growth is justified.</para>
         <para>In this chapter, you will learn about the
             following:</para>
         <para>
@@ -507,8 +521,9 @@ is external so it's handy for Getting Started to share -->
                                 configuration specifies what type of
                                 server image will be started on
                                 launch, what flavor the new server is,
-                                and which load balancer or RackConnect v3 the new server
-                                connects to.</td>
+                                and which cloud load balancer or
+                                RackConnectV3 load balancer pool the
+                                new server connects to.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -652,29 +667,47 @@ is external so it's handy for Getting Started to share -->
             </para>
         </section>
         <section xml:id="RCv3" xmlns:raxm="http://docs.rackspace.com/api/metadata">
-            <title>Cloud Bursting with RackConnect v3</title>
-            <para>You can use Auto Scale with a hybrid, dedicated and cloud, solution to "burst" into the cloud when extra servers are 
-                temporarily needed. To do this, you use RackConnect v3, proprietary software that works with Rackspace cloud servers and 
-            creates a secure bridge between the Rackspace cloud and your dedicated hardware.</para>
-            <para>To get started with RackConnect v3 cloud bursting: <itemizedlist>
-                <listitem>
-                    <para>Contact Rackspace Customer Support and tell them what you want to do. They will configure a load balancer pool for 
-                    you and give you the UUID. </para>
-                </listitem>
-                <listitem>
-                    <para>Configure your <parameter>launchConfiguration</parameter> <parameter>loadBalancer</parameter> attributes with the 
-                        load balancer pool UUID that was given to you 
-                        as the <parameter>loadBalancerId</parameter> and use <parameter>"RackConnect v3"</parameter> 
-                        for the <parameter>type</parameter>. Do not set a value for <parameter>port</parameter>.</para>
-                </listitem>
-            </itemizedlist>
+            <title>Cloud Bursting with RackConnectV3</title>
+            <para>You can use Auto Scale with a hybrid, dedicated and
+                cloud, solution to "burst" into the cloud when extra
+                servers are temporarily needed. To do this, you use
+                RackConnectV3, proprietary software that works with
+                Rackspace cloud servers and creates a secure bridge
+                between the Rackspace cloud and your dedicated
+                hardware.</para>
+            <para>To get started with RackConnectV3 cloud bursting: <itemizedlist>
+                    <listitem>
+                        <para>Contact Rackspace Customer Support and
+                            tell them what you want to do. They will
+                            configure a load balancer pool for you and
+                            give you the UUID. </para>
+                    </listitem>
+                    <listitem>
+                        <para>Configure your
+                                <parameter>launchConfiguration</parameter>
+                            <parameter>loadBalancers</parameter>
+                            attributes with the load balancer pool
+                            UUID that was given to you as the
+                                <parameter>loadBalancerId</parameter>
+                            and use
+                                <parameter>"RackConnectV3"</parameter>
+                            for the <parameter>type</parameter>. Do
+                            not set a value for
+                                <parameter>port</parameter>.</para>
+                    </listitem>
+                </itemizedlist>
             </para>
-            <example><title>Example RackConnect v3 launchConfiguration with 2 load balancer pools</title>
+            <example><title>Example RackConnectV3 launchConfiguration with 2 load balancer
+                    pools</title>
                 <programlisting language="json">
                             <xi:include href="./samples/exampleRCv3launchConfig.json" parse="text"/>
                         </programlisting></example>
-            <para>For more information on RackConnect v3, see this <link xlink:href="http://www.rackspace.com/cloud/hybrid/rackconnect">Overview</link>, 
-                and there are several <link xlink:href="http://www.rackspace.com/knowledge_center/product-page/rackconnect">Knowledge Center articles</link>.</para>
+            <para>For more information on RackConnectV3, see this
+                    <link
+                    xlink:href="http://www.rackspace.com/cloud/hybrid/rackconnect"
+                    >Overview</link>, and there are several <link
+                    xlink:href="http://www.rackspace.com/knowledge_center/product-page/rackconnect"
+                    >Knowledge Center articles</link>.</para>
         </section>
     </chapter>
     <chapter xml:id="Gen_API_Info-de01">
@@ -727,7 +760,7 @@ is external so it's handy for Getting Started to share -->
                         </link>
                     </para>
                 </listitem>
-                <listitem linkend="audit-log">
+                <listitem linkend="audit-log" security="writerOnly">
                     <para>
                         <link linkend="audit-log">Audit logs</link>
                     </para>
@@ -1965,7 +1998,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 </note>
             </para>
         </section>
-        <section xml:id="audit-log">
+        <section xml:id="audit-log" security="writerOnly">
             <title>Audit logs</title>
             <para>Because of the deferred nature of Auto Scale, most
                 errors occur outside of the user's session. Errors are
@@ -2165,7 +2198,8 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <para>The launch configuration manages the process of
                 creating new servers. It specifies what type of server
                 image will be started on launch, what flavor the new
-                server is, and which load balancer or RackConnect v3 the new server
+                server is, and which cloud load balancer or
+                RackConnectV3 load balancer pool the new server
                 connects to.</para>
             <para>The <parameter>launchConfiguration</parameter>
                 parameter specifies the following items:</para>
@@ -2191,9 +2225,13 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>args</parameter>
                             </td>
-                            <td>Specifies the item to be configured. Must be <parameter>server</parameter> and also <parameter>loadbalancer</parameter>. 
-                                Most launch configurations have both a server and
-                                a load balancer (can be RackConnect v3) configured.</td>
+                            <td>Specifies the item to be configured.
+                                Must be <parameter>server</parameter>
+                                and also
+                                   <parameter>loadBalancers</parameter>.
+                                Most launch configurations have both a
+                                server and a load balancer (can be
+                                RackConnectV3) configured.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -2228,17 +2266,27 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             </td>
                             <td>Specifies the configuration
                                 information for the load balancer(s)
-                                used in the cloud server deployment, including a RackConnect v3 load balancer pool. 
-                                For background information and an example configuration, see <link linkend="RCv3">Cloud Bursting with RackConnect v3</link>.
-                                Please note that you must include the <parameter>service.net</parameter>
-                                network in your configuration if you use a load balancer so the load
-                                balancer can retrieve the IP address of new servers. </td>
+                                used in the cloud server deployment,
+                                including a RackConnectV3 load
+                                balancer pool. For background
+                                information and an example
+                                configuration, see <link
+                                   linkend="RCv3">Cloud Bursting with
+                                   RackConnectV3</link>. Please note
+                                that you must include the
+                                   <parameter>ServiceNet</parameter>
+                                network in your configuration if you
+                                use a load balancer so the load
+                                balancer can retrieve the IP address
+                                of new servers. </td>
                         </tr>
                     </tbody>
                 </table>
             </para>
             <para>The <parameter>server</parameter>group parameter specifies details about the server as described in the
                 following table. Note the <parameter>server</parameter> arguments are directly passed to nova when creating a server.</para>
+            <para>For more information see 
+                <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/nova_create_server.html">Create Your Server with the nova Client</link></para>
             <para>
                 <table rules="all">
                     <caption>server Parameters</caption>
@@ -2306,12 +2354,21 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>Optional. The maximum size of the
                                 metadata key and value is 255 bytes
                                 each. For more information, see the
-                                   <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html">
-                                       Server Metadata</link> documentation for Rackspace Cloud Servers. You use this attribute to configure 
-                                RackConnect v2 with Auto Scale, for details, see 
-                                <link xlink:href="http://www.rackspace.com/knowledge_center/article/cloud-bursting-using-auto-scale-rackconnect-and-f5-load-balancers">
-                                    Cloud Bursting Using Auto Scale, RackConnect, and F5 Load Balancers.</link> You do NOT use this parameter to configure 
-                            Auto Scale and RackConnect v3, you use the <parameter>loadBalancer</parameter> parameter for that.</td>
+                                   <link
+                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html"
+                                   > Server Metadata</link>
+                                documentation for Rackspace Cloud
+                                Servers. You use this attribute to
+                                configure RackConnect v2 with Auto
+                                Scale, for details, see <link
+                                   xlink:href="http://www.rackspace.com/knowledge_center/article/cloud-bursting-using-auto-scale-rackconnect-and-f5-load-balancers"
+                                   > Cloud Bursting Using Auto Scale,
+                                   RackConnect, and F5 Load
+                                   Balancers.</link> You do NOT use
+                                this parameter to configure Auto Scale
+                                and RackConnectV3, you use the
+                                   <parameter>loadBalancers</parameter>
+                                parameter for that.</td>
                         </tr>
                         <tr>
                             <td>
@@ -2344,10 +2401,9 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                 <parameter>user_data</parameter>
                             </td>
                             <td>Specifies your base64 encoded create server template you use for Boot from Volume. For more information on this parameter, see the
-                                <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Create_Server_with_configdrive.html">
-                                    Create Server with Config-drive and User-data</link> section of the 
-                                <citetitle>Next Generation Cloud Servers Developer Guide</citetitle> and the 
-                                <link xlink:href="http://developer.openstack.org/api-ref-guides/bk-api-ref.pdf">OpenStack API Complete Reference</link>. 
+                                <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/config_drive_ext.html">
+                                    Config-Drive Extension</link> section of the 
+                                <citetitle>Next Generation Cloud Servers Developer Guide</citetitle>. 
                                 For more information on Boot from Volume, see the developer blog 
                                 <link xlink:href="https://developer.rackspace.com/blog/using-cloud-init-with-rackspace-cloud/"> Using Cloud Init with Rackspace Cloud</link></td>
                         </tr>
@@ -2411,9 +2467,9 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <para>Here is an example of a very simple create server template that you could base64 encode. This template simply 
                 installs the apache2 package and runs a shell command.</para>
             <example xml:id="createServerTemplate">
-                <title>Create server template for RackConnect v3 </title>
+                <title>Create server template for RackConnectV3 </title>
                 <programlisting language="json">
-                            <xi:include href="./samples/user_dataTemplate.json" parse="text"/>
+                            <xi:include href="./samples/exampleRCv3launchConfig.json" parse="text"/>
                         </programlisting>
             </example> 
             <tip>
@@ -2435,7 +2491,9 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         </listitem>
                         <listitem>
                             <para>
-                                <link xlink:href="http://docs.rcv3.apiary.io/">RackConnect v3 API</link>
+                                <link
+                                   xlink:href="http://docs.rcv3.apiary.io/"
+                                   >RackConnectV3 API</link>
                             </para>
                         </listitem>
                     </itemizedlist>
@@ -2979,10 +3037,11 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     group </title>
                 <para>To obtain the launch configuration for a scaling
                     group, which includes the details of how to create
-                    a server, from what image, which load balancers to
-                    join it to, what networks to add it to, and other
-                    metadata, submit a <command>GET</command> request
-                    with the <parameter>tenantId</parameter> and
+                    a server, from what image, which cloud load
+                    balancers to join it to, what networks to add it
+                    to, and other metadata, submit a
+                        <command>GET</command> request with the
+                        <parameter>tenantId</parameter> and
                         <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
@@ -3006,21 +3065,23 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     group </title>
                 <para>To edit the launch configuration for a scaling
                     group, including how to create a server, from what
-                    image, which load balancers to join it to, and
-                    what networks to add it to, and other metadata,
-                    submit a <command>PUT</command> request with the
-                        <parameter>tenantId</parameter> and
+                    image, which cloud load balancers to join it to,
+                    and what networks to add it to, and other
+                    metadata, submit a <command>PUT</command> request
+                    with the <parameter>tenantId</parameter> and
                         <parameter>groupId</parameter> parameters
                     specified in the request URL. In the request body,
                     specify the details about the server type, server
                     image, load balancers, network, and any other
                     information you want to edit, as shown in the
-                    following example. For non-Rackspace server images, the
+                    following example. For non-Rackspace server
+                    images, the
                         <parameter>OS-DCF:diskConfig</parameter>
                     parameter value must always be
-                    <parameter>MANUAL</parameter>. A non-Rackspace server
-                    image would be one that you imported using a non-Rackspace server. For more
-                    information, see the <link
+                        <parameter>MANUAL</parameter>. A non-Rackspace
+                    server image would be one that you imported using
+                    a non-Rackspace server. For more information, see
+                    the <link
                         xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html"
                         >Disk Configuration Extension
                     </link>documentation.</para>
@@ -3035,7 +3096,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     successful, a 204 response code with an empty
                     response body will be returned. </para>
                 <example>
-                    <title>Request: Update launchConfiguration for boot from volume </title>
+                    <title>Request: Update launchConfiguration to boot from volume </title>
                     <programlisting>PUT /{tenantId}/groups/{groupId}/launch</programlisting>
                     <programlisting language="json">
                             <xi:include href="./samples/reqPutLaunchConfigBFV.json" parse="text"/>
