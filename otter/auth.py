@@ -150,7 +150,7 @@ class CachingAuthenticator(object):
         self._waiters = {}
         self._cache = {}
         self._log = self._bind_log(default_log)
-        self._auth_func = wait()(self._authenticator.authenticate_tenant)
+        self._auth_func = wait(ignore_kwargs=['log'])(self._authenticator.authenticate_tenant)
 
     def _bind_log(self, log, **kwargs):
         """
@@ -210,7 +210,7 @@ class ImpersonatingAuthenticator(object):
         # cached token to admin identity
         self._token = None
 
-    @wait()
+    @wait(ignore_kwargs=['log'])
     def _auth_me(self, log=None):
         if log:
             log.msg('Getting new identity admin token')
