@@ -288,7 +288,7 @@ class WaitTests(SynchronousTestCase):
         """
 
         @wait()
-        def f(n):
+        def f(n, a=1):
             return self.returns.pop(0)
 
         self.f = f
@@ -309,7 +309,7 @@ class WaitTests(SynchronousTestCase):
 
     def test_success_waits(self):
         """
-        Calling decorated function again with same arg calls wrapped function only once
+        Calling decorated function again with same args calls wrapped function only once
         and returns result to all callers
         """
         self._test_success_waits()
@@ -326,14 +326,17 @@ class WaitTests(SynchronousTestCase):
     def test_success_diff_args(self):
         """
         Calling decorated function again with diff arg calls wrapped function only once
-        for specific argument
+        for specific argument. This also shows that keyword arguments are considered
         """
         self.returns = [Deferred(), Deferred()]
         a1d, a2d = self.returns
-        d11 = self.f(1)
-        d12 = self.f(1)
+        d11 = self.f(1, a=3)
+        d12 = self.f(1, a=3)
         d2 = self.f(2)
         self.assertIs(a1d, d11)
+        self.assertNoResult(d11)
+        self.assertNoResult(d12)
+        self.assertNoResult(d2)
         a1d.callback(3)
         self.assertEqual(self.successResultOf(d12), 3)
         self.assertNoResult(d2)
@@ -352,6 +355,7 @@ class WaitTests(SynchronousTestCase):
         d3 = self.f(1)
         # Actual f called only once otherwise f would've errored
         self.assertIs(fd, d1)
+        self.assertNoResult(d1)
         self.assertNoResult(d2)
         self.assertNoResult(d3)
         fd.errback(ValueError('oops'))
@@ -366,10 +370,13 @@ class WaitTests(SynchronousTestCase):
         """
         self.returns = [Deferred(), Deferred()]
         a1d, a2d = self.returns
-        d11 = self.f(1)
-        d12 = self.f(1)
+        d11 = self.f(1, a=5)
+        d12 = self.f(1, a=5)
         d2 = self.f(2)
         self.assertIs(a1d, d11)
+        self.assertNoResult(d11)
+        self.assertNoResult(d12)
+        self.assertNoResult(d2)
         a1d.errback(ValueError('a'))
         self.failureResultOf(d12, ValueError)
         self.failureResultOf(a1d)  # Clear error
@@ -377,24 +384,47 @@ class WaitTests(SynchronousTestCase):
         a2d.errback(NotImplementedError('a'))
         self.failureResultOf(d2, NotImplementedError)
 
-    def test_with_kwargs(self):
+    def test_ignore_kwargs(self):
         """
-        If function is decorated by considering keyword arguments, then multiple
-        calls to decorated function with same args is called only once
+        Decorated function will ignore specific keyword arguments when mapping calls
+        to result
         """
 
-        @wait(ignore_kwargs=False)
+        @wait(ignore_kwargs=('k'))
         def f(n, k=None):
             return self.returns.pop(0)
 
-        self.returns = [Deferred(), Deferred()]
+        self.returns = [Deferred()]
         fd = self.returns[0]
         d1 = f(1, k=11)
-        d2 = f(1, k=11)
+        d2 = f(1, k=13)
         d3 = f(1, k=15)
+        self.assertNoResult(d1)
+        self.assertNoResult(d2)
+        self.assertNoResult(d3)
         fd.callback('r')
         self.assertEqual(self.successResultOf(d1), 'r')
         self.assertEqual(self.successResultOf(d2), 'r')
+
+    def test_ignore_kwargs_does_not_err(self):
+        """
+        Decorated function will ignore specific keyword arguments when mapping calls
+        to result. It will not error if the kwargs to be ignored are not passed to
+        decorated function
+        """
+
+        @wait(ignore_kwargs=('b'))
+        def f(n, k=None):
+            return self.returns.pop(0)
+
+        self.returns = [Deferred()]
+        fd = self.returns[0]
+        d1 = f(1, k=11)
+        d2 = f(1, k=11)
+        d3 = f(1, k=11)
+        self.assertNoResult(d1)
+        self.assertNoResult(d2)
         self.assertNoResult(d3)
-        d3.callback('a')
-        self.assertEqual(self.successResultOf(d3), 'a')
+        fd.callback('r')
+        self.assertEqual(self.successResultOf(d1), 'r')
+        self.assertEqual(self.successResultOf(d2), 'r')

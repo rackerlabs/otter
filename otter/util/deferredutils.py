@@ -262,13 +262,13 @@ def delay(result, reactor, seconds):
     return d
 
 
-def wait(ignore_kwargs=True):
+def wait(ignore_kwargs=()):
     """
     Return decorator that wraps a function by waiting for its result when its called
-    multiple times and its result from first call is not yet ready. Basically disallows
-    re-entrancy for Deferred returning functions
+    multiple times and its result from first call with same arguments is not yet ready.
+    Basically disallows re-entrancy for Deferred returning functions
 
-    :param bool ignore_kwargs: Ignore keyword arguments of wrapped function when waiting
+    :param list ignore_kwargs: Keyword arguments to ignore when matching results with args
     :return: A decorator that can wrap function to wait
     """
     waiters = defaultdict(list)
@@ -280,11 +280,13 @@ def wait(ignore_kwargs=True):
         del waiters[k], waiting[k]
         return r
 
-    def wrap(func):
+    def decorator(func):
 
         @wraps(func)
         def wrapped_f(*args, **kwargs):
-            k = freeze(args) if ignore_kwargs else freeze((args, kwargs))
+            kwcopy = kwargs.copy()
+            [kwcopy.pop(kwa, None) for kwa in ignore_kwargs]
+            k = freeze((args, kwcopy))
             if k in waiting:
                 d = defer.Deferred()
                 waiters[k].append(d)
@@ -297,4 +299,4 @@ def wait(ignore_kwargs=True):
 
         return wrapped_f
 
-    return wrap
+    return decorator
