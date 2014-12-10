@@ -324,17 +324,11 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         """
         Setup treq
         """
-        self.resp = {
-            'access': {
-                'token': {'id': 'token'},
-                'serviceCatalog': [
-                    {'endpoints': [{"region": "IAD", "publicURL": "url"}],
-                     "name": "cloudMetricsIngest"}
-                ]
-            }
-        }
-        self.au = patch(self, 'otter.metrics.authenticate_user',
-                        return_value=succeed(self.resp))
+        def request(*a, **k):
+            self.a, self.k = a, k
+            return Effect(StubIntent(ConstantIntent('r')))
+
+        self.request = request
 
     @mock.patch('otter.metrics.time')
     def test_added(self, mock_time):
@@ -349,16 +343,15 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         md = merge(m, {'metricValue': td, 'metricName': 'ord.desired'})
         ma = merge(m, {'metricValue': ta, 'metricName': 'ord.actual'})
         mp = merge(m, {'metricValue': tp, 'metricName': 'ord.pending'})
-        req = ('POST', 'url/ingest', {'headers': headers('token'),
-                                      'data': json.dumps([md, ma, mp])})
-        treq = StubTreq2([(req, (200, ''))])
-        conf = {'username': 'a', 'password': 'p', 'service': 'cloudMetricsIngest',
-                'region': 'IAD', 'ttl': m['ttlInSeconds']}
+        req_data = [md, ma, mp]
+        conf = {'ttl': m['ttlInSeconds']}
+        log = object()
 
-        d = add_to_cloud_metrics(conf, 'idurl', 'ord', td, ta, tp, _treq=treq)
+        eff = add_to_cloud_metrics(self.request, td, ta, tp, log=log)
 
-        self.assertIsNone(self.successResultOf(d))
-        self.au.assert_called_once_with('idurl', 'a', 'p', log=matches(IsInstance(BoundLog)))
+        self.assertEqual(resolve_stubs(eff), 'r')
+        self.assertEqual(self.a, (ServiceType.CLOUD_METRICS_INGEST, 'POST', 'ingest'))
+        self.assertEqual(self.k, dict(data=req_data, log=log))
 
 
 class CollectMetricsTests(SynchronousTestCase):

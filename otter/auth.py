@@ -274,6 +274,12 @@ class ImpersonatingAuthenticator(object):
         return d
 
 
+class IdentityAuthenticator(object):
+    """
+    Authenticates to given identity service
+    """
+
+
 def extract_token(auth_response):
     """
     Extract an auth token from an authentication response.
