@@ -40,7 +40,9 @@ import json
 from itertools import groupby
 from functools import partial
 
-from twisted.internet.defer import succeed, Deferred
+from characteristic import attributes
+
+from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
@@ -50,7 +52,7 @@ from otter.util.retry import retry, retry_times, repeating_interval
 from otter.log import log as default_log
 from otter.util.http import (
     headers, check_success, append_segments, wrap_upstream_error, retry_on_unauth)
-from otter.util.deferredutils import delay
+from otter.util.deferredutils import delay, wait
 
 
 class IAuthenticator(Interface):
@@ -150,6 +152,7 @@ class CachingAuthenticator(object):
         self._waiters = {}
         self._cache = {}
         self._log = self._bind_log(default_log)
+        self._auth_func = wait(ignore_kwargs=['log'])(self._authenticator.authenticate_tenant)
 
     def _bind_log(self, log, **kwargs):
         """
@@ -179,35 +182,14 @@ class CachingAuthenticator(object):
 
             log.msg('otter.auth.cache.expired', age=now - created)
 
-        if tenant_id in self._waiters:
-            d = Deferred()
-            self._waiters[tenant_id].append(d)
-            log.msg('otter.auth.cache.waiting',
-                    waiters=len(self._waiters[tenant_id]))
-            return d
-
         def when_authenticated(result):
             log.msg('otter.auth.cache.populate')
             self._cache[tenant_id] = (self._reactor.seconds(), result)
-
-            waiters = self._waiters.pop(tenant_id, [])
-            for waiter in waiters:
-                waiter.callback(result)
-
             return result
 
-        def when_auth_fails(failure):
-            waiters = self._waiters.pop(tenant_id, [])
-            for waiter in waiters:
-                waiter.errback(failure)
-
-            return failure
-
         log.msg('otter.auth.cache.miss')
-        self._waiters[tenant_id] = []
-        d = self._authenticator.authenticate_tenant(tenant_id, log=log)
+        d = self._auth_func(tenant_id, log=log)
         d.addCallback(when_authenticated)
-        d.addErrback(when_auth_fails)
 
         return d
 
@@ -230,7 +212,8 @@ class ImpersonatingAuthenticator(object):
         # cached token to admin identity
         self._token = None
 
-    def _auth_me(self, log):
+    @wait(ignore_kwargs=['log'])
+    def _auth_me(self, log=None):
         if log:
             log.msg('Getting new identity admin token')
         d = authenticate_user(self._url,
@@ -245,7 +228,7 @@ class ImpersonatingAuthenticator(object):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
-        auth = partial(self._auth_me, log)
+        auth = partial(self._auth_me, log=log)
 
         d = user_for_tenant(self._admin_url,
                             self._identity_admin_user,
@@ -270,6 +253,14 @@ class ImpersonatingAuthenticator(object):
         d.addCallback(lambda token: retry_on_unauth(partial(endpoints, token), auth))
 
         return d
+
+    def __hash__(self):
+        """
+        Return hash of the object. Required for this to be stored in dict to
+        make wait() decorator work
+        """
+        return hash((self._identity_admin_user, self._identity_admin_password,
+                     self._url, self._admin_url))
 
 
 def extract_token(auth_response):
@@ -426,3 +417,63 @@ def public_endpoint_url(service_catalog, service_name, region):
     """
     first_endpoint = next(endpoints(service_catalog, service_name, region))
     return first_endpoint['publicURL']
+
+
+@attributes(['authenticator', 'tenant_id', 'log'], apply_with_init=False)
+class Authenticate(object):
+    """
+    An Effect intent that represents authentication.
+
+    The result type is (auth_token, service_catalog).
+    """
+    def __init__(self, authenticator, tenant_id, log):
+        self.authenticator = authenticator
+        self.tenant_id = tenant_id
+        self.log = log
+
+    def perform_effect(self, dispatcher):
+        """Authenticate."""
+        return self.authenticator.authenticate_tenant(self.tenant_id, log=self.log)
+
+
+@attributes(['authenticator', 'tenant_id'], apply_with_init=False)
+class InvalidateToken(object):
+    """
+    An Effect intent that represents the invalidation of a token from a local cache.
+
+    The result type is None.
+    """
+    def __init__(self, authenticator, tenant_id):
+        self.authenticator = authenticator
+        self.tenant_id = tenant_id
+
+    def perform_effect(self, dispatcher):
+        """Invalidate the credential cache."""
+        return self.authenticator.invalidate(self.tenant_id)
+
+
+def generate_authenticator(reactor, config):
+    """
+    Generate authenticator based on settings in config
+
+    :param reactor: Twisted reactor
+    :param dict config: Identity specific config
+    """
+    # FIXME: Pick an arbitrary cache ttl value based on absolutely no science.
+    cache_ttl = config.get('cache_ttl', 300)
+
+    return CachingAuthenticator(
+        reactor,
+        WaitingAuthenticator(
+            reactor,
+            RetryingAuthenticator(
+                reactor,
+                ImpersonatingAuthenticator(
+                    config['username'],
+                    config['password'],
+                    config['url'],
+                    config['admin_url']),
+                max_retries=config['max_retries'],
+                retry_interval=config['retry_interval']),
+            config.get('wait', 5)),
+        cache_ttl)

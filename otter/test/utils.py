@@ -7,7 +7,11 @@ import mock
 import os
 import treq
 
+from effect import guard
+from effect.testing import resolve_effect, resolve_stubs
+
 from zope.interface import implementer, directlyProvides
+from zope.interface.verify import verifyObject
 
 from testtools.matchers import Mismatch, MatchesException
 
@@ -20,6 +24,7 @@ from otter.log.bound import BoundLog
 from otter.supervisor import ISupervisor
 from otter.models.interface import IScalingGroup
 from otter.util.deferredutils import DeferredPool
+from otter.util.retry import Retry
 
 from pyrsistent import freeze
 
@@ -104,6 +109,24 @@ class IsBoundWith(object):
             return None
         else:
             return Mismatch('Expected kwargs {} but got {} instead'.format(self.kwargs, kwargs))
+
+
+class Provides(object):
+    """
+    Match if instance provides given interface
+    """
+    def __init__(self, intf):
+        self.intf = intf
+
+    def __str__(self):
+        return 'Provides {}'.format(self.intf)
+
+    def match(self, inst):
+        """
+        Return None if inst provides given interface. Otherwise return Mismatch
+        """
+        return None if verifyObject(self.intf, inst) else Mismatch(
+            'Expected instance providing interface {}'.format(self.intf))
 
 
 class CheckFailure(object):
@@ -564,3 +587,17 @@ def alist_get(data, key):
         if dkey == key:
             return dvalue
     raise KeyError(key)
+
+
+def resolve_retry_stubs(eff):
+    """
+    Ensure that the passed effect has a Retry intent, and then resolve it
+    successfully (so no retry occurs).
+
+    This should be used in the positive cases of any retry-using effects.
+    The *value* of the Retry (or at least, Retry.should_retry) should be tested
+    separately to determine that the policy is as expected.
+    """
+    assert type(eff.intent) is Retry
+    is_error, intermediate_result = guard(resolve_stubs, eff.intent.effect)
+    return resolve_effect(eff, intermediate_result, is_error=is_error)

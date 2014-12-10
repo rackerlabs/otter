@@ -14,6 +14,7 @@ decorator==3.4.0
 unittest2==0.5.1
 IPy==0.81
 # mock==1.0.1
+yunomi==0.3.0
 
 # pin deps of deps
 
