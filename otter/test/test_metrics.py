@@ -7,7 +7,7 @@ import json
 from io import StringIO
 import operator
 
-from effect import Effect, ConstantIntent
+from effect import Effect, ConstantIntent, ErrorIntent
 from effect.testing import StubIntent
 
 from pyrsistent import freeze
@@ -28,7 +28,7 @@ from otter.test.test_auth import identity_config
 from otter.auth import IAuthenticator
 from otter.test.utils import (
     patch, StubTreq2, matches, IsCallable, CheckFailure, mock_log, resolve_retry_stubs,
-    Provides)
+    CheckFailureValue, Provides)
 from otter.util.http import headers
 from otter.log import BoundLog
 
@@ -194,7 +194,7 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
             def request_func(service_type, method, url, headers=None, data=None):
                 return Effect(StubIntent(ConstantIntent(tenant_servers[tenant_id])))
             return request_func
-        effs = get_all_metrics_effects(groups, get_bound_request_func)
+        effs = get_all_metrics_effects(groups, get_bound_request_func, mock_log())
 
         # All of the HTTP requests are wrapped in retries, so unwrap them
         results = map(resolve_retry_stubs, effs)
@@ -204,6 +204,32 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
             set([GroupMetrics('t1', 'g1', desired=3, actual=3, pending=2),
                  GroupMetrics('t1', 'g2', desired=4, actual=1, pending=0),
                  GroupMetrics('t2', 'g4', desired=2, actual=1, pending=1)]))
+
+    def test_error_per_tenant(self):
+        """
+        When a request for servers fails, the associated effect results in
+        None, and an error is logged.
+        """
+        log = mock_log()
+        log.err.return_value = None
+
+        def get_bound_request_func(tenant_id):
+            def request_func(service_type, method, url, headers=None, data=None):
+                if tenant_id == 't1':
+                    return Effect(StubIntent(ConstantIntent({'servers': []})))
+                else:
+                    return Effect(StubIntent(ErrorIntent(ZeroDivisionError('foo bar'))))
+            return request_func
+
+        groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
+                  {'tenantId': 't2', 'groupId': 'g2', 'desired': 0}]
+
+        effs = get_all_metrics_effects(groups, get_bound_request_func, log)
+        results = map(resolve_retry_stubs, effs)
+        self.assertEqual(
+            results,
+            [None, [GroupMetrics('t1', 'g1', desired=0, actual=0, pending=0)]])
+        log.err.assert_called_once_with(CheckFailureValue(ZeroDivisionError('foo bar')))
 
 
 class GnarlyGetMetricsTests(SynchronousTestCase):
@@ -266,6 +292,27 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
         self.mock_get_request_func.assert_any_call(
             authenticator, 't2', metrics_log,
             get_service_mapping({'cloudServersOpenStack': 'cloudServersOpenStack'}.get), 'r')
+
+    def test_ignore_error_results(self):
+        """
+        When get_all_metrics_effects returns a list containing a None, those elements are
+        ignored.
+        """
+        def mock_game(cass_groups, get_request_func_for_tenant, log, _print=False):
+            return [Effect(ConstantIntent(None)),
+                    Effect(ConstantIntent([GroupMetrics('t1', 'g1', 0, 0, 0)]))]
+        mock_game = patch(self, 'otter.metrics.get_all_metrics_effects', side_effect=mock_game)
+        groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
+                  {'tenantId': 't2', 'groupId': 'g2', 'desired': 500}]
+        authenticator = mock.Mock()
+        d = get_all_metrics(
+            groups, authenticator,
+            {'cloudServersOpenStack': 'cloudServersOpenStack'},
+            'r', clock='c')
+
+        self.assertEqual(
+            self.successResultOf(d),
+            [GroupMetrics('t1', 'g1', 0, 0, 0)])
 
 
 class AddToCloudMetricsTests(SynchronousTestCase):

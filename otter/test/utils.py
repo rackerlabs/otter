@@ -7,6 +7,7 @@ import mock
 import os
 import treq
 
+from effect import guard
 from effect.testing import resolve_effect, resolve_stubs
 
 from zope.interface import implementer, directlyProvides
@@ -598,4 +599,5 @@ def resolve_retry_stubs(eff):
     separately to determine that the policy is as expected.
     """
     assert type(eff.intent) is Retry
-    return resolve_effect(eff, resolve_stubs(eff.intent.effect))
+    is_error, intermediate_result = guard(resolve_stubs, eff.intent.effect)
+    return resolve_effect(eff, intermediate_result, is_error=is_error)
