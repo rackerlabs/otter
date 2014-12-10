@@ -3,8 +3,6 @@ Convergence.
 """
 
 from urllib import urlencode
-import json
-import calendar
 from itertools import izip as zip
 from operator import itemgetter
 import time

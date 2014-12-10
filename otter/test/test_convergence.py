@@ -5,15 +5,16 @@ from functools import partial
 
 from characteristic import attributes
 
-from effect import Effect, ConstantIntent, parallel
-from effect.testing import StubIntent, resolve_effect
+import mock
+
+from effect import Effect, ConstantIntent, parallel, ParallelEffects
+from effect.testing import StubIntent, resolve_effect, resolve_stubs
 
 from pyrsistent import pmap, pbag, pset, s
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.retry import ShouldDelayAndRetry, exponential_backoff_interval, retry_times
-from otter.constants import ServiceType
 from otter.test.utils import patch, resolve_retry_stubs
 from otter.util.timestamp import from_timestamp, now
 from otter.convergence import (
@@ -27,13 +28,6 @@ from otter.convergence import (
     ServerState, ServiceType, NodeCondition, NodeType, optimize_steps,
     extract_drained_at, get_load_balancer_contents, _reqs_to_effect,
     execute_convergence, to_nova_server, json_to_LBConfigs)
-
-from pyrsistent import pmap, pbag, pset, s, freeze
-
-from effect import ConstantIntent, Effect, parallel, ParallelEffects
-from effect.testing import StubIntent, resolve_stubs, resolve_effect
-
-import mock
 
 
 def _request(requests):
