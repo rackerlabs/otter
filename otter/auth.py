@@ -42,7 +42,7 @@ from functools import partial
 
 from characteristic import attributes
 
-from twisted.internet.defer import succeed, Deferred
+from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
