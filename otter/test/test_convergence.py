@@ -1,18 +1,20 @@
 """Tests for convergence."""
 
-import json
 import calendar
 from functools import partial
 
-from twisted.trial.unittest import SynchronousTestCase
-from twisted.internet.task import Clock
-from twisted.internet.defer import succeed
-
 from characteristic import attributes
 
-from otter.test.utils import StubTreq2, patch, iMock
-from otter.auth import IAuthenticator
-from otter.util.http import headers, APIError
+from effect import Effect, ConstantIntent, parallel
+from effect.testing import StubIntent, resolve_effect
+
+from pyrsistent import pmap, pbag, pset, s
+
+from twisted.trial.unittest import SynchronousTestCase
+
+from otter.util.retry import ShouldDelayAndRetry, exponential_backoff_interval, retry_times
+from otter.constants import ServiceType
+from otter.test.utils import patch, resolve_retry_stubs
 from otter.util.timestamp import from_timestamp
 from otter.convergence import (
     _remove_from_lb_with_draining, _converge_lb_state,
@@ -22,13 +24,17 @@ from otter.convergence import (
     BulkAddToRCv3, BulkRemoveFromRCv3,
     SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
-    ServerState, ServiceType, NodeCondition, NodeType, optimize_steps,
+    ServerState, NodeCondition, NodeType, optimize_steps,
     extract_drained_at, get_load_balancer_contents, _reqs_to_effect)
 
-from pyrsistent import pmap, pbag, pset, s
 
-from effect import ConstantIntent, Effect, parallel
-from effect.testing import StubIntent, resolve_stubs
+def _request(requests):
+    def request(service_type, method, url):
+        response = requests.get((service_type, method, url))
+        if response is None:
+            raise KeyError("{} not in {}".format((method, url), requests.keys()))
+        return Effect(StubIntent(ConstantIntent(response)))
+    return request
 
 
 class GetAllServerDetailsTests(SynchronousTestCase):
@@ -37,66 +43,45 @@ class GetAllServerDetailsTests(SynchronousTestCase):
     """
 
     def setUp(self):
-        """
-        Setup stub clock, treq implementation and mock authenticator
-        """
-        self.clock = Clock()
-        self.auth = iMock(IAuthenticator)
-        self.auth.authenticate_tenant.return_value = succeed(('token', 'catalog'))
-        self.peu = patch(self, 'otter.convergence.public_endpoint_url',
-                         return_value='url')
-        self.req = ('GET', 'url/servers/detail?limit=10', dict(headers=headers('token')))
+        """Save basic reused data."""
+        self.req = (ServiceType.CLOUD_SERVERS, 'GET',
+                    'servers/detail?limit=10')
         self.servers = [{'id': i} for i in range(9)]
 
-    def test_get_all_less_limit(self):
+    def test_get_all_less_batch_size(self):
         """
-        `get_all_server_details` will not fetch again if first get returns results
-        with size < limit
+        `get_all_server_details` will not fetch again if first get returns
+        results with size < batch_size
         """
-        treq = StubTreq2([(self.req, (200, json.dumps({'servers': self.servers})))])
-        d = get_all_server_details('tid', self.auth, 'service', 'ord',
-                                   limit=10, clock=self.clock, _treq=treq)
-        self.assertEqual(self.successResultOf(d), self.servers)
+        request = _request({self.req: {'servers': self.servers}})
+        eff = get_all_server_details(request, batch_size=10)
+        result = resolve_retry_stubs(eff)
+        self.assertEqual(result, self.servers)
 
-    def test_get_all_above_limit(self):
+    def test_get_all_above_batch_size(self):
         """
-        `get_all_server_details` will fetch again until batch returned has size < limit
+        `get_all_server_details` will fetch again until batch returned has
+        size < batch_size
         """
         servers = [{'id': i} for i in range(19)]
-        req2 = ('GET', 'url/servers/detail?limit=10&marker=9', dict(headers=headers('token')))
-        treq = StubTreq2([(self.req, (200, json.dumps({'servers': servers[:10]}))),
-                          (req2, (200, json.dumps({'servers': servers[10:]})))])
-        d = get_all_server_details('tid', self.auth, 'service', 'ord',
-                                   limit=10, clock=self.clock, _treq=treq)
-        self.assertEqual(self.successResultOf(d), servers)
 
-    def test_get_all_retries_exp(self):
-        """
-        `get_all_server_details` will fetch again in exponential backoff form
-        if request fails
-        """
-        data = json.dumps({'servers': self.servers})
-        treq = StubTreq2([(self.req, [(500, 'bad data'), (401, 'unauth'),
-                                      (200, data)])])
-        d = get_all_server_details('tid', self.auth, 'service', 'ord',
-                                   limit=10, clock=self.clock, _treq=treq)
-        self.assertNoResult(d)
-        self.clock.advance(2)
-        self.assertNoResult(d)
-        self.clock.advance(4)
-        self.assertEqual(self.successResultOf(d), self.servers)
+        req2 = (ServiceType.CLOUD_SERVERS, 'GET',
+                'servers/detail?limit=10&marker=9')
+        request = _request({self.req: {'servers': servers[:10]},
+                            req2: {'servers': servers[10:]}})
+        eff = get_all_server_details(request, batch_size=10)
+        self.assertEqual(resolve_retry_stubs(resolve_retry_stubs(eff)), servers)
 
-    def test_get_all_retries_times_out(self):
-        """
-        `get_all_server_details` will keep trying to fetch info and give up
-        eventually
-        """
-        treq = StubTreq2([(self.req, [(500, 'bad data') for i in range(6)])])
-        d = get_all_server_details('tid', self.auth, 'service', 'ord',
-                                   limit=10, clock=self.clock, _treq=treq)
-        self.assertNoResult(d)
-        self.clock.pump([2 ** i for i in range(1, 6)])
-        self.failureResultOf(d, APIError)
+    def test_retry(self):
+        """The HTTP requests are retried with some appropriate policy."""
+        request = _request({self.req: {'servers': self.servers}})
+        eff = get_all_server_details(request, batch_size=10)
+        self.assertEqual(
+            eff.intent.should_retry,
+            ShouldDelayAndRetry(can_retry=retry_times(5),
+                                next_interval=exponential_backoff_interval(2)))
+        result = resolve_retry_stubs(eff)
+        self.assertEqual(result, self.servers)
 
 
 class GetScalingGroupServersTests(SynchronousTestCase):
@@ -105,37 +90,27 @@ class GetScalingGroupServersTests(SynchronousTestCase):
     """
 
     def setUp(self):
-        """
-        Mock and setup :func:`get_all_server_details`
-        """
-        self.mock_gasd = patch(self, 'otter.convergence.get_all_server_details')
-        self.servers = []
-        self.clock = None
-
-        def gasd(*args, **kwargs):
-            if args == ('t', 'a', 's', 'r') and kwargs == {'clock': self.clock}:
-                return succeed(self.servers)
-
-        # Setup function to return value only on expected args to avoid asserting
-        # its called every time
-        self.mock_gasd.side_effect = gasd
+        """Save basic reused data."""
+        self.req = (ServiceType.CLOUD_SERVERS, 'GET',
+                    'servers/detail?limit=100')
 
     def test_filters_no_metadata(self):
         """
-        Does not include servers which do not have metadata in it
+        Servers without metadata are not included in the result.
         """
-        self.servers = [{'id': i} for i in range(10)]
-        d = get_scaling_group_servers('t', 'a', 's', 'r')
-        self.assertEqual(self.successResultOf(d), {})
+        servers = [{'id': i} for i in range(10)]
+        request = _request({self.req: {'servers': servers}})
+        eff = get_scaling_group_servers(request)
+        self.assertEqual(resolve_retry_stubs(eff), {})
 
     def test_filters_no_as_metadata(self):
         """
         Does not include servers which have metadata but does not have AS info in it
         """
-        self.servers = [{'id': i, 'metadata': {}} for i in range(10)]
-        self.clock = Clock()
-        d = get_scaling_group_servers('t', 'a', 's', 'r', clock=self.clock)
-        self.assertEqual(self.successResultOf(d), {})
+        servers = [{'id': i, 'metadata': {}} for i in range(10)]
+        request = _request({self.req: {'servers': servers}})
+        eff = get_scaling_group_servers(request)
+        self.assertEqual(resolve_retry_stubs(eff), {})
 
     def test_returns_as_servers(self):
         """
@@ -145,10 +120,11 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i} for i in range(5)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i} for i in range(5, 8)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
-        self.servers = as_servers + [{'metadata': 'junk'}] * 3
-        d = get_scaling_group_servers('t', 'a', 's', 'r')
+        servers = as_servers + [{'metadata': 'junk'}] * 3
+        request = _request({self.req: {'servers': servers}})
+        eff = get_scaling_group_servers(request)
         self.assertEqual(
-            self.successResultOf(d),
+            resolve_retry_stubs(eff),
             {'a': as_servers[:5] + [as_servers[-1]], 'b': as_servers[5:8]})
 
     def test_filters_on_user_criteria(self):
@@ -158,11 +134,11 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         as_servers = (
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i} for i in range(5)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i} for i in range(5, 8)])
-        self.servers = as_servers + [{'metadata': 'junk'}] * 3
-        d = get_scaling_group_servers('t', 'a', 's', 'r',
-                                      server_predicate=lambda s: s['id'] % 3 == 0)
+        servers = as_servers + [{'metadata': 'junk'}] * 3
+        request = _request({self.req: {'servers': servers}})
+        eff = get_scaling_group_servers(request, server_predicate=lambda s: s['id'] % 3 == 0)
         self.assertEqual(
-            self.successResultOf(d),
+            resolve_retry_stubs(eff),
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
 
 
@@ -204,19 +180,19 @@ class GetLBContentsTests(SynchronousTestCase):
         Stub request function and mock `extract_drained_at`
         """
         self.reqs = {
-            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
-            ('GET', 'loadbalancers/1/nodes'): [
+            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes', True): [
                 {'id': '11', 'port': 20, 'address': 'a11',
                  'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
                 {'id': '12', 'port': 20, 'address': 'a12',
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}],
-            ('GET', 'loadbalancers/2/nodes'): [
+            ('GET', 'loadbalancers/2/nodes', True): [
                 {'id': '21', 'port': 20, 'address': 'a21',
                  'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
                 {'id': '22', 'port': 20, 'address': 'a22',
                  'weight': 3, 'condition': 'DRAINING', 'type': 'PRIMARY'}],
-            ('GET', 'loadbalancers/1/nodes/11.atom'): '11feed',
-            ('GET', 'loadbalancers/2/nodes/22.atom'): '22feed'
+            ('GET', 'loadbalancers/1/nodes/11.atom', False): '11feed',
+            ('GET', 'loadbalancers/2/nodes/22.atom', False): '22feed'
         }
         self.feeds = {'11feed': 1.0, '22feed': 2.0}
         self.mock_eda = patch(
@@ -224,11 +200,37 @@ class GetLBContentsTests(SynchronousTestCase):
             side_effect=lambda f: self.feeds[f])
 
     def _request(self):
-        def request(method, url):
-            body = self.reqs[(method, url)]
-            body = body if type(body) is str else json.dumps(body)
-            return Effect(StubIntent(ConstantIntent(body)))
+        def request(service_type, method, url, json_response=False):
+            assert service_type is ServiceType.CLOUD_LOAD_BALANCERS
+            response = self.reqs[(method, url, json_response)]
+            return Effect(StubIntent(ConstantIntent(response)))
         return request
+
+    def _resolve_retry_stubs(self, eff):
+        """
+        Like :func:`resolve_retry_stub`, but assert what we expect to be the
+        correct policy.
+        """
+        self.assertEqual(
+            eff.intent.should_retry,
+            ShouldDelayAndRetry(can_retry=retry_times(5),
+                                next_interval=exponential_backoff_interval(2)))
+        return resolve_retry_stubs(eff)
+
+    def _resolve_lb(self, eff):
+        """Resolve the tree of effects used to fetch LB information."""
+        # first resolve the request to list LBs
+        lb_nodes_fetch = self._resolve_retry_stubs(eff)
+        # which results in a parallel fetch of all nodes from all LBs
+        feed_fetches = resolve_effect(
+            lb_nodes_fetch,
+            map(self._resolve_retry_stubs, lb_nodes_fetch.intent.effects))
+        # which results in a list parallel fetch of feeds for the nodes
+        lbnodes = resolve_effect(
+            feed_fetches,
+            map(self._resolve_retry_stubs, feed_fetches.intent.effects))
+        # and we finally have the LBNodes.
+        return lbnodes
 
     def test_success(self):
         """
@@ -238,7 +240,7 @@ class GetLBContentsTests(SynchronousTestCase):
         draining, enabled = NodeCondition.DRAINING, NodeCondition.ENABLED
         make_config = partial(LBConfig, port=20, type=NodeType.PRIMARY)
         self.assertEqual(
-            resolve_stubs(eff),
+            self._resolve_lb(eff),
             [LBNode(lb_id=1, node_id='11', address='a11', drained_at=1.0,
                     config=make_config(weight=2, condition=draining)),
              LBNode(lb_id=1, node_id='12', address='a12',
@@ -252,33 +254,33 @@ class GetLBContentsTests(SynchronousTestCase):
         """
         Return empty list if there are no LB
         """
-        self.reqs = {('GET', 'loadbalancers'): []}
+        self.reqs = {('GET', 'loadbalancers', True): []}
         eff = get_load_balancer_contents(self._request())
-        self.assertEqual(resolve_stubs(eff), [])
+        self.assertEqual(self._resolve_lb(eff), [])
 
     def test_no_nodes(self):
         """
         Return empty if there are LBs but no nodes in them
         """
         self.reqs = {
-            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
-            ('GET', 'loadbalancers/1/nodes'): [],
-            ('GET', 'loadbalancers/2/nodes'): []
+            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes', True): [],
+            ('GET', 'loadbalancers/2/nodes', True): []
         }
         eff = get_load_balancer_contents(self._request())
-        self.assertEqual(resolve_stubs(eff), [])
+        self.assertEqual(self._resolve_lb(eff), [])
 
     def test_no_draining(self):
         """
         Doesnt fetch feeds if all nodes are ENABLED
         """
         self.reqs = {
-            ('GET', 'loadbalancers'): [{'id': 1}, {'id': 2}],
-            ('GET', 'loadbalancers/1/nodes'): [
+            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers/1/nodes', True): [
                 {'id': '11', 'port': 20, 'address': 'a11',
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
             ],
-            ('GET', 'loadbalancers/2/nodes'): [
+            ('GET', 'loadbalancers/2/nodes', True): [
                 {'id': '21', 'port': 20, 'address': 'a21',
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
             ]
@@ -287,7 +289,7 @@ class GetLBContentsTests(SynchronousTestCase):
                           type=NodeType.PRIMARY)
         eff = get_load_balancer_contents(self._request())
         self.assertEqual(
-            resolve_stubs(eff),
+            self._resolve_lb(eff),
             [LBNode(lb_id=1, node_id='11', address='a11', config=config),
              LBNode(lb_id=2, node_id='21', address='a21', config=config)])
 

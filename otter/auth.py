@@ -461,3 +461,30 @@ class InvalidateToken(object):
     def perform_effect(self, dispatcher):
         """Invalidate the credential cache."""
         return self.authenticator.invalidate(self.tenant_id)
+
+
+def generate_authenticator(reactor, config):
+    """
+    Generate authenticator based on settings in config
+
+    :param reactor: Twisted reactor
+    :param dict config: Identity specific config
+    """
+    # FIXME: Pick an arbitrary cache ttl value based on absolutely no science.
+    cache_ttl = config.get('cache_ttl', 300)
+
+    return CachingAuthenticator(
+        reactor,
+        WaitingAuthenticator(
+            reactor,
+            RetryingAuthenticator(
+                reactor,
+                ImpersonatingAuthenticator(
+                    config['username'],
+                    config['password'],
+                    config['url'],
+                    config['admin_url']),
+                max_retries=config['max_retries'],
+                retry_interval=config['retry_interval']),
+            config.get('wait', 5)),
+        cache_ttl)

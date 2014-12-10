@@ -2,15 +2,9 @@
 Convergence.
 """
 
-from functools import partial
 from urllib import urlencode
 import calendar
-import json
 from itertools import izip as zip
-
-import treq
-
-from twisted.internet import defer
 
 from characteristic import attributes, Attribute
 from effect import parallel
@@ -22,17 +16,15 @@ from twisted.python.constants import Names, NamedConstant
 import effect
 
 from toolz.curried import filter, groupby
-from toolz.functoolz import compose
+from toolz.functoolz import compose, identity
 from toolz.itertoolz import concat, concatv, mapcat
 
 from otter.constants import ServiceType
-from otter.log import log as default_log
-from otter.util.http import append_segments, check_success, headers
+from otter.util.http import append_segments
 from otter.util.fp import partition_bool, partition_groups
-from otter.util.retry import retry, retry_times, exponential_backoff_interval
+from otter.util.retry import retry_times, exponential_backoff_interval, retry_effect
 from otter.util.timestamp import from_timestamp
 from otter.indexer import atom
-from otter.auth import public_endpoint_url
 
 
 class NodeCondition(Names):
@@ -51,55 +43,47 @@ class NodeType(Names):
                                  # primary node fails.
 
 
-@defer.inlineCallbacks
-def get_all_server_details(tenant_id, authenticator, service_name, region,
-                           limit=100, clock=None, _treq=None):
+def get_all_server_details(request_func, batch_size=100):
     """
-    Return all servers of a tenant
-    TODO: service_name is possibly internal to this function but I don't want to pass config here?
-    NOTE: This really screams to be a independent txcloud-type API
+    Return all servers of a tenant.
+
+    :param request_func: a request function.
+    :param batch_size: number of servers to fetch *per batch*.
+
+    NOTE: This really screams to be a independent effcloud-type API
     """
-    token, catalog = yield authenticator.authenticate_tenant(tenant_id, log=default_log)
-    endpoint = public_endpoint_url(catalog, service_name, region)
-    url = append_segments(endpoint, 'servers', 'detail')
-    query = {'limit': limit}
-    all_servers = []
+    url = append_segments('servers', 'detail')
 
-    if clock is None:  # pragma: no cover
-        from twisted.internet import reactor as clock
-
-    if _treq is None:  # pragma: no cover
-        _treq = treq
-
-    def fetch(url, headers):
-        d = _treq.get(url, headers=headers)
-        d.addCallback(check_success, [200], _treq=_treq)
-        d.addCallback(_treq.json_content)
-        return d
-
-    while True:
+    def get_server_details(marker):
         # sort based on query name to make the tests predictable
-        urlparams = sorted(query.items(), key=lambda e: e[0])
-        d = retry(partial(fetch, '{}?{}'.format(url, urlencode(urlparams)), headers(token)),
-                  can_retry=retry_times(5),
-                  next_interval=exponential_backoff_interval(2), clock=clock)
-        servers = (yield d)['servers']
-        all_servers.extend(servers)
-        if len(servers) < limit:
-            break
-        query.update({'marker': servers[-1]['id']})
+        query = {'limit': batch_size}
+        if marker is not None:
+            query.update({'marker': marker})
+        urlparams = sorted(query.items())
+        eff = retry_effect(
+            request_func(
+                ServiceType.CLOUD_SERVERS,
+                'GET', '{}?{}'.format(url, urlencode(urlparams))),
+            retry_times(5), exponential_backoff_interval(2))
+        return eff.on(continue_)
 
-    defer.returnValue(all_servers)
+    def continue_(response):
+        servers = response['servers']
+        if len(servers) < batch_size:
+            return servers
+        else:
+            more_eff = get_server_details(servers[-1]['id'])
+            return more_eff.on(lambda more_servers: servers + more_servers)
+    return get_server_details(None)
 
 
-def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
-                              server_predicate=None, clock=None):
+def get_scaling_group_servers(request_func, server_predicate=identity):
     """
     Return tenant's servers that belong to a scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
 
-    :param server_predicate: `callable` taking single server as arg and returns True
-                              if the server should be included, False otherwise
+    :param server_predicate: function of server -> bool that determines whether
+        the server should be included in the result.
     """
 
     def has_group_id(s):
@@ -108,12 +92,10 @@ def get_scaling_group_servers(tenant_id, authenticator, service_name, region,
     def group_id(s):
         return s['metadata']['rax:auto_scaling_group_id']
 
-    server_predicate = server_predicate if server_predicate is not None else lambda s: s
     servers_apply = compose(groupby(group_id), filter(server_predicate), filter(has_group_id))
 
-    d = get_all_server_details(tenant_id, authenticator, service_name, region, clock=clock)
-    d.addCallback(servers_apply)
-    return d
+    eff = get_all_server_details(request_func)
+    return eff.on(servers_apply)
 
 
 def extract_drained_at(feed):
@@ -143,12 +125,18 @@ def get_load_balancer_contents(request_func):
     :param request_func: A tenant-bound, CLB-bound, auth-retry based request function
     """
 
+    def lb_req(method, url, json_response=True):
+        """Make a request to the LB service with retries."""
+        return retry_effect(
+            request_func(
+                ServiceType.CLOUD_LOAD_BALANCERS,
+                method, url, json_response=json_response),
+            retry_times(5), exponential_backoff_interval(2))
+
     def fetch_nodes(lbs):
-        lb_ids = [lb['id'] for lb in json.loads(lbs)]
+        lb_ids = [lb['id'] for lb in lbs]
         return effect.parallel(
-            [request_func(
-                'GET',
-                append_segments('loadbalancers', str(lb_id), 'nodes')).on(json.loads)
+            [lb_req('GET', append_segments('loadbalancers', str(lb_id), 'nodes'))
              for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
@@ -160,10 +148,11 @@ def get_load_balancer_contents(request_func):
                  for node in nodes]
         draining = [n for n in nodes if n.config.condition == NodeCondition.DRAINING]
         return effect.parallel(
-            [request_func(
+            [lb_req(
                 'GET',
                 append_segments('loadbalancers', str(n.lb_id), 'nodes',
-                                '{}.atom'.format(n.node_id)))
+                                '{}.atom'.format(n.node_id)),
+                json_response=False)
              for n in draining]).on(lambda feeds: (nodes, draining, feeds))
 
     def fill_drained_at((nodes, draining, feeds)):
@@ -171,7 +160,7 @@ def get_load_balancer_contents(request_func):
             node.drained_at = extract_drained_at(feed)
         return nodes
 
-    return request_func('GET', 'loadbalancers').on(
+    return lb_req('GET', 'loadbalancers').on(
         fetch_nodes).on(fetch_drained_feeds).on(fill_drained_at)
 
 

@@ -2,6 +2,7 @@
 Test authentication functions.
 """
 import mock
+from copy import deepcopy
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed, fail, Deferred
@@ -24,8 +25,9 @@ from otter.auth import (authenticate_user, extract_token, impersonate_user,
                         CachingAuthenticator, RetryingAuthenticator,
                         WaitingAuthenticator, IAuthenticator,
                         ICachingAuthenticator,
-                        endpoints, public_endpoint_url,
-                        Authenticate, InvalidateToken)
+                        Authenticate, InvalidateToken,
+                        endpoints, public_endpoint_url, generate_authenticator)
+
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],
@@ -751,3 +753,68 @@ class InvalidateTokenTests(SynchronousTestCase):
         intent = InvalidateToken(mock_auth, 'tenant_id1')
         self.assertEqual(intent.perform_effect(None), None)
         mock_auth.invalidate.assert_called_once_with('tenant_id1')
+
+
+identity_config = {
+    'username': 'uname', 'password': 'pwd', 'url': 'htp',
+    'admin_url': 'ad', 'max_retries': 3, 'retry_interval': 5,
+    'wait': 4, 'cache_ttl': 50
+}
+
+
+class AuthenticatorTests(SynchronousTestCase):
+    """
+    Check if authenticators are instantiated in right composition
+    """
+
+    def setUp(self):
+        """
+        Config with identity settings
+        """
+        self.config = deepcopy(identity_config)
+
+    def test_composition(self):
+        """
+        authenticator is composed correctly with values from config
+        """
+        r = mock.Mock()
+        a = generate_authenticator(r, self.config)
+        self.assertIsInstance(a, CachingAuthenticator)
+        self.assertIdentical(a._reactor, r)
+        self.assertEqual(a._ttl, 50)
+
+        wa = a._authenticator
+        self.assertIsInstance(wa, WaitingAuthenticator)
+        self.assertIdentical(wa._reactor, r)
+        self.assertEqual(wa._wait, 4)
+
+        ra = wa._authenticator
+        self.assertIsInstance(ra, RetryingAuthenticator)
+        self.assertIdentical(ra._reactor, r)
+        self.assertEqual(ra._max_retries, 3)
+        self.assertEqual(ra._retry_interval, 5)
+
+        ia = ra._authenticator
+        self.assertIsInstance(ia, ImpersonatingAuthenticator)
+        self.assertEqual(ia._identity_admin_user, 'uname')
+        self.assertEqual(ia._identity_admin_password, 'pwd')
+        self.assertEqual(ia._url, 'htp')
+        self.assertEqual(ia._admin_url, 'ad')
+
+    def test_wait_defaults(self):
+        """
+        WaitingAuthenticator is created with default of 5 if not given
+        """
+        del self.config['wait']
+        r = mock.Mock()
+        a = generate_authenticator(r, self.config)
+        self.assertEqual(a._authenticator._wait, 5)
+
+    def test_cache_ttl_defaults(self):
+        """
+        CachingAuthenticator is created with default of 300 if not given
+        """
+        del self.config['cache_ttl']
+        r = mock.Mock()
+        a = generate_authenticator(r, self.config)
+        self.assertEqual(a._ttl, 300)
