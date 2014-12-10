@@ -40,6 +40,8 @@ import json
 from itertools import groupby
 from functools import partial
 
+from characteristic import attributes
+
 from twisted.internet.defer import succeed, Deferred
 
 from zope.interface import Interface, implementer
@@ -426,6 +428,39 @@ def public_endpoint_url(service_catalog, service_name, region):
     """
     first_endpoint = next(endpoints(service_catalog, service_name, region))
     return first_endpoint['publicURL']
+
+
+@attributes(['authenticator', 'tenant_id', 'log'], apply_with_init=False)
+class Authenticate(object):
+    """
+    An Effect intent that represents authentication.
+
+    The result type is (auth_token, service_catalog).
+    """
+    def __init__(self, authenticator, tenant_id, log):
+        self.authenticator = authenticator
+        self.tenant_id = tenant_id
+        self.log = log
+
+    def perform_effect(self, dispatcher):
+        """Authenticate."""
+        return self.authenticator.authenticate_tenant(self.tenant_id, log=self.log)
+
+
+@attributes(['authenticator', 'tenant_id'], apply_with_init=False)
+class InvalidateToken(object):
+    """
+    An Effect intent that represents the invalidation of a token from a local cache.
+
+    The result type is None.
+    """
+    def __init__(self, authenticator, tenant_id):
+        self.authenticator = authenticator
+        self.tenant_id = tenant_id
+
+    def perform_effect(self, dispatcher):
+        """Invalidate the credential cache."""
+        return self.authenticator.invalidate(self.tenant_id)
 
 
 def generate_authenticator(reactor, config):
