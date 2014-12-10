@@ -5,17 +5,18 @@ from functools import partial
 
 from characteristic import attributes
 
-from effect import Effect, ConstantIntent, parallel
-from effect.testing import StubIntent, resolve_effect
+import mock
+
+from effect import Effect, ConstantIntent, parallel, ParallelEffects
+from effect.testing import StubIntent, resolve_effect, resolve_stubs
 
 from pyrsistent import pmap, pbag, pset, s
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.retry import ShouldDelayAndRetry, exponential_backoff_interval, retry_times
-from otter.constants import ServiceType
 from otter.test.utils import patch, resolve_retry_stubs
-from otter.util.timestamp import from_timestamp
+from otter.util.timestamp import from_timestamp, now
 from otter.convergence import (
     _remove_from_lb_with_draining, _converge_lb_state,
     get_all_server_details, get_scaling_group_servers,
@@ -24,9 +25,9 @@ from otter.convergence import (
     BulkAddToRCv3, BulkRemoveFromRCv3,
     SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
-    ServerState, NodeCondition, NodeType, optimize_steps,
+    ServerState, ServiceType, NodeCondition, NodeType, optimize_steps,
     extract_drained_at, get_load_balancer_contents, _reqs_to_effect,
-    tenant_is_enabled)
+    execute_convergence, to_nova_server, json_to_LBConfigs, tenant_is_enabled)
 
 
 def _request(requests):
@@ -1300,6 +1301,141 @@ class RequestsToEffectTests(SynchronousTestCase):
                              headers=None,
                              data=data_sentinel)]
         self.assertCompileTo(conv_requests, expected_effects)
+
+
+class ToNovaServerTests(SynchronousTestCase):
+    """
+    Tests for :func:`to_nova_server`
+    """
+    def setUp(self):
+        """
+        Sample servers
+        """
+        self.createds = [('2020-10-10T10:00:00Z', 1602324000),
+                         ('2020-10-20T11:30:00Z', 1603193400)]
+        self.servers = [{'id': 'a', 'state': 'ACTIVE', 'created': self.createds[0][0]},
+                        {'id': 'b', 'state': 'BUILD', 'created': self.createds[1][0],
+                         'addresses': {'private': [{'addr': 'ipv4', 'version': 4}]}}]
+
+    def test_without_address(self):
+        """
+        Handles server json that does not have "addresses" in it
+        """
+        self.assertEqual(
+            to_nova_server(self.servers[0]),
+            NovaServer(id='a', state=ServerState.ACTIVE, created=self.createds[0][1],
+                       servicenet_address=''))
+
+    def test_without_private(self):
+        """
+        Creates server that does not have private/servicenet IP in it
+        """
+        self.servers[0]['addresses'] = {'public': 'p'}
+        self.assertEqual(
+            to_nova_server(self.servers[0]),
+            NovaServer(id='a', state=ServerState.ACTIVE, created=self.createds[0][1],
+                       servicenet_address=''))
+
+    def test_with_servicenet(self):
+        """
+        Create server that has servicenet IP in it
+        """
+        self.assertEqual(
+            to_nova_server(self.servers[1]),
+            NovaServer(id='b', state=ServerState.BUILD, created=self.createds[1][1],
+                       servicenet_address='ipv4'))
+
+
+class JsonToLBConfigTests(SynchronousTestCase):
+    """
+    Tests for :func:`json_to_LBConfigs`
+    """
+    def test_without_rackconnect(self):
+        """
+        LB config without rackconnect
+        """
+        self.assertEqual(
+            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
+                               {'loadBalancerId': 20, 'port': 800},
+                               {'loadBalancerId': 21, 'port': 81}]),
+            {20: [LBConfig(port=80), LBConfig(port=800)], 21: [LBConfig(port=81)]})
+
+    def test_with_rackconnect(self):
+        """
+        LB config with rackconnect
+        """
+        self.assertEqual(
+            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
+                               {'loadBalancerId': 200, 'type': 'RackConnectV3'},
+                               {'loadBalancerId': 21, 'port': 81}]),
+            {20: [LBConfig(port=80)], 21: [LBConfig(port=81)]})
+
+
+class ExecConvergenceTests(SynchronousTestCase):
+    """
+    Tests for :func:`execute_convergence`
+    """
+
+    def setUp(self):
+        """
+        Sample server json
+        """
+        self.servers = [
+            {'id': 'a', 'state': 'ACTIVE', 'created': now(),
+             'addresses': {'private': [{'addr': 'ip1', 'version': 4}]}},
+            {'id': 'b', 'state': 'ACTIVE', 'created': now(),
+             'addresses': {'private': [{'addr': 'ip2', 'version': 4}]}}
+        ]
+
+    def test_success(self):
+        """
+        Executes optimized steps if state of world does not match desired and returns
+        True to be called again
+        """
+        get_servers = lambda r: Effect(StubIntent(ConstantIntent({'gid': self.servers})))
+        get_lb = lambda r: Effect(StubIntent(ConstantIntent([])))
+        lc = {'args': {'server': {'name': 'test', 'flavorRef': 'f'},
+                       'loadBalancers': [{'loadBalancerId': 23, 'port': 80}]}}
+        reqfunc = lambda **k: Effect(k)
+
+        eff = execute_convergence(reqfunc, 'gid', 2, lc, get_servers=get_servers,
+                                  get_lb=get_lb)
+
+        eff = resolve_stubs(eff)
+        # The steps are optimized
+        self.assertIsInstance(eff.intent, ParallelEffects)
+        self.assertEqual(len(eff.intent.effects), 1)
+        self.assertEqual(
+            eff.intent.effects[0].intent,
+            {'url': 'loadbalancers/23', 'headers': None,
+             'service_type': ServiceType.CLOUD_LOAD_BALANCERS,
+             'data': {'nodes': mock.ANY},
+             'method': 'POST', 'success_codes': (200,)})
+        # separate check for nodes as it can be in any order but content is unique
+        self.assertEqual(
+            set(map(pmap, eff.intent.effects[0].intent['data']['nodes'])),
+            set([pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
+                       'condition': 'ENABLED', 'address': 'ip2'}),
+                 pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
+                       'condition': 'ENABLED', 'address': 'ip1'})]))
+
+        r = resolve_effect(eff, [{'nodes': [{'address': 'ip'}]}])
+        # Returns true to be called again
+        self.assertIs(r, True)
+
+    def test_no_steps(self):
+        """
+        If state of world matches desired, no steps are executed and False is returned
+        """
+        get_servers = lambda r: Effect(StubIntent(ConstantIntent({'gid': self.servers})))
+        get_lb = lambda r: Effect(StubIntent(ConstantIntent([])))
+        lc = {'args': {'server': {'name': 'test', 'flavorRef': 'f'}, 'loadBalancers': []}}
+        reqfunc = lambda **k: 1 / 0
+
+        eff = execute_convergence(reqfunc, 'gid', 2, lc, get_servers=get_servers,
+                                  get_lb=get_lb)
+
+        self.assertIs(resolve_stubs(eff), False)
 
 
 class FeatureFlagTest(SynchronousTestCase):

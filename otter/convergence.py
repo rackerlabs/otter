@@ -4,8 +4,10 @@ Convergence.
 """
 
 from urllib import urlencode
-import calendar
 from itertools import izip as zip
+from operator import itemgetter
+import time
+from collections import defaultdict
 
 from characteristic import attributes, Attribute
 from effect import parallel
@@ -16,15 +18,16 @@ from twisted.python.constants import Names, NamedConstant
 
 import effect
 
-from toolz.curried import filter, groupby
+from toolz.curried import filter, groupby, map
 from toolz.functoolz import compose, identity
 from toolz.itertoolz import concat, concatv, mapcat
+from toolz.dicttoolz import get_in
 
 from otter.constants import ServiceType
 from otter.util.http import append_segments
 from otter.util.fp import partition_bool, partition_groups
 from otter.util.retry import retry_times, exponential_backoff_interval, retry_effect
-from otter.util.timestamp import from_timestamp
+from otter.util.timestamp import timestamp_to_epoch
 from otter.indexer import atom
 
 
@@ -99,6 +102,19 @@ def get_scaling_group_servers(request_func, server_predicate=identity):
     return eff.on(servers_apply)
 
 
+def to_nova_server(server_json):
+    """
+    Convert from JSON format to :obj:`NovaServer` instance
+    """
+    ips = get_in(['addresses', 'private'], server_json, default=[])
+    ip = ''
+    if len(ips) > 0:
+        ip = [addr['addr'] for addr in ips if addr['version'] == 4][0]
+    return NovaServer(id=server_json['id'], state=ServerState.lookupByName(server_json['state']),
+                      created=timestamp_to_epoch(server_json['created']),
+                      servicenet_address=ip)
+
+
 def extract_drained_at(feed):
     """
     Extract time when node was changed to DRAINING
@@ -114,7 +130,7 @@ def extract_drained_at(feed):
     entry = atom.entries(atom.parse(feed))[0]
     summary = atom.summary(entry)
     if 'Node successfully updated' in summary and 'DRAINING' in summary:
-        return calendar.timegm(from_timestamp(atom.updated(entry)).utctimetuple())
+        return timestamp_to_epoch(atom.updated(entry))
     else:
         raise ValueError('Unexpected summary: {}'.format(summary))
 
@@ -570,6 +586,16 @@ class AddNodesToLoadBalancer(object):
     :param address_configs: A collection of two-tuples of address and
         :obj:`LBConfig`.
     """
+    def as_request(self):
+        """Produce a :obj:`Request` to add nodes to CLB"""
+        return Request(
+            service=ServiceType.CLOUD_LOAD_BALANCERS,
+            method='POST',
+            path=append_segments('loadbalancers', str(self.lb_id)),
+            data={'nodes': [{'address': address, 'port': lbc.port,
+                             'condition': lbc.condition.name, 'weight': lbc.weight,
+                             'type': lbc.type.name}
+                            for address, lbc in self.address_configs]})
 
 
 @implementer(IStep)
@@ -782,6 +808,60 @@ def _reqs_to_effect(request_func, conv_requests):
                             success_codes=r.success_codes)
                for r in conv_requests]
     return parallel(effects)
+
+
+def json_to_LBConfigs(lbs_json):
+    """
+    Convert load balancer config from JSON to :obj:`LBConfig`
+
+    :param list lbs_json: List of load balancer configs
+    :return: `dict` of LBid -> [LBConfig] mapping
+
+    NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
+    implemented in convergence
+    """
+    lbd = defaultdict(list)
+    for lb in lbs_json:
+        if lb.get('type') != 'RackConnectV3':
+            lbd[lb['loadBalancerId']].append(LBConfig(port=lb['port']))
+    return lbd
+
+
+def execute_convergence(request_func, group_id, desired, launch_config,
+                        get_servers=get_scaling_group_servers,
+                        get_lb=get_load_balancer_contents):
+    """
+    Execute convergence. This function will do following:
+    1. Get state of the nova, CLB and RCv3.
+    2. Call `converge` with above info and get steps to execute
+    3. Execute these steps
+    This is in effect single cycle execution. A layer above this is expected
+    to keep calling this until this function returns False
+
+    :param request_func: Tenant bound request function
+    :param bytes group_id: Tenant's group
+    :param int desired: Group's desired capacity
+    :param dict launch_config: Group's launch config as per
+                              :obj:`otter.json_schema.group_schemas.launch_config`
+    :param callable get_servers: Optional arg to get scaling group servers useful for testing
+    :param callable get_lb: Optional arg to get load balancer info useful for testing
+
+    :return: Effect with Bool specifying if it should be called again
+    :rtype: :class:`effect.Effect`
+    """
+    eff = effect.parallel(
+        [get_servers(request_func).on(itemgetter(group_id)).on(map(to_nova_server)),
+         get_lb(request_func)])
+
+    lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
+    desired_state = DesiredGroupState(launch_config={'server': launch_config['args']['server']},
+                                      desired=desired, desired_lbs=lbs)
+
+    conv_eff = eff.on(lambda (servers, lb_nodes): converge(desired_state, servers, lb_nodes,
+                                                           time.time()))
+    # TODO: Do request specific throttling. For ex create only 3 servers at a time
+    return conv_eff.on(lambda c: optimize_steps(c.steps)).on(
+        lambda steps: _reqs_to_effect(request_func, [s.as_request() for s in steps])).on(bool)
 
 
 def tenant_is_enabled(tenant_id, get_config_value):
