@@ -106,9 +106,10 @@ def to_nova_server(server_json):
     """
     Convert from JSON format to :obj:`NovaServer` instance
     """
-    ip = get_in(['addresses', 'private'], server_json, default='')
-    if ip is not '':
-        ip = [addr['addr'] for addr in ip if addr['version'] == 4][0]
+    ips = get_in(['addresses', 'private'], server_json, default=[])
+    ip = ''
+    if len(ips) > 0:
+        ip = [addr['addr'] for addr in ips if addr['version'] == 4][0]
     return NovaServer(id=server_json['id'], state=ServerState.lookupByName(server_json['state']),
                       created=timestamp_to_epoch(server_json['created']),
                       servicenet_address=ip)
