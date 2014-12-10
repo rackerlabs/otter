@@ -5,11 +5,8 @@ import json
 from effect.testing import resolve_effect
 
 from twisted.trial.unittest import SynchronousTestCase
-from twisted.internet.defer import succeed
 
-from zope.interface import implementer
-
-from otter.auth import ICachingAuthenticator
+from otter.auth import Authenticate, InvalidateToken
 from otter.constants import ServiceType
 from otter.util.http import headers, APIError
 from otter.http import get_request_func, add_bind_service
@@ -18,23 +15,9 @@ from otter.util.pure_http import Request
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 
 
-@implementer(ICachingAuthenticator)
-class FakeCachingAuthenticator(object):
-    """
-    Fake object that exposes caching side-effects.
-    """
-    def __init__(self):
-        self.cache = {}
-
-    def authenticate_tenant(self, tenant_id, log=None):
-        """Put an entry in self.cache for the tenant."""
-        result = 'token', fake_service_catalog
-        self.cache[tenant_id] = result
-        return succeed(result)
-
-    def invalidate(self, tenant_id):
-        """Delete an entry in self.cache"""
-        del self.cache[tenant_id]
+def resolve_authenticate(eff, token='token'):
+    """Resolve an Authenticate effect with test data."""
+    return resolve_effect(eff, (token, fake_service_catalog))
 
 
 class GetRequestFuncTests(SynchronousTestCase):
@@ -45,7 +28,7 @@ class GetRequestFuncTests(SynchronousTestCase):
     def setUp(self):
         """Save some common parameters."""
         self.log = object()
-        self.authenticator = FakeCachingAuthenticator()
+        self.authenticator = object()
         self.request = get_request_func(
             self.authenticator, 1, self.log,
             {ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'},
@@ -57,11 +40,8 @@ class GetRequestFuncTests(SynchronousTestCase):
         authentication before making the request.
         """
         eff = self.request(ServiceType.CLOUD_SERVERS, 'get', 'servers')
-        # First there's a FuncIntent for the authentication
-        next_eff = resolve_effect(eff, self.successResultOf(eff.intent.func()))
-        # which causes the token to be cached
-        self.assertEqual(self.authenticator.cache[1],
-                         ('token', fake_service_catalog))
+        self.assertEqual(eff.intent, Authenticate(self.authenticator, 1, self.log))
+        next_eff = resolve_authenticate(eff)
         # The next effect in the chain is the requested HTTP request,
         # with appropriate auth headers
         self.assertEqual(
@@ -74,16 +54,12 @@ class GetRequestFuncTests(SynchronousTestCase):
         Upon authentication error, the auth cache is invalidated.
         """
         eff = self.request(ServiceType.CLOUD_SERVERS, 'get', 'servers')
-        # First there's a FuncIntent for the authentication
-        next_eff = resolve_effect(eff, self.successResultOf(eff.intent.func()))
-        # which causes the token to be cached
-        self.assertEqual(self.authenticator.cache[1],
-                         ('token', fake_service_catalog))
+        next_eff = resolve_authenticate(eff)
         # When the HTTP response is an auth error, the auth cache is
         # invalidated, by way of the next effect:
-        invalidate_effect = resolve_effect(next_eff, stub_pure_response("", 401))
-        self.assertRaises(APIError, resolve_effect, invalidate_effect, invalidate_effect.intent.func())
-        self.assertNotIn(1, self.authenticator.cache)
+        invalidate_eff = resolve_effect(next_eff, stub_pure_response("", 401))
+        self.assertEqual(invalidate_eff.intent, InvalidateToken(self.authenticator, 1))
+        self.assertRaises(APIError, resolve_effect, invalidate_eff, None)
 
     def test_json(self):
         """
@@ -92,7 +68,7 @@ class GetRequestFuncTests(SynchronousTestCase):
         input_json = {"a": 1}
         output_json = {"b": 2}
         eff = self.request(ServiceType.CLOUD_SERVERS, "get", "servers", data=input_json)
-        next_eff = resolve_effect(eff, self.successResultOf(eff.intent.func()))
+        next_eff = resolve_authenticate(eff)
         result = resolve_effect(next_eff,
                                 stub_pure_response(json.dumps(output_json)))
         self.assertEqual(next_eff.intent.data, json.dumps(input_json))
@@ -104,7 +80,7 @@ class GetRequestFuncTests(SynchronousTestCase):
         response.
         """
         eff = self.request(ServiceType.CLOUD_SERVERS, "get", "servers", json_response=False)
-        next_eff = resolve_effect(eff, self.successResultOf(eff.intent.func()))
+        next_eff = resolve_authenticate(eff)
         result = resolve_effect(next_eff, stub_pure_response("foo"))
         self.assertEqual(result, "foo")
 
