@@ -1,3 +1,4 @@
+# -*- test-case-name: otter.test.test_convergence -*-
 """
 Convergence.
 """
@@ -860,3 +861,15 @@ def execute_convergence(request_func, group_id, desired, launch_config,
     # TODO: Do request specific throttling. For ex create only 3 servers at a time
     return conv_eff.on(lambda c: optimize_steps(c.steps)).on(
         lambda steps: _reqs_to_effect(request_func, [s.as_request() for s in steps])).on(bool)
+
+
+def tenant_is_enabled(tenant_id, get_config_value):
+    """
+    Feature-flag test: is the given tenant enabled for convergence?
+
+    :param str tenant_id: A tenant's ID, which may or may not be present in the
+        "convergence-tenants" portion of the configuration file.
+    :param callable get_config_value: config key -> config value.
+    """
+    enabled_tenant_ids = get_config_value("convergence-tenants")
+    return (tenant_id in enabled_tenant_ids)

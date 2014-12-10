@@ -27,7 +27,7 @@ from otter.convergence import (
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
     ServerState, ServiceType, NodeCondition, NodeType, optimize_steps,
     extract_drained_at, get_load_balancer_contents, _reqs_to_effect,
-    execute_convergence, to_nova_server, json_to_LBConfigs)
+    execute_convergence, to_nova_server, json_to_LBConfigs, tenant_is_enabled)
 
 
 def _request(requests):
@@ -1436,3 +1436,37 @@ class ExecConvergenceTests(SynchronousTestCase):
                                   get_lb=get_lb)
 
         self.assertIs(resolve_stubs(eff), False)
+
+
+class FeatureFlagTest(SynchronousTestCase):
+    """
+    Tests for determining which tenants should have convergence enabled.
+    """
+
+    def test_tenant_is_enabled(self):
+        """
+        :obj:`convergence.tenant_is_enabled` should return ``True`` when a
+        given tenant ID has convergence behavior turned on.
+        """
+        enabled_tenant_id = "some-tenant"
+
+        def get_config_value(config_key):
+            self.assertEqual(config_key, "convergence-tenants")
+            return [enabled_tenant_id]
+        self.assertEqual(tenant_is_enabled(enabled_tenant_id,
+                                           get_config_value),
+                         True)
+
+    def test_tenant_is_not_enabled(self):
+        """
+        :obj:`convergence.tenant_is_enabled` should return ``False`` when a
+        given tenant ID has convergence behavior turned off.
+        """
+        enabled_tenant_id = "some-tenant"
+
+        def get_config_value(config_key):
+            self.assertEqual(config_key, "convergence-tenants")
+            return [enabled_tenant_id + "-nope"]
+        self.assertEqual(tenant_is_enabled(enabled_tenant_id,
+                                           get_config_value),
+                         False)
