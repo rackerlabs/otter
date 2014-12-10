@@ -24,7 +24,7 @@ from otter.convergence import (
     BulkAddToRCv3, BulkRemoveFromRCv3,
     SetMetadataItemOnServer,
     DesiredGroupState, NovaServer, Request, LBConfig, LBNode,
-    ServerState, ServiceType, NodeCondition, NodeType, optimize_steps,
+    ServerState, NodeCondition, NodeType, optimize_steps,
     extract_drained_at, get_load_balancer_contents, _reqs_to_effect,
     tenant_is_enabled)
 
