@@ -1,10 +1,11 @@
+
 """
 Tests for RCv3-specific worker code.
 """
 from effect import Effect
 from otter.constants import ServiceType
 from otter.worker import _rcv3
-from otter.test.test_convergence import _PureRequestStub
+from otter.test.convergence.test_effecting import _PureRequestStub
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 from uuid import uuid4
