@@ -190,6 +190,7 @@ def add_bind_root(root, request_func):
     def request(method, url, *args, **kwargs):
         if isinstance(url, unicode):
             url = url.encode('utf-8')
-        return request_func(method, '{}/{}'.format(_root.rstrip('/'), url), *args, **kwargs)
+        url = '{}/{}'.format(root.rstrip('/'), url)
+        return request_func(method, url, *args, **kwargs)
 
     return request
