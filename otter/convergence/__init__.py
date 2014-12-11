@@ -10,13 +10,16 @@ from effect import parallel
 
 from toolz.curried import map
 
-# radix in-development imports
+from otter.convergence.gathering import (
+    get_load_balancer_contents,
+    get_scaling_group_servers,
+    json_to_LBConfigs,
+    to_nova_server)
+from otter.convergence.planning import converge, optimize_steps
 
-from otter.constants import ServiceType
-from otter.convergence.planning import converge, _remove_from_lb_with_draining, _converge_lb_state, optimize_steps
+# radix in-development imports
 from otter.convergence.steps import AddNodesToLoadBalancer, BulkAddToRCv3, BulkRemoveFromRCv3, CreateServer, DeleteServer, RemoveFromLoadBalancer, ChangeLoadBalancerNode, SetMetadataItemOnServer, Request, Convergence
 from otter.convergence.model import NodeCondition, NodeType, ServerState, LBNode, LBConfig, NovaServer, DesiredGroupState
-from otter.convergence.gathering import get_all_server_details, get_scaling_group_servers, get_load_balancer_contents, extract_drained_at, to_nova_server, json_to_LBConfigs
 from otter.convergence.effecting import _reqs_to_effect
 
 

@@ -1,3 +1,5 @@
+"""Tests for convergence planning."""
+
 from pyrsistent import pmap, pbag, pset, s
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -25,6 +27,7 @@ from otter.convergence.steps import (
     DeleteServer,
     RemoveFromLoadBalancer,
     SetMetadataItemOnServer)
+
 
 class RemoveFromLBWithDrainingTests(SynchronousTestCase):
     """
