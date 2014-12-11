@@ -238,5 +238,3 @@ class Request(object):
         such as 201 (Created) for most ``POST`` requests or 204 (No content)
         for most ``DELETE`` requests should specify that through this argument.
     """
-
-

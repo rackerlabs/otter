@@ -5,7 +5,7 @@ from urllib import urlencode
 
 from effect import parallel
 
-from toolz.curried import filter, groupby, map
+from toolz.curried import filter, groupby
 from toolz.dicttoolz import get_in
 from toolz.functoolz import compose, identity
 
@@ -76,6 +76,7 @@ def get_scaling_group_servers(request_func, server_predicate=identity):
 
     eff = get_all_server_details(request_func)
     return eff.on(servers_apply)
+
 
 def get_load_balancer_contents(request_func):
     """
@@ -171,4 +172,3 @@ def json_to_LBConfigs(lbs_json):
         if lb.get('type') != 'RackConnectV3':
             lbd[lb['loadBalancerId']].append(LBConfig(port=lb['port']))
     return lbd
-

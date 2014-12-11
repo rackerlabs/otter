@@ -3,27 +3,12 @@
 Convergence.
 """
 
-from itertools import izip as zip
 from operator import itemgetter
 import time
 
-from characteristic import attributes, Attribute
-from effect import parallel
-from pyrsistent import pbag, freeze, s, pset
-from zope.interface import Interface, implementer
-
-from twisted.python.constants import Names, NamedConstant
-
 from effect import parallel
 
-from toolz.curried import filter, groupby, map
-from toolz.functoolz import compose, identity
-from toolz.itertoolz import concat, concatv, mapcat
-
-from otter.constants import ServiceType
-from otter.util.http import append_segments
-from otter.util.fp import partition_bool, partition_groups
-from otter.util.timestamp import timestamp_to_epoch
+from toolz.curried import map
 
 # radix in-development imports
 

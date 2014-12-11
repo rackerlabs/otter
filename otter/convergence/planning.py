@@ -1,15 +1,13 @@
 """Code related to creating a plan for convergence."""
 
-from pyrsistent import pbag, freeze, s, pset
+from pyrsistent import pbag, s, pset
 
-from toolz.curried import filter, groupby, map
+from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
 
-from otter.convergence.model import NodeCondition, NodeType, ServerState
+from otter.convergence.model import NodeCondition, ServerState
 from otter.convergence.steps import (
     AddNodesToLoadBalancer,
-    BulkAddToRCv3,
-    BulkRemoveFromRCv3,
     ChangeLoadBalancerNode,
     Convergence,
     CreateServer,

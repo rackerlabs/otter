@@ -10,7 +10,6 @@ from pyrsistent import freeze
 from twisted.python.constants import Names, NamedConstant
 
 
-
 class NodeCondition(Names):
     """Constants representing the condition a load balancer node can be in"""
     ENABLED = NamedConstant()   # Node can accept new connections.
@@ -115,5 +114,3 @@ class DesiredGroupState(object):
 
     def __init__(self):
         self.launch_config = freeze(self.launch_config)
-
-
