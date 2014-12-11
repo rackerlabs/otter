@@ -12,7 +12,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
 from otter.util.timestamp import now
-from otter.convergence import execute_convergence, tenant_is_enabled
+from otter.convergence.composition import execute_convergence, tenant_is_enabled
 
 
 class ExecConvergenceTests(SynchronousTestCase):
