@@ -1,10 +1,9 @@
 """Tests for convergence."""
 
-from characteristic import attributes
 
 import mock
 
-from effect import Effect, ConstantIntent, parallel, ParallelEffects
+from effect import Effect, ConstantIntent, ParallelEffects
 from effect.testing import StubIntent, resolve_effect, resolve_stubs
 
 from pyrsistent import pmap
@@ -13,132 +12,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
 from otter.util.timestamp import now
-from otter.convergence.steps import Request
-from otter.convergence import (
-    LBConfig,
-    NodeCondition, NodeType,
-    _reqs_to_effect,
-    execute_convergence, tenant_is_enabled)
-
-
-class ObjectStorageTests(SynchronousTestCase):
-    """
-    Tests for objects that store data such as :class:`LBConfig`
-    """
-
-    def test_lbconfig_default_weight_condition_and_type(self):
-        """
-        :obj:`LBConfig` only requires a port.  The other attributes have
-        default values.
-        """
-        lb = LBConfig(port=80)
-        self.assertEqual(lb.weight, 1)
-        self.assertEqual(lb.condition, NodeCondition.ENABLED)
-        self.assertEqual(lb.type, NodeType.PRIMARY)
-
-
-@attributes(["service_type", "method", "url", "headers", "data", "success_codes"],
-            defaults={"success_codes": (200,)})
-class _PureRequestStub(object):
-    """
-    A bound request stub, suitable for testing.
-    """
-
-
-class RequestsToEffectTests(SynchronousTestCase):
-    """
-    Tests for converting :class:`Request` into effects.
-    """
-
-    def assertCompileTo(self, conv_requests, expected_effects):
-        """
-        Assert that the given convergence requests compile down to a parallel
-        effect comprised of the given effects.
-        """
-        effect = _reqs_to_effect(_PureRequestStub, conv_requests)
-        self.assertEqual(effect, parallel(expected_effects))
-
-    def test_single_request(self):
-        """
-        A single request is correctly compiled down to an effect.
-        """
-        conv_requests = [
-            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
-                    method="GET",
-                    path="/whatever",
-                    success_codes=(999,))]
-        expected_effects = [
-            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                             method="GET",
-                             url="/whatever",
-                             headers=None,
-                             data=None,
-                             success_codes=(999,))]
-        self.assertCompileTo(conv_requests, expected_effects)
-
-    def test_multiple_requests(self):
-        """
-        Multiple requests of the same type are correctly compiled down to an
-        effect.
-        """
-        conv_requests = [
-            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
-                    method="GET",
-                    path="/whatever"),
-            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
-                    method="GET",
-                    path="/whatever/something/else",
-                    success_codes=(231,))]
-        expected_effects = [
-            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                             method="GET",
-                             url="/whatever",
-                             headers=None,
-                             data=None),
-            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                             method="GET",
-                             url="/whatever/something/else",
-                             headers=None,
-                             data=None,
-                             success_codes=(231,))]
-        self.assertCompileTo(conv_requests, expected_effects)
-
-    def test_multiple_requests_of_different_type(self):
-        """
-        Multiple requests of different types are correctly compiled down to
-        an effect.
-        """
-        data_sentinel = object()
-        conv_requests = [
-            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
-                    method="GET",
-                    path="/whatever"),
-            Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
-                    method="GET",
-                    path="/whatever/something/else",
-                    success_codes=(231,)),
-            Request(service=ServiceType.CLOUD_SERVERS,
-                    method="POST",
-                    path="/xyzzy",
-                    data=data_sentinel)]
-        expected_effects = [
-            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                             method="GET",
-                             url="/whatever",
-                             headers=None,
-                             data=None),
-            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                             method="GET",
-                             url="/whatever/something/else",
-                             headers=None,
-                             data=None,
-                             success_codes=(231,)),
-            _PureRequestStub(service_type=ServiceType.CLOUD_SERVERS,
-                             method="POST",
-                             url="/xyzzy",
-                             headers=None,
-                             data=data_sentinel)]
-        self.assertCompileTo(conv_requests, expected_effects)
+from otter.convergence import execute_convergence, tenant_is_enabled
 
 
 class ExecConvergenceTests(SynchronousTestCase):

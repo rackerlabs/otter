@@ -10,16 +10,14 @@ from effect import parallel
 
 from toolz.curried import map
 
+from otter.convergence.effecting import _reqs_to_effect
 from otter.convergence.gathering import (
     get_load_balancer_contents,
     get_scaling_group_servers,
     json_to_LBConfigs,
     to_nova_server)
+from otter.convergence.model import DesiredGroupState
 from otter.convergence.planning import converge, optimize_steps
-
-# radix in-development imports
-from otter.convergence.model import NodeCondition, NodeType, ServerState, LBNode, LBConfig, NovaServer, DesiredGroupState
-from otter.convergence.effecting import _reqs_to_effect
 
 
 def execute_convergence(request_func, group_id, desired, launch_config,
