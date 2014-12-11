@@ -20,17 +20,6 @@ class IStep(Interface):
         """
 
 
-@attributes(['steps'])
-class Convergence(object):
-    """
-    A :obj:`Convergence` is a set of :class:`ISteps` required to converge a
-        ``group_id``.
-
-    :ivar pbag steps: A :obj:`pbag` of :obj:`IStep`s to be performed in
-        parallel.
-    """
-
-
 @implementer(IStep)
 @attributes(['launch_config'])
 class CreateServer(object):
