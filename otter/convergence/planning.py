@@ -245,3 +245,63 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                    + delete_timeout_steps
                    + lb_converge_steps
                    ))
+
+
+_optimizers = {}
+
+
+def _optimizer(step_type):
+    """
+    A decorator for a type-specific optimizer.
+
+    Usage::
+
+        @_optimizer(StepTypeToOptimize)
+        def optimizing_function(steps_of_that_type):
+           return iterable_of_optimized_steps
+    """
+    def _add_to_optimizers(optimizer):
+        _optimizers[step_type] = optimizer
+        return optimizer
+    return _add_to_optimizers
+
+
+@_optimizer(AddNodesToLoadBalancer)
+def _optimize_lb_adds(lb_add_steps):
+    """
+    Merge together multiple :obj:`AddNodesToLoadBalancer`, per load balancer.
+
+    :param steps_by_lb: Iterable of :obj:`AddNodesToLoadBalancer`.
+    """
+    steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
+    return [
+        AddNodesToLoadBalancer(
+            lb_id=lbid,
+            address_configs=pset(reduce(lambda s, y: s.union(y),
+                                        [step.address_configs for step in steps])))
+        for lbid, steps in steps_by_lb.iteritems()
+    ]
+
+
+def optimize_steps(steps):
+    """
+    Optimize steps.
+
+    Currently only optimizes per step type. See the :func:`_optimizer`
+    decorator for more information on how to register an optimizer.
+
+    :param pbag steps: Collection of steps.
+    :return: a pbag of steps.
+    """
+    def grouping_fn(step):
+        step_type = type(step)
+        if step_type in _optimizers:
+            return step_type
+        else:
+            return "unoptimizable"
+
+    steps_by_type = groupby(grouping_fn, steps)
+    unoptimizable = steps_by_type.pop("unoptimizable", [])
+    omg_optimized = concat(_optimizers[step_type](steps)
+                           for step_type, steps in steps_by_type.iteritems())
+    return pbag(concatv(omg_optimized, unoptimizable))

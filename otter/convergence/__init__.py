@@ -27,70 +27,10 @@ from otter.util.timestamp import timestamp_to_epoch
 
 # radix in-development imports
 
-from otter.convergence.planning import converge, _remove_from_lb_with_draining, _converge_lb_state
+from otter.convergence.planning import converge, _remove_from_lb_with_draining, _converge_lb_state, optimize_steps
 from otter.convergence.steps import AddNodesToLoadBalancer, BulkAddToRCv3, BulkRemoveFromRCv3, CreateServer, DeleteServer, RemoveFromLoadBalancer, ChangeLoadBalancerNode, SetMetadataItemOnServer, Request, Convergence
 from otter.convergence.model import NodeCondition, NodeType, ServerState, LBNode, LBConfig, NovaServer, DesiredGroupState
 from otter.convergence.gathering import get_all_server_details, get_scaling_group_servers, get_load_balancer_contents, extract_drained_at, to_nova_server, json_to_LBConfigs
-
-
-_optimizers = {}
-
-
-def _optimizer(step_type):
-    """
-    A decorator for a type-specific optimizer.
-
-    Usage::
-
-        @_optimizer(StepTypeToOptimize)
-        def optimizing_function(steps_of_that_type):
-           return iterable_of_optimized_steps
-    """
-    def _add_to_optimizers(optimizer):
-        _optimizers[step_type] = optimizer
-        return optimizer
-    return _add_to_optimizers
-
-
-@_optimizer(AddNodesToLoadBalancer)
-def _optimize_lb_adds(lb_add_steps):
-    """
-    Merge together multiple :obj:`AddNodesToLoadBalancer`, per load balancer.
-
-    :param steps_by_lb: Iterable of :obj:`AddNodesToLoadBalancer`.
-    """
-    steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
-    return [
-        AddNodesToLoadBalancer(
-            lb_id=lbid,
-            address_configs=pset(reduce(lambda s, y: s.union(y),
-                                        [step.address_configs for step in steps])))
-        for lbid, steps in steps_by_lb.iteritems()
-    ]
-
-
-def optimize_steps(steps):
-    """
-    Optimize steps.
-
-    Currently only optimizes per step type. See the :func:`_optimizer`
-    decorator for more information on how to register an optimizer.
-
-    :param pbag steps: Collection of steps.
-    :return: a pbag of steps.
-    """
-    def grouping_fn(step):
-        step_type = type(step)
-        if step_type in _optimizers:
-            return step_type
-        else:
-            return "unoptimizable"
-
-    steps_by_type = groupby(grouping_fn, steps)
-    unoptimizable = steps_by_type.pop("unoptimizable", [])
-    omg_optimized = concat(_optimizers[step_type](steps)
-                           for step_type, steps in steps_by_type.iteritems())
-    return pbag(concatv(omg_optimized, unoptimizable))
 
 
 def _reqs_to_effect(request_func, conv_requests):
