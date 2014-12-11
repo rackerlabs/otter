@@ -5,7 +5,10 @@ representation across the different phases of convergence.
 
 from characteristic import attributes, Attribute
 
+from pyrsistent import freeze
+
 from twisted.python.constants import Names, NamedConstant
+
 
 
 class NodeCondition(Names):
@@ -77,3 +80,40 @@ class LBConfig(object):
         the default is ``ENABLED``
     :ivar str type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
     """
+
+
+@attributes(['id', 'state', 'created',
+             Attribute('servicenet_address', default_value='', instance_of=str)])
+class NovaServer(object):
+    """
+    Information about a server that was retrieved from Nova.
+
+    :ivar str id: The server id.
+    :ivar str state: Current state of the server.
+    :ivar float created: Timestamp at which the server was created.
+    :ivar str servicenet_address: The private ServiceNet IPv4 address, if
+        the server is on the ServiceNet network
+    """
+
+
+@attributes(['launch_config', 'desired',
+             Attribute('desired_lbs', default_factory=dict, instance_of=dict),
+             Attribute('draining_timeout', default_value=0.0, instance_of=float)])
+class DesiredGroupState(object):
+    """
+    The desired state for a scaling group.
+
+    :ivar dict launch_config: nova launch config.
+    :ivar int desired: the number of desired servers within the group.
+    :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
+        :class:`LBConfig` instances.
+    :ivar float draining_timeout: If greater than zero, when the server is
+        scaled down it will be put into draining condition.  It will remain
+        in draining condition for a maximum of ``draining_timeout`` seconds
+        before being removed from the load balancer and then deleted.
+    """
+
+    def __init__(self):
+        self.launch_config = freeze(self.launch_config)
+
+

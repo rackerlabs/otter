@@ -6,7 +6,6 @@ Convergence.
 from itertools import izip as zip
 from operator import itemgetter
 import time
-from collections import defaultdict
 
 from characteristic import attributes, Attribute
 from effect import parallel
@@ -20,7 +19,6 @@ from effect import parallel
 from toolz.curried import filter, groupby, map
 from toolz.functoolz import compose, identity
 from toolz.itertoolz import concat, concatv, mapcat
-from toolz.dicttoolz import get_in
 
 from otter.constants import ServiceType
 from otter.util.http import append_segments
@@ -31,57 +29,8 @@ from otter.util.timestamp import timestamp_to_epoch
 
 from otter.convergence.planning import converge, _remove_from_lb_with_draining, _converge_lb_state
 from otter.convergence.steps import AddNodesToLoadBalancer, BulkAddToRCv3, BulkRemoveFromRCv3, CreateServer, DeleteServer, RemoveFromLoadBalancer, ChangeLoadBalancerNode, SetMetadataItemOnServer, Request, Convergence
-from otter.convergence.model import NodeCondition, NodeType, ServerState, LBNode, LBConfig
-from otter.convergence.gathering import get_all_server_details, get_scaling_group_servers, get_load_balancer_contents, extract_drained_at
-
-
-
-def to_nova_server(server_json):
-    """
-    Convert from JSON format to :obj:`NovaServer` instance
-    """
-    ips = get_in(['addresses', 'private'], server_json, default=[])
-    ip = ''
-    if len(ips) > 0:
-        ip = [addr['addr'] for addr in ips if addr['version'] == 4][0]
-    return NovaServer(id=server_json['id'], state=ServerState.lookupByName(server_json['state']),
-                      created=timestamp_to_epoch(server_json['created']),
-                      servicenet_address=ip)
-
-
-@attributes(['launch_config', 'desired',
-             Attribute('desired_lbs', default_factory=dict, instance_of=dict),
-             Attribute('draining_timeout', default_value=0.0, instance_of=float)])
-class DesiredGroupState(object):
-    """
-    The desired state for a scaling group.
-
-    :ivar dict launch_config: nova launch config.
-    :ivar int desired: the number of desired servers within the group.
-    :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
-        :class:`LBConfig` instances.
-    :ivar float draining_timeout: If greater than zero, when the server is
-        scaled down it will be put into draining condition.  It will remain
-        in draining condition for a maximum of ``draining_timeout`` seconds
-        before being removed from the load balancer and then deleted.
-    """
-
-    def __init__(self):
-        self.launch_config = freeze(self.launch_config)
-
-
-@attributes(['id', 'state', 'created',
-             Attribute('servicenet_address', default_value='', instance_of=str)])
-class NovaServer(object):
-    """
-    Information about a server that was retrieved from Nova.
-
-    :ivar str id: The server id.
-    :ivar str state: Current state of the server.
-    :ivar float created: Timestamp at which the server was created.
-    :ivar str servicenet_address: The private ServiceNet IPv4 address, if
-        the server is on the ServiceNet network
-    """
+from otter.convergence.model import NodeCondition, NodeType, ServerState, LBNode, LBConfig, NovaServer, DesiredGroupState
+from otter.convergence.gathering import get_all_server_details, get_scaling_group_servers, get_load_balancer_contents, extract_drained_at, to_nova_server, json_to_LBConfigs
 
 
 _optimizers = {}
@@ -161,23 +110,6 @@ def _reqs_to_effect(request_func, conv_requests):
                             success_codes=r.success_codes)
                for r in conv_requests]
     return parallel(effects)
-
-
-def json_to_LBConfigs(lbs_json):
-    """
-    Convert load balancer config from JSON to :obj:`LBConfig`
-
-    :param list lbs_json: List of load balancer configs
-    :return: `dict` of LBid -> [LBConfig] mapping
-
-    NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
-    implemented in convergence
-    """
-    lbd = defaultdict(list)
-    for lb in lbs_json:
-        if lb.get('type') != 'RackConnectV3':
-            lbd[lb['loadBalancerId']].append(LBConfig(port=lb['port']))
-    return lbd
 
 
 def execute_convergence(request_func, group_id, desired, launch_config,

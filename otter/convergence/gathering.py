@@ -1,14 +1,22 @@
 """Code related to gathering data to inform convergence."""
 
-from effect import parallel
-
+from collections import defaultdict
 from urllib import urlencode
 
+from effect import parallel
+
 from toolz.curried import filter, groupby, map
+from toolz.dicttoolz import get_in
 from toolz.functoolz import compose, identity
 
 from otter.constants import ServiceType
-from otter.convergence.model import LBConfig, LBNode, NodeCondition, NodeType
+from otter.convergence.model import (
+    LBConfig,
+    LBNode,
+    NodeCondition,
+    NodeType,
+    NovaServer,
+    ServerState)
 from otter.indexer import atom
 from otter.util.http import append_segments
 from otter.util.retry import exponential_backoff_interval, retry_effect, retry_times
@@ -127,10 +135,40 @@ def extract_drained_at(feed):
     # TODO: This function temporarily only looks at last entry assuming that
     # it was draining operation. May need to look at all entries in reverse order
     # and check for draining operation. This could include paging to further entries
-    print("wtf is feed", feed)
     entry = atom.entries(atom.parse(feed))[0]
     summary = atom.summary(entry)
     if 'Node successfully updated' in summary and 'DRAINING' in summary:
         return timestamp_to_epoch(atom.updated(entry))
     else:
         raise ValueError('Unexpected summary: {}'.format(summary))
+
+
+def to_nova_server(server_json):
+    """
+    Convert from JSON format to :obj:`NovaServer` instance
+    """
+    ips = get_in(['addresses', 'private'], server_json, default=[])
+    ip = ''
+    if len(ips) > 0:
+        ip = [addr['addr'] for addr in ips if addr['version'] == 4][0]
+    return NovaServer(id=server_json['id'], state=ServerState.lookupByName(server_json['state']),
+                      created=timestamp_to_epoch(server_json['created']),
+                      servicenet_address=ip)
+
+
+def json_to_LBConfigs(lbs_json):
+    """
+    Convert load balancer config from JSON to :obj:`LBConfig`
+
+    :param list lbs_json: List of load balancer configs
+    :return: `dict` of LBid -> [LBConfig] mapping
+
+    NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
+    implemented in convergence
+    """
+    lbd = defaultdict(list)
+    for lb in lbs_json:
+        if lb.get('type') != 'RackConnectV3':
+            lbd[lb['loadBalancerId']].append(LBConfig(port=lb['port']))
+    return lbd
+
