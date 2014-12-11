@@ -180,7 +180,8 @@ def add_json_request_data(request_func):
 def add_bind_root(root, request_func):
     """
     Decorate a request function so that it's URL is appended to a common root.
-    The URL given is expected to be quoted if required. This decorator does not quote the URL.
+    The URL given is expected to be quoted if required. This decorator does not
+    quote the URL.
     """
     @wraps(request_func)
     def request(method, url, *args, **kwargs):
