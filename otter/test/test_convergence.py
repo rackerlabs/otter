@@ -198,7 +198,7 @@ class GetLBContentsTests(SynchronousTestCase):
         }
         self.feeds = {'11feed': 1.0, '22feed': 2.0}
         self.mock_eda = patch(
-            self, 'otter.convergence.extract_drained_at',
+            self, 'otter.convergence.gathering.extract_drained_at',
             side_effect=lambda f: self.feeds[f])
 
     def _request(self):
