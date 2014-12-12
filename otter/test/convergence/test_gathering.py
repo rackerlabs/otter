@@ -15,7 +15,6 @@ from otter.convergence.gathering import (
     get_all_server_details,
     get_load_balancer_contents,
     get_scaling_group_servers,
-    json_to_LBConfigs,
     to_nova_server)
 from otter.convergence.model import (
     LBConfig,
@@ -336,31 +335,6 @@ class ToNovaServerTests(SynchronousTestCase):
             to_nova_server(self.servers[1]),
             NovaServer(id='b', state=ServerState.BUILD, created=self.createds[1][1],
                        servicenet_address='ipv4'))
-
-
-class JsonToLBConfigTests(SynchronousTestCase):
-    """
-    Tests for :func:`json_to_LBConfigs`
-    """
-    def test_without_rackconnect(self):
-        """
-        LB config without rackconnect
-        """
-        self.assertEqual(
-            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
-                               {'loadBalancerId': 20, 'port': 800},
-                               {'loadBalancerId': 21, 'port': 81}]),
-            {20: [LBConfig(port=80), LBConfig(port=800)], 21: [LBConfig(port=81)]})
-
-    def test_with_rackconnect(self):
-        """
-        LB config with rackconnect
-        """
-        self.assertEqual(
-            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
-                               {'loadBalancerId': 200, 'type': 'RackConnectV3'},
-                               {'loadBalancerId': 21, 'port': 81}]),
-            {20: [LBConfig(port=80)], 21: [LBConfig(port=81)]})
 
 
 class GetAllConvergenceDataTests(SynchronousTestCase):

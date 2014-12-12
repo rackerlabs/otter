@@ -12,7 +12,53 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
 from otter.util.timestamp import now
-from otter.convergence.composition import execute_convergence, tenant_is_enabled
+from otter.convergence.composition import (
+    execute_convergence,
+    get_desired_group_state,
+    json_to_LBConfigs,
+    tenant_is_enabled)
+from otter.convergence.model import DesiredGroupState, LBConfig
+
+
+class JsonToLBConfigTests(SynchronousTestCase):
+    """
+    Tests for :func:`json_to_LBConfigs`
+    """
+    def test_without_rackconnect(self):
+        """
+        LB config without rackconnect
+        """
+        self.assertEqual(
+            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
+                               {'loadBalancerId': 20, 'port': 800},
+                               {'loadBalancerId': 21, 'port': 81}]),
+            {20: [LBConfig(port=80), LBConfig(port=800)], 21: [LBConfig(port=81)]})
+
+    def test_with_rackconnect(self):
+        """
+        LB config with rackconnect
+        """
+        self.assertEqual(
+            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
+                               {'loadBalancerId': 200, 'type': 'RackConnectV3'},
+                               {'loadBalancerId': 21, 'port': 81}]),
+            {20: [LBConfig(port=80)], 21: [LBConfig(port=81)]})
+
+
+class GetDesiredGroupStateTests(SynchronousTestCase):
+    """Tests for :func:`get_desired_group_state`."""
+    def test_convert(self):
+        """An Otter launch config is converted into a :obj:`DesiredGroupState`."""
+        server_config = {'name': 'test', 'flavorRef': 'f'}
+        lc = {'args': {'server': server_config,
+                       'loadBalancers': [{'loadBalancerId': 23, 'port': 80}]}}
+        state = get_desired_group_state(lc, 2)
+        self.assertEqual(
+            state,
+            DesiredGroupState(
+                launch_config={'server': server_config},
+                desired=2,
+                desired_lbs={23: [LBConfig(port=80)]}))
 
 
 class ExecConvergenceTests(SynchronousTestCase):

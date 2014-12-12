@@ -80,6 +80,4 @@ def get_desired_group_state(launch_config, desired):
     return desired_state
 
 # TODO
-# - test get_all_convergence_data
-# - test get_desired_group_state
 # - update execute_convergence tests.
