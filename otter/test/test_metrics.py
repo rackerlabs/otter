@@ -8,7 +8,7 @@ from io import StringIO
 import operator
 
 from effect import Effect, ConstantIntent, ErrorIntent
-from effect.testing import StubIntent
+from effect.testing import StubIntent, resolve_stubs
 
 from pyrsistent import freeze
 
@@ -19,7 +19,7 @@ from twisted.internet.defer import succeed, fail
 from twisted.internet.task import Clock
 from twisted.internet.base import ReactorBase
 
-from otter.constants import get_service_mapping
+from otter.constants import get_service_mapping, ServiceType
 from otter.metrics import (
     get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
     add_to_cloud_metrics, collect_metrics, MetricsService, makeService, Options,
@@ -347,7 +347,7 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         conf = {'ttl': m['ttlInSeconds']}
         log = object()
 
-        eff = add_to_cloud_metrics(self.request, td, ta, tp, log=log)
+        eff = add_to_cloud_metrics(self.request, conf, 'ord', td, ta, tp, log=log)
 
         self.assertEqual(resolve_stubs(eff), 'r')
         self.assertEqual(self.a, (ServiceType.CLOUD_METRICS_INGEST, 'POST', 'ingest'))

@@ -29,7 +29,7 @@ from toolz.functoolz import identity
 from otter.auth import generate_authenticator, authenticate_user, extract_token
 
 from otter.auth import public_endpoint_url
-from otter.constants import get_service_mapping
+from otter.constants import get_service_mapping, ServiceType
 from otter.http import get_request_func
 from otter.convergence.gathering import get_scaling_group_servers
 from otter.util.http import append_segments, headers, check_success
@@ -187,7 +187,7 @@ def get_all_metrics(cass_groups, authenticator, services, region,
     return d.addCallback(lambda x: reduce(operator.add, x, []))
 
 
-def add_to_cloud_metrics(request_func, conf, total_desired, total_actual, total_pending, log=None):
+def add_to_cloud_metrics(request_func, conf, region, total_desired, total_actual, total_pending, log=None):
     """
     Add total number of desired, actual and pending servers of a region to Cloud metrics
 
@@ -257,11 +257,13 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
             total_desired, total_actual, total_pending))
 
     # Add to cloud metrics
+    metr_serv_name = config['metrics']['service']
+    config['services'][metr_serv_name] = metr_serv_name
     req_func = get_request_func(authenticator, config['metrics']['tenant_id'],
-                                metrics_log, get_service_mapping(services.get),
+                                metrics_log, get_service_mapping(config['services'].get),
                                 config['metrics']['region'])
-    eff = add_to_cloud_metrics(req_func, config['metrics'], total_desired, total_actual,
-                               total_pending, log=metrics_log)
+    eff = add_to_cloud_metrics(req_func, config['metrics'], config['region'],
+                               total_desired, total_actual, total_pending, log=metrics_log)
     yield perform(reactor, eff)
     metrics_log.msg('added to cloud metrics')
     if _print:
@@ -343,4 +345,7 @@ if __name__ == '__main__':
     config = json.load(open(sys.argv[1]))
     config['services'] = {'cloudServersOpenStack': 'cloudServersOpenStack'}
     # TODO: Take _print as cmd-line arg and pass it.
+    from twisted.python.log import startLoggingWithObserver
+    from otter.log.setup import observer_factory_debug
+    startLoggingWithObserver(observer_factory_debug())
     task.react(collect_metrics, (config, None, None, True))
