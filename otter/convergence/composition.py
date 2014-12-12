@@ -2,27 +2,18 @@
 Code for composing all of the convergence functionality together.
 """
 
+from collections import defaultdict
 from functools import partial
-from operator import itemgetter
 import time
 
-from effect import parallel
-
-from toolz.curried import map
-
 from otter.convergence.effecting import steps_to_effect
-from otter.convergence.gathering import (
-    get_load_balancer_contents,
-    get_scaling_group_servers,
-    json_to_LBConfigs,
-    to_nova_server)
-from otter.convergence.model import DesiredGroupState
+from otter.convergence.gathering import get_all_convergence_data
+from otter.convergence.model import DesiredGroupState, LBConfig
 from otter.convergence.planning import converge, optimize_steps
 
 
-def execute_convergence(request_func, group_id, desired, launch_config,
-                        get_servers=get_scaling_group_servers,
-                        get_lb=get_load_balancer_contents):
+def execute_convergence(request_func, group_id, desired_group_state,
+                        get_all_convergence_data=get_all_convergence_data):
     """
     Execute convergence. This function will do following:
     1. Get state of the nova, CLB and RCv3.
@@ -33,25 +24,13 @@ def execute_convergence(request_func, group_id, desired, launch_config,
 
     :param request_func: Tenant bound request function
     :param bytes group_id: Tenant's group
-    :param int desired: Group's desired capacity
-    :param dict launch_config: Group's launch config as per
-                              :obj:`otter.json_schema.group_schemas.launch_config`
-    :param callable get_servers: Optional arg to get scaling group servers useful for testing
-    :param callable get_lb: Optional arg to get load balancer info useful for testing
 
     :return: Effect with Bool specifying if it should be called again
     :rtype: :class:`effect.Effect`
     """
-    eff = parallel(
-        [get_servers(request_func).on(itemgetter(group_id)).on(map(to_nova_server)),
-         get_lb(request_func)])
-
-    lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
-    desired_state = DesiredGroupState(launch_config={'server': launch_config['args']['server']},
-                                      desired=desired, desired_lbs=lbs)
-
-    conv_eff = eff.on(lambda (servers, lb_nodes): converge(desired_state, servers, lb_nodes,
-                                                           time.time()))
+    eff = get_all_convergence_data(request_func, group_id)
+    conv_eff = eff.on(
+        lambda (servers, lb_nodes): converge(desired_group_state, servers, lb_nodes, time.time()))
     # TODO: Do request specific throttling. For ex create only 3 servers at a time
     return conv_eff.on(optimize_steps).on(partial(steps_to_effect, request_func)).on(bool)
 
@@ -66,3 +45,41 @@ def tenant_is_enabled(tenant_id, get_config_value):
     """
     enabled_tenant_ids = get_config_value("convergence-tenants")
     return (tenant_id in enabled_tenant_ids)
+
+
+def json_to_LBConfigs(lbs_json):
+    """
+    Convert load balancer config from JSON to :obj:`LBConfig`
+
+    :param list lbs_json: List of load balancer configs
+    :return: `dict` of LBid -> [LBConfig] mapping
+
+    NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
+    implemented in convergence
+    """
+    lbd = defaultdict(list)
+    for lb in lbs_json:
+        if lb.get('type') != 'RackConnectV3':
+            lbd[lb['loadBalancerId']].append(LBConfig(port=lb['port']))
+    return lbd
+
+
+def get_desired_group_state(launch_config, desired):
+    """
+    Create a :obj:`DesiredGroupState` from a launch config and desired
+    number of servers.
+
+    :param dict launch_config: Group's launch config as per
+        :obj:`otter.json_schema.group_schemas.launch_config`
+    :param int desired: Group's desired capacity
+    """
+    lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
+    desired_state = DesiredGroupState(
+        launch_config={'server': launch_config['args']['server']},
+        desired=desired, desired_lbs=lbs)
+    return desired_state
+
+# TODO
+# - test get_all_convergence_data
+# - test get_desired_group_state
+# - update execute_convergence tests.

@@ -4,13 +4,14 @@ import calendar
 from functools import partial
 
 from effect import Effect, ConstantIntent
-from effect.testing import StubIntent, resolve_effect
+from effect.testing import StubIntent, resolve_effect, resolve_stubs
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
     extract_drained_at,
+    get_all_convergence_data,
     get_all_server_details,
     get_load_balancer_contents,
     get_scaling_group_servers,
@@ -360,3 +361,43 @@ class JsonToLBConfigTests(SynchronousTestCase):
                                {'loadBalancerId': 200, 'type': 'RackConnectV3'},
                                {'loadBalancerId': 21, 'port': 81}]),
             {20: [LBConfig(port=80)], 21: [LBConfig(port=81)]})
+
+
+class GetAllConvergenceDataTests(SynchronousTestCase):
+    """Tests for :func:`get_all_convergence_data`."""
+
+    def setUp(self):
+        """Save some stuff."""
+        self.servers = [
+            {'id': 'a', 'state': 'ACTIVE', 'created': '1970-01-01T00:00:00Z',
+             'addresses': {'private': [{'addr': 'ip1', 'version': 4}]}},
+            {'id': 'b', 'state': 'ACTIVE', 'created': '1970-01-01T00:00:01Z',
+             'addresses': {'private': [{'addr': 'ip2', 'version': 4}]}}
+        ]
+
+    def test_success(self):
+        """The data is returned as a tuple of ([NovaServer], [LBNode])."""
+        lb_nodes = [LBNode(lb_id='lb1', node_id='node1', address='ip1',
+                           config=LBConfig(port='80'))]
+
+        reqfunc = lambda **k: Effect(k)
+        get_servers = lambda r: Effect(StubIntent(ConstantIntent({'gid': self.servers})))
+        get_lb = lambda r: Effect(StubIntent(ConstantIntent(lb_nodes)))
+
+        eff = get_all_convergence_data(
+            reqfunc,
+            'gid',
+            get_scaling_group_servers=get_servers,
+            get_load_balancer_contents=get_lb)
+
+        expected_servers = [
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=0,
+                       servicenet_address='ip1'),
+            NovaServer(id='b',
+                       state=ServerState.ACTIVE,
+                       created=1,
+                       servicenet_address='ip2'),
+        ]
+        self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))
