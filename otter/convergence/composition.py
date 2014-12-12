@@ -2,6 +2,7 @@
 Code for composing all of the convergence functionality together.
 """
 
+from functools import partial
 from operator import itemgetter
 import time
 
@@ -9,7 +10,7 @@ from effect import parallel
 
 from toolz.curried import map
 
-from otter.convergence.effecting import _reqs_to_effect
+from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import (
     get_load_balancer_contents,
     get_scaling_group_servers,
@@ -52,8 +53,7 @@ def execute_convergence(request_func, group_id, desired, launch_config,
     conv_eff = eff.on(lambda (servers, lb_nodes): converge(desired_state, servers, lb_nodes,
                                                            time.time()))
     # TODO: Do request specific throttling. For ex create only 3 servers at a time
-    return conv_eff.on(optimize_steps).on(
-        lambda steps: _reqs_to_effect(request_func, [s.as_request() for s in steps])).on(bool)
+    return conv_eff.on(optimize_steps).on(partial(steps_to_effect, request_func)).on(bool)
 
 
 def tenant_is_enabled(tenant_id, get_config_value):
