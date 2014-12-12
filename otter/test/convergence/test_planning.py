@@ -462,7 +462,7 @@ class ConvergeTests(SynchronousTestCase):
                 set(),
                 set(),
                 0),
-                pbag([CreateServer(launch_config=pmap())]))
+            pbag([CreateServer(launch_config=pmap())]))
 
     def test_converge_give_me_multiple_servers(self):
         """
@@ -475,9 +475,9 @@ class ConvergeTests(SynchronousTestCase):
                 set(),
                 set(),
                 0),
-                pbag([
-                    CreateServer(launch_config=pmap()),
-                    CreateServer(launch_config=pmap())]))
+            pbag([
+                CreateServer(launch_config=pmap()),
+                CreateServer(launch_config=pmap())]))
 
     def test_count_building_as_meeting_capacity(self):
         """
@@ -503,10 +503,10 @@ class ConvergeTests(SynchronousTestCase):
                 set([server('abc', ServerState.ERROR)]),
                 set(),
                 0),
-                pbag([
-                    DeleteServer(server_id='abc'),
-                    CreateServer(launch_config=pmap()),
-                ]))
+            pbag([
+                DeleteServer(server_id='abc'),
+                CreateServer(launch_config=pmap()),
+            ]))
 
     def test_delete_error_state_servers_with_lb_nodes(self):
         """
@@ -523,12 +523,12 @@ class ConvergeTests(SynchronousTestCase):
                      LBNode(lb_id=5, address='1.1.1.1', node_id=5,
                             config=LBConfig(port=8080))]),
                 0),
-                pbag([
-                    DeleteServer(server_id='abc'),
-                    RemoveFromLoadBalancer(lb_id=5, node_id=3),
-                    RemoveFromLoadBalancer(lb_id=5, node_id=5),
-                    CreateServer(launch_config=pmap()),
-                ]))
+            pbag([
+                DeleteServer(server_id='abc'),
+                RemoveFromLoadBalancer(lb_id=5, node_id=3),
+                RemoveFromLoadBalancer(lb_id=5, node_id=5),
+                CreateServer(launch_config=pmap()),
+            ]))
 
     def test_scale_down(self):
         """If we have more servers than desired, we delete the oldest."""
@@ -573,7 +573,7 @@ class ConvergeTests(SynchronousTestCase):
                      server('ghi', ServerState.ACTIVE, created=2)]),
                 set(),
                 0),
-                pbag([DeleteServer(server_id='def')]))
+            pbag([DeleteServer(server_id='def')]))
 
     def test_timeout_building(self):
         """
@@ -587,9 +587,9 @@ class ConvergeTests(SynchronousTestCase):
                      server('ok', ServerState.ACTIVE, created=0)]),
                 set(),
                 3600),
-                pbag([
-                    DeleteServer(server_id='slowpoke'),
-                    CreateServer(launch_config=pmap())]))
+            pbag([
+                DeleteServer(server_id='slowpoke'),
+                CreateServer(launch_config=pmap())]))
 
     def test_timeout_replace_only_when_necessary(self):
         """
