@@ -78,6 +78,3 @@ def get_desired_group_state(launch_config, desired):
         launch_config={'server': launch_config['args']['server']},
         desired=desired, desired_lbs=lbs)
     return desired_state
-
-# TODO
-# - update execute_convergence tests.

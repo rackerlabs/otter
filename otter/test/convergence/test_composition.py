@@ -17,7 +17,7 @@ from otter.convergence.composition import (
     get_desired_group_state,
     json_to_LBConfigs,
     tenant_is_enabled)
-from otter.convergence.model import DesiredGroupState, LBConfig
+from otter.convergence.model import DesiredGroupState, LBConfig, NovaServer, ServerState
 
 
 class JsonToLBConfigTests(SynchronousTestCase):
@@ -71,25 +71,33 @@ class ExecConvergenceTests(SynchronousTestCase):
         Sample server json
         """
         self.servers = [
-            {'id': 'a', 'state': 'ACTIVE', 'created': now(),
-             'addresses': {'private': [{'addr': 'ip1', 'version': 4}]}},
-            {'id': 'b', 'state': 'ACTIVE', 'created': now(),
-             'addresses': {'private': [{'addr': 'ip2', 'version': 4}]}}
+            NovaServer(id='a', state=ServerState.ACTIVE, created=0, servicenet_address='ip1'),
+            NovaServer(id='b', state=ServerState.ACTIVE, created=0, servicenet_address='ip2'),
         ]
+
+    def _get_get_all_convergence_data(self, servers, group_id, reqfunc):
+        def get_all_convergence_data(request_func, grp_id):
+            self.assertIs(request_func, reqfunc)
+            self.assertEqual(grp_id, group_id)
+            return Effect(StubIntent(ConstantIntent((self.servers, []))))
+        return get_all_convergence_data
 
     def test_success(self):
         """
         Executes optimized steps if state of world does not match desired and returns
         True to be called again
         """
-        get_servers = lambda r: Effect(StubIntent(ConstantIntent({'gid': self.servers})))
-        get_lb = lambda r: Effect(StubIntent(ConstantIntent([])))
-        lc = {'args': {'server': {'name': 'test', 'flavorRef': 'f'},
-                       'loadBalancers': [{'loadBalancerId': 23, 'port': 80}]}}
         reqfunc = lambda **k: Effect(k)
+        get_all_convergence_data = self._get_get_all_convergence_data(
+            self.servers, 'gid', reqfunc)
+        desired = DesiredGroupState(
+            launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
+            desired_lbs={23: [LBConfig(port=80)]},
+            desired=2)
 
-        eff = execute_convergence(reqfunc, 'gid', 2, lc, get_servers=get_servers,
-                                  get_lb=get_lb)
+        eff = execute_convergence(
+            reqfunc, 'gid', desired,
+            get_all_convergence_data=get_all_convergence_data)
 
         eff = resolve_stubs(eff)
         # The steps are optimized
@@ -117,14 +125,16 @@ class ExecConvergenceTests(SynchronousTestCase):
         """
         If state of world matches desired, no steps are executed and False is returned
         """
-        get_servers = lambda r: Effect(StubIntent(ConstantIntent({'gid': self.servers})))
-        get_lb = lambda r: Effect(StubIntent(ConstantIntent([])))
-        lc = {'args': {'server': {'name': 'test', 'flavorRef': 'f'}, 'loadBalancers': []}}
+        desired = DesiredGroupState(
+            launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
+            desired_lbs={},
+            desired=2)
         reqfunc = lambda **k: 1 / 0
-
-        eff = execute_convergence(reqfunc, 'gid', 2, lc, get_servers=get_servers,
-                                  get_lb=get_lb)
-
+        get_all_convergence_data = self._get_get_all_convergence_data(
+            self.servers, 'gid', reqfunc)
+        eff = execute_convergence(
+            reqfunc, 'gid', desired,
+            get_all_convergence_data=get_all_convergence_data)
         self.assertIs(resolve_stubs(eff), False)
 
 
