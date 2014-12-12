@@ -9,7 +9,7 @@ import time
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import DesiredGroupState, LBConfig
-from otter.convergence.planning import converge, optimize_steps
+from otter.convergence.planning import plan
 
 
 def execute_convergence(request_func, group_id, desired_group_state,
@@ -30,9 +30,9 @@ def execute_convergence(request_func, group_id, desired_group_state,
     """
     eff = get_all_convergence_data(request_func, group_id)
     conv_eff = eff.on(
-        lambda (servers, lb_nodes): converge(desired_group_state, servers, lb_nodes, time.time()))
+        lambda (servers, lb_nodes): plan(desired_group_state, servers, lb_nodes, time.time()))
     # TODO: Do request specific throttling. For ex create only 3 servers at a time
-    return conv_eff.on(optimize_steps).on(partial(steps_to_effect, request_func)).on(bool)
+    return conv_eff.on(partial(steps_to_effect, request_func)).on(bool)
 
 
 def tenant_is_enabled(tenant_id, get_config_value):

@@ -300,3 +300,10 @@ def optimize_steps(steps):
     omg_optimized = concat(_optimizers[step_type](steps)
                            for step_type, steps in steps_by_type.iteritems())
     return pbag(concatv(omg_optimized, unoptimizable))
+
+
+def plan(desired_group_state, servers, lb_nodes, now):
+    """Get an optimized convergence plan."""
+    steps = converge(desired_group_state, servers, lb_nodes, now)
+    return optimize_steps(steps)
+
