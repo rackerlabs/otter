@@ -31,7 +31,7 @@ from otter.auth import generate_authenticator, authenticate_user, extract_token
 from otter.auth import public_endpoint_url
 from otter.constants import get_service_mapping
 from otter.http import get_request_func
-from otter.convergence import get_scaling_group_servers
+from otter.convergence.gathering import get_scaling_group_servers
 from otter.util.http import append_segments, headers, check_success
 from otter.util.fp import predicate_all
 from otter.log import log as otter_log

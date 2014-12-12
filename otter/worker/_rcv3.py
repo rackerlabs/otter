@@ -6,7 +6,8 @@ At some point, this should just be moved into that module.
 from effect.twisted import perform
 from functools import partial
 from operator import itemgetter
-from otter.convergence import BulkAddToRCv3, BulkRemoveFromRCv3, _reqs_to_effect
+from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3
+from otter.convergence.effecting import _reqs_to_effect
 from twisted.internet import reactor
 
 
