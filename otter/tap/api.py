@@ -30,6 +30,7 @@ from otter.scheduler import SchedulerService
 
 from otter.supervisor import SupervisorService, set_supervisor
 from otter.auth import generate_authenticator
+from otter.constants import get_service_mapping
 
 from otter.log import log
 from silverberg.cluster import RoundRobinCassandraCluster
@@ -211,7 +212,8 @@ def makeService(config):
         set_bobby(BobbyClient(bobby_url))
 
     authenticator = generate_authenticator(reactor, config['identity'])
-    supervisor = SupervisorService(authenticator, region, coiterate)
+    supervisor = SupervisorService(authenticator, region, coiterate,
+                                   get_service_mapping(config))
     supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
