@@ -263,12 +263,6 @@ class ImpersonatingAuthenticator(object):
                      self._url, self._admin_url))
 
 
-class IdentityAuthenticator(object):
-    """
-    Authenticates to given identity service
-    """
-
-
 def extract_token(auth_response):
     """
     Extract an auth token from an authentication response.
