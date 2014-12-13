@@ -12,6 +12,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.pure_http import (
     Request, request, check_status, has_code,
+    check_response,
     effect_on_response,
     add_effectful_headers, add_headers, add_effect_on_response, add_bind_root,
     add_content_only, add_error_handling, add_json_response,
