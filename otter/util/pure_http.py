@@ -74,7 +74,7 @@ def check_status(success_codes, result):
 
 def has_code(*codes):
     """
-    A response success predicate that checks the status code.
+    Return a response success predicate that checks the status code.
 
     :param codes: Status codes to be considered successful.
     :type codes: ints
