@@ -72,7 +72,7 @@ def check_status(success_codes, result):
     return result
 
 
-def with_code(*codes):
+def has_code(*codes):
     """
     A response success predicate that checks the status code.
 
