@@ -72,6 +72,28 @@ def check_status(success_codes, result):
     return result
 
 
+def has_code(*codes):
+    """
+    Return a response success predicate that checks the status code.
+
+    :param codes: Status codes to be considered successful.
+    :type codes: ints
+    :return: Response success predicate that checks for these codes.
+    :rtype: function
+    """
+    def check_response_code(response, _content):
+        """
+        Checks if the given response has a successful error code.
+
+        :param response: Response object, from treq.
+        :return: :data:`True` if the error code indicates success,
+            :data:`False` otherwise.
+        :rtype: bool
+        """
+        return response.code in codes
+    return check_response_code
+
+
 # Request function decorators! These make up the most common API exposed by this
 # module.
 

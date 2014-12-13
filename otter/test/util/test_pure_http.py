@@ -11,7 +11,7 @@ from effect import Effect, ConstantIntent, FuncIntent
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.pure_http import (
-    Request, request, check_status,
+    Request, request, check_status, has_code,
     effect_on_response,
     add_effectful_headers, add_headers, add_effect_on_response, add_bind_root,
     add_content_only, add_error_handling, add_json_response,
@@ -88,6 +88,25 @@ class CheckStatusTests(TestCase):
         response = stub_pure_response("", code=404)
         eff = add_error_handling((200,), stub_request(response))('m', 'u')
         self.assertRaises(APIError, resolve_stubs, eff)
+
+
+class HasCodeTests(SynchronousTestCase):
+    """Tests :func:`has_code`."""
+
+    def test_has_code(self):
+        """
+        The predicate returns :data:`True` if the given response is in the
+        successful code list, :data:`False` otherwise.
+        """
+        pred = has_code(200, 204)
+
+        def check_for_code(code):
+            return pred(*stub_pure_response(None, code))
+
+        self.assertTrue(check_for_code(200))
+        self.assertTrue(check_for_code(204))
+        self.assertFalse(check_for_code(400))
+        self.assertFalse(check_for_code(500))
 
 
 class AddEffectfulHeadersTest(TestCase):
