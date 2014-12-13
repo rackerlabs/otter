@@ -258,11 +258,8 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
             total_desired, total_actual, total_pending))
 
     # Add to cloud metrics
-    metr_serv_name = config['metrics']['service']
-    config['services'][metr_serv_name] = metr_serv_name
     req_func = get_request_func(authenticator, config['metrics']['tenant_id'],
-                                metrics_log, get_service_mapping(config['services'].get),
-                                config['metrics']['region'])
+                                metrics_log, service_mapping, config['metrics']['region'])
     eff = add_to_cloud_metrics(req_func, config['metrics'], config['region'],
                                total_desired, total_actual, total_pending, log=metrics_log)
     yield perform(reactor, eff)

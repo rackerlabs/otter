@@ -30,7 +30,6 @@ from otter.test.utils import (
     patch, StubTreq2, matches, IsCallable, CheckFailure, mock_log, resolve_retry_stubs,
     CheckFailureValue, Provides)
 from otter.util.http import headers
-from otter.log import BoundLog
 
 from testtools.matchers import IsInstance
 
@@ -371,9 +370,13 @@ class CollectMetricsTests(SynchronousTestCase):
                                      return_value=succeed(self.metrics))
 
         self.add_to_cloud_metrics = patch(self, 'otter.metrics.add_to_cloud_metrics',
-                                          return_value=succeed(None))
+                                          return_value=Effect(ConstantIntent(succeed(None))))
+        self.req_func = object()
+        self.mock_grf = patch(self, 'otter.metrics.get_request_func',
+                              return_value=self.req_func)
 
-        self.config = {'cassandra': 'c', 'identity': identity_config, 'metrics': 'm',
+        self.config = {'cassandra': 'c', 'identity': identity_config,
+                       'metrics': {'service': 'ms', 'tenant_id': 'tid', 'region': 'IAD'},
                        'region': 'r', 'cloudServersOpenStack': 'nova',
                        'cloudLoadBalancers': 'clb', 'rackconnect': 'rc'}
 
@@ -383,6 +386,8 @@ class CollectMetricsTests(SynchronousTestCase):
         and it is added to blueflood
         """
         _reactor = mock.Mock()
+        service_mapping = get_service_mapping(self.config)
+
         d = collect_metrics(_reactor, self.config)
         self.assertIsNone(self.successResultOf(d))
 
@@ -391,10 +396,12 @@ class CollectMetricsTests(SynchronousTestCase):
             self.client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
             self.groups, matches(Provides(IAuthenticator)),
-            get_service_mapping(self.config), 'r',
-            clock=_reactor, _print=False)
+            service_mapping, 'r', clock=_reactor, _print=False)
+        self.mock_grf.assert_called_once_with(
+            matches(Provides(IAuthenticator)), 'tid', metrics_log,
+            service_mapping, 'IAD')
         self.add_to_cloud_metrics.assert_called_once_with(
-            'm', identity_config['url'], 'r', 107, 26, 1)
+            self.req_func, self.config['metrics'], 'r', 107, 26, 1, log=metrics_log)
         self.client.disconnect.assert_called_once_with()
 
     def test_with_client(self):
