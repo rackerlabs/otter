@@ -257,6 +257,7 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
             self, 'otter.metrics.get_scaling_group_servers',
             side_effect=lambda rf, server_predicate: (
                 Effect(ConstantIntent(self.tenant_servers[rf]))))
+        self.service_mapping = 'service mapping'
 
     def test_get_all_metrics(self):
         """
@@ -274,10 +275,7 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
 
         authenticator = mock.Mock()
 
-        d = get_all_metrics(
-            groups, authenticator,
-            {'cloudServersOpenStack': 'cloudServersOpenStack'},
-            'r', clock='c')
+        d = get_all_metrics(groups, authenticator, self.service_mapping, 'r', clock='c')
 
         self.assertEqual(
             set(self.successResultOf(d)),
@@ -287,11 +285,9 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
         self.mock_gsgs.assert_any_call('t2', server_predicate=IsCallable())
 
         self.mock_get_request_func.assert_any_call(
-            authenticator, 't1', metrics_log,
-            get_service_mapping({'cloudServersOpenStack': 'cloudServersOpenStack'}.get), 'r')
+            authenticator, 't1', metrics_log, self.service_mapping, 'r')
         self.mock_get_request_func.assert_any_call(
-            authenticator, 't2', metrics_log,
-            get_service_mapping({'cloudServersOpenStack': 'cloudServersOpenStack'}.get), 'r')
+            authenticator, 't2', metrics_log, self.service_mapping, 'r')
 
     def test_ignore_error_results(self):
         """
@@ -305,11 +301,7 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
         groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
                   {'tenantId': 't2', 'groupId': 'g2', 'desired': 500}]
         authenticator = mock.Mock()
-        d = get_all_metrics(
-            groups, authenticator,
-            {'cloudServersOpenStack': 'cloudServersOpenStack'},
-            'r', clock='c')
-
+        d = get_all_metrics(groups, authenticator, self.service_mapping, 'r', clock='c')
         self.assertEqual(
             self.successResultOf(d),
             [GroupMetrics('t1', 'g1', 0, 0, 0)])
@@ -382,7 +374,8 @@ class CollectMetricsTests(SynchronousTestCase):
                                           return_value=succeed(None))
 
         self.config = {'cassandra': 'c', 'identity': identity_config, 'metrics': 'm',
-                       'region': 'r', 'services': {'cloudServersOpenStack': 'cloudServersOpenStack'}}
+                       'region': 'r', 'cloudServersOpenStack': 'nova',
+                       'cloudLoadBalancers': 'clb', 'rackconnect': 'rc'}
 
     def test_metrics_collected(self):
         """
@@ -398,7 +391,7 @@ class CollectMetricsTests(SynchronousTestCase):
             self.client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
             self.groups, matches(Provides(IAuthenticator)),
-            {'cloudServersOpenStack': 'cloudServersOpenStack'}, 'r',
+            get_service_mapping(self.config), 'r',
             clock=_reactor, _print=False)
         self.add_to_cloud_metrics.assert_called_once_with(
             'm', identity_config['url'], 'r', 107, 26, 1)
@@ -422,7 +415,7 @@ class CollectMetricsTests(SynchronousTestCase):
         d = collect_metrics(_reactor, self.config, authenticator=auth)
         self.assertIsNone(self.successResultOf(d))
         self.get_all_metrics.assert_called_once_with(
-            self.groups, auth, {'cloudServersOpenStack': 'cloudServersOpenStack'},
+            self.groups, auth, get_service_mapping(self.config),
             'r', clock=_reactor, _print=False)
 
 
@@ -440,7 +433,7 @@ class APIOptionsTests(SynchronousTestCase):
         config.open = mock.Mock(return_value=StringIO(u'{"a": "b"}'))
         config.parseOptions(['--config=file.json'])
         self.assertEqual(config, {'a': 'b', 'config': 'file.json',
-                                  'services': {'cloudServersOpenStack': 'cloudServersOpenStack'}})
+                                  'cloudServersOpenStack': 'cloudServersOpenStack'})
 
 
 class ServiceTests(SynchronousTestCase):

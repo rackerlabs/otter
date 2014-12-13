@@ -164,7 +164,7 @@ def _perform_limited_effects(effects, clock, limit):
     return defer.gatherResults(defs)
 
 
-def get_all_metrics(cass_groups, authenticator, services, region,
+def get_all_metrics(cass_groups, authenticator, service_mapping, region,
                     clock=None, _print=False):
     """
     Gather server data and produce metrics for all groups across all tenants
@@ -180,7 +180,7 @@ def get_all_metrics(cass_groups, authenticator, services, region,
     """
     def req_func_for_tenant(tenant_id):
         return get_request_func(authenticator, tenant_id, metrics_log,
-                                get_service_mapping(services.get), region)
+                                service_mapping, region)
     effs = get_all_metrics_effects(cass_groups, req_func_for_tenant, metrics_log, _print=_print)
     d = _perform_limited_effects(effs, clock, 10)
     d.addCallback(filter(lambda x: x is not None))
@@ -240,11 +240,12 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
     """
     _client = client or connect_cass_servers(reactor, config['cassandra'])
     authenticator = authenticator or generate_authenticator(reactor, config['identity'])
+    service_mapping = get_service_mapping(config)
 
     cass_groups = yield get_scaling_groups(_client, props=['status'],
                                            group_pred=lambda g: g['status'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
-        cass_groups, authenticator, config['services'], config['region'],
+        cass_groups, authenticator, service_mapping, config['region'],
         clock=reactor, _print=_print)
 
     total_desired, total_actual, total_pending = reduce(
@@ -288,10 +289,10 @@ class Options(usage.Options):
         Parse config file and add nova service name
         """
         self.open = getattr(self, 'open', None) or open  # For testing
-        self.update(json.load(self.open(self['config'])))
         # TODO: This is hard-coded here and in tap/api.py. Should be there in
-        # config file only
-        self.update({'services': {'cloudServersOpenStack': 'cloudServersOpenStack'}})
+        # Inject nova service name in case it is not there in config
+        self.update({'cloudServersOpenStack': 'cloudServersOpenStack'})
+        self.update(json.load(self.open(self['config'])))
 
 
 class MetricsService(Service, object):
@@ -343,7 +344,8 @@ def makeService(config):
 
 if __name__ == '__main__':
     config = json.load(open(sys.argv[1]))
-    config['services'] = {'cloudServersOpenStack': 'cloudServersOpenStack'}
+    # TODO: This should come from config only
+    config['cloudServersOpenStack'] = 'cloudServersOpenStack'
     # TODO: Take _print as cmd-line arg and pass it.
     from twisted.python.log import startLoggingWithObserver
     from otter.log.setup import observer_factory_debug

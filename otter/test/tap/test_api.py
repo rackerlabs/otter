@@ -36,7 +36,10 @@ test_config = {
     },
     'environment': 'prod',
     'region': 'ord',
-    'identity': identity_config
+    'identity': identity_config,
+    'cloudServersOpenStack': 'cloudServersOpenStack',
+    'cloudLoadBalancers': 'cloudLoadBalancers',
+    'rackconnect': 'rackconnect'
 }
 
 
