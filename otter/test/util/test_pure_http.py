@@ -92,6 +92,7 @@ class CheckStatusTests(TestCase):
 
 class HasCodeTests(SynchronousTestCase):
     """Tests :func:`has_code`."""
+
     def test_has_code(self):
         """
         The predicate returns :data:`True` if the given response is in the
