@@ -52,7 +52,7 @@ def execute_convergence(request_func, group_id, desired, launch_config,
     conv_eff = eff.on(lambda (servers, lb_nodes): converge(desired_state, servers, lb_nodes,
                                                            time.time()))
     # TODO: Do request specific throttling. For ex create only 3 servers at a time
-    return conv_eff.on(lambda c: optimize_steps(c.steps)).on(
+    return conv_eff.on(optimize_steps).on(
         lambda steps: _reqs_to_effect(request_func, [s.as_request() for s in steps])).on(bool)
 
 
