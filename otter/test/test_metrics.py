@@ -19,7 +19,7 @@ from twisted.internet.defer import succeed, fail
 from twisted.internet.task import Clock
 from twisted.internet.base import ReactorBase
 
-from otter.constants import get_service_mapping
+from otter.constants import get_service_mapping, ServiceType
 from otter.metrics import (
     get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
     add_to_cloud_metrics, collect_metrics, MetricsService, makeService, Options,
@@ -257,7 +257,7 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
             self, 'otter.metrics.get_scaling_group_servers',
             side_effect=lambda rf, server_predicate: (
                 Effect(ConstantIntent(self.tenant_servers[rf]))))
-        self.service_mapping = 'service mapping'
+        self.service_mapping = {ServiceType.CLOUD_SERVERS: 'nova'}
 
     def test_get_all_metrics(self):
         """
