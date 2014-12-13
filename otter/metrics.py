@@ -26,13 +26,11 @@ from toolz.curried import groupby, filter, get_in
 from toolz.dicttoolz import merge
 from toolz.functoolz import identity
 
-from otter.auth import generate_authenticator, authenticate_user, extract_token
+from otter.auth import generate_authenticator
 
-from otter.auth import public_endpoint_url
 from otter.constants import get_service_mapping, ServiceType
 from otter.http import get_request_func
 from otter.convergence.gathering import get_scaling_group_servers
-from otter.util.http import append_segments, headers, check_success
 from otter.util.fp import predicate_all
 from otter.log import log as otter_log
 
@@ -187,7 +185,8 @@ def get_all_metrics(cass_groups, authenticator, service_mapping, region,
     return d.addCallback(lambda x: reduce(operator.add, x, []))
 
 
-def add_to_cloud_metrics(request_func, conf, region, total_desired, total_actual, total_pending, log=None):
+def add_to_cloud_metrics(request_func, conf, region, total_desired, total_actual,
+                         total_pending, log=None):
     """
     Add total number of desired, actual and pending servers of a region to Cloud metrics
 
