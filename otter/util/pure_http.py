@@ -77,7 +77,11 @@ def check_response(pred, result):
     Ensure that the response is acceptable according to the given predicate.
     otherwise raise :exc:`APIError`.
 
-    TODO: make the docstring for this actually good
+    :param pred: A callable that takes a response object and the
+        its content and synchronously returns :data:`True` if
+        the response is good, or :data:`False` if it is bad.
+    :type pred: 2-argument callable
+    :param result: The result of :meth:`Request.perform_effect`.
     """
     response, content = result
     if pred(response, content):
