@@ -174,9 +174,10 @@ def add_error_handling(pred, request_func):
     Decorate a request function with response checking as per
     :func:`check_response`.
     """
-    # TODO: rewrite as a real function
-    request = lambda *args, **kwargs: request_func(*args, **kwargs).on(
-        partial(check_response, pred))
+    @wraps(request_func)
+    def wrapped(*args, **kwargs):
+        eff = request_func(*args, **kwargs)
+        return eff.on(partial(check_response, pred))
     return wraps(request_func)(request)
 
 
