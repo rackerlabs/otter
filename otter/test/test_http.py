@@ -59,7 +59,8 @@ class GetRequestFuncTests(SynchronousTestCase):
         # When the HTTP response is an auth error, the auth cache is
         # invalidated, by way of the next effect:
         invalidate_eff = resolve_effect(next_eff, stub_pure_response("", 401))
-        self.assertEqual(invalidate_eff.intent, InvalidateToken(self.authenticator, 1))
+        expected_intent = InvalidateToken(self.authenticator, 1)
+        self.assertEqual(invalidate_eff.intent, expected_intent)
         self.assertRaises(APIError, resolve_effect, invalidate_eff, None)
 
     def test_json(self):
