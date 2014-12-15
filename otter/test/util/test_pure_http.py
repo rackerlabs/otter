@@ -91,6 +91,27 @@ class CheckStatusTests(TestCase):
         self.assertRaises(APIError, resolve_stubs, eff)
 
 
+class CheckResponseTests(SynchronousTestCase):
+    """Tests :func:`check_response`."""
+    def test_error(self):
+        """
+        :func:`check_response` raises :class:`APIError` if the predicate
+        doesn't like the response.
+        """
+        pred = lambda _response, _content: False
+        result = stub_pure_response(None)
+        self.assertRaises(APIError, check_response, pred, result)
+
+    def test_success(self):
+        """
+        :func:`check_response` returns the value passed into it if the
+        predicate likes the response.
+        """
+        pred = lambda _response, _content: True
+        result = stub_pure_response(None)
+        self.assertIdentical(check_response(pred, result), result)
+
+
 class HasCodeTests(SynchronousTestCase):
     """Tests :func:`has_code`."""
 
