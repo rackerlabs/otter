@@ -65,7 +65,8 @@ class GetRequestFuncTests(SynchronousTestCase):
 
     def test_json(self):
         """
-        Requests and responses are dumped and loaded.
+        JSON-serializable requests are dumped before being sent, and
+        JSON-serialized responses are parsed.
         """
         input_json = {"a": 1}
         output_json = {"b": 2}
