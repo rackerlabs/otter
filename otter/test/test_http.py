@@ -29,7 +29,7 @@ class GetRequestFuncTests(SynchronousTestCase):
         """Save some common parameters."""
         self.log = object()
         self.authenticator = object()
-        self.request = get_request_func(
+        self.request_func = get_request_func(
             self.authenticator, 1, self.log,
             {ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'},
             'DFW')
@@ -39,7 +39,7 @@ class GetRequestFuncTests(SynchronousTestCase):
         The request function returned from get_request_func performs
         authentication before making the request.
         """
-        eff = self.request(ServiceType.CLOUD_SERVERS, 'get', 'servers')
+        eff = self.request_func(ServiceType.CLOUD_SERVERS, 'get', 'servers')
         self.assertEqual(eff.intent, Authenticate(self.authenticator, 1, self.log))
         next_eff = resolve_authenticate(eff)
         # The next effect in the chain is the requested HTTP request,
@@ -53,7 +53,7 @@ class GetRequestFuncTests(SynchronousTestCase):
         """
         Upon authentication error, the auth cache is invalidated.
         """
-        eff = self.request(ServiceType.CLOUD_SERVERS, 'get', 'servers')
+        eff = self.request_func(ServiceType.CLOUD_SERVERS, 'get', 'servers')
         next_eff = resolve_authenticate(eff)
         # When the HTTP response is an auth error, the auth cache is
         # invalidated, by way of the next effect:
@@ -67,7 +67,7 @@ class GetRequestFuncTests(SynchronousTestCase):
         """
         input_json = {"a": 1}
         output_json = {"b": 2}
-        eff = self.request(ServiceType.CLOUD_SERVERS, "get", "servers", data=input_json)
+        eff = self.request_func(ServiceType.CLOUD_SERVERS, "get", "servers", data=input_json)
         next_eff = resolve_authenticate(eff)
         result = resolve_effect(next_eff,
                                 stub_pure_response(json.dumps(output_json)))
@@ -79,7 +79,7 @@ class GetRequestFuncTests(SynchronousTestCase):
         ``json_response`` can be specifies as False to get the plaintext
         response.
         """
-        eff = self.request(ServiceType.CLOUD_SERVERS, "get", "servers", json_response=False)
+        eff = self.request_func(ServiceType.CLOUD_SERVERS, "get", "servers", json_response=False)
         next_eff = resolve_authenticate(eff)
         result = resolve_effect(next_eff, stub_pure_response("foo"))
         self.assertEqual(result, "foo")
