@@ -72,6 +72,24 @@ def check_status(success_codes, result):
     return result
 
 
+def check_response(pred, result):
+    """
+    Ensure that the response is acceptable according to the given predicate.
+    otherwise raise :exc:`APIError`.
+
+    :param pred: A callable that takes a response object and the
+        its content and synchronously returns :data:`True` if
+        the response is good, or :data:`False` if it is bad.
+    :type pred: 2-argument callable
+    :param result: The result of :meth:`Request.perform_effect`.
+    """
+    response, content = result
+    if pred(response, content):
+        return result
+    else:
+        raise APIError(response.code, content, response.headers)
+
+
 def has_code(*codes):
     """
     Return a response success predicate that checks the status code.

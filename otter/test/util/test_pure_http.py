@@ -12,6 +12,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.pure_http import (
     Request, request, check_status, has_code,
+    check_response,
     effect_on_response,
     add_effectful_headers, add_headers, add_effect_on_response, add_bind_root,
     add_content_only, add_error_handling, add_json_response,
@@ -88,6 +89,27 @@ class CheckStatusTests(TestCase):
         response = stub_pure_response("", code=404)
         eff = add_error_handling((200,), stub_request(response))('m', 'u')
         self.assertRaises(APIError, resolve_stubs, eff)
+
+
+class CheckResponseTests(SynchronousTestCase):
+    """Tests :func:`check_response`."""
+    def test_error(self):
+        """
+        :func:`check_response` raises :class:`APIError` if the predicate
+        doesn't like the response.
+        """
+        pred = lambda _response, _content: False
+        result = stub_pure_response(None)
+        self.assertRaises(APIError, check_response, pred, result)
+
+    def test_success(self):
+        """
+        :func:`check_response` returns the value passed into it if the
+        predicate likes the response.
+        """
+        pred = lambda _response, _content: True
+        result = stub_pure_response(None)
+        self.assertIdentical(check_response(pred, result), result)
 
 
 class HasCodeTests(SynchronousTestCase):
