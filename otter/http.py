@@ -27,8 +27,8 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
     :param ICachingAuthenticator authenticator: the caching authenticator
     :param tenant_id: tenant ID.
     :param BoundLog log: info about requests will be logged to this.
-    :param dict service_mapping: A mapping of otter.constants.ServiceType constants
-        to real service names as found in a tenant's catalog.
+    :param dict service_mapping: A mapping of otter.constants.ServiceType
+        constants to real service names as found in a tenant's catalog.
     :param region: The region of the Rackspace services which requests will
         be made to.
     """
