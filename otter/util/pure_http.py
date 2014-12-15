@@ -169,13 +169,14 @@ def add_effect_on_response(effect, codes, request_func):
     return wraps(request_func)(request)
 
 
-def add_error_handling(success_codes, request_func):
+def add_error_handling(pred, request_func):
     """
-    Decorate a request function with response-code checking as per
-    :func:`check_status`.
+    Decorate a request function with response checking as per
+    :func:`check_response`.
     """
+    # TODO: rewrite as a real function
     request = lambda *args, **kwargs: request_func(*args, **kwargs).on(
-        partial(check_status, success_codes))
+        partial(check_response, pred))
     return wraps(request_func)(request)
 
 
