@@ -7,7 +7,8 @@ from effect import Effect
 
 from otter.util.pure_http import (
     request, add_headers, add_effect_on_response, add_error_handling,
-    add_bind_root, add_content_only, add_json_response, add_json_request_data)
+    add_bind_root, add_content_only, add_json_response, add_json_request_data,
+    has_code)
 from otter.util.http import headers as otter_headers
 from otter.auth import public_endpoint_url, Authenticate, InvalidateToken
 
@@ -27,8 +28,8 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
     :param ICachingAuthenticator authenticator: the caching authenticator
     :param tenant_id: tenant ID.
     :param BoundLog log: info about requests will be logged to this.
-    :param dict service_mapping: A mapping of otter.constants.ServiceType constants
-        to real service names as found in a tenant's catalog.
+    :param dict service_mapping: A mapping of otter.constants.ServiceType
+        constants to real service names as found in a tenant's catalog.
     :param region: The region of the Rackspace services which requests will
         be made to.
     """
@@ -73,7 +74,7 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
                 log,
                 add_json_request_data(
                     add_error_handling(
-                        success_codes,
+                        has_code(*success_codes),
                         add_effect_on_response(
                             invalidate_eff,
                             reauth_codes,
