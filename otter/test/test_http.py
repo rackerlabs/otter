@@ -79,7 +79,7 @@ class GetRequestFuncTests(SynchronousTestCase):
 
     def test_no_json_response(self):
         """
-        ``json_response`` can be specifies as False to get the plaintext
+        ``json_response`` can be set to :data:`False` to get the plaintext.
         response.
         """
         eff = self.request_func(ServiceType.CLOUD_SERVERS, "get", "servers", json_response=False)
