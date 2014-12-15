@@ -82,6 +82,7 @@ class CheckStatusTests(TestCase):
         result = check_status((404,),  response)
         self.assertEqual(result, response)
 
+
 class AddErrorHandlingTests(SynchronousTestCase):
     """Tests :func:`add_error_handling`."""
     def test_error(self):
