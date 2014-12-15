@@ -70,7 +70,8 @@ class GetRequestFuncTests(SynchronousTestCase):
         """
         input_json = {"a": 1}
         output_json = {"b": 2}
-        eff = self.request_func(ServiceType.CLOUD_SERVERS, "get", "servers", data=input_json)
+        eff = self.request_func(ServiceType.CLOUD_SERVERS, "GET", "servers",
+                                data=input_json)
         next_eff = resolve_authenticate(eff)
         result = resolve_effect(next_eff,
                                 stub_pure_response(json.dumps(output_json)))
