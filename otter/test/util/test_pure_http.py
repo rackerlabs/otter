@@ -82,12 +82,16 @@ class CheckStatusTests(TestCase):
         result = check_status((404,),  response)
         self.assertEqual(result, response)
 
-    def test_add_error_handling(self):
+class AddErrorHandlingTests(SynchronousTestCase):
+    """Tests :func:`add_error_handling`."""
+    def test_error(self):
         """
-        :func:`add_error_handling` invokes :func:`check_status` as a callback.
+        :func:`add_error_handling` ostensibly invokes :func:`check_response`.
         """
         response = stub_pure_response("", code=404)
-        eff = add_error_handling((200,), stub_request(response))('m', 'u')
+        request = stub_request(response)
+        request_fn = add_error_handling(has_code(200), request)
+        eff = request_fn('GET', '/xyzzy')
         self.assertRaises(APIError, resolve_stubs, eff)
 
 
