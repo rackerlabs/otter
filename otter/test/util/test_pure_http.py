@@ -89,8 +89,7 @@ class AddErrorHandlingTests(SynchronousTestCase):
         :func:`add_error_handling` ostensibly invokes :func:`check_response`.
         """
         response = stub_pure_response("", code=404)
-        request = stub_request(response)
-        request_fn = add_error_handling(has_code(200), request)
+        request_fn = add_error_handling(has_code(200), stub_request(response))
         eff = request_fn('GET', '/xyzzy')
         self.assertRaises(APIError, resolve_stubs, eff)
 
