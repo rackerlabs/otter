@@ -254,7 +254,7 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
             self, 'otter.metrics.get_scaling_group_servers',
             side_effect=lambda rf, server_predicate: (
                 Effect(ConstantIntent(self.tenant_servers[rf]))))
-        self.service_mapping = 'service mapping'
+        self.service_mapping = {ServiceType.CLOUD_SERVERS: 'nova'}
 
     def test_get_all_metrics(self):
         """

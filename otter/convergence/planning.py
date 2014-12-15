@@ -9,7 +9,6 @@ from otter.convergence.model import NodeCondition, ServerState
 from otter.convergence.steps import (
     AddNodesToLoadBalancer,
     ChangeLoadBalancerNode,
-    Convergence,
     CreateServer,
     DeleteServer,
     RemoveFromLoadBalancer,
@@ -158,9 +157,9 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
              timeout=3600):
     """
-    Create a :obj:`Convergence` that indicates how to transition from the state
-    provided by the given parameters to the :obj:`DesiredGroupState` described
-    by ``desired_state``.
+    Create steps that indicate how to transition from the state provided
+    by the given parameters to the :obj:`DesiredGroupState` described by
+    ``desired_state``.
 
     :param DesiredGroupState desired_state: The desired group state.
     :param set servers_with_cheese: a list of :obj:`NovaServer` instances.
@@ -174,7 +173,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     :param float timeout: Number of seconds after which we will delete a server
         in BUILD.
 
-    :rtype: obj:`Convergence`
+    :rtype: :obj:`pbag` of `IStep`
     """
     lbs_by_address = groupby(lambda n: n.address, load_balancer_contents)
 
@@ -236,13 +235,11 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
             server.servicenet_address)
         if server.servicenet_address]
 
-    return Convergence(
-        steps=pbag(create_steps
-                   + scale_down_steps
-                   + delete_error_steps
-                   + delete_timeout_steps
-                   + lb_converge_steps
-                   ))
+    return pbag(create_steps
+                + scale_down_steps
+                + delete_error_steps
+                + delete_timeout_steps
+                + lb_converge_steps)
 
 
 _optimizers = {}
