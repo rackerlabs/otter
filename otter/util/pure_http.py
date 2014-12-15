@@ -178,7 +178,7 @@ def add_error_handling(pred, request_func):
     def wrapped(*args, **kwargs):
         eff = request_func(*args, **kwargs)
         return eff.on(partial(check_response, pred))
-    return wraps(request_func)(request)
+    return wrapped
 
 
 def add_content_only(request_func):
