@@ -40,7 +40,8 @@ class GetRequestFuncTests(SynchronousTestCase):
         authentication before making the request.
         """
         eff = self.request_func(ServiceType.CLOUD_SERVERS, 'get', 'servers')
-        self.assertEqual(eff.intent, Authenticate(self.authenticator, 1, self.log))
+        expected_intent = Authenticate(self.authenticator, 1, self.log)
+        self.assertEqual(eff.intent, expected_intent)
         next_eff = resolve_authenticate(eff)
         # The next effect in the chain is the requested HTTP request,
         # with appropriate auth headers
