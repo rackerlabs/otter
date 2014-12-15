@@ -72,6 +72,20 @@ def check_status(success_codes, result):
     return result
 
 
+def check_response(pred, result):
+    """
+    Ensure that the response is acceptable according to the given predicate.
+    otherwise raise :exc:`APIError`.
+
+    TODO: make the docstring for this actually good
+    """
+    response, content = result
+    if pred(response, content):
+        return result
+    else:
+        raise APIError(response.code, content, response.headers)
+
+
 def has_code(*codes):
     """
     Return a response success predicate that checks the status code.
