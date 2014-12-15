@@ -83,7 +83,8 @@ class GetRequestFuncTests(SynchronousTestCase):
         ``json_response`` can be set to :data:`False` to get the plaintext.
         response.
         """
-        eff = self.request_func(ServiceType.CLOUD_SERVERS, "get", "servers", json_response=False)
+        eff = self.request_func(ServiceType.CLOUD_SERVERS, "GET", "servers",
+                                json_response=False)
         next_eff = resolve_authenticate(eff)
         result = resolve_effect(next_eff, stub_pure_response("foo"))
         self.assertEqual(result, "foo")
