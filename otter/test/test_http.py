@@ -91,7 +91,7 @@ class BindServiceTests(SynchronousTestCase):
     def setUp(self):
         """Save some common parameters."""
         self.log = object()
-        self.request = lambda method, url, headers=None, data=None: (method, url, headers, data)
+        self.request_func = lambda method, url, headers=None, data=None: (method, url, headers, data)
 
     def test_add_bind_service(self):
         """
@@ -100,7 +100,7 @@ class BindServiceTests(SynchronousTestCase):
         """
         request = add_bind_service(fake_service_catalog,
                                    'cloudServersOpenStack', 'DFW', self.log,
-                                   self.request)
+                                   self.request_func)
         self.assertEqual(
             request('get', 'foo'),
             ('get', 'http://dfw.openstack/foo', None, None))
