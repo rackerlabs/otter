@@ -39,7 +39,7 @@ class GetRequestFuncTests(SynchronousTestCase):
         The request function returned from get_request_func performs
         authentication before making the request.
         """
-        eff = self.request_func(ServiceType.CLOUD_SERVERS, 'get', 'servers')
+        eff = self.request_func(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
         expected_intent = Authenticate(self.authenticator, 1, self.log)
         self.assertEqual(eff.intent, expected_intent)
         next_eff = resolve_authenticate(eff)
@@ -47,14 +47,14 @@ class GetRequestFuncTests(SynchronousTestCase):
         # with appropriate auth headers
         self.assertEqual(
             next_eff.intent,
-            Request(method='get', url='http://dfw.openstack/servers',
+            Request(method='GET', url='http://dfw.openstack/servers',
                     headers=headers('token'), log=self.log))
 
     def test_invalidate_on_auth_error_code(self):
         """
         Upon authentication error, the auth cache is invalidated.
         """
-        eff = self.request_func(ServiceType.CLOUD_SERVERS, 'get', 'servers')
+        eff = self.request_func(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
         next_eff = resolve_authenticate(eff)
         # When the HTTP response is an auth error, the auth cache is
         # invalidated, by way of the next effect:
