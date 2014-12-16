@@ -41,7 +41,7 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
     def service_request(service_type, method, url, headers=None, data=None,
                         log=default_log,
                         reauth_codes=(401, 403),
-                        success_codes=(200,),
+                        success_pred=has_code(200),
                         json_response=True):
         # TODO: We may want to parameterize some retry options *here*, but only
         # if it's really necessary.
@@ -74,7 +74,7 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
                 log,
                 add_json_request_data(
                     add_error_handling(
-                        has_code(*success_codes),
+                        success_pred,
                         add_effect_on_response(
                             invalidate_eff,
                             reauth_codes,
