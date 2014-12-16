@@ -26,13 +26,11 @@ from toolz.curried import groupby, filter, get_in
 from toolz.dicttoolz import merge
 from toolz.functoolz import identity
 
-from otter.auth import generate_authenticator, authenticate_user, extract_token
+from otter.auth import generate_authenticator
 
-from otter.auth import public_endpoint_url
-from otter.constants import get_service_mapping
+from otter.constants import get_service_mapping, ServiceType
 from otter.http import get_request_func
 from otter.convergence.gathering import get_scaling_group_servers
-from otter.util.http import append_segments, headers, check_success
 from otter.util.fp import predicate_all
 from otter.log import log as otter_log
 
@@ -187,9 +185,8 @@ def get_all_metrics(cass_groups, authenticator, service_mapping, region,
     return d.addCallback(lambda x: reduce(operator.add, x, []))
 
 
-@defer.inlineCallbacks
-def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual,
-                         total_pending, _treq=None):
+def add_to_cloud_metrics(request_func, conf, region, total_desired, total_actual,
+                         total_pending, log=None):
     """
     Add total number of desired, actual and pending servers of a region to Cloud metrics
 
@@ -204,31 +201,15 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
 
     :return: `Deferred` with None
     """
-    # TODO: Have generic authentication function that auths, gets the service URL
-    # and returns the token
-    resp = yield authenticate_user(identity_url, conf['username'], conf['password'],
-                                   log=metrics_log)
-    token = extract_token(resp)
-
-    if _treq is None:  # pragma: no cover
-        from otter.util import logging_treq
-        _treq = logging_treq
-
-    url = public_endpoint_url(resp['access']['serviceCatalog'], conf['service'], conf['region'])
-
     metric_part = {'collectionTime': int(time.time() * 1000),
                    'ttlInSeconds': conf['ttl']}
     totals = [('desired', total_desired), ('actual', total_actual), ('pending', total_pending)]
-    d = _treq.post(
-        append_segments(url, 'ingest'), headers=headers(token),
-        data=json.dumps([merge(metric_part,
-                               {'metricValue': value,
-                                'metricName': '{}.{}'.format(region, metric)})
-                         for metric, value in totals]),
-        log=metrics_log)
-    d.addCallback(check_success, [200], _treq=_treq)
-    d.addCallback(_treq.content)
-    yield d
+    return request_func(ServiceType.CLOUD_METRICS_INGEST, 'POST', 'ingest',
+                        data=[merge(metric_part,
+                                    {'metricValue': value,
+                                     'metricName': '{}.{}'.format(region, metric)})
+                              for metric, value in totals],
+                        log=log)
 
 
 def connect_cass_servers(reactor, config):
@@ -274,9 +255,13 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
     if _print:
         print('total desired: {}, total actual: {}, total pending: {}'.format(
             total_desired, total_actual, total_pending))
-    yield add_to_cloud_metrics(config['metrics'], config['identity']['url'],
-                               config['region'], total_desired, total_actual,
-                               total_pending)
+
+    # Add to cloud metrics
+    req_func = get_request_func(authenticator, config['metrics']['tenant_id'],
+                                metrics_log, service_mapping, config['metrics']['region'])
+    eff = add_to_cloud_metrics(req_func, config['metrics'], config['region'],
+                               total_desired, total_actual, total_pending, log=metrics_log)
+    yield perform(reactor, eff)
     metrics_log.msg('added to cloud metrics')
     if _print:
         print('added to cloud metrics')
@@ -300,7 +285,7 @@ class Options(usage.Options):
         Parse config file and add nova service name
         """
         self.open = getattr(self, 'open', None) or open  # For testing
-        # TODO: This is hard-coded here and in tap/api.py. Should be there in
+        # TODO: This is hard-coded here and in tap/api.py. Should be there from config only
         # Inject nova service name in case it is not there in config
         self.update({'cloudServersOpenStack': 'cloudServersOpenStack'})
         self.update(json.load(self.open(self['config'])))
