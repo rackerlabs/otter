@@ -111,7 +111,7 @@ version="5.0-extension RaxBook-2.0" xml:id="autoscale-releasenotes">
             </listitem>
             <listitem>
                 <para>Get reference information per programming language in the </para>
-                <para><link xlink:href="https://developer.rackspace.com/docs/auto-scale/getting-started//">
+                <para><link xlink:href="https://developer.rackspace.com/docs/auto-scale/getting-started/">
                     <emphasis role="italic">Rackspace Auto Scale Quick Start Guide</emphasis></link>.</para>
             </listitem>    
         </itemizedlist>
