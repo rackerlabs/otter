@@ -343,7 +343,4 @@ if __name__ == '__main__':
     # TODO: This should come from config only
     config['cloudServersOpenStack'] = 'cloudServersOpenStack'
     # TODO: Take _print as cmd-line arg and pass it.
-    from twisted.python.log import startLoggingWithObserver
-    from otter.log.setup import observer_factory_debug
-    startLoggingWithObserver(observer_factory_debug())
     task.react(collect_metrics, (config, None, None, True))
