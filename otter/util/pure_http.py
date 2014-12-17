@@ -94,6 +94,9 @@ def has_code(*codes):
     """
     Return a response success predicate that checks the status code.
 
+    If this function is called multiple times with the same argument,
+    the results will compare equal.
+
     :param codes: Status codes to be considered successful.
     :type codes: ints
     :return: Response success predicate that checks for these codes.
