@@ -54,6 +54,7 @@ def get_all_server_details(request_func, batch_size=100):
         else:
             more_eff = get_server_details(servers[-1]['id'])
             return more_eff.on(lambda more_servers: servers + more_servers)
+
     return get_server_details(None)
 
 
