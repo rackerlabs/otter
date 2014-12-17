@@ -11,6 +11,7 @@ from pyrsistent import pmap
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
+from otter.util.pure_http import has_code
 from otter.util.timestamp import now
 from otter.convergence.composition import execute_convergence, tenant_is_enabled
 
@@ -55,7 +56,7 @@ class ExecConvergenceTests(SynchronousTestCase):
              'service_type': ServiceType.CLOUD_LOAD_BALANCERS,
              'data': {'nodes': mock.ANY},
              'method': 'POST',
-             'success_codes': (200,)})
+             'success_pred': has_code(200)})
         # separate check for nodes as it can be in any order but content is unique
         self.assertEqual(
             set(map(pmap, eff.intent.effects[0].intent['data']['nodes'])),
