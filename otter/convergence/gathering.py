@@ -55,7 +55,7 @@ def get_all_server_details(request_func, batch_size=100):
             more_eff = get_server_details(servers[-1]['id'])
             return more_eff.on(lambda more_servers: servers + more_servers)
 
-    return get_server_details(None)
+    return get_server_details(marker=None)
 
 
 def get_scaling_group_servers(request_func, server_predicate=identity):
