@@ -9,6 +9,7 @@ from functools import partial, wraps
 from effect import Effect
 from characteristic import attributes
 from toolz.dicttoolz import merge
+from toolz.functoolz import memoize
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 from otter.util import logging_treq
@@ -90,9 +91,13 @@ def check_response(pred, result):
         raise APIError(response.code, content, response.headers)
 
 
+@memoize
 def has_code(*codes):
     """
     Return a response success predicate that checks the status code.
+
+    If this function is called multiple times with the same argument,
+    the results will compare equal.
 
     :param codes: Status codes to be considered successful.
     :type codes: ints
