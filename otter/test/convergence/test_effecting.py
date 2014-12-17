@@ -1,14 +1,12 @@
 """Tests for convergence effecting."""
 from characteristic import attributes
-
 from effect import parallel
-
-from twisted.trial.unittest import SynchronousTestCase
-
 from otter.constants import ServiceType
 from otter.convergence.effecting import _reqs_to_effect
 from otter.convergence.steps import Request
+from otter.http import get_request_func
 from otter.util.pure_http import has_code
+from twisted.trial.unittest import SynchronousTestCase
 
 
 @attributes(["service_type", "method", "url", "headers", "data", "success_pred"],
