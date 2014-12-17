@@ -73,7 +73,9 @@ def get_scaling_group_servers(request_func, server_predicate=identity):
     def group_id(s):
         return s['metadata']['rax:auto_scaling_group_id']
 
-    servers_apply = compose(groupby(group_id), filter(server_predicate), filter(has_group_id))
+    servers_apply = compose(groupby(group_id),
+                            filter(server_predicate),
+                            filter(has_group_id))
 
     eff = get_all_server_details(request_func)
     return eff.on(servers_apply)
