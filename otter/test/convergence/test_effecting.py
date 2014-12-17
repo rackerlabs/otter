@@ -106,7 +106,7 @@ class RequestsToEffectTests(SynchronousTestCase):
                              url="/whatever/something/else",
                              headers=None,
                              data=None,
-                             success_codes=(231,)),
+                             success_pred=has_code(231)),
             _PureRequestStub(service_type=ServiceType.CLOUD_SERVERS,
                              method="POST",
                              url="/xyzzy",
