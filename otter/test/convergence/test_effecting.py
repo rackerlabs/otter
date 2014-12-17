@@ -8,10 +8,11 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.constants import ServiceType
 from otter.convergence.effecting import _reqs_to_effect
 from otter.convergence.steps import Request
+from otter.util.pure_http import has_code
 
 
-@attributes(["service_type", "method", "url", "headers", "data", "success_codes"],
-            defaults={"success_codes": (200,)})
+@attributes(["service_type", "method", "url", "headers", "data", "success_pred"],
+            defaults={"success_pred": has_code(200)})
 class _PureRequestStub(object):
     """
     A bound request stub, suitable for testing.
