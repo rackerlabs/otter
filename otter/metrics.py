@@ -285,9 +285,6 @@ class Options(usage.Options):
         Parse config file and add nova service name
         """
         self.open = getattr(self, 'open', None) or open  # For testing
-        # TODO: This is hard-coded here and in tap/api.py. Should be there from config only
-        # Inject nova service name in case it is not there in config
-        self.update({'cloudServersOpenStack': 'cloudServersOpenStack'})
         self.update(json.load(self.open(self['config'])))
 
 
@@ -340,7 +337,5 @@ def makeService(config):
 
 if __name__ == '__main__':
     config = json.load(open(sys.argv[1]))
-    # TODO: This should come from config only
-    config['cloudServersOpenStack'] = 'cloudServersOpenStack'
     # TODO: Take _print as cmd-line arg and pass it.
     task.react(collect_metrics, (config, None, None, True))
