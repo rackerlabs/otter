@@ -7,6 +7,7 @@ from testtools import TestCase
 from effect.testing import StubIntent, resolve_stubs
 from effect.twisted import perform
 from effect import Effect, ConstantIntent, FuncIntent
+from itertools import starmap
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -133,6 +134,20 @@ class HasCodeTests(SynchronousTestCase):
         self.assertTrue(check_for_code(204))
         self.assertFalse(check_for_code(400))
         self.assertFalse(check_for_code(500))
+
+    def test_equality(self):
+        """
+        Return values from multiple calls to :func:`has_code` have correct
+        equality semantics.
+        """
+        a, b, c, d = starmap(has_code, [(200,), (200,), (200, 204), (400,)])
+
+        self.assertEqual(a, b)
+        self.assertNotEqual(a, c)
+        self.assertNotEqual(a, d)
+        self.assertNotEqual(b, c)
+        self.assertNotEqual(b, d)
+        self.assertNotEqual(c, d)
 
 
 class AddEffectfulHeadersTest(TestCase):
