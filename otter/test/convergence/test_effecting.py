@@ -47,7 +47,7 @@ class RequestsToEffectTests(SynchronousTestCase):
                              url="/whatever",
                              headers=None,
                              data=None,
-                             success_codes=(999,))]
+                             success_pred=has_code(999))]
         self.assertCompileTo(conv_requests, expected_effects)
 
     def test_multiple_requests(self):
