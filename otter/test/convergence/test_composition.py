@@ -54,7 +54,8 @@ class ExecConvergenceTests(SynchronousTestCase):
             {'url': 'loadbalancers/23', 'headers': None,
              'service_type': ServiceType.CLOUD_LOAD_BALANCERS,
              'data': {'nodes': mock.ANY},
-             'method': 'POST', 'success_codes': (200,)})
+             'method': 'POST',
+             'success_codes': (200,)})
         # separate check for nodes as it can be in any order but content is unique
         self.assertEqual(
             set(map(pmap, eff.intent.effects[0].intent['data']['nodes'])),
