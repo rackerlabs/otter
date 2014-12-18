@@ -2,6 +2,7 @@
 from characteristic import attributes, NOTHING
 from effect import parallel
 from inspect import getargspec
+from mock import ANY
 from otter.constants import ServiceType
 from otter.convergence.effecting import _reqs_to_effect
 from otter.convergence.steps import Request
@@ -9,9 +10,14 @@ from otter.http import get_request_func
 from otter.util.pure_http import has_code
 from twisted.trial.unittest import SynchronousTestCase
 
-
-@attributes(["service_type", "method", "url", "headers", "data", "success_pred"],
-            defaults={"success_pred": has_code(200)})
+@attributes(["service_type", "method", "url", "headers", "data", "log",
+             "reauth_codes", "success_pred", "json_response"],
+            defaults={"headers": None,
+                      "data": None,
+                      "log": ANY,
+                      "reauth_codes": (401, 403),
+                      "success_pred": has_code(200),
+                      "json_response": True})
 class _PureRequestStub(object):
     """
     A bound request stub, suitable for testing.
