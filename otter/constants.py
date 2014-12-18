@@ -2,8 +2,6 @@
 
 from twisted.python.constants import Names, NamedConstant
 
-from toolz.dicttoolz import get_in
-
 
 class ServiceType(Names):
     """Constants representing Rackspace cloud services."""
