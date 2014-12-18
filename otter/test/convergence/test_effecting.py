@@ -1,6 +1,7 @@
 """Tests for convergence effecting."""
-from characteristic import attributes
+from characteristic import attributes, NOTHING
 from effect import parallel
+from inspect import getargspec
 from otter.constants import ServiceType
 from otter.convergence.effecting import _reqs_to_effect
 from otter.convergence.steps import Request
@@ -15,6 +16,23 @@ class _PureRequestStub(object):
     """
     A bound request stub, suitable for testing.
     """
+
+
+class PureRequestStubTests(SynchronousTestCase):
+    def test_signature_and_defaults(self):
+        """
+        Compare the test double to the real thing.
+        """
+        authenticator, log, = object(), object()
+        request_func = get_request_func(authenticator, 1234, log, {}, "XYZ")
+        args, _, _, defaults = getargspec(request_func)
+        characteristic_attrs = _PureRequestStub.characteristic_attributes
+        self.assertEqual(set(a.name for a in characteristic_attrs), set(args))
+        characteristic_defaults = {a.name: a.default_value
+                                   for a in characteristic_attrs
+                                   if a.default_value is not Nothing}
+        defaults_by_name = dict(zip(reversed(args), reversed(defaults)))
+        self.assertEqual(characteristic_defaults, defaults_by_name)
 
 
 class RequestsToEffectTests(SynchronousTestCase):
