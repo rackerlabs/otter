@@ -30,7 +30,7 @@ class PureRequestStubTests(SynchronousTestCase):
         self.assertEqual(set(a.name for a in characteristic_attrs), set(args))
         characteristic_defaults = {a.name: a.default_value
                                    for a in characteristic_attrs
-                                   if a.default_value is not Nothing}
+                                   if a.default_value is not NOTHING}
         defaults_by_name = dict(zip(reversed(args), reversed(defaults)))
         self.assertEqual(characteristic_defaults, defaults_by_name)
 
