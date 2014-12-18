@@ -62,17 +62,9 @@ class Options(usage.Options):
         """
         Merge our commandline arguments with our config file.
         """
-        # Inject some default values into the config.  Right now this is
-        # only used to support distinguishing between staging and production.
-        self.update({
-            'regionOverrides': {},
-            'cloudServersOpenStack': 'cloudServersOpenStack',
-            'cloudLoadBalancers': 'cloudLoadBalancers',
-            'rackconnect': 'rackconnect'
-        })
-
         self.update(jsonfig.from_path(self['config']))
 
+        # TODO: #846
         # The staging service catalog has some unfortunate differences
         # from the production one, so these are here to hint at the
         # correct ocnfiguration for staging.
