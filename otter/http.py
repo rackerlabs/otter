@@ -121,19 +121,19 @@ def service_request(
 
     :param otter.constants.ServiceType service_type: The service against
         which the request should be made.
-    :param bytes method: as :func:`request`.
-    :param url: as :func:`request`.
-    :param dict headers: as :func:`request`, but will have
-        authentication headers added.
-    :param data: JSON-able object.
-    :param log: as :func:`request`.
+    :param bytes method: HTTP method
+    :param url: partial URL (appended to service endpoint)
+    :param dict headers: base headers; will have auth headers added.
+    :param data: JSON-able object or None.
+    :param log: log to send request info to.
     :param sequence success_codes: HTTP codes to consider successful.
     :param sequence reauth_codes: HTTP codes upon which to invalidate the
         auth cache.
     :param bool json_response: Specifies whether the response should be
         parsed as JSON.
 
-    :raise APIError: When the response HTTP code is not in success_codes.
+    :raise APIError: Raised asynchronously when the response HTTP code is not in
+        success_codes.
     :return: Effect of :obj:`ServiceRequest`, resulting in a JSON-parsed HTTP
         response body.
     """
