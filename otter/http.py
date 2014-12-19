@@ -153,3 +153,48 @@ def service_request(
              "log", "reauth_codes", "success_codes", "json_response"])
 class ServiceRequest(object):
     """A request to a Rackspace/OpenStack service."""
+
+
+def concretize_service_request(
+        authenticator, tenant_id, log, service_mapping, region,
+        service_request):
+    """
+    Translate a high-level :obj:`ServiceRequest` into a low-level :obj:`Effect`
+    of :obj:`pure_http.Request`.
+
+    :param ICachingAuthenticator authenticator: the caching authenticator
+    :param tenant_id: tenant ID.
+    :param BoundLog log: info about requests will be logged to this.
+    :param dict service_mapping: A mapping of otter.constants.ServiceType
+        constants to real service names as found in a tenant's catalog.
+    :param region: The region of the Rackspace services which requests will
+        be made to.
+    """
+    auth_eff = Effect(Authenticate(authenticator, tenant_id, log))
+    invalidate_eff = Effect(InvalidateToken(authenticator, tenant_id))
+    if service_request.log is not None:
+        log = service_request.log
+
+    def got_auth((token, catalog)):
+        request_ = add_bind_service(
+            catalog,
+            service_mapping[service_request.service_type],
+            region,
+            log,
+            add_json_request_data(
+                add_error_handling(
+                    has_code(*service_request.success_codes),
+                    add_effect_on_response(
+                        invalidate_eff,
+                        service_request.reauth_codes,
+                        add_headers(otter_headers(token), request)))))
+        if service_request.json_response:
+            request_ = add_json_response(request_)
+        request_ = add_content_only(request_)
+        return request_(
+            service_request.method,
+            service_request.url,
+            headers=service_request.headers,
+            data=service_request.data,
+            log=log)
+    return auth_eff.on(got_auth)

@@ -10,7 +10,12 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.auth import Authenticate, InvalidateToken
 from otter.constants import ServiceType
 from otter.util.http import headers, APIError
-from otter.http import get_request_func, add_bind_service, service_request, ServiceRequest
+from otter.http import (
+    ServiceRequest,
+    add_bind_service,
+    concretize_service_request,
+    get_request_func,
+    service_request)
 from otter.test.utils import stub_pure_response
 from otter.util.pure_http import Request
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
@@ -133,3 +138,77 @@ class ServiceRequestTests(SynchronousTestCase):
                 )
             )
         )
+
+
+class PerformServiceRequestTests(SynchronousTestCase):
+    """Tests for :func:`concretize_service_request`."""
+    def setUp(self):
+        """Save some common parameters."""
+        self.log = object()
+        self.authenticator = object()
+        self.service_mapping = {ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'}
+        self.svcreq = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers').intent
+
+    def _concrete(self, svcreq):
+        """Call :func:`concretize_service_request` with premade test objects."""
+        return concretize_service_request(
+            self.authenticator, 1, self.log, self.service_mapping, 'DFW',
+            svcreq
+        )
+
+    def test_get_request_func_authenticates(self):
+        """
+        The request function returned from get_request_func performs
+        authentication before making the request.
+        """
+        eff = self._concrete(self.svcreq)
+        expected_intent = Authenticate(self.authenticator, 1, self.log)
+        self.assertEqual(eff.intent, expected_intent)
+        next_eff = resolve_authenticate(eff)
+        # The next effect in the chain is the requested HTTP request,
+        # with appropriate auth headers
+        self.assertEqual(
+            next_eff.intent,
+            Request(method='GET', url='http://dfw.openstack/servers',
+                    headers=headers('token'), log=self.log))
+
+    def test_invalidate_on_auth_error_code(self):
+        """
+        Upon authentication error, the auth cache is invalidated.
+        """
+        eff = self._concrete(self.svcreq)
+        next_eff = resolve_authenticate(eff)
+        # When the HTTP response is an auth error, the auth cache is
+        # invalidated, by way of the next effect:
+        invalidate_eff = resolve_effect(next_eff, stub_pure_response("", 401))
+        expected_intent = InvalidateToken(self.authenticator, 1)
+        self.assertEqual(invalidate_eff.intent, expected_intent)
+        self.assertRaises(APIError, resolve_effect, invalidate_eff, None)
+
+    def test_json(self):
+        """
+        JSON-serializable requests are dumped before being sent, and
+        JSON-serialized responses are parsed.
+        """
+        input_json = {"a": 1}
+        output_json = {"b": 2}
+        svcreq = service_request(ServiceType.CLOUD_SERVERS, "GET", "servers",
+                                 data=input_json).intent
+        eff = self._concrete(svcreq)
+        next_eff = resolve_authenticate(eff)
+        result = resolve_effect(next_eff,
+                                stub_pure_response(json.dumps(output_json)))
+        self.assertEqual(next_eff.intent.data, json.dumps(input_json))
+        self.assertEqual(result, output_json)
+
+    def test_no_json_response(self):
+        """
+        ``json_response`` can be set to :data:`False` to get the plaintext.
+        response.
+        """
+        svcreq = service_request(ServiceType.CLOUD_SERVERS, "GET", "servers",
+                                 json_response=False).intent
+        eff = self._concrete(svcreq)
+        next_eff = resolve_authenticate(eff)
+        result = resolve_effect(next_eff, stub_pure_response("foo"))
+        self.assertEqual(result, "foo")
