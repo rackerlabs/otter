@@ -3,6 +3,7 @@ Integration point for HTTP clients in otter.
 """
 from functools import wraps
 
+from characteristic import attributes
 from effect import Effect
 
 from otter.util.pure_http import (
@@ -15,6 +16,8 @@ from otter.auth import public_endpoint_url, Authenticate, InvalidateToken
 
 def get_request_func(authenticator, tenant_id, log, service_mapping, region):
     """
+    Deprecated. :func:`service_request` should be used instead.
+
     Return a pure_http.Request-returning function extended with:
 
     - authentication for Rackspace APIs
@@ -104,3 +107,49 @@ def add_bind_service(catalog, service_name, region, log, request_func):
         bound_request = add_bind_root(endpoint, request_func)
         return bound_request(*args, **kwargs)
     return service_request
+
+
+def service_request(
+        service_type, method, url, headers=None, data=None,
+        log=None,
+        reauth_codes=(401, 403),
+        success_codes=(200,),
+        json_response=True):
+    """
+    Make an HTTP request to a Rackspace service, with a bunch of awesome
+    behavior!
+
+    :param otter.constants.ServiceType service_type: The service against
+        which the request should be made.
+    :param bytes method: as :func:`request`.
+    :param url: as :func:`request`.
+    :param dict headers: as :func:`request`, but will have
+        authentication headers added.
+    :param data: JSON-able object.
+    :param log: as :func:`request`.
+    :param sequence success_codes: HTTP codes to consider successful.
+    :param sequence reauth_codes: HTTP codes upon which to invalidate the
+        auth cache.
+    :param bool json_response: Specifies whether the response should be
+        parsed as JSON.
+
+    :raise APIError: When the response HTTP code is not in success_codes.
+    :return: Effect of :obj:`ServiceRequest`, resulting in a JSON-parsed HTTP
+        response body.
+    """
+    return Effect(ServiceRequest(
+        service_type=service_type,
+        method=method,
+        url=url,
+        headers=headers,
+        data=data,
+        log=log,
+        reauth_codes=reauth_codes,
+        success_codes=success_codes,
+        json_response=json_response))
+
+
+@attributes(["service_type", "method", "url", "headers", "data",
+             "log", "reauth_codes", "success_codes", "json_response"])
+class ServiceRequest(object):
+    """A request to a Rackspace/OpenStack service."""
