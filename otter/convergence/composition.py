@@ -17,21 +17,22 @@ def execute_convergence(request_func, group_id, desired_group_state,
     """
     Execute convergence. This function will do following:
     1. Get state of the nova, CLB and RCv3.
-    2. Call `converge` with above info and get steps to execute
-    3. Execute these steps
+    2. Get a plan for convergence
+    3. Return an Effect representing the execution of the steps in the plan.
+
     This is in effect single cycle execution. A layer above this is expected
     to keep calling this until this function returns False
 
     :param request_func: Tenant bound request function
     :param bytes group_id: Tenant's group
+    :param DesiredGroupState desired_group_state: the desired state
 
-    :return: Effect with Bool specifying if it should be called again
+    :return: Effect of Bool specifying if the effect should be performed again
     :rtype: :class:`effect.Effect`
     """
     eff = get_all_convergence_data(request_func, group_id)
     conv_eff = eff.on(
         lambda (servers, lb_nodes): plan(desired_group_state, servers, lb_nodes, time.time()))
-    # TODO: Do request specific throttling. For ex create only 3 servers at a time
     return conv_eff.on(partial(steps_to_effect, request_func)).on(bool)
 
 

@@ -303,7 +303,10 @@ def optimize_steps(steps):
 
 
 def plan(desired_group_state, servers, lb_nodes, now):
-    """Get an optimized convergence plan."""
+    """
+    Get an optimized convergence plan.
+
+    Takes the same arguments as :func:`converge`.
+    """
     steps = converge(desired_group_state, servers, lb_nodes, now)
     return optimize_steps(steps)
-
