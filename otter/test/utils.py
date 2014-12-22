@@ -5,10 +5,12 @@ from functools import partial
 import json
 import mock
 import os
+import sys
 import treq
 
-from effect import guard
-from effect.testing import resolve_effect, resolve_stubs
+from effect.testing import resolve_effect, resolve_stubs as eff_resolve_stubs
+from effect.twisted import legacy_dispatcher
+from effect import ComposedDispatcher, base_dispatcher
 
 from zope.interface import implementer, directlyProvides
 from zope.interface.verify import verifyObject
@@ -599,5 +601,19 @@ def resolve_retry_stubs(eff):
     separately to determine that the policy is as expected.
     """
     assert type(eff.intent) is Retry
-    is_error, intermediate_result = guard(resolve_stubs, eff.intent.effect)
+    try:
+        intermediate_result = resolve_stubs(eff.intent.effect)
+        is_error = False
+    except:
+        intermediate_result = sys.exc_info()
+        is_error = True
     return resolve_effect(eff, intermediate_result, is_error=is_error)
+
+
+def resolve_stubs(eff):
+    """
+    Invoke :func:`effect.testing.resolve_stubs` with the base and legacy
+    dispatchers from Effect.
+    """
+    dispatcher = ComposedDispatcher([legacy_dispatcher, base_dispatcher])
+    return eff_resolve_stubs(dispatcher, eff)
