@@ -7,11 +7,13 @@ from testtools import TestCase
 from effect.testing import StubIntent, resolve_stubs
 from effect.twisted import perform
 from effect import Effect, ConstantIntent, FuncIntent
+from itertools import starmap
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.pure_http import (
-    Request, request, check_status,
+    Request, request, check_status, has_code,
+    check_response,
     effect_on_response,
     add_effectful_headers, add_headers, add_effect_on_response, add_bind_root,
     add_content_only, add_error_handling, add_json_response,
@@ -81,13 +83,71 @@ class CheckStatusTests(TestCase):
         result = check_status((404,),  response)
         self.assertEqual(result, response)
 
-    def test_add_error_handling(self):
+
+class AddErrorHandlingTests(SynchronousTestCase):
+    """Tests :func:`add_error_handling`."""
+    def test_error(self):
         """
-        :func:`add_error_handling` invokes :func:`check_status` as a callback.
+        :func:`add_error_handling` ostensibly invokes :func:`check_response`.
         """
         response = stub_pure_response("", code=404)
-        eff = add_error_handling((200,), stub_request(response))('m', 'u')
+        request_fn = add_error_handling(has_code(200), stub_request(response))
+        eff = request_fn('GET', '/xyzzy')
         self.assertRaises(APIError, resolve_stubs, eff)
+
+
+class CheckResponseTests(SynchronousTestCase):
+    """Tests :func:`check_response`."""
+    def test_error(self):
+        """
+        :func:`check_response` raises :class:`APIError` if the predicate
+        doesn't like the response.
+        """
+        pred = lambda _response, _content: False
+        result = stub_pure_response(None)
+        self.assertRaises(APIError, check_response, pred, result)
+
+    def test_success(self):
+        """
+        :func:`check_response` returns the value passed into it if the
+        predicate likes the response.
+        """
+        pred = lambda _response, _content: True
+        result = stub_pure_response(None)
+        self.assertIdentical(check_response(pred, result), result)
+
+
+class HasCodeTests(SynchronousTestCase):
+    """Tests :func:`has_code`."""
+
+    def test_has_code(self):
+        """
+        The predicate returns :data:`True` if the given response is in the
+        successful code list, :data:`False` otherwise.
+        """
+        pred = has_code(200, 204)
+
+        def check_for_code(code):
+            return pred(*stub_pure_response(None, code))
+
+        self.assertTrue(check_for_code(200))
+        self.assertTrue(check_for_code(204))
+        self.assertFalse(check_for_code(400))
+        self.assertFalse(check_for_code(500))
+
+    def test_equality(self):
+        """
+        Return values from multiple calls to :func:`has_code` have correct
+        equality semantics.
+        """
+        a, b, c, d = starmap(has_code, [(200,), (200,), (200, 204), (400,)])
+
+        self.assertEqual(a, b)
+        self.assertNotEqual(a, c)
+        self.assertNotEqual(a, d)
+        self.assertNotEqual(b, c)
+        self.assertNotEqual(b, d)
+        self.assertNotEqual(c, d)
 
 
 class AddEffectfulHeadersTest(TestCase):

@@ -9,7 +9,6 @@ from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
-from otter.constants import get_service_mapping
 from otter.models.interface import NoSuchScalingGroupError
 from otter.http import get_request_func
 from otter.log import audit
@@ -83,11 +82,12 @@ class SupervisorService(object, Service):
     """
     name = "supervisor"
 
-    def __init__(self, authenticator, region, coiterate):
+    def __init__(self, authenticator, region, coiterate, service_mapping):
         self.authenticator = authenticator
         self.region = region
         self.coiterate = coiterate
         self.deferred_pool = DeferredPool()
+        self.service_mapping = service_mapping
 
     def _get_request_func(self, log, scaling_group):
         """
@@ -96,7 +96,7 @@ class SupervisorService(object, Service):
         """
         tenant_id = scaling_group.tenant_id
         request_func = get_request_func(self.authenticator, tenant_id,
-                                        log, get_service_mapping(config_value),
+                                        log, self.service_mapping,
                                         self.region)
         lb_region = config_value('regionOverrides.cloudLoadBalancers')
         request_func.lb_region = lb_region or self.region

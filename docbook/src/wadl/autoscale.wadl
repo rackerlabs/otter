@@ -34,7 +34,8 @@
         xml:id="autoscale-v1">
         <resource id="version" path="v1.0/"
             rax:roles="admin autoscale:admin autoscale:service-admin">
-            <!-- GROUPS resource -->
+            
+<!-- GROUPS resources -->
             <resource id="tenantid" path="{tenantId}">
                 <param name="tenantId" type="xsd:string"
                     required="true" style="template">
@@ -90,7 +91,8 @@
                         <resource id="resume" path="resume">
                             <method href="#resumeGroup"/>
                         </resource>
-                        <!-- POLICIES resource -->
+                        
+<!-- POLICIES resource -->
                         <resource id="policies" path="policies">
                             <method href="#getPolicies"/>
                             <method href="#createPolicies"/>
@@ -149,9 +151,10 @@
             </resource>
         </resource>
     </resources>
-    <!-- ======================================================================================= -->
-    <!-- Methods -->
-    <!-- ======================================================================================= -->
+    
+<!-- ======================================================================================= -->
+<!-- Methods -->
+<!-- ======================================================================================= -->
     <method id="createGroup" name="POST">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
             title="Create scaling group">
@@ -176,9 +179,10 @@
                     <para>A launch configuration defines what to do
                         when a new server is created, including
                         information about the server image, the flavor
-                        of the server image, and the load balancer to
+                        of the server image, and the cloud load balancer or 
+                        RackConnectV3 load balancer pool to
                         which to connect. You must set the
-                        <code>type</code> parameter to <code>launch_server</code>.
+                        <parameter>type</parameter> parameter to <parameter>launch_server</parameter>.
                     </para></wadl:doc>
             </param>
             <param style="plain" name="loadBalancers" required="false"
@@ -186,39 +190,45 @@
                 path="$.launchConfiguration.args.loadBalancers">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
-                    <para>One or more load balancers to which to add
+                    <para>One or more cloud load balancers or RackConnectV3 load balancer pools to which to add
                         new servers. All servers are added to these
                         load balancers with the IP addresses of their
                         ServiceNet network. All servers are enabled
                         and equally weighted. Any new servers that are
                         not connected to the ServiceNet network are
-                        not added to any load
-                    balancers.</para></wadl:doc>
+                        not added to any load balancers.</para></wadl:doc>
             </param>
             <param style="plain" name="port" required="true"
                 type="integer"
                 path="$.launchConfiguration.args.loadBalancers.[*].port">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN"><para>The port number of the service
-                        (on the new servers) to use for this
-                        particular load balancer. In most cases, this
-                        port number is 80.</para></wadl:doc>
+                    xml:lang="EN"><para>The port number of the service (on the new servers) to use for this
+                        particular cloud load balancer. In most cases, this port number is 80.</para>
+                    <note>This parameter is NOT required if you are using RackConnectV3 and should be left empty. </note></wadl:doc>
             </param>
             <param style="plain" name="loadBalancerId" required="true"
-                type="integer"
+                type="string"
                 path="$.launchConfiguration.args.loadBalancers.[*].loadBalancerId">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN"><para>The ID of the load balancer to
-                        which to add new servers.</para></wadl:doc>
+                    xml:lang="EN"><para>The ID of the cloud load balancer, or RackConnectV3 load balancer pool, to which new
+                        servers are added. For cloud load balancers set the <emphasis>ID as an integer</emphasis>, 
+                        for RackConnectV3 set the <emphasis>UUID as a string</emphasis>. 
+                        NOTE that when using RackConnectV3, this value is supplied to you by Rackspace Support 
+                        after they configure your load balancer pool. </para></wadl:doc>
+            </param>
+            <param style="plain" name="Type" required="true"
+                type="string"
+                path="$.launchConfiguration.args.loadBalancers.[*].type">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>Must be set to <parameter>"RackConnectV3"</parameter> if you are using RackConnectV3.</para>
+                <note>This parameter is NOT required if you are using cloud load balancers and not using RackConnectV3. </note></wadl:doc>
             </param>
             <param style="plain" name="server" required="true"
                 type="object" path="$.launchConfiguration.args.server">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The attributes that Auto Scale
-                        uses to create a new server. For more
-                        information, see <link
-                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html"
-                            >Create Server</link>. The attributes that
+                        uses to create a new server. 
+                        The attributes that
                         you specify for the server entity apply to all
                         new servers in the scaling group, including
                         the server name.</para></wadl:doc>
@@ -245,17 +255,7 @@
                         image, after which new server images are
                         created.</para></wadl:doc>
             </param>
-            <param style="plain" name="personality" required="false"
-                type="array"
-                path="$.launchConfiguration.args.server.personality">
-                <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN"><para>The file path and/or the
-                        content that you want to inject into a server
-                        image. For more information, see the <link
-                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html"
-                            >Server Personality</link> documentation
-                        for Rackspace Cloud Servers.</para></wadl:doc>
-            </param>
+
             <param style="plain" name="path" required="true"
                 type="string"
                 path="$.launchConfiguration.args.server.personality.[*].path">
@@ -263,7 +263,7 @@
                     xml:lang="EN"><para>The path to the file that
                         contains data that is injected into the file
                         system of the new cloud server
-                    image.</para></wadl:doc>
+                    image. </para></wadl:doc>
             </param>
             <param style="plain" name="contents" required="true"
                 type="string"
@@ -274,21 +274,26 @@
                         server image.</para>
                 </wadl:doc>
             </param>
+            <param style="plain" name="user_data" required="false"
+                type="string"
+                path="$.launchConfiguration.args.server.user_data">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The base64 encoded string of your create server template.</para></wadl:doc>
+            </param>            
             <param style="plain" name="args" required="true"
                 type="object" path="$.launchConfiguration.args">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The item to be configured.
-                        Must be "server" or "load balancer." Most
+                        Must be <parameter>server</parameter> or <parameter>loadBalancers</parameter>. Most
                         launch configurations have both a server and a
-                        load balancer configured.</para></wadl:doc>
+                        cloud load balancer or RackConnectV3 load balancer pool configured.</para></wadl:doc>
             </param>
             <param style="plain" name="type" required="true"
                 type="string" path="$.launchConfiguration.type">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The type of the launch
                         configuration. For this release, this
-                        parameter must be set to
-                            <code>launch_server</code>.</para></wadl:doc>
+                        parameter must be set to <parameter>launch_server</parameter>.</para></wadl:doc>
             </param>
             <param style="plain" name="groupConfiguration"
                 required="true" type="object"
@@ -374,8 +379,7 @@
                         information for policies of type "schedule."
                         This parameter is not required for policies of
                         type "webhook." This parameter must be set to
-                        either "at" or <code>cron</code>. Both "at"
-                        and <code>cron</code> are mutually
+                        either <parameter>at</parameter> or <parameter>cron</parameter>. Both are mutually
                         exclusive.</para>
                 </wadl:doc>
             </param>
@@ -384,22 +388,20 @@
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The recurring time when the
                         policy runs as a cron entry. For example, if
-                        you set this parameter to <code>1 0 * *
-                            *</code>, the policy runs at one minute
+                        you set this parameter to <code>1 0 * * *</code>, the policy runs at one minute
                         past midnight (00:01) every day of the month,
                         and every day of the week. For more
-                        information about cron, see <link
-                            xlink:href="http://en.wikipedia.org/wiki/Cron"
-                            >http://en.wikipedia.org/wiki/Cron</link>.</para></wadl:doc>
+                        information about cron, see <link xlink:href="http://en.wikipedia.org/wiki/Cron">
+                            http://en.wikipedia.org/wiki/Cron</link>.</para></wadl:doc>
             </param>
             <param style="plain" name="at" required="false"
                 type="string" path="$.scalingPolicies.[*].args.at">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The time when this policy
                         runs. This property is mutually exclusive with
-                        the <code>cron</code> parameter. You must
-                        specify seconds when using "at". For example,
-                            <code>"at": "2013-12-05T03:12:00Z"</code>.
+                        the <parameter>cron</parameter> parameter. You must
+                        specify seconds when using <parameter>at</parameter>. For example, if you set
+                            <code>at: "2013-12-05T03:12:00Z"</code>.
                         If seconds are not specified, a 400 error is
                         returned. Note, the policy is triggered within
                         a 10-second range of the time specified.</para></wadl:doc>
@@ -441,8 +443,8 @@
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The type of policy that runs
                         for the current release, this value can be
-                        either <code>webhook</code> for webhook-based
-                        policies or <code>schedule</code> for
+                        either <parameter>webhook</parameter> for webhook-based
+                        policies or <parameter>schedule</parameter> for
                         schedule-based policies.</para></wadl:doc>
             </param>
             <param style="plain" name="change" required="false"
@@ -482,9 +484,9 @@
                         >What to do when a new server is created. Its
                         configuration includes information about the
                         server image, the flavor of the server image,
-                        and which load balancer to connect to. The
-                        <code>type</code> parameter for <code>launchConfiguration</code> must be
-                        set to <code>launch_server</code>.</wadl:doc>
+                        and to which cloud load balancer or RackConnectV3 load balancer pool to connect. The
+                        <parameter>type</parameter> parameter for <parameter>launchConfiguration</parameter> must be
+                        set to <parameter>launch_server</parameter>.</wadl:doc>
                 </param>
                 <param style="plain" name="loadBalancers"
                     required="false" type="array"
@@ -497,35 +499,35 @@
                         enabled and equally weighted. Any new servers
                         that are not connected to the ServiceNet
                         network are not added to any load
-                        balancers.</wadl:doc>
+                        balancers. </wadl:doc>
                 </param>
                 <param style="plain" name="port" required="true"
                     type="integer"
                     path="$.launchConfiguration.args.loadBalancers.[*].port">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                        >The port number of the service (on the new
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook">The port number of the service (on the new
                         servers) to use for this particular load
                         balancer. In most cases, this port number is
-                        80.</wadl:doc>
+                        80. NOTE that when using RackConnectV3, instead of a cloud load balancer, leave this parameter empty.</wadl:doc>
                 </param>
                 <param style="plain" name="loadBalancerId"
-                    required="true" type="integer"
+                    required="true" type="UUID"
                     path="$.launchConfiguration.args.loadBalancers.[*].loadBalancerId">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                        >The ID of the load balancer to which new
-                        servers are added.</wadl:doc>
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook">The ID of the cloud load balancer, or RackConnectV3 load balancer pool, to which new
+                        servers are added. For cloud load balancers set the <emphasis>ID as an integer</emphasis>, 
+                        for RackConnectV3 set the <emphasis>UUID as a string</emphasis>. 
+                        NOTE that when using RackConnectV3, this value is supplied to you by Rackspace Support 
+                    after they configure your load balancer pool. </wadl:doc>
                 </param>
                 <param style="plain" name="server" required="true"
                     type="object"
                     path="$.launchConfiguration.args.server">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                        >The attributes that Auto Scale uses to create
-                        a server. For more information, see: <link xlink:href="/servers/api/v2/cs-devguide/content/CreateServers.html">Create
-                        Servers</link> in the cloud servers
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook">The attributes that Auto Scale uses to create
+                        a server. For more information, see <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html">
+                            Create Servers</link> in the cloud servers
                         developer's guide. The attributes that are
-                        specified for the <code>server</code> parameter are applied
+                        specified for the <parameter>server</parameter> parameter are applied
                         to all new servers in the scaling group. The
-                        specified server name is used as the base name
+                        specified server <parameter>name</parameter> is used as the base name
                         for all created servers.</wadl:doc>
                 </param>
                 <param style="plain" name="flavorRef" required="true"
@@ -552,9 +554,8 @@
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >The file path and/or the content that you
                         want to inject into a server image. For more
-                        information, see the <link
-                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html"
-                            >Server Personality</link> documentation
+                        information, see the <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html">
+                            Server Personality</link> documentation
                         for Rackspace Cloud Servers </wadl:doc>
                 </param>
                 <param style="plain" name="path" required="true"
@@ -577,17 +578,26 @@
                     type="object" path="$.launchConfiguration.args">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >The item to be configured. Must be
-                        <code>server</code> or
-                        <code>loadbalancer</code>. Most launch
+                        <parameter>server</parameter> or
+                        <parameter>loadBalancers</parameter>. Most launch
                         configurations have both a server and a
-                        loadbalancer.</wadl:doc>
+                        load balancer or RackConnectV3 load balancer pool.</wadl:doc>
+                </param>
+                <param style="plain" name="user_data"
+                    required="false" type="string"
+                    path="$.launchConfiguration.args.server.user_data">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The base64 encoded string containing your create server template. 
+                        You can create this template to install packages and run commands via cloud init. You use this for boot from volume. 
+                        For an example create server template, see <link linkend="Edit_Launch_Config">Edit the launch configuration 
+                            for your scaling group</link>. </wadl:doc>
                 </param>
                 <param style="plain" name="type" required="true"
                     type="string" path="$.launchConfiguration.type">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >The type of the launch configuration.
                         Currently, this parameter must be set to
-                        <code>launch_server</code>.</wadl:doc>
+                        <parameter>launch_server</parameter>.</wadl:doc>
                 </param>
                 <param style="plain" name="groupConfiguration"
                     required="true" type="object"
@@ -663,11 +673,11 @@
                     type="object" path="$.scalingPolicies.[*].args">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >Configuration information for policies of
-                        type <code>schedule</code>. Must be
-                        either <code>at</code> or
-                        <code>cron</code>, which are mutually
+                        type <parameter>schedule</parameter>. Must be
+                        either <parameter>at</parameter> or
+                        <parameter>cron</parameter>, which are mutually
                         exclusive. Not required for policies of type
-                        <code>webhook</code>. </wadl:doc>
+                        <parameter>webhook</parameter>. </wadl:doc>
                 </param>
                 <param style="plain" name="cron" required="false"
                     type="string"
@@ -687,17 +697,16 @@
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         xml:lang="EN">The time when this policy will
                         be executed. The time must be formatted
-                        according to this service's custom <link xlink:href="
-                        /cas/api/v1.0/autoscale-devguide/content/datetimeformat.html">Date
-                        and Time format</link>, with seconds,
+                        according to this service's custom <link xlink:href="/cas/api/v1.0/autoscale-devguide/content/datetimeformat.html">
+                            Date and Time format</link>, with seconds,
                         otherwise a 400 error may be returned. The
                         policy will be triggered within a 10-second
                         range of the time specified, so if you set the
-                        <code>at</code> time to
+                        <parameter>at</parameter> time to
                         <code>2013-05-19T08:07:08Z</code>, it
                         will be triggered anytime between 08:07:08 to
                         08:07:18. This property is mutually exclusive
-                        with the <code>cron</code>
+                        with the <parameter>cron</parameter>
                         parameter.</wadl:doc>
                 </param>
                 <param style="plain" name="changePercent"
@@ -840,7 +849,7 @@
                    format.</para>
                <para>
                    <note>
-                       <para>The <code>?webhooks=true</code> parameter is required for this method.</para>
+                       <para>The <parameter>?webhooks=true</parameter> parameter is required for this method.</para>
                    </note>
                </para>
            </wadl:doc>
@@ -849,7 +858,7 @@
                    type="xsd:boolean">
                    <wadl:doc xml:lang="EN"
                        xmlns="http://docbook.org/ns/docbook">
-                       <para>Set <code>?webhooks=true</code>
+                       <para>Set <parameter>?webhooks=true</parameter>
                            to display webhook configuration details in the results.</para></wadl:doc>
                </param>
            </request>
@@ -878,8 +887,8 @@
                 pending or active entities, deletion fails and a 409
                 error message is returned. If there are pending or
                 active servers in the scaling group, pass
-                    <code>force=true</code> to force delete the group.
-                Passing <code>force=true</code> immediately deletes
+                    <parameter>force=true</parameter> to force delete the group.
+                Passing <parameter>force=true</parameter> immediately deletes
                 all active servers in the group. Pending servers are
                 deleted when they build and become active.</para>
         </wadl:doc>
@@ -895,8 +904,10 @@
             IP address. </para>
             <para>
                 <note>
-                    <para>The <code>replace={true/false}</code> parameter is optional for this method. Default is <code>replace=true</code>, even if not passed. 
-                        Use <code>replace=false</code> if you do not want the deleted server replaced. </para>
+                    <para>The <parameter>replace</parameter> parameter is optional for this method. Default is <parameter>replace=true</parameter>, even if not passed. 
+                        Use <parameter>replace=false</parameter> if you do not want the deleted server replaced. </para>
+                    <para>Similarly, the <parameter>purge</parameter> parameter is also optional. Default is <parameter>purge=true</parameter>, so the deleted server is also deleted from the account. 
+                        Use <parameter>purge=false</parameter> if you do not want the deleted server removed from the account. You may want to do this if you want to investigate the server. </para>
                 </note>
             </para>
             <para>This endpoint can be useful if you have deleted a server through a nova command or another method that
@@ -921,7 +932,13 @@
                 type="xsd:boolean">
                 <wadl:doc xml:lang="EN"
                     xmlns="http://docbook.org/ns/docbook">
-                    <para>Defaults to <code>replace=true</code> if not passed. Set <code>replace=false</code> to delete the server without replacing it.</para></wadl:doc>
+                    <para>Defaults to <parameter>replace=true</parameter> if not passed. Set <parameter>replace=false</parameter> to delete the server without replacing it.</para></wadl:doc>
+            </param>
+            <param name="purge" style="query" required="false" default="true"
+                type="xsd:boolean">
+                <wadl:doc xml:lang="EN"
+                    xmlns="http://docbook.org/ns/docbook">
+                    <para>Defaults to <parameter>purge=true</parameter> if not passed. Set <parameter>purge=false</parameter> to delete the server from the group without removing it from the account.</para></wadl:doc>
             </param>
         </request>
         <response status="202"><doc title="Accepted">The request succeeded. No response body is returned.</doc>
@@ -1131,7 +1148,7 @@
             <para role="shortdesc">Shows launch configuration details
                 for a specified scaling group.</para>
             <para>The details include from
-                which image to create a server, which load balancers
+                which image to create a server, which cloud load balancers
                 to join the server to, which networks to add the
                 server to, and other metadata.</para>
             <para>The details appear in the response body in JSON
@@ -1159,9 +1176,11 @@
                 balancers to join the server to, which networks to add
                 the server to, and other metadata. If the update is
                 successful, no response body is returned.</para>
-            <note><para>All Rackspace Auto Scale update (<methodname>PUT</methodname>) operations completely replace the configuration being updated. Empty values (for example, 
+            <note><para>All Rackspace Auto Scale update (<methodname>PUT</methodname>) operations completely 
+                replace the configuration being updated. Empty values (for example, 
                 <varname>{ }</varname>)in the update 
-                are accepted and overwrite previously specified parameters. New parameters can be specified. All create (<methodname>POST</methodname>) parameters, even optional ones, 
+                are accepted and overwrite previously specified parameters. New parameters can be specified. 
+                All create (<methodname>POST</methodname>) parameters, even optional ones, 
                 are required for the update operation. </para></note>
         </wadl:doc>
         <request>
@@ -1169,9 +1188,9 @@
                 type="object" path="$.args">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The item to be configured.
-                        Must be <code>server</code> or <code>loadbalancer</code>. Most
+                        Must be <parameter>server</parameter> or <parameter>loadBalancers</parameter>. Most
                         launch configurations have both a server and a
-                        loadbalancer configured.</para></wadl:doc>
+                        cloud load balancer or RackConnectV3 load balancer pool configured.</para></wadl:doc>
             </param>
             <param style="plain" name="loadBalancers" required="false"
                 type="array" path="$.args.loadBalancers">
@@ -1188,31 +1207,32 @@
             </param>
             <param style="plain" name="port" required="true"
                 type="integer" path="$.args.loadBalancers.[*].port">
-                <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN"><para>The port number of the service
+                <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"><para>The port number of the service
                         (on the new servers) to use for this
                         particular load balancer. In most cases, this
-                        port number is 80.</para></wadl:doc>
+                        port number is 80. NOTE that when using RackConnectV3, instead of a cloud load balancer, leave this parameter empty.</para></wadl:doc>
             </param>
             <param style="plain" name="loadBalancerId" required="true"
                 type="integer"
                 path="$.args.loadBalancers.[*].loadBalancerId">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN"><para>The ID of the load balancer to
-                        which new servers will be
-                    added.</para></wadl:doc>
+                    xml:lang="EN"><para>The ID of the cloud load balancer, or RackConnectV3 load balancer pool, to which new
+                        servers are added. For cloud load balancers set the <emphasis>ID as an integer</emphasis>, 
+                        for RackConnectV3 set the <emphasis>UUID as a string</emphasis>. 
+                        NOTE that when using RackConnectV3, this value is supplied to you by Rackspace Support 
+                        after they configure your load balancer pool. </para></wadl:doc>
             </param>
             <param style="plain" name="server" required="true"
                 type="object" path="$.args.server">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The attributes that Auto Scale
                         uses to create a new server. For more
-                        information, see <link
-                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html"
-                            >Create Server</link>. The attributes that
+                        information, see <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html">
+                            Create Servers</link>. 
+                        The attributes that
                         are specified for the server entity will apply
                         to all new servers in the scaling group,
-                        including the server name.</para></wadl:doc>
+                        including the server name. </para></wadl:doc>
             </param>
             <param style="plain" name="flavorRef" required="true"
                 type="string" path="$.args.server.flavorRef">
@@ -1232,16 +1252,7 @@
                         image from which new server images will be
                         created.</para></wadl:doc>
             </param>
-            <param style="plain" name="personality" required="false"
-                type="array" path="$.args.server.personality">
-                <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN"><para>The file path and/or the
-                        content that you want to inject into a server
-                        image. For more information, see the <link
-                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html"
-                            >Server Personality</link> documentation
-                        for Rackspace Cloud Servers.</para></wadl:doc>
-            </param>
+
             <param style="plain" name="path" required="true"
                 type="string"
                 path="$.args.server.personality.[*].path">
@@ -1257,7 +1268,7 @@
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The content items that will be
                         injected into the file system of the new cloud
-                        server image.</para>
+                        server image. </para>
                 </wadl:doc>
             </param>
             <representation mediaType="application/json">
@@ -1271,8 +1282,7 @@
                     type="object" path="$.args">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >The item to be configured. Must be
-                        <code>server</code> or
-                        <code>loadbalancer</code>. Most launch
+                        <parameter>server</parameter> or <parameter>loadBalancers</parameter>. Most launch
                         configurations have both a server and a
                         load balancer configured.</wadl:doc>
                 </param>
@@ -1296,23 +1306,23 @@
                         >The port number of the service (on the new
                         servers) to use for this particular load
                         balancer. In most cases, this port number is
-                        80.</wadl:doc>
+                        80. NOTE that when using RackConnectV3, instead of a cloud load balancer, leave this parameter empty.</wadl:doc>
                 </param>
                 <param style="plain" name="loadBalancerId"
                     required="true" type="integer"
                     path="$.args.loadBalancers.[*].loadBalancerId">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                        >The ID of the load balancer to which new
-                        servers will be added.</wadl:doc>
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook">The ID of the cloud load balancer, or RackConnectV3 load balancer pool, to which new
+                        servers are added. For cloud load balancers set the <emphasis>ID as an integer</emphasis>, 
+                        for RackConnectV3 set the <emphasis>UUID as a string</emphasis>. 
+                        NOTE that when using RackConnectV3, this value is supplied to you by Rackspace Support 
+                        after they configure your load balancer pool. </wadl:doc>
                 </param>
                 <param style="plain" name="server" required="true"
                     type="object" path="$.args.server">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                        >The attributes Auto Scale will use to create
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook">The attributes Auto Scale will use to create
                         a new server. For more information, see:
-                        <link xlink:href=" /servers/api/v2/cs-
-                        devguide/content/CreateServers.html">"Create
-                        Servers"</link> in the cloud servers
+                        <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html">
+                           Create Servers</link> in the cloud servers
                         developer's guide. The attributes that are
                         specified for the server entity will apply to
                         all new servers in the scaling group. The
@@ -1342,10 +1352,9 @@
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >The file path and/or the content that you
                         want to inject into a server image. For more
-                        information, see the <link
-                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html"
-                            >Server Personality</link> documentation
-                        for Rackspace Cloud Servers </wadl:doc>
+                        information, see the <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html">
+                            Server Personality</link> documentation
+                        for Rackspace Cloud Servers. </wadl:doc>
                 </param>
                 <param style="plain" name="path" required="true"
                     type="string"
@@ -1587,12 +1596,12 @@
                     type="object" path="$.[*].args">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >Additional configuration information for
-                        policies of type <code>schedule</code>.
+                        policies of type <parameter>schedule</parameter>.
                         This parameter is not required for policies of
-                        type <code>webhook</code>. This
+                        type <parameter>webhook</parameter>. This
                         parameter must be set to either
-                        <code>at</code> or
-                        <code>cron</code>, which are mutually
+                        <parameter>at</parameter> or
+                        <parameter>cron</parameter>, which are mutually
                         exclusive. </wadl:doc>
                 </param>
                 <param style="plain" name="cron" required="false"
@@ -1600,8 +1609,7 @@
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >The time when the policy will be executed, as
                         a cron entry. For example, if this is
-                        parameter is set to <code>1 0 * *
-                        *</code>, the policy will be executed at
+                        parameter is set to <code>1 0 * * *</code>, the policy will be executed at
                         one minute past midnight (00:01) every day of
                         the month, and every day of the week. For more
                         information about cron, read:
@@ -1612,13 +1620,12 @@
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >The time when this policy will be executed.
                         The time must be formatted according to this
-                        service's custom <link xlink:href="
-                        /cas/api/v1.0/autoscale-devguide/content/datetimeformat.html">Date
+                        service's custom <link xlink:href="/cas/api/v1.0/autoscale-devguide/content/datetimeformat.html">Date
                         and Time format</link>, with seconds,
                         otherwise a 400 error may be returned. The
                         policy will be triggered within a 10-second
                         range of the time specified, so if you set the
-                        <code>at</code> time to
+                        <parameter>at</parameter> time to
                         <code>2013-05-19T08:07:08Z</code>, it
                         will be triggered anytime between 08:07:08 to
                         08:07:18. This property is mutually exclusive
@@ -1775,16 +1782,15 @@
                             *</code>, the policy runs at one minute
                         past midnight (00:01) every day of the month,
                         and every day of the week. For more
-                        information about cron, see <link xlink:href="http://en.wikipedia.org/wiki/Cron">http://en.wikipedia.org/wiki/Cron</link>.</para></wadl:doc>
+                        information about cron, see <link xlink:href="http://en.wikipedia.org/wiki/Cron">http://en.wikipedia.org/wiki/Cron</link>.
+                    </para></wadl:doc>
             </param>
             <param style="plain" name="at" required="false"
                 type="string" path="$.scalingPolicies.[*].args.at">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         xml:lang="EN">The time when this policy will
                         be executed. The time must be formatted
-                        according to this service's custom <link
-                        xlink:href="
-                        /cas/api/v1.0/autoscale-devguide/content/datetimeformat.html">Date
+                        according to this service's custom <link xlink:href="/cas/api/v1.0/autoscale-devguide/content/datetimeformat.html">Date
                         and Time format</link>, with seconds,
                         otherwise a 400 error may be returned. The
                         policy will be triggered within a 10-second

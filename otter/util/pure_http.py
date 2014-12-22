@@ -9,6 +9,7 @@ from functools import partial, wraps
 from effect import Effect
 from characteristic import attributes
 from toolz.dicttoolz import merge
+from toolz.functoolz import memoize
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 from otter.util import logging_treq
@@ -72,6 +73,50 @@ def check_status(success_codes, result):
     return result
 
 
+def check_response(pred, result):
+    """
+    Ensure that the response is acceptable according to the given predicate.
+    otherwise raise :exc:`APIError`.
+
+    :param pred: A callable that takes a response object and the
+        its content and synchronously returns :data:`True` if
+        the response is good, or :data:`False` if it is bad.
+    :type pred: 2-argument callable
+    :param result: The result of :meth:`Request.perform_effect`.
+    """
+    response, content = result
+    if pred(response, content):
+        return result
+    else:
+        raise APIError(response.code, content, response.headers)
+
+
+@memoize
+def has_code(*codes):
+    """
+    Return a response success predicate that checks the status code.
+
+    If this function is called multiple times with the same argument,
+    the results will compare equal.
+
+    :param codes: Status codes to be considered successful.
+    :type codes: ints
+    :return: Response success predicate that checks for these codes.
+    :rtype: function
+    """
+    def check_response_code(response, _content):
+        """
+        Checks if the given response has a successful error code.
+
+        :param response: Response object, from treq.
+        :return: :data:`True` if the error code indicates success,
+            :data:`False` otherwise.
+        :rtype: bool
+        """
+        return response.code in codes
+    return check_response_code
+
+
 # Request function decorators! These make up the most common API exposed by this
 # module.
 
@@ -129,14 +174,16 @@ def add_effect_on_response(effect, codes, request_func):
     return wraps(request_func)(request)
 
 
-def add_error_handling(success_codes, request_func):
+def add_error_handling(pred, request_func):
     """
-    Decorate a request function with response-code checking as per
-    :func:`check_status`.
+    Decorate a request function with response checking as per
+    :func:`check_response`.
     """
-    request = lambda *args, **kwargs: request_func(*args, **kwargs).on(
-        partial(check_status, success_codes))
-    return wraps(request_func)(request)
+    @wraps(request_func)
+    def wrapped(*args, **kwargs):
+        eff = request_func(*args, **kwargs)
+        return eff.on(partial(check_response, pred))
+    return wrapped
 
 
 def add_content_only(request_func):
@@ -180,15 +227,17 @@ def add_json_request_data(request_func):
 def add_bind_root(root, request_func):
     """
     Decorate a request function so that it's URL is appended to a common root.
-    The URL given is expected to be quoted if required. This decorator does not quote the URL.
+    The URL given is expected to be quoted if required. This decorator does not
+    quote the URL.
     """
+    if isinstance(root, unicode):
+        root = root.encode('ascii')
+
     @wraps(request_func)
     def request(method, url, *args, **kwargs):
-        _root = root
-        if isinstance(_root, unicode):
-            _root = _root.encode('ascii')
         if isinstance(url, unicode):
             url = url.encode('utf-8')
-        return request_func(method, '{}/{}'.format(_root.rstrip('/'), url), *args, **kwargs)
+        url = '{}/{}'.format(root.rstrip('/'), url)
+        return request_func(method, url, *args, **kwargs)
 
     return request

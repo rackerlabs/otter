@@ -29,7 +29,7 @@ class GetRequestFuncTests(SynchronousTestCase):
         """Save some common parameters."""
         self.log = object()
         self.authenticator = object()
-        self.request = get_request_func(
+        self.request_func = get_request_func(
             self.authenticator, 1, self.log,
             {ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'},
             'DFW')
@@ -39,35 +39,39 @@ class GetRequestFuncTests(SynchronousTestCase):
         The request function returned from get_request_func performs
         authentication before making the request.
         """
-        eff = self.request(ServiceType.CLOUD_SERVERS, 'get', 'servers')
-        self.assertEqual(eff.intent, Authenticate(self.authenticator, 1, self.log))
+        eff = self.request_func(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
+        expected_intent = Authenticate(self.authenticator, 1, self.log)
+        self.assertEqual(eff.intent, expected_intent)
         next_eff = resolve_authenticate(eff)
         # The next effect in the chain is the requested HTTP request,
         # with appropriate auth headers
         self.assertEqual(
             next_eff.intent,
-            Request(method='get', url='http://dfw.openstack/servers',
+            Request(method='GET', url='http://dfw.openstack/servers',
                     headers=headers('token'), log=self.log))
 
     def test_invalidate_on_auth_error_code(self):
         """
         Upon authentication error, the auth cache is invalidated.
         """
-        eff = self.request(ServiceType.CLOUD_SERVERS, 'get', 'servers')
+        eff = self.request_func(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
         next_eff = resolve_authenticate(eff)
         # When the HTTP response is an auth error, the auth cache is
         # invalidated, by way of the next effect:
         invalidate_eff = resolve_effect(next_eff, stub_pure_response("", 401))
-        self.assertEqual(invalidate_eff.intent, InvalidateToken(self.authenticator, 1))
+        expected_intent = InvalidateToken(self.authenticator, 1)
+        self.assertEqual(invalidate_eff.intent, expected_intent)
         self.assertRaises(APIError, resolve_effect, invalidate_eff, None)
 
     def test_json(self):
         """
-        Requests and responses are dumped and loaded.
+        JSON-serializable requests are dumped before being sent, and
+        JSON-serialized responses are parsed.
         """
         input_json = {"a": 1}
         output_json = {"b": 2}
-        eff = self.request(ServiceType.CLOUD_SERVERS, "get", "servers", data=input_json)
+        eff = self.request_func(ServiceType.CLOUD_SERVERS, "GET", "servers",
+                                data=input_json)
         next_eff = resolve_authenticate(eff)
         result = resolve_effect(next_eff,
                                 stub_pure_response(json.dumps(output_json)))
@@ -76,10 +80,11 @@ class GetRequestFuncTests(SynchronousTestCase):
 
     def test_no_json_response(self):
         """
-        ``json_response`` can be specifies as False to get the plaintext
+        ``json_response`` can be set to :data:`False` to get the plaintext.
         response.
         """
-        eff = self.request(ServiceType.CLOUD_SERVERS, "get", "servers", json_response=False)
+        eff = self.request_func(ServiceType.CLOUD_SERVERS, "GET", "servers",
+                                json_response=False)
         next_eff = resolve_authenticate(eff)
         result = resolve_effect(next_eff, stub_pure_response("foo"))
         self.assertEqual(result, "foo")
@@ -91,7 +96,7 @@ class BindServiceTests(SynchronousTestCase):
     def setUp(self):
         """Save some common parameters."""
         self.log = object()
-        self.request = lambda method, url, headers=None, data=None: (method, url, headers, data)
+        self.request_func = lambda method, url, headers=None, data=None: (method, url, headers, data)
 
     def test_add_bind_service(self):
         """
@@ -100,7 +105,7 @@ class BindServiceTests(SynchronousTestCase):
         """
         request = add_bind_service(fake_service_catalog,
                                    'cloudServersOpenStack', 'DFW', self.log,
-                                   self.request)
+                                   self.request_func)
         self.assertEqual(
             request('get', 'foo'),
             ('get', 'http://dfw.openstack/foo', None, None))
