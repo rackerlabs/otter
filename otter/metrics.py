@@ -30,6 +30,7 @@ from otter.auth import generate_authenticator, authenticate_user, extract_token
 
 from otter.auth import public_endpoint_url
 from otter.constants import get_service_mapping
+from otter.effect_dispatcher import get_dispatcher
 from otter.http import get_request_func
 from otter.convergence.gathering import get_scaling_group_servers
 from otter.util.http import append_segments, headers, check_success
@@ -159,8 +160,9 @@ def _perform_limited_effects(effects, clock, limit):
     It'd be nice if effect.parallel had a "limit" parameter.
     """
     # TODO: Use cooperator instead
+    dispatcher = get_dispatcher(clock)
     sem = defer.DeferredSemaphore(limit)
-    defs = [sem.run(perform, clock, eff) for eff in effects]
+    defs = [sem.run(perform, dispatcher, eff) for eff in effects]
     return defer.gatherResults(defs)
 
 

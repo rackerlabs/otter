@@ -4,7 +4,7 @@
 import mock
 
 from effect import Effect, ConstantIntent, ParallelEffects
-from effect.testing import StubIntent, resolve_effect, resolve_stubs
+from effect.testing import StubIntent, resolve_effect
 
 from pyrsistent import pmap
 
@@ -13,6 +13,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.constants import ServiceType
 from otter.util.timestamp import now
 from otter.convergence.composition import execute_convergence, tenant_is_enabled
+from otter.test.utils import resolve_stubs
 
 
 class ExecConvergenceTests(SynchronousTestCase):

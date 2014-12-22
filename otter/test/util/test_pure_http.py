@@ -4,7 +4,7 @@ import json
 
 from testtools import TestCase
 
-from effect.testing import StubIntent, resolve_stubs
+from effect.testing import StubIntent
 from effect.twisted import perform
 from effect import Effect, ConstantIntent, FuncIntent
 from itertools import starmap
@@ -19,7 +19,8 @@ from otter.util.pure_http import (
     add_content_only, add_error_handling, add_json_response,
     add_json_request_data)
 from otter.util.http import APIError
-from otter.test.utils import stub_pure_response, StubResponse, StubTreq
+from otter.test.utils import stub_pure_response, StubResponse, StubTreq, resolve_stubs
+from otter.effect_dispatcher import get_dispatcher
 
 
 Constant = lambda x: StubIntent(ConstantIntent(x))
@@ -45,8 +46,9 @@ class RequestEffectTests(SynchronousTestCase):
                         contents=[(response, "content")])
         req = Request(method="get", url="http://google.com/")
         req.treq = treq
+        dispatcher = get_dispatcher(None)
         self.assertEqual(
-            self.successResultOf(perform(None, Effect(req))),
+            self.successResultOf(perform(dispatcher, Effect(req))),
             (response, "content"))
 
     def test_log(self):
@@ -60,7 +62,8 @@ class RequestEffectTests(SynchronousTestCase):
                         contents=[(response, "content")])
         req = Request(method="get", url="http://google.com/", log=log)
         req.treq = treq
-        self.assertEqual(self.successResultOf(perform(None, Effect(req))),
+        dispatcher = get_dispatcher(None)
+        self.assertEqual(self.successResultOf(perform(dispatcher, Effect(req))),
                          (response, "content"))
 
 

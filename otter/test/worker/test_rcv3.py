@@ -2,7 +2,7 @@
 """
 Tests for RCv3-specific worker code.
 """
-from effect import Effect
+from effect import Effect, ComposedDispatcher
 from otter.constants import ServiceType
 from otter.worker import _rcv3
 from otter.test.convergence.test_effecting import _PureRequestStub
@@ -38,14 +38,14 @@ class RCv3Tests(SynchronousTestCase):
         self.reactor = object()
         self.patch(_rcv3, "perform", self._fake_perform)
 
-    def _fake_perform(self, reactor, effect):
+    def _fake_perform(self, dispatcher, effect):
         """
         A test double for :func:`effect.twisted.perform`.
 
-        :param IReactorCore _reactor: The reactor used to "execute".
+        :param dispatcher: The Effect dispatcher.
         :param effect: The effect to "execute".
         """
-        self.assertIdentical(self.reactor, reactor)
+        self.assertTrue(isinstance(dispatcher, ComposedDispatcher))
 
         self.effect = effect
         self.assertTrue(isinstance(effect, Effect))

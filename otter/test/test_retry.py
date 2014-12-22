@@ -3,8 +3,8 @@ Tests for :mod:`otter.utils.retry`
 """
 import sys
 
-from effect import Effect, Delay, FuncIntent, ConstantIntent
-from effect.testing import resolve_effect, StubIntent, resolve_stubs
+from effect import Effect, Delay, FuncIntent, ConstantIntent, sync_perform
+from effect.testing import resolve_effect, StubIntent
 
 import mock
 
@@ -18,7 +18,8 @@ from otter.util.retry import (retry, repeating_interval, random_interval,
                               compose_retries, exponential_backoff_interval,
                               terminal_errors_except, retry_effect, Retry,
                               ShouldDelayAndRetry)
-from otter.test.utils import CheckFailure, DummyException, CheckFailureValue
+from otter.test.utils import CheckFailure, DummyException, CheckFailureValue, resolve_stubs
+from otter.effect_dispatcher import get_dispatcher
 
 
 class RetryTests(SynchronousTestCase):
@@ -482,6 +483,12 @@ def get_exc_info():
         return sys.exc_info()
 
 
+def _perform_func(eff):
+    """Perform a func intent without recursing on effects."""
+    assert type(eff.intent) is FuncIntent
+    return sync_perform(get_dispatcher(None), eff, recurse_effects=False)
+
+
 class ShouldDelayAndRetryTests(SynchronousTestCase):
     """Tests for :obj:`ShouldDelayAndRetry`."""
 
@@ -493,9 +500,7 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=lambda f: False,
                                    next_interval=lambda f: 1 / 0)
         eff = sdar(get_exc_info())
-        self.assertEqual(
-            resolve_effect(eff, eff.intent.perform_effect(None)),
-            False)
+        self.assertEqual(_perform_func(eff), False)
 
     def test_should_retry(self):
         """
@@ -505,7 +510,7 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=lambda f: True,
                                    next_interval=lambda f: 1.5)
         eff = sdar(get_exc_info())
-        next_eff = resolve_effect(eff, eff.intent.perform_effect(None))
+        next_eff = _perform_func(eff)
         self.assertEqual(next_eff.intent, Delay(delay=1.5))
         self.assertEqual(resolve_effect(next_eff, None),
                          True)
@@ -529,6 +534,6 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=can_retry,
                                    next_interval=next_interval)
         eff = sdar(get_exc_info())
-        resolve_effect(eff, eff.intent.perform_effect(None))
+        _perform_func(eff)
         self.assertEqual(can_retry_failures, next_interval_failures)
         self.assertEqual(can_retry_failures[0], CheckFailureValue(ZeroDivisionError("foo")))
