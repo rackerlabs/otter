@@ -19,7 +19,7 @@ from otter.util.retry import (retry, repeating_interval, random_interval,
                               terminal_errors_except, retry_effect, Retry,
                               ShouldDelayAndRetry)
 from otter.test.utils import CheckFailure, DummyException, CheckFailureValue, resolve_stubs
-from otter.effect_dispatcher import get_dispatcher
+from otter.effect_dispatcher import get_simple_dispatcher
 
 
 class RetryTests(SynchronousTestCase):
@@ -486,7 +486,7 @@ def get_exc_info():
 def _perform_func(eff):
     """Perform a func intent without recursing on effects."""
     assert type(eff.intent) is FuncIntent
-    return sync_perform(get_dispatcher(None), eff, recurse_effects=False)
+    return sync_perform(get_simple_dispatcher(None), eff, recurse_effects=False)
 
 
 class ShouldDelayAndRetryTests(SynchronousTestCase):

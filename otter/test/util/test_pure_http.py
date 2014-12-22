@@ -20,7 +20,7 @@ from otter.util.pure_http import (
     add_json_request_data)
 from otter.util.http import APIError
 from otter.test.utils import stub_pure_response, StubResponse, StubTreq, resolve_stubs
-from otter.effect_dispatcher import get_dispatcher
+from otter.effect_dispatcher import get_simple_dispatcher
 
 
 Constant = lambda x: StubIntent(ConstantIntent(x))
@@ -46,7 +46,7 @@ class RequestEffectTests(SynchronousTestCase):
                         contents=[(response, "content")])
         req = Request(method="get", url="http://google.com/")
         req.treq = treq
-        dispatcher = get_dispatcher(None)
+        dispatcher = get_simple_dispatcher(None)
         self.assertEqual(
             self.successResultOf(perform(dispatcher, Effect(req))),
             (response, "content"))
@@ -62,7 +62,7 @@ class RequestEffectTests(SynchronousTestCase):
                         contents=[(response, "content")])
         req = Request(method="get", url="http://google.com/", log=log)
         req.treq = treq
-        dispatcher = get_dispatcher(None)
+        dispatcher = get_simple_dispatcher(None)
         self.assertEqual(self.successResultOf(perform(dispatcher, Effect(req))),
                          (response, "content"))
 

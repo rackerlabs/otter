@@ -152,11 +152,62 @@ def service_request(
 @attributes(["service_type", "method", "url", "headers", "data",
              "log", "reauth_codes", "success_codes", "json_response"])
 class ServiceRequest(object):
-    """A request to a Rackspace/OpenStack service."""
+    """
+    A request to a Rackspace/OpenStack service.
+
+    Note that this intent does _not_ contain a tenant ID. To specify the tenant
+    ID for any tree of effects that might contain a ServiceRequest, wrap the
+    effect in a :obj:`TenantScope` intent.
+    """
+
+
+@attributes(['effect', 'tenant_id'], apply_with_init=False)
+class TenantScope(object):
+    """
+    An intent that specifies a tenant for any effect which might make
+    :obj:`ServiceRequest`s.
+
+    In other words, something like this::
+
+        perform(dispatcher, TenantScope(Effect(ServiceRequest(...))))
+
+    will make the ServiceRequest bound to the specified tenant.
+    """
+    def __init__(self, effect, tenant_id):
+        self.effect = effect
+        self.tenant_id = tenant_id
+
+
+def perform_tenant_scope(
+        authenticator, log, service_mapping, region,
+        dispatcher, tenant_scope, box):
+    """
+    Perform a :obj:`TenantScope` by binding the tenant_id specified in it to
+    any :obj:`ServiceRequest` effects that it wraps.
+
+    The first arguments before (dispatcher, tenant_scope, box) are intended
+    to be partially applied, and the result is a performer that can be put into
+    a dispatcher.
+    """
+
+    def effect_to_box(eff, box):
+        return eff.on(box.succeed, box.fail)
+
+    @sync_performer
+    def scoped_performer(dispatcher, service_request):
+        return concretize_service_request(
+            authenticator, log, service_mapping, region,
+            tenant_scope.tenant_id, service_request)
+
+    new_disp = ComposedDispatcher([
+        TypeDispatcher({ServiceRequest: scoped_performer}),
+        dispatcher])
+    perform(new_disp, effect_to_box(tenant_scope.effect, box))
 
 
 def concretize_service_request(
-        authenticator, tenant_id, log, service_mapping, region,
+        authenticator, log, service_mapping, region,
+        tenant_id,
         service_request):
     """
     Translate a high-level :obj:`ServiceRequest` into a low-level :obj:`Effect`

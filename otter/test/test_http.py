@@ -152,7 +152,8 @@ class PerformServiceRequestTests(SynchronousTestCase):
     def _concrete(self, svcreq):
         """Call :func:`concretize_service_request` with premade test objects."""
         return concretize_service_request(
-            self.authenticator, 1, self.log, self.service_mapping, 'DFW',
+            self.authenticator, self.log, self.service_mapping, 'DFW',
+            1,
             svcreq
         )
 
