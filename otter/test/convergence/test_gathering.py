@@ -350,7 +350,9 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 20, 'port': 800},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [LBConfig(port=80), LBConfig(port=800)], 21: [LBConfig(port=81)]})
+            {20: [LBConfig(port=80),
+                  LBConfig(port=800)],
+             21: [LBConfig(port=81)]})
 
     def test_with_rackconnect(self):
         """
