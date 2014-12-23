@@ -404,4 +404,4 @@ class IPAddressTests(SynchronousTestCase):
         ``private`` group. This happens when the tenant specifies
         their own network named ``private``.
         """
-        self.assertEqual(_servicenet_address(self.server), "10.0.0.1")
+        self.assertEqual(_servicenet_address(self.server_dict), "10.0.0.1")
