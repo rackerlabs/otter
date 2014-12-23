@@ -362,7 +362,8 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 200, 'type': 'RackConnectV3'},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [LBConfig(port=80)], 21: [LBConfig(port=81)]})
+            {20: [LBConfig(port=80)],
+             21: [LBConfig(port=81)]})
 
 
 class IPAddressTests(SynchronousTestCase):
