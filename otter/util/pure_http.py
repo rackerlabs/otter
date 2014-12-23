@@ -7,6 +7,7 @@ import json
 from functools import partial, wraps
 
 from effect import Effect
+from effect.twisted import deferred_performer
 from characteristic import attributes
 from toolz.dicttoolz import merge
 from toolz.functoolz import memoize
@@ -27,18 +28,20 @@ class Request(object):
 
     treq = logging_treq
 
-    @inlineCallbacks
-    def perform_effect(self, dispatcher):
-        """
-        Perform the request with treq.
 
-        :return: A two-tuple of (HTTP Response, content as bytes)
-        """
-        response = yield self.treq.request(self.method.upper(), self.url,
-                                           headers=self.headers,
-                                           data=self.data, log=self.log)
-        content = yield self.treq.content(response)
-        returnValue((response, content))
+@deferred_performer
+@inlineCallbacks
+def perform_request(dispatcher, intent):
+    """
+    Perform the request with treq.
+
+    :return: A two-tuple of (HTTP Response, content as bytes)
+    """
+    response = yield intent.treq.request(intent.method.upper(), intent.url,
+                                         headers=intent.headers,
+                                         data=intent.data, log=intent.log)
+    content = yield intent.treq.content(response)
+    returnValue((response, content))
 
 
 def request(method, url, **kwargs):
@@ -82,7 +85,7 @@ def check_response(pred, result):
         its content and synchronously returns :data:`True` if
         the response is good, or :data:`False` if it is bad.
     :type pred: 2-argument callable
-    :param result: The result of :meth:`Request.perform_effect`.
+    :param result: The result of :meth:`perform_request`.
     """
     response, content = result
     if pred(response, content):
