@@ -373,6 +373,9 @@ class IPAddressTests(SynchronousTestCase):
     dicts.
     """
     def setUp(self):
+        """
+        Set up a bunch of addresses and a server dict.
+        """
         self.addresses = {
             'private': [
                 {'addr': '192.168.1.1', 'version': 4},
