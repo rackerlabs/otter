@@ -144,7 +144,7 @@ def extract_drained_at(feed):
         raise ValueError('Unexpected summary: {}'.format(summary))
 
 
-def private_ipv4_addresses(server):
+def _private_ipv4_addresses(server):
     """
     Get all private IPv4 addresses from the addresses section of a server.
 

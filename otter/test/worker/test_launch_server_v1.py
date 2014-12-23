@@ -14,7 +14,7 @@ from twisted.python.failure import Failure
 
 from otter.worker import launch_server_v1
 from otter.worker.launch_server_v1 import (
-    private_ipv4_addresses,
+    _private_ipv4_addresses,
     add_to_clb,
     add_to_load_balancer,
     add_to_load_balancers,
@@ -85,9 +85,9 @@ class UtilityTests(SynchronousTestCase):
     worker implementation eventually.
     """
 
-    def test_private_ipv4_addresses(self):
+    def test__private_ipv4_addresses(self):
         """
-        private_ipv4_addresses returns all private IPv4 addresses from a
+        _private_ipv4_addresses returns all private IPv4 addresses from a
         complete server body.
         """
         addresses = {
@@ -101,7 +101,7 @@ class UtilityTests(SynchronousTestCase):
                 {'addr': '::::', 'version': 6}
             ]}
 
-        result = private_ipv4_addresses({'server': {'addresses': addresses}})
+        result = _private_ipv4_addresses({'server': {'addresses': addresses}})
         self.assertEqual(result, ['10.0.0.1', '10.0.0.2'])
 
 
