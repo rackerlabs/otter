@@ -375,9 +375,9 @@ class IPAddressTests(SynchronousTestCase):
     def setUp(self):
         self.addresses = {
             'private': [
+                {'addr': '192.168.1.1', 'version': 4},
                 {'addr': '10.0.0.1', 'version': 4},
                 {'addr': '10.0.0.2', 'version': 4},
-                {'addr': '192.168.1.1', 'version': 4},
                 {'addr': '::1', 'version': 6}
             ],
             'public': [
@@ -392,7 +392,7 @@ class IPAddressTests(SynchronousTestCase):
         complete server body.
         """
         result = _private_ipv4_addresses(self.server_dict)
-        self.assertEqual(result, ['10.0.0.1', '10.0.0.2', '192.168.1.1'])
+        self.assertEqual(result, ['192.168.1.1', '10.0.0.1', '10.0.0.2'])
 
     def test_servicenet_address(self):
         """
