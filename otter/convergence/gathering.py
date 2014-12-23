@@ -144,6 +144,17 @@ def extract_drained_at(feed):
         raise ValueError('Unexpected summary: {}'.format(summary))
 
 
+def private_ip_addresses(server):
+    """
+    Get all private IPv4 addresses from the addresses section of a server.
+
+    :param dict server: A server body.
+    :return: List of IP addresses as strings.
+    """
+    return [addr['addr'] for addr in server['server']['addresses']['private']
+            if addr['version'] == 4]
+
+
 def to_nova_server(server_json):
     """
     Convert from JSON format to :obj:`NovaServer` instance
