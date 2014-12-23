@@ -85,7 +85,7 @@ class UtilityTests(SynchronousTestCase):
     worker implementation eventually.
     """
 
-    def test__private_ipv4_addresses(self):
+    def test_private_ipv4_addresses(self):
         """
         _private_ipv4_addresses returns all private IPv4 addresses from a
         complete server body.
