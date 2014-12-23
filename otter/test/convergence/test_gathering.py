@@ -371,13 +371,8 @@ class IPAddressTests(SynchronousTestCase):
     Tests for utility functions that extract IP addresses from server
     dicts.
     """
-
-    def test_private_ipv4_addresses(self):
-        """
-        _private_ipv4_addresses returns all private IPv4 addresses from a
-        complete server body.
-        """
-        addresses = {
+    def setUp(self):
+        self.addresses = {
             'private': [
                 {'addr': '10.0.0.1', 'version': 4},
                 {'addr': '10.0.0.2', 'version': 4},
@@ -387,6 +382,12 @@ class IPAddressTests(SynchronousTestCase):
                 {'addr': '50.50.50.50', 'version': 4},
                 {'addr': '::::', 'version': 6}
             ]}
+        self.server_dict = {'server': {'addresses': self.addresses}}
 
-        result = _private_ipv4_addresses({'server': {'addresses': addresses}})
+    def test_private_ipv4_addresses(self):
+        """
+        _private_ipv4_addresses returns all private IPv4 addresses from a
+        complete server body.
+        """
+        result = _private_ipv4_addresses(self.server_dict)
         self.assertEqual(result, ['10.0.0.1', '10.0.0.2'])
