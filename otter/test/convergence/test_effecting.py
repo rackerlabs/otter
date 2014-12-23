@@ -26,6 +26,9 @@ class _PureRequestStub(object):
 
 
 class PureRequestStubTests(SynchronousTestCase):
+    """
+    Tests for :class:`_PureRequestStub`, the request func test double.
+    """
     def test_signature_and_defaults(self):
         """
         Compare the test double to the real thing.
