@@ -1,4 +1,3 @@
-
 """
 Tests for RCv3-specific worker code.
 """
