@@ -360,3 +360,29 @@ class JsonToLBConfigTests(SynchronousTestCase):
                                {'loadBalancerId': 200, 'type': 'RackConnectV3'},
                                {'loadBalancerId': 21, 'port': 81}]),
             {20: [LBConfig(port=80)], 21: [LBConfig(port=81)]})
+
+
+class IPAddressTests(SynchronousTestCase):
+    """
+    Tests for utility functions that extract IP addresses from server
+    dicts.
+    """
+
+    def test_private_ipv4_addresses(self):
+        """
+        _private_ipv4_addresses returns all private IPv4 addresses from a
+        complete server body.
+        """
+        addresses = {
+            'private': [
+                {'addr': '10.0.0.1', 'version': 4},
+                {'addr': '10.0.0.2', 'version': 4},
+                {'addr': '::1', 'version': 6}
+            ],
+            'public': [
+                {'addr': '50.50.50.50', 'version': 4},
+                {'addr': '::::', 'version': 6}
+            ]}
+
+        result = _private_ipv4_addresses({'server': {'addresses': addresses}})
+        self.assertEqual(result, ['10.0.0.1', '10.0.0.2'])

@@ -78,40 +78,12 @@ fake_service_catalog = [
      ]}
 ]
 
-
-class UtilityTests(SynchronousTestCase):
-    """
-    Tests for non-specific utilities that should be refactored out of the
-    worker implementation eventually.
-    """
-
-    def test_private_ipv4_addresses(self):
-        """
-        _private_ipv4_addresses returns all private IPv4 addresses from a
-        complete server body.
-        """
-        addresses = {
-            'private': [
-                {'addr': '10.0.0.1', 'version': 4},
-                {'addr': '10.0.0.2', 'version': 4},
-                {'addr': '::1', 'version': 6}
-            ],
-            'public': [
-                {'addr': '50.50.50.50', 'version': 4},
-                {'addr': '::::', 'version': 6}
-            ]}
-
-        result = _private_ipv4_addresses({'server': {'addresses': addresses}})
-        self.assertEqual(result, ['10.0.0.1', '10.0.0.2'])
-
-
 expected_headers = {
     'content-type': ['application/json'],
     'accept': ['application/json'],
     'x-auth-token': ['my-auth-token'],
     'User-Agent': ['OtterScale/0.0']
 }
-
 
 error_body = '{"code": 500, "message": "Internal Server Error"}'
 
