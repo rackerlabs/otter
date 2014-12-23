@@ -167,6 +167,11 @@ def to_nova_server(server_json):
     """
     Convert from JSON format to :obj:`NovaServer` instance
     """
+    # REVIEW: The old code used get_in to cover the case where
+    # ["server"]["addresses"]["private"] doesn't actually exist. This
+    # makes the test fail. Does that actually happen, or is that just
+    # a bogus test? The fact that the old worker code works suggests
+    # "no".
     return NovaServer(id=server_json['id'],
                       state=ServerState.lookupByName(server_json['state']),
                       created=timestamp_to_epoch(server_json['created']),
