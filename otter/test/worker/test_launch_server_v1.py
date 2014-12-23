@@ -14,7 +14,6 @@ from twisted.python.failure import Failure
 
 from otter.worker import launch_server_v1
 from otter.worker.launch_server_v1 import (
-    _private_ipv4_addresses,
     add_to_clb,
     add_to_load_balancer,
     add_to_load_balancers,

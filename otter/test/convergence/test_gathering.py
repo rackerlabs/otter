@@ -15,7 +15,8 @@ from otter.convergence.gathering import (
     get_load_balancer_contents,
     get_scaling_group_servers,
     json_to_LBConfigs,
-    to_nova_server)
+    to_nova_server,
+    _private_ipv4_addresses)
 from otter.convergence.model import (
     LBConfig,
     LBNode,
