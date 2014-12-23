@@ -152,7 +152,8 @@ def to_nova_server(server_json):
     ip = ''
     if len(ips) > 0:
         ip = [addr['addr'] for addr in ips if addr['version'] == 4][0]
-    return NovaServer(id=server_json['id'], state=ServerState.lookupByName(server_json['state']),
+    return NovaServer(id=server_json['id'],
+                      state=ServerState.lookupByName(server_json['state']),
                       created=timestamp_to_epoch(server_json['created']),
                       servicenet_address=ip)
 
