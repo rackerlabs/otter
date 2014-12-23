@@ -148,7 +148,7 @@ def _private_ipv4_addresses(server):
     """
     Get all private IPv4 addresses from the addresses section of a server.
 
-    :param dict server: A server body.
+    :param dict server: A server dict.
     :return: List of IP addresses as strings.
     """
     return [addr['addr'] for addr in server['server']['addresses']['private']
