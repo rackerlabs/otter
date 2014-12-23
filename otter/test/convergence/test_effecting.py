@@ -10,6 +10,7 @@ from otter.http import get_request_func
 from otter.util.pure_http import has_code
 from twisted.trial.unittest import SynchronousTestCase
 
+
 @attributes(["service_type", "method", "url", "headers", "data", "log",
              "reauth_codes", "success_pred", "json_response"],
             defaults={"headers": None,
