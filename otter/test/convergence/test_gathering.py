@@ -16,7 +16,8 @@ from otter.convergence.gathering import (
     get_scaling_group_servers,
     json_to_LBConfigs,
     to_nova_server,
-    _private_ipv4_addresses)
+    _private_ipv4_addresses,
+    _servicenet_address)
 from otter.convergence.model import (
     LBConfig,
     LBNode,
@@ -392,3 +393,15 @@ class IPAddressTests(SynchronousTestCase):
         """
         result = _private_ipv4_addresses(self.server_dict)
         self.assertEqual(result, ['10.0.0.1', '10.0.0.2', '192.168.1.1'])
+
+    def test_servicenet_address(self):
+        """
+        :func:`_servicenet_address` returns the correct ServiceNet
+        address, which is the first IPv4 address in the ``private``
+        group in the 10.x.x.x range.
+
+        It even does this when there are other addresses in the
+        ``private`` group. This happens when the tenant specifies
+        their own network named ``private``.
+        """
+        self.assertEqual(_servicenet_address(self.server), "10.0.0.1")
