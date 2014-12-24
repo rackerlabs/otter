@@ -110,6 +110,7 @@ class RequestFuncTestMixin(object):
                     'private': [
                         {'addr': '192.168.1.1', 'version': 4},
                         {'addr': '192.168.1.2', 'version': 4},
+                        {'addr': '10.0.0.1', 'version': 4},
                         {'addr': '::1', 'version': 6}
                     ],
                     'public': [
