@@ -397,6 +397,15 @@ class IPAddressTests(SynchronousTestCase):
         result = _private_ipv4_addresses(self.server_dict)
         self.assertEqual(result, ['192.168.1.1', '10.0.0.1', '10.0.0.2'])
 
+    def test_no_private_ip_addresses(self):
+        """
+        :func:`_private_ipv4_addresses` returns an empty list if the given
+        server has no private IPv4 addresses.
+        """
+        del self.addresses["private"]
+        result = _private_ipv4_addresses(self.server_dict)
+        self.assertEqual(result, [])
+
     def test_servicenet_address(self):
         """
         :func:`_servicenet_address` returns the correct ServiceNet
