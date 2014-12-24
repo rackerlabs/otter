@@ -417,3 +417,11 @@ class IPAddressTests(SynchronousTestCase):
         their own network named ``private``.
         """
         self.assertEqual(_servicenet_address(self.server_dict), "10.0.0.1")
+
+    def test_no_servicenet_address(self):
+        """
+        :func:`_servicenet_address` returns :data:`None` if the server has no
+        ServiceNet address.
+        """
+        del self.addresses["private"]
+        self.assertIdentical(_servicenet_address(self.server_dict), None)
