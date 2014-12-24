@@ -151,8 +151,8 @@ def _private_ipv4_addresses(server):
     :param dict server: A server dict.
     :return: List of IP addresses as strings.
     """
-    return [addr['addr'] for addr in server['server']['addresses']['private']
-            if addr['version'] == 4]
+    private_addresses = get_in(server, ["server", "addresses", "private"], [])
+    return [addr['addr'] for addr in private_addresses if addr['version'] == 4]
 
 
 def _servicenet_address(server):
