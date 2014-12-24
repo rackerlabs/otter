@@ -160,7 +160,7 @@ def _servicenet_address(server):
     Finds the ServiceNet address for the given server.
     """
     return next((ip for ip in _private_ipv4_addresses(server)
-                 if ip.startswith("10.")), None)
+                 if ip.startswith("10.")), "")
 
 
 def to_nova_server(server_json):
