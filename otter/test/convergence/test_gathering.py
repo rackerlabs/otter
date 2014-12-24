@@ -398,7 +398,7 @@ class IPAddressTests(SynchronousTestCase):
                 {'addr': '50.50.50.50', 'version': 4},
                 {'addr': '::::', 'version': 6}
             ]}
-        self.server_dict = {'server': {'addresses': self.addresses}}
+        self.server_dict = {'addresses': self.addresses}
 
     def test_private_ipv4_addresses(self):
         """
