@@ -306,9 +306,14 @@ class ToNovaServerTests(SynchronousTestCase):
         """
         self.createds = [('2020-10-10T10:00:00Z', 1602324000),
                          ('2020-10-20T11:30:00Z', 1603193400)]
-        self.servers = [{'id': 'a', 'state': 'ACTIVE', 'created': self.createds[0][0]},
-                        {'id': 'b', 'state': 'BUILD', 'created': self.createds[1][0],
-                         'addresses': {'private': [{'addr': 'ipv4', 'version': 4}]}}]
+        self.servers = [{'id': 'a',
+                         'state': 'ACTIVE',
+                         'created': self.createds[0][0]},
+                        {'id': 'b',
+                         'state': 'BUILD',
+                         'created': self.createds[1][0],
+                         'addresses': {'private': [{'addr': 'ipv4',
+                                                    'version': 4}]}}]
 
     def test_without_address(self):
         """
@@ -316,7 +321,9 @@ class ToNovaServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             to_nova_server(self.servers[0]),
-            NovaServer(id='a', state=ServerState.ACTIVE, created=self.createds[0][1],
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=self.createds[0][1],
                        servicenet_address=''))
 
     def test_without_private(self):
@@ -326,7 +333,9 @@ class ToNovaServerTests(SynchronousTestCase):
         self.servers[0]['addresses'] = {'public': 'p'}
         self.assertEqual(
             to_nova_server(self.servers[0]),
-            NovaServer(id='a', state=ServerState.ACTIVE, created=self.createds[0][1],
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=self.createds[0][1],
                        servicenet_address=''))
 
     def test_with_servicenet(self):
@@ -335,7 +344,9 @@ class ToNovaServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             to_nova_server(self.servers[1]),
-            NovaServer(id='b', state=ServerState.BUILD, created=self.createds[1][1],
+            NovaServer(id='b',
+                       state=ServerState.BUILD,
+                       created=self.createds[1][1],
                        servicenet_address='ipv4'))
 
 
