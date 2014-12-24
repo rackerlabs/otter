@@ -5,7 +5,7 @@ from pyrsistent import pbag, s, pset
 from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
 
-from otter.convergence.model import NodeCondition, ServerState
+from otter.convergence.model import CLBNodeCondition, ServerState
 from otter.convergence.steps import (
     AddNodesToLoadBalancer,
     ChangeLoadBalancerNode,
@@ -51,8 +51,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     # only put nodes into draining if a timeout is specified
     if timeout > 0:
         draining, to_drain = partition_groups(
-            lambda n: n.config.condition, nodes, [NodeCondition.DRAINING,
-                                                  NodeCondition.ENABLED])
+            lambda n: n.config.condition, nodes, [CLBNodeCondition.DRAINING,
+                                                  CLBNodeCondition.ENABLED])
 
         # Nothing should be done to these, because the timeout has not expired
         # and there are still active connections
@@ -65,7 +65,7 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
 
     changes = [ChangeLoadBalancerNode(lb_id=node.lb_id,
                                       node_id=node.node_id,
-                                      condition=NodeCondition.DRAINING,
+                                      condition=CLBNodeCondition.DRAINING,
                                       weight=node.config.weight,
                                       type=node.config.type)
                for node in to_drain]

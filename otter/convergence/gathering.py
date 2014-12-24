@@ -13,8 +13,8 @@ from otter.constants import ServiceType
 from otter.convergence.model import (
     LBConfig,
     LBNode,
-    NodeCondition,
-    NodeType,
+    CLBNodeCondition,
+    CLBNodeType,
     NovaServer,
     ServerState)
 from otter.indexer import atom
@@ -102,11 +102,11 @@ def get_load_balancer_contents(request_func):
     def fetch_drained_feeds((ids, all_lb_nodes)):
         nodes = [LBNode(lb_id=_id, node_id=node['id'], address=node['address'],
                         config=LBConfig(port=node['port'], weight=node['weight'],
-                                        condition=NodeCondition.lookupByName(node['condition']),
-                                        type=NodeType.lookupByName(node['type'])))
+                                        condition=CLBNodeCondition.lookupByName(node['condition']),
+                                        type=CLBNodeType.lookupByName(node['type'])))
                  for _id, nodes in zip(ids, all_lb_nodes)
                  for node in nodes]
-        draining = [n for n in nodes if n.config.condition == NodeCondition.DRAINING]
+        draining = [n for n in nodes if n.config.condition == CLBNodeCondition.DRAINING]
         return parallel(
             [lb_req(
                 'GET',

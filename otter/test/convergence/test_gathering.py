@@ -19,8 +19,8 @@ from otter.convergence.gathering import (
 from otter.convergence.model import (
     LBConfig,
     LBNode,
-    NodeCondition,
-    NodeType,
+    CLBNodeCondition,
+    CLBNodeType,
     NovaServer,
     ServerState)
 from otter.test.utils import patch, resolve_retry_stubs
@@ -237,8 +237,8 @@ class GetLBContentsTests(SynchronousTestCase):
         Gets LB contents with drained_at correctly
         """
         eff = get_load_balancer_contents(self._request())
-        draining, enabled = NodeCondition.DRAINING, NodeCondition.ENABLED
-        make_config = partial(LBConfig, port=20, type=NodeType.PRIMARY)
+        draining, enabled = CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED
+        make_config = partial(LBConfig, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
             self._resolve_lb(eff),
             [LBNode(lb_id=1, node_id='11', address='a11', drained_at=1.0,
@@ -285,8 +285,8 @@ class GetLBContentsTests(SynchronousTestCase):
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
             ]
         }
-        config = LBConfig(port=20, weight=2, condition=NodeCondition.ENABLED,
-                          type=NodeType.PRIMARY)
+        config = LBConfig(port=20, weight=2, condition=CLBNodeCondition.ENABLED,
+                          type=CLBNodeType.PRIMARY)
         eff = get_load_balancer_contents(self._request())
         self.assertEqual(
             self._resolve_lb(eff),
