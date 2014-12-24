@@ -312,7 +312,7 @@ class ToNovaServerTests(SynchronousTestCase):
                         {'id': 'b',
                          'state': 'BUILD',
                          'created': self.createds[1][0],
-                         'addresses': {'private': [{'addr': 'ipv4',
+                         'addresses': {'private': [{'addr': '10.0.0.1',
                                                     'version': 4}]}}]
 
     def test_without_address(self):
@@ -347,7 +347,7 @@ class ToNovaServerTests(SynchronousTestCase):
             NovaServer(id='b',
                        state=ServerState.BUILD,
                        created=self.createds[1][1],
-                       servicenet_address='ipv4'))
+                       servicenet_address='10.0.0.1'))
 
 
 class JsonToLBConfigTests(SynchronousTestCase):
