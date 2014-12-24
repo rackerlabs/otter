@@ -391,8 +391,8 @@ class IPAddressTests(SynchronousTestCase):
 
     def test_private_ipv4_addresses(self):
         """
-        _private_ipv4_addresses returns all private IPv4 addresses from a
-        complete server body.
+        :func:`_private_ipv4_addresses` returns all private IPv4 addresses
+        from a complete server body.
         """
         result = _private_ipv4_addresses(self.server_dict)
         self.assertEqual(result, ['192.168.1.1', '10.0.0.1', '10.0.0.2'])
