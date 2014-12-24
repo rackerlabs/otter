@@ -424,4 +424,4 @@ class IPAddressTests(SynchronousTestCase):
         ServiceNet address.
         """
         del self.addresses["private"]
-        self.assertIdentical(_servicenet_address(self.server_dict), None)
+        self.assertEqual(_servicenet_address(self.server_dict), "")
