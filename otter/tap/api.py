@@ -64,14 +64,6 @@ class Options(usage.Options):
         """
         self.update(jsonfig.from_path(self['config']))
 
-        # TODO: #846
-        # The staging service catalog has some unfortunate differences
-        # from the production one, so these are here to hint at the
-        # correct ocnfiguration for staging.
-        if self.get('environment') == 'staging':
-            self['cloudServersOpenStack'] = 'cloudServersPreprod'
-            self['regionOverrides']['cloudLoadBalancers'] = 'STAGING'
-
 
 class FunctionalService(Service, object):
     """
