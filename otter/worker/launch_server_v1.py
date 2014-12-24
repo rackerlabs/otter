@@ -446,7 +446,7 @@ def add_to_load_balancer(log, request_func, lb_config, server_details, undo,
                                        cloudLoadBalancers,
                                        request_func.lb_region)
         auth_token = request_func.auth_token
-        ip_address = _private_ipv4_addresses(server_details)[0]
+        ip_address = _private_ipv4_addresses(server_details["server"])[0]
         return add_to_clb(log, endpoint, auth_token, lb_config, ip_address,
                           undo, clock)
     elif lb_type == "RackConnectV3":
