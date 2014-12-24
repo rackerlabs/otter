@@ -385,7 +385,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(log, self.log)
         self.assertEqual(endpoint, 'http://dfw.lbaas/')
         self.assertEqual(auth_token, self.auth_token)
-        self.assertEqual(ip_address, "192.168.1.1")
+        self.assertEqual(ip_address, "10.0.0.1")
         self.assertEqual(undo, self.undo)
         self.assertEqual(clock, self.clock)
         self.assertEqual(lb_config, self.lb_config)
