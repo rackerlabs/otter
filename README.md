@@ -2,19 +2,33 @@
 
 *There Otter be an Otter scaling system.*
 
-
 ![Otter Cups](https://i.chzbgr.com/completestore/12/8/19/AjXtHogT4UqgJwDJsq7igA2.gif)
-
 
 This codebase is not able to be deployed independently.
 The code is open source as a reference, but requires dependencies not available within this repository.
 
 Talk with us! Join us in:
 
-irc.freenode.net #rackspace
+irc.freenode.net #stretch-dev
 
-fsargent, wirehead\_, oubiwann, dreid, cyli, rockstar, lvh
+Otter Dev Hall of Fame (alphabetical):
 
+- cyli
+- lvh
+- manisht
+- radix
+- wirehead
+
+Honorary Otters:
+
+- glyph
+
+Emeritus otters:
+
+- dreid
+- fsargent
+- oubiwann
+- rockstar
 
 ## Make Tasks:
 
