@@ -308,6 +308,18 @@ class IScalingGroup(Interface):
             deleted (e.g. if the state is not empty)
         """
 
+    def update_status(status):
+        """
+        Updates the status of the group
+
+        :param str status: status to update
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises NoSuchScalingGroupError: if the scaling group id
+            doesn't exist for this tenant id
+        """
+
     def update_config(config):
         """
         Update the scaling group configuration paramaters based on the

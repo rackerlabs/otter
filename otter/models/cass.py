@@ -738,6 +738,21 @@ class CassScalingGroup(object):
                               log.bind(category='locking'), acquire_timeout=150,
                               release_timeout=30)
 
+    def update_status(self, status):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.update_status`
+        """
+        self.log.bind(status=status).msg("Updating status")
+
+        @self.with_timestamp
+        def _do_update(ts, _):
+            return self.connection.execute(
+                _cql_update.format(cf=self.group_table, column='status', name=':status'),
+                {'tenantId': self.tenant_id, 'groupId': self.uuid, 'ts': ts, 'status': status},
+                consistency=self.get_consistency('update', 'status'))
+
+        return self.view_config().addCallback(_do_update)
+
     def update_config(self, data):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_config`
