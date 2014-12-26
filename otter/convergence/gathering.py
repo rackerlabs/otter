@@ -117,16 +117,16 @@ def get_clb_contents(request_func):
 
     def fill_drained_at((nodes, draining, feeds)):
         for node, feed in zip(draining, feeds):
-            node.drained_at = extract_drained_at(feed)
+            node.drained_at = extract_CLB_drained_at(feed)
         return nodes
 
     return lb_req('GET', 'loadbalancers').on(
         fetch_nodes).on(fetch_drained_feeds).on(fill_drained_at)
 
 
-def extract_drained_at(feed):
+def extract_CLB_drained_at(feed):
     """
-    Extract time when node was changed to DRAINING
+    Extract time when node was changed to DRAINING from a CLB atom feed.
 
     :param str feed: Atom feed of the node
 
