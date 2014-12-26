@@ -31,7 +31,7 @@ Emeritus otters:
 - oubiwann
 - rockstar
 
-## Make Tasks:
+## `make` targets
 
 In alphabetical order.  You probably will only need a select few of these.
 
