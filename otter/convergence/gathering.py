@@ -78,9 +78,9 @@ def get_scaling_group_servers(request_func, server_predicate=identity):
     return eff.on(servers_apply)
 
 
-def get_load_balancer_contents(request_func):
+def get_clb_contents(request_func):
     """
-    Get load balancer contents as list of `LBNode`
+    Get Rackspace Cloud Load Balancer contents as list of `LBNode`.
 
     :param request_func: A tenant-bound, CLB-bound, auth-retry based request function
     """

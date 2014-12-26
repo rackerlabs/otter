@@ -12,7 +12,7 @@ from otter.constants import ServiceType
 from otter.convergence.gathering import (
     extract_drained_at,
     get_all_server_details,
-    get_load_balancer_contents,
+    get_clb_contents,
     get_scaling_group_servers,
     json_to_LBConfigs,
     to_nova_server)
@@ -172,7 +172,7 @@ class ExtractDrainedTests(SynchronousTestCase):
 
 class GetLBContentsTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.convergence.get_load_balancer_contents`
+    Tests for :func:`otter.convergence.get_clb_contents`
     """
 
     def setUp(self):
@@ -236,7 +236,7 @@ class GetLBContentsTests(SynchronousTestCase):
         """
         Gets LB contents with drained_at correctly
         """
-        eff = get_load_balancer_contents(self._request())
+        eff = get_clb_contents(self._request())
         draining, enabled = CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED
         make_config = partial(LBConfig, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
@@ -255,7 +255,7 @@ class GetLBContentsTests(SynchronousTestCase):
         Return empty list if there are no LB
         """
         self.reqs = {('GET', 'loadbalancers', True): []}
-        eff = get_load_balancer_contents(self._request())
+        eff = get_clb_contents(self._request())
         self.assertEqual(self._resolve_lb(eff), [])
 
     def test_no_nodes(self):
@@ -267,7 +267,7 @@ class GetLBContentsTests(SynchronousTestCase):
             ('GET', 'loadbalancers/1/nodes', True): [],
             ('GET', 'loadbalancers/2/nodes', True): []
         }
-        eff = get_load_balancer_contents(self._request())
+        eff = get_clb_contents(self._request())
         self.assertEqual(self._resolve_lb(eff), [])
 
     def test_no_draining(self):
@@ -287,7 +287,7 @@ class GetLBContentsTests(SynchronousTestCase):
         }
         config = LBConfig(port=20, weight=2, condition=CLBNodeCondition.ENABLED,
                           type=CLBNodeType.PRIMARY)
-        eff = get_load_balancer_contents(self._request())
+        eff = get_clb_contents(self._request())
         self.assertEqual(
             self._resolve_lb(eff),
             [LBNode(lb_id=1, node_id='11', address='a11', config=config),
