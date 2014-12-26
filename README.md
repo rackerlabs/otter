@@ -67,8 +67,6 @@ Build the documentation:
   removing other artifacts.
 - `make clean` removes all build-time artifacts, leaving the
   repository in a distributable state.
-- `make clear-dev-schema` first removes any existing development
-  schema, then re-installs a fresh schema.
 
 ### Build and migrate Cassandra schemata
 
@@ -90,3 +88,5 @@ development VM):
   schema on an existing Cassandra instance.
 - `make teardown-dev-schema` will attempt to remove a development
   schema from an existing Cassandra instance.
+- `make clear-dev-schema` first removes any existing development
+  schema, then re-installs a fresh schema.
