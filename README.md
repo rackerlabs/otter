@@ -72,14 +72,17 @@ Build the documentation:
 
 ### Build and migrate Cassandra schemata
 
+Some tools for building Cassandra schemata as CQL files:
+
+- `make schema-setup` generates the setup CQL files.
+- `make schema-teardown` generates the teardown CQL files.
+- `make schema` generates the CQL files corresponding to setting up
+  and tearing down Otter's Cassandra schema.  Equivalent to running
+  `make schema-setup schema-teardown` manually.
+
 - `make load-dev-schema` will attempt to load the development schema
   into Cassandra.
 - `make migrate-dev-schema` will attempt to update the development
   schema on an existing Cassandra instance.
-- `make schema` generates the CQL files corresponding to setting up
-  and tearing down Otter's Cassandra schema.  Equivalent to running
-  `make schema-setup schema-teardown` manually.
-- `make schema-setup` generates the setup CQL files.
-- `make schema-teardown` generates the teardown CQL files.
 - `make teardown-dev-schema` will attempt to remove a development
   schema from an existing Cassandra instance.
