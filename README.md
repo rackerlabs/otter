@@ -80,6 +80,10 @@ Some tools for building Cassandra schemata as CQL files:
   and tearing down Otter's Cassandra schema.  Equivalent to running
   `make schema-setup schema-teardown` manually.
 
+Some tools for applying Cassandra schemata (by default, these are
+pointed at `localhost`, because they're typically only used within the
+development VM):
+
 - `make load-dev-schema` will attempt to load the development schema
   into Cassandra.
 - `make migrate-dev-schema` will attempt to update the development
