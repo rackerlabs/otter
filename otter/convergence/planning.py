@@ -73,7 +73,7 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     return removes + changes
 
 
-def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
+def _converge_lb_state(desired_lb_descriptions, current_lb_nodes, server):
     """
     Produce a series of steps to converge a server's current load balancer
     state towards its desired load balancer state.
@@ -93,39 +93,28 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
 
     :rtype: `list` of :class:`IStep`
     """
-    desired = {
-        (lb_id, config.port): config
-        for lb_id, configs in desired_lb_state.items()
-        for config in configs}
-    current = {
-        (node.lb_id, node.config.port): node
-        for node in current_lb_nodes}
-    desired_idports = set(desired)
-    current_idports = set(current)
+    desired_existing = [(desired, node) for desired in desired_lb_descriptions
+                        for node in current_lb_nodes
+                        if desired.equiv_definition(node.description)]
 
     adds = [
-        AddNodesToLoadBalancer(
-            lb_id=lb_id,
-            address_configs=s((ip_address, desired[lb_id, port])))
-        for lb_id, port in desired_idports - current_idports]
+        AddServerToLoadBalancing(server=server, description=desired)
+        for desired in desired_lb_descriptions
+        if desired not in [t[0] for t in desired_existing]
+    ]
 
-    # TODO: Removes could be replaced with _remove_from_lb_with_draining if
+    # Removes could be replaced with _remove_from_lb_with_draining if
     # we wanted to support draining for moving load balancers too
     removes = [
-        RemoveFromLoadBalancer(
-            lb_id=lb_id,
-            node_id=current[lb_id, port].node_id)
-        for lb_id, port in current_idports - desired_idports]
+        RemoveNodeFromLoadBalancing(node=node)
+        for node in current_lb_nodes
+        if node not in [t[1] for t in desired_existing]
+    ]
+
     changes = [
-        ChangeLoadBalancerNode(
-            lb_id=lb_id,
-            node_id=current[lb_id, port].node_id,
-            condition=desired_config.condition,
-            weight=desired_config.weight,
-            type=desired_config.type)
-        for (lb_id, port), desired_config in desired.iteritems()
-        if ((lb_id, port) in current
-            and current[lb_id, port].config != desired_config)]
+        ChangeLoadBalancerNode(node=node, desired=desired)
+        for node, desired in desired_existing
+    ]
     return adds + removes + changes
 
 
