@@ -8,8 +8,8 @@ from otter.convergence.model import (
     DesiredGroupState,
     LBConfig,
     LBNode,
-    NodeCondition,
-    NodeType,
+    CLBNodeCondition,
+    CLBNodeType,
     NovaServer,
     ServerState)
 from otter.convergence.planning import (
@@ -52,7 +52,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         result = _remove_from_lb_with_draining(
             10,
             [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
-                    config=LBConfig(port=80, condition=NodeCondition.DISABLED))],
+                    config=LBConfig(port=80, condition=CLBNodeCondition.DISABLED))],
             0)
 
         self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
@@ -70,8 +70,8 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         self.assertEqual(
             result,
             [ChangeLoadBalancerNode(lb_id=5, node_id=123, weight=1,
-                                    condition=NodeCondition.DRAINING,
-                                    type=NodeType.PRIMARY)])
+                                    condition=CLBNodeCondition.DRAINING,
+                                    type=CLBNodeType.PRIMARY)])
 
     def test_draining_state_is_ignored_if_connections_and_not_yet_timeout(self):
         """
@@ -81,7 +81,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         result = _remove_from_lb_with_draining(
             10,
             [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
-                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    config=LBConfig(port=80, condition=CLBNodeCondition.DRAINING),
                     drained_at=0.0, connections=1)],
             5)
 
@@ -95,7 +95,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         result = _remove_from_lb_with_draining(
             10,
             [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
-                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    config=LBConfig(port=80, condition=CLBNodeCondition.DRAINING),
                     drained_at=0.0, connections=0)],
             5)
 
@@ -109,7 +109,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         result = _remove_from_lb_with_draining(
             10,
             [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
-                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    config=LBConfig(port=80, condition=CLBNodeCondition.DRAINING),
                     drained_at=0.0)],
             5)
 
@@ -123,7 +123,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         result = _remove_from_lb_with_draining(
             10,
             [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
-                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    config=LBConfig(port=80, condition=CLBNodeCondition.DRAINING),
                     drained_at=0.0)],
             15)
 
@@ -137,7 +137,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         result = _remove_from_lb_with_draining(
             10,
             [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
-                    config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                    config=LBConfig(port=80, condition=CLBNodeCondition.DRAINING),
                     drained_at=0.0, connections=10)],
             15)
 
@@ -154,25 +154,25 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                    config=LBConfig(port=80)),
             # disabled, should be removed
             LBNode(lb_id=2, node_id=2, address='1.1.1.1',
-                   config=LBConfig(port=80, condition=NodeCondition.DISABLED)),
+                   config=LBConfig(port=80, condition=CLBNodeCondition.DISABLED)),
             # draining, still connections, should be ignored
             LBNode(lb_id=3, node_id=3, address='1.1.1.1',
-                   config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                   config=LBConfig(port=80, condition=CLBNodeCondition.DRAINING),
                    connections=3, drained_at=5.0),
             # draining, no connections, should be removed
             LBNode(lb_id=4, node_id=4, address='1.1.1.1',
-                   config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                   config=LBConfig(port=80, condition=CLBNodeCondition.DRAINING),
                    connections=0, drained_at=5.0),
             # draining, timeout exired, should be removed
             LBNode(lb_id=5, node_id=5, address='1.1.1.1',
-                   config=LBConfig(port=80, condition=NodeCondition.DRAINING),
+                   config=LBConfig(port=80, condition=CLBNodeCondition.DRAINING),
                    connections=10, drained_at=0.0)]
 
         result = _remove_from_lb_with_draining(10, current, 10)
         self.assertEqual(set(result), set([
             ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
-                                   condition=NodeCondition.DRAINING,
-                                   type=NodeType.PRIMARY),
+                                   condition=CLBNodeCondition.DRAINING,
+                                   type=CLBNodeType.PRIMARY),
             RemoveFromLoadBalancer(lb_id=2, node_id=2),
             RemoveFromLoadBalancer(lb_id=4, node_id=4),
             RemoveFromLoadBalancer(lb_id=5, node_id=5),
@@ -213,8 +213,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         self.assertEqual(
             list(result),
             [ChangeLoadBalancerNode(lb_id=5, node_id=123, weight=1,
-                                    condition=NodeCondition.ENABLED,
-                                    type=NodeType.PRIMARY)])
+                                    condition=CLBNodeCondition.ENABLED,
+                                    type=CLBNodeType.PRIMARY)])
 
     def test_remove_lb_node(self):
         """
@@ -264,8 +264,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
             ChangeLoadBalancerNode(lb_id=6, node_id=234, weight=2,
-                                   condition=NodeCondition.ENABLED,
-                                   type=NodeType.PRIMARY),
+                                   condition=CLBNodeCondition.ENABLED,
+                                   type=CLBNodeType.PRIMARY),
             RemoveFromLoadBalancer(lb_id=5, node_id=123)
         ]))
 
@@ -346,7 +346,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1')]),
                 set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
                             config=LBConfig(port=80,
-                            condition=NodeCondition.DRAINING))]),
+                                            condition=CLBNodeCondition.DRAINING))]),
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
@@ -366,7 +366,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1')]),
                 set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
                             config=LBConfig(port=80,
-                            condition=NodeCondition.DRAINING),
+                                            condition=CLBNodeCondition.DRAINING),
                             drained_at=1.0, connections=1)]),
                 2),
             pbag([]))
@@ -388,8 +388,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 0),
             pbag([
                 ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
-                                       condition=NodeCondition.DRAINING,
-                                       type=NodeType.PRIMARY),
+                                       condition=CLBNodeCondition.DRAINING,
+                                       type=CLBNodeType.PRIMARY),
                 SetMetadataItemOnServer(server_id='abc',
                                         key='rax:auto_scaling_draining',
                                         value='draining')
@@ -413,7 +413,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1')]),
                 set([LBNode(lb_id=1, node_id=1, address='1.1.1.1',
                             config=LBConfig(port=80,
-                                            condition=NodeCondition.DRAINING),
+                                            condition=CLBNodeCondition.DRAINING),
                             connections=1, drained_at=0.0)]),
                 1),
             pbag([
@@ -443,8 +443,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 1),
             pbag([
                 ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
-                                       condition=NodeCondition.DRAINING,
-                                       type=NodeType.PRIMARY)
+                                       condition=CLBNodeCondition.DRAINING,
+                                       type=CLBNodeType.PRIMARY)
             ]))
 
 

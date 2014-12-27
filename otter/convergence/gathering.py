@@ -13,8 +13,8 @@ from otter.constants import ServiceType
 from otter.convergence.model import (
     LBConfig,
     LBNode,
-    NodeCondition,
-    NodeType,
+    CLBNodeCondition,
+    CLBNodeType,
     NovaServer,
     ServerState)
 from otter.indexer import atom
@@ -78,9 +78,9 @@ def get_scaling_group_servers(request_func, server_predicate=identity):
     return eff.on(servers_apply)
 
 
-def get_load_balancer_contents(request_func):
+def get_clb_contents(request_func):
     """
-    Get load balancer contents as list of `LBNode`
+    Get Rackspace Cloud Load Balancer contents as list of `LBNode`.
 
     :param request_func: A tenant-bound, CLB-bound, auth-retry based request function
     """
@@ -102,11 +102,11 @@ def get_load_balancer_contents(request_func):
     def fetch_drained_feeds((ids, all_lb_nodes)):
         nodes = [LBNode(lb_id=_id, node_id=node['id'], address=node['address'],
                         config=LBConfig(port=node['port'], weight=node['weight'],
-                                        condition=NodeCondition.lookupByName(node['condition']),
-                                        type=NodeType.lookupByName(node['type'])))
+                                        condition=CLBNodeCondition.lookupByName(node['condition']),
+                                        type=CLBNodeType.lookupByName(node['type'])))
                  for _id, nodes in zip(ids, all_lb_nodes)
                  for node in nodes]
-        draining = [n for n in nodes if n.config.condition == NodeCondition.DRAINING]
+        draining = [n for n in nodes if n.config.condition == CLBNodeCondition.DRAINING]
         return parallel(
             [lb_req(
                 'GET',
@@ -117,16 +117,16 @@ def get_load_balancer_contents(request_func):
 
     def fill_drained_at((nodes, draining, feeds)):
         for node, feed in zip(draining, feeds):
-            node.drained_at = extract_drained_at(feed)
+            node.drained_at = extract_CLB_drained_at(feed)
         return nodes
 
     return lb_req('GET', 'loadbalancers').on(
         fetch_nodes).on(fetch_drained_feeds).on(fill_drained_at)
 
 
-def extract_drained_at(feed):
+def extract_CLB_drained_at(feed):
     """
-    Extract time when node was changed to DRAINING
+    Extract time when node was changed to DRAINING from a CLB atom feed.
 
     :param str feed: Atom feed of the node
 
