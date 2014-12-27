@@ -11,7 +11,7 @@ from toolz.curried import map
 
 from otter.convergence.effecting import _reqs_to_effect
 from otter.convergence.gathering import (
-    get_load_balancer_contents,
+    get_clb_contents,
     get_scaling_group_servers,
     json_to_LBConfigs,
     to_nova_server)
@@ -21,7 +21,7 @@ from otter.convergence.planning import converge, optimize_steps
 
 def execute_convergence(request_func, group_id, desired, launch_config,
                         get_servers=get_scaling_group_servers,
-                        get_lb=get_load_balancer_contents):
+                        get_lb=get_clb_contents):
     """
     Execute convergence. This function will do following:
     1. Get state of the nova, CLB and RCv3.

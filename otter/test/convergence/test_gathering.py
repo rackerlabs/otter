@@ -10,9 +10,9 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
-    extract_drained_at,
+    extract_CLB_drained_at,
     get_all_server_details,
-    get_load_balancer_contents,
+    get_clb_contents,
     get_scaling_group_servers,
     json_to_LBConfigs,
     to_nova_server)
@@ -144,7 +144,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
 
 class ExtractDrainedTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.convergence.extract_drained_at`
+    Tests for :func:`otter.convergence.extract_CLB_drained_at`
     """
     summary = ("Node successfully updated with address: " +
                "'10.23.45.6', port: '8080', weight: '1', condition: 'DRAINING'")
@@ -159,7 +159,7 @@ class ExtractDrainedTests(SynchronousTestCase):
         Takes the first entry only
         """
         feed = self.feed.format(self.summary, self.updated)
-        self.assertEqual(extract_drained_at(feed),
+        self.assertEqual(extract_CLB_drained_at(feed),
                          calendar.timegm(from_timestamp(self.updated).utctimetuple()))
 
     def test_invalid_first_entry(self):
@@ -167,17 +167,17 @@ class ExtractDrainedTests(SynchronousTestCase):
         Raises error if first entry is not DRAINING entry
         """
         feed = self.feed.format("Node successfully updated with ENABLED", self.updated)
-        self.assertRaises(ValueError, extract_drained_at, feed)
+        self.assertRaises(ValueError, extract_CLB_drained_at, feed)
 
 
 class GetLBContentsTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.convergence.get_load_balancer_contents`
+    Tests for :func:`otter.convergence.get_clb_contents`
     """
 
     def setUp(self):
         """
-        Stub request function and mock `extract_drained_at`
+        Stub request function and mock `extract_CLB_drained_at`
         """
         self.reqs = {
             ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
@@ -196,7 +196,7 @@ class GetLBContentsTests(SynchronousTestCase):
         }
         self.feeds = {'11feed': 1.0, '22feed': 2.0}
         self.mock_eda = patch(
-            self, 'otter.convergence.gathering.extract_drained_at',
+            self, 'otter.convergence.gathering.extract_CLB_drained_at',
             side_effect=lambda f: self.feeds[f])
 
     def _request(self):
@@ -236,7 +236,7 @@ class GetLBContentsTests(SynchronousTestCase):
         """
         Gets LB contents with drained_at correctly
         """
-        eff = get_load_balancer_contents(self._request())
+        eff = get_clb_contents(self._request())
         draining, enabled = CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED
         make_config = partial(LBConfig, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
@@ -255,7 +255,7 @@ class GetLBContentsTests(SynchronousTestCase):
         Return empty list if there are no LB
         """
         self.reqs = {('GET', 'loadbalancers', True): []}
-        eff = get_load_balancer_contents(self._request())
+        eff = get_clb_contents(self._request())
         self.assertEqual(self._resolve_lb(eff), [])
 
     def test_no_nodes(self):
@@ -267,7 +267,7 @@ class GetLBContentsTests(SynchronousTestCase):
             ('GET', 'loadbalancers/1/nodes', True): [],
             ('GET', 'loadbalancers/2/nodes', True): []
         }
-        eff = get_load_balancer_contents(self._request())
+        eff = get_clb_contents(self._request())
         self.assertEqual(self._resolve_lb(eff), [])
 
     def test_no_draining(self):
@@ -287,7 +287,7 @@ class GetLBContentsTests(SynchronousTestCase):
         }
         config = LBConfig(port=20, weight=2, condition=CLBNodeCondition.ENABLED,
                           type=CLBNodeType.PRIMARY)
-        eff = get_load_balancer_contents(self._request())
+        eff = get_clb_contents(self._request())
         self.assertEqual(
             self._resolve_lb(eff),
             [LBNode(lb_id=1, node_id='11', address='a11', config=config),
