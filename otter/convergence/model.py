@@ -102,7 +102,7 @@ class NovaServer(object):
 
 
 @attributes(['launch_config', 'desired',
-             Attribute('desired_lbs', default_value=(), instance_of=tuple),
+             Attribute('desired_lbs', default_factory=dict, instance_of=dict),
              Attribute('draining_timeout', default_value=0.0, instance_of=float)])
 class DesiredGroupState(object):
     """
@@ -110,7 +110,8 @@ class DesiredGroupState(object):
 
     :ivar dict launch_config: nova launch config.
     :ivar int desired: the number of desired servers within the group.
-    :ivar tuple desired_lbs: A tuple of :class:`ILBDescription` providers.
+    :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
+        :class:`LBConfig` instances.
     :ivar float draining_timeout: If greater than zero, when the server is
         scaled down it will be put into draining condition.  It will remain
         in draining condition for a maximum of ``draining_timeout`` seconds
