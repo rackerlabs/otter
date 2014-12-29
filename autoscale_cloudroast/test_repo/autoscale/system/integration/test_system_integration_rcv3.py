@@ -295,7 +295,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             network_info_response = self.rcv3_client.get_cloud_network_info(
                 self.rackconnect_network['uuid'])
             network_info = network_info_response.entity
-            self._debug_message()
 
             # Verify that our servers have the correct set of networks attached.
             self.assertTrue('private' in dir(server_info.addresses),
@@ -320,7 +319,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         initial_node_ids = []
         initial_node_list = self.rcv3_client.get_nodes_on_pool(self.pool_1.id).entity.nodes
         for each_node in initial_node_list:
-                self._debug_message()
                 initial_node_ids.append(each_node.id)
 
         # Create the group used for testing
@@ -736,14 +734,4 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             if hasattr(each_lb, 'port'):
                 port_list.append(each_lb.port)
         return port_list
-
-    def _debug_message(self):
-        """
-        Return & print a grepable string to mark debug statements
-        '... rcdebug: test_system_integration_rcv3.{test_case_method} ...'
-        """
-        # Obsolete if we using logging.
-        msg = '\n\n... rcdebug: {0}.{1} ...'.format(__file__, self._testMethodName)
-        print msg
-        return msg
 
