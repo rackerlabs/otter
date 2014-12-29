@@ -630,3 +630,10 @@ class ScalingGroupWebhookFixture(ScalingGroupPolicyFixture):
         Delete the webhook
         """
         super(ScalingGroupWebhookFixture, cls).tearDownClass()
+
+
+def safe_hasattr(obj, key):
+    """This function provides a safe alternative to the hasattr() function."""
+    sentinel = object()
+    return getattr(obj, key, sentinel) is not sentinel
+

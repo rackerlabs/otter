@@ -1,7 +1,7 @@
 """
 System Integration tests for autoscaling with RackConnect V3 load balancers
 """
-from test_repo.autoscale.fixtures import AutoscaleFixture
+from test_repo.autoscale.fixtures import AutoscaleFixture, safe_hasattr
 from cafe.drivers.unittest.decorators import tags
 import random
 import time
@@ -595,7 +595,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         node_list = self.rcv3_client.get_nodes_on_pool(pool_id).entity.nodes
         servers_on_node = []
         for node in node_list:
-            if hasattr(node, 'cloud_server'):
+            if safe_hasattr(node, 'cloud_server'):
                 servers_on_node.append({'server_id': node.cloud_server['id'],
                                         'node_id': node.id})
         return servers_on_node
@@ -731,7 +731,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         launch_config = (
             self.autoscale_client.view_launch_config(group_id)).entity
         for each_lb in launch_config.loadBalancers:
-            if hasattr(each_lb, 'port'):
+            if safe_hasattr(each_lb, 'port'):
                 port_list.append(each_lb.port)
         return port_list
 
