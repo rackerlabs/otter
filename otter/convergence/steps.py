@@ -98,7 +98,7 @@ class AddNodesToLoadBalancer(object):
 
 @implementer(IStep)
 @attributes(['lb_id', 'node_id'])
-class RemoveFromLoadBalancer(object):
+class RemoveFromCLB(object):
     """
     A server must be removed from a load balancer.
     """

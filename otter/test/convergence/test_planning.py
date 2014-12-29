@@ -24,7 +24,7 @@ from otter.convergence.steps import (
     ChangeLoadBalancerNode,
     CreateServer,
     DeleteServer,
-    RemoveFromLoadBalancer,
+    RemoveFromCLB,
     SetMetadataItemOnServer)
 
 
@@ -42,7 +42,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                     config=LBConfig(port=80))],
             0)
 
-        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+        self.assertEqual(result, [RemoveFromCLB(lb_id=5, node_id=123)])
 
     def test_disabled_state_is_removed(self):
         """
@@ -55,7 +55,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                     config=LBConfig(port=80, condition=CLBNodeCondition.DISABLED))],
             0)
 
-        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+        self.assertEqual(result, [RemoveFromCLB(lb_id=5, node_id=123)])
 
     def test_enabled_state_is_drained(self):
         """
@@ -99,7 +99,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                     drained_at=0.0, connections=0)],
             5)
 
-        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+        self.assertEqual(result, [RemoveFromCLB(lb_id=5, node_id=123)])
 
     def test_draining_state_remains_if_connections_None_and_not_yet_timeout(self):
         """
@@ -127,7 +127,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                     drained_at=0.0)],
             15)
 
-        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+        self.assertEqual(result, [RemoveFromCLB(lb_id=5, node_id=123)])
 
     def test_draining_state_removed_if_connections_and_timeout_expired(self):
         """
@@ -141,7 +141,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                     drained_at=0.0, connections=10)],
             15)
 
-        self.assertEqual(result, [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+        self.assertEqual(result, [RemoveFromCLB(lb_id=5, node_id=123)])
 
     def test_all_changes_together(self):
         """
@@ -173,9 +173,9 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
             ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
                                    condition=CLBNodeCondition.DRAINING,
                                    type=CLBNodeType.PRIMARY),
-            RemoveFromLoadBalancer(lb_id=2, node_id=2),
-            RemoveFromLoadBalancer(lb_id=4, node_id=4),
-            RemoveFromLoadBalancer(lb_id=5, node_id=5),
+            RemoveFromCLB(lb_id=2, node_id=2),
+            RemoveFromCLB(lb_id=4, node_id=4),
+            RemoveFromCLB(lb_id=5, node_id=5),
         ]))
 
 
@@ -219,7 +219,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
     def test_remove_lb_node(self):
         """
         If a current lb config is not in the desired set of lb configs,
-        `converge_lb_state` returns a :class:`RemoveFromLoadBalancer` object
+        `converge_lb_state` returns a :class:`RemoveFromCLB` object
         """
         current = [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
                           config=LBConfig(port=80, weight=5))]
@@ -229,7 +229,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
-            [RemoveFromLoadBalancer(lb_id=5, node_id=123)])
+            [RemoveFromCLB(lb_id=5, node_id=123)])
 
     def test_do_nothing(self):
         """
@@ -266,7 +266,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
             ChangeLoadBalancerNode(lb_id=6, node_id=234, weight=2,
                                    condition=CLBNodeCondition.ENABLED,
                                    type=CLBNodeType.PRIMARY),
-            RemoveFromLoadBalancer(lb_id=5, node_id=123)
+            RemoveFromCLB(lb_id=5, node_id=123)
         ]))
 
     def test_same_lb_multiple_ports(self):
@@ -331,7 +331,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
-                RemoveFromLoadBalancer(lb_id=1, node_id=1)
+                RemoveFromCLB(lb_id=1, node_id=1)
             ]))
 
     def test_draining_server_can_be_deleted_if_all_lbs_can_be_removed(self):
@@ -350,7 +350,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
-                RemoveFromLoadBalancer(lb_id=1, node_id=1)
+                RemoveFromCLB(lb_id=1, node_id=1)
             ]))
 
     def test_draining_server_ignored_if_waiting_for_timeout(self):
@@ -525,8 +525,8 @@ class ConvergeTests(SynchronousTestCase):
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
-                RemoveFromLoadBalancer(lb_id=5, node_id=3),
-                RemoveFromLoadBalancer(lb_id=5, node_id=5),
+                RemoveFromCLB(lb_id=5, node_id=3),
+                RemoveFromCLB(lb_id=5, node_id=5),
                 CreateServer(launch_config=pmap()),
             ]))
 
@@ -557,7 +557,7 @@ class ConvergeTests(SynchronousTestCase):
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
-                RemoveFromLoadBalancer(lb_id=5, node_id=3)
+                RemoveFromCLB(lb_id=5, node_id=3)
             ]))
 
     def test_scale_down_building_first(self):

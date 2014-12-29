@@ -11,7 +11,7 @@ from otter.convergence.steps import (
     ChangeLoadBalancerNode,
     CreateServer,
     DeleteServer,
-    RemoveFromLoadBalancer,
+    RemoveFromCLB,
     Request,
     SetMetadataItemOnServer)
 
@@ -63,10 +63,10 @@ class StepAsRequestTests(SynchronousTestCase):
 
     def test_remove_from_load_balancer(self):
         """
-        :obj:`RemoveFromLoadBalancer.as_request` produces a request for
+        :obj:`RemoveFromCLB.as_request` produces a request for
         removing a node from a load balancer.
         """
-        lbremove = RemoveFromLoadBalancer(
+        lbremove = RemoveFromCLB(
             lb_id='abc123',
             node_id='node1')
         self.assertEqual(
