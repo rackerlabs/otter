@@ -7,7 +7,7 @@ from toolz.itertoolz import concat, concatv, mapcat
 
 from otter.convergence.model import CLBNodeCondition, ServerState
 from otter.convergence.steps import (
-    AddNodesToLoadBalancer,
+    AddNodesToCLB,
     ChangeLoadBalancerNode,
     CreateServer,
     DeleteServer,
@@ -104,7 +104,7 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     current_idports = set(current)
 
     adds = [
-        AddNodesToLoadBalancer(
+        AddNodesToCLB(
             lb_id=lb_id,
             address_configs=s((ip_address, desired[lb_id, port])))
         for lb_id, port in desired_idports - current_idports]
@@ -261,16 +261,16 @@ def _optimizer(step_type):
     return _add_to_optimizers
 
 
-@_optimizer(AddNodesToLoadBalancer)
+@_optimizer(AddNodesToCLB)
 def _optimize_lb_adds(lb_add_steps):
     """
-    Merge together multiple :obj:`AddNodesToLoadBalancer`, per load balancer.
+    Merge together multiple :obj:`AddNodesToCLB`, per load balancer.
 
-    :param steps_by_lb: Iterable of :obj:`AddNodesToLoadBalancer`.
+    :param steps_by_lb: Iterable of :obj:`AddNodesToCLB`.
     """
     steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
     return [
-        AddNodesToLoadBalancer(
+        AddNodesToCLB(
             lb_id=lbid,
             address_configs=pset(reduce(lambda s, y: s.union(y),
                                         [step.address_configs for step in steps])))

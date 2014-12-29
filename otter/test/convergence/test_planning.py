@@ -18,7 +18,7 @@ from otter.convergence.planning import (
     converge,
     optimize_steps)
 from otter.convergence.steps import (
-    AddNodesToLoadBalancer,
+    AddNodesToCLB,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeLoadBalancerNode,
@@ -193,7 +193,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
-            [AddNodesToLoadBalancer(
+            [AddNodesToCLB(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80))))])
 
@@ -260,7 +260,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                                     current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(set(result), set([
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
             ChangeLoadBalancerNode(lb_id=6, node_id=234, weight=2,
@@ -283,10 +283,10 @@ class ConvergeLBStateTests(SynchronousTestCase):
         self.assertEqual(
             set(result),
             set([
-                AddNodesToLoadBalancer(
+                AddNodesToCLB(
                     lb_id=5,
                     address_configs=s(('1.1.1.1', LBConfig(port=8080)))),
-                AddNodesToLoadBalancer(
+                AddNodesToCLB(
                     lb_id=5,
                     address_configs=s(('1.1.1.1', LBConfig(port=8081))))
                 ]))
@@ -623,7 +623,7 @@ class ConvergeTests(SynchronousTestCase):
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
-                AddNodesToLoadBalancer(
+                AddNodesToCLB(
                     lb_id=5,
                     address_configs=s(('2.2.2.2', LBConfig(port=80))))
             ]))
@@ -634,20 +634,20 @@ class OptimizerTests(SynchronousTestCase):
 
     def test_optimize_lb_adds(self):
         """
-        Multiple :class:`AddNodesToLoadBalancer` steps for the same LB
+        Multiple :class:`AddNodesToCLB` steps for the same LB
         are merged into one.
         """
         steps = pbag([
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=5,
                 address_configs=s(('1.2.3.4', LBConfig(port=80))))])
         self.assertEqual(
             optimize_steps(steps),
             pbag([
-                AddNodesToLoadBalancer(
+                AddNodesToCLB(
                     lb_id=5,
                     address_configs=s(
                         ('1.1.1.1', LBConfig(port=80)),
@@ -659,17 +659,17 @@ class OptimizerTests(SynchronousTestCase):
         Multiple ports can be specified for the same address and LB ID.
         """
         steps = pbag([
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=8080))))])
 
         self.assertEqual(
             optimize_steps(steps),
             pbag([
-                AddNodesToLoadBalancer(
+                AddNodesToCLB(
                     lb_id=5,
                     address_configs=s(('1.1.1.1', LBConfig(port=80)),
                                       ('1.1.1.1', LBConfig(port=8080))))]))
@@ -677,27 +677,27 @@ class OptimizerTests(SynchronousTestCase):
     def test_multiple_load_balancers(self):
         """Aggregation is done on a per-load-balancer basis."""
         steps = pbag([
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=5,
                 address_configs=s(('1.1.1.2', LBConfig(port=80)))),
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=6,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=6,
                 address_configs=s(('1.1.1.2', LBConfig(port=80)))),
         ])
         self.assertEqual(
             optimize_steps(steps),
             pbag([
-                AddNodesToLoadBalancer(
+                AddNodesToCLB(
                     lb_id=5,
                     address_configs=s(('1.1.1.1', LBConfig(port=80)),
                                       ('1.1.1.2', LBConfig(port=80)))),
-                AddNodesToLoadBalancer(
+                AddNodesToCLB(
                     lb_id=6,
                     address_configs=s(('1.1.1.1', LBConfig(port=80)),
                                       ('1.1.1.2', LBConfig(port=80)))),
@@ -708,7 +708,7 @@ class OptimizerTests(SynchronousTestCase):
         Unoptimizable steps pass the optimizer unchanged.
         """
         steps = pbag([
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
             CreateServer(launch_config=pmap({})),
@@ -729,16 +729,16 @@ class OptimizerTests(SynchronousTestCase):
         """
         steps = pbag([
             # CLB adds
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=5,
                 address_configs=s(('1.1.1.2', LBConfig(port=80)))),
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=6,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
-            AddNodesToLoadBalancer(
+            AddNodesToCLB(
                 lb_id=6,
                 address_configs=s(('1.1.1.2', LBConfig(port=80)))),
 
@@ -750,11 +750,11 @@ class OptimizerTests(SynchronousTestCase):
             optimize_steps(steps),
             pbag([
                 # Optimized CLB adds
-                AddNodesToLoadBalancer(
+                AddNodesToCLB(
                     lb_id=5,
                     address_configs=s(('1.1.1.1', LBConfig(port=80)),
                                       ('1.1.1.2', LBConfig(port=80)))),
-                AddNodesToLoadBalancer(
+                AddNodesToCLB(
                     lb_id=6,
                     address_configs=s(('1.1.1.1', LBConfig(port=80)),
                                       ('1.1.1.2', LBConfig(port=80)))),

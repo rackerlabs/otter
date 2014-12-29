@@ -77,7 +77,7 @@ class SetMetadataItemOnServer(object):
 
 @implementer(IStep)
 @attributes(['lb_id', 'address_configs'])
-class AddNodesToLoadBalancer(object):
+class AddNodesToCLB(object):
     """
     Multiple nodes must be added to a load balancer.
 
