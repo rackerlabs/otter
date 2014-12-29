@@ -252,13 +252,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         # Make sure that we have the correct number of cloud servers in our possession.
         new_counts = self._get_node_counts_on_pool(self.pool_1.id)
         expected_count_on_pool = init_cloud_servers + self.min_servers
-        print "$$$"
-        print "MIN SVR =",self.min_servers
-        print " INITIAL=",init_cloud_servers
-        print " ACTIVE =",active_servers
-        print "    NEW =",new_counts['cloud_servers']
-        print "EXPECTED=",expected_count_on_pool
-        print "---"
         self.assertEqual(new_counts['cloud_servers'], expected_count_on_pool,
                          msg='count {0} is not equal to expected count ([{1}] + {2})'.format(
                              new_counts['cloud_servers'], init_cloud_servers,
