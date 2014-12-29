@@ -1,6 +1,9 @@
 """
 System tests for negative groups scenarios
 """
+import json
+import time
+
 from test_repo.autoscale.fixtures import AutoscaleFixture
 import unittest
 from cafe.drivers.unittest.decorators import tags
@@ -105,6 +108,34 @@ class NegativeGroupFixture(AutoscaleFixture):
                          msg='{0} servers are building or active. Expected '
                          '{1}'.format(updated_state.pendingCapacity + updated_state.activeCapacity,
                                       server_count - 1))
+
+    @tags(requires='mimic')
+    def test_system_create_group_create_server_fails(self):
+        """
+        If a scaling group is created with a min. entity of 1, the group
+        starts off with a pending capacity of 1.  But when creating the
+        server fails, the group will end up with up with a pending capacity of
+        0.
+        """
+        error = {
+            "message": "This is a simulated nova error",
+            "code": 500
+        }
+
+        lc_metadata = {'create_server_failure': json.dumps(error)}
+
+        create_response = self.autoscale_behaviors.create_scaling_group_given(
+            gc_min_entities=1,
+            lc_metadata=lc_metadata)
+        self.assertEquals(create_response.status_code, 201)
+        group = create_response.entity
+        self.resources.add(group, self.empty_scaling_group)
+
+        # wait to give it otter time to become consistent, so this doesn't
+        # pass by accident
+        time.sleep(1)
+
+        self.wait_for_expected_group_state(group.id, 0)
 
     def test_system_create_delete_scaling_group_server_building_indefinitely(self):
         """
