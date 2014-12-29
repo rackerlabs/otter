@@ -3,11 +3,23 @@ Behaviors for Autoscale
 """
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta
-
+import logging
+import time
+import inspect
 
 from cafe.engine.behaviors import BaseBehavior
 from cloudcafe.common.tools.datagen import rand_name
 from autoscale.models.servers import Metadata
+
+
+log = logging.getLogger('RunnerLog')
+
+
+def __line():
+    """Returns the line number of the caller."""
+    # Taken shamelessly from
+    # http://code.activestate.com/recipes/145297-grabbing-the-current-line-number-easily/
+    return inspect.currentframe().f_back.f_lineno
 
 
 class AutoscaleBehaviors(BaseBehavior):
@@ -538,3 +550,63 @@ class AutoscaleBehaviors(BaseBehavior):
                 pass
             webhook['count'] = len(webhook_list)
             return webhook
+
+    def wait_for_servers_to_build(self, group_id, expected_servers,
+                                  interval_time=None, timeout=None):
+        """
+        Modification of wait_for_expected_number_of_servers without asserts.
+        This returns a tuple containing (list of server ids, error flag).  The
+        error flag is True if there was an error and False if everything
+        completed successfully.  (Note:  This likely needs reworked)
+        """
+        # Assume sane return defaults: no servers, and that an error occurred.
+        ret_list = []
+        err = True
+
+        # So as to not overload the API, we want to space our API queries to
+        # reasonable intervals.  This setting configures that span of time.
+        interval_time = interval_time or int(self.autoscale_config.interval_time)
+
+        # If no timeout is provided, assume the default setting in the configuration file.
+        # We don't want to wait forever for our servers to spin up, so using the timeout,
+        # determine when we should abort.
+        timeout = timeout or int(self.autoscale_config.timeout)
+        end_time = time.time() + timeout
+
+        # Verify that our autoscale group has the correct desired capacity.
+        # If not, log it, and return an error.
+        group_state_response = self.autoscale_client.list_status_entities_sgroups(
+            group_id)
+        group_state = group_state_response.entity
+        if (group_state.desiredCapacity != expected_servers):
+            log.info("{0}: {1}: Group {2} should have {3} servers, but is trying to "
+                     "build {4} servers".format(
+                         __file__, __line(), group_id, expected_servers,
+                         group_state.desiredCapacity))
+            return ret_list, err
+
+        # Check for server bring-up, for as long as is reasonable.
+        while time.time() < end_time:
+            resp = self.autoscale_client.list_status_entities_sgroups(group_id)
+            group_state = resp.entity
+            active_list = group_state.active
+            ret_list = [server.id for server in active_list]
+            if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
+                log.info("{0}: {1}: Group ID {2} failed server creation.".format(
+                    __file__, __line(), group_id))
+                return ret_list, err
+            if group_state.desiredCapacity != expected_servers:
+                log.info("{0}: {1}: Group {2} should have {3} servers, but has "
+                         "reduced in quantity to {4}".format(
+                            __file__, __line(), group_id, expected_servers,
+                            group_state.desiredCapacity))
+                return ret_list, err
+            if len(active_list) == expected_servers:
+                err = False
+                return (ret_list, err)
+            time.sleep(interval_time)
+        else:
+            log.info("{0}: {1}: Group {2} did not complete its {3} servers "
+                     "within the {4} second timeout.".format(
+                         __file__, __line(), group_id, expected_servers, timeout))
+            return ret_list, err
