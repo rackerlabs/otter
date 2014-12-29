@@ -133,7 +133,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             log.info("{0}: {1}: SetUpClass failed: background servers".format(
                 __file__, __line()))
 
-    #@unittest.skip("Skipping")
     @tags(speed='slow', type='rcv3')
     def test_create_scaling_group_with_pool_on_cn(self):
         """
@@ -162,7 +161,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           msg='Load balancer type {0} is not correct for RackConnect pools'
                           .format(pool_group.launchConfiguration.loadBalancers[0].type))
 
-    #@unittest.skip("Skipping")
     @tags(speed='slow', type='rcv3')
     def test_create_scaling_group_with_pool_on_private(self):
         """
@@ -191,7 +189,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           msg='Load balancer type {0} is not correct for RackConnect pools'
                           .format(pool_group.launchConfiguration.loadBalancers[0].type))
 
-    #@unittest.skip("Skipping")
     @tags(speed='slow', type='rcv3')
     def test_create_scaling_group_with_pool_on_public(self):
         """
@@ -220,7 +217,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           msg='Load balancer type {0} is not correct for RackConnect pools'
                           .format(pool_group.launchConfiguration.loadBalancers[0].type))
 
-    #@unittest.skip("Skipping")
     @tags(speed='slow', type='rcv3')
     def test_create_scaling_group_with_pool_counts(self):
         """
@@ -268,7 +264,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                              new_counts['cloud_servers'], init_cloud_servers,
                              self.min_servers))
 
-    #@unittest.skip("Skipping")
     @tags(speed='slow', type='rcv3')
     def test_create_scaling_group_with_pool_and_nonzero_min(self):
         """
@@ -313,7 +308,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.assertEquals(status, "ACTIVE",
                           msg='LB Pool status {0} is not in expected ACTIVE state'.format(status))
 
-    #@unittest.skip("Skipping: This test doesn't seem to be valid.")
     @tags(speed='slow', type='rcv3')
     def test_scale_up_on_illegal_rcv3_pool(self):
         """
@@ -377,7 +371,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           'cloud_server count of [{0}] does not match the initial count '
                           'of [{1}]'.format(scale_up_node_count, initial_node_count))
 
-    #@unittest.skip("Skipping")
     @tags(speed='slow', type='rcv3')
     def test_scale_up_down_on_rcv3_pool(self):
         """
@@ -475,7 +468,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             self.assertTrue(nid in final_node_ids, msg='Initial node {0} was not in '
                             'the final list'.format(nid))
 
-    #@unittest.skip("Skipping")
     @tags(speed='slow', type='rcv3')
     def test_scale_up_down_on_rcv3_and_clb(self):
         """As test_scale_up_down_on_rcv3, but includes a cloud load balancer as well."""
