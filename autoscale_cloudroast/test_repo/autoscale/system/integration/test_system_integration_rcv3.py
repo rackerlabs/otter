@@ -585,21 +585,15 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         Return a list of the cloud server nodes on the specified pool,
         identified by pool_id.
         """
+        def as_hash(n):
+            return {'server_id': n.cloud_server['id'], 'node_id': n.id}
+
         node_list = self.rcv3_client.get_nodes_on_pool(pool_id).entity.nodes
-        servers_on_node = []
-        for node in node_list:
-            if safe_hasattr(node, 'cloud_server'):
-                servers_on_node.append({'server_id': node.cloud_server['id'],
-                                        'node_id': node.id})
-        return servers_on_node
+        return [as_hash(n) for n in node_list if safe_hasattr(n, 'cloud_server')]
 
     def _get_cloud_server_ids_on_lb_pool_nodes(self, pool_id):
         """Return a list of all cloud server ids on the given lb pool_id."""
-        id_list = []
-        servers_on_node = self._get_cloud_servers_on_pool(pool_id)
-        for server in servers_on_node:
-            id_list.append(server['server_id'])
-        return id_list
+        return [s['server_id'] for s in self._get_cloud_servers_on_pool(pool_id)]
 
     def _get_node_list_from_lb(self, load_balancer_id):
         """Returns the list of nodes on the load balancer."""
