@@ -5,7 +5,7 @@ from pyrsistent import pbag, s, pset
 from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
 
-from otter.convergence.model import IDrainable, CLBNodeCondition, ServerState
+from otter.convergence.model import CLBNodeCondition, ServerState
 from otter.convergence.steps import (
     AddNodesToLoadBalancer,
     ChangeLoadBalancerNode,
@@ -45,27 +45,35 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
 
     :rtype: `list` of :class:`IStep`
     """
-    to_drain = ()
-    in_drain = ()
+    to_drain = []
+    in_drain = []
 
     # only put nodes into draining if a timeout is specified
     if timeout > 0:
-        draining, to_drain = partition_bool(
-            lambda node: node.currently_draining(),
-            [node for node in nodes if IDrainable.providedBy(node)])
+        draining, to_drain = partition_groups(
+            lambda n: n.config.condition, nodes, [CLBNodeCondition.DRAINING,
+                                                  CLBNodeCondition.ENABLED])
 
+        # Nothing should be done to these, because the timeout has not expired
+        # and there are still active connections
         in_drain = [node for node in draining
-                    if not node.is_done_draining(now, timeout)]
+                    if (now - node.drained_at < timeout and
+                        (node.connections is None or node.connections > 0))]
 
-    removes = [RemoveFromLoadBalancing(node=node)
+    removes = [RemoveFromLoadBalancer(lb_id=node.lb_id, node_id=node.node_id)
                for node in (set(nodes) - set(to_drain) - set(in_drain))]
 
-    changes = [DrainLoadBalancingNode(node=node) for node in to_drain]
+    changes = [ChangeLoadBalancerNode(lb_id=node.lb_id,
+                                      node_id=node.node_id,
+                                      condition=CLBNodeCondition.DRAINING,
+                                      weight=node.config.weight,
+                                      type=node.config.type)
+               for node in to_drain]
 
     return removes + changes
 
 
-def _converge_lb_state(desired_lb_descriptions, current_lb_nodes, server):
+def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     """
     Produce a series of steps to converge a server's current load balancer
     state towards its desired load balancer state.
@@ -85,28 +93,39 @@ def _converge_lb_state(desired_lb_descriptions, current_lb_nodes, server):
 
     :rtype: `list` of :class:`IStep`
     """
-    desired_existing = [(desired, node) for desired in desired_lb_descriptions
-                        for node in current_lb_nodes
-                        if desired.equiv_definition(node.description)]
+    desired = {
+        (lb_id, config.port): config
+        for lb_id, configs in desired_lb_state.items()
+        for config in configs}
+    current = {
+        (node.lb_id, node.config.port): node
+        for node in current_lb_nodes}
+    desired_idports = set(desired)
+    current_idports = set(current)
 
     adds = [
-        AddServerToLoadBalancing(server=server, description=desired)
-        for desired in desired_lb_descriptions
-        if desired not in [t[0] for t in desired_existing]
-    ]
+        AddNodesToLoadBalancer(
+            lb_id=lb_id,
+            address_configs=s((ip_address, desired[lb_id, port])))
+        for lb_id, port in desired_idports - current_idports]
 
-    # Removes could be replaced with _remove_from_lb_with_draining if
+    # TODO: Removes could be replaced with _remove_from_lb_with_draining if
     # we wanted to support draining for moving load balancers too
     removes = [
-        RemoveNodeFromLoadBalancing(node=node)
-        for node in current_lb_nodes
-        if node not in [t[1] for t in desired_existing]
-    ]
-
+        RemoveFromLoadBalancer(
+            lb_id=lb_id,
+            node_id=current[lb_id, port].node_id)
+        for lb_id, port in current_idports - desired_idports]
     changes = [
-        ChangeLoadBalancingNode(node=node, desired=desired)
-        for node, desired in desired_existing if node.description != desired
-    ]
+        ChangeLoadBalancerNode(
+            lb_id=lb_id,
+            node_id=current[lb_id, port].node_id,
+            condition=desired_config.condition,
+            weight=desired_config.weight,
+            type=desired_config.type)
+        for (lb_id, port), desired_config in desired.iteritems()
+        if ((lb_id, port) in current
+            and current[lb_id, port].config != desired_config)]
     return adds + removes + changes
 
 
@@ -146,9 +165,9 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     :param set servers_with_cheese: a list of :obj:`NovaServer` instances.
         This must only contain servers that are being managed for the specified
         group.
-    :param load_balancer_contents: a set of :obj:`ILBNode` providers.  This must
-        contain all the load balancer mappings for all the load balancers
-        (of all types) on the tenant.
+    :param load_balancer_contents: a set of :obj:`LBNode` instances.  This must
+        contain all the load balancer mappings for all the load balancers on the
+        tenant.
     :param float now: number of seconds since the POSIX epoch indicating the
         time at which the convergence was requested.
     :param float timeout: Number of seconds after which we will delete a server
