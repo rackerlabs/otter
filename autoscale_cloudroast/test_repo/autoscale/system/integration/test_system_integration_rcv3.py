@@ -56,11 +56,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             raise Exception("No RCv3 pools exist.  "
                             "We need at least one (two preferred).")
 
-        # Mimic should have a single pool out of the box.  However, if it
-        # exists, we'll gladly help ourselves to a second pool.  Eventually,
-        # we can try to create a second pool on-demand once Mimic supports
-        # the feature.
-        #
+        # Mimic should have a single pool out of the box.
         # Note: Ideally, we want the same code path for both mimic and
         # real hardware.  However, since it requires human intervention to
         # create an RCv3 load balancer pool, we have to make the exception
@@ -69,18 +65,13 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         # rc_load_balancer_* are initialized in the base class,
         # AutoscaleFixture.
         cls.pool_1 = None
-        cls.pool_2 = None
         if cls.rc_load_balancer_pool_1['type'] == 'mimic':
             cls.pool_1 = tenant_pools[0]
-            if len(tenant_pools) > 1:
-                cls.pool_2 = tenant_pools[1]
         else:
             # We're configured to run against actual hardware.
             for pool in tenant_pools:
                 if pool.id == cls.rc_load_balancer_pool_1['loadBalancerId']:
                     cls.pool_1 = pool
-                if pool.id == cls.rc_load_balancer_pool_2['loadBalancerId']:
-                    cls.pool_2 = pool
 
         lb_pools = [{'loadBalancerId': cls.pool_1.id, 'type': 'RackConnectV3'}]
 
@@ -253,7 +244,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         new_counts = self._get_node_counts_on_pool(self.pool_1.id)
         expected_count_on_pool = init_cloud_servers + self.min_servers
         self.assertEqual(new_counts['cloud_servers'], expected_count_on_pool,
-                         msg='count {0} is not equal to expected count ([{1}] + {2})'.format(
+                         msg=('count of servers on lb pool {0} is not equal to '
+                              'expected count ([{1}] + {2})').format(
                              new_counts['cloud_servers'], init_cloud_servers,
                              self.min_servers))
 
