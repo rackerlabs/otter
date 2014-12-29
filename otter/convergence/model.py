@@ -91,7 +91,10 @@ class NovaServer(object):
     Information about a server that was retrieved from Nova.
 
     :ivar str id: The server id.
-    :ivar str state: Current state of the server.
+
+    :ivar state: Current state of the server.
+    :type state: A member of :class:`ServerState`
+
     :ivar float created: Timestamp at which the server was created.
     :ivar str servicenet_address: The private ServiceNet IPv4 address, if
         the server is on the ServiceNet network
@@ -129,7 +132,7 @@ class ILBDescription(Interface):
 
     Implementers should have immutable attributes.
     """
-    def equivalent_definition(other_description):
+    def equivalent_definition(other_description):  # pragma: no cover
         """
         Checks whether two description have the same definitions.
 
@@ -152,12 +155,21 @@ class ILBNode(Interface):
         mapped to the load balancer.
     :ivar str node_id: The ID of the node, which is represents a unique
         mapping of a server to a load balancer (possibly one of many).
-    :ivar NovaServer: The server corresponding to this node.
     """
-    server = IAttribute("The server that corresponds to this node.")
     node_id = IAttribute("The ID of this node.")
     description = IAttribute("The LB Description for how this server is "
                              "attached to the load balancer.")
+
+    def matches(server):  # pragma: no cover
+        """
+        Whether the server corresponds to this LB Node.
+
+        :param server: The server to match against.
+        :type server: :class:`NovaServer`
+
+        :return: ``True`` if the server could match this LB node, ``False`` else
+        :rtype: `bool`
+        """
 
 
 class IDrainable(Interface):
@@ -165,15 +177,19 @@ class IDrainable(Interface):
     The drainability part of a LB Node.  If a node is drainable, it should
     also provide this interface.
     """
-    def currently_draining():
+    def currently_draining():  # pragma: no cover
         """
-        Is this node currently in draining mode?
+        :return: Whether this node currently in (load balancer) draining mode.
+        :rtype: `bool`
         """
 
-    def is_done_draining(now, timeout):
+    def is_done_draining(now, timeout):  # pragma: no cover
         """
-        Given the current time and the draining timeout, can this node be
-        done draining?
+        Given the current time and the draining timeout, is the period of time
+        the node must remain in draining over?
+
+        :return: Whether the node is done draining.
+        :rtype: `bool`
         """
 
 
@@ -196,9 +212,13 @@ class CLBDescription(object):
     :ivar int weight: The weight to be used for certain load-balancing
         algorithms if configured on the load balancer.  Defaults to 1,
         the max is 100.
-    :ivar str condition: One of ``ENABLED``, ``DISABLED``, or ``DRAINING`` -
+
+    :ivar condition: One of ``ENABLED``, ``DISABLED``, or ``DRAINING`` -
         the default is ``ENABLED``
-    :ivar str type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
+    :type condition: A member of :class:`CLBNodeCondition`
+
+    :ivar type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
+    :type type: A member of :class:`CLBNodeType`
     """
     def equivalent_definition(self, other_description):
         """
@@ -210,3 +230,48 @@ class CLBDescription(object):
         return (isinstance(other_description, CLBDescription) and
                 other_description.lb_id == self.lb_id and
                 other_description.port == self.port)
+
+
+@implementer(ILBNode, IDrainable)
+@attributes([Attribute("node_id", instance_of=str),
+             Attribute("description", instance_of=CLBDescription),
+             Attribute("address", instance_of=str),
+             Attribute("drained_at", default_value=0.0, instance_of=float),
+             Attribute("connections", default_value=None)])
+class CLBNode(object):
+    """
+    A Rackspace Cloud Load Balancer node.
+
+    :ivar int node_id: The ID of the node, which is represents a unique
+        combination of IP and port number, on the CLB.  Also, see
+        :obj:`ILBNode.node_id`.
+    :ivar description: The description of how the node should be set up. See
+        :obj:`ILBNode.node_id`.
+    :type: :class:`ILBDescription` provider
+
+    :ivar str address: The IP address of the node.  The IP and port form a
+        unique mapping on the CLB, which is assigned a node ID.  Two
+        nodes with the same IP and port cannot exist on a single CLB.
+    :ivar float drained_at: EPOCH at which this node was put in DRAINING.
+        Should be 0 if node is not DRAINING.
+    :ivar int connections: The number of active connections on the node - this
+        is None by default (the stat is not available yet).
+    """
+    def matches(self, server):
+        """
+        See :func:`ILBNode.matches`.
+        """
+        return (isinstance(server, NovaServer) and
+                server.servicenet_address == self.address)
+
+    def currently_draining(self):
+        """
+        See :func:`IDrainable.currently_draining`.
+        """
+        return self.description.condition == CLBNodeCondition.DRAINING
+
+    def is_done_draining(self, now, timeout):
+        """
+        See :func:`IDrainable.is_done_draining`.
+        """
+        return now - self.drained_at >= timeout or self.connections == 0
