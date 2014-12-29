@@ -8,7 +8,7 @@ from toolz.itertoolz import concat, concatv, mapcat
 from otter.convergence.model import CLBNodeCondition, ServerState
 from otter.convergence.steps import (
     AddNodesToCLB,
-    ChangeLoadBalancerNode,
+    ChangeCLBNode,
     CreateServer,
     DeleteServer,
     RemoveFromCLB,
@@ -63,11 +63,11 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     removes = [RemoveFromCLB(lb_id=node.lb_id, node_id=node.node_id)
                for node in (set(nodes) - set(to_drain) - set(in_drain))]
 
-    changes = [ChangeLoadBalancerNode(lb_id=node.lb_id,
-                                      node_id=node.node_id,
-                                      condition=CLBNodeCondition.DRAINING,
-                                      weight=node.config.weight,
-                                      type=node.config.type)
+    changes = [ChangeCLBNode(lb_id=node.lb_id,
+                             node_id=node.node_id,
+                             condition=CLBNodeCondition.DRAINING,
+                             weight=node.config.weight,
+                             type=node.config.type)
                for node in to_drain]
 
     return removes + changes
@@ -117,7 +117,7 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
             node_id=current[lb_id, port].node_id)
         for lb_id, port in current_idports - desired_idports]
     changes = [
-        ChangeLoadBalancerNode(
+        ChangeCLBNode(
             lb_id=lb_id,
             node_id=current[lb_id, port].node_id,
             condition=desired_config.condition,

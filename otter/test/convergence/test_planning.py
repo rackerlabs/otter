@@ -21,7 +21,7 @@ from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
-    ChangeLoadBalancerNode,
+    ChangeCLBNode,
     CreateServer,
     DeleteServer,
     RemoveFromCLB,
@@ -69,9 +69,9 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
 
         self.assertEqual(
             result,
-            [ChangeLoadBalancerNode(lb_id=5, node_id=123, weight=1,
-                                    condition=CLBNodeCondition.DRAINING,
-                                    type=CLBNodeType.PRIMARY)])
+            [ChangeCLBNode(lb_id=5, node_id=123, weight=1,
+                           condition=CLBNodeCondition.DRAINING,
+                           type=CLBNodeType.PRIMARY)])
 
     def test_draining_state_is_ignored_if_connections_and_not_yet_timeout(self):
         """
@@ -170,9 +170,9 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
 
         result = _remove_from_lb_with_draining(10, current, 10)
         self.assertEqual(set(result), set([
-            ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
-                                   condition=CLBNodeCondition.DRAINING,
-                                   type=CLBNodeType.PRIMARY),
+            ChangeCLBNode(lb_id=1, node_id=1, weight=1,
+                          condition=CLBNodeCondition.DRAINING,
+                          type=CLBNodeType.PRIMARY),
             RemoveFromCLB(lb_id=2, node_id=2),
             RemoveFromCLB(lb_id=4, node_id=4),
             RemoveFromCLB(lb_id=5, node_id=5),
@@ -201,7 +201,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         """
         If a desired LB mapping is in the set of current configs,
         but the configuration is wrong, `converge_lb_state` returns a
-        :class:`ChangeLoadBalancerNode` object
+        :class:`ChangeCLBNode` object
         """
         desired = {5: [LBConfig(port=80)]}
         current = [LBNode(lb_id=5, node_id=123, address='1.1.1.1',
@@ -212,9 +212,9 @@ class ConvergeLBStateTests(SynchronousTestCase):
                                     ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
-            [ChangeLoadBalancerNode(lb_id=5, node_id=123, weight=1,
-                                    condition=CLBNodeCondition.ENABLED,
-                                    type=CLBNodeType.PRIMARY)])
+            [ChangeCLBNode(lb_id=5, node_id=123, weight=1,
+                           condition=CLBNodeCondition.ENABLED,
+                           type=CLBNodeType.PRIMARY)])
 
     def test_remove_lb_node(self):
         """
@@ -263,9 +263,9 @@ class ConvergeLBStateTests(SynchronousTestCase):
             AddNodesToCLB(
                 lb_id=5,
                 address_configs=s(('1.1.1.1', LBConfig(port=80)))),
-            ChangeLoadBalancerNode(lb_id=6, node_id=234, weight=2,
-                                   condition=CLBNodeCondition.ENABLED,
-                                   type=CLBNodeType.PRIMARY),
+            ChangeCLBNode(lb_id=6, node_id=234, weight=2,
+                          condition=CLBNodeCondition.ENABLED,
+                          type=CLBNodeType.PRIMARY),
             RemoveFromCLB(lb_id=5, node_id=123)
         ]))
 
@@ -387,9 +387,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                             config=LBConfig(port=80))]),
                 0),
             pbag([
-                ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
-                                       condition=CLBNodeCondition.DRAINING,
-                                       type=CLBNodeType.PRIMARY),
+                ChangeCLBNode(lb_id=1, node_id=1, weight=1,
+                              condition=CLBNodeCondition.DRAINING,
+                              type=CLBNodeType.PRIMARY),
                 SetMetadataItemOnServer(server_id='abc',
                                         key='rax:auto_scaling_draining',
                                         value='draining')
@@ -442,9 +442,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                             config=LBConfig(port=80))]),
                 1),
             pbag([
-                ChangeLoadBalancerNode(lb_id=1, node_id=1, weight=1,
-                                       condition=CLBNodeCondition.DRAINING,
-                                       type=CLBNodeType.PRIMARY)
+                ChangeCLBNode(lb_id=1, node_id=1, weight=1,
+                              condition=CLBNodeCondition.DRAINING,
+                              type=CLBNodeType.PRIMARY)
             ]))
 
 

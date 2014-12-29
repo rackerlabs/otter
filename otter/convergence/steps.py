@@ -115,7 +115,7 @@ class RemoveFromCLB(object):
 
 @implementer(IStep)
 @attributes(['lb_id', 'node_id', 'condition', 'weight', 'type'])
-class ChangeLoadBalancerNode(object):
+class ChangeCLBNode(object):
     """
     An existing port mapping on a load balancer must have its condition,
     weight, or type modified.
