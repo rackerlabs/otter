@@ -22,10 +22,3 @@ yunomi==0.3.0
 # Debugging niceties
 ipython==2.3.1
 pudb==2014.1
-
-# pin deps of deps
-httpretty==0.6.0
-pymongo==2.5
-argparse==1.2.1
-Pygments==1.5
-Jinja2==2.6
