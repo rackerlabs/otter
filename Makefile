@@ -32,6 +32,7 @@ env:
 	./scripts/bootstrap-virtualenv.sh
 
 lint:
+	pip list --outdated
 	flake8 --max-complexity=10 ${PYDIRS}
 
 unit:
