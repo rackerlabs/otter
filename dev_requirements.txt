@@ -15,7 +15,6 @@ unittest2==0.8.0
 yunomi==0.3.0
 
 # pin deps of deps
-
 httpretty==0.6.0
 pymongo==2.5
 argparse==1.2.1
