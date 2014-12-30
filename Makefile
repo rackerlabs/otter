@@ -3,7 +3,6 @@ TESTDIR1=autoscale_cloudroast/test_repo
 TESTDIR2=autoscale_cloudcafe/autoscale
 TESTDIR3=autoscale_cloudcafe/bobby
 SCRIPTSDIR=scripts
-PYTHONLINT=${SCRIPTSDIR}/python-lint.py
 PYDIRS=${CODEDIR} ${SCRIPTSDIR} autoscale_cloudcafe autoscale_cloudroast
 CQLSH ?= $(shell which cqlsh)
 DOCDIR=doc
@@ -33,7 +32,7 @@ env:
 	./scripts/bootstrap-virtualenv.sh
 
 lint:
-	${PYTHONLINT} ${PYDIRS}
+	flake8 --max-complexity=10 ${PYDIRS}
 
 unit:
 ifneq ($(JENKINS_URL), )
