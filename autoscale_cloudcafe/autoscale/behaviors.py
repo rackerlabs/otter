@@ -15,7 +15,7 @@ from autoscale.models.servers import Metadata
 log = logging.getLogger('RunnerLog')
 
 
-def __line():
+def _line():
     """Returns the line number of the caller."""
     # Taken shamelessly from
     # http://code.activestate.com/recipes/145297-grabbing-the-current-line-number-easily/
@@ -581,7 +581,7 @@ class AutoscaleBehaviors(BaseBehavior):
         if (group_state.desiredCapacity != expected_servers):
             log.info("{0}: {1}: Group {2} should have {3} servers, but is trying to "
                      "build {4} servers".format(
-                         __file__, __line(), group_id, expected_servers,
+                         __file__, _line(), group_id, expected_servers,
                          group_state.desiredCapacity))
             return ret_list, err
 
@@ -593,12 +593,12 @@ class AutoscaleBehaviors(BaseBehavior):
             ret_list = [server.id for server in active_list]
             if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
                 log.info("{0}: {1}: Group ID {2} failed server creation.".format(
-                    __file__, __line(), group_id))
+                    __file__, _line(), group_id))
                 return ret_list, err
             if group_state.desiredCapacity != expected_servers:
                 log.info("{0}: {1}: Group {2} should have {3} servers, but has "
                          "reduced in quantity to {4}".format(
-                            __file__, __line(), group_id, expected_servers,
+                            __file__, _line(), group_id, expected_servers,
                             group_state.desiredCapacity))
                 return ret_list, err
             if len(active_list) == expected_servers:
@@ -608,5 +608,5 @@ class AutoscaleBehaviors(BaseBehavior):
         else:
             log.info("{0}: {1}: Group {2} did not complete its {3} servers "
                      "within the {4} second timeout.".format(
-                         __file__, __line(), group_id, expected_servers, timeout))
+                         __file__, _line(), group_id, expected_servers, timeout))
             return ret_list, err
