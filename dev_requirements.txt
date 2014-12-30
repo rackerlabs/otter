@@ -19,6 +19,10 @@ unittest2==0.8.0
 # mock==1.0.1
 yunomi==0.3.0
 
+# Debugging niceties
+ipython==2.3.1
+pudb==2014.1
+
 # pin deps of deps
 httpretty==0.6.0
 pymongo==2.5
