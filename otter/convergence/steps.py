@@ -4,6 +4,7 @@ from characteristic import attributes
 from zope.interface import implementer, Interface
 
 from otter.constants import ServiceType
+from otter.http import has_code
 from otter.util.http import append_segments
 
 
@@ -155,7 +156,7 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
         data=[{"cloud_server": {"id": node},
                "load_balancer_pool": {"id": lb}}
               for (lb, node) in lb_node_pairs],
-        success_codes=success_codes)
+        success_pred=has_code(*success_codes))
 
 
 @implementer(IStep)
