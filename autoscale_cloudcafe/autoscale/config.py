@@ -378,23 +378,13 @@ class AutoscaleConfig(ConfigSectionInterface):
         return self.get('rcv3_endpoint_name')
 
     @property
-    def rc_load_balancer_pool_1(self):
+    def rc_load_balancer_pool(self):
         """
-        Name and id of the first shared RCV3 LB
+        Name and id of the shared RCV3 LB
         """
-        print "Get rc_load_balancer_pool_1 ..... "
+        print "Get rc_load_balancer_pool ..... "
 
-        temp = self.get('rc_load_balancer_pool_1')
-        print temp
-        return temp
-
-    @property
-    def rc_load_balancer_pool_2(self):
-        """
-        Name and id of the second shared RCV3 LB
-        """
-        temp = self.get('rc_load_balancer_pool_2')
-        print "Get lb2 {0}".format(temp)
+        temp = self.get('rc_load_balancer_pool')
         return temp
 
     @property

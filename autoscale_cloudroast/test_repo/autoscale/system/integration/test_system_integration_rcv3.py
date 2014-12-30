@@ -10,6 +10,8 @@ import unittest
 import inspect
 import logging
 
+import common
+
 
 log = logging.getLogger("RunnerLog")
 
@@ -675,8 +677,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             server_ids_list)
 
         # call otter, list launch config, create list of ports
-        port_list_from_group = self._get_ports_from_otter_launch_configs(
-            group_id)
+        port_list_from_group = common.get_ports_from_otter_launch_configs(group_id)
 
         # call list node for each lbaas, create list of Ips and ports
         ports_list = []
@@ -705,17 +706,4 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                     network_list.append(
                         each_network.addr)
         return network_list
-
-    def _get_ports_from_otter_launch_configs(self, group_id):
-        """
-        (DUPLICATE: copied from lbaas)
-        Returns the list of ports in the luanch configs of the group_id
-        """
-        port_list = []
-        launch_config = (
-            self.autoscale_client.view_launch_config(group_id)).entity
-        for each_lb in launch_config.loadBalancers:
-            if safe_hasattr(each_lb, 'port'):
-                port_list.append(each_lb.port)
-        return port_list
 
