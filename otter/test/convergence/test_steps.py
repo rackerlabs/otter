@@ -14,6 +14,7 @@ from otter.convergence.steps import (
     RemoveFromLoadBalancer,
     Request,
     SetMetadataItemOnServer)
+from otter.http import has_code
 
 
 class StepAsRequestTests(SynchronousTestCase):
@@ -116,8 +117,8 @@ class StepAsRequestTests(SynchronousTestCase):
         request = step.as_request()
         self.assertEqual(request.service, ServiceType.RACKCONNECT_V3)
         self.assertEqual(request.method, expected_method)
-        self.assertEqual(request.success_codes,
-                         (201,) if request.method == "POST" else (204,))
+        expected_code = 201 if request.method == "POST" else 204
+        self.assertEqual(request.success_pred, has_code(expected_code))
         self.assertEqual(request.path, "load_balancer_pools/nodes")
         self.assertEqual(request.headers, None)
 
