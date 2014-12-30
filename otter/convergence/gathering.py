@@ -11,7 +11,7 @@ from toolz.functoolz import compose, identity
 
 from otter.constants import ServiceType
 from otter.convergence.model import (
-    LBConfig,
+    CLBDescription,
     LBNode,
     CLBNodeCondition,
     CLBNodeType,
@@ -101,9 +101,10 @@ def get_clb_contents(request_func):
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
         nodes = [LBNode(lb_id=_id, node_id=node['id'], address=node['address'],
-                        config=LBConfig(port=node['port'], weight=node['weight'],
-                                        condition=CLBNodeCondition.lookupByName(node['condition']),
-                                        type=CLBNodeType.lookupByName(node['type'])))
+                        config=CLBDescription(
+                            lb_id=str(_id), port=node['port'], weight=node['weight'],
+                            condition=CLBNodeCondition.lookupByName(node['condition']),
+                            type=CLBNodeType.lookupByName(node['type'])))
                  for _id, nodes in zip(ids, all_lb_nodes)
                  for node in nodes]
         draining = [n for n in nodes if n.config.condition == CLBNodeCondition.DRAINING]
@@ -159,10 +160,10 @@ def to_nova_server(server_json):
 
 def json_to_LBConfigs(lbs_json):
     """
-    Convert load balancer config from JSON to :obj:`LBConfig`
+    Convert load balancer config from JSON to :obj:`CLBDescription`
 
     :param list lbs_json: List of load balancer configs
-    :return: `dict` of LBid -> [LBConfig] mapping
+    :return: `dict` of LBid -> [CLBDescription] mapping
 
     NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
     implemented in convergence
@@ -170,5 +171,6 @@ def json_to_LBConfigs(lbs_json):
     lbd = defaultdict(list)
     for lb in lbs_json:
         if lb.get('type') != 'RackConnectV3':
-            lbd[lb['loadBalancerId']].append(LBConfig(port=lb['port']))
+            lbd[lb['loadBalancerId']].append(CLBDescription(
+                lb_id=str(lb['loadBalancerId']), port=lb['port']))
     return lbd

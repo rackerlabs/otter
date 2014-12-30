@@ -17,7 +17,7 @@ from otter.convergence.gathering import (
     json_to_LBConfigs,
     to_nova_server)
 from otter.convergence.model import (
-    LBConfig,
+    CLBDescription,
     LBNode,
     CLBNodeCondition,
     CLBNodeType,
@@ -238,17 +238,17 @@ class GetLBContentsTests(SynchronousTestCase):
         """
         eff = get_clb_contents(self._request())
         draining, enabled = CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED
-        make_config = partial(LBConfig, port=20, type=CLBNodeType.PRIMARY)
+        make_config = partial(CLBDescription, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
             self._resolve_lb(eff),
             [LBNode(lb_id=1, node_id='11', address='a11', drained_at=1.0,
-                    config=make_config(weight=2, condition=draining)),
+                    config=make_config(lb_id='1', weight=2, condition=draining)),
              LBNode(lb_id=1, node_id='12', address='a12',
-                    config=make_config(weight=2, condition=enabled)),
+                    config=make_config(lb_id='1', weight=2, condition=enabled)),
              LBNode(lb_id=2, node_id='21', address='a21',
-                    config=make_config(weight=3, condition=enabled)),
+                    config=make_config(lb_id='2', weight=3, condition=enabled)),
              LBNode(lb_id=2, node_id='22', address='a22', drained_at=2.0,
-                    config=make_config(weight=3, condition=draining))])
+                    config=make_config(lb_id='2', weight=3, condition=draining))])
 
     def test_no_lb(self):
         """
@@ -285,13 +285,14 @@ class GetLBContentsTests(SynchronousTestCase):
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
             ]
         }
-        config = LBConfig(port=20, weight=2, condition=CLBNodeCondition.ENABLED,
-                          type=CLBNodeType.PRIMARY)
+        config = partial(CLBDescription, port=20, weight=2,
+                         condition=CLBNodeCondition.ENABLED,
+                         type=CLBNodeType.PRIMARY)
         eff = get_clb_contents(self._request())
         self.assertEqual(
             self._resolve_lb(eff),
-            [LBNode(lb_id=1, node_id='11', address='a11', config=config),
-             LBNode(lb_id=2, node_id='21', address='a21', config=config)])
+            [LBNode(lb_id=1, node_id='11', address='a11', config=config(lb_id='1')),
+             LBNode(lb_id=2, node_id='21', address='a21', config=config(lb_id='2'))])
 
 
 class ToNovaServerTests(SynchronousTestCase):
@@ -349,7 +350,8 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 20, 'port': 800},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [LBConfig(port=80), LBConfig(port=800)], 21: [LBConfig(port=81)]})
+            {20: [CLBDescription(lb_id='20', port=80), CLBDescription(lb_id='20', port=800)],
+             21: [CLBDescription(lb_id='21', port=81)]})
 
     def test_with_rackconnect(self):
         """
@@ -359,4 +361,5 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 200, 'type': 'RackConnectV3'},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [LBConfig(port=80)], 21: [LBConfig(port=81)]})
+            {20: [CLBDescription(lb_id='20', port=80)],
+             21: [CLBDescription(lb_id='21', port=81)]})

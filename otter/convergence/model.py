@@ -58,29 +58,7 @@ class LBNode(object):
         is None by default (the stat is not available yet)
 
     :ivar config: The configuration for the port mapping
-    :type config: :class:`LBConfig`
-    """
-
-
-@attributes(["port",
-             Attribute("weight", default_value=1, instance_of=int),
-             Attribute("condition", default_value=CLBNodeCondition.ENABLED,
-                       instance_of=NamedConstant),
-             Attribute("type", default_value=CLBNodeType.PRIMARY,
-                       instance_of=NamedConstant)])
-class LBConfig(object):
-    """
-    Information representing a load balancer port mapping; how a particular
-    server *should* be port-mapped to a load balancer.
-
-    :ivar int port: The port, which together with the server's IP, specifies
-        the service that should be load-balanced by the load balancer.
-    :ivar int weight: The weight to be used for certain load-balancing
-        algorithms if configured on the load balancer.  Defaults to 1,
-        the max is 100.
-    :ivar str condition: One of ``ENABLED``, ``DISABLED``, or ``DRAINING`` -
-        the default is ``ENABLED``
-    :ivar str type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
+    :type config: :class:`CLBDescription`
     """
 
 
@@ -111,7 +89,7 @@ class DesiredGroupState(object):
     :ivar dict launch_config: nova launch config.
     :ivar int desired: the number of desired servers within the group.
     :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
-        :class:`LBConfig` instances.
+        :class:`CLBDescription` instances.
     :ivar float draining_timeout: If greater than zero, when the server is
         scaled down it will be put into draining condition.  It will remain
         in draining condition for a maximum of ``draining_timeout`` seconds
