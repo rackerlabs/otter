@@ -225,8 +225,7 @@ class Request(object):
     :ivar dict headers: a dict mapping bytes to lists of bytes.
     :ivar object data: a Python object that will be JSON-serialized as the body
         of the request.
-    :ivar iterable<int> success_codes: The status codes that will be considered
-        successful. Defaults to just 200 (OK). Requests that expect other codes,
-        such as 201 (Created) for most ``POST`` requests or 204 (No content)
-        for most ``DELETE`` requests should specify that through this argument.
+    :ivar callable success_pred: Function that takes a response object
+        and decides if it was successful. Defaults to just checking that
+        the response code is 200 (OK).
     """
