@@ -18,7 +18,7 @@ from otter.convergence.gathering import (
     to_nova_server)
 from otter.convergence.model import (
     CLBDescription,
-    LBNode,
+    CLBNode,
     CLBNodeCondition,
     CLBNodeType,
     NovaServer,
@@ -238,17 +238,17 @@ class GetLBContentsTests(SynchronousTestCase):
         """
         eff = get_clb_contents(self._request())
         draining, enabled = CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED
-        make_config = partial(CLBDescription, port=20, type=CLBNodeType.PRIMARY)
+        make_desc = partial(CLBDescription, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
             self._resolve_lb(eff),
-            [LBNode(lb_id=1, node_id='11', address='a11', drained_at=1.0,
-                    config=make_config(lb_id='1', weight=2, condition=draining)),
-             LBNode(lb_id=1, node_id='12', address='a12',
-                    config=make_config(lb_id='1', weight=2, condition=enabled)),
-             LBNode(lb_id=2, node_id='21', address='a21',
-                    config=make_config(lb_id='2', weight=3, condition=enabled)),
-             LBNode(lb_id=2, node_id='22', address='a22', drained_at=2.0,
-                    config=make_config(lb_id='2', weight=3, condition=draining))])
+            [CLBNode(node_id='11', address='a11', drained_at=1.0,
+                     description=make_desc(lb_id='1', weight=2, condition=draining)),
+             CLBNode(node_id='12', address='a12',
+                     description=make_desc(lb_id='1', weight=2, condition=enabled)),
+             CLBNode(node_id='21', address='a21',
+                     description=make_desc(lb_id='2', weight=3, condition=enabled)),
+             CLBNode(node_id='22', address='a22', drained_at=2.0,
+                     description=make_desc(lb_id='2', weight=3, condition=draining))])
 
     def test_no_lb(self):
         """
@@ -285,14 +285,14 @@ class GetLBContentsTests(SynchronousTestCase):
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
             ]
         }
-        config = partial(CLBDescription, port=20, weight=2,
-                         condition=CLBNodeCondition.ENABLED,
-                         type=CLBNodeType.PRIMARY)
+        make_desc = partial(CLBDescription, port=20, weight=2,
+                            condition=CLBNodeCondition.ENABLED,
+                            type=CLBNodeType.PRIMARY)
         eff = get_clb_contents(self._request())
         self.assertEqual(
             self._resolve_lb(eff),
-            [LBNode(lb_id=1, node_id='11', address='a11', config=config(lb_id='1')),
-             LBNode(lb_id=2, node_id='21', address='a21', config=config(lb_id='2'))])
+            [CLBNode(node_id='11', address='a11', description=make_desc(lb_id='1')),
+             CLBNode(node_id='21', address='a21', description=make_desc(lb_id='2'))])
 
 
 class ToNovaServerTests(SynchronousTestCase):
