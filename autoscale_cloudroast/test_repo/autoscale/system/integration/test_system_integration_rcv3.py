@@ -9,6 +9,7 @@ from cloudcafe.common.tools.datagen import rand_name
 import unittest
 import inspect
 import logging
+import uuid
 
 import common
 
@@ -45,7 +46,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         """
         super(AutoscaleRackConnectFixture, cls).setUpClass()
 
-        cls.common = common.CommonTestUtilities(cls.server_client, cls.autoscale_client)
+        cls.common = common.CommonTestUtilities(cls.server_client, cls.autoscale_client, cls.lbaas_client)
 
         cls.cloud_servers_on_node = []
         cls.private_network = {'uuid': '11111111-1111-1111-1111-111111111111'}
@@ -124,7 +125,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         # If there was an error waiting for servers to build, abort the testing.
         if err:
             log.info("{0}: {1}: SetUpClass failed: background servers".format(
-                __file__, __line()))
+                __file__, line()))
 
     @tags(speed='slow', type='rcv3')
     @unittest.skip('')
@@ -138,22 +139,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         pool_group_resp = self._create_rcv3_group(lb_list=lb_pools,
                                                   group_min=0,
                                                   network_list=[self.rackconnect_network])
-
-        pool_group = pool_group_resp.entity
-
-        self.assertTrue(pool_group_resp.ok,
-                        msg='Create scaling group call failed with API Response: {0} for '
-                        'group {1}'.format(pool_group_resp.content, pool_group.id))
-        self.assertEquals(self.create_resp.status_code, 201,
-                          msg='The create failed with {0} for group '
-                          '{1}'.format(pool_group_resp.status_code, pool_group.id))
-        self.assertEquals(pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
-                          self.pool.id,
-                          msg='The launchConfig for group {0} did not contain the load balancer'
-                          .format(pool_group.id))
-        self.assertEquals(pool_group.launchConfiguration.loadBalancers[0].type, "RackConnectV3",
-                          msg='Load balancer type {0} is not correct for RackConnect pools'
-                          .format(pool_group.launchConfiguration.loadBalancers[0].type))
+        self._common_scaling_group_assertions(pool_group_resp)
 
     @tags(speed='slow', type='rcv3')
     @unittest.skip('')
@@ -167,22 +153,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         pool_group_resp = self._create_rcv3_group(lb_list=lb_pools,
                                                   group_min=0,
                                                   network_list=[self.private_network])
-
-        pool_group = pool_group_resp.entity
-
-        self.assertTrue(pool_group_resp.ok,
-                        msg='Create scaling group call failed with API Response: {0} for '
-                        'group {1}'.format(pool_group_resp.content, pool_group.id))
-        self.assertEquals(self.create_resp.status_code, 201,
-                          msg='The create failed with {0} for group '
-                          '{1}'.format(pool_group_resp.status_code, pool_group.id))
-        self.assertEquals(pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
-                          self.pool.id,
-                          msg='The launchConfig for group {0} did not contain the load balancer'
-                          .format(pool_group.id))
-        self.assertEquals(pool_group.launchConfiguration.loadBalancers[0].type, "RackConnectV3",
-                          msg='Load balancer type {0} is not correct for RackConnect pools'
-                          .format(pool_group.launchConfiguration.loadBalancers[0].type))
+        self._common_scaling_group_assertions(pool_group_resp)
 
     @tags(speed='slow', type='rcv3')
     @unittest.skip('')
@@ -196,22 +167,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         pool_group_resp = self._create_rcv3_group(lb_list=lb_pools,
                                                   group_min=0,
                                                   network_list=[self.public_network])
-
-        pool_group = pool_group_resp.entity
-
-        self.assertTrue(pool_group_resp.ok,
-                        msg='Create scaling group call failed with API Response: {0} for '
-                        'group {1}'.format(pool_group_resp.content, pool_group.id))
-        self.assertEquals(self.create_resp.status_code, 201,
-                          msg='The create failed with {0} for group '
-                          '{1}'.format(pool_group_resp.status_code, pool_group.id))
-        self.assertEquals(pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
-                          self.pool.id,
-                          msg='The launchConfig for group {0} did not contain the load balancer'
-                          .format(pool_group.id))
-        self.assertEquals(pool_group.launchConfiguration.loadBalancers[0].type, "RackConnectV3",
-                          msg='Load balancer type {0} is not correct for RackConnect pools'
-                          .format(pool_group.launchConfiguration.loadBalancers[0].type))
+        self._common_scaling_group_assertions(pool_group_resp)
 
     @tags(speed='slow', type='rcv3')
     @unittest.skip('')
@@ -238,9 +194,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         pool_group_resp = self._create_rcv3_group(lb_list=lb_pools,
                                                   group_min=self.min_servers,
                                                   network_list=[self.rackconnect_network])
-        active_servers = self.wait_for_expected_number_of_active_servers(pool_group_resp.entity.id,
-                                                                         self.min_servers,
-                                                                         timeout=700)
+        self.wait_for_expected_number_of_active_servers(pool_group_resp.entity.id,
+                                                        self.min_servers,
+                                                        timeout=700)
 
         # Wait for rackconnect to reflect number of servers.  This is not a
         # polling loop since that would prevent overage detection.
@@ -300,13 +256,14 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           msg='LB Pool status {0} is not in expected ACTIVE state'.format(status))
 
     @tags(speed='slow', type='rcv3')
+    #@unittest.skip('')
     def test_scale_up_on_illegal_rcv3_pool(self):
         """
         Create a group with some servers, but with an incorrectly configured
         RackConnect pool.  Check that nothing happens when we attempt to scale
         up using this group.
         """
-        lb_pools = [{'loadBalancerId': self.pool.id+"HASKJDH", 'type': 'RackConnectV3'}]
+        lb_pools = [{'loadBalancerId': str(uuid.uuid4()), 'type': 'RackConnectV3'}]
 
         initial_node_ids = []
         initial_node_list = self.rcv3_client.get_nodes_on_pool(self.pool.id).entity.nodes
@@ -475,10 +432,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         for each_node in initial_node_list:
             init_rc_node_ids.append(each_node.id)
 
-        # Capture a list of IPs present on the load balancer before doing anything
-        clb_node_list_before_scale = [each_node.address for each_node in
-                                      self._get_node_list_from_lb(self.load_balancer_1)]
-
         # Create the group used for testing The timeout bounds the length of
         # time needed to create the servers in Nova.  However....
         pool_group_resp = self._create_rcv3_group(lb_list=load_balancers,
@@ -502,8 +455,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         initial_node_count = self._get_node_counts_on_pool(self.pool.id)['cloud_servers']
 
         # Confirm that the servers were also added to the cloud load balancer
-        self._verify_lbs_on_group_have_servers_as_nodes(pool_group.id, active_server_list,
-                                                        self.load_balancer_1)
+        self.common.verify_lbs_on_group_have_servers_as_nodes(
+            self, pool_group.id, active_server_list, self.load_balancer_1)
 
         # Since at least group_min nodes should be on the load_balancer, check that
         # the initial list of node ids is not empty
@@ -596,10 +549,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         """Return a list of all cloud server ids on the given lb pool_id."""
         return [s['server_id'] for s in self._get_cloud_servers_on_pool(pool_id)]
 
-    def _get_node_list_from_lb(self, load_balancer_id):
-        """Returns the list of nodes on the load balancer."""
-        return self.lbaas_client.list_nodes(load_balancer_id).entity
-
     def _create_rcv3_group(self, lb_list=None, group_min=None, network_list=None):
         """
         Create a scaling group.  The group created will automatically be added
@@ -659,53 +608,19 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                            self.autoscale_client.delete_scaling_group_with_force)
         return self.create_resp
 
-    def _verify_lbs_on_group_have_servers_as_nodes(self, group_id, server_ids_list, *lbaas_ids):
-        """
-        (DUPLICATE: copied from lbaas)
-        Given the list of active server ids on the group, create a list of the
-        ip address of the servers on the group,
-        and compare it to the list of ip addresses got from a list node
-        call for the lbaas id.
-        Get list of ports of lbaas on the group and compare to the list of
-        port on the lbaas id.
-        (note: the test ensures the ports are distinct during group creation,
-        which escapes the case this function would fail for, which is if the
-        loadbalancer had a node with the port on it already, and autoscale
-        failed to add node to that same port, this will not fail. This was done
-        to keep it simple.)
-        """
-        # call nova list server, filter by ID and create ip address list
-        servers_address_list = self._get_ipv4_address_list_on_servers(
-            server_ids_list)
-
-        # call otter, list launch config, create list of ports
-        port_list_from_group = self.common.get_ports_from_otter_launch_configs(group_id)
-
-        # call list node for each lbaas, create list of Ips and ports
-        ports_list = []
-        for each_loadbalancer in lbaas_ids:
-            get_nodes_on_lb = self._get_node_list_from_lb(each_loadbalancer)
-            nodes_list_on_lb = []
-            for each_node in get_nodes_on_lb:
-                nodes_list_on_lb.append(each_node.address)
-                ports_list.append(each_node.port)
-            # compare ip address lists and port lists
-            for each_address in servers_address_list:
-                self.assertTrue(each_address in nodes_list_on_lb)
-        for each_port in port_list_from_group:
-            self.assertTrue(each_port in ports_list)
-
-    def _get_ipv4_address_list_on_servers(self, server_ids_list):
-        """
-        (DUPLICATE: copied from lbaas)
-        Returns the list of ipv4 addresses for the given list of servers
-        """
-        network_list = []
-        for each_server in server_ids_list:
-            network = (self.server_client.list_addresses(each_server).entity)
-            for each_network in network.private.addresses:
-                if str(each_network.version) is '4':
-                    network_list.append(
-                        each_network.addr)
-        return network_list
+    def _common_scaling_group_assertions(self, pool_group_resp):
+        pool_group = pool_group_resp.entity
+        self.assertTrue(pool_group_resp.ok,
+                        msg='Create scaling group call failed with API Response: {0} for '
+                        'group {1}'.format(pool_group_resp.content, pool_group.id))
+        self.assertEquals(self.create_resp.status_code, 201,
+                          msg='The create failed with {0} for group '
+                          '{1}'.format(pool_group_resp.status_code, pool_group.id))
+        self.assertEquals(pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
+                          self.pool.id,
+                          msg='The launchConfig for group {0} did not contain the load balancer'
+                          .format(pool_group.id))
+        self.assertEquals(pool_group.launchConfiguration.loadBalancers[0].type, "RackConnectV3",
+                          msg='Load balancer type {0} is not correct for RackConnect pools'
+                          .format(pool_group.launchConfiguration.loadBalancers[0].type))
 
