@@ -11,7 +11,7 @@ junitxml==0.7
 paramiko==1.10.0
 requests==1.2.0
 decorator==3.4.0
-unittest2==0.5.1
+unittest2==0.8.0
 IPy==0.81
 # mock==1.0.1
 yunomi==0.3.0

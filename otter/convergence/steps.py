@@ -78,7 +78,7 @@ class SetMetadataItemOnServer(object):
 
 @implementer(IStep)
 @attributes(['lb_id', 'address_configs'])
-class AddNodesToLoadBalancer(object):
+class AddNodesToCLB(object):
     """
     Multiple nodes must be added to a load balancer.
 
@@ -99,7 +99,7 @@ class AddNodesToLoadBalancer(object):
 
 @implementer(IStep)
 @attributes(['lb_id', 'node_id'])
-class RemoveFromLoadBalancer(object):
+class RemoveFromCLB(object):
     """
     A server must be removed from a load balancer.
     """
@@ -116,7 +116,7 @@ class RemoveFromLoadBalancer(object):
 
 @implementer(IStep)
 @attributes(['lb_id', 'node_id', 'condition', 'weight', 'type'])
-class ChangeLoadBalancerNode(object):
+class ChangeCLBNode(object):
     """
     An existing port mapping on a load balancer must have its condition,
     weight, or type modified.

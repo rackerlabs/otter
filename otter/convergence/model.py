@@ -10,7 +10,7 @@ from pyrsistent import freeze
 from twisted.python.constants import Names, NamedConstant
 
 
-class NodeCondition(Names):
+class CLBNodeCondition(Names):
     """Constants representing the condition a load balancer node can be in"""
     ENABLED = NamedConstant()   # Node can accept new connections.
     DRAINING = NamedConstant()  # Node cannot accept any new connections.
@@ -19,7 +19,7 @@ class NodeCondition(Names):
                                 # Existing connections are permitted to continue.
 
 
-class NodeType(Names):
+class CLBNodeType(Names):
     """Constants representing the type of a load balancer node"""
     PRIMARY = NamedConstant()    # Node in normal rotation
     SECONDARY = NamedConstant()  # Node only put into normal rotation if a
@@ -61,9 +61,9 @@ class LBNode(object):
 
 @attributes(["port",
              Attribute("weight", default_value=1, instance_of=int),
-             Attribute("condition", default_value=NodeCondition.ENABLED,
+             Attribute("condition", default_value=CLBNodeCondition.ENABLED,
                        instance_of=NamedConstant),
-             Attribute("type", default_value=NodeType.PRIMARY,
+             Attribute("type", default_value=CLBNodeType.PRIMARY,
                        instance_of=NamedConstant)])
 class LBConfig(object):
     """
