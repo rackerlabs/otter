@@ -109,7 +109,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         cls.lb_other_region = 0000
 
         # OK, back to waiting for servers to spin up.
-        time.sleep(20)
         background_servers, err = cls.autoscale_behaviors.wait_for_servers_to_build(
             background_group_resp.entity.id,
             2,
