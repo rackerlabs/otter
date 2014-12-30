@@ -202,8 +202,10 @@ class BulkRemoveFromRCv3(object):
         return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE", (204,))
 
 
-@attributes(['service', 'method', 'path', 'headers', 'data', 'success_codes'],
-            defaults={'headers': None, 'data': None, 'success_codes': (200,)})
+@attributes(['service', 'method', 'path', 'headers', 'data', 'success_pred'],
+            defaults={'headers': None,
+                      'data': None,
+                      'success_pred': has_code(200)})
 class Request(object):
     """
     An object representing a Rackspace API request that must be performed.
