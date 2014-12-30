@@ -1,7 +1,6 @@
 """Code related to effecting change based on a convergence plan."""
 
 from effect import parallel
-from otter.util.pure_http import has_code
 
 
 def _reqs_to_effect(request_func, conv_requests):
