@@ -6,6 +6,8 @@ from cafe.drivers.unittest.decorators import tags
 import random
 import time
 
+import common
+
 
 class AutoscaleLbaasFixture(AutoscaleFixture):
 
@@ -18,6 +20,8 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         Create 3 load balancers
         """
         super(AutoscaleLbaasFixture, cls).setUpClass()
+        cls.common = common.CommonTestUtilities(cls.server_client, cls.autoscale_client)
+
         cls.load_balancer_1_response = cls.lbaas_client.create_load_balancer('test', [],
                                                                              'HTTP', 80, "PUBLIC")
         cls.load_balancer_1 = cls.load_balancer_1_response.entity.id
@@ -382,8 +386,8 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         servers_address_list = self._get_ipv4_address_list_on_servers(
             server_ids_list)
         # call otter, list launch config, create list of ports
-        port_list_from_group = self._get_ports_from_otter_launch_configs(
-            group_id)
+        port_list_from_group = self.common.get_ports_from_otter_launch_configs(group_id)
+
         # call list node for each lbaas, create list of Ips and ports
         ports_list = []
         for each_loadbalancer in lbaas_ids:
@@ -444,17 +448,6 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                     network_list.append(
                         each_network.addr)
         return network_list
-
-    def _get_ports_from_otter_launch_configs(self, group_id):
-        """
-        Returns the list of ports in the luanch configs of the group_id
-        """
-        port_list = []
-        launch_config = (
-            self.autoscale_client.view_launch_config(group_id)).entity
-        for each_lb in launch_config.loadBalancers:
-            port_list.append(each_lb.port)
-        return port_list
 
     def _get_node_list_from_lb(self, load_balancer_id):
         """

@@ -45,6 +45,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         """
         super(AutoscaleRackConnectFixture, cls).setUpClass()
 
+        cls.common = common.CommonTestUtilities(cls.server_client, cls.autoscale_client)
+
         cls.cloud_servers_on_node = []
         cls.private_network = {'uuid': '11111111-1111-1111-1111-111111111111'}
         cls.public_network = {'uuid': '00000000-0000-0000-0000-000000000000'}
@@ -677,7 +679,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             server_ids_list)
 
         # call otter, list launch config, create list of ports
-        port_list_from_group = common.get_ports_from_otter_launch_configs(group_id)
+        port_list_from_group = self.common.get_ports_from_otter_launch_configs(group_id)
 
         # call list node for each lbaas, create list of Ips and ports
         ports_list = []
