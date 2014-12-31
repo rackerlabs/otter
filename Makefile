@@ -35,8 +35,7 @@ lint:
 	pip list --outdated
 	git diff --patch --no-prefix origin/master | flake8 --diff
 
-fulllint:
-	pip list --outdated
+fullflake8:
 	flake8 --max-complexity=10 ${PYDIRS}
 
 unit:
