@@ -125,7 +125,8 @@ _clb_lb = {
         "One load balancer all new servers should be "
         "added to."),
     "properties": {
-        # load balancer id's are NOT uuid's.  just an int.
+        # Cloud load balancer id's are NOT uuid's, just ints.  But accept
+        # strings also for backwards compatibility reasons.
         "loadBalancerId": {
             "type": ["integer", "string"],
             "description": (
@@ -138,7 +139,7 @@ _clb_lb = {
             "description": (
                 "The port number of the service (on the "
                 "new servers) to load balance on for this "
-                "particular load balancer."),
+                "particular Cloud Load Balancer."),
             "required": True
         },
         "type": {
