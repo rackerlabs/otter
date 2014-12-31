@@ -1,4 +1,3 @@
-############################################################### ffffffffffffffffffffffffff
 """
 Functions for interacting with the authentication API.
 
