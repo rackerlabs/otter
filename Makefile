@@ -32,7 +32,7 @@ env:
 	./scripts/bootstrap-virtualenv.sh
 
 lint:
-	pip list --outdated
+	pip list --outdated --allow-external=cafe,cloudcafe
 	git diff --patch --no-prefix origin/master | flake8 --diff
 
 fullflake8:
