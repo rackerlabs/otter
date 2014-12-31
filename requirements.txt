@@ -9,7 +9,7 @@ silverberg==0.1.8
 pyOpenSSL==0.13
 jsonfig==0.1.1
 testtools==0.9.32
-croniter==0.3.3
+croniter==0.3.5
 txkazoo==0.0.5
 effect==0.1a11
 characteristic==14.3.0
