@@ -112,7 +112,12 @@ load-dev-schema:
 		--port ${CASSANDRA_PORT}
 
 migrate-dev-schema:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/migrations --outfile schema/migrations-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/migrations \
+		--outfile schema/migrations-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--host ${CASSANDRA_HOST} \
+		--port ${CASSANDRA_PORT}
 
 teardown-dev-schema:
 	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
