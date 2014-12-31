@@ -127,7 +127,7 @@ _clb_lb = {
     "properties": {
         # load balancer id's are NOT uuid's.  just an int.
         "loadBalancerId": {
-            "type": "integer",
+            "type": ["integer", "string"],
             "description": (
                 "The ID of the load balancer to which new "
                 "servers will be added."),
