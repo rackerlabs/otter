@@ -33,6 +33,10 @@ env:
 
 lint:
 	pip list --outdated
+	flake8-diff
+
+fulllint:
+	pip list --outdated
 	flake8 --max-complexity=10 ${PYDIRS}
 
 unit:
