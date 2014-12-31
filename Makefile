@@ -77,8 +77,18 @@ docs: cleandocs
 schema: FORCE schema-setup schema-teardown
 
 schema-setup:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE}  --dry-run
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-prod.cql --replication ${REPLICATION_FACTOR} --keyspace ${CONTROL_KEYSPACE}  --dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup \
+		--ban-unsafe \
+		--outfile schema/setup-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup \
+		--ban-unsafe \
+		--outfile schema/setup-prod.cql \
+		--replication ${REPLICATION_FACTOR} \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--dry-run
 
 schema-teardown:
 	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE}  --dry-run
