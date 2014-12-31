@@ -62,7 +62,8 @@ else
 endif
 
 coverage:
-	coverage run --source=${CODEDIR} --branch `which trial` ${UNITTESTS} && coverage html -d _trial_coverage --omit="*/test/*"
+	coverage run --source=${CODEDIR} --branch `which trial` ${UNITTESTS}
+	coverage html -d _trial_coverage --omit="*/test/*"
 
 cleandocs:
 	rm -rf _builddoc
