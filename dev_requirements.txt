@@ -17,7 +17,6 @@ repoze.sphinx.autointerface==0.7.1
 # Tests
 python-subunit==0.0.8
 junitxml==0.7
-unittest2==0.8.0
 mock==1.0.1
 yunomi==0.3.0
 
