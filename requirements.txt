@@ -2,7 +2,7 @@ klein==0.2.1
 twisted==14.0.2
 service_identity==0.2
 jsonschema==2.0
-iso8601==0.1.4
+iso8601==0.1.10
 lxml==3.0.1
 treq==0.2.0
 silverberg==0.1.8
