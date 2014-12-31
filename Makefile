@@ -103,7 +103,13 @@ schema-teardown:
 		--dry-run
 
 load-dev-schema:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup \
+		--ban-unsafe \
+		--outfile schema/setup-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--host ${CASSANDRA_HOST} \
+		--port ${CASSANDRA_PORT}
 
 migrate-dev-schema:
 	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/migrations --outfile schema/migrations-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
