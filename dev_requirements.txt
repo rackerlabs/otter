@@ -8,7 +8,7 @@ flake8-print==1.5.0
 flake8-quotes==0.0.1
 pep8-naming==0.2.2
 pep257==0.3.2
-coverage==3.5.3
+coverage==3.7.1
 
 # Docs
 sphinx==1.1.3
