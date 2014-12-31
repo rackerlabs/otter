@@ -91,8 +91,16 @@ schema-setup:
 		--dry-run
 
 schema-teardown:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE}  --dry-run
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-prod.cql --replication ${REPLICATION_FACTOR} --keyspace ${CONTROL_KEYSPACE}  --dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown \
+		--outfile schema/teardown-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE}  \
+		--dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown \
+		--outfile schema/teardown-prod.cql \
+		--replication ${REPLICATION_FACTOR} \
+		--keyspace ${CONTROL_KEYSPACE}  \
+		--dry-run
 
 load-dev-schema:
 	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
