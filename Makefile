@@ -33,7 +33,7 @@ env:
 
 lint:
 	pip list --outdated
-	flake8-diff
+	git diff --patch --no-prefix origin/master | flake8 --diff
 
 fulllint:
 	pip list --outdated
