@@ -141,6 +141,53 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
                               msg='Create group with invalid flavor id was successsful with'
                               ' response {0}'.format(create_group_response.status_code))
 
+    def test_create_scaling_group_with_CLBs_but_no_ServiceNet(self):
+        """
+        Scaling group creation fails with a 400 when a launch config has one or
+        more CLBs configured, but no ServiceNet configured.
+        """
+        create_group_response = self.autoscale_client.create_scaling_group(
+            gc_name='test_no_servicenet',
+            gc_cooldown=self.gc_cooldown,
+            gc_min_entities=self.gc_min_entities,
+            lc_name=self.lc_name,
+            lc_image_ref=self.lc_image_ref,
+            lc_flavor_ref=self.lc_flavor_ref,
+            lc_networks=[
+                {"uuid": "4ebd35cf-bfe7-4d93-b0d8-eb468ce2245a"},
+                {"uuid": "00000000-0000-0000-0000-000000000000"}
+            ],
+            lc_load_balancers=[{'loadBalancerId': '1234', 'port': 80,
+                                'type': 'CloudLoadBalancer'}])
+        self.assertEquals(
+            create_group_response.status_code, 400,
+            msg=('Create group with no CLBs but no ServiceNet was successsful '
+                 'with response {0}'.format(create_group_response.status_code)))
+
+    def test_update_scaling_group_with_CLBs_but_no_ServiceNet(self):
+        """
+        Update scaling group fails with a 400 when a launch config has one or
+        more CLBs configured, but no ServiceNet configured.
+        """
+        group = self._create_group()
+        update_launch_config_response = self.autoscale_client.update_launch_config(
+            group_id=group.id,
+            name=self.lc_name,
+            image_ref=self.lc_image_ref,
+            flavor_ref=self.lc_flavor_ref,
+            networks=[
+                {"uuid": "4ebd35cf-bfe7-4d93-b0d8-eb468ce2245a"},
+                {"uuid": "00000000-0000-0000-0000-000000000000"}
+            ],
+            load_balancers=[{'loadBalancerId': '1234', 'port': 80,
+                             'type': 'CloudLoadBalancer'}])
+
+        status = update_launch_config_response.status_code
+        self.assertEquals(
+            status, 400,
+            msg=('Create group with no CLBs but no ServiceNet was successsful '
+                 'with response {0}'.format(status)))
+
     def _create_group(self):
         """
         Create a group
