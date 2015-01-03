@@ -44,6 +44,8 @@ from characteristic import attributes
 
 from twisted.internet.defer import succeed
 
+from effect.twisted import deferred_performer
+
 from zope.interface import Interface, implementer
 
 from otter.util import logging_treq as treq
@@ -431,9 +433,11 @@ class Authenticate(object):
         self.tenant_id = tenant_id
         self.log = log
 
-    def perform_effect(self, dispatcher):
-        """Authenticate."""
-        return self.authenticator.authenticate_tenant(self.tenant_id, log=self.log)
+
+@deferred_performer
+def perform_authenticate(dispatcher, intent):
+    """Authenticate."""
+    return intent.authenticator.authenticate_tenant(intent.tenant_id, log=intent.log)
 
 
 @attributes(['authenticator', 'tenant_id'], apply_with_init=False)
@@ -447,9 +451,11 @@ class InvalidateToken(object):
         self.authenticator = authenticator
         self.tenant_id = tenant_id
 
-    def perform_effect(self, dispatcher):
-        """Invalidate the credential cache."""
-        return self.authenticator.invalidate(self.tenant_id)
+
+@deferred_performer
+def perform_invalidate_token(dispatcher, intent):
+    """Invalidate the credential cache."""
+    return intent.authenticator.invalidate(intent.tenant_id)
 
 
 def generate_authenticator(reactor, config):
