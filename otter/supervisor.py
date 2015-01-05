@@ -433,7 +433,6 @@ class _Job(object):
         self.scaling_group = scaling_group
         self.supervisor = supervisor
         self.job_id = None
-        self.failed = False
 
     def start(self, launch_config):
         """
@@ -471,7 +470,6 @@ class _Job(object):
             if self.job_id in state.pending:
                 state.remove_job(self.job_id)
             self.log.err(f, 'Launching server failed', **_log_capacity(state))
-            self.failed = True
             return state
 
         d = self.scaling_group.modify_state(handle_failure)
@@ -531,40 +529,18 @@ class _Job(object):
         return d
 
 
-def update_group_status(ignore, jobs, scaling_group, log):
-    """
-    Update group status based on the result of the jobs
-    """
-    # Update to ERROR if all jobs failed, ACTIVE otherwise
-    status = 'ERROR' if all([job.failed for job in jobs]) else 'ACTIVE'
-    d = scaling_group.update_status(status)
-    d.addErrback(lambda f: f.trap(NoSuchScalingGroupError))
-    d.addErrback(log.err, 'Error updating status')
-    return d
-
-
 def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
     """
     Execute a launch config some number of times.
     """
     log.msg("Launching {delta} servers.", delta=delta)
     supervisor = get_supervisor()
-    jobs_completion_pool = DeferredPool()
-    jobs = []
-
     for i in range(delta):
         job = _Job(log, transaction_id, scaling_group, supervisor)
-        jobs.append(job)
         d = job.start(launch)
         state.add_job(job.job_id)
         # Add the job to the pool to ensure otter does not shut down until job is completed
         supervisor.deferred_pool.add(d)
-        # Add to job_completion_pool for status update tracking
-        jobs_completion_pool.add(d)
-
-    jobs_completion_deferred = jobs_completion_pool.notify_when_empty()
-    jobs_completion_deferred.addCallback(update_group_status, jobs, scaling_group, log)
-    supervisor.deferred_pool.add(jobs_completion_deferred)
 
     #TODO: Doing this to not cause change in controller but would be nice to remove it
     return succeed(None)
