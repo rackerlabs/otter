@@ -217,7 +217,8 @@ _consistency_levels = {'event': {'fetch': ConsistencyLevel.QUORUM,
                                  'insert': ConsistencyLevel.ONE,
                                  'delete': ConsistencyLevel.QUORUM},
                        'group': {'create': ConsistencyLevel.QUORUM},
-                       'state': {'update': ConsistencyLevel.QUORUM}}
+                       'state': {'update': ConsistencyLevel.QUORUM},
+                       'status': {'update': ConsistencyLevel.QUORUM}}
 
 
 def get_consistency_level(operation_name, resource_name,
@@ -748,8 +749,9 @@ class CassScalingGroup(object):
         def _do_update(ts, _):
             return self.connection.execute(
                 _cql_update.format(cf=self.group_table, column='status', name=':status'),
-                {'tenantId': self.tenant_id, 'groupId': self.uuid, 'ts': ts, 'status': status},
-                consistency=self.get_consistency('update', 'status'))
+                {'tenantId': self.tenant_id, 'groupId': self.uuid, 'ts': ts,
+                 'status': status.name},
+                self.get_consistency('update', 'status'))
 
         return self.view_config().addCallback(_do_update)
 

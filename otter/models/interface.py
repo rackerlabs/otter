@@ -2,6 +2,7 @@
 Interface to be used by the scaling groups engine
 """
 from zope.interface import Interface, Attribute
+from twisted.python.constants import Names, NamedConstant
 
 from otter.util import timestamp
 
@@ -240,6 +241,16 @@ class PoliciesOverLimitError(Exception):
                     c=curr_policies, n=new_policies))
 
 
+class ScalingGroupStatus(Names):
+    """
+    Status of scaling group
+    """
+    ACTIVE = NamedConstant()    # Group is active and executing policies/converging
+    ERROR = NamedConstant()     # Group has errored due to (mostly) invalid
+                                # launch configuration and has stopped executing
+                                # policies/converging
+
+
 class IScalingGroup(Interface):
     """
     Scaling group record
@@ -312,7 +323,9 @@ class IScalingGroup(Interface):
         """
         Updates the status of the group
 
-        :param str status: status to update
+        :param status: status to update
+        :type status: One of the constants from
+                      :class:`otter.models.interface.ScalingGroupStatus`
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
