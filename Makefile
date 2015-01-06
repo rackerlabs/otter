@@ -18,6 +18,11 @@ CLOUDCAFE ?= $(shell which cafe-runner)
 
 .PHONY: targets env-precheck
 
+hooks:
+	echo "#!/bin/bash" > .git/hooks/pre-commit
+	echo "python `pwd`/scripts/config_check.py" >> .git/hooks/pre-commit
+	echo "`pwd`/scripts/python-lint.py --git-precommit" >> .git/hooks/pre-commit
+
 targets:
 	@cat README.md
 
