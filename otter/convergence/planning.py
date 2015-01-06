@@ -5,13 +5,13 @@ from pyrsistent import pbag, s, pset
 from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
 
-from otter.convergence.model import NodeCondition, ServerState
+from otter.convergence.model import CLBNodeCondition, ServerState
 from otter.convergence.steps import (
-    AddNodesToLoadBalancer,
-    ChangeLoadBalancerNode,
+    AddNodesToCLB,
+    ChangeCLBNode,
     CreateServer,
     DeleteServer,
-    RemoveFromLoadBalancer,
+    RemoveFromCLB,
     SetMetadataItemOnServer,
 )
 from otter.util.fp import partition_bool, partition_groups
@@ -51,8 +51,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     # only put nodes into draining if a timeout is specified
     if timeout > 0:
         draining, to_drain = partition_groups(
-            lambda n: n.config.condition, nodes, [NodeCondition.DRAINING,
-                                                  NodeCondition.ENABLED])
+            lambda n: n.config.condition, nodes, [CLBNodeCondition.DRAINING,
+                                                  CLBNodeCondition.ENABLED])
 
         # Nothing should be done to these, because the timeout has not expired
         # and there are still active connections
@@ -60,14 +60,14 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
                     if (now - node.drained_at < timeout and
                         (node.connections is None or node.connections > 0))]
 
-    removes = [RemoveFromLoadBalancer(lb_id=node.lb_id, node_id=node.node_id)
+    removes = [RemoveFromCLB(lb_id=node.lb_id, node_id=node.node_id)
                for node in (set(nodes) - set(to_drain) - set(in_drain))]
 
-    changes = [ChangeLoadBalancerNode(lb_id=node.lb_id,
-                                      node_id=node.node_id,
-                                      condition=NodeCondition.DRAINING,
-                                      weight=node.config.weight,
-                                      type=node.config.type)
+    changes = [ChangeCLBNode(lb_id=node.lb_id,
+                             node_id=node.node_id,
+                             condition=CLBNodeCondition.DRAINING,
+                             weight=node.config.weight,
+                             type=node.config.type)
                for node in to_drain]
 
     return removes + changes
@@ -104,7 +104,7 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     current_idports = set(current)
 
     adds = [
-        AddNodesToLoadBalancer(
+        AddNodesToCLB(
             lb_id=lb_id,
             address_configs=s((ip_address, desired[lb_id, port])))
         for lb_id, port in desired_idports - current_idports]
@@ -112,12 +112,12 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     # TODO: Removes could be replaced with _remove_from_lb_with_draining if
     # we wanted to support draining for moving load balancers too
     removes = [
-        RemoveFromLoadBalancer(
+        RemoveFromCLB(
             lb_id=lb_id,
             node_id=current[lb_id, port].node_id)
         for lb_id, port in current_idports - desired_idports]
     changes = [
-        ChangeLoadBalancerNode(
+        ChangeCLBNode(
             lb_id=lb_id,
             node_id=current[lb_id, port].node_id,
             condition=desired_config.condition,
@@ -140,7 +140,7 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
     # if there are no load balancers that are waiting on draining timeouts or
     # connections, just delete the server too
     if (len(lb_draining_steps) == len(current_lb_nodes) and
-        all([isinstance(step, RemoveFromLoadBalancer)
+        all([isinstance(step, RemoveFromCLB)
              for step in lb_draining_steps])):
         return lb_draining_steps + [DeleteServer(server_id=server.id)]
 
@@ -218,8 +218,8 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # servers in error presumably are not serving traffic anyway
     delete_error_steps = (
         [DeleteServer(server_id=server.id) for server in servers_in_error] +
-        [RemoveFromLoadBalancer(lb_id=lb_node.lb_id,
-                                node_id=lb_node.node_id)
+        [RemoveFromCLB(lb_id=lb_node.lb_id,
+                       node_id=lb_node.node_id)
          for server in servers_in_error
          for lb_node in lbs_by_address.get(server.servicenet_address, [])])
 
@@ -261,16 +261,16 @@ def _optimizer(step_type):
     return _add_to_optimizers
 
 
-@_optimizer(AddNodesToLoadBalancer)
+@_optimizer(AddNodesToCLB)
 def _optimize_lb_adds(lb_add_steps):
     """
-    Merge together multiple :obj:`AddNodesToLoadBalancer`, per load balancer.
+    Merge together multiple :obj:`AddNodesToCLB`, per load balancer.
 
-    :param steps_by_lb: Iterable of :obj:`AddNodesToLoadBalancer`.
+    :param steps_by_lb: Iterable of :obj:`AddNodesToCLB`.
     """
     steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
     return [
-        AddNodesToLoadBalancer(
+        AddNodesToCLB(
             lb_id=lbid,
             address_configs=pset(reduce(lambda s, y: s.union(y),
                                         [step.address_configs for step in steps])))
