@@ -12,8 +12,8 @@
     "identity": {
         "username": "REPLACE_WITH_REAL_USERNAME",
         "password": "REPLACE_WITH_REAL_PASSWORD",
-        "url": "https://staging.identity.api.rackspacecloud.com/v2.0",
-        "admin_url": "https://staging.identity.api.rackspacecloud.com/v2.0",
+        "url": "https://keystone_identity_endpoint.com/v2.0",
+        "admin_url": "https://keystone_identity_endpoint.com/v2.0",
         "max_retries": 10,
         "retry_interval": 10,
         "wait": 3
@@ -46,8 +46,8 @@
     },
     "root": {
       "code": 301,
-      "headers": ["http://autoscale.api.rackspacecloud.com"],
-      "body": "Moved to http://autoscale.api.rackspacecloud.com"
+      "headers": ["http://redirected_to_api.com"],
+      "body": "Moved to http://redirected_to_api.com"
     },
     "elasticsearch": {
       "host": "http://127.0.0.1:9200"
