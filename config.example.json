@@ -10,7 +10,7 @@
         "consistency_exceptions": null
     },
     "identity": {
-        "username": "REPLACE_WITH_REAL_USERNAME",
+        "username": "username",
         "password": "REPLACE_WITH_REAL_PASSWORD",
         "url": "https://keystone_identity_endpoint.com/v2.0",
         "admin_url": "https://keystone_identity_endpoint.com/v2.0",
@@ -55,7 +55,7 @@
     "metrics": {
         "service": "cloudMetricsIngest",
         "region": "IAD",
-        "username": "REPLACE_WITH_REAL_USERNAME",
+        "username": "username",
         "password": "REPLACE_WITH_REAL_PASSWORD",
         "ttl": 432000,
         "interval": 60
