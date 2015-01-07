@@ -15,7 +15,15 @@ CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
 CLOUDCAFE ?= $(shell which cafe-runner)
 
+mkfile_dir := $(shell dirname "$(MAKEFILE_LIST)")
+
 .PHONY: targets env-precheck
+
+hooks:
+	cp ${mkfile_dir}/scripts/config_check.py ${mkfile_dir}/.git/hooks
+	echo "#!/bin/bash" > ${mkfile_dir}/.git/hooks/pre-commit
+	echo "python .git/hooks/config_check.py" >> ${mkfile_dir}/.git/hooks/pre-commit
+	chmod a+x ${mkfile_dir}/.git/hooks/pre-commit
 
 targets:
 	@cat README.md
