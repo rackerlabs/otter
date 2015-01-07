@@ -2,6 +2,7 @@
 
 import json
 
+from effect import Effect
 from effect.testing import resolve_effect
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -9,7 +10,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.auth import Authenticate, InvalidateToken
 from otter.constants import ServiceType
 from otter.util.http import headers, APIError
-from otter.http import get_request_func, add_bind_service
+from otter.http import get_request_func, add_bind_service, service_request, ServiceRequest
 from otter.test.utils import stub_pure_response
 from otter.util.pure_http import Request
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
@@ -109,3 +110,26 @@ class BindServiceTests(SynchronousTestCase):
         self.assertEqual(
             request('get', 'foo'),
             ('get', 'http://dfw.openstack/foo', None, None))
+
+
+class ServiceRequestTests(SynchronousTestCase):
+    """Tests for :func:`service_request`."""
+    def test_defaults(self):
+        """Default arguments are populated."""
+        eff = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'foo')
+        self.assertEqual(
+            eff,
+            Effect(
+                ServiceRequest(
+                    service_type=ServiceType.CLOUD_SERVERS,
+                    method='GET',
+                    url='foo',
+                    headers=None,
+                    data=None,
+                    log=None,
+                    reauth_codes=(401, 403),
+                    success_codes=(200,),
+                    json_response=True,
+                )
+            )
+        )
