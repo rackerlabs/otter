@@ -1,7 +1,7 @@
-klein==14.0.0
+klein==0.2.1
 twisted==14.0.2
 service_identity==14.0.0
-jsonschema==2.0
+jsonschema==2.4.0
 iso8601==0.1.10
 lxml==3.4.1
 treq==0.2.1
