@@ -3,8 +3,8 @@ Tests for :mod:`otter.utils.retry`
 """
 import sys
 
-from effect import Effect, Delay, FuncIntent, ConstantIntent, sync_perform
-from effect.testing import resolve_effect, StubIntent
+from effect import Effect, Delay, Func, Constant, sync_perform
+from effect.testing import resolve_effect, Stub
 
 import mock
 
@@ -397,7 +397,7 @@ class NextIntervalHelperTests(SynchronousTestCase):
         self.assertEqual(next_interval(err), 12)
 
 
-STUB = Effect(StubIntent(ConstantIntent("foo")))
+STUB = Effect(Stub(Constant("foo")))
 
 
 class RetryEffectTests(SynchronousTestCase):
@@ -465,11 +465,11 @@ class EffectfulRetryTests(SynchronousTestCase):
         def should_retry(exc_info):
             if (exc_info[0] is RuntimeError
                     and exc_info[1].message == "foo"):
-                return Effect(StubIntent(ConstantIntent(True)))
+                return Effect(Stub(Constant(True)))
             else:
-                return Effect(StubIntent(ConstantIntent(False)))
+                return Effect(Stub(Constant(False)))
 
-        retry = Retry(effect=Effect(StubIntent(FuncIntent(func))),
+        retry = Retry(effect=Effect(Stub(Func(func))),
                       should_retry=should_retry)
         eff = perform_retry(None, retry)
         self.assertEqual(resolve_stubs(eff), "final")
@@ -485,7 +485,7 @@ def get_exc_info():
 
 def _perform_func(eff):
     """Perform a func intent without recursing on effects."""
-    assert type(eff.intent) is FuncIntent
+    assert type(eff.intent) is Func
     return sync_perform(get_dispatcher(None), eff, recurse_effects=False)
 
 

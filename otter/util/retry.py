@@ -6,7 +6,7 @@ import random
 
 from characteristic import attributes, Attribute
 
-from effect import Effect, Delay, FuncIntent
+from effect import Effect, Delay, Func
 from effect.retry import retry as effect_retry
 
 from twisted.internet import defer
@@ -322,7 +322,7 @@ class ShouldDelayAndRetry(object):
                 return Effect(Delay(interval)).on(lambda r: True)
             else:
                 return False
-        return Effect(FuncIntent(doit))
+        return Effect(Func(doit))
 
 
 @attributes(['effect', 'should_retry'])

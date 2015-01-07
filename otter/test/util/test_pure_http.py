@@ -4,9 +4,9 @@ import json
 
 from testtools import TestCase
 
-from effect.testing import StubIntent
+from effect.testing import Stub
 from effect.twisted import perform
-from effect import Effect, ConstantIntent, FuncIntent
+from effect import Effect, Constant, Func
 from itertools import starmap
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -23,12 +23,12 @@ from otter.test.utils import stub_pure_response, StubResponse, StubTreq, resolve
 from otter.effect_dispatcher import get_dispatcher
 
 
-Constant = lambda x: StubIntent(ConstantIntent(x))
+ESConstant = lambda x: Effect(Stub(Constant(x)))
 
 
 def stub_request(response):
     """Create a request function that returns a stubbed response."""
-    return lambda method, url, headers=None, data=None: Effect(Constant(response))
+    return lambda method, url, headers=None, data=None: ESConstant(response)
 
 
 class RequestEffectTests(SynchronousTestCase):
@@ -161,7 +161,7 @@ class AddEffectfulHeadersTest(TestCase):
     def setUp(self):
         """Save auth effect."""
         super(AddEffectfulHeadersTest, self).setUp()
-        self.auth_effect = Effect(Constant({"x-auth-token": "abc123"}))
+        self.auth_effect = ESConstant({"x-auth-token": "abc123"})
 
     def test_add_headers(self):
         """Headers from the provided effect are inserted."""
@@ -227,7 +227,7 @@ class EffectOnResponseTests(TestCase):
         super(EffectOnResponseTests, self).setUp()
         self.invalidations = []
         invalidate = lambda: self.invalidations.append(True)
-        self.invalidate_effect = Effect(StubIntent(FuncIntent(invalidate)))
+        self.invalidate_effect = Effect(Stub(Func(invalidate)))
 
     def test_invalidate(self):
         """

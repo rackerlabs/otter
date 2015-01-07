@@ -3,8 +3,8 @@
 
 import mock
 
-from effect import Effect, ConstantIntent, ParallelEffects
-from effect.testing import StubIntent, resolve_effect
+from effect import Effect, Constant, ParallelEffects
+from effect.testing import Stub, resolve_effect
 
 from pyrsistent import pmap
 
@@ -80,7 +80,7 @@ class ExecConvergenceTests(SynchronousTestCase):
         def get_all_convergence_data(request_func, grp_id):
             self.assertIs(request_func, reqfunc)
             self.assertEqual(grp_id, group_id)
-            return Effect(StubIntent(ConstantIntent((self.servers, []))))
+            return Effect(Stub(Constant((self.servers, []))))
         return get_all_convergence_data
 
     def test_success(self):
