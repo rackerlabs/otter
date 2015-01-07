@@ -27,7 +27,7 @@ def execute_convergence(request_func, group_id, desired_group_state,
     :param bytes group_id: Tenant's group
     :param DesiredGroupState desired_group_state: the desired state
 
-    :return: Effect of Bool specifying if the effect should be performed again
+    :return: Effect of bool specifying if the effect should be performed again
     :rtype: :class:`effect.Effect`
     """
     eff = get_all_convergence_data(request_func, group_id)
