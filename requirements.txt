@@ -14,4 +14,4 @@ txkazoo==0.0.5
 effect==0.1a11
 characteristic==14.3.0
 toolz==0.7.1
-pyrsistent==0.6.3
+pyrsistent==0.7.0
