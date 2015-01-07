@@ -9,7 +9,6 @@ import sys
 import treq
 
 from effect.testing import resolve_effect, resolve_stubs as eff_resolve_stubs
-from effect.twisted import legacy_dispatcher
 from effect import ComposedDispatcher, base_dispatcher
 
 from zope.interface import implementer, directlyProvides
@@ -615,5 +614,4 @@ def resolve_stubs(eff):
     Invoke :func:`effect.testing.resolve_stubs` with the base and legacy
     dispatchers from Effect.
     """
-    dispatcher = ComposedDispatcher([legacy_dispatcher, base_dispatcher])
-    return eff_resolve_stubs(dispatcher, eff)
+    return eff_resolve_stubs(base_dispatcher, eff)
