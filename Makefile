@@ -115,6 +115,3 @@ clean: cleandocs
 	rm -rf schema/setup-*.cql
 	rm -rf schema/migrations-*.cql
 	rm -rf schema/teardown-*.cql
-
-bundle:
-	./scripts/bundle.sh
