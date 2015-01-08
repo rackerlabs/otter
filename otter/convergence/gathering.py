@@ -101,7 +101,7 @@ def get_clb_contents(request_func):
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
         nodes = [
-            CLBNode(node_id=node['id'], address=node['address'],
+            CLBNode(node_id=str(node['id']), address=node['address'],
                     description=CLBDescription(
                         lb_id=str(_id), port=node['port'], weight=node['weight'],
                         condition=CLBNodeCondition.lookupByName(node['condition']),
