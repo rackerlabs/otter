@@ -95,13 +95,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         cls.load_balancer_1 = cls.load_balancer_1_response.entity.id
         cls.resources.add(cls.load_balancer_1, cls.lbaas_client.delete_load_balancer)
 
-        cls.load_balancer_2_response = cls.lbaas_client.create_load_balancer('otter_test_2', [],
-                                                                             'HTTP', 80, "PUBLIC")
-        cls.load_balancer_2 = cls.load_balancer_2_response.entity.id
-        cls.resources.add(cls.load_balancer_2, cls.lbaas_client.delete_load_balancer)
-
-        cls.lb_other_region = 0000
-
         # OK, back to waiting for servers to spin up.
         background_servers, err = cls.autoscale_behaviors.wait_for_servers_to_build(
             background_group_resp.entity.id,
