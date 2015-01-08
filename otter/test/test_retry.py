@@ -486,7 +486,7 @@ def get_exc_info():
 def _perform_func(eff):
     """Perform a func intent without recursing on effects."""
     assert type(eff.intent) is Func
-    return sync_perform(get_dispatcher(None), eff, recurse_effects=False)
+    return eff.intent.func()
 
 
 class ShouldDelayAndRetryTests(SynchronousTestCase):
