@@ -545,14 +545,16 @@ class HealthCheckTestCase(RestAPITestMixin, TestCase):
         """
         And returns the stringified json blob
         """
+        jsonobj = {'blargh': 'boo', 'inside': {'key': 'boom'}}
+
         def health_check():
-            return succeed({'blargh': 'boo'})
+            return succeed(jsonobj)
 
         otter = Otter(self.mock_store, 'region', health_check)
         self.root = otter.app.resource()
 
         resp = self.assert_status_code(200)
-        self.assertEqual(resp, json.dumps({'blargh': 'boo'}))
+        self.assertEqual(resp, json.dumps(jsonobj, indent=4))
 
 
 class RootRouteTestCase(RestAPITestMixin, TestCase):
