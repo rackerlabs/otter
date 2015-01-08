@@ -429,10 +429,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             self.assertTrue(nid in final_node_ids, msg='Initial node {0} was not in '
                             'the final list'.format(nid))
 
-    def _get_available_pools(self):
-        """List the rcv3 pools on the tenant."""
-        return self.rcv3_client.list_pools().entity.pools
-
     def _get_node_counts_on_pool(self, pool_id):
         """
         Get the node counts on a given pool.  Takes an ID string.
