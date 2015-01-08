@@ -18,6 +18,7 @@ from otter.convergence.composition import (
     json_to_LBConfigs,
     tenant_is_enabled)
 from otter.convergence.model import DesiredGroupState, LBConfig, NovaServer, ServerState
+from otter.util.pure_http import has_code
 
 
 class JsonToLBConfigTests(SynchronousTestCase):
@@ -108,7 +109,8 @@ class ExecConvergenceTests(SynchronousTestCase):
             {'url': 'loadbalancers/23', 'headers': None,
              'service_type': ServiceType.CLOUD_LOAD_BALANCERS,
              'data': {'nodes': mock.ANY},
-             'method': 'POST', 'success_codes': (200,)})
+             'method': 'POST',
+             'success_pred': has_code(200)})
         # separate check for nodes as it can be in any order but content is unique
         self.assertEqual(
             set(map(pmap, eff.intent.effects[0].intent['data']['nodes'])),
