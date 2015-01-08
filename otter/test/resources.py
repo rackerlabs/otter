@@ -4,21 +4,12 @@ Code to load keyspaces and data into a running Cassandra cluster.
 Uses the python CQL driver, becuase silverberg doesn't yet support connecting
 without a defined keyspace.
 """
+import json
+import os
+import re
 
 from cStringIO import StringIO
 from glob import glob
-import json
-import os.path
-import os
-import re
-import uuid
-
-from cql.apivalues import ProgrammingError
-from cql.connection import connect
-
-from silverberg import client
-
-from twisted.internet import endpoints, reactor
 
 
 def simple_create_keyspace(keyspace_name, replication_dict=None):
