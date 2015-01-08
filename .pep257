@@ -1,0 +1,3 @@
+[pep257]
+ignore = D203
+# D203: see https://github.com/GreenSteam/pep257/pull/91
