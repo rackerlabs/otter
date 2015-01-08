@@ -429,7 +429,7 @@ class FindPendingJobsToCancelTests(SynchronousTestCase):
         sorting.
         """
         self.data = {
-            '1': {'created': '2014-01-01T00:00:05Z.2014'},
+            '1': {'created': '2014-01-01T00:00:05Z.1234'},
             '2': {'created': '2014-01-04T00:02:02Z'},
             '3': {'created': '2014-01-04T00:00:10Z'},
             '4': {'created': '2014-01-01T01:00:00Z.3513'},
@@ -470,7 +470,7 @@ class FindServersToEvictTests(SynchronousTestCase):
         sorting.
         """
         self.data = {
-            '1': {'created': '2014-01-01T00:00:05Z.2014', 'id': '1',
+            '1': {'created': '2014-01-01T00:00:05Z.1234', 'id': '1',
                   'lb': 'lb'},
             '2': {'created': '2014-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
             '3': {'created': '2014-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
@@ -514,7 +514,7 @@ class DeleteActiveServersTests(SynchronousTestCase):
         """
         self.log = mock.Mock()
         self.data = {
-            '1': {'created': '2014-01-01T00:00:05Z.2014', 'id': '1',
+            '1': {'created': '2014-01-01T00:00:05Z.1234', 'id': '1',
                   'lb': 'lb'},
             '2': {'created': '2014-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
             '3': {'created': '2014-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
@@ -681,14 +681,14 @@ class ExecScaleDownTests(SynchronousTestCase):
         """
         self.log = mock.Mock()
         self.pending = {
-            '1': {'created': '2014-01-01T00:00:05Z.2014'},
+            '1': {'created': '2014-01-01T00:00:05Z.1234'},
             '2': {'created': '2014-01-04T00:02:02Z'},
             '3': {'created': '2014-01-04T00:00:10Z'},
             '4': {'created': '2014-01-01T01:00:00Z.3513'},
             '5': {'created': '2014-01-05T00:00:00Z'}
         }  # descending order by time would be: 5, 2, 3, 4, 1
         self.active = {
-            'a1': {'created': '2014-01-01T00:00:05Z.2014', 'id': '1',
+            'a1': {'created': '2014-01-01T00:00:05Z.1234', 'id': '1',
                    'lb': 'lb'},
             'a2': {'created': '2014-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
             'a3': {'created': '2014-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
