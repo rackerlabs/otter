@@ -40,6 +40,9 @@ def simple_drop_keyspace(keyspace_name):
     return "DROP KEYSPACE {name}".format(name=keyspace_name)
 
 
+_drop_regex = re.compile('^\s*(alter|drop|truncate|delete)\s', re.I | re.M)
+
+
 class CQLGenerator(object):
     """
     Reads all cql files from a particular directory in sorted order (by name),
