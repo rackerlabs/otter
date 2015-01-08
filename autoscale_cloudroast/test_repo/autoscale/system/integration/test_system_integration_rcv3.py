@@ -107,7 +107,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             print "SetUpClass failed: background servers"
 
     @tags(speed='slow', type='rcv3')
-    def test_create_scaling_group_with_pool_on_cn(self):
+    def test_create_scaling_group_with_pool_on_cloud_network(self):
         """
         Test that it is possible to create a scaling group with 0 entities
         connected to an RCV3 LB pool with a cloud_network specified.
