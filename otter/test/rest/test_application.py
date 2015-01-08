@@ -554,7 +554,7 @@ class HealthCheckTestCase(RestAPITestMixin, TestCase):
         self.root = otter.app.resource()
 
         resp = self.assert_status_code(200)
-        self.assertEqual(resp, json.dumps(jsonobj, indent=4))
+        self.assertEqual(resp, json.dumps(jsonobj, indent=4, sort_keys=True))
 
 
 class RootRouteTestCase(RestAPITestMixin, TestCase):
