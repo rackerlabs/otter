@@ -9,6 +9,9 @@ from twisted.internet.defer import succeed, fail, Deferred
 from twisted.python.failure import Failure
 from twisted.internet.task import Clock
 
+from effect import sync_perform, Effect
+from ..effect_dispatcher import get_simple_dispatcher
+
 from zope.interface.verify import verifyObject
 
 from otter.test.utils import patch, SameJSON, iMock, mock_log
@@ -743,8 +746,8 @@ class AuthenticateTests(SynchronousTestCase):
         mock_auth = iMock(IAuthenticator)
         mock_auth.authenticate_tenant.return_value = succeed(result)
         log = object()
-        intent = Authenticate(mock_auth, 'tenant_id1', log)
-        self.assertEqual(self.successResultOf(intent.perform_effect(None)), result)
+        eff = Effect(Authenticate(mock_auth, 'tenant_id1', log))
+        self.assertEqual(sync_perform(get_simple_dispatcher(None), eff), result)
         mock_auth.authenticate_tenant.assert_called_once_with('tenant_id1', log=log)
 
 
@@ -755,8 +758,8 @@ class InvalidateTokenTests(SynchronousTestCase):
         """Performig causes a call to authenticator.invalidate."""
         mock_auth = iMock(ICachingAuthenticator)
         mock_auth.invalidate.return_value = None
-        intent = InvalidateToken(mock_auth, 'tenant_id1')
-        self.assertEqual(intent.perform_effect(None), None)
+        eff = Effect(InvalidateToken(mock_auth, 'tenant_id1'))
+        self.assertEqual(sync_perform(get_simple_dispatcher(None), eff), None)
         mock_auth.invalidate.assert_called_once_with('tenant_id1')
 
 

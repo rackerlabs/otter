@@ -463,7 +463,7 @@ policy = {
                 {
                     "type": "object",
                     "properties": {"alarm_criteria": {"required": True},
-                                   "check": {"required":True}},
+                                   "check": {"required": True}},
                     "additionalProperties": False
                 }
             ],

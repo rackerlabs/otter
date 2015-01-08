@@ -7,8 +7,8 @@ import json
 from io import StringIO
 import operator
 
-from effect import Effect, ConstantIntent, ErrorIntent
-from effect.testing import StubIntent
+from effect import Effect, Constant, Error
+from effect.testing import Stub
 
 from pyrsistent import freeze
 
@@ -192,7 +192,7 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
 
         def get_bound_request_func(tenant_id):
             def request_func(service_type, method, url, headers=None, data=None):
-                return Effect(StubIntent(ConstantIntent(tenant_servers[tenant_id])))
+                return Effect(Stub(Constant(tenant_servers[tenant_id])))
             return request_func
         effs = get_all_metrics_effects(groups, get_bound_request_func, mock_log())
 
@@ -216,9 +216,9 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         def get_bound_request_func(tenant_id):
             def request_func(service_type, method, url, headers=None, data=None):
                 if tenant_id == 't1':
-                    return Effect(StubIntent(ConstantIntent({'servers': []})))
+                    return Effect(Stub(Constant({'servers': []})))
                 else:
-                    return Effect(StubIntent(ErrorIntent(ZeroDivisionError('foo bar'))))
+                    return Effect(Stub(Error(ZeroDivisionError('foo bar'))))
             return request_func
 
         groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
@@ -256,7 +256,7 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
         self.mock_gsgs = patch(
             self, 'otter.metrics.get_scaling_group_servers',
             side_effect=lambda rf, server_predicate: (
-                Effect(ConstantIntent(self.tenant_servers[rf]))))
+                Effect(Constant(self.tenant_servers[rf]))))
         self.service_mapping = {ServiceType.CLOUD_SERVERS: 'nova'}
 
     def test_get_all_metrics(self):
@@ -295,8 +295,8 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
         ignored.
         """
         def mock_game(cass_groups, get_request_func_for_tenant, log, _print=False):
-            return [Effect(ConstantIntent(None)),
-                    Effect(ConstantIntent([GroupMetrics('t1', 'g1', 0, 0, 0)]))]
+            return [Effect(Constant(None)),
+                    Effect(Constant([GroupMetrics('t1', 'g1', 0, 0, 0)]))]
         mock_game = patch(self, 'otter.metrics.get_all_metrics_effects', side_effect=mock_game)
         groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
                   {'tenantId': 't2', 'groupId': 'g2', 'desired': 500}]

@@ -167,7 +167,6 @@ def with_transaction_id():
 
 class InvalidJsonError(Exception):
     """Null"""
-    pass
 
 
 def validate_body(schema):

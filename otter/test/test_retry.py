@@ -3,8 +3,8 @@ Tests for :mod:`otter.utils.retry`
 """
 import sys
 
-from effect import Effect, Delay, FuncIntent, ConstantIntent, sync_perform
-from effect.testing import resolve_effect, StubIntent
+from effect import Effect, Delay, Func, Constant
+from effect.testing import resolve_effect, Stub
 
 import mock
 
@@ -17,9 +17,8 @@ from otter.util.retry import (retry, repeating_interval, random_interval,
                               transient_errors_except, retry_times,
                               compose_retries, exponential_backoff_interval,
                               terminal_errors_except, retry_effect, Retry,
-                              ShouldDelayAndRetry)
+                              ShouldDelayAndRetry, perform_retry)
 from otter.test.utils import CheckFailure, DummyException, CheckFailureValue, resolve_stubs
-from otter.effect_dispatcher import get_simple_dispatcher
 
 
 class RetryTests(SynchronousTestCase):
@@ -397,7 +396,7 @@ class NextIntervalHelperTests(SynchronousTestCase):
         self.assertEqual(next_interval(err), 12)
 
 
-STUB = Effect(StubIntent(ConstantIntent("foo")))
+STUB = Effect(Stub(Constant("foo")))
 
 
 class RetryEffectTests(SynchronousTestCase):
@@ -447,13 +446,13 @@ class EffectfulRetryTests(SynchronousTestCase):
     # an object which calls a function with arguments specified as public
     # attributes, I guess...
 
-    def test_perform_effect(self):
+    def test_perform_retry(self):
         """When the specified effect is successful, its result is propagated."""
         retry = Retry(effect=STUB, should_retry=lambda e: 1 / 0)
-        eff = retry.perform_effect(None)
+        eff = perform_retry(None, retry)
         self.assertEqual(resolve_stubs(eff), "foo")
 
-    def test_perform_effect_retries_on_error(self):
+    def test_perform_retry_retries_on_error(self):
         """
         When the specified effect raises, it is retried when should_retry
         returns an Effect of True.
@@ -465,13 +464,13 @@ class EffectfulRetryTests(SynchronousTestCase):
         def should_retry(exc_info):
             if (exc_info[0] is RuntimeError
                     and exc_info[1].message == "foo"):
-                return Effect(StubIntent(ConstantIntent(True)))
+                return Effect(Stub(Constant(True)))
             else:
-                return Effect(StubIntent(ConstantIntent(False)))
+                return Effect(Stub(Constant(False)))
 
-        retry = Retry(effect=Effect(StubIntent(FuncIntent(func))),
+        retry = Retry(effect=Effect(Stub(Func(func))),
                       should_retry=should_retry)
-        eff = retry.perform_effect(None)
+        eff = perform_retry(None, retry)
         self.assertEqual(resolve_stubs(eff), "final")
 
 
@@ -485,8 +484,8 @@ def get_exc_info():
 
 def _perform_func(eff):
     """Perform a func intent without recursing on effects."""
-    assert type(eff.intent) is FuncIntent
-    return sync_perform(get_simple_dispatcher(None), eff, recurse_effects=False)
+    assert type(eff.intent) is Func
+    return eff.intent.func()
 
 
 class ShouldDelayAndRetryTests(SynchronousTestCase):

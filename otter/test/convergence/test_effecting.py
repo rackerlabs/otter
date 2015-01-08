@@ -5,9 +5,11 @@ from effect import parallel
 
 from twisted.trial.unittest import SynchronousTestCase
 
+from zope.interface import implementer
+
 from otter.constants import ServiceType
-from otter.convergence.effecting import _reqs_to_effect
-from otter.convergence.steps import Request
+from otter.convergence.effecting import _reqs_to_effect, steps_to_effect
+from otter.convergence.steps import Request, IStep
 
 
 @attributes(["service_type", "method", "url", "headers", "data", "success_codes"],
@@ -112,3 +114,36 @@ class RequestsToEffectTests(SynchronousTestCase):
                              headers=None,
                              data=data_sentinel)]
         self.assertCompileTo(conv_requests, expected_effects)
+
+
+@implementer(IStep)
+class Steppy(object):
+    """A dummy step."""
+    def as_request(self):
+        """Return a simple GET .../whatever on CLOUD_LOAD_BALANCERS"""
+        return Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
+                       method="GET",
+                       path="whatever")
+
+
+class StepsToEffectTests(SynchronousTestCase):
+    """Tests for :func:`steps_to_effect`"""
+    def test_uses_step_request(self):
+        """Steps are converted to requests."""
+        steps = [Steppy(), Steppy()]
+        expected_effects = [
+            _PureRequestStub(
+                service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                method="GET",
+                url="whatever",
+                headers=None,
+                data=None),
+            _PureRequestStub(
+                service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                method="GET",
+                url="whatever",
+                headers=None,
+                data=None),
+        ]
+        effect = steps_to_effect(_PureRequestStub, steps)
+        self.assertEqual(effect, parallel(expected_effects))

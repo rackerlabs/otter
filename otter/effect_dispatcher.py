@@ -3,7 +3,13 @@
 from functools import partial
 
 from effect import base_dispatcher, ComposedDispatcher, TypeDispatcher
-from effect.twisted import legacy_dispatcher, make_twisted_dispatcher
+from effect.twisted import make_twisted_dispatcher
+
+from .auth import (
+    Authenticate, perform_authenticate,
+    InvalidateToken, perform_invalidate_token)
+from .util.pure_http import Request, perform_request
+from .util.retry import Retry, perform_retry
 
 from otter.http import TenantScope, perform_tenant_scope
 
@@ -14,11 +20,14 @@ def get_simple_dispatcher(reactor):
     suitable for passing to :func:`effect.perform`. Note that this does NOT
     handle :obj:`ServiceRequest` and :obj:`TenantScope`.
     """
-    # TODO: Get rid of the "legacy_dispatcher" here, after we get rid of all use
-    # of "perform_effect" methods on intents.
     return ComposedDispatcher([
         base_dispatcher,
-        legacy_dispatcher,
+        TypeDispatcher({
+            Authenticate: perform_authenticate,
+            InvalidateToken: perform_invalidate_token,
+            Request: perform_request,
+            Retry: perform_retry,
+        }),
         make_twisted_dispatcher(reactor),
     ])
 
