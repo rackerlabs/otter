@@ -74,7 +74,7 @@ class ExecConvergenceTests(SynchronousTestCase):
             NovaServer(id='b', state=ServerState.ACTIVE, created=0, servicenet_address='ip2'),
         ]
 
-    def _get_get_all_convergence_data(self, servers, group_id, reqfunc):
+    def _get_gacd_func(self, servers, group_id, reqfunc):
         def get_all_convergence_data(request_func, grp_id):
             self.assertIs(request_func, reqfunc)
             self.assertEqual(grp_id, group_id)
@@ -87,7 +87,7 @@ class ExecConvergenceTests(SynchronousTestCase):
         True to be called again
         """
         reqfunc = lambda **k: Effect(k)
-        get_all_convergence_data = self._get_get_all_convergence_data(
+        get_all_convergence_data = self._get_gacd_func(
             self.servers, 'gid', reqfunc)
         desired = DesiredGroupState(
             launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
@@ -129,7 +129,7 @@ class ExecConvergenceTests(SynchronousTestCase):
             desired_lbs={},
             desired=2)
         reqfunc = lambda **k: 1 / 0
-        get_all_convergence_data = self._get_get_all_convergence_data(
+        get_all_convergence_data = self._get_gacd_func(
             self.servers, 'gid', reqfunc)
         eff = execute_convergence(
             reqfunc, 'gid', desired,
