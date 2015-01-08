@@ -39,7 +39,8 @@ test_config = {
     'identity': identity_config,
     'cloudServersOpenStack': 'cloudServersOpenStack',
     'cloudLoadBalancers': 'cloudLoadBalancers',
-    'rackconnect': 'rackconnect'
+    'rackconnect': 'rackconnect',
+    'metrics': {'service': 'cloudMetricsIngest'}
 }
 
 
