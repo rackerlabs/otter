@@ -35,6 +35,9 @@ Emeritus otters:
 
 ### Development
 
+- `make hooks` to set up pre-commit hooks for the project
+  (PLEASE RUN THIS IF DEVELOPING ON THE PROJECT)
+
 Build an environment:
 
 - `make env-precheck` makes sure you have enough pre-existing

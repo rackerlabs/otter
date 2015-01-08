@@ -439,8 +439,7 @@ class APIOptionsTests(SynchronousTestCase):
         config = Options()
         config.open = mock.Mock(return_value=StringIO(u'{"a": "b"}'))
         config.parseOptions(['--config=file.json'])
-        self.assertEqual(config, {'a': 'b', 'config': 'file.json',
-                                  'cloudServersOpenStack': 'cloudServersOpenStack'})
+        self.assertEqual(config, {'a': 'b', 'config': 'file.json'})
 
 
 class ServiceTests(SynchronousTestCase):
