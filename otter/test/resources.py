@@ -45,7 +45,6 @@ _drop_regex = re.compile('^\s*(alter|drop|truncate|delete)\s', re.I | re.M)
 
 
 class CQLGenerator(object):
-
     """Combines CQL files in a directory into one SQL statement, in order."""
 
     def __init__(self, directory, safe_only=True):
