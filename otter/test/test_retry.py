@@ -3,7 +3,7 @@ Tests for :mod:`otter.utils.retry`
 """
 import sys
 
-from effect import Effect, Delay, Func, Constant, sync_perform
+from effect import Effect, Delay, Func, Constant
 from effect.testing import resolve_effect, Stub
 
 import mock
@@ -19,7 +19,6 @@ from otter.util.retry import (retry, repeating_interval, random_interval,
                               terminal_errors_except, retry_effect, Retry,
                               ShouldDelayAndRetry, perform_retry)
 from otter.test.utils import CheckFailure, DummyException, CheckFailureValue, resolve_stubs
-from otter.effect_dispatcher import get_dispatcher
 
 
 class RetryTests(SynchronousTestCase):

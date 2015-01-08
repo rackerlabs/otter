@@ -11,7 +11,6 @@ from pyrsistent import pmap
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
-from otter.util.timestamp import now
 from otter.test.utils import resolve_stubs
 from otter.convergence.composition import (
     execute_convergence,

@@ -9,7 +9,7 @@ import sys
 import treq
 
 from effect.testing import resolve_effect, resolve_stubs as eff_resolve_stubs
-from effect import ComposedDispatcher, base_dispatcher
+from effect import base_dispatcher
 
 from zope.interface import implementer, directlyProvides
 from zope.interface.verify import verifyObject
