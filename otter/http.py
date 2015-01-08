@@ -4,7 +4,7 @@ Integration point for HTTP clients in otter.
 from functools import wraps
 
 from characteristic import attributes
-from effect import Effect
+from effect import ComposedDispatcher, Effect, TypeDispatcher, perform, sync_performer
 
 from otter.util.pure_http import (
     request, add_headers, add_effect_on_response, add_error_handling,
@@ -190,11 +190,14 @@ def perform_tenant_scope(
     a dispatcher.
     """
 
+    1 / 0
+
     def effect_to_box(eff, box):
         return eff.on(box.succeed, box.fail)
 
     @sync_performer
     def scoped_performer(dispatcher, service_request):
+        1 / 0
         return concretize_service_request(
             authenticator, log, service_mapping, region,
             tenant_scope.tenant_id, service_request)

@@ -181,6 +181,7 @@ def get_all_metrics(cass_groups, authenticator, service_mapping, region,
     """
     dispatcher = get_full_dispatcher(clock, authenticator, metrics_log,
                                      service_mapping, region)
+
     def req_func_for_tenant(tenant_id):
         # TODO: Get rid of this when we switch everything to ServiceRequest
         return get_request_func(authenticator, tenant_id, metrics_log,
