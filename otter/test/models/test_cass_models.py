@@ -43,7 +43,9 @@ from otter.util.config import set_config_data
 
 from twisted.internet import defer
 from twisted.internet.task import Clock
-from silverberg.client import ConsistencyLevel
+
+from silverberg.client import ConsistencyLevel, CQLClient
+
 from kazoo.protocol.states import KazooState
 
 
@@ -365,7 +367,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, Synchronou
         """
         Create a mock group
         """
-        self.connection = mock.MagicMock(spec=['execute'])
+        self.connection = mock.MagicMock(spec=CQLClient)
         set_config_data({'limits': {'absolute': {'maxWebhooksPerPolicy': 1000}}})
         self.addCleanup(set_config_data, {})
 
