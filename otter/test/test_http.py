@@ -17,7 +17,7 @@ from otter.http import (
     get_request_func,
     service_request)
 from otter.test.utils import stub_pure_response
-from otter.util.pure_http import Request
+from otter.util.pure_http import Request, has_code
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 
 
@@ -133,7 +133,7 @@ class ServiceRequestTests(SynchronousTestCase):
                     data=None,
                     log=None,
                     reauth_codes=(401, 403),
-                    success_codes=(200,),
+                    success_pred=has_code(200),
                     json_response=True,
                 )
             )

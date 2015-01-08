@@ -113,7 +113,7 @@ def service_request(
         service_type, method, url, headers=None, data=None,
         log=None,
         reauth_codes=(401, 403),
-        success_codes=(200,),
+        success_pred=has_code(200),
         json_response=True):
     """
     Make an HTTP request to a Rackspace service, with a bunch of awesome
@@ -126,7 +126,8 @@ def service_request(
     :param dict headers: base headers; will have auth headers added.
     :param data: JSON-able object or None.
     :param log: log to send request info to.
-    :param sequence success_codes: HTTP codes to consider successful.
+    :param sequence success_pred: A predicate of responses which determines if
+        a response indicates success or failure.
     :param sequence reauth_codes: HTTP codes upon which to invalidate the
         auth cache.
     :param bool json_response: Specifies whether the response should be
@@ -145,19 +146,19 @@ def service_request(
         data=data,
         log=log,
         reauth_codes=reauth_codes,
-        success_codes=success_codes,
+        success_pred=success_pred,
         json_response=json_response))
 
 
 @attributes(["service_type", "method", "url", "headers", "data",
-             "log", "reauth_codes", "success_codes", "json_response"])
+             "log", "reauth_codes", "success_pred", "json_response"])
 class ServiceRequest(object):
     """
     A request to a Rackspace/OpenStack service.
 
     Note that this intent does _not_ contain a tenant ID. To specify the tenant
     ID for any tree of effects that might contain a ServiceRequest, wrap the
-    effect in a :obj:`TenantScope` intent.
+    effect in a :obj:`TenantScope`.
     """
 
 
@@ -237,7 +238,7 @@ def concretize_service_request(
             log,
             add_json_request_data(
                 add_error_handling(
-                    has_code(*service_request.success_codes),
+                    service_request.success_pred,
                     add_effect_on_response(
                         invalidate_eff,
                         service_request.reauth_codes,
