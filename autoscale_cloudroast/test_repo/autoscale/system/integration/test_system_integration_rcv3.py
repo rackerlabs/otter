@@ -196,10 +196,10 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
     @tags(speed='slow', type='rcv3')
     def test_create_scaling_group_with_pool_and_nonzero_min(self):
         """
-        Create group with min_entities servers, a single RCv3 LB, and a Rackconnect
-        internal, public, and private network.  After waiting for the number of
-        servers to come up, we verify that the nova_server_id is in the list of
-        servers on the node.  We also verify correct networks appear on the server.
+        Create group with min_entities servers, a single RCv3 LB, and a
+        Rackconnect network.  After waiting for the number of servers to come
+        up, we verify that the nova_server_id is in the list of servers on the
+        node.  We also verify correct networks appear on the server.
         """
         # Create the group with some minimum number of nodes.
         networks = [self.rackconnect_network]
