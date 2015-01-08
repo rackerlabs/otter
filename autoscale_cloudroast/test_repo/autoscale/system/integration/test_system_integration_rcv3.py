@@ -227,9 +227,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
             # Verify that our servers have the correct set of networks attached.
             self.assertTrue('private' in dir(server_info.addresses),
-                            msg='server has a private network')
+                            msg='server does not have a private network')
             self.assertTrue(network_info.name in dir(server_info.addresses),
-                            msg='server RC network matches RC config')
+                            msg='server RC network does not match RC config')
 
         # Our pool should be in active status, of course.  Anything else is an error.
         status = self.rcv3_client.get_pool_info(self.pool.id).entity.status
