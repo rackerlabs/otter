@@ -43,7 +43,7 @@ lint:
 	pip list --outdated --allow-external=cafe,cloudcafe
 	git diff --patch --no-prefix origin/master | flake8 --diff
 
-fullflake8:
+flake8full:
 	flake8 --max-complexity=10 ${PYDIRS}
 
 unit:
