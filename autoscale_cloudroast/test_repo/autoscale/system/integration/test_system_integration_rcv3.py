@@ -237,68 +237,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           msg='LB Pool status {0} is not in expected ACTIVE state'.format(status))
 
     @tags(speed='slow', type='rcv3')
-    def test_scale_up_on_illegal_rcv3_pool(self):
-        """
-        Create a group with some servers, but with an incorrectly configured
-        RackConnect pool.  Check that nothing happens when we attempt to scale
-        up using this group.
-        """
-        lb_pools = [{'loadBalancerId': str(uuid.uuid4()), 'type': 'RackConnectV3'}]
-
-        initial_node_ids = []
-        initial_node_list = self.rcv3_client.get_nodes_on_pool(self.pool.id).entity.nodes
-        for each_node in initial_node_list:
-                initial_node_ids.append(each_node.id)
-
-        # Create the group used for testing
-        pool_group_resp = self._create_rcv3_group(lb_list=lb_pools,
-                                                  group_min=self.min_servers,
-                                                  network_list=[self.rackconnect_network])
-        pool_group = pool_group_resp.entity
-        self.wait_for_expected_number_of_active_servers(
-            pool_group.id, self.min_servers, timeout=600)
-
-        # Even though the servers for the group exists, we still need to wait
-        # some more to allow their existence to propegate through the rest of
-        # Autoscale's and Rackconnect V3's infrastructure.  One minute ought to
-        # be enough for anyone.(tm)
-        time.sleep(60)
-
-        # We get the initial nodes on each of the group's load balancers.
-        # For this code to have any meaning, we assume EITHER (1) nobody else
-        # uses the Rackconnect load balancer pool for the duration of this test,
-        # or (2) the Rackconnect hardware belongs exclusively to the QE team
-        # running this test (essentially fulfilling #1 anyway).
-        initial_node_count = self._get_node_counts_on_pool(self.pool.id)['cloud_servers']
-
-        # Since at least the group_min node should be on the load_balancer, check that
-        # the initial list of node ids is not empty.
-        self.assertTrue(initial_node_ids, msg='There were no initial nodes present on the loadbalancer')
-
-        # Define a policy to scale up.
-        scale_amt = 2
-        policy_up_data = {'change': scale_amt, 'cooldown': 0}
-        as_server_count = self.min_servers + scale_amt
-
-        # Create the policy and execute it immediately
-        self.autoscale_behaviors.create_policy_webhook(pool_group.id,
-                                                       policy_up_data,
-                                                       execute_policy=True)
-        self.wait_for_expected_number_of_active_servers(
-            pool_group.id, as_server_count, timeout=600)
-
-        # Wait for propogation again
-        time.sleep(60)
-
-        # Get node count after scaling and confirm that the expected number of nodes are
-        # present on the load_balancer_pool.  Remember we have a deliberately busted pool,
-        # so we expect no changes to our server count.
-        scale_up_node_count = self._get_node_counts_on_pool(self.pool.id)['cloud_servers']
-        self.assertEquals(scale_up_node_count, initial_node_count, msg='The actual '
-                          'cloud_server count of [{0}] does not match the initial count '
-                          'of [{1}]'.format(scale_up_node_count, initial_node_count))
-
-    @tags(speed='slow', type='rcv3')
     def test_scale_up_down_on_rcv3_pool(self):
         """
         Attempt to scale up and down on a correctly configured RCv3 pool.
