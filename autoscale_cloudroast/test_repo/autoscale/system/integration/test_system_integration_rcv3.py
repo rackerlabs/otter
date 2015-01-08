@@ -8,20 +8,9 @@ import time
 from cloudcafe.common.tools.datagen import rand_name
 import unittest
 import inspect
-import logging
 import uuid
 
 import common
-
-
-log = logging.getLogger("RunnerLog")
-
-
-def line():
-    """Returns the current line number in our program."""
-    # Shamelessly taken from
-    # http://code.activestate.com/recipes/145297-grabbing-the-current-line-number-easily/
-    return inspect.currentframe().f_back.f_lineno
 
 
 class AutoscaleRackConnectFixture(AutoscaleFixture):
@@ -118,14 +107,11 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             background_group_resp.entity.id,
             2,
             timeout=600)
-        log.info("{0}: {1}: Background servers = {2}".format(
-            __file__, line(), background_servers))
         time.sleep(60)
 
         # If there was an error waiting for servers to build, abort the testing.
         if err:
-            log.info("{0}: {1}: SetUpClass failed: background servers".format(
-                __file__, line()))
+            print "SetUpClass failed: background servers"
 
     @tags(speed='slow', type='rcv3')
     def test_create_scaling_group_with_pool_on_cn(self):
