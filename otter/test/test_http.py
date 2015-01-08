@@ -1,8 +1,15 @@
 """Tests for otter.http."""
 
 import json
+from functools import partial
 
-from effect import Effect
+from effect import (
+    ComposedDispatcher,
+    Constant,
+    Effect,
+    TypeDispatcher,
+    base_dispatcher,
+    sync_perform)
 from effect.testing import resolve_effect
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -12,9 +19,11 @@ from otter.constants import ServiceType
 from otter.util.http import headers, APIError
 from otter.http import (
     ServiceRequest,
+    TenantScope,
     add_bind_service,
     concretize_service_request,
     get_request_func,
+    perform_tenant_scope,
     service_request)
 from otter.test.utils import stub_pure_response
 from otter.util.pure_http import Request, has_code
@@ -157,11 +166,8 @@ class PerformServiceRequestTests(SynchronousTestCase):
             svcreq
         )
 
-    def test_get_request_func_authenticates(self):
-        """
-        The request function returned from get_request_func performs
-        authentication before making the request.
-        """
+    def test_authenticates(self):
+        """Auth is done before making the request."""
         eff = self._concrete(self.svcreq)
         expected_intent = Authenticate(self.authenticator, 1, self.log)
         self.assertEqual(eff.intent, expected_intent)
@@ -213,3 +219,55 @@ class PerformServiceRequestTests(SynchronousTestCase):
         next_eff = resolve_authenticate(eff)
         result = resolve_effect(next_eff, stub_pure_response("foo"))
         self.assertEqual(result, "foo")
+
+
+class PerformTenantScopeTests(SynchronousTestCase):
+    """Tests for :func:`perform_tenant_scope`."""
+
+    def setUp(self):
+        """Save some common parameters."""
+        self.log = object()
+        self.authenticator = object()
+        self.service_mapping = {ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'}
+
+        def concretize(au, lo, smap, reg, tenid, srvreq):
+            return Effect(Constant(('concretized', au, lo, smap, reg, tenid, srvreq)))
+
+        self.dispatcher = ComposedDispatcher([
+            TypeDispatcher({
+                TenantScope: partial(perform_tenant_scope, self.authenticator,
+                                     self.log, self.service_mapping, 'DFW',
+                                     _concretize=concretize)}),
+            base_dispatcher])
+
+    def test_perform_boring(self):
+        """Other effects within a TenantScope are performed as usual."""
+        tscope = TenantScope(Effect(Constant('foo')), 1)
+        self.assertEqual(sync_perform(self.dispatcher, Effect(tscope)), 'foo')
+
+    def test_perform_service_request(self):
+        """
+        Performing a :obj:`TenantScope` when it contains a :obj:`ServiceRequest`
+        concretizes the :obj:`ServiceRequest` into a :obj:`Request` as per
+        :func:`concretize_service_request`.
+        """
+        ereq = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
+        tscope = TenantScope(ereq, 1)
+        self.assertEqual(
+            sync_perform(self.dispatcher, Effect(tscope)),
+            ('concretized', self.authenticator, self.log, self.service_mapping,
+             'DFW', 1, ereq.intent))
+
+    def test_perform_srvreq_nested(self):
+        """
+        Concretizing of :obj:`ServiceRequest` effects happens even when they are
+        not directly passed as the TenantScope's toplevel Effect, but also when
+        they are returned from callbacks down the line.
+        """
+        ereq = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
+        eff = Effect(Constant("foo")).on(lambda r: ereq)
+        tscope = TenantScope(eff, 1)
+        self.assertEqual(
+            sync_perform(self.dispatcher, Effect(tscope)),
+            ('concretized', self.authenticator, self.log, self.service_mapping,
+             'DFW', 1, ereq.intent))

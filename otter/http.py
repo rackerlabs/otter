@@ -179,36 +179,6 @@ class TenantScope(object):
         self.tenant_id = tenant_id
 
 
-def perform_tenant_scope(
-        authenticator, log, service_mapping, region,
-        dispatcher, tenant_scope, box):
-    """
-    Perform a :obj:`TenantScope` by binding the tenant_id specified in it to
-    any :obj:`ServiceRequest` effects that it wraps.
-
-    The first arguments before (dispatcher, tenant_scope, box) are intended
-    to be partially applied, and the result is a performer that can be put into
-    a dispatcher.
-    """
-
-    1 / 0
-
-    def effect_to_box(eff, box):
-        return eff.on(box.succeed, box.fail)
-
-    @sync_performer
-    def scoped_performer(dispatcher, service_request):
-        1 / 0
-        return concretize_service_request(
-            authenticator, log, service_mapping, region,
-            tenant_scope.tenant_id, service_request)
-
-    new_disp = ComposedDispatcher([
-        TypeDispatcher({ServiceRequest: scoped_performer}),
-        dispatcher])
-    perform(new_disp, effect_to_box(tenant_scope.effect, box))
-
-
 def concretize_service_request(
         authenticator, log, service_mapping, region,
         tenant_id,
@@ -253,3 +223,28 @@ def concretize_service_request(
             data=service_request.data,
             log=log)
     return auth_eff.on(got_auth)
+
+
+def perform_tenant_scope(
+        authenticator, log, service_mapping, region,
+        dispatcher, tenant_scope, box,
+        _concretize=concretize_service_request):
+    """
+    Perform a :obj:`TenantScope` by performing its :attr:`TenantScope.effect`,
+    with a dispatcher extended with a performer for :obj:`ServiceRequest`
+    intents. The performer will use the tenant provided by the
+    :obj:`TenantScope`.
+
+    The first arguments before (dispatcher, tenant_scope, box) are intended
+    to be partially applied, and the result is a performer that can be put into
+    a dispatcher.
+    """
+    @sync_performer
+    def scoped_performer(dispatcher, service_request):
+        return _concretize(
+            authenticator, log, service_mapping, region,
+            tenant_scope.tenant_id, service_request)
+    new_disp = ComposedDispatcher([
+        TypeDispatcher({ServiceRequest: scoped_performer}),
+        dispatcher])
+    perform(new_disp, tenant_scope.effect.on(box.succeed, box.fail))
