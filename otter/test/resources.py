@@ -353,37 +353,3 @@ class KeyspaceWithClient(object):
             return self.client._client.disconnect()
         except:
             pass
-
-
-schema_dir = os.path.abspath(os.path.join(__file__, '../../../schema'))
-
-
-class OtterKeymaster(object):
-    """
-    Object that keeps track of created keyspaces, PauseableSilverbergClients,
-    and is a factory for PausableSilverbergClients
-    """
-    def __init__(self, host="localhost", port=9160, setup_generator=None):
-        self.host = host
-        self.port = port
-        self.setup_generator = (
-            setup_generator or CQLGenerator(schema_dir + '/setup'))
-
-        self._keys = {}
-        self.cluster = RunningCassandraCluster(
-            host=host, port=port,
-            setup_cql=(setup_generator or
-                       CQLGenerator(schema_dir + '/setup').generate_cql))
-
-    def get_keyspace(self, keyspace_name=None):
-        """
-        Get a keyspace resource named ``keyspace_name``.  If no name is
-        specified, one will randomly be chosen.
-        """
-        # keyspaces must start with a letter, not a number
-        keyspace_name = keyspace_name or ('a' + uuid.uuid4().hex)
-
-        if not keyspace_name in self._keys:
-            self._keys[keyspace_name] = KeyspaceWithClient(
-                self.cluster, keyspace_name)
-        return self._keys[keyspace_name]
