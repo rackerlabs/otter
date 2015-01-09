@@ -92,7 +92,8 @@ class Otter(object):
         """
         request.setHeader('X-Response-Id', 'health_check')
         if self.health_check_function:
-            return self.health_check_function().addCallback(json.dumps)
+            return self.health_check_function().addCallback(json.dumps, sort_keys=True,
+                                                            indent=4)
 
         return json.dumps({'healthy': True})
 
