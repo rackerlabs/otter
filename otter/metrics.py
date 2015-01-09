@@ -28,7 +28,6 @@ from toolz.functoolz import identity
 
 from otter.auth import generate_authenticator
 
-from otter.auth import public_endpoint_url
 from otter.constants import get_service_mapping, ServiceType
 from otter.effect_dispatcher import get_dispatcher
 from otter.http import get_request_func
