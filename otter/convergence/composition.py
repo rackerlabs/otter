@@ -8,7 +8,7 @@ import time
 
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
-from otter.convergence.model import DesiredGroupState, LBConfig
+from otter.convergence.model import DesiredGroupState, CLBDescription
 from otter.convergence.planning import plan
 
 
@@ -50,10 +50,10 @@ def tenant_is_enabled(tenant_id, get_config_value):
 
 def json_to_LBConfigs(lbs_json):
     """
-    Convert load balancer config from JSON to :obj:`LBConfig`
+    Convert load balancer config from JSON to :obj:`CLBDescription`
 
     :param list lbs_json: List of load balancer configs
-    :return: `dict` of LBid -> [LBConfig] mapping
+    :return: `dict` of LBid -> [LBDescription] mapping
 
     NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
     implemented in convergence
@@ -61,7 +61,8 @@ def json_to_LBConfigs(lbs_json):
     lbd = defaultdict(list)
     for lb in lbs_json:
         if lb.get('type') != 'RackConnectV3':
-            lbd[lb['loadBalancerId']].append(LBConfig(port=lb['port']))
+            lbd[lb['loadBalancerId']].append(CLBDescription(
+                lb_id=str(lb['loadBalancerId']), port=lb['port']))
     return lbd
 
 

@@ -17,8 +17,8 @@ from otter.convergence.gathering import (
     get_scaling_group_servers,
     to_nova_server)
 from otter.convergence.model import (
-    LBConfig,
-    LBNode,
+    CLBDescription,
+    CLBNode,
     CLBNodeCondition,
     CLBNodeType,
     NovaServer,
@@ -229,7 +229,7 @@ class GetLBContentsTests(SynchronousTestCase):
         lbnodes = resolve_effect(
             feed_fetches,
             map(self._resolve_retry_stubs, feed_fetches.intent.effects))
-        # and we finally have the LBNodes.
+        # and we finally have the CLBNodes.
         return lbnodes
 
     def test_success(self):
@@ -238,17 +238,17 @@ class GetLBContentsTests(SynchronousTestCase):
         """
         eff = get_clb_contents(self._request())
         draining, enabled = CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED
-        make_config = partial(LBConfig, port=20, type=CLBNodeType.PRIMARY)
+        make_desc = partial(CLBDescription, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
             self._resolve_lb(eff),
-            [LBNode(lb_id=1, node_id='11', address='a11', drained_at=1.0,
-                    config=make_config(weight=2, condition=draining)),
-             LBNode(lb_id=1, node_id='12', address='a12',
-                    config=make_config(weight=2, condition=enabled)),
-             LBNode(lb_id=2, node_id='21', address='a21',
-                    config=make_config(weight=3, condition=enabled)),
-             LBNode(lb_id=2, node_id='22', address='a22', drained_at=2.0,
-                    config=make_config(weight=3, condition=draining))])
+            [CLBNode(node_id='11', address='a11', drained_at=1.0,
+                     description=make_desc(lb_id='1', weight=2, condition=draining)),
+             CLBNode(node_id='12', address='a12',
+                     description=make_desc(lb_id='1', weight=2, condition=enabled)),
+             CLBNode(node_id='21', address='a21',
+                     description=make_desc(lb_id='2', weight=3, condition=enabled)),
+             CLBNode(node_id='22', address='a22', drained_at=2.0,
+                     description=make_desc(lb_id='2', weight=3, condition=draining))])
 
     def test_no_lb(self):
         """
@@ -285,13 +285,14 @@ class GetLBContentsTests(SynchronousTestCase):
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
             ]
         }
-        config = LBConfig(port=20, weight=2, condition=CLBNodeCondition.ENABLED,
-                          type=CLBNodeType.PRIMARY)
+        make_desc = partial(CLBDescription, port=20, weight=2,
+                            condition=CLBNodeCondition.ENABLED,
+                            type=CLBNodeType.PRIMARY)
         eff = get_clb_contents(self._request())
         self.assertEqual(
             self._resolve_lb(eff),
-            [LBNode(lb_id=1, node_id='11', address='a11', config=config),
-             LBNode(lb_id=2, node_id='21', address='a21', config=config)])
+            [CLBNode(node_id='11', address='a11', description=make_desc(lb_id='1')),
+             CLBNode(node_id='21', address='a21', description=make_desc(lb_id='2'))])
 
 
 class ToNovaServerTests(SynchronousTestCase):
@@ -350,9 +351,9 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         ]
 
     def test_success(self):
-        """The data is returned as a tuple of ([NovaServer], [LBNode])."""
-        lb_nodes = [LBNode(lb_id='lb1', node_id='node1', address='ip1',
-                           config=LBConfig(port='80'))]
+        """The data is returned as a tuple of ([NovaServer], [CLBNode])."""
+        lb_nodes = [CLBNode(node_id='node1', address='ip1',
+                            description=CLBDescription(lb_id='lb1', port=80))]
 
         reqfunc = lambda **k: Effect(k)
         get_servers = lambda r: Effect(StubIntent(ConstantIntent({'gid': self.servers})))
