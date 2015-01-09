@@ -20,14 +20,14 @@ mkfile_dir := $(shell dirname "$(MAKEFILE_LIST)")
 
 .PHONY: targets env-precheck
 
+targets:
+	@cat README.md
+
 hooks:
 	cp ${mkfile_dir}/scripts/config_check.py ${mkfile_dir}/.git/hooks
 	echo "#!/bin/bash" > ${mkfile_dir}/.git/hooks/pre-commit
 	echo "python .git/hooks/config_check.py" >> ${mkfile_dir}/.git/hooks/pre-commit
 	chmod a+x ${mkfile_dir}/.git/hooks/pre-commit
-
-targets:
-	@cat README.md
 
 env-precheck:
 	./scripts/env-precheck.py
