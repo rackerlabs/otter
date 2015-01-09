@@ -58,12 +58,12 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         # rc_load_balancer_* are initialized in the base class,
         # AutoscaleFixture.
         cls.pool = None
-        if cls.rc_load_balancer_pool['type'] == 'mimic':
+        if cls.rcv3_load_balancer_pool['type'] == 'mimic':
             cls.pool = tenant_pools[0]
         else:
             # We're configured to run against actual hardware.
             for pool in tenant_pools:
-                if pool.id == cls.rc_load_balancer_pool['loadBalancerId']:
+                if pool.id == cls.rcv3_load_balancer_pool['loadBalancerId']:
                     cls.pool = pool
 
         lb_pools = [{'loadBalancerId': cls.pool.id, 'type': 'RackConnectV3'}]

@@ -135,12 +135,12 @@ class AutoscaleFixture(BaseTestFixture):
         cls.non_autoscale_tenant = cls.autoscale_config.non_autoscale_tenant
 
         # Initialize optional values to None
-        cls.rc_load_balancer_pool = None
+        cls.rcv3_load_balancer_pool = None
         cls.rcv3_cloud_network = None
 
         # Get optional RCV3 values.  These might not be present in the config file.
         try:
-            cls.rc_load_balancer_pool = json.loads(cls.autoscale_config.rc_load_balancer_pool)
+            cls.rcv3_load_balancer_pool = json.loads(cls.autoscale_config.rcv3_load_balancer_pool)
             cls.rcv3_cloud_network = cls.autoscale_config.rcv3_cloud_network
         except:
             # Skip all RCV3 testing
