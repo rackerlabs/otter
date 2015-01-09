@@ -266,6 +266,10 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.reactor = patch(self, 'otter.tap.api.reactor')
 
+        self.authenticator = object()
+        self.mock_ga = patch(self, 'otter.tap.api.generate_authenticator',
+                             return_value=self.authenticator)
+
         def scaling_group_collection(*args, **kwargs):
             self.store = original_store(*args, **kwargs)
             return self.store
@@ -429,17 +433,15 @@ class APIMakeServiceTests(SynchronousTestCase):
                          ConsistencyLevel.ALL)
 
     @mock.patch('otter.tap.api.reactor')
-    @mock.patch('otter.tap.api.generate_authenticator')
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
-    def test_authenticator(self, mock_ss, mock_ga, mock_reactor):
+    def test_authenticator(self, mock_ss, mock_reactor):
         """
         Authenticator is generated and passed to SupervisorService
         """
         self.addCleanup(lambda: set_supervisor(None))
         makeService(test_config)
-        mock_ga.assert_called_once_with(mock_reactor, test_config['identity'])
-        self.assertIdentical(get_supervisor().authenticator,
-                             mock_ga.return_value)
+        self.mock_ga.assert_called_once_with(mock_reactor, test_config['identity'])
+        self.assertIdentical(get_supervisor().authenticator, self.authenticator)
 
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_health_checker_no_zookeeper(self, supervisor):

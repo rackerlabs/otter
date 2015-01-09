@@ -39,6 +39,7 @@ a token.)
 import json
 from itertools import groupby
 from functools import partial
+import os
 
 from characteristic import attributes
 
@@ -452,15 +453,22 @@ class InvalidateToken(object):
         return self.authenticator.invalidate(self.tenant_id)
 
 
-def generate_authenticator(reactor, config):
+def generate_authenticator(reactor, config, _open=open):
     """
     Generate authenticator based on settings in config
 
     :param reactor: Twisted reactor
     :param dict config: Identity specific config
+    :param callable _open: Optional callable to replace `open` call for testing
     """
     # FIXME: Pick an arbitrary cache ttl value based on absolutely no science.
     cache_ttl = config.get('cache_ttl', 300)
+
+    # Extract credentials from file and delete the file afterwards
+    creds_file = config['credentials']
+    with _open(creds_file) as f:
+        credentials = json.load(f)
+    os.remove(creds_file)
 
     return CachingAuthenticator(
         reactor,
@@ -469,8 +477,8 @@ def generate_authenticator(reactor, config):
             RetryingAuthenticator(
                 reactor,
                 ImpersonatingAuthenticator(
-                    config['username'],
-                    config['password'],
+                    credentials['username'],
+                    credentials['password'],
                     config['url'],
                     config['admin_url']),
                 max_retries=config['max_retries'],
