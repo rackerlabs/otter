@@ -6,7 +6,7 @@ response from the rest resource.
 from collections import namedtuple
 from urlparse import urlsplit
 
-from klein.test.test_resource import requestMock
+from klein.test_resource import requestMock
 
 import mock
 
