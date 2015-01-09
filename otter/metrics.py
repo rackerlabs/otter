@@ -262,6 +262,10 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
             total_desired, total_actual, total_pending))
 
     # Add to cloud metrics
+
+    # WARNING: This request func (and dispatcher) are configured to make
+    # requests against the metrics region. The same request_func and dispatcher
+    # can't be used for other purposes, like making requests to cloud servers.
     req_func = get_request_func(authenticator, config['metrics']['tenant_id'],
                                 metrics_log, service_mapping, config['metrics']['region'])
     eff = add_to_cloud_metrics(req_func, config['metrics'], config['region'],
