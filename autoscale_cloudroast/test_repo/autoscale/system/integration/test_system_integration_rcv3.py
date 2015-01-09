@@ -1,14 +1,12 @@
 """
 System Integration tests for autoscaling with RackConnect V3 load balancers
 """
-from test_repo.autoscale.fixtures import AutoscaleFixture, safe_hasattr
-from cafe.drivers.unittest.decorators import tags
 import random
 import time
+
+from test_repo.autoscale.fixtures import AutoscaleFixture, safe_hasattr
+from cafe.drivers.unittest.decorators import tags
 from cloudcafe.common.tools.datagen import rand_name
-import unittest
-import inspect
-import uuid
 
 import common
 
@@ -35,7 +33,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         """
         super(AutoscaleRackConnectFixture, cls).setUpClass()
 
-        cls.common = common.CommonTestUtilities(cls.server_client, cls.autoscale_client, cls.lbaas_client)
+        cls.common = common.CommonTestUtilities(cls.server_client,
+                                                cls.autoscale_client,
+                                                cls.lbaas_client)
 
         cls.cloud_servers_on_node = []
         cls.private_network = {'uuid': '11111111-1111-1111-1111-111111111111'}
@@ -183,8 +183,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.assertEqual(new_counts['cloud_servers'], expected_count_on_pool,
                          msg=('count of servers on lb pool {0} is not equal to '
                               'expected count ([{1}] + {2})').format(
-                             new_counts['cloud_servers'], init_cloud_servers,
-                             self.min_servers))
+                                  new_counts['cloud_servers'], init_cloud_servers,
+                                  self.min_servers))
 
     @tags(speed='slow', type='rcv3')
     def test_create_scaling_group_with_pool_and_nonzero_min(self):
@@ -528,4 +528,3 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.assertEquals(pool_group.launchConfiguration.loadBalancers[0].type, "RackConnectV3",
                           msg='Load balancer type {0} is not correct for RackConnect pools'
                           .format(pool_group.launchConfiguration.loadBalancers[0].type))
-

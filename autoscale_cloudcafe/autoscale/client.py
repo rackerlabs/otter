@@ -955,8 +955,3 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         """
         url = self.url + '/load_balancer_pools/{0}/nodes/{1}'.format(pool_id, node_id)
         return self.request('DELETE', url, requestslib_kwargs=requestslib_kwargs)
-
-    def try_marshalling(self, url=None, requestslib_kwargs=None):
-        url = url or (self.url + "/load_balancer_pools")
-        return self.request('GET', url, response_entity_type=RackConnectLBPools)
-

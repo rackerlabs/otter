@@ -598,8 +598,8 @@ class AutoscaleBehaviors(BaseBehavior):
             if group_state.desiredCapacity != expected_servers:
                 log.info("{0}: {1}: Group {2} should have {3} servers, but has "
                          "reduced in quantity to {4}".format(
-                            __file__, _line(), group_id, expected_servers,
-                            group_state.desiredCapacity))
+                             __file__, _line(), group_id, expected_servers,
+                             group_state.desiredCapacity))
                 return ret_list, err
             if len(active_list) == expected_servers:
                 err = False

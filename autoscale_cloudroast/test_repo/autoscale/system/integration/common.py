@@ -21,7 +21,6 @@ class CommonTestUtilities(object):
         launch_config = self.autoscale_client.view_launch_config(group_id).entity
         return [lb.port for lb in launch_config.loadBalancers if safe_hasattr(lb, 'port')]
 
-
     def get_ipv4_address_list_on_servers(self, server_ids_list):
         """
         Returns the list of private IPv4 addresses for the given list of
@@ -72,4 +71,3 @@ class CommonTestUtilities(object):
                 asserter.assertTrue(each_address in nodes_list_on_lb)
         for each_port in port_list_from_group:
             asserter.assertTrue(each_port in ports_list)
-

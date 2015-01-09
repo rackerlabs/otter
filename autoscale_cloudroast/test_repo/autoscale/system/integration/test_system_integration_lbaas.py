@@ -99,9 +99,9 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             group.id,
             self.gc_min_entities_alt)
         self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id, active_server_list,
-                                                        self.load_balancer_1,
-                                                        self.load_balancer_2,
-                                                        self.load_balancer_3)
+                                                              self.load_balancer_1,
+                                                              self.load_balancer_2,
+                                                              self.load_balancer_3)
 
     @tags(speed='slow', type='lbaas')
     def test_update_launch_config_to_include_multiple_lbaas(self):
@@ -116,7 +116,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             group.id,
             self.gc_min_entities_alt)
         self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id, active_server_list,
-                                                        self.load_balancer_1)
+                                                              self.load_balancer_1)
         self._update_launch_config(group, self.load_balancer_1, self.load_balancer_2,
                                    self.load_balancer_3)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_data, execute_policy=True)
@@ -125,9 +125,9 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             self.gc_min_entities_alt + self.sp_change)
         active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
         self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id, active_servers_from_scale,
-                                                        self.load_balancer_1,
-                                                        self.load_balancer_2,
-                                                        self.load_balancer_3)
+                                                              self.load_balancer_1,
+                                                              self.load_balancer_2,
+                                                              self.load_balancer_3)
 
     @tags(speed='slow', type='lbaas')
     def test_update_launch_config_to_include_lbaas(self):
@@ -152,9 +152,9 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             self.gc_min_entities_alt + self.sp_change)
         active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
         self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id, active_servers_from_scale,
-                                                        self.load_balancer_1,
-                                                        self.load_balancer_2,
-                                                        self.load_balancer_3)
+                                                              self.load_balancer_1,
+                                                              self.load_balancer_2,
+                                                              self.load_balancer_3)
 
     @tags(speed='slow', type='lbaas')
     def test_update_existing_lbaas_in_launch_config(self):
@@ -173,7 +173,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             group.id,
             self.gc_min_entities_alt)
         self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id, active_server_list,
-                                                        self.load_balancer_1)
+                                                              self.load_balancer_1)
         self._update_launch_config(group, self.load_balancer_2)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
         activeservers_after_scale = self.wait_for_expected_number_of_active_servers(
@@ -181,14 +181,14 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             self.gc_min_entities_alt * 2)
         active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
         self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id, active_servers_from_scale,
-                                                        self.load_balancer_2)
+                                                              self.load_balancer_2)
         scaled_down_server_ip = self.common.get_ipv4_address_list_on_servers(active_server_list)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_down_data, execute_policy=True)
         activeservers_scaledown = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
         self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id, activeservers_scaledown,
-                                                        self.load_balancer_2)
+                                                              self.load_balancer_2)
         lb_node_list = [each_node.address for each_node in self._get_node_list_from_lb(
             self.load_balancer_1)]
         self.assertTrue(set(scaled_down_server_ip) not in set(lb_node_list))
@@ -208,7 +208,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             group.id,
             self.gc_min_entities_alt)
         self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id, active_server_list,
-                                                        load_balancer)
+                                                              load_balancer)
         self.delete_nodes_in_loadbalancer(lb_node_id_list_before_scale, load_balancer)
         self.empty_scaling_group(group=group, delete=False)
         self.assert_servers_deleted_successfully(group.launchConfiguration.server.name)
@@ -253,7 +253,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             group.id,
             self.gc_min_entities_alt)
         self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id, active_server_list,
-                                                        self.load_balancer_1)
+                                                              self.load_balancer_1)
         self._update_launch_config(group)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
         activeservers_after_scale = self.wait_for_expected_number_of_active_servers(
@@ -313,15 +313,19 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         activeservers_after_scale_up = self.wait_for_expected_number_of_active_servers(
             group.id, policy_up_data['desired_capacity'])
         ip_list_on_scale_up = self.common.get_ipv4_address_list_on_servers(activeservers_after_scale_up)
-        self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id, activeservers_after_scale_up,
-                                                        self.load_balancer_3)
+        self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id,
+                                                              activeservers_after_scale_up,
+                                                              self.load_balancer_3)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_down_data, execute_policy=True)
         activeservers_after_scaledown = self.wait_for_expected_number_of_active_servers(
             group.id,
-            policy_down_data['desired_capacity'])
-        ip_list_on_scale_down = self.common.get_ipv4_address_list_on_servers(activeservers_after_scaledown)
-        self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id, activeservers_after_scaledown,
-                                                        self.load_balancer_3)
+            policy_down_data['desired_capacity']
+        )
+        ip_list_on_scale_down = self.common.get_ipv4_address_list_on_servers(
+            activeservers_after_scaledown)
+        self.common.verify_lbs_on_group_have_servers_as_nodes(self, group.id,
+                                                              activeservers_after_scaledown,
+                                                              self.load_balancer_3)
         ips_removed = set(ip_list_on_scale_up) - set(ip_list_on_scale_down)
         self.common.verify_given_ips_do_not_exist_as_nodes_on_lb(self.load_balancer_3, ips_removed)
         self.assert_servers_deleted_successfully(
