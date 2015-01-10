@@ -1,4 +1,3 @@
-
 """
 Tests for RCv3-specific worker code.
 """
@@ -6,6 +5,7 @@ from effect import Effect
 from otter.constants import ServiceType
 from otter.worker import _rcv3
 from otter.test.convergence.test_effecting import _PureRequestStub
+from otter.util.pure_http import has_code
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 from uuid import uuid4
@@ -65,11 +65,11 @@ class RCv3Tests(SynchronousTestCase):
         self.assertIn(sub_effect.method, ["POST", "DELETE"])
 
         if sub_effect.method == "POST":
-            self.assertEqual(sub_effect.success_codes, (201,))
+            self.assertEqual(sub_effect.success_pred, has_code(201))
             # http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes
             response = _rcv3_add_response("lb_id", "server_id")
         elif sub_effect.method == "DELETE":
-            self.assertEqual(sub_effect.success_codes, (204,))
+            self.assertEqual(sub_effect.success_pred, has_code(204))
             # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes
             response = None
 

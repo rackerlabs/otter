@@ -8,10 +8,10 @@ from otter.constants import ServiceType
 from otter.convergence.steps import (
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
-    ChangeLoadBalancerNode,
+    ChangeCLBNode,
     CreateServer,
     DeleteServer,
-    RemoveFromLoadBalancer,
+    RemoveFromCLB,
     Request,
     SetMetadataItemOnServer)
 
@@ -63,10 +63,10 @@ class StepAsRequestTests(SynchronousTestCase):
 
     def test_remove_from_load_balancer(self):
         """
-        :obj:`RemoveFromLoadBalancer.as_request` produces a request for
+        :obj:`RemoveFromCLB.as_request` produces a request for
         removing a node from a load balancer.
         """
-        lbremove = RemoveFromLoadBalancer(
+        lbremove = RemoveFromCLB(
             lb_id='abc123',
             node_id='node1')
         self.assertEqual(
@@ -78,10 +78,10 @@ class StepAsRequestTests(SynchronousTestCase):
 
     def test_change_load_balancer_node(self):
         """
-        :obj:`ChangeLoadBalancerNode.as_request` produces a request for
+        :obj:`ChangeCLBNode.as_request` produces a request for
         modifying a load balancer node.
         """
-        changenode = ChangeLoadBalancerNode(
+        changenode = ChangeCLBNode(
             lb_id='abc123',
             node_id='node1',
             condition='DRAINING',

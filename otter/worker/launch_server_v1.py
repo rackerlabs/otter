@@ -684,7 +684,7 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
         # function
         expected = launch_config['server']['metadata']
         result = server['server'].get('metadata')
-        if  result != expected:
+        if result != expected:
             ilog[0].msg('Server metadata has changed.',
                         sanity_check=True,
                         expected_metadata=expected,
