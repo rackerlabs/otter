@@ -230,14 +230,9 @@ def add_bind_root(root, request_func):
     The URL given is expected to be quoted if required. This decorator does not
     quote the URL.
     """
-    if isinstance(root, unicode):
-        root = root.encode('ascii')
-
     @wraps(request_func)
     def request(method, url, *args, **kwargs):
-        if isinstance(url, unicode):
-            url = url.encode('utf-8')
-        url = '{}/{}'.format(root.rstrip('/'), url)
+        url = u'{}/{}'.format(root.rstrip('/'), url).encode('utf-8')
         return request_func(method, url, *args, **kwargs)
 
     return request
