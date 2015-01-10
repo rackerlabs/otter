@@ -29,6 +29,7 @@ from twisted.internet.defer import (gatherResults, DeferredSemaphore,
 from twisted.internet.task import deferLater
 
 from otter.auth import public_endpoint_url
+from otter.convergence.gathering import _servicenet_address
 from otter.util import logging_treq as treq
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
@@ -445,7 +446,7 @@ def add_to_load_balancer(log, request_func, lb_config, server_details, undo,
                                        cloudLoadBalancers,
                                        request_func.lb_region)
         auth_token = request_func.auth_token
-        ip_address = private_ip_addresses(server_details)[0]
+        ip_address = _servicenet_address(server_details["server"])
         return add_to_clb(log, endpoint, auth_token, lb_config, ip_address,
                           undo, clock)
     elif lb_type == "RackConnectV3":
@@ -539,17 +540,6 @@ def add_to_load_balancers(log, request_func, lb_configs, server, undo):
 
     d = gatherResults(map(_serial_add, lb_configs), consumeErrors=True)
     return d.addCallback(partial(zip, lb_configs))
-
-
-def private_ip_addresses(server):
-    """
-    Get all private IPv4 addresses from the addresses section of a server.
-
-    :param dict server: A server body.
-    :return: List of IP addresses as strings.
-    """
-    return [addr['addr'] for addr in server['server']['addresses']['private']
-            if addr['version'] == 4]
 
 
 def prepare_launch_config(scaling_group_uuid, launch_config):

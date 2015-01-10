@@ -83,7 +83,7 @@ class AddNodesToCLB(object):
     Multiple nodes must be added to a load balancer.
 
     :param address_configs: A collection of two-tuples of address and
-        :obj:`LBConfig`.
+        :obj:`CLBDescription`.
     """
     def as_request(self):
         """Produce a :obj:`Request` to add nodes to CLB"""

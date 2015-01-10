@@ -11,8 +11,8 @@ from toolz.functoolz import compose, identity
 
 from otter.constants import ServiceType
 from otter.convergence.model import (
-    LBConfig,
-    LBNode,
+    CLBDescription,
+    CLBNode,
     CLBNodeCondition,
     CLBNodeType,
     NovaServer,
@@ -83,7 +83,7 @@ def get_scaling_group_servers(request_func, server_predicate=identity):
 
 def get_clb_contents(request_func):
     """
-    Get Rackspace Cloud Load Balancer contents as list of `LBNode`.
+    Get Rackspace Cloud Load Balancer contents as list of `CLBNode`.
 
     :param request_func: A tenant-bound, CLB-bound, auth-retry based request function
     """
@@ -103,17 +103,19 @@ def get_clb_contents(request_func):
              for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
-        nodes = [LBNode(lb_id=_id, node_id=node['id'], address=node['address'],
-                        config=LBConfig(port=node['port'], weight=node['weight'],
-                                        condition=CLBNodeCondition.lookupByName(node['condition']),
-                                        type=CLBNodeType.lookupByName(node['type'])))
-                 for _id, nodes in zip(ids, all_lb_nodes)
-                 for node in nodes]
-        draining = [n for n in nodes if n.config.condition == CLBNodeCondition.DRAINING]
+        nodes = [
+            CLBNode(node_id=str(node['id']), address=node['address'],
+                    description=CLBDescription(
+                        lb_id=str(_id), port=node['port'], weight=node['weight'],
+                        condition=CLBNodeCondition.lookupByName(node['condition']),
+                        type=CLBNodeType.lookupByName(node['type'])))
+            for _id, nodes in zip(ids, all_lb_nodes)
+            for node in nodes]
+        draining = [n for n in nodes if n.description.condition == CLBNodeCondition.DRAINING]
         return parallel(
             [lb_req(
                 'GET',
-                append_segments('loadbalancers', str(n.lb_id), 'nodes',
+                append_segments('loadbalancers', str(n.description.lb_id), 'nodes',
                                 '{}.atom'.format(n.node_id)),
                 json_response=False)
              for n in draining]).on(lambda feeds: (nodes, draining, feeds))
@@ -147,25 +149,41 @@ def extract_CLB_drained_at(feed):
         raise ValueError('Unexpected summary: {}'.format(summary))
 
 
+def _private_ipv4_addresses(server):
+    """
+    Get all private IPv4 addresses from the addresses section of a server.
+
+    :param dict server: A server dict.
+    :return: List of IP addresses as strings.
+    """
+    private_addresses = get_in(["addresses", "private"], server, [])
+    return [addr['addr'] for addr in private_addresses if addr['version'] == 4]
+
+
+def _servicenet_address(server):
+    """
+    Finds the ServiceNet address for the given server.
+    """
+    return next((ip for ip in _private_ipv4_addresses(server)
+                 if ip.startswith("10.")), "")
+
+
 def to_nova_server(server_json):
     """
     Convert from JSON format to :obj:`NovaServer` instance
     """
-    ips = get_in(['addresses', 'private'], server_json, default=[])
-    ip = ''
-    if len(ips) > 0:
-        ip = [addr['addr'] for addr in ips if addr['version'] == 4][0]
-    return NovaServer(id=server_json['id'], state=ServerState.lookupByName(server_json['state']),
+    return NovaServer(id=server_json['id'],
+                      state=ServerState.lookupByName(server_json['state']),
                       created=timestamp_to_epoch(server_json['created']),
-                      servicenet_address=ip)
+                      servicenet_address=_servicenet_address(server_json))
 
 
 def json_to_LBConfigs(lbs_json):
     """
-    Convert load balancer config from JSON to :obj:`LBConfig`
+    Convert load balancer config from JSON to :obj:`CLBDescription`
 
     :param list lbs_json: List of load balancer configs
-    :return: `dict` of LBid -> [LBConfig] mapping
+    :return: `dict` of LBid -> [CLBDescription] mapping
 
     NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
     implemented in convergence
@@ -173,5 +191,6 @@ def json_to_LBConfigs(lbs_json):
     lbd = defaultdict(list)
     for lb in lbs_json:
         if lb.get('type') != 'RackConnectV3':
-            lbd[lb['loadBalancerId']].append(LBConfig(port=lb['port']))
+            lbd[lb['loadBalancerId']].append(CLBDescription(
+                lb_id=str(lb['loadBalancerId']), port=lb['port']))
     return lbd

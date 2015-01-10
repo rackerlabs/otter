@@ -39,7 +39,8 @@ test_config = {
     'identity': identity_config,
     'cloudServersOpenStack': 'cloudServersOpenStack',
     'cloudLoadBalancers': 'cloudLoadBalancers',
-    'rackconnect': 'rackconnect'
+    'rackconnect': 'rackconnect',
+    'metrics': {'service': 'cloudMetricsIngest'}
 }
 
 
@@ -72,16 +73,6 @@ class APIOptionsTests(SynchronousTestCase):
         config = Options()
         config.parseOptions(['-p', 'tcp:9999'])
         self.assertEqual(config['port'], 'tcp:9999')
-
-    def test_hardcoded_service_names(self):
-        """
-        Several hardcoded service names are injected.
-        """
-        config = Options()
-        config.parseOptions([])
-        self.assertEqual(config['cloudLoadBalancers'], 'cloudLoadBalancers')
-        self.assertEqual(config['cloudServersOpenStack'], 'cloudServersOpenStack')
-        self.assertEqual(config['rackconnect'], 'rackconnect')
 
 
 class HealthCheckerTests(SynchronousTestCase):
