@@ -15,7 +15,9 @@ from otter.convergence.gathering import (
     get_clb_contents,
     get_scaling_group_servers,
     json_to_LBConfigs,
-    to_nova_server)
+    to_nova_server,
+    _private_ipv4_addresses,
+    _servicenet_address)
 from otter.convergence.model import (
     CLBDescription,
     CLBNode,
@@ -305,9 +307,14 @@ class ToNovaServerTests(SynchronousTestCase):
         """
         self.createds = [('2020-10-10T10:00:00Z', 1602324000),
                          ('2020-10-20T11:30:00Z', 1603193400)]
-        self.servers = [{'id': 'a', 'state': 'ACTIVE', 'created': self.createds[0][0]},
-                        {'id': 'b', 'state': 'BUILD', 'created': self.createds[1][0],
-                         'addresses': {'private': [{'addr': 'ipv4', 'version': 4}]}}]
+        self.servers = [{'id': 'a',
+                         'state': 'ACTIVE',
+                         'created': self.createds[0][0]},
+                        {'id': 'b',
+                         'state': 'BUILD',
+                         'created': self.createds[1][0],
+                         'addresses': {'private': [{'addr': '10.0.0.1',
+                                                    'version': 4}]}}]
 
     def test_without_address(self):
         """
@@ -315,7 +322,9 @@ class ToNovaServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             to_nova_server(self.servers[0]),
-            NovaServer(id='a', state=ServerState.ACTIVE, created=self.createds[0][1],
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=self.createds[0][1],
                        servicenet_address=''))
 
     def test_without_private(self):
@@ -325,7 +334,9 @@ class ToNovaServerTests(SynchronousTestCase):
         self.servers[0]['addresses'] = {'public': 'p'}
         self.assertEqual(
             to_nova_server(self.servers[0]),
-            NovaServer(id='a', state=ServerState.ACTIVE, created=self.createds[0][1],
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=self.createds[0][1],
                        servicenet_address=''))
 
     def test_with_servicenet(self):
@@ -334,8 +345,10 @@ class ToNovaServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             to_nova_server(self.servers[1]),
-            NovaServer(id='b', state=ServerState.BUILD, created=self.createds[1][1],
-                       servicenet_address='ipv4'))
+            NovaServer(id='b',
+                       state=ServerState.BUILD,
+                       created=self.createds[1][1],
+                       servicenet_address='10.0.0.1'))
 
 
 class JsonToLBConfigTests(SynchronousTestCase):
@@ -350,7 +363,8 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 20, 'port': 800},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80), CLBDescription(lb_id='20', port=800)],
+            {20: [CLBDescription(lb_id='20', port=80),
+                  CLBDescription(lb_id='20', port=800)],
              21: [CLBDescription(lb_id='21', port=81)]})
 
     def test_with_rackconnect(self):
@@ -363,3 +377,63 @@ class JsonToLBConfigTests(SynchronousTestCase):
                                {'loadBalancerId': 21, 'port': 81}]),
             {20: [CLBDescription(lb_id='20', port=80)],
              21: [CLBDescription(lb_id='21', port=81)]})
+
+
+class IPAddressTests(SynchronousTestCase):
+    """
+    Tests for utility functions that extract IP addresses from server
+    dicts.
+    """
+    def setUp(self):
+        """
+        Set up a bunch of addresses and a server dict.
+        """
+        self.addresses = {
+            'private': [
+                {'addr': '192.168.1.1', 'version': 4},
+                {'addr': '10.0.0.1', 'version': 4},
+                {'addr': '10.0.0.2', 'version': 4},
+                {'addr': '::1', 'version': 6}
+            ],
+            'public': [
+                {'addr': '50.50.50.50', 'version': 4},
+                {'addr': '::::', 'version': 6}
+            ]}
+        self.server_dict = {'addresses': self.addresses}
+
+    def test_private_ipv4_addresses(self):
+        """
+        :func:`_private_ipv4_addresses` returns all private IPv4 addresses
+        from a complete server body.
+        """
+        result = _private_ipv4_addresses(self.server_dict)
+        self.assertEqual(result, ['192.168.1.1', '10.0.0.1', '10.0.0.2'])
+
+    def test_no_private_ip_addresses(self):
+        """
+        :func:`_private_ipv4_addresses` returns an empty list if the given
+        server has no private IPv4 addresses.
+        """
+        del self.addresses["private"]
+        result = _private_ipv4_addresses(self.server_dict)
+        self.assertEqual(result, [])
+
+    def test_servicenet_address(self):
+        """
+        :func:`_servicenet_address` returns the correct ServiceNet
+        address, which is the first IPv4 address in the ``private``
+        group in the 10.x.x.x range.
+
+        It even does this when there are other addresses in the
+        ``private`` group. This happens when the tenant specifies
+        their own network named ``private``.
+        """
+        self.assertEqual(_servicenet_address(self.server_dict), "10.0.0.1")
+
+    def test_no_servicenet_address(self):
+        """
+        :func:`_servicenet_address` returns :data:`None` if the server has no
+        ServiceNet address.
+        """
+        del self.addresses["private"]
+        self.assertEqual(_servicenet_address(self.server_dict), "")

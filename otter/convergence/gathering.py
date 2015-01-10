@@ -149,17 +149,33 @@ def extract_CLB_drained_at(feed):
         raise ValueError('Unexpected summary: {}'.format(summary))
 
 
+def _private_ipv4_addresses(server):
+    """
+    Get all private IPv4 addresses from the addresses section of a server.
+
+    :param dict server: A server dict.
+    :return: List of IP addresses as strings.
+    """
+    private_addresses = get_in(["addresses", "private"], server, [])
+    return [addr['addr'] for addr in private_addresses if addr['version'] == 4]
+
+
+def _servicenet_address(server):
+    """
+    Finds the ServiceNet address for the given server.
+    """
+    return next((ip for ip in _private_ipv4_addresses(server)
+                 if ip.startswith("10.")), "")
+
+
 def to_nova_server(server_json):
     """
     Convert from JSON format to :obj:`NovaServer` instance
     """
-    ips = get_in(['addresses', 'private'], server_json, default=[])
-    ip = ''
-    if len(ips) > 0:
-        ip = [addr['addr'] for addr in ips if addr['version'] == 4][0]
-    return NovaServer(id=server_json['id'], state=ServerState.lookupByName(server_json['state']),
+    return NovaServer(id=server_json['id'],
+                      state=ServerState.lookupByName(server_json['state']),
                       created=timestamp_to_epoch(server_json['created']),
-                      servicenet_address=ip)
+                      servicenet_address=_servicenet_address(server_json))
 
 
 def json_to_LBConfigs(lbs_json):
