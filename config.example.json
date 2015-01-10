@@ -10,8 +10,7 @@
         "consistency_exceptions": null
     },
     "identity": {
-        "username": "REPLACE_WITH_REAL_USERNAME",
-        "password": "REPLACE_WITH_REAL_PASSWORD",
+        "credentials": "/path/to/credentials.json",
         "url": "https://keystone_identity_endpoint.com/v2.0",
         "admin_url": "https://keystone_identity_endpoint.com/v2.0",
         "max_retries": 10,
