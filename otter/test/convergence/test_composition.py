@@ -11,6 +11,7 @@ from pyrsistent import pmap
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
+from otter.util.pure_http import has_code
 from otter.util.timestamp import now
 from otter.convergence.composition import execute_convergence, tenant_is_enabled
 
@@ -26,9 +27,11 @@ class ExecConvergenceTests(SynchronousTestCase):
         """
         self.servers = [
             {'id': 'a', 'state': 'ACTIVE', 'created': now(),
-             'addresses': {'private': [{'addr': 'ip1', 'version': 4}]}},
+             'addresses': {'private': [{'addr': '10.0.0.1',
+                                        'version': 4}]}},
             {'id': 'b', 'state': 'ACTIVE', 'created': now(),
-             'addresses': {'private': [{'addr': 'ip2', 'version': 4}]}}
+             'addresses': {'private': [{'addr': '10.0.0.2',
+                                        'version': 4}]}}
         ]
 
     def test_success(self):
@@ -54,14 +57,15 @@ class ExecConvergenceTests(SynchronousTestCase):
             {'url': 'loadbalancers/23', 'headers': None,
              'service_type': ServiceType.CLOUD_LOAD_BALANCERS,
              'data': {'nodes': mock.ANY},
-             'method': 'POST', 'success_codes': (200,)})
+             'method': 'POST',
+             'success_pred': has_code(200)})
         # separate check for nodes as it can be in any order but content is unique
         self.assertEqual(
             set(map(pmap, eff.intent.effects[0].intent['data']['nodes'])),
             set([pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
-                       'condition': 'ENABLED', 'address': 'ip2'}),
+                       'condition': 'ENABLED', 'address': '10.0.0.2'}),
                  pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
-                       'condition': 'ENABLED', 'address': 'ip1'})]))
+                       'condition': 'ENABLED', 'address': '10.0.0.1'})]))
 
         r = resolve_effect(eff, [{'nodes': [{'address': 'ip'}]}])
         # Returns true to be called again
