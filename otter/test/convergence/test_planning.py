@@ -16,7 +16,8 @@ from otter.convergence.planning import (
     _converge_lb_state,
     _remove_from_lb_with_draining,
     converge,
-    optimize_steps)
+    optimize_steps,
+    plan)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -772,3 +773,33 @@ class OptimizerTests(SynchronousTestCase):
                 # Unoptimizable steps
                 CreateServer(launch_config=pmap({}))
             ]))
+
+
+class PlanTests(SynchronousTestCase):
+    """Tests for :func:`plan`."""
+
+    def test_plan(self):
+        """An optimized plan is returned."""
+
+        desired_lbs = {5: [CLBDescription(lb_id='5', port=80)]}
+        desired_group_state = DesiredGroupState(
+            launch_config={}, desired=2, desired_lbs=desired_lbs)
+
+        result = plan(
+            desired_group_state,
+            set([server('server1', state=ServerState.ACTIVE,
+                        servicenet_address='1.1.1.1'),
+                 server('server2', state=ServerState.ACTIVE,
+                        servicenet_address='1.2.3.4')]),
+            set(),
+            0)
+
+        self.assertEqual(
+            result,
+            pbag([
+                AddNodesToCLB(
+                    lb_id=5,
+                    address_configs=s(
+                        ('1.1.1.1', CLBDescription(lb_id='5', port=80)),
+                        ('1.2.3.4', CLBDescription(lb_id='5', port=80)))
+                )]))

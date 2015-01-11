@@ -21,3 +21,8 @@ def _reqs_to_effect(request_func, conv_requests):
                             success_pred=has_code(*r.success_codes))
                for r in conv_requests]
     return parallel(effects)
+
+
+def steps_to_effect(request_func, steps):
+    """Turns a collection of :class:`IStep` providers into an effect."""
+    return _reqs_to_effect(request_func, [s.as_request() for s in steps])

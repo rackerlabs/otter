@@ -4,12 +4,13 @@ import calendar
 from functools import partial
 
 from effect import Effect, ConstantIntent
-from effect.testing import StubIntent, resolve_effect
+from effect.testing import StubIntent, resolve_effect, resolve_stubs
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
+    get_all_convergence_data,
     extract_CLB_drained_at,
     get_all_server_details,
     get_clb_contents,
@@ -231,7 +232,7 @@ class GetLBContentsTests(SynchronousTestCase):
         lbnodes = resolve_effect(
             feed_fetches,
             map(self._resolve_retry_stubs, feed_fetches.intent.effects))
-        # and we finally have the LBNodes.
+        # and we finally have the CLBNodes.
         return lbnodes
 
     def test_success(self):
@@ -437,3 +438,43 @@ class IPAddressTests(SynchronousTestCase):
         """
         del self.addresses["private"]
         self.assertEqual(_servicenet_address(self.server_dict), "")
+
+
+class GetAllConvergenceDataTests(SynchronousTestCase):
+    """Tests for :func:`get_all_convergence_data`."""
+
+    def setUp(self):
+        """Save some stuff."""
+        self.servers = [
+            {'id': 'a', 'state': 'ACTIVE', 'created': '1970-01-01T00:00:00Z',
+             'addresses': {'private': [{'addr': 'ip1', 'version': 4}]}},
+            {'id': 'b', 'state': 'ACTIVE', 'created': '1970-01-01T00:00:01Z',
+             'addresses': {'private': [{'addr': 'ip2', 'version': 4}]}}
+        ]
+
+    def test_success(self):
+        """The data is returned as a tuple of ([NovaServer], [CLBNode])."""
+        lb_nodes = [CLBNode(node_id='node1', address='ip1',
+                            description=CLBDescription(lb_id='lb1', port=80))]
+
+        reqfunc = lambda **k: Effect(k)
+        get_servers = lambda r: Effect(StubIntent(ConstantIntent({'gid': self.servers})))
+        get_lb = lambda r: Effect(StubIntent(ConstantIntent(lb_nodes)))
+
+        eff = get_all_convergence_data(
+            reqfunc,
+            'gid',
+            get_scaling_group_servers=get_servers,
+            get_clb_contents=get_lb)
+
+        expected_servers = [
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=0,
+                       servicenet_address='ip1'),
+            NovaServer(id='b',
+                       state=ServerState.ACTIVE,
+                       created=1,
+                       servicenet_address='ip2'),
+        ]
+        self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))
