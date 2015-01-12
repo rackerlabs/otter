@@ -460,10 +460,16 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
     def setUp(self):
         """Save some stuff."""
         self.servers = [
-            {'id': 'a', 'state': 'ACTIVE', 'created': '1970-01-01T00:00:00Z',
-             'addresses': {'private': [{'addr': 'ip1', 'version': 4}]}},
-            {'id': 'b', 'state': 'ACTIVE', 'created': '1970-01-01T00:00:01Z',
-             'addresses': {'private': [{'addr': 'ip2', 'version': 4}]}}
+            {'id': 'a',
+             'state': 'ACTIVE',
+             'created': '1970-01-01T00:00:00Z',
+             'addresses': {'private': [{'addr': 'ip1',
+                                        'version': 4}]}},
+            {'id': 'b',
+             'state': 'ACTIVE',
+             'created': '1970-01-01T00:00:01Z',
+             'addresses': {'private': [{'addr': 'ip2',
+                                        'version': 4}]}}
         ]
 
     def test_success(self):
