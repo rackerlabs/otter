@@ -328,11 +328,11 @@ def validate_launch_config_servicenet(lc):
     """
     clb = any([lb.get('type', 'CloudLoadBalancer') == 'CloudLoadBalancer'
                for lb in get_in(('args', 'loadBalancers'), lc, default=())])
-    servicenet = get_in(('args', 'server', 'networks'), lc, default=None)
+    networks = get_in(('args', 'server', 'networks'), lc, default=None)
 
     if (clb and
-            servicenet is not None and
-            {'uuid': '11111111-1111-1111-1111-111111111111'} not in servicenet):
+            networks is not None and
+            {'uuid': '11111111-1111-1111-1111-111111111111'} not in networks):
         raise ValidationError("ServiceNet network must be present if one or "
                               "more Cloud Load Balancers are configured.")
 
