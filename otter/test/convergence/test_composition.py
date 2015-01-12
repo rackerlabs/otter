@@ -75,11 +75,11 @@ class ExecConvergenceTests(SynchronousTestCase):
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
                        created=0,
-                       servicenet_address='ip1'),
+                       servicenet_address='10.0.0.1'),
             NovaServer(id='b',
                        state=ServerState.ACTIVE,
                        created=0,
-                       servicenet_address='ip2')
+                       servicenet_address='10.0.0.2')
         ]
 
     def _get_gacd_func(self, servers, group_id, reqfunc):
