@@ -65,14 +65,6 @@ def effect_on_response(codes, effect, result):
         return result
 
 
-def check_status(success_codes, result):
-    """Ensure that the response code is acceptable. If not, raise APIError."""
-    response, content = result
-    if response.code not in success_codes:
-        raise APIError(response.code, content, response.headers)
-    return result
-
-
 def check_response(pred, result):
     """
     Ensure that the response is acceptable according to the given predicate.
