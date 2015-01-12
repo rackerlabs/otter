@@ -244,14 +244,28 @@ class GetLBContentsTests(SynchronousTestCase):
         make_desc = partial(CLBDescription, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
             self._resolve_lb(eff),
-            [CLBNode(node_id='11', address='a11', drained_at=1.0,
-                     description=make_desc(lb_id='1', weight=2, condition=draining)),
-             CLBNode(node_id='12', address='a12',
-                     description=make_desc(lb_id='1', weight=2, condition=enabled)),
-             CLBNode(node_id='21', address='a21',
-                     description=make_desc(lb_id='2', weight=3, condition=enabled)),
-             CLBNode(node_id='22', address='a22', drained_at=2.0,
-                     description=make_desc(lb_id='2', weight=3, condition=draining))])
+            [CLBNode(node_id='11',
+                     address='a11',
+                     drained_at=1.0,
+                     description=make_desc(lb_id='1',
+                                           weight=2,
+                                           condition=draining)),
+             CLBNode(node_id='12',
+                     address='a12',
+                     description=make_desc(lb_id='1',
+                                           weight=2,
+                                           condition=enabled)),
+             CLBNode(node_id='21',
+                     address='a21',
+                     description=make_desc(lb_id='2',
+                                           weight=3,
+                                           condition=enabled)),
+             CLBNode(node_id='22',
+                     address='a22',
+                     drained_at=2.0,
+                     description=make_desc(lb_id='2',
+                                           weight=3,
+                                           condition=draining))])
 
     def test_no_lb(self):
         """
