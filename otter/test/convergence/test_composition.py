@@ -72,8 +72,14 @@ class ExecConvergenceTests(SynchronousTestCase):
         Sample server json
         """
         self.servers = [
-            NovaServer(id='a', state=ServerState.ACTIVE, created=0, servicenet_address='ip1'),
-            NovaServer(id='b', state=ServerState.ACTIVE, created=0, servicenet_address='ip2'),
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=0,
+                       servicenet_address='ip1'),
+            NovaServer(id='b',
+                       state=ServerState.ACTIVE,
+                       created=0,
+                       servicenet_address='ip2')
         ]
 
     def _get_gacd_func(self, servers, group_id, reqfunc):
