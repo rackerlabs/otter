@@ -1,7 +1,6 @@
 """Code related to effecting change based on a convergence plan."""
 
 from effect import parallel
-from otter.util.pure_http import has_code
 
 
 def _reqs_to_effect(request_func, conv_requests):
@@ -18,6 +17,6 @@ def _reqs_to_effect(request_func, conv_requests):
                             url=r.path,
                             headers=r.headers,
                             data=r.data,
-                            success_pred=has_code(*r.success_codes))
+                            success_pred=r.success_pred)
                for r in conv_requests]
     return parallel(effects)

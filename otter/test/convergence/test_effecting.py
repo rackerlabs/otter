@@ -66,7 +66,7 @@ class RequestsToEffectTests(SynchronousTestCase):
             Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
                     method="GET",
                     path="/whatever",
-                    success_codes=(999,))]
+                    success_pred=has_code(999))]
         expected_effects = [
             _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
                              method="GET",
@@ -88,7 +88,7 @@ class RequestsToEffectTests(SynchronousTestCase):
             Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
                     method="GET",
                     path="/whatever/something/else",
-                    success_codes=(231,))]
+                    success_pred=has_code(231))]
         expected_effects = [
             _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
                              method="GET",
@@ -116,7 +116,7 @@ class RequestsToEffectTests(SynchronousTestCase):
             Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
                     method="GET",
                     path="/whatever/something/else",
-                    success_codes=(231,)),
+                    success_pred=has_code(231)),
             Request(service=ServiceType.CLOUD_SERVERS,
                     method="POST",
                     path="/xyzzy",

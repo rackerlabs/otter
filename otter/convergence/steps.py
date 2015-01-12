@@ -4,6 +4,7 @@ from characteristic import attributes
 from zope.interface import implementer, Interface
 
 from otter.constants import ServiceType
+from otter.http import has_code
 from otter.util.http import append_segments
 
 
@@ -141,7 +142,8 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
         connections to be made or broken.
     :param str method: The method of the request ``"DELETE"`` or
         ``"POST"``.
-    :param iterable success_codes: Status codes considered successful for this request.
+    :param iterable success_codes: Status codes considered successful for this
+        request.
     :return: A bulk RackConnect v3.0 request for the given load balancer,
         node pairs.
     :rtype: :class:`Request`
@@ -154,7 +156,7 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
         data=[{"cloud_server": {"id": node},
                "load_balancer_pool": {"id": lb}}
               for (lb, node) in lb_node_pairs],
-        success_codes=success_codes)
+        success_pred=has_code(*success_codes))
 
 
 @implementer(IStep)
@@ -201,8 +203,10 @@ class BulkRemoveFromRCv3(object):
         return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE", (204,))
 
 
-@attributes(['service', 'method', 'path', 'headers', 'data', 'success_codes'],
-            defaults={'headers': None, 'data': None, 'success_codes': (200,)})
+@attributes(['service', 'method', 'path', 'headers', 'data', 'success_pred'],
+            defaults={'headers': None,
+                      'data': None,
+                      'success_pred': has_code(200)})
 class Request(object):
     """
     An object representing a Rackspace API request that must be performed.
@@ -222,8 +226,7 @@ class Request(object):
     :ivar dict headers: a dict mapping bytes to lists of bytes.
     :ivar object data: a Python object that will be JSON-serialized as the body
         of the request.
-    :ivar iterable<int> success_codes: The status codes that will be considered
-        successful. Defaults to just 200 (OK). Requests that expect other codes,
-        such as 201 (Created) for most ``POST`` requests or 204 (No content)
-        for most ``DELETE`` requests should specify that through this argument.
+    :ivar callable success_pred: Function that takes a response object
+        and decides if it was successful. Defaults to just checking that
+        the response code is 200 (OK).
     """
