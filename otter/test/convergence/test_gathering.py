@@ -15,10 +15,10 @@ from otter.convergence.gathering import (
     get_all_server_details,
     get_clb_contents,
     get_scaling_group_servers,
-    json_to_LBConfigs,
     to_nova_server,
     _private_ipv4_addresses,
     _servicenet_address)
+from otter.convergence.composition import json_to_LBConfigs
 from otter.convergence.model import (
     CLBDescription,
     CLBNode,
