@@ -112,7 +112,7 @@ def wait_for_active(log,
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param int interval: Polling interval in seconds.  Default: 5.
+    :param int interval: Polling interval in seconds.  Default: 20.
     :param int timeout: timeout to poll for the server status in seconds.
         Default 3600 (1 hour)
 
