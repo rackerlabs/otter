@@ -7,6 +7,7 @@ from otter.constants import ServiceType
 from otter.convergence.effecting import _reqs_to_effect
 from otter.convergence.steps import Request
 from otter.http import get_request_func
+from otter.test.utils import defaults_by_name
 from otter.util.pure_http import has_code
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -35,14 +36,14 @@ class PureRequestStubTests(SynchronousTestCase):
         """
         authenticator, log, = object(), object()
         request_func = get_request_func(authenticator, 1234, log, {}, "XYZ")
-        args, _, _, defaults = getargspec(request_func)
+        args = getargspec(request_func).args
         characteristic_attrs = _PureRequestStub.characteristic_attributes
         self.assertEqual(set(a.name for a in characteristic_attrs), set(args))
         characteristic_defaults = {a.name: a.default_value
                                    for a in characteristic_attrs
                                    if a.default_value is not NOTHING}
-        defaults_by_name = dict(zip(reversed(args), reversed(defaults)))
-        self.assertEqual(characteristic_defaults, defaults_by_name)
+        self.assertEqual(characteristic_defaults,
+                         defaults_by_name(request_func))
 
 
 class RequestsToEffectTests(SynchronousTestCase):
