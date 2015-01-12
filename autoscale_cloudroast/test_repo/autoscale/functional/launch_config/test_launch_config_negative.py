@@ -161,7 +161,7 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
                                 'type': 'CloudLoadBalancer'}])
         self.assertEquals(
             create_group_response.status_code, 400,
-            msg=('Create group with no CLBs but no ServiceNet was successsful '
+            msg=('Create group with CLBs but no ServiceNet was successsful '
                  'with response {0}'.format(create_group_response.status_code)))
 
     def test_update_scaling_group_with_CLBs_but_no_ServiceNet(self):
@@ -185,7 +185,7 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         status = update_launch_config_response.status_code
         self.assertEquals(
             status, 400,
-            msg=('Create group with no CLBs but no ServiceNet was successsful '
+            msg=('Updating a group to have CLBs but no ServiceNet was successsful '
                  'with response {0}'.format(status)))
 
     def _create_group(self):
