@@ -270,3 +270,88 @@ class CQLGenerator(object):
         if outfile:
             outfile.write(output)
         return output
+
+
+class KeyspaceWithClient(object):
+    """
+    Resource that represents a keyspace, and a Silverberg client for said
+    keyspace, that can be dirtied.  When dirtied and then reset, the data
+    can be optionally dumped, and then the data is truncated.
+
+    This resource also cleans its connections (and keyspace) up when the
+    reactor shuts down.
+
+    :ivar client: the Silverberg client for this keyspace
+    :type client: :class:``silverberg.client.CQLClient``
+    """
+    def __init__(self, cluster, keyspace_name):
+        self._cluster = cluster
+        self._keyspace_name = keyspace_name
+
+        reactor.addSystemEventTrigger("before", "shutdown", self.cleanup)
+
+        self._cluster.setup_keyspace(self._keyspace_name)
+        self.client = client.CQLClient(
+            endpoints.clientFromString(
+                reactor,
+                "tcp:{0}:{1}".format(self._cluster.host, self._cluster.port)),
+            self._keyspace_name)
+
+        self._dirtied = False
+
+    def pause(self):
+        """
+        Pause this resource, for use at the end of tests.  It removes the
+        client's connection from the reactor.  If not paused, there will be a
+        dirty reactor warning.
+        """
+        # pause the silverberg client's transport
+        if self.client._client._transport:
+            self.client._client._transport.stopReading()
+            self.client._client._transport.stopWriting()
+
+    def resume(self):
+        """
+        Resumes this resource, for use at the start of tests.  It puts the
+        client's connection back in the reactor, if not there.
+        """
+        # resume the silverberg client's transport
+        if self.client._client._transport:
+            self.client._client._transport.startReading()
+            self.client._client._transport.startWriting()
+
+    def dirtied(self):
+        """
+        Specify that this resource has been dirtied, so when reset is called
+        the data gets truncated.
+        """
+        self._dirtied = True
+
+    def reset(self, dumpdir=None):
+        """
+        If this resource is dirty, truncate the data (dump the data to
+        ``dumpdir`` first, if specified).  Each table will be written to
+        a different file (named for the table) in the dump directory.
+
+        If the resource has not been dirtied, do nothing (not even dump data)
+
+        :param dumpdir: the path to the directory to dump the data in
+        :type dumpdir: ``str``
+        """
+        if not self._dirtied:
+            return
+
+        if dumpdir:
+            self._cluster.dump_data(self._keyspace_name, dumpdir)
+        self._cluster.truncate_keyspace(self._keyspace_name)
+
+    def cleanup(self):
+        """
+        Clean up this resource by dropping the keyspace from the database
+        and by closing the client's connection to the database.
+        """
+        self._cluster.teardown_keyspace(self._keyspace_name)
+        try:
+            return self.client._client.disconnect()
+        except:
+            pass
