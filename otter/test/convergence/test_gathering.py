@@ -463,12 +463,12 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
             {'id': 'a',
              'state': 'ACTIVE',
              'created': '1970-01-01T00:00:00Z',
-             'addresses': {'private': [{'addr': 'ip1',
+             'addresses': {'private': [{'addr': '10.0.0.1',
                                         'version': 4}]}},
             {'id': 'b',
              'state': 'ACTIVE',
              'created': '1970-01-01T00:00:01Z',
-             'addresses': {'private': [{'addr': 'ip2',
+             'addresses': {'private': [{'addr': '10.0.0.2',
                                         'version': 4}]}}
         ]
 
@@ -491,10 +491,10 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
                        created=0,
-                       servicenet_address='ip1'),
+                       servicenet_address='10.0.0.1'),
             NovaServer(id='b',
                        state=ServerState.ACTIVE,
                        created=1,
-                       servicenet_address='ip2'),
+                       servicenet_address='10.0.0.2'),
         ]
         self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))
