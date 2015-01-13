@@ -33,6 +33,7 @@ from otter.auth import generate_authenticator
 from otter.constants import get_service_mapping
 
 from otter.log import log
+from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 from silverberg.logger import LoggingCQLClient
 from otter.util.cqlbatch import TimingOutCQLClient
@@ -184,8 +185,7 @@ def makeService(config):
 
     get_consistency = partial(
         get_consistency_level,
-        default=config_value('cassandra.default_consistency'),
-        exceptions=config_value('cassandra.consistency_exceptions'))
+        default=ConsistencyLevel.QUORUM)
 
     store = CassScalingGroupCollection(cassandra_cluster, reactor,
                                        get_consistency)
