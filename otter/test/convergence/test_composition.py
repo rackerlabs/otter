@@ -16,7 +16,7 @@ from otter.convergence.composition import (
     get_desired_group_state,
     json_to_LBConfigs,
     tenant_is_enabled)
-from otter.convergence.model import DesiredGroupState, LBConfig, NovaServer, ServerState
+from otter.convergence.model import CLBDescription, DesiredGroupState, NovaServer, ServerState
 from otter.util.pure_http import has_code
 
 
@@ -32,7 +32,8 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 20, 'port': 800},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [LBConfig(port=80), LBConfig(port=800)], 21: [LBConfig(port=81)]})
+            {20: [CLBDescription(lb_id='20', port=80), CLBDescription(lb_id='20', port=800)],
+             21: [CLBDescription(lb_id='21', port=81)]})
 
     def test_with_rackconnect(self):
         """
@@ -42,7 +43,8 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 200, 'type': 'RackConnectV3'},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [LBConfig(port=80)], 21: [LBConfig(port=81)]})
+            {20: [CLBDescription(lb_id='20', port=80)],
+             21: [CLBDescription(lb_id='21', port=81)]})
 
 
 class GetDesiredGroupStateTests(SynchronousTestCase):
@@ -58,7 +60,7 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
             DesiredGroupState(
                 launch_config={'server': server_config},
                 desired=2,
-                desired_lbs={23: [LBConfig(port=80)]}))
+                desired_lbs={23: [CLBDescription(lb_id='23', port=80)]}))
 
 
 class ExecConvergenceTests(SynchronousTestCase):
@@ -71,8 +73,14 @@ class ExecConvergenceTests(SynchronousTestCase):
         Sample server json
         """
         self.servers = [
-            NovaServer(id='a', state=ServerState.ACTIVE, created=0, servicenet_address='ip1'),
-            NovaServer(id='b', state=ServerState.ACTIVE, created=0, servicenet_address='ip2'),
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=0,
+                       servicenet_address='10.0.0.1'),
+            NovaServer(id='b',
+                       state=ServerState.ACTIVE,
+                       created=0,
+                       servicenet_address='10.0.0.2')
         ]
 
     def _get_gacd_func(self, servers, group_id, reqfunc):
@@ -92,7 +100,7 @@ class ExecConvergenceTests(SynchronousTestCase):
             self.servers, 'gid', reqfunc)
         desired = DesiredGroupState(
             launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
-            desired_lbs={23: [LBConfig(port=80)]},
+            desired_lbs={23: [CLBDescription(lb_id='23', port=80)]},
             desired=2)
 
         eff = execute_convergence(
@@ -114,9 +122,9 @@ class ExecConvergenceTests(SynchronousTestCase):
         self.assertEqual(
             set(map(pmap, eff.intent.effects[0].intent['data']['nodes'])),
             set([pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
-                       'condition': 'ENABLED', 'address': 'ip2'}),
+                       'condition': 'ENABLED', 'address': '10.0.0.2'}),
                  pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
-                       'condition': 'ENABLED', 'address': 'ip1'})]))
+                       'condition': 'ENABLED', 'address': '10.0.0.1'})]))
 
         r = resolve_effect(eff, [{'nodes': [{'address': 'ip'}]}])
         # Returns true to be called again

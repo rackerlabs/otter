@@ -12,7 +12,7 @@ from itertools import starmap
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.pure_http import (
-    Request, request, check_status, has_code,
+    Request, request, has_code,
     check_response,
     effect_on_response,
     add_effectful_headers, add_headers, add_effect_on_response, add_bind_root,
@@ -65,26 +65,6 @@ class RequestEffectTests(SynchronousTestCase):
         dispatcher = get_dispatcher(None)
         self.assertEqual(self.successResultOf(perform(dispatcher, Effect(req))),
                          (response, "content"))
-
-
-class CheckStatusTests(TestCase):
-    """Tests :func:`check_status`"""
-
-    def test_check_status(self):
-        """
-        :func:`check_status` raises an APIError when HTTP codes don't match.
-        """
-        self.assertRaises(
-            APIError,
-            check_status,
-            (200,),
-            stub_pure_response({"foo": "bar"}, code=404))
-
-    def test_check_status_success(self):
-        """When the HTTP code matches, the response is returned."""
-        response = stub_pure_response({"foo": "bar"}, code=404)
-        result = check_status((404,),  response)
-        self.assertEqual(result, response)
 
 
 class AddErrorHandlingTests(SynchronousTestCase):

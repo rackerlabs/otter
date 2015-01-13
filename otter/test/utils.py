@@ -2,6 +2,7 @@
 Mixins and utilities to be used for testing.
 """
 from functools import partial
+from inspect import getargspec
 import json
 import mock
 import os
@@ -615,3 +616,9 @@ def resolve_stubs(eff):
     dispatchers from Effect.
     """
     return eff_resolve_stubs(base_dispatcher, eff)
+
+
+def defaults_by_name(fn):
+    """Returns a mapping of args of fn to their default values."""
+    args, _, _, defaults = getargspec(fn)
+    return dict(zip(reversed(args), reversed(defaults)))

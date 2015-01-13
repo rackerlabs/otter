@@ -450,6 +450,27 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertFalse(self.mock_store.get_scaling_group.called)
         self.assertFalse(self.mock_group.update_launch_config.called)
 
+    def test_update_with_clb_and_no_servicenet_returns_400(self):
+        """
+        If the launch config has one or more cloud load balancers attached, but
+        disabled ServiceNet on the server, the launch config fails to validate
+        when editing a launch config.
+        """
+        no_servicenet = launch_examples()[0]
+        no_servicenet['args']['server']['networks'] = [
+            {'uuid': "00000000-0000-0000-0000-000000000000"}]
+        no_servicenet['args']["loadBalancers"] = [
+            {'loadBalancerId': 1, 'port': 80}]
+
+        response_body = self.assert_status_code(
+            400, method='PUT', body=json.dumps(no_servicenet))
+        resp = json.loads(response_body)
+        self.assertEquals(resp['error']['type'], 'ValidationError')
+        self.assertEquals(
+            resp['error']['message'],
+            "ServiceNet network must be present if one or more Cloud Load "
+            "Balancers are configured.")
+
     def test_launch_config_modify_bad_or_missing_input_400(self):
         """
         Checks that an update with no PUT data will fail with a 400
