@@ -111,12 +111,15 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         else:
             lc_metadata = dict(build_config='core')
 
-        # Setting netowrk type for servers to be private by default.
+        # Setting network type for servers to be private by default so that
+        # when testing against production, by default public IPs are not
+        # used up.
         if lc_networks is None:
             lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'}]
             if network_type is 'public':
                 lc_networks.append(
                     {'uuid': '00000000-0000-0000-0000-000000000000'})
+
         scaling_group = ScalingGroup_Request(
             gc_name=gc_name,
             gc_cooldown=gc_cooldown,
