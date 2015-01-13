@@ -44,8 +44,9 @@ lint: listoutdated flake8diff
 listoutdated:
 	pip list --outdated --allow-external=cafe,cloudcafe
 
+HEAD := $(shell git rev-parse --abbrev-ref HEAD)
 flake8diff:
-	git diff --patch --no-prefix origin/master | flake8 --diff
+	git diff --patch --no-prefix master...${HEAD} | flake8 --diff
 
 flake8full:
 	flake8 --max-complexity=10 ${PYDIRS}
