@@ -3,7 +3,6 @@ TESTDIR1=autoscale_cloudroast/test_repo
 TESTDIR2=autoscale_cloudcafe/autoscale
 TESTDIR3=autoscale_cloudcafe/bobby
 SCRIPTSDIR=scripts
-PYTHONLINT=${SCRIPTSDIR}/python-lint.py
 PYDIRS=${CODEDIR} ${SCRIPTSDIR} autoscale_cloudcafe autoscale_cloudroast
 CQLSH ?= $(shell which cqlsh)
 DOCDIR=doc
@@ -40,8 +39,20 @@ run:
 env:
 	./scripts/bootstrap-virtualenv.sh
 
-lint:
-	${PYTHONLINT} ${PYDIRS}
+lint: listoutdated flake8diff
+
+listoutdated:
+	pip list --outdated --allow-external=cafe,cloudcafe
+
+HEAD := $(shell git rev-parse --abbrev-ref HEAD)
+flake8diff:
+	@echo "Lint between master and ${HEAD}:"
+	git diff --patch --no-prefix master...${HEAD} | flake8 --diff
+	@echo "Lint between working tree and ${HEAD}:"
+	git diff --patch --no-prefix ${HEAD} | flake8 --diff
+
+flake8full:
+	flake8 --max-complexity=10 ${PYDIRS}
 
 unit:
 ifneq ($(JENKINS_URL), )
@@ -66,7 +77,8 @@ else
 endif
 
 coverage:
-	coverage run --source=${CODEDIR} --branch `which trial` ${UNITTESTS} && coverage html -d _trial_coverage --omit="*/test/*"
+	coverage run --source=${CODEDIR} --branch `which trial` ${UNITTESTS}
+	coverage html -d _trial_coverage --omit="*/test/*"
 
 cleandocs:
 	rm -rf _builddoc
@@ -85,21 +97,55 @@ docs: cleandocs
 schema: FORCE schema-setup schema-teardown
 
 schema-setup:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE}  --dry-run
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-prod.cql --replication ${REPLICATION_FACTOR} --keyspace ${CONTROL_KEYSPACE}  --dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup \
+		--ban-unsafe \
+		--outfile schema/setup-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup \
+		--ban-unsafe \
+		--outfile schema/setup-prod.cql \
+		--replication ${REPLICATION_FACTOR} \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--dry-run
 
 schema-teardown:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE}  --dry-run
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-prod.cql --replication ${REPLICATION_FACTOR} --keyspace ${CONTROL_KEYSPACE}  --dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown \
+		--outfile schema/teardown-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE}  \
+		--dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown \
+		--outfile schema/teardown-prod.cql \
+		--replication ${REPLICATION_FACTOR} \
+		--keyspace ${CONTROL_KEYSPACE}  \
+		--dry-run
 
 load-dev-schema:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup \
+		--ban-unsafe \
+		--outfile schema/setup-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--host ${CASSANDRA_HOST} \
+		--port ${CASSANDRA_PORT}
 
 migrate-dev-schema:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/migrations --outfile schema/migrations-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/migrations \
+		--outfile schema/migrations-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--host ${CASSANDRA_HOST} \
+		--port ${CASSANDRA_PORT}
 
 teardown-dev-schema:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown \
+		--outfile schema/teardown-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--host ${CASSANDRA_HOST} \
+		--port ${CASSANDRA_PORT}
 
 clear-dev-schema: FORCE teardown-dev-schema load-dev-schema
 
