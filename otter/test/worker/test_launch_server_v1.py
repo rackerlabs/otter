@@ -42,9 +42,9 @@ from otter.worker.launch_server_v1 import (
 )
 
 
-from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
-                              matches, DummyException, IsBoundWith,
-                              StubTreq, StubTreq2, StubResponse)
+from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq, matches,
+                              DummyException, IsBoundWith, StubTreq, StubTreq2,
+                              StubResponse, defaults_by_name)
 from otter.test.worker.test_rcv3 import _rcv3_add_response
 from testtools.matchers import IsInstance, StartsWith, MatchesRegex
 
@@ -1468,6 +1468,11 @@ class ServerTests(SynchronousTestCase):
         # the loop has stopped
         clock.advance(5)
         self.assertEqual(server_details.call_count, 2)
+
+    def test_wait_for_active_default_timeout(self):
+        """:func`wait_for_active` waits for 2 hours by default."""
+        self.assertEqual(defaults_by_name(wait_for_active)["timeout"],
+                         2 * 60 * 60)
 
     def _launch_server(self, launch_config, log=None, clock=None):
         """

@@ -103,7 +103,7 @@ def wait_for_active(log,
                     auth_token,
                     server_id,
                     interval=20,
-                    timeout=3600,
+                    timeout=7200,
                     clock=None):
     """
     Wait until the server specified by server_id's status is 'ACTIVE'
@@ -112,9 +112,9 @@ def wait_for_active(log,
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param int interval: Polling interval in seconds.  Default: 5.
+    :param int interval: Polling interval in seconds.  Default: 20.
     :param int timeout: timeout to poll for the server status in seconds.
-        Default 3600 (1 hour)
+        Default 7200 (2 hours).
 
     :return: Deferred that fires when the expected status has been seen.
     """

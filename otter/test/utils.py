@@ -2,6 +2,7 @@
 Mixins and utilities to be used for testing.
 """
 from functools import partial
+from inspect import getargspec
 import json
 import mock
 import os
@@ -601,3 +602,9 @@ def resolve_retry_stubs(eff):
     assert type(eff.intent) is Retry
     is_error, intermediate_result = guard(resolve_stubs, eff.intent.effect)
     return resolve_effect(eff, intermediate_result, is_error=is_error)
+
+
+def defaults_by_name(fn):
+    """Returns a mapping of args of fn to their default values."""
+    args, _, _, defaults = getargspec(fn)
+    return dict(zip(reversed(args), reversed(defaults)))
