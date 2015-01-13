@@ -1,11 +1,11 @@
 """Code related to gathering data to inform convergence."""
 
-from collections import defaultdict
+from operator import itemgetter
 from urllib import urlencode
 
 from effect import parallel
 
-from toolz.curried import filter, groupby
+from toolz.curried import filter, groupby, map
 from toolz.dicttoolz import get_in
 from toolz.functoolz import compose, identity
 
@@ -178,19 +178,21 @@ def to_nova_server(server_json):
                       servicenet_address=_servicenet_address(server_json))
 
 
-def json_to_LBConfigs(lbs_json):
+def get_all_convergence_data(
+        request_func,
+        group_id,
+        get_scaling_group_servers=get_scaling_group_servers,
+        get_clb_contents=get_clb_contents):
     """
-    Convert load balancer config from JSON to :obj:`CLBDescription`
+    Gather all data relevant for convergence, in parallel where
+    possible.
 
-    :param list lbs_json: List of load balancer configs
-    :return: `dict` of LBid -> [CLBDescription] mapping
-
-    NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
-    implemented in convergence
+    Returns an Effect of ([NovaServer], [LBNode]).
     """
-    lbd = defaultdict(list)
-    for lb in lbs_json:
-        if lb.get('type') != 'RackConnectV3':
-            lbd[lb['loadBalancerId']].append(CLBDescription(
-                lb_id=str(lb['loadBalancerId']), port=lb['port']))
-    return lbd
+    eff = parallel(
+        [get_scaling_group_servers(request_func)
+         .on(itemgetter(group_id))
+         .on(map(to_nova_server)).on(list),
+         get_clb_contents(request_func)]
+    ).on(tuple)
+    return eff
