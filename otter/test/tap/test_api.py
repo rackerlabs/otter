@@ -400,7 +400,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         """
         makeService configures a CassScalingGroupCollection with a callable
         that returns the default consistencies with the default consistency
-        of one.
+        of QUORUM.
         """
         makeService(test_config)
         # tests the defaults
