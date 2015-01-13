@@ -110,25 +110,29 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
             lc_metadata['build_config'] = 'core'
         else:
             lc_metadata = dict(build_config='core')
+
         # Setting netowrk type for servers to be private by default.
-        lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'}]
-        if network_type is 'public':
-            lc_networks.append({'uuid': '00000000-0000-0000-0000-000000000000'})
-        scaling_group = ScalingGroup_Request(gc_name=gc_name,
-                                             gc_cooldown=gc_cooldown,
-                                             gc_min_entities=gc_min_entities,
-                                             gc_max_entities=gc_max_entities,
-                                             gc_metadata=gc_metadata,
-                                             lc_name=lc_name,
-                                             lc_image_ref=lc_image_ref,
-                                             lc_flavor_ref=lc_flavor_ref,
-                                             lc_personality=lc_personality,
-                                             lc_metadata=lc_metadata,
-                                             lc_disk_config=lc_disk_config,
-                                             lc_networks=lc_networks,
-                                             lc_block_device_mapping=lc_block_device_mapping,
-                                             lc_load_balancers=lc_load_balancers,
-                                             sp_list=sp_list)
+        if lc_networks is None:
+            lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'}]
+            if network_type is 'public':
+                lc_networks.append(
+                    {'uuid': '00000000-0000-0000-0000-000000000000'})
+        scaling_group = ScalingGroup_Request(
+            gc_name=gc_name,
+            gc_cooldown=gc_cooldown,
+            gc_min_entities=gc_min_entities,
+            gc_max_entities=gc_max_entities,
+            gc_metadata=gc_metadata,
+            lc_name=lc_name,
+            lc_image_ref=lc_image_ref,
+            lc_flavor_ref=lc_flavor_ref,
+            lc_personality=lc_personality,
+            lc_metadata=lc_metadata,
+            lc_disk_config=lc_disk_config,
+            lc_networks=lc_networks,
+            lc_block_device_mapping=lc_block_device_mapping,
+            lc_load_balancers=lc_load_balancers,
+            sp_list=sp_list)
         return self.request('POST', url,
                             request_entity=scaling_group,
                             requestslib_kwargs=requestslib_kwargs,
