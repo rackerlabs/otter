@@ -857,6 +857,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         Test that you can update a config, and if its successful the return
         value is None
         """
+        self.group.get_consistency = get_consistency_level  # test defaults
+
         self.clock.advance(10.345)
         d = self.group.update_config({"b": "lah"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
@@ -868,7 +870,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                         "groupId": '12345678g',
                         "tenantId": '11111', 'ts': 10345000}
         self.connection.execute.assert_called_with(
-            expectedCql, expectedData, ConsistencyLevel.TWO)
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
@@ -877,6 +879,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         Test that you can update a launch config, and if successful the return
         value is None
         """
+        self.group.get_consistency = get_consistency_level  # test defaults
+
         self.clock.advance(10.345)
         d = self.group.update_launch_config({"b": "lah"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
@@ -888,7 +892,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                         "groupId": '12345678g',
                         "tenantId": '11111', 'ts': 10345000}
         self.connection.execute.assert_called_with(
-            expectedCql, expectedData, ConsistencyLevel.TWO)
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config')
     def test_update_configs_call_view_first(self, view_config):
