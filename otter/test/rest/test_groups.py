@@ -364,6 +364,29 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['error']['type'], 'ValidationError')
 
+    def test_create_group_with_clb_and_no_servicenet_returns_400(self):
+        """
+        If the launch config has one or more cloud load balancers attached, but
+        disabled ServiceNet on the server, the launch config fails to validate
+        when creating a group.
+        """
+        no_servicenet = launch_examples()[0]
+        no_servicenet['args']['server']['networks'] = [
+            {'uuid': "00000000-0000-0000-0000-000000000000"}]
+        no_servicenet['args']["loadBalancers"] = [
+            {'loadBalancerId': 1, 'port': 80}]
+
+        response_body = self.assert_status_code(
+            400, method='POST', body=json.dumps({
+                'groupConfiguration': config_examples()[0],
+                'launchConfiguration': no_servicenet}))
+        resp = json.loads(response_body)
+        self.assertEquals(resp['error']['type'], 'ValidationError')
+        self.assertEquals(
+            resp['error']['message'],
+            "ServiceNet network must be present if one or more Cloud Load "
+            "Balancers are configured.")
+
     def test_group_create_maxEntites_lt_minEntities_invalid_400(self):
         """
         minEntities > maxEntities results in a 400.
