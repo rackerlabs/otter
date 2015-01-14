@@ -206,10 +206,12 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         tenant_servers = {'t1': servers_t1, 't2': servers_t2}
 
         def get_bound_request_func(tenant_id):
-            def request_func(service_type, method, url, headers=None, data=None):
+            def request_func(service_type, method, url, headers=None,
+                             data=None):
                 return Effect(Stub(Constant(tenant_servers[tenant_id])))
             return request_func
-        effs = get_all_metrics_effects(groups, get_bound_request_func, mock_log())
+        effs = get_all_metrics_effects(groups, get_bound_request_func,
+                                       mock_log())
 
         # All of the HTTP requests are wrapped in retries, so unwrap them
         results = map(resolve_retry_stubs, effs)
@@ -229,7 +231,8 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         log.err.return_value = None
 
         def get_bound_request_func(tenant_id):
-            def request_func(service_type, method, url, headers=None, data=None):
+            def request_func(service_type, method, url, headers=None,
+                             data=None):
                 if tenant_id == 't1':
                     return Effect(Stub(Constant({'servers': []})))
                 else:
@@ -391,7 +394,8 @@ class CollectMetricsTests(SynchronousTestCase):
         self.get_all_metrics = patch(self, 'otter.metrics.get_all_metrics',
                                      return_value=succeed(self.metrics))
 
-        self.add_to_cloud_metrics = patch(self, 'otter.metrics.add_to_cloud_metrics',
+        self.add_to_cloud_metrics = patch(self,
+                                          'otter.metrics.add_to_cloud_metrics',
                                           return_value=Effect(Constant(None)))
         self.req_func = object()
         self.mock_grf = patch(self, 'otter.metrics.get_request_func',

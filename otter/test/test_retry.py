@@ -457,7 +457,9 @@ class EffectfulRetryTests(SynchronousTestCase):
     # attributes, I guess...
 
     def test_perform_retry(self):
-        """When the specified effect is successful, its result is propagated."""
+        """
+        When the specified effect is successful, its result is propagated.
+        """
         retry = Retry(effect=STUB, should_retry=lambda e: 1 / 0)
         eff = perform_retry(None, retry)
         self.assertEqual(resolve_stubs(eff), "foo")
@@ -545,4 +547,5 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         eff = sdar(get_exc_info())
         _perform_func(eff)
         self.assertEqual(can_retry_failures, next_interval_failures)
-        self.assertEqual(can_retry_failures[0], CheckFailureValue(ZeroDivisionError("foo")))
+        self.assertEqual(can_retry_failures[0],
+                         CheckFailureValue(ZeroDivisionError("foo")))
