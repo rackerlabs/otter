@@ -24,8 +24,7 @@ from otter.rest.application import Otter
 from otter.rest.bobby import set_bobby
 from otter.util.config import set_config_data, config_value
 from otter.util.deferredutils import timeout_deferred
-from otter.models.cass import (
-    CassAdmin, CassScalingGroupCollection, get_consistency_level)
+from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.scheduler import SchedulerService
 
 from otter.supervisor import SupervisorService, set_supervisor
@@ -33,7 +32,6 @@ from otter.auth import generate_authenticator
 from otter.constants import get_service_mapping
 
 from otter.log import log
-from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 from silverberg.logger import LoggingCQLClient
 from otter.util.cqlbatch import TimingOutCQLClient
@@ -183,13 +181,8 @@ def makeService(config):
             config_value('cassandra.timeout') or 30),
         log.bind(system='otter.silverberg'))
 
-    get_consistency = partial(
-        get_consistency_level,
-        default=ConsistencyLevel.QUORUM)
-
-    store = CassScalingGroupCollection(cassandra_cluster, reactor,
-                                       get_consistency)
-    admin_store = CassAdmin(cassandra_cluster, get_consistency)
+    store = CassScalingGroupCollection(cassandra_cluster, reactor)
+    admin_store = CassAdmin(cassandra_cluster)
 
     bobby_url = config_value('bobby_url')
     if bobby_url is not None:
