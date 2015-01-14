@@ -398,9 +398,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         expectedCql = ('SELECT group_config, created_at FROM scaling_group WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
         self.assertEqual(r, {})
 
     def test_view_config_recurrected_entry(self):
@@ -436,9 +435,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                        'FROM scaling_group '
                        'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
                                        'a', {'A': 'R'},
                                        {'P': 'R'}, '123', {'PT': 'R'}, False,
@@ -551,9 +549,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                         "groupTouched": '0001-01-01T00:00:00Z',
                         "policyTouched": _S({}),
                         "paused": True, "desired": 5, "ts": 10345000}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
         self.kz_client.Lock.assert_called_once_with('/locks/' + self.group.uuid)
 
@@ -695,9 +692,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         expectedCql = ('SELECT group_config, created_at FROM scaling_group WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_view_config_no_version(self):
@@ -723,9 +720,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         expectedCql = ('SELECT launch_config, created_at FROM scaling_group WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
         self.assertEqual(r, {})
 
     def test_view_launch_no_such_group(self):
@@ -739,9 +736,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         expectedCql = ('SELECT launch_config, created_at FROM scaling_group WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_view_launch_no_version(self):
@@ -769,10 +766,11 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         delCql = ('DELETE FROM scaling_group WHERE '
                   '"tenantId" = :tenantId AND "groupId" = :groupId')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
-        mock_verfied_view.assert_called_once_with(self.connection, viewCql, delCql,
-                                                  expectedData, ConsistencyLevel.QUORUM,
-                                                  matches(IsInstance(NoSuchScalingGroupError)),
-                                                  self.mock_log)
+        mock_verfied_view.assert_called_once_with(
+            self.connection, viewCql, delCql, expectedData,
+            ConsistencyLevel.QUORUM,
+            matches(IsInstance(NoSuchScalingGroupError)),
+            self.mock_log)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
@@ -845,9 +843,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         expectedCql = ('SELECT data, version FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g", "policyId": "3444"}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
         self.assertEqual(r, {})
 
     def test_view_policy_no_such_policy(self):
@@ -861,9 +859,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         expectedCql = ('SELECT data, version FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g", "policyId": "3444"}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_view_policy_no_version(self):
@@ -913,9 +911,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         r = self.successResultOf(d)
         self.assertEqual(r, [{'id': 'policy1'}, {'id': 'policy2'}])
 
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.fail(NoSuchScalingGroupError('t', 'g')))
@@ -947,9 +944,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group._naive_list_policies(limit=2)
         r = self.successResultOf(d)
         self.assertEqual(r, [{'id': 'policy1'}, {'id': 'policy2'}])
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     def test_naive_list_policies_offsets_by_marker(self):
         """
@@ -968,9 +964,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group._naive_list_policies(limit=2, marker="blah")
         r = self.successResultOf(d)
         self.assertEqual(r, [{'id': 'policy1'}, {'id': 'policy2'}])
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.fail(NoSuchScalingGroupError('t', 'g')))
@@ -1107,9 +1102,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         expectedCql = ('SELECT group_config, created_at FROM scaling_group WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     def test_update_policy_calls_view_first(self):
         """
@@ -1207,7 +1201,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             self.connection.execute.mock_calls,
             [mock.call(expected_count_cql, expected_params,
                        ConsistencyLevel.QUORUM),
-             mock.call(expected_insert_cql, mock.ANY, ConsistencyLevel.QUORUM)])
+             mock.call(expected_insert_cql, mock.ANY,
+                       ConsistencyLevel.QUORUM)])
 
         cql_params = self.connection.execute.call_args[0][1]
 
@@ -1326,9 +1321,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         self.assertEqual(r, [dict(id='webhook1', **expected_data),
                              dict(id='webhook2', **expected_data)])
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
         self.assertEqual(len(mock_get_policy.mock_calls), 0)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
@@ -1360,9 +1354,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group._naive_list_webhooks('234567', 2, None)
         r = self.successResultOf(d)
         self.assertEqual(r, [])
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     def test_naive_list_webhooks_offsets_by_marker(self):
         """
@@ -1390,9 +1383,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         }
         r = self.successResultOf(d)
         self.assertEqual(r, [dict(id='webhook1', **expected_data)])
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.succeed({}))
@@ -1478,9 +1470,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                        '"policyId" = :policyId AND "webhookId" = :webhookId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g",
                         "policyId": "3444", "webhookId": "4555"}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
         self.assertEqual(
             r, {'name': 'pokey', 'capability': {"version": "1", "hash": "h"}})
 
@@ -1640,10 +1632,11 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                     'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
         exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
-        verified_view.assert_called_once_with(self.connection, view_cql, del_cql,
-                                              exp_data, ConsistencyLevel.QUORUM,
-                                              matches(IsInstance(NoSuchScalingGroupError)),
-                                              self.mock_log)
+        verified_view.assert_called_once_with(
+            self.connection, view_cql, del_cql,
+            exp_data, ConsistencyLevel.QUORUM,
+            matches(IsInstance(NoSuchScalingGroupError)),
+            self.mock_log)
 
     @mock.patch('otter.models.cass.assemble_webhooks_in_policies')
     @mock.patch('otter.models.cass.verified_view')
@@ -2246,9 +2239,10 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         result = self.validate_fetch_and_delete(2, 1234, 100)
 
         self.assertEqual(result, events)
-        self.assertEqual(self.connection.execute.mock_calls,
-                         [mock.call(fetch_cql, fetch_data, ConsistencyLevel.QUORUM),
-                          mock.call(del_cql, del_data, ConsistencyLevel.QUORUM)])
+        self.assertEqual(
+            self.connection.execute.mock_calls,
+            [mock.call(fetch_cql, fetch_data, ConsistencyLevel.QUORUM),
+             mock.call(del_cql, del_data, ConsistencyLevel.QUORUM)])
 
     def test_add_cron_events(self):
         """
@@ -2541,8 +2535,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(self.successResultOf(d), dict))
 
         self.assertEqual(len(self.connection.execute.mock_calls), 2)
-        self.assertEqual(self.connection.execute.mock_calls[0],
-                         mock.call(expectedCQL, expectedData, ConsistencyLevel.QUORUM))
+        self.assertEqual(
+            self.connection.execute.mock_calls[0],
+            mock.call(expectedCQL, expectedData, ConsistencyLevel.QUORUM))
 
     def test_max_groups_overlimit(self):
         """
@@ -2555,9 +2550,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCQL = 'SELECT COUNT(*) FROM scaling_group WHERE "tenantId" = :tenantId;'
 
         d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
-        self.connection.execute.assert_called_once_with(expectedCQL,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCQL, expectedData, ConsistencyLevel.QUORUM)
 
         self.failureResultOf(d, ScalingGroupOverLimitError)
 
@@ -2584,9 +2578,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"groupTouched", "policyTouched", paused, desired, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
         self.assertEqual(r, [
             GroupState('123', 'group0', 'test', {}, {}, '0001-01-01T00:00:00Z', {}, False),
             GroupState('123', 'group1', 'test', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
@@ -2604,9 +2598,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     def test_list_states_respects_limit(self):
         """
@@ -2619,9 +2612,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"groupTouched", "policyTouched", paused, desired, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         self.collection.list_scaling_group_states(self.mock_log, '123', limit=5)
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     def test_list_states_offsets_by_marker(self):
         """
@@ -2635,9 +2627,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"groupId" > :marker LIMIT :limit;')
         self.collection.list_scaling_group_states(self.mock_log, '123',
                                                   marker='345')
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     def test_list_states_does_not_return_resurrected_groups(self):
         """
@@ -2674,8 +2665,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"groupTouched", "policyTouched", paused, desired, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
-        self.assertEqual(self.connection.execute.call_args_list[0],
-                         mock.call(expectedCql, expectedData, ConsistencyLevel.QUORUM))
+        self.assertEqual(
+            self.connection.execute.call_args_list[0],
+            mock.call(expectedCql, expectedData, ConsistencyLevel.QUORUM))
         self.assertEqual(r, [
             GroupState('123', 'group123', 'test123', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
         self.mock_log.msg.assert_called_once_with('Resurrected rows', tenant_id='123',
@@ -2741,8 +2733,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                         'tenantId': '123'}
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(self.connection.execute.call_count, 2)
-        self.assertEqual(self.connection.execute.call_args_list[1],
-                         mock.call(expectedCql, expectedData, ConsistencyLevel.QUORUM))
+        self.assertEqual(
+            self.connection.execute.call_args_list[1],
+            mock.call(expectedCql, expectedData, ConsistencyLevel.QUORUM))
         self.assertEqual(r, [
             GroupState('123', 'group123', 'test123', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
 
@@ -2873,9 +2866,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         policy_query = ('SELECT COUNT(*) FROM scaling_policies WHERE "tenantId" = :tenantId;')
         webhook_query = ('SELECT COUNT(*) FROM policy_webhooks WHERE "tenantId" = :tenantId;')
 
-        calls = [mock.call(config_query, expectedData, ConsistencyLevel.QUORUM),
-                 mock.call(policy_query, expectedData, ConsistencyLevel.QUORUM),
-                 mock.call(webhook_query, expectedData, ConsistencyLevel.QUORUM)]
+        calls = [
+            mock.call(config_query, expectedData, ConsistencyLevel.QUORUM),
+            mock.call(policy_query, expectedData, ConsistencyLevel.QUORUM),
+            mock.call(webhook_query, expectedData, ConsistencyLevel.QUORUM)]
 
         d = self.collection.get_counts(self.mock_log, '123')
         result = self.successResultOf(d)
