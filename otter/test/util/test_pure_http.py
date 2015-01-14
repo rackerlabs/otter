@@ -1,33 +1,43 @@
 """Tests for otter.util.pure_http"""
 
 import json
+from itertools import starmap
+
+from effect import Constant, Effect, Func
+from effect.testing import Stub
+from effect.twisted import perform
 
 from testtools import TestCase
 
-from effect.testing import StubIntent, resolve_stubs
-from effect.twisted import perform
-from effect import Effect, ConstantIntent, FuncIntent
-from itertools import starmap
-
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.effect_dispatcher import get_dispatcher
+from otter.test.utils import (
+    StubResponse, StubTreq, resolve_stubs, stub_pure_response)
+from otter.util.http import APIError
 from otter.util.pure_http import (
-    Request, request, has_code,
+    Request,
+    add_bind_root,
+    add_content_only,
+    add_effect_on_response,
+    add_effectful_headers,
+    add_error_handling,
+    add_headers,
+    add_json_request_data,
+    add_json_response,
     check_response,
     effect_on_response,
-    add_effectful_headers, add_headers, add_effect_on_response, add_bind_root,
-    add_content_only, add_error_handling, add_json_response,
-    add_json_request_data)
-from otter.util.http import APIError
-from otter.test.utils import stub_pure_response, StubResponse, StubTreq
+    has_code,
+    request,
+)
 
 
-Constant = lambda x: StubIntent(ConstantIntent(x))
+ESConstant = lambda x: Effect(Stub(Constant(x)))
 
 
 def stub_request(response):
     """Create a request function that returns a stubbed response."""
-    return lambda method, url, headers=None, data=None: Effect(Constant(response))
+    return lambda method, url, headers=None, data=None: ESConstant(response)
 
 
 class RequestEffectTests(SynchronousTestCase):
@@ -36,8 +46,8 @@ class RequestEffectTests(SynchronousTestCase):
     """
     def test_perform(self):
         """
-        The Request effect dispatches a request to treq, and returns a two-tuple
-        of the Twisted Response object and the content as bytes.
+        The Request effect dispatches a request to treq, and returns a
+        two-tuple of the Twisted Response object and the content as bytes.
         """
         req = ('GET', 'http://google.com/', None, None,  {'log': None})
         response = StubResponse(200, {})
@@ -45,13 +55,15 @@ class RequestEffectTests(SynchronousTestCase):
                         contents=[(response, "content")])
         req = Request(method="get", url="http://google.com/")
         req.treq = treq
+        dispatcher = get_dispatcher(None)
         self.assertEqual(
-            self.successResultOf(perform(None, Effect(req))),
+            self.successResultOf(perform(dispatcher, Effect(req))),
             (response, "content"))
 
     def test_log(self):
         """
-        The log specified in the Request is passed on to the treq implementation.
+        The log specified in the Request is passed on to the treq
+        implementation.
         """
         log = object()
         req = ('GET', 'http://google.com/', None, None, {'log': log})
@@ -60,8 +72,10 @@ class RequestEffectTests(SynchronousTestCase):
                         contents=[(response, "content")])
         req = Request(method="get", url="http://google.com/", log=log)
         req.treq = treq
-        self.assertEqual(self.successResultOf(perform(None, Effect(req))),
-                         (response, "content"))
+        dispatcher = get_dispatcher(None)
+        self.assertEqual(
+            self.successResultOf(perform(dispatcher, Effect(req))),
+            (response, "content"))
 
 
 class AddErrorHandlingTests(SynchronousTestCase):
@@ -138,7 +152,7 @@ class AddEffectfulHeadersTest(TestCase):
     def setUp(self):
         """Save auth effect."""
         super(AddEffectfulHeadersTest, self).setUp()
-        self.auth_effect = Effect(Constant({"x-auth-token": "abc123"}))
+        self.auth_effect = ESConstant({"x-auth-token": "abc123"})
 
     def test_add_headers(self):
         """Headers from the provided effect are inserted."""
@@ -204,7 +218,7 @@ class EffectOnResponseTests(TestCase):
         super(EffectOnResponseTests, self).setUp()
         self.invalidations = []
         invalidate = lambda: self.invalidations.append(True)
-        self.invalidate_effect = Effect(StubIntent(FuncIntent(invalidate)))
+        self.invalidate_effect = Effect(Stub(Func(invalidate)))
 
     def test_invalidate(self):
         """

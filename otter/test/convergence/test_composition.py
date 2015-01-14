@@ -1,9 +1,9 @@
 """Tests for convergence."""
 
-import mock
+from effect import Constant, Effect, ParallelEffects
+from effect.testing import Stub, resolve_effect
 
-from effect import Effect, ConstantIntent, ParallelEffects
-from effect.testing import StubIntent, resolve_effect, resolve_stubs
+import mock
 
 from pyrsistent import pmap
 
@@ -15,7 +15,9 @@ from otter.convergence.composition import (
     get_desired_group_state,
     json_to_LBConfigs,
     tenant_is_enabled)
-from otter.convergence.model import CLBDescription, DesiredGroupState, NovaServer, ServerState
+from otter.convergence.model import (
+    CLBDescription, DesiredGroupState, NovaServer, ServerState)
+from otter.test.utils import resolve_stubs
 from otter.util.pure_http import has_code
 
 
@@ -86,7 +88,7 @@ class ExecConvergenceTests(SynchronousTestCase):
         def get_all_convergence_data(request_func, grp_id):
             self.assertIs(request_func, reqfunc)
             self.assertEqual(grp_id, group_id)
-            return Effect(StubIntent(ConstantIntent((self.servers, []))))
+            return Effect(Stub(Constant((self.servers, []))))
         return get_all_convergence_data
 
     def test_success(self):

@@ -4,35 +4,35 @@ Script to collect metrics (total desired, actual and pending) from a DC
 
 from __future__ import print_function
 
-from functools import partial
-import sys
 import json
-from collections import namedtuple
-import time
 import operator
+import sys
+import time
+from collections import namedtuple
+from functools import partial
 
-from effect.twisted import perform, exc_info_to_failure
-
-from twisted.internet import task, defer
-from twisted.internet.endpoints import clientFromString
-from twisted.application.service import Service
-from twisted.application.internet import TimerService
-from twisted.python import usage
+from effect.twisted import exc_info_to_failure, perform
 
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
-from toolz.curried import groupby, filter, get_in
+from toolz.curried import filter, get_in, groupby
 from toolz.dicttoolz import merge
 from toolz.functoolz import identity
 
-from otter.auth import generate_authenticator
+from twisted.application.internet import TimerService
+from twisted.application.service import Service
+from twisted.internet import defer, task
+from twisted.internet.endpoints import clientFromString
+from twisted.python import usage
 
-from otter.constants import get_service_mapping, ServiceType
-from otter.http import get_request_func
+from otter.auth import generate_authenticator
+from otter.constants import ServiceType, get_service_mapping
 from otter.convergence.gathering import get_scaling_group_servers
-from otter.util.fp import predicate_all
+from otter.effect_dispatcher import get_dispatcher
+from otter.http import get_request_func
 from otter.log import log as otter_log
+from otter.util.fp import predicate_all
 
 
 # TODO: Remove this and pass it from service to other functions
@@ -157,8 +157,9 @@ def _perform_limited_effects(effects, clock, limit):
     It'd be nice if effect.parallel had a "limit" parameter.
     """
     # TODO: Use cooperator instead
+    dispatcher = get_dispatcher(clock)
     sem = defer.DeferredSemaphore(limit)
-    defs = [sem.run(perform, clock, eff) for eff in effects]
+    defs = [sem.run(perform, dispatcher, eff) for eff in effects]
     return defer.gatherResults(defs)
 
 
@@ -258,10 +259,12 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
 
     # Add to cloud metrics
     req_func = get_request_func(authenticator, config['metrics']['tenant_id'],
-                                metrics_log, service_mapping, config['metrics']['region'])
+                                metrics_log, service_mapping,
+                                config['metrics']['region'])
     eff = add_to_cloud_metrics(req_func, config['metrics'], config['region'],
-                               total_desired, total_actual, total_pending, log=metrics_log)
-    yield perform(reactor, eff)
+                               total_desired, total_actual, total_pending,
+                               log=metrics_log)
+    yield perform(get_dispatcher(reactor), eff)
     metrics_log.msg('added to cloud metrics')
     if _print:
         print('added to cloud metrics')

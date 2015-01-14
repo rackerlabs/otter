@@ -3,8 +3,8 @@
 import calendar
 from functools import partial
 
-from effect import Effect, ConstantIntent
-from effect.testing import StubIntent, resolve_effect, resolve_stubs
+from effect import Constant, Effect
+from effect.testing import Stub, resolve_effect
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -26,8 +26,9 @@ from otter.convergence.model import (
     CLBNodeType,
     NovaServer,
     ServerState)
-from otter.test.utils import patch, resolve_retry_stubs
-from otter.util.retry import ShouldDelayAndRetry, exponential_backoff_interval, retry_times
+from otter.test.utils import patch, resolve_retry_stubs, resolve_stubs
+from otter.util.retry import (
+    ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import from_timestamp
 
 
@@ -35,8 +36,9 @@ def _request(requests):
     def request(service_type, method, url):
         response = requests.get((service_type, method, url))
         if response is None:
-            raise KeyError("{} not in {}".format((method, url), requests.keys()))
-        return Effect(StubIntent(ConstantIntent(response)))
+            raise KeyError("{} not in {}".format((method, url),
+                                                 requests.keys()))
+        return Effect(Stub(Constant(response)))
     return request
 
 
@@ -206,7 +208,7 @@ class GetLBContentsTests(SynchronousTestCase):
         def request(service_type, method, url, json_response=False):
             assert service_type is ServiceType.CLOUD_LOAD_BALANCERS
             response = self.reqs[(method, url, json_response)]
-            return Effect(StubIntent(ConstantIntent(response)))
+            return Effect(Stub(Constant(response)))
         return request
 
     def _resolve_retry_stubs(self, eff):
@@ -478,8 +480,8 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                             description=CLBDescription(lb_id='lb1', port=80))]
 
         reqfunc = lambda **k: Effect(k)
-        get_servers = lambda r: Effect(StubIntent(ConstantIntent({'gid': self.servers})))
-        get_lb = lambda r: Effect(StubIntent(ConstantIntent(lb_nodes)))
+        get_servers = lambda r: Effect(Stub(Constant({'gid': self.servers})))
+        get_lb = lambda r: Effect(Stub(Constant(lb_nodes)))
 
         eff = get_all_convergence_data(
             reqfunc,

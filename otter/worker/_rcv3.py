@@ -3,12 +3,16 @@
 
 At some point, this should just be moved into that module.
 """
-from effect.twisted import perform
 from functools import partial
 from operator import itemgetter
-from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3
-from otter.convergence.effecting import steps_to_effect
+
+from effect.twisted import perform
+
 from twisted.internet import reactor
+
+from otter.convergence.effecting import steps_to_effect
+from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3
+from otter.effect_dispatcher import get_dispatcher
 
 
 def _generic_rcv3_request(step_class, request_func, lb_id, server_id,
@@ -32,7 +36,8 @@ def _generic_rcv3_request(step_class, request_func, lb_id, server_id,
     # know there will only be one element in that list. Our contract
     # is that we return the result of the request, so we discard the
     # outer list.
-    return perform(_reactor, effect).addCallback(itemgetter(0))
+    dispatcher = get_dispatcher(_reactor)
+    return perform(dispatcher, effect).addCallback(itemgetter(0))
 
 
 add_to_rcv3 = partial(_generic_rcv3_request, BulkAddToRCv3)
