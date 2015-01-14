@@ -60,8 +60,9 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
             self.time_boundary, self.buckets, self.clock, threshold=600)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
 
-        # TODO: Would like to not do below 2 statements but leaving TimerService
-        # as such causes check_events to be called immediately when scheduler is started.
+        # TODO: Would like to not do below 2 statements but leaving
+        # TimerService as such causes check_events to be called
+        # immediately when scheduler is started.
         self.scheduler_service.running = False
         self.timer_service = patch(self, 'otter.scheduler.TimerService')
 
