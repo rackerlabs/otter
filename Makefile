@@ -57,6 +57,7 @@ endif
 
 flake8diff:
 	git diff --patch --no-prefix ${DIFF_TARGET} | flake8 --diff
+	true
 
 flake8full:
 	flake8 ${PYDIRS}
