@@ -44,12 +44,10 @@ lint: listoutdated flake8diff
 listoutdated:
 	pip list --outdated --allow-external=cafe,cloudcafe
 
-HEAD := $(shell git rev-parse --abbrev-ref HEAD)
+MERGE_BASE := $(shell git merge-base master HEAD)
+
 flake8diff:
-	@echo "Lint between master and ${HEAD}:"
-	git diff --patch --no-prefix master...${HEAD} | flake8 --diff
-	@echo "Lint between working tree and ${HEAD}:"
-	git diff --patch --no-prefix ${HEAD} | flake8 --diff
+	git diff --patch --no-prefix ${MERGE_BASE} | flake8 --diff
 
 flake8full:
 	flake8 --max-complexity=10 ${PYDIRS}
