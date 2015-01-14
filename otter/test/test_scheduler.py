@@ -633,9 +633,7 @@ class ExecuteEventTests(SchedulerTests):
             reason=CheckFailure(CannotExecutePolicyError))
 
     def test_unknown_error(self):
-        """
-        Unknown error occurs. It is logged and not propogated
-        """
+        """Unexpected errors are logged and propagated."""
         del_pol_ids = set()
         self.log.bind.return_value.err.return_value = None
         self.maybe_exec_policy.return_value = defer.fail(ValueError(4))
