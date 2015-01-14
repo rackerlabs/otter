@@ -35,10 +35,11 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
     """Tests for `SchedulerService`"""
 
     def setUp(self):
-        """
-        mock all the dependencies of SchedulingService that includes logging,
-        store's fetch_and_delete, TxKazooClient stuff, TimerService, check_events_in_bucket
-        and twisted.internet.task.Clock is used to simulate time
+        """Mock all the dependencies of SchedulingService.
+
+        This includes logging, store's fetch_and_delete, TxKazooClient
+        stuff, TimerService, check_events_in_bucket and
+        twisted.internet.task.Clock is used to simulate time.
         """
         super(SchedulerServiceTests, self).setUp()
 
