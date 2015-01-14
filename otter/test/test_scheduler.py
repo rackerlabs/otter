@@ -393,10 +393,20 @@ class CheckEventsInBucketTests(SchedulerTests):
         """
         When events fetched > 100, they are processed in 2 batches
         """
-        events1 = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol4{}'.format(i),
-                    'trigger': 'now', 'cron': None, 'bucket': 1} for i in range(100)]
-        events2 = [{'tenantId': '1235', 'groupId': 'scal54', 'policyId': 'pol4{}'.format(i),
-                    'trigger': 'now', 'cron': None, 'bucket': 1} for i in range(10)]
+        events1 = [{'tenantId': '1234',
+                    'groupId': 'scal44',
+                    'policyId': 'pol4{}'.format(i),
+                    'trigger': 'now',
+                    'cron': None,
+                    'bucket': 1}
+                   for i in range(100)]
+        events2 = [{'tenantId': '1235',
+                    'groupId': 'scal54',
+                    'policyId': 'pol4{}'.format(i),
+                    'trigger': 'now',
+                    'cron': None,
+                    'bucket': 1}
+                   for i in range(10)]
         self.returns = [events1, events2]
 
         d = check_events_in_bucket(self.log, self.mock_store, 1, 'now', 100)
@@ -405,16 +415,25 @@ class CheckEventsInBucketTests(SchedulerTests):
         self.assertEqual(self.mock_store.fetch_and_delete.mock_calls,
                          [mock.call(1, 'now', 100)] * 2)
         self.assertEqual(self.process_events.mock_calls,
-                         [mock.call(events1, self.mock_store, self.log.bind()),
-                          mock.call(events2, self.mock_store, self.log.bind())])
+                         [mock.call(events1,
+                                    self.mock_store,
+                                    self.log.bind()),
+                          mock.call(events2,
+                                    self.mock_store,
+                                    self.log.bind())])
 
     def test_events_batch_error(self):
         """
         When error occurs after first batch of events are processed, then it
         logs errors and does not try to fetch again
         """
-        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol4{}'.format(i),
-                   'trigger': 'now', 'cron': None, 'bucket': 1} for i in range(100)]
+        events = [{'tenantId': '1234',
+                   'groupId': 'scal44',
+                   'policyId': 'pol4{}'.format(i),
+                   'trigger': 'now',
+                   'cron': None,
+                   'bucket': 1}
+                  for i in range(100)]
         self.returns = [events, ValueError('some')]
 
         d = check_events_in_bucket(self.log, self.mock_store, 1, 'now', 100)
@@ -573,12 +592,22 @@ class ExecuteEventTests(SchedulerTests):
         self.maybe_exec_policy = patch(self, 'otter.scheduler.maybe_execute_scaling_policy',
                                        return_value=defer.succeed('newstate'))
         self.log = mock.Mock()
-        self.log_args = {'tenant_id': '1234', 'scaling_group_id': 'scal44', 'policy_id': 'pol44'}
-        self.event = {'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol44',
-                      'trigger': 'now', 'cron': '*', 'bucket': 1, 'version': 'v2'}
+        self.log_args = {
+            'tenant_id': '1234',
+            'scaling_group_id': 'scal44',
+            'policy_id': 'pol44'
+        }
+        self.event = {
+            'tenantId': '1234',
+            'groupId': 'scal44',
+            'policyId': 'pol44',
+            'trigger': 'now',
+            'cron': '*',
+            'bucket': 1,
+            'version': 'v2'
+        }
 
     def test_event_executed(self):
-        """
         """Event is executed successfully and appropriate logs logged."""
         del_pol_ids = set()
         d = execute_event(self.mock_store, self.log, self.event, del_pol_ids)
