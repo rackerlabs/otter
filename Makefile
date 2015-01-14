@@ -48,7 +48,7 @@ ifneq ($(JENKINS_URL), )
 # On Jenkins, HEAD will be a Github-created merge commit. Hence, diffing
 # against HEAD^1 gives you the diff introduced by the PR, which is what we're
 # trying to test.
-DIFF_TARGET = "HEAD^1"
+DIFF_TARGET = HEAD^1
 else
 # On not-Jenkins, we find the current branch's branch-off point from master,
 # and diff against that.
