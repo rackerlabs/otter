@@ -503,11 +503,13 @@ class ProcessEventsTests(SchedulerTests):
         events = range(10)
         d = process_events(events, self.mock_store, self.log)
         self.assertEqual(self.successResultOf(d), 10)
-        self.log.msg.assert_called_once_with('Processing {num_events} events', num_events=10)
+        self.log.msg.assert_called_once_with(
+            'Processing {num_events} events', num_events=10)
         self.assertEqual(
             self.execute_event.mock_calls,
             [mock.call(self.mock_store, self.log, event, set()) for event in events])
-        self.add_cron_events.assert_called_once_with(self.mock_store, self.log, events, set())
+        self.add_cron_events.assert_called_once_with(
+            self.mock_store, self.log, events, set())
 
 
 class AddCronEventsTests(SchedulerTests):
