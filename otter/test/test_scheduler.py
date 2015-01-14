@@ -588,7 +588,8 @@ class ExecuteEventTests(SchedulerTests):
         deleted_policy_ids and does not call maybe_execute_scaling_policy
         """
         del_pol_ids = set()
-        self.mock_group.modify_state.side_effect = lambda *_: defer.fail(NoSuchScalingGroupError(1, 2))
+        self.mock_group.modify_state.side_effect = \
+            lambda *_: defer.fail(NoSuchScalingGroupError(1, 2))
 
         d = execute_event(self.mock_store, self.log, self.event, del_pol_ids)
 
