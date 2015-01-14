@@ -66,7 +66,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.scheduler_service.running = False
         self.timer_service = patch(self, 'otter.scheduler.TimerService')
 
-        self.check_events_in_bucket = patch(self, 'otter.scheduler.check_events_in_bucket')
+        self.check_events_in_bucket = patch(
+            self, 'otter.scheduler.check_events_in_bucket')
 
         self.returns = []
         self.setup_func(self.mock_store.get_oldest_event)
