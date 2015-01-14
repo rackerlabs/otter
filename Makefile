@@ -50,7 +50,7 @@ listoutdated:
 # unset, we don't know what you're trying to merge against, so we
 # assume master.
 ghprbTargetBranch ?= master
-MERGE_BASE = $(shell git merge-base ${ghprbTargetBranch} HEAD)
+MERGE_BASE = $(shell git merge-base $(ghprbTargetBranch) HEAD)
 
 flake8diff:
 	git diff --patch --no-prefix ${MERGE_BASE} | flake8 --diff
