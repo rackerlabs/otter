@@ -44,16 +44,19 @@ lint: listoutdated flake8diff
 listoutdated:
 	pip list --outdated --allow-external=cafe,cloudcafe
 
-
-# If building a PR on Jenkins, ghprbTargetBranch is the target
-# branch. This allows PRs against branches other than master. If
-# unset, we don't know what you're trying to merge against, so we
-# assume master.
-ghprbTargetBranch ?= master
-MERGE_BASE = $(shell git merge-base $(ghprbTargetBranch) HEAD)
+ifneq ($(JENKINS_URL), )
+# On Jenkins, HEAD will be a Github-created merge commit. Hence, diffing
+# against HEAD^1 gives you the diff introduced by the PR, which is what we're
+# trying to test.
+DIFF_TARGET = "HEAD^1"
+else
+# On not-Jenkins, we find the current branch's branch-off point from master,
+# and diff against that.
+DIFF_TARGET = $(shell git merge-base master HEAD)
+endif
 
 flake8diff:
-	git diff --patch --no-prefix ${MERGE_BASE} | flake8 --diff
+	git diff --patch --no-prefix ${DIFF_TARGET} | flake8 --diff
 
 flake8full:
 	flake8 --max-complexity=10 ${PYDIRS}
