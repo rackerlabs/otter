@@ -59,7 +59,7 @@ flake8diff:
 	git diff --patch --no-prefix ${DIFF_TARGET} | flake8 --diff
 
 flake8full:
-	flake8 --max-complexity=10 ${PYDIRS}
+	flake8 ${PYDIRS}
 
 unit:
 ifneq ($(JENKINS_URL), )
