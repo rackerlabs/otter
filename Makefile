@@ -44,15 +44,22 @@ lint: listoutdated flake8diff
 listoutdated:
 	pip list --outdated --allow-external=cafe,cloudcafe
 
-HEAD := $(shell git rev-parse --abbrev-ref HEAD)
+ifneq ($(JENKINS_URL), )
+# On Jenkins, HEAD will be a Github-created merge commit. Hence, diffing
+# against HEAD^1 gives you the diff introduced by the PR, which is what we're
+# trying to test.
+DIFF_TARGET = HEAD^1
+else
+# On not-Jenkins, we find the current branch's branch-off point from master,
+# and diff against that.
+DIFF_TARGET = $(shell git merge-base master HEAD)
+endif
+
 flake8diff:
-	@echo "Lint between master and ${HEAD}:"
-	git diff --patch --no-prefix master...${HEAD} | flake8 --diff
-	@echo "Lint between working tree and ${HEAD}:"
-	git diff --patch --no-prefix ${HEAD} | flake8 --diff
+	git diff --patch --no-prefix ${DIFF_TARGET} | flake8 --diff
 
 flake8full:
-	flake8 --max-complexity=10 ${PYDIRS}
+	flake8 ${PYDIRS}
 
 unit:
 ifneq ($(JENKINS_URL), )
