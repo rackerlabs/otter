@@ -494,7 +494,7 @@ def get_exc_info():
         return sys.exc_info()
 
 
-def _perform_func(eff):
+def _perform_func_intent(eff):
     """Perform a func intent without recursing on effects."""
     assert type(eff.intent) is Func
     return eff.intent.func()
@@ -511,7 +511,7 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=lambda f: False,
                                    next_interval=lambda f: 1 / 0)
         eff = sdar(get_exc_info())
-        self.assertEqual(_perform_func(eff), False)
+        self.assertEqual(_perform_func_intent(eff), False)
 
     def test_should_retry(self):
         """
@@ -521,7 +521,7 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=lambda f: True,
                                    next_interval=lambda f: 1.5)
         eff = sdar(get_exc_info())
-        next_eff = _perform_func(eff)
+        next_eff = _perform_func_intent(eff)
         self.assertEqual(next_eff.intent, Delay(delay=1.5))
         self.assertEqual(resolve_effect(next_eff, None),
                          True)
@@ -545,7 +545,7 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=can_retry,
                                    next_interval=next_interval)
         eff = sdar(get_exc_info())
-        _perform_func(eff)
+        _perform_func_intent(eff)
         self.assertEqual(can_retry_failures, next_interval_failures)
         self.assertEqual(can_retry_failures[0],
                          CheckFailureValue(ZeroDivisionError("foo")))
