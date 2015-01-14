@@ -25,7 +25,8 @@ class SchedulerTests(SynchronousTestCase):
         """
         mock common dependencies of methods in scheduler.py
         """
-        self.mock_store = iMock(IScalingGroupCollection, IScalingScheduleCollection)
+        self.mock_store = iMock(
+            IScalingGroupCollection, IScalingScheduleCollection)
         self.mock_generate_transaction_id = patch(
             self, 'otter.scheduler.generate_transaction_id',
             return_value='transaction-id')
