@@ -1370,10 +1370,11 @@ class CassScalingGroupCollection:
         """
 
         fields = ['scaling_group', 'scaling_policies', 'policy_webhooks']
-        deferred = [self.connection.execute(_cql_count_for_tenant.format(cf=field),
-                                            {'tenantId': tenant_id},
-                                            DEFAULT_CONSISTENCY)
-                    for field in fields]
+        deferred = [
+            self.connection.execute(_cql_count_for_tenant.format(cf=field),
+                                    {'tenantId': tenant_id},
+                                    ConsistencyLevel.ONE)
+            for field in fields]
 
         d = defer.gatherResults(deferred)
         d.addCallback(lambda results: [r[0]['count'] for r in results])

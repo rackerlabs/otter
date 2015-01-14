@@ -2867,9 +2867,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         webhook_query = ('SELECT COUNT(*) FROM policy_webhooks WHERE "tenantId" = :tenantId;')
 
         calls = [
-            mock.call(config_query, expectedData, ConsistencyLevel.QUORUM),
-            mock.call(policy_query, expectedData, ConsistencyLevel.QUORUM),
-            mock.call(webhook_query, expectedData, ConsistencyLevel.QUORUM)]
+            mock.call(config_query, expectedData, ConsistencyLevel.ONE),
+            mock.call(policy_query, expectedData, ConsistencyLevel.ONE),
+            mock.call(webhook_query, expectedData, ConsistencyLevel.ONE)]
 
         d = self.collection.get_counts(self.mock_log, '123')
         result = self.successResultOf(d)
