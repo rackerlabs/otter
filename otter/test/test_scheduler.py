@@ -193,7 +193,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         """
         reset() raises error on same path
         """
-        self.assertRaises(ValueError, self.scheduler_service.reset, '/part_path')
+        self.assertRaises(
+            ValueError, self.scheduler_service.reset, '/part_path')
         self.assertFalse(self.kz_client.SetPartitioner.called)
 
     def test_check_events_allocating(self):
@@ -530,7 +531,8 @@ class AddCronEventsTests(SchedulerTests):
         new_events.pop(4)
         [event.update({'trigger': 'next'}) for event in new_events]
 
-        d = add_cron_events(self.mock_store, self.log, events, deleted_policy_ids)
+        d = add_cron_events(
+            self.mock_store, self.log, events, deleted_policy_ids)
 
         self.assertIsNone(self.successResultOf(d), None)
         self.assertEqual(self.next_cron_occurrence.call_count, 8)
@@ -574,7 +576,8 @@ class ExecuteEventTests(SchedulerTests):
         self.assertIsNone(self.successResultOf(d))
         self.log.bind.assert_called_with(**self.log_args)
         log = self.log.bind.return_value
-        log.msg.assert_called_once_with('Scheduler executing policy {policy_id}')
+        log.msg.assert_called_once_with(
+            'Scheduler executing policy {policy_id}')
         self.maybe_exec_policy.assert_called_once_with(
             log, 'transaction-id', self.mock_group, self.mock_state,
             policy_id=self.event['policyId'], version=self.event['version'])
