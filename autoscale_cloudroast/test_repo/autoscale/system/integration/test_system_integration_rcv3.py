@@ -375,10 +375,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         # running this test (essentially fulfilling #1 anyway).
         server_count_before_autoscaling = self._get_node_counts_on_pool(self.pool.id)['cloud_servers']
 
-        # Confirm that the servers were also added to the cloud load balancer
-        self.common.verify_lbs_on_group_have_servers_as_nodes(
-            self, pool_group.id, active_server_list, self.load_balancer_1)
-
         # Define a policy to scale up
         scale_amt = 2
         policy_up_data = {'change': scale_amt, 'cooldown': 0}
@@ -399,15 +395,11 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             expected_rcv3_server_count, timeout=300, api="RackConnect")
 
         # Get node count after scaling and confirm that the expected number of
-        # nodes are present on the load_balancer_pool.  Also, check servers are
-        # listed with the cloud load balancer.
+        # nodes are present on the load_balancer_pool.
         scale_up_node_count = self._get_node_counts_on_pool(self.pool.id)['cloud_servers']
         self.assertEquals(scale_up_node_count, expected_rcv3_server_count, msg='The actual '
                           'cloud_server count of [{0}] does not match the expected count '
                           'of [{1}]'.format(scale_up_node_count, expected_rcv3_server_count))
-
-        self.common.verify_lbs_on_group_have_servers_as_nodes(
-            self, pool_group.id, server_list_after_scale_up, self.load_balancer_1)
 
         # Define a policy to scale down
         policy_down_data = {'change': -scale_amt, 'cooldown': 0}
@@ -444,10 +436,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             self.assertTrue(nid in final_node_ids, msg='Initial node {0} was not in '
                             'the final list'.format(nid))
 
-        self.common.verify_lbs_on_group_have_servers_as_nodes(
-            self, pool_group.id, server_list_after_scale_down, self.load_balancer_1)
-
-
     def _get_node_counts_on_pool(self, pool_id):
         """
         Get the node counts on a given pool.  Takes an ID string.
@@ -456,6 +444,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         cloud_servers counts the number of Rackspace cloud servers, while
         external counts everything but (e.g., dedicated servers).
         """
+        print "%g _get_node_counts_on_pool(447)(self, %s)" % (time.time(), pool_id)
         return self.rcv3_client.get_pool_info(pool_id).entity.node_counts
 
     def _get_cloud_servers_on_pool(self, pool_id):
