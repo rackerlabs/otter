@@ -47,7 +47,7 @@ listoutdated:
 MERGE_BASE := $(shell git merge-base master HEAD)
 
 flake8diff:
-	git diff --patch --no-prefix ${MERGE_BASE} | flake8 --diff
+	git diff --patch --no-prefix master ${MERGE_BASE} | flake8 --diff
 
 flake8full:
 	flake8 --max-complexity=10 ${PYDIRS}
