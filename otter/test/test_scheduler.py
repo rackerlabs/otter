@@ -655,12 +655,14 @@ class ExecuteEventTests(SchedulerTests):
         self.assertFalse(self.maybe_exec_policy.called)
 
     def test_semantic_prob(self):
-        """
-        Policy execution causes semantic error like cooldowns not met.
+        """Policy execution causes semantic error like cooldowns not met.
+
         i.e. CannotExecutePolicyError is captured and logged
+
         """
         del_pol_ids = set()
-        self.maybe_exec_policy.return_value = defer.fail(CannotExecutePolicyError(*range(4)))
+        self.maybe_exec_policy.return_value = defer.fail(
+            CannotExecutePolicyError(*range(4)))
 
         d = execute_event(self.mock_store, self.log, self.event, del_pol_ids)
 
@@ -681,4 +683,5 @@ class ExecuteEventTests(SchedulerTests):
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(len(del_pol_ids), 0)
         self.log.bind.return_value.err.assert_called_with(
-            CheckFailure(ValueError), 'Scheduler failed to execute policy {policy_id}')
+            CheckFailure(ValueError),
+            'Scheduler failed to execute policy {policy_id}')
