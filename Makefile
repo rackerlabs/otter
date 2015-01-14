@@ -45,9 +45,11 @@ listoutdated:
 	pip list --outdated --allow-external=cafe,cloudcafe
 
 MERGE_BASE := $(shell git merge-base master HEAD)
+ghprbTargetBranch ?= master
 
 flake8diff:
-	git diff --patch --no-prefix master ${MERGE_BASE} | flake8 --diff
+	git diff --patch --no-prefix ${ghprbTargetBranch} ${MERGE_BASE} \
+		| flake8 --diff
 
 flake8full:
 	flake8 --max-complexity=10 ${PYDIRS}
