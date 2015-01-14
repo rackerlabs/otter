@@ -19,9 +19,7 @@ from otter.controller import CannotExecutePolicyError
 
 
 class SchedulerTests(SynchronousTestCase):
-    """
-    Tests for `scheduler.py`
-    """
+    """Tests for `scheduler.py`"""
 
     def setUp(self):
         """
@@ -34,9 +32,7 @@ class SchedulerTests(SynchronousTestCase):
 
 
 class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
-    """
-    Tests for `SchedulerService`
-    """
+    """Tests for `SchedulerService`"""
 
     def setUp(self):
         """
