@@ -22,9 +22,7 @@ class SchedulerTests(SynchronousTestCase):
     """Tests for `scheduler.py`"""
 
     def setUp(self):
-        """
-        mock common dependencies of methods in scheduler.py
-        """
+        """mock common dependencies of methods in scheduler.py."""
         self.mock_store = iMock(
             IScalingGroupCollection, IScalingScheduleCollection)
         self.mock_generate_transaction_id = patch(
