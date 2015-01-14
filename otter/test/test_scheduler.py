@@ -538,14 +538,10 @@ class AddCronEventsTests(SchedulerTests):
 
 
 class ExecuteEventTests(SchedulerTests):
-    """
-    Tests for `execute_event`
-    """
+    """Tests for `execute_event`"""
 
     def setUp(self):
-        """
-        Mock execution of scaling policy
-        """
+        """Mock execution of scaling policy."""
         super(ExecuteEventTests, self).setUp()
         self.mock_group = iMock(IScalingGroup)
         self.mock_store.get_scaling_group.return_value = self.mock_group
@@ -571,8 +567,7 @@ class ExecuteEventTests(SchedulerTests):
 
     def test_event_executed(self):
         """
-        Event is executed successfully and appropriate logs logged
-        """
+        """Event is executed successfully and appropriate logs logged."""
         del_pol_ids = set()
         d = execute_event(self.mock_store, self.log, self.event, del_pol_ids)
 
