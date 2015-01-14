@@ -53,6 +53,13 @@ Run tests, check code quality:
 - `make coverage` performs coverage analysis.
 - `make lint` performs a lint (PEP8, et. al.) check on the source
   code.
+- `make listoutdated` returns the packages that are currently
+  installed that have new versions available on PyPI. This is normally
+  run as a part of `make lint`.
+- `make flake8diff` looks at the diff introduced by your current
+  branch and lints it. This is normally run as a part of `make lint`.
+- `make flake8full` is like `flake8diff`, except on the entire
+  repository.
 
 Build the documentation:
 

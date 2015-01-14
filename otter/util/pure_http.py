@@ -6,10 +6,14 @@ import json
 
 from functools import partial, wraps
 
-from effect import Effect
 from characteristic import attributes
+
+from effect import Effect
+from effect.twisted import deferred_performer
+
 from toolz.dicttoolz import merge
 from toolz.functoolz import memoize
+
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 from otter.util import logging_treq
@@ -27,18 +31,20 @@ class Request(object):
 
     treq = logging_treq
 
-    @inlineCallbacks
-    def perform_effect(self, dispatcher):
-        """
-        Perform the request with treq.
 
-        :return: A two-tuple of (HTTP Response, content as bytes)
-        """
-        response = yield self.treq.request(self.method.upper(), self.url,
-                                           headers=self.headers,
-                                           data=self.data, log=self.log)
-        content = yield self.treq.content(response)
-        returnValue((response, content))
+@deferred_performer
+@inlineCallbacks
+def perform_request(dispatcher, intent):
+    """
+    Perform the request with treq.
+
+    :return: A two-tuple of (HTTP Response, content as bytes)
+    """
+    response = yield intent.treq.request(intent.method.upper(), intent.url,
+                                         headers=intent.headers,
+                                         data=intent.data, log=intent.log)
+    content = yield intent.treq.content(response)
+    returnValue((response, content))
 
 
 def request(method, url, **kwargs):
@@ -65,14 +71,6 @@ def effect_on_response(codes, effect, result):
         return result
 
 
-def check_status(success_codes, result):
-    """Ensure that the response code is acceptable. If not, raise APIError."""
-    response, content = result
-    if response.code not in success_codes:
-        raise APIError(response.code, content, response.headers)
-    return result
-
-
 def check_response(pred, result):
     """
     Ensure that the response is acceptable according to the given predicate.
@@ -82,7 +80,7 @@ def check_response(pred, result):
         its content and synchronously returns :data:`True` if
         the response is good, or :data:`False` if it is bad.
     :type pred: 2-argument callable
-    :param result: The result of :meth:`Request.perform_effect`.
+    :param result: The result of :meth:`perform_request`.
     """
     response, content = result
     if pred(response, content):
@@ -230,14 +228,9 @@ def add_bind_root(root, request_func):
     The URL given is expected to be quoted if required. This decorator does not
     quote the URL.
     """
-    if isinstance(root, unicode):
-        root = root.encode('ascii')
-
     @wraps(request_func)
     def request(method, url, *args, **kwargs):
-        if isinstance(url, unicode):
-            url = url.encode('utf-8')
-        url = '{}/{}'.format(root.rstrip('/'), url)
+        url = u'{}/{}'.format(root.rstrip('/'), url).encode('utf-8')
         return request_func(method, url, *args, **kwargs)
 
     return request

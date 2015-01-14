@@ -2,31 +2,54 @@
 Tests for `metrics.py`
 """
 
-import mock
-from io import StringIO
 import operator
+from io import StringIO
 
-from effect import Effect, ConstantIntent, ErrorIntent
-from effect.testing import StubIntent, resolve_stubs
+from effect import Constant, Effect, Error
+from effect.testing import Stub
+
+import mock
 
 from pyrsistent import freeze
 
+from silverberg.client import CQLClient
+
+from testtools.matchers import IsInstance
+
 from toolz.dicttoolz import merge
 
-from twisted.trial.unittest import SynchronousTestCase
-from twisted.internet.defer import succeed, fail
-from twisted.internet.task import Clock
 from twisted.internet.base import ReactorBase
+from twisted.internet.defer import fail, succeed
+from twisted.internet.task import Clock
+from twisted.trial.unittest import SynchronousTestCase
 
-from otter.constants import get_service_mapping, ServiceType
+from otter.auth import IAuthenticator
+from otter.constants import ServiceType, get_service_mapping
 from otter.metrics import (
-    get_scaling_groups, get_tenant_metrics, get_all_metrics, GroupMetrics,
-    add_to_cloud_metrics, collect_metrics, MetricsService, makeService, Options,
-    get_all_metrics_effects, metrics_log)
+    GroupMetrics,
+    MetricsService,
+    Options,
+    add_to_cloud_metrics,
+    collect_metrics,
+    get_all_metrics,
+    get_all_metrics_effects,
+    get_scaling_groups,
+    get_tenant_metrics,
+    makeService,
+    metrics_log,
+)
 from otter.test.test_auth import identity_config
 from otter.test.utils import (
-    patch, matches, IsCallable, CheckFailure, mock_log, resolve_retry_stubs,
-    CheckFailureValue)
+    CheckFailure,
+    CheckFailureValue,
+    IsCallable,
+    Provides,
+    matches,
+    mock_log,
+    patch,
+    resolve_retry_stubs,
+    resolve_stubs,
+)
 
 from testtools.matchers import IsInstance
 
@@ -187,10 +210,12 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         tenant_servers = {'t1': servers_t1, 't2': servers_t2}
 
         def get_bound_request_func(tenant_id):
-            def request_func(service_type, method, url, headers=None, data=None):
-                return Effect(StubIntent(ConstantIntent(tenant_servers[tenant_id])))
+            def request_func(service_type, method, url, headers=None,
+                             data=None):
+                return Effect(Stub(Constant(tenant_servers[tenant_id])))
             return request_func
-        effs = get_all_metrics_effects(groups, get_bound_request_func, mock_log())
+        effs = get_all_metrics_effects(groups, get_bound_request_func,
+                                       mock_log())
 
         # All of the HTTP requests are wrapped in retries, so unwrap them
         results = map(resolve_retry_stubs, effs)
@@ -210,11 +235,12 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         log.err.return_value = None
 
         def get_bound_request_func(tenant_id):
-            def request_func(service_type, method, url, headers=None, data=None):
+            def request_func(service_type, method, url, headers=None,
+                             data=None):
                 if tenant_id == 't1':
-                    return Effect(StubIntent(ConstantIntent({'servers': []})))
+                    return Effect(Stub(Constant({'servers': []})))
                 else:
-                    return Effect(StubIntent(ErrorIntent(ZeroDivisionError('foo bar'))))
+                    return Effect(Stub(Error(ZeroDivisionError('foo bar'))))
             return request_func
 
         groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
@@ -252,7 +278,7 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
         self.mock_gsgs = patch(
             self, 'otter.metrics.get_scaling_group_servers',
             side_effect=lambda rf, server_predicate: (
-                Effect(ConstantIntent(self.tenant_servers[rf]))))
+                Effect(Constant(self.tenant_servers[rf]))))
         self.service_mapping = {ServiceType.CLOUD_SERVERS: 'nova'}
 
     def test_get_all_metrics(self):
@@ -271,11 +297,13 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
 
         authenticator = mock.Mock()
 
-        d = get_all_metrics(groups, authenticator, self.service_mapping, 'r', clock='c')
+        d = get_all_metrics(groups, authenticator, self.service_mapping, 'r',
+                            clock='c')
 
         self.assertEqual(
             set(self.successResultOf(d)),
-            set([GroupMetrics('t1', 'g1', 3, 3, 2), GroupMetrics('t1', 'g2', 4, 1, 0),
+            set([GroupMetrics('t1', 'g1', 3, 3, 2),
+                 GroupMetrics('t1', 'g2', 4, 1, 0),
                  GroupMetrics('t2', 'g4', 2, 1, 1)]))
         self.mock_gsgs.assert_any_call('t1', server_predicate=IsCallable())
         self.mock_gsgs.assert_any_call('t2', server_predicate=IsCallable())
@@ -287,17 +315,20 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
 
     def test_ignore_error_results(self):
         """
-        When get_all_metrics_effects returns a list containing a None, those elements are
-        ignored.
+        When get_all_metrics_effects returns a list containing a None, those
+        elements are ignored.
         """
-        def mock_game(cass_groups, get_request_func_for_tenant, log, _print=False):
-            return [Effect(ConstantIntent(None)),
-                    Effect(ConstantIntent([GroupMetrics('t1', 'g1', 0, 0, 0)]))]
-        mock_game = patch(self, 'otter.metrics.get_all_metrics_effects', side_effect=mock_game)
+        def mock_game(cass_groups, get_request_func_for_tenant, log,
+                      _print=False):
+            return [Effect(Constant(None)),
+                    Effect(Constant([GroupMetrics('t1', 'g1', 0, 0, 0)]))]
+        mock_game = patch(self, 'otter.metrics.get_all_metrics_effects',
+                          side_effect=mock_game)
         groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
                   {'tenantId': 't2', 'groupId': 'g2', 'desired': 500}]
         authenticator = mock.Mock()
-        d = get_all_metrics(groups, authenticator, self.service_mapping, 'r', clock='c')
+        d = get_all_metrics(groups, authenticator, self.service_mapping, 'r',
+                            clock='c')
         self.assertEqual(
             self.successResultOf(d),
             [GroupMetrics('t1', 'g1', 0, 0, 0)])
@@ -314,7 +345,7 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         """
         def request(*a, **k):
             self.a, self.k = a, k
-            return Effect(StubIntent(ConstantIntent('r')))
+            return Effect(Stub(Constant('r')))
 
         self.request = request
 
@@ -373,8 +404,9 @@ class CollectMetricsTests(CommonMocks):
         """
         super(CollectMetricsTests, self).setUp()
         self.groups = mock.Mock()
-        self.get_scaling_groups = patch(self, 'otter.metrics.get_scaling_groups',
-                                        return_value=succeed(self.groups))
+        self.get_scaling_groups = patch(
+            self, 'otter.metrics.get_scaling_groups',
+            return_value=succeed(self.groups))
 
         self.metrics = [GroupMetrics('t', 'g1', 3, 2, 0),
                         GroupMetrics('t2', 'g1', 4, 4, 1),
@@ -382,8 +414,9 @@ class CollectMetricsTests(CommonMocks):
         self.get_all_metrics = patch(self, 'otter.metrics.get_all_metrics',
                                      return_value=succeed(self.metrics))
 
-        self.add_to_cloud_metrics = patch(self, 'otter.metrics.add_to_cloud_metrics',
-                                          return_value=Effect(ConstantIntent(succeed(None))))
+        self.add_to_cloud_metrics = patch(self,
+                                          'otter.metrics.add_to_cloud_metrics',
+                                          return_value=Effect(Constant(None)))
         self.req_func = object()
         self.mock_grf = patch(self, 'otter.metrics.get_request_func',
                               return_value=self.req_func)

@@ -400,38 +400,6 @@ class APIMakeServiceTests(SynchronousTestCase):
                                            self.health_checker.health_check,
                                            es_host=None)
 
-    def test_cassandra_scaling_group_collection_with_default_consistency(self):
-        """
-        makeService configures a CassScalingGroupCollection with a callable
-        that returns the default consistencies with the default exceptions,
-        if no other values are configured.
-        """
-        makeService(test_config)
-        # tests the defaults
-
-        self.assertEqual(self.store.get_consistency('nonexistant', 'nonexistant'),
-                         ConsistencyLevel.ONE)
-        self.assertEqual(self.store.get_consistency('update', 'state'),
-                         ConsistencyLevel.QUORUM)
-
-    def test_cassandra_scaling_group_collection_with_consistency_info(self):
-        """
-        makeService configures a CassandraScalingGroupCollection with the
-        default consistency and consistency mapping in the configuration
-        """
-        config = test_config.copy()
-        config['cassandra'] = test_config['cassandra'].copy()
-        config['cassandra']['default_consistency'] = ConsistencyLevel.TWO
-        config['cassandra']['consistency_exceptions'] = {
-            'state': {'update': ConsistencyLevel.ALL}
-        }
-
-        makeService(config)
-        self.assertEqual(self.store.get_consistency('nonexistant', 'nonexistant'),
-                         ConsistencyLevel.TWO)
-        self.assertEqual(self.store.get_consistency('update', 'state'),
-                         ConsistencyLevel.ALL)
-
     @mock.patch('otter.tap.api.reactor')
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_authenticator(self, mock_ss, mock_reactor):

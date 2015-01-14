@@ -1,19 +1,67 @@
 """Tests for convergence."""
 
+from effect import Constant, Effect, ParallelEffects
+from effect.testing import Stub, resolve_effect
 
 import mock
-
-from effect import Effect, ConstantIntent, ParallelEffects
-from effect.testing import StubIntent, resolve_effect, resolve_stubs
 
 from pyrsistent import pmap
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
+from otter.convergence.composition import (
+    execute_convergence,
+    get_desired_group_state,
+    json_to_LBConfigs,
+    tenant_is_enabled)
+from otter.convergence.model import (
+    CLBDescription, DesiredGroupState, NovaServer, ServerState)
+from otter.test.utils import resolve_stubs
 from otter.util.pure_http import has_code
-from otter.util.timestamp import now
-from otter.convergence.composition import execute_convergence, tenant_is_enabled
+
+
+class JsonToLBConfigTests(SynchronousTestCase):
+    """
+    Tests for :func:`json_to_LBConfigs`
+    """
+    def test_without_rackconnect(self):
+        """
+        LB config without rackconnect
+        """
+        self.assertEqual(
+            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
+                               {'loadBalancerId': 20, 'port': 800},
+                               {'loadBalancerId': 21, 'port': 81}]),
+            {20: [CLBDescription(lb_id='20', port=80), CLBDescription(lb_id='20', port=800)],
+             21: [CLBDescription(lb_id='21', port=81)]})
+
+    def test_with_rackconnect(self):
+        """
+        LB config with rackconnect
+        """
+        self.assertEqual(
+            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
+                               {'loadBalancerId': 200, 'type': 'RackConnectV3'},
+                               {'loadBalancerId': 21, 'port': 81}]),
+            {20: [CLBDescription(lb_id='20', port=80)],
+             21: [CLBDescription(lb_id='21', port=81)]})
+
+
+class GetDesiredGroupStateTests(SynchronousTestCase):
+    """Tests for :func:`get_desired_group_state`."""
+    def test_convert(self):
+        """An Otter launch config is converted into a :obj:`DesiredGroupState`."""
+        server_config = {'name': 'test', 'flavorRef': 'f'}
+        lc = {'args': {'server': server_config,
+                       'loadBalancers': [{'loadBalancerId': 23, 'port': 80}]}}
+        state = get_desired_group_state(lc, 2)
+        self.assertEqual(
+            state,
+            DesiredGroupState(
+                launch_config={'server': server_config},
+                desired=2,
+                desired_lbs={23: [CLBDescription(lb_id='23', port=80)]}))
 
 
 class ExecConvergenceTests(SynchronousTestCase):
@@ -26,25 +74,39 @@ class ExecConvergenceTests(SynchronousTestCase):
         Sample server json
         """
         self.servers = [
-            {'id': 'a', 'state': 'ACTIVE', 'created': now(),
-             'addresses': {'private': [{'addr': 'ip1', 'version': 4}]}},
-            {'id': 'b', 'state': 'ACTIVE', 'created': now(),
-             'addresses': {'private': [{'addr': 'ip2', 'version': 4}]}}
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=0,
+                       servicenet_address='10.0.0.1'),
+            NovaServer(id='b',
+                       state=ServerState.ACTIVE,
+                       created=0,
+                       servicenet_address='10.0.0.2')
         ]
+
+    def _get_gacd_func(self, servers, group_id, reqfunc):
+        def get_all_convergence_data(request_func, grp_id):
+            self.assertIs(request_func, reqfunc)
+            self.assertEqual(grp_id, group_id)
+            return Effect(Stub(Constant((self.servers, []))))
+        return get_all_convergence_data
 
     def test_success(self):
         """
         Executes optimized steps if state of world does not match desired and returns
         True to be called again
         """
-        get_servers = lambda r: Effect(StubIntent(ConstantIntent({'gid': self.servers})))
-        get_lb = lambda r: Effect(StubIntent(ConstantIntent([])))
-        lc = {'args': {'server': {'name': 'test', 'flavorRef': 'f'},
-                       'loadBalancers': [{'loadBalancerId': 23, 'port': 80}]}}
         reqfunc = lambda **k: Effect(k)
+        get_all_convergence_data = self._get_gacd_func(
+            self.servers, 'gid', reqfunc)
+        desired = DesiredGroupState(
+            launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
+            desired_lbs={23: [CLBDescription(lb_id='23', port=80)]},
+            desired=2)
 
-        eff = execute_convergence(reqfunc, 'gid', 2, lc, get_servers=get_servers,
-                                  get_lb=get_lb)
+        eff = execute_convergence(
+            reqfunc, 'gid', desired,
+            get_all_convergence_data=get_all_convergence_data)
 
         eff = resolve_stubs(eff)
         # The steps are optimized
@@ -61,9 +123,9 @@ class ExecConvergenceTests(SynchronousTestCase):
         self.assertEqual(
             set(map(pmap, eff.intent.effects[0].intent['data']['nodes'])),
             set([pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
-                       'condition': 'ENABLED', 'address': 'ip2'}),
+                       'condition': 'ENABLED', 'address': '10.0.0.2'}),
                  pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
-                       'condition': 'ENABLED', 'address': 'ip1'})]))
+                       'condition': 'ENABLED', 'address': '10.0.0.1'})]))
 
         r = resolve_effect(eff, [{'nodes': [{'address': 'ip'}]}])
         # Returns true to be called again
@@ -73,14 +135,16 @@ class ExecConvergenceTests(SynchronousTestCase):
         """
         If state of world matches desired, no steps are executed and False is returned
         """
-        get_servers = lambda r: Effect(StubIntent(ConstantIntent({'gid': self.servers})))
-        get_lb = lambda r: Effect(StubIntent(ConstantIntent([])))
-        lc = {'args': {'server': {'name': 'test', 'flavorRef': 'f'}, 'loadBalancers': []}}
+        desired = DesiredGroupState(
+            launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
+            desired_lbs={},
+            desired=2)
         reqfunc = lambda **k: 1 / 0
-
-        eff = execute_convergence(reqfunc, 'gid', 2, lc, get_servers=get_servers,
-                                  get_lb=get_lb)
-
+        get_all_convergence_data = self._get_gacd_func(
+            self.servers, 'gid', reqfunc)
+        eff = execute_convergence(
+            reqfunc, 'gid', desired,
+            get_all_convergence_data=get_all_convergence_data)
         self.assertIs(resolve_stubs(eff), False)
 
 
