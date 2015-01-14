@@ -44,12 +44,16 @@ lint: listoutdated flake8diff
 listoutdated:
 	pip list --outdated --allow-external=cafe,cloudcafe
 
-HEAD := $(shell git rev-parse --abbrev-ref HEAD)
+
+# If building a PR on Jenkins, ghprbTargetBranch is the target
+# branch. This allows PRs against branches other than master. If
+# unset, we don't know what you're trying to merge against, so we
+# assume master.
+ghprbTargetBranch ?= master
+MERGE_BASE = $(shell git merge-base $(ghprbTargetBranch) HEAD)
+
 flake8diff:
-	@echo "Lint between master and ${HEAD}:"
-	git diff --patch --no-prefix master...${HEAD} | flake8 --diff
-	@echo "Lint between working tree and ${HEAD}:"
-	git diff --patch --no-prefix ${HEAD} | flake8 --diff
+	git diff --patch --no-prefix ${MERGE_BASE} | flake8 --diff
 
 flake8full:
 	flake8 --max-complexity=10 ${PYDIRS}
