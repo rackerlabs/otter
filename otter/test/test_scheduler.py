@@ -82,9 +82,13 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         """
         self._start_service()
         self.kz_client.SetPartitioner.assert_called_once_with(
-            self.zk_partition_path, set=set(self.buckets), time_boundary=self.time_boundary)
-        self.assertEqual(self.scheduler_service.kz_partition, self.kz_partition)
-        self.timer_service.startService.assert_called_once_with(self.scheduler_service)
+            self.zk_partition_path,
+            set=set(self.buckets),
+            time_boundary=self.time_boundary)
+        self.assertEqual(
+            self.scheduler_service.kz_partition, self.kz_partition)
+        self.timer_service.startService.assert_called_once_with(
+            self.scheduler_service)
 
     def test_stop_service(self):
         """
@@ -94,7 +98,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self._start_service()
         self.kz_partition.acquired = True
         d = self.scheduler_service.stopService()
-        self.timer_service.stopService.assert_called_once_with(self.scheduler_service)
+        self.timer_service.stopService.assert_called_once_with(
+            self.scheduler_service)
         self.kz_partition.finish.assert_called_once_with()
         self.assertEqual(self.kz_partition.finish.return_value, d)
 
@@ -112,9 +117,11 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         d = self.scheduler_service.health_check()
 
-        self.assertEqual(self.successResultOf(d), (False, {'old_events': [returns[0]],
-                                                           'buckets': [2, 3]}))
-        self.mock_store.get_oldest_event.assert_has_calls([mock.call(2), mock.call(3)])
+        self.assertEqual(self.successResultOf(d),
+                         (False, {'old_events': [returns[0]],
+                                  'buckets': [2, 3]}))
+        self.mock_store.get_oldest_event.assert_has_calls(
+            [mock.call(2), mock.call(3)])
 
     def test_health_check_before_threshold(self):
         """
@@ -131,7 +138,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         self.assertEqual(self.successResultOf(d), (True, {'old_events': [],
                                                           'buckets': [2, 3]}))
-        self.mock_store.get_oldest_event.assert_has_calls([mock.call(2), mock.call(3)])
+        self.mock_store.get_oldest_event.assert_has_calls(
+            [mock.call(2), mock.call(3)])
 
     def test_health_check_None(self):
         """
@@ -144,45 +152,42 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         d = self.scheduler_service.health_check()
 
-        self.assertEqual(self.successResultOf(d), (True, {'old_events': [],
-                                                          'buckets': [2, 3]}))
-        self.mock_store.get_oldest_event.assert_has_calls([mock.call(2), mock.call(3)])
+        self.assertEqual(self.successResultOf(d),
+                         (True, {'old_events': [], 'buckets': [2, 3]}))
+        self.mock_store.get_oldest_event.assert_has_calls(
+            [mock.call(2), mock.call(3)])
 
     def test_health_check_not_acquired(self):
-        """
-        `service.health_check` returns False when partition is not acquired
-        """
+        """`service.health_check` returns False when partition is not
+        acquired."""
         self.kz_partition.acquired = False
         self._start_service()
         self.kz_partition.__iter__.return_value = [2, 3]
 
         d = self.scheduler_service.health_check()
 
-        self.assertEqual(self.successResultOf(d), (False, {'reason': 'Not acquired'}))
+        self.assertEqual(self.successResultOf(d),
+                         (False, {'reason': 'Not acquired'}))
         self.assertFalse(self.mock_store.get_oldest_event.called)
 
     def test_health_check_not_running(self):
-        """
-        `service.health_check` returns False when scheduler is stopped
-        """
+        """`service.health_check` returns False when scheduler is stopped."""
         d = self.scheduler_service.health_check()
 
-        self.assertEqual(self.successResultOf(d), (False, {'reason': 'Not running'}))
+        self.assertEqual(self.successResultOf(d),
+                         (False, {'reason': 'Not running'}))
         self.assertFalse(self.mock_store.get_oldest_event.called)
 
     def test_stop_service_allocating(self):
-        """
-        stopService() does not stop the allocation (i.e. call finish) if it is not acquired
-        """
+        """stopService() does not stop the allocation (i.e. call finish) if it
+        is not acquired."""
         self._start_service()
         d = self.scheduler_service.stopService()
         self.assertFalse(self.kz_partition.finish.called)
         self.assertIsNone(d)
 
     def test_reset(self):
-        """
-        reset() starts new partition based on new path
-        """
+        """reset() starts new partition based on new path."""
         self.scheduler_service.reset('/new_path')
         self.assertEqual(self.scheduler_service.zk_partition_path, '/new_path')
         self.kz_client.SetPartitioner.assert_called_once_with(
@@ -342,7 +347,8 @@ class CheckEventsInBucketTests(SchedulerTests):
         """
         d = check_events_in_bucket(self.log, self.mock_store, 1, 'utcnow', 100)
         self.successResultOf(d)
-        self.mock_store.fetch_and_delete.assert_called_once_with(1, 'utcnow', 100)
+        self.mock_store.fetch_and_delete.assert_called_once_with(
+            1, 'utcnow', 100)
         self.log.bind.assert_called_once_with(bucket=1)
 
     def test_no_events(self):
@@ -351,7 +357,8 @@ class CheckEventsInBucketTests(SchedulerTests):
         """
         d = check_events_in_bucket(self.log, self.mock_store, 1, 'utcnow', 100)
         self.successResultOf(d)
-        self.process_events.assert_called_once_with([], self.mock_store, self.log.bind())
+        self.process_events.assert_called_once_with(
+            [], self.mock_store, self.log.bind())
 
     def test_events_in_limit(self):
         """
@@ -365,8 +372,10 @@ class CheckEventsInBucketTests(SchedulerTests):
 
         self.successResultOf(d)
         # Ensure fetch_and_delete and process_events is called only once
-        self.mock_store.fetch_and_delete.assert_called_once_with(1, 'utcnow', 100)
-        self.process_events.assert_called_once_with(events, self.mock_store, self.log.bind())
+        self.mock_store.fetch_and_delete.assert_called_once_with(
+            1, 'utcnow', 100)
+        self.process_events.assert_called_once_with(
+            events, self.mock_store, self.log.bind())
 
     def test_events_process_error(self):
         """
