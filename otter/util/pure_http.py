@@ -6,11 +6,14 @@ import json
 
 from functools import partial, wraps
 
+from characteristic import attributes
+
 from effect import Effect
 from effect.twisted import deferred_performer
-from characteristic import attributes
+
 from toolz.dicttoolz import merge
 from toolz.functoolz import memoize
+
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 from otter.util import logging_treq

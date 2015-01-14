@@ -1,22 +1,23 @@
 """Tests for convergence."""
 
-import mock
-
-from effect import Effect, Constant, ParallelEffects
+from effect import Constant, Effect, ParallelEffects
 from effect.testing import Stub, resolve_effect
+
+import mock
 
 from pyrsistent import pmap
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
-from otter.test.utils import resolve_stubs
 from otter.convergence.composition import (
     execute_convergence,
     get_desired_group_state,
     json_to_LBConfigs,
     tenant_is_enabled)
-from otter.convergence.model import CLBDescription, DesiredGroupState, NovaServer, ServerState
+from otter.convergence.model import (
+    CLBDescription, DesiredGroupState, NovaServer, ServerState)
+from otter.test.utils import resolve_stubs
 from otter.util.pure_http import has_code
 
 

@@ -3,7 +3,7 @@
 import calendar
 from functools import partial
 
-from effect import Effect, Constant
+from effect import Constant, Effect
 from effect.testing import Stub, resolve_effect
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -27,7 +27,8 @@ from otter.convergence.model import (
     NovaServer,
     ServerState)
 from otter.test.utils import patch, resolve_retry_stubs, resolve_stubs
-from otter.util.retry import ShouldDelayAndRetry, exponential_backoff_interval, retry_times
+from otter.util.retry import (
+    ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import from_timestamp
 
 
@@ -35,7 +36,8 @@ def _request(requests):
     def request(service_type, method, url):
         response = requests.get((service_type, method, url))
         if response is None:
-            raise KeyError("{} not in {}".format((method, url), requests.keys()))
+            raise KeyError("{} not in {}".format((method, url),
+                                                 requests.keys()))
         return Effect(Stub(Constant(response)))
     return request
 

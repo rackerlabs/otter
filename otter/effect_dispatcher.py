@@ -1,18 +1,16 @@
 """Effect dispatchers for Otter."""
 
-from effect import base_dispatcher, ComposedDispatcher, TypeDispatcher
+from effect import ComposedDispatcher, TypeDispatcher, base_dispatcher
 from effect.twisted import make_twisted_dispatcher
 
 from .auth import (
-    Authenticate, perform_authenticate,
-    InvalidateToken, perform_invalidate_token,
+    Authenticate,
+    InvalidateToken,
+    perform_authenticate,
+    perform_invalidate_token,
 )
-from .util.pure_http import (
-    Request, perform_request,
-)
-from .util.retry import (
-    Retry, perform_retry,
-)
+from .util.pure_http import Request, perform_request
+from .util.retry import Retry, perform_retry
 
 
 def get_dispatcher(reactor):

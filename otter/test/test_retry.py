@@ -3,8 +3,8 @@ Tests for :mod:`otter.utils.retry`
 """
 import sys
 
-from effect import Effect, Delay, Func, Constant
-from effect.testing import resolve_effect, Stub
+from effect import Constant, Delay, Effect, Func
+from effect.testing import Stub, resolve_effect
 
 import mock
 
@@ -13,12 +13,22 @@ from twisted.internet.defer import CancelledError, Deferred, succeed
 from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.util.retry import (retry, repeating_interval, random_interval,
-                              transient_errors_except, retry_times,
-                              compose_retries, exponential_backoff_interval,
-                              terminal_errors_except, retry_effect, Retry,
-                              ShouldDelayAndRetry, perform_retry)
-from otter.test.utils import CheckFailure, DummyException, CheckFailureValue, resolve_stubs
+from otter.test.utils import (
+    CheckFailure, CheckFailureValue, DummyException, resolve_stubs)
+from otter.util.retry import (
+    Retry,
+    ShouldDelayAndRetry,
+    compose_retries,
+    exponential_backoff_interval,
+    perform_retry,
+    random_interval,
+    repeating_interval,
+    retry,
+    retry_effect,
+    retry_times,
+    terminal_errors_except,
+    transient_errors_except,
+)
 
 
 class RetryTests(SynchronousTestCase):
@@ -478,7 +488,7 @@ def get_exc_info():
     """Get the exc_info tuple representing a ZeroDivisionError('foo')"""
     try:
         raise ZeroDivisionError("foo")
-    except:
+    except Exception:
         return sys.exc_info()
 
 

@@ -42,19 +42,23 @@ from functools import partial
 
 from characteristic import attributes
 
-from twisted.internet.defer import succeed
-
 from effect.twisted import deferred_performer
+
+from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
-from otter.util import logging_treq as treq
-from otter.util.retry import retry, retry_times, repeating_interval
-
 from otter.log import log as default_log
-from otter.util.http import (
-    headers, check_success, append_segments, wrap_upstream_error, retry_on_unauth)
+from otter.util import logging_treq as treq
 from otter.util.deferredutils import delay, wait
+from otter.util.http import (
+    append_segments,
+    check_success,
+    headers,
+    retry_on_unauth,
+    wrap_upstream_error,
+)
+from otter.util.retry import repeating_interval, retry, retry_times
 
 
 class IAuthenticator(Interface):
@@ -437,13 +441,15 @@ class Authenticate(object):
 @deferred_performer
 def perform_authenticate(dispatcher, intent):
     """Authenticate."""
-    return intent.authenticator.authenticate_tenant(intent.tenant_id, log=intent.log)
+    return intent.authenticator.authenticate_tenant(intent.tenant_id,
+                                                    log=intent.log)
 
 
 @attributes(['authenticator', 'tenant_id'], apply_with_init=False)
 class InvalidateToken(object):
     """
-    An Effect intent that represents the invalidation of a token from a local cache.
+    An Effect intent that represents the invalidation of a token from a local
+    cache.
 
     The result type is None.
     """
