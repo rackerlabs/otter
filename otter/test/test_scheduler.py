@@ -326,9 +326,7 @@ class CheckEventsInBucketTests(SchedulerTests):
     """
 
     def setUp(self):
-        """
-        Mock store.fetch_and_delete and `process_events`
-        """
+        """Mock store.fetch_and_delete and `process_events`"""
         super(CheckEventsInBucketTests, self).setUp()
 
         self.returns = [[]]
@@ -474,14 +472,10 @@ class CheckEventsInBucketTests(SchedulerTests):
 
 
 class ProcessEventsTests(SchedulerTests):
-    """
-    Tests for `process_events`
-    """
+    """Tests for `process_events`"""
 
     def setUp(self):
-        """
-        Mock `execute_event` and `add_cron_events`
-        """
+        """Mock `execute_event` and `add_cron_events`"""
         super(ProcessEventsTests, self).setUp()
         self.execute_event = patch(self, 'otter.scheduler.execute_event',
                                    return_value=defer.succeed(None))
@@ -491,9 +485,7 @@ class ProcessEventsTests(SchedulerTests):
         self.log = mock_log()
 
     def test_no_events(self):
-        """
-        Does nothing on no events
-        """
+        """Does nothing on no events."""
         process_events([], self.mock_store, self.log)
         self.assertFalse(self.log.msg.called)
         self.assertFalse(self.execute_event.called)
@@ -517,14 +509,10 @@ class ProcessEventsTests(SchedulerTests):
 
 
 class AddCronEventsTests(SchedulerTests):
-    """
-    Tests for `add_cron_events`
-    """
+    """Tests for `add_cron_events`"""
 
     def setUp(self):
-        """
-        Mock store.add_cron_events and next_cron_occurrence
-        """
+        """Mock store.add_cron_events and next_cron_occurrence."""
         super(AddCronEventsTests, self).setUp()
         self.mock_store.add_cron_events.return_value = defer.succeed(None)
         self.next_cron_occurrence = patch(self, 'otter.scheduler.next_cron_occurrence',
