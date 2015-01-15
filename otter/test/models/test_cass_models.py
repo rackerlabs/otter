@@ -399,13 +399,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin,
 
 class CassScalingGroupTests(CassScalingGroupTestCase):
     """
-    CassScalingGroup's tests
+    CassScalingGroup's tests.
     """
 
     def test_with_timestamp(self):
         """
         `with_timestamp` calls the decorated function with the timestamp
-        got from `get_client_ts`
+        got from `get_client_ts`.
         """
         self.clock.advance(23.566783)
 
@@ -618,9 +618,17 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         ``modify_state`` writes the state the modifier returns to the database
         with default quorum consistency for everything
         """
-        def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None,
-                              {}, True, desired=5)
+        def modifier(_group, _state):
+            group_state = GroupState(tenant_id=self.tenant_id,
+                                     group_id=self.group_id,
+                                     group_name='a',
+                                     active={},
+                                     pending={},
+                                     group_touched=None,
+                                     policy_touched={},
+                                     paused=True,
+                                     desired=5)
+            return group_state
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
         self.clock.advance(10.345)
@@ -651,9 +659,17 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         """
         ``modify_state`` first acquires local lock then acquires kz lock
         """
-        def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None,
-                              {}, True, desired=5)
+        def modifier(_group, _state):
+            group_state = GroupState(tenant_id=self.tenant_id,
+                                     group_id=self.group_id,
+                                     group_name='a',
+                                     active={},
+                                     pending={},
+                                     group_touched=None,
+                                     policy_touched={},
+                                     paused=True,
+                                     desired=5)
+            return group_state
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
         # setup local lock
@@ -705,7 +721,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(d, ValueError)
 
         self.assertEqual(self.connection.execute.call_count, 0)
-        self.kz_client.Lock.assert_called_once_with('/locks/' + self.group.uuid)
+        self.kz_client.Lock.assert_called_once_with(
+            '/locks/' + self.group.uuid)
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.assertEqual(self.lock.release.call_count, 0)
 
@@ -713,8 +730,16 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         """
         `modify_state` locking logs with category='locking'
         """
-        def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None, {}, True)
+        def modifier(_group, _state):
+            group_state = GroupState(tenant_id=self.tenant_id,
+                                     group_id=self.group_id,
+                                     group_name='a',
+                                     active={},
+                                     pending={},
+                                     group_touched=None,
+                                     policy_touched={},
+                                     paused=True)
+            return group_state
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
         self.returns = [None, None]
@@ -747,8 +772,16 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         of the :class:`GroupState` returned by the modifier does not match its
         tenant id
         """
-        def modifier(group, state):
-            return GroupState('tid', self.group_id, 'name', {}, {}, None, {}, True)
+        def modifier(_group, _state):
+            group_state = GroupState(tenant_id='tid',
+                                     group_id=self.group_id,
+                                     group_name='a',
+                                     active={},
+                                     pending={},
+                                     group_touched=None,
+                                     policy_touched={},
+                                     paused=True)
+            return group_state
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
@@ -763,8 +796,16 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         of the :class:`GroupState` returned by the modifier does not match its
         group id
         """
-        def modifier(group, state):
-            return GroupState(self.tenant_id, 'gid', 'name', {}, {}, None, {}, True)
+        def modifier(_group, _state):
+            group_state = GroupState(tenant_id=self.tenant_id,
+                                     group_id='gid',
+                                     group_name='name',
+                                     active={},
+                                     pending={},
+                                     group_touched=None,
+                                     policy_touched={},
+                                     paused=True)
+            return group_state
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
@@ -811,8 +852,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.returns = [cass_response]
         d = self.group.view_config()
         self.failureResultOf(d, NoSuchScalingGroupError)
-        expectedCql = ('SELECT group_config, created_at FROM scaling_group WHERE '
-                       '"tenantId" = :tenantId AND "groupId" = :groupId;')
+        expectedCql = ('SELECT group_config, created_at FROM scaling_group '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
@@ -839,8 +880,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.returns = [cass_response]
         d = self.group.view_launch_config()
         r = self.successResultOf(d)
-        expectedCql = ('SELECT launch_config, created_at FROM scaling_group '
-                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
+        expectedCql = (
+            'SELECT launch_config, created_at FROM scaling_group '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
@@ -877,8 +919,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
     @mock.patch('otter.models.cass.verified_view')
     def test_view_launch_resurrected_entry(self, mock_verfied_view):
         """
-        When viewing the launch config, if the returned row is rescurrected row,
-        it is not returned and it is triggerred for deletion.
+        When viewing the launch config, if the returned row is rescurrected
+        row, it is not returned and it is triggerred for deletion.
         """
         mock_verfied_view.return_value = defer.fail(
             NoSuchScalingGroupError('a', 'b'))
