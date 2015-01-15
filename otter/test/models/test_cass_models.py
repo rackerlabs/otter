@@ -205,13 +205,27 @@ class VerifiedViewTests(SynchronousTestCase):
         self.connection = mock.MagicMock(spec=['execute'])
         self.log = mock_log()
 
+
+    def _verified_view(self):
+        """
+        Returns a verified view, with some test arguments.
+        """
+        view = verified_view(self.connection,
+                             'vq',
+                             'dq',
+                             {'d': 2},
+                             6,
+                             ValueError,
+                             self.log)
+        return view
+
     def test_valid_view(self):
         """
         Returns row if it is valid
         """
         self.connection.execute.return_value = defer.succeed(
             [{'c1': 2, 'created_at': 23}])
-        r = verified_view(self.connection, 'vq', 'dq', {'d': 2}, 6, ValueError, self.log)
+        r = self._verified_view()
         self.assertEqual(self.successResultOf(r), {'c1': 2, 'created_at': 23})
         self.connection.execute.assert_called_once_with('vq', {'d': 2}, 6)
         self.assertFalse(self.log.msg.called)
@@ -221,7 +235,7 @@ class VerifiedViewTests(SynchronousTestCase):
         Raise empty error if resurrected view
         """
         self.connection.execute.return_value = defer.succeed([{'c1': 2, 'created_at': None}])
-        r = verified_view(self.connection, 'vq', 'dq', {'d': 2}, 6, ValueError, self.log)
+        r = self._verified_view()
         self.failureResultOf(r, ValueError)
         self.connection.execute.assert_has_calls([mock.call('vq', {'d': 2}, 6),
                                                   mock.call('dq', {'d': 2}, 6)])
@@ -245,7 +259,7 @@ class VerifiedViewTests(SynchronousTestCase):
             return defer.Deferred()
 
         self.connection.execute.side_effect = _execute
-        r = verified_view(self.connection, 'vq', 'dq', {'d': 2}, 6, ValueError, self.log)
+        r = self._verified_view()
         self.failureResultOf(r, ValueError)
         self.connection.execute.assert_has_calls([mock.call('vq', {'d': 2}, 6),
                                                   mock.call('dq', {'d': 2}, 6)])
@@ -255,7 +269,7 @@ class VerifiedViewTests(SynchronousTestCase):
         Raise empty error if no result
         """
         self.connection.execute.return_value = defer.succeed([])
-        r = verified_view(self.connection, 'vq', 'dq', {'d': 2}, 6, ValueError, self.log)
+        r = self._verified_view()
         self.failureResultOf(r, ValueError)
         self.connection.execute.assert_called_once_with('vq', {'d': 2}, 6)
         self.assertFalse(self.log.msg.called)
