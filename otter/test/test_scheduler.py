@@ -477,9 +477,13 @@ class ProcessEventsTests(SchedulerTests):
         super(ProcessEventsTests, self).setUp()
         self.execute_event = patch(self, 'otter.scheduler.execute_event',
                                    return_value=defer.succeed(None))
+
+        def fake_add_cron_events(store, log, events, deleted_policy_ids):
+            return defer.succeed(events)
+
         self.add_cron_events = patch(
             self, 'otter.scheduler.add_cron_events',
-            side_effect=lambda store, log, events, deleted_policy_ids: defer.succeed(events))
+            side_effect=fake_add_cron_events)
         self.log = mock_log()
 
     def test_no_events(self):
