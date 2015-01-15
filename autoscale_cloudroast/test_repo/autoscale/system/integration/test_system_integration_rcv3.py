@@ -109,7 +109,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             print "SetUpClass failed: background servers"
 
     @tags(speed='slow', type='rcv3')
-    @unittest.skip('')
+    #@unittest.skip('')
     def test_create_scaling_group_with_pool_on_cloud_network(self):
         """
         Test that it is possible to create a scaling group with 0 entities
@@ -123,7 +123,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self._common_scaling_group_assertions(pool_group_resp)
 
     @tags(speed='slow', type='rcv3')
-    @unittest.skip('')
+    #@unittest.skip('')
     def test_create_scaling_group_with_pool_on_private(self):
         """
         Test that it is possible to create a scaling group with 0 entities
@@ -137,7 +137,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self._common_scaling_group_assertions(pool_group_resp)
 
     @tags(speed='slow', type='rcv3')
-    @unittest.skip('')
+    #@unittest.skip('')
     def test_create_scaling_group_with_pool_on_public(self):
         """
         Test that it is possible to create a scaling group with 0 entities
@@ -149,6 +149,68 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                                                   group_min=0,
                                                   network_list=[self.public_network])
         self._common_scaling_group_assertions(pool_group_resp)
+
+
+
+
+    @tags(speed='slow', type='rcv3')
+    #@unittest.skip('')
+    def test_create_nonzero_scaling_group_with_pool_on_cloud_network(self):
+        """
+        Test that it is possible to create a scaling group with gc_min_entities_alt entities
+        connected to an RCV3 LB pool with a cloud_network specified.
+        """
+        # Create a scaling group with zero servers
+        lb_pools = [{'loadBalancerId': self.pool.id, 'type': 'RackConnectV3'}]
+        pool_group_resp = self._create_rcv3_group(lb_list=lb_pools,
+                                                  group_min=self.gc_min_entities_alt,
+                                                  network_list=[self.rackconnect_network])
+        self._common_scaling_group_assertions(pool_group_resp)
+        self.wait_for_expected_number_of_active_servers(pool_group_resp.entity.id,
+                                                        self.gc_min_entities_alt,
+                                                        timeout=600)
+        self.verify_group_state(pool_group_resp.entity.id, self.gc_min_entities_alt)
+
+    @tags(speed='slow', type='rcv3')
+    #@unittest.skip('')
+    def test_create_nonzero_scaling_group_with_pool_on_private(self):
+        """
+        Test that it is possible to create a scaling group with self.gc_min_entities_alt entities
+        connected to an RCV3 LB pool with only private network specified.
+        """
+        # Create a scaling group with zero servers
+        lb_pools = [{'loadBalancerId': self.pool.id, 'type': 'RackConnectV3'}]
+        pool_group_resp = self._create_rcv3_group(lb_list=lb_pools,
+                                                  group_min=self.gc_min_entities_alt,
+                                                  network_list=[self.private_network])
+        self._common_scaling_group_assertions(pool_group_resp)
+        self.wait_for_expected_number_of_active_servers(pool_group_resp.entity.id,
+                                                        self.gc_min_entities_alt,
+                                                        timeout=600)
+        self.verify_group_state(pool_group_resp.entity.id, self.gc_min_entities_alt)
+
+    @tags(speed='slow', type='rcv3')
+    #@unittest.skip('')
+    def test_create_nonzero_scaling_group_with_pool_on_public(self):
+        """
+        Test that it is possible to create a scaling group with self.gc_min_entities_alt entities
+        connected to an RCV3 LB pool with only private network specified
+        """
+        # Create a scaling group with zero servers
+        lb_pools = [{'loadBalancerId': self.pool.id, 'type': 'RackConnectV3'}]
+        pool_group_resp = self._create_rcv3_group(lb_list=lb_pools,
+                                                  group_min=self.gc_min_entities_alt,
+                                                  network_list=[self.public_network])
+        self._common_scaling_group_assertions(pool_group_resp)
+        self.wait_for_expected_number_of_active_servers(pool_group_resp.entity.id,
+                                                        self.gc_min_entities_alt,
+                                                        timeout=600)
+        self.verify_group_state(pool_group_resp.entity.id, self.gc_min_entities_alt)
+
+
+
+
+
 
     @tags(speed='slow', type='rcv3')
     @unittest.skip('')
@@ -189,8 +251,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.assertEqual(new_counts['cloud_servers'], expected_count_on_pool,
                          msg=('count of servers on lb pool {0} is not equal to '
                               'expected count ([{1}] + {2})').format(
-                                  new_counts['cloud_servers'], init_cloud_servers,
-                                  self.min_servers))
+                              new_counts['cloud_servers'], init_cloud_servers,
+                              self.min_servers))
 
     @tags(speed='slow', type='rcv3')
     @unittest.skip('')

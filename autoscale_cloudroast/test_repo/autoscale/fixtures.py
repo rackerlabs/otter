@@ -40,6 +40,8 @@ class AutoscaleFixture(BaseTestFixture):
         user_config = UserConfig()
         access_data = AuthProvider.get_access_data(cls.endpoint_config,
                                                    user_config)
+        print "Access Data ====================== "
+        pp.pprint(access_data)
         server_service = access_data.get_service(
             cls.autoscale_config.server_endpoint_name)
         load_balancer_service = access_data.get_service(
@@ -72,11 +74,13 @@ class AutoscaleFixture(BaseTestFixture):
         if ('preprod' in env.lower()) or ('dev' in env.lower()):
             cls.url = str(cls.autoscale_config.server_endpoint) + \
                 '/' + str(cls.tenant_id)
+            print " ------ Using dev or pre-prod otter --------"
         else:
             autoscale_service = access_data.get_service(
                 cls.autoscale_config.autoscale_endpoint_name)
             cls.url = autoscale_service.get_endpoint(
                 cls.autoscale_config.region).public_url
+        print "autoscale url:  ", cls.url
 
         cls.autoscale_client = AutoscalingAPIClient(
             cls.url, access_data.token.id_,
@@ -327,7 +331,7 @@ class AutoscaleFixture(BaseTestFixture):
                       'metadata but has {2} servers'.format(expected_count, group_id,
                                                             actual_count))
 
-    def wait_for_expected_number_of_active_servers(self, gp_id, expected_servers,
+    def wait_for_expected_number_of_active_servers(self, group_id, expected_servers,
                                                    interval_time=None, timeout=None,
                                                    api="Autoscale"):
         """
@@ -335,7 +339,7 @@ class AutoscaleFixture(BaseTestFixture):
 
         :summary: verify the desired capacity in group state is equal to expected servers
          and waits for the specified number of servers to be active on a group
-        :param gp_id: Group id (AutoScale API), or pool ID (RackConnect API)
+        :param group_id: Group id (AutoScale API), or pool ID (RackConnect API)
         :param expected_servers: Total active servers expected on the group
         :param interval_time: Time to wait during polling group state
         :param timeout: Time to wait before exiting this function
@@ -357,38 +361,39 @@ class AutoscaleFixture(BaseTestFixture):
         # since it has no mechanism to report back its current "plans."
         if api == 'Autoscale':
             group_state_response = self.autoscale_client.list_status_entities_sgroups(
-                gp_id)
+                group_id)
             group_state = group_state_response.entity
             self.assertEquals(group_state.desiredCapacity, expected_servers,
                               msg='Group {0} should have {1} servers, but is trying to '
-                              'build {2} servers'.format(gp_id, expected_servers,
+                              'build {2} servers'.format(group_id, expected_servers,
                                                          group_state.desiredCapacity))
 
         while time.time() < end_time:
             if api == 'Autoscale':
-                resp = self.autoscale_client.list_status_entities_sgroups(gp_id)
+                resp = self.autoscale_client.list_status_entities_sgroups(group_id)
                 group_state = resp.entity
                 active_list = group_state.active
                 self.assertNotEquals(
                     (group_state.activeCapacity + group_state.pendingCapacity), 0,
                     msg='Group Id {0} failed to attempt server creation. Group has no'
-                    ' servers'.format(gp_id))
+                    ' servers'.format(group_id))
                 self.assertEquals(group_state.desiredCapacity, expected_servers,
                                   msg='Group {0} should have {1} servers, but has reduced the build {2}'
-                                  'servers'.format(gp_id, expected_servers, group_state.desiredCapacity))
+                                  'servers'.format(group_id, expected_servers,
+                                                   group_state.desiredCapacity))
                 if len(active_list) == expected_servers:
                     print "Otter"
-                    print "Achieved expected servers after ",time.time()-start_time," seconds"
+                    print "Achieved expected servers after ", time.time() - start_time, " seconds"
                     return [server.id for server in active_list]
             else:
                 # We're looking at the RackConnect API for our server list here.
-                nodes = self.rcv3_client.get_nodes_on_pool(gp_id).entity
+                nodes = self.rcv3_client.get_nodes_on_pool(group_id).entity
                 pp.pprint(nodes.nodes)
                 server_list = [n for n in nodes.nodes
-                                  if (safe_hasattr(n, "cloud_server")) and (n.status == "ACTIVE")]
+                               if (safe_hasattr(n, "cloud_server")) and (n.status == "ACTIVE")]
                 if len(server_list) == expected_servers:
                     print "RCv3"
-                    print "Achieved expected servers after ",time.time()-start_time," seconds"
+                    print "Achieved expected servers after ", time.time() - start_time, " seconds"
                     return [n.id for n in server_list]
 
             time.sleep(interval_time)
@@ -397,7 +402,7 @@ class AutoscaleFixture(BaseTestFixture):
                 "wait_for_active_list_in_group_state ran for {0} seconds "
                 "for group/pool ID {1} and did not observe the active "
                 "server list achieving the expected servers count: {2}.".format(
-                    timeout, gp_id, expected_servers)
+                    timeout, group_id, expected_servers)
             )
 
     def wait_for_expected_group_state(self, group_id, expected_servers, wait_time=180):

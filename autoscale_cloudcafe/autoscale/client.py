@@ -929,6 +929,7 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         :rtype: Response Object
         """
         url = self.url + '/load_balancer_pools/{0}'.format(pool_id)
+        print "... RCV3 request ... ", url
         return self.request('GET', url, response_entity_type=RackConnectLBPool)
 
     def get_nodes_on_pool(self, pool_id):
@@ -938,6 +939,7 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         :rtype: Response Object
         """
         url = self.url + '/load_balancer_pools/{0}/nodes'.format(pool_id)
+        print "... RCV3 request ... ", url
         return self.request('GET', url, response_entity_type=RackConnectLBNodes)
 
     def get_node_info_detail(self, pool_id, node_id):
@@ -947,6 +949,7 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         :rtype: Response Object
         """
         url = self.url + '/load_balancer_pools/{0}/nodes/{1}/details'.format(pool_id, node_id)
+        print "... RCV3 request ... ", url
         return self.request('GET', url, response_entity_type=RackConnectLBNodeDetail)
 
     def remove_node_from_pool(self, pool_id, node_id, requestslib_kwargs=None):
@@ -954,4 +957,5 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         :summary: Remove a node from a lb pool
         """
         url = self.url + '/load_balancer_pools/{0}/nodes/{1}'.format(pool_id, node_id)
+        print "... RCV3 request ... ", url
         return self.request('DELETE', url, requestslib_kwargs=requestslib_kwargs)
