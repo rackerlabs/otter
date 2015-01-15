@@ -16,7 +16,6 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import Authenticate, InvalidateToken
 from otter.constants import ServiceType
-from otter.util.http import headers, APIError
 from otter.http import (
     ServiceRequest,
     TenantScope,
@@ -26,8 +25,9 @@ from otter.http import (
     perform_tenant_scope,
     service_request)
 from otter.test.utils import stub_pure_response
-from otter.util.pure_http import Request, has_code
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
+from otter.util.http import APIError, headers
+from otter.util.pure_http import Request, has_code
 
 
 def resolve_authenticate(eff, token='token'):
@@ -155,11 +155,15 @@ class PerformServiceRequestTests(SynchronousTestCase):
         """Save some common parameters."""
         self.log = object()
         self.authenticator = object()
-        self.service_mapping = {ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'}
-        self.svcreq = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers').intent
+        self.service_mapping = {
+            ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'}
+        eff = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
+        self.svcreq = eff.intent
 
     def _concrete(self, svcreq):
-        """Call :func:`concretize_service_request` with premade test objects."""
+        """
+        Call :func:`concretize_service_request` with premade test objects.
+        """
         return concretize_service_request(
             self.authenticator, self.log, self.service_mapping, 'DFW',
             1,
@@ -228,10 +232,12 @@ class PerformTenantScopeTests(SynchronousTestCase):
         """Save some common parameters."""
         self.log = object()
         self.authenticator = object()
-        self.service_mapping = {ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'}
+        self.service_mapping = {
+            ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'}
 
         def concretize(au, lo, smap, reg, tenid, srvreq):
-            return Effect(Constant(('concretized', au, lo, smap, reg, tenid, srvreq)))
+            return Effect(Constant(('concretized', au, lo, smap, reg, tenid,
+                                    srvreq)))
 
         self.dispatcher = ComposedDispatcher([
             TypeDispatcher({
@@ -247,9 +253,9 @@ class PerformTenantScopeTests(SynchronousTestCase):
 
     def test_perform_service_request(self):
         """
-        Performing a :obj:`TenantScope` when it contains a :obj:`ServiceRequest`
-        concretizes the :obj:`ServiceRequest` into a :obj:`Request` as per
-        :func:`concretize_service_request`.
+        Performing a :obj:`TenantScope` when it contains a
+        :obj:`ServiceRequest` concretizes the :obj:`ServiceRequest` into a
+        :obj:`Request` as per :func:`concretize_service_request`.
         """
         ereq = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
         tscope = TenantScope(ereq, 1)
@@ -260,9 +266,9 @@ class PerformTenantScopeTests(SynchronousTestCase):
 
     def test_perform_srvreq_nested(self):
         """
-        Concretizing of :obj:`ServiceRequest` effects happens even when they are
-        not directly passed as the TenantScope's toplevel Effect, but also when
-        they are returned from callbacks down the line.
+        Concretizing of :obj:`ServiceRequest` effects happens even when they
+        are not directly passed as the TenantScope's toplevel Effect, but also
+        when they are returned from callbacks down the line.
         """
         ereq = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
         eff = Effect(Constant("foo")).on(lambda r: ereq)

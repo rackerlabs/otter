@@ -4,14 +4,23 @@ Integration point for HTTP clients in otter.
 from functools import wraps
 
 from characteristic import attributes
-from effect import ComposedDispatcher, Effect, TypeDispatcher, perform, sync_performer
 
-from otter.util.pure_http import (
-    request, add_headers, add_effect_on_response, add_error_handling,
-    add_bind_root, add_content_only, add_json_response, add_json_request_data,
-    has_code)
+from effect import (ComposedDispatcher, Effect, TypeDispatcher, perform,
+                    sync_performer)
+
+from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.util.http import headers as otter_headers
-from otter.auth import public_endpoint_url, Authenticate, InvalidateToken
+from otter.util.pure_http import (
+    add_bind_root,
+    add_content_only,
+    add_effect_on_response,
+    add_error_handling,
+    add_headers,
+    add_json_request_data,
+    add_json_response,
+    has_code,
+    request,
+)
 
 
 def get_request_func(authenticator, tenant_id, log, service_mapping, region):

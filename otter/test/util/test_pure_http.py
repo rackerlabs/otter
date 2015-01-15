@@ -73,8 +73,9 @@ class RequestEffectTests(SynchronousTestCase):
         req = Request(method="get", url="http://google.com/", log=log)
         req.treq = treq
         dispatcher = get_simple_dispatcher(None)
-        self.assertEqual(self.successResultOf(perform(dispatcher, Effect(req))),
-                         (response, "content"))
+        self.assertEqual(
+            self.successResultOf(perform(dispatcher, Effect(req))),
+            (response, "content"))
 
 
 class AddErrorHandlingTests(SynchronousTestCase):

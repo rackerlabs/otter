@@ -183,7 +183,8 @@ def get_all_metrics(cass_groups, authenticator, service_mapping, region,
         # TODO: Get rid of this when we switch everything to ServiceRequest
         return get_request_func(authenticator, tenant_id, metrics_log,
                                 service_mapping, region)
-    effs = get_all_metrics_effects(cass_groups, req_func_for_tenant, metrics_log, _print=_print)
+    effs = get_all_metrics_effects(cass_groups, req_func_for_tenant,
+                                   metrics_log, _print=_print)
     d = _perform_limited_effects(dispatcher, effs, 10)
     d.addCallback(filter(lambda x: x is not None))
     return d.addCallback(lambda x: reduce(operator.add, x, []))
@@ -271,8 +272,9 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
     eff = add_to_cloud_metrics(req_func, config['metrics'], config['region'],
                                total_desired, total_actual, total_pending,
                                log=metrics_log)
-    dispatcher = get_full_dispatcher(reactor, authenticator, metrics_log,
-                                     service_mapping, config['metrics']['region'])
+    dispatcher = get_full_dispatcher(
+        reactor, authenticator, metrics_log,
+        service_mapping, config['metrics']['region'])
     yield perform(dispatcher, eff)
     metrics_log.msg('added to cloud metrics')
     if _print:
