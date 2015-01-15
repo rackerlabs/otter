@@ -364,8 +364,13 @@ class CheckEventsInBucketTests(SchedulerTests):
         """
         When events fetched < 100, they are processed
         """
-        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol4{}'.format(i),
-                   'trigger': 'now', 'cron': None, 'bucket': 1} for i in range(10)]
+        events = [{'tenantId': '1234',
+                   'groupId': 'scal44',
+                   'policyId': 'pol4{}'.format(i),
+                   'trigger': 'now',
+                   'cron': None,
+                   'bucket': 1}
+                  for i in range(10)]
         self.returns = [events]
 
         d = check_events_in_bucket(self.log, self.mock_store, 1, 'utcnow', 100)
@@ -529,8 +534,13 @@ class AddCronEventsTests(SchedulerTests):
         """
         When all events passed are to be deleted, then does nothing
         """
-        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol4{}'.format(i),
-                   'trigger': 'now', 'cron': '*', 'bucket': 1} for i in range(3)]
+        events = [{'tenantId': '1234',
+                   'groupId': 'scal44',
+                   'policyId': 'pol4{}'.format(i),
+                   'trigger': 'now',
+                   'cron': '*',
+                   'bucket': 1}
+                  for i in range(3)]
         d = add_cron_events(self.mock_store, self.log, events,
                             set(['pol4{}'.format(i) for i in range(3)]))
         self.assertIsNone(d)
@@ -542,8 +552,13 @@ class AddCronEventsTests(SchedulerTests):
         """
         Updates cron events for non-deleted policies by calling store.add_cron_events
         """
-        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol4{}'.format(i),
-                   'trigger': 'now', 'cron': '*', 'bucket': 1} for i in range(10)]
+        events = [{'tenantId': '1234',
+                   'groupId': 'scal44',
+                   'policyId': 'pol4{}'.format(i),
+                   'trigger': 'now',
+                   'cron': '*',
+                   'bucket': 1}
+                  for i in range(10)]
         deleted_policy_ids = set(['pol41', 'pol45'])
         new_events = events[:]
         new_events.pop(1)
