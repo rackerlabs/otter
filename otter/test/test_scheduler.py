@@ -520,9 +520,7 @@ class AddCronEventsTests(SchedulerTests):
         self.log = mock_log()
 
     def test_no_events(self):
-        """
-        Does nothing on no events
-        """
+        """Does nothing on no events."""
         d = add_cron_events(self.mock_store, self.log, [], set())
         self.assertIsNone(d)
         self.assertFalse(self.log.msg.called)
