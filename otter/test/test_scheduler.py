@@ -501,7 +501,8 @@ class ProcessEventsTests(SchedulerTests):
             'Processing {num_events} events', num_events=10)
         self.assertEqual(
             self.execute_event.mock_calls,
-            [mock.call(self.mock_store, self.log, event, set()) for event in events])
+            [mock.call(self.mock_store, self.log, event, set())
+             for event in events])
         self.add_cron_events.assert_called_once_with(
             self.mock_store, self.log, events, set())
 
@@ -513,8 +514,9 @@ class AddCronEventsTests(SchedulerTests):
         """Mock store.add_cron_events and next_cron_occurrence."""
         super(AddCronEventsTests, self).setUp()
         self.mock_store.add_cron_events.return_value = defer.succeed(None)
-        self.next_cron_occurrence = patch(self, 'otter.scheduler.next_cron_occurrence',
-                                          return_value='next')
+        self.next_cron_occurrence = patch(
+            self, 'otter.scheduler.next_cron_occurrence',
+            return_value='next')
         self.log = mock_log()
 
     def test_no_events(self):
