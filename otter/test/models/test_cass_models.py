@@ -2647,7 +2647,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def test_list_states_offsets_by_marker(self):
         """
-        If a marker is provided, it is passed into the CQL as a where clause
+        If a marker is provided, it is passed into the CQL as a where clause.
         """
         self.returns = [[]]
         expectedData = {'tenantId': '123', 'limit': 100, 'marker': '345'}
@@ -2662,8 +2662,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def test_list_states_does_not_return_resurrected_groups(self):
         """
-        If any of the rows returned is resurrected, i.e. does not contain created_at
-        then it is not returned
+        If any of the rows returned is resurrected, i.e. does not contain
+        created_at then it is not returned.
         """
         group_dicts = [{
             'tenantId': '123',
@@ -2705,8 +2705,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def test_list_states_deletes_resurrected_groups(self):
         """
-        If any of the rows returned is resurrected, i.e. does not contain created_at
-        then it is triggered for deletion
+        If any of the rows returned is resurrected, i.e. does not contain
+        created_at, then it is triggered for deletion.
         """
         group_dicts = [{
             'tenantId': '123',
@@ -2797,7 +2797,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
     def test_webhook_hash_from_index(self):
         """
         `webhook_info_by_hash` returns info from _webhook_info_by_index if
-        _webhook_info_from_table returns nothing
+        _webhook_info_from_table returns nothing.
         """
         self.collection._webhook_info_from_table = mock.Mock(
             return_value=defer.fail(UnrecognizedCapabilityError('hash', 1)))
