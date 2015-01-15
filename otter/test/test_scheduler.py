@@ -143,8 +143,10 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self._start_service()
         self.kz_partition.__iter__.return_value = [2, 3]
         now = datetime.utcnow()
-        self.returns = [{'trigger': now + timedelta(hours=1), 'version': 'v1'},
-                        {'trigger': now + timedelta(seconds=2), 'version': 'v1'}]
+        self.returns = [{'trigger': now + timedelta(hours=1),
+                         'version': 'v1'},
+                        {'trigger': now + timedelta(seconds=2),
+                         'version': 'v1'}]
 
         d = self.scheduler_service.health_check()
 
@@ -201,7 +203,9 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.scheduler_service.reset('/new_path')
         self.assertEqual(self.scheduler_service.zk_partition_path, '/new_path')
         self.kz_client.SetPartitioner.assert_called_once_with(
-            '/new_path', set=set(self.buckets), time_boundary=self.time_boundary)
+            '/new_path',
+            set=set(self.buckets),
+            time_boundary=self.time_boundary)
         self.assertEqual(self.scheduler_service.kz_partition,
                          self.kz_client.SetPartitioner.return_value)
 
@@ -260,7 +264,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         # Called once when starting and now again when partition failed
         self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
-                         [mock.call(self.zk_partition_path, set=set(self.buckets),
+                         [mock.call(self.zk_partition_path,
+                                    set=set(self.buckets),
                                     time_boundary=self.time_boundary)] * 2)
         self.assertEqual(self.scheduler_service.kz_partition, new_kz_partition)
 
@@ -291,7 +296,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         # Called once when starting and now again when got bad state
         self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
-                         [mock.call(self.zk_partition_path, set=set(self.buckets),
+                         [mock.call(self.zk_partition_path,
+                                    set=set(self.buckets),
                                     time_boundary=self.time_boundary)] * 2)
         self.assertEqual(self.scheduler_service.kz_partition, new_kz_partition)
 
@@ -450,12 +456,24 @@ class CheckEventsInBucketTests(SchedulerTests):
 
     def test_events_batch_process(self):
         """Events are processed in batches of 100 or fewer."""
-        events1 = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol4{}'.format(i),
-                    'trigger': 'now', 'cron': None, 'bucket': 1} for i in range(100)]
-        events2 = [{'tenantId': '1235', 'groupId': 'scal54', 'policyId': 'pol4{}'.format(i),
-                    'trigger': 'now', 'cron': None, 'bucket': 1} for i in range(100)]
-        events3 = [{'tenantId': '1236', 'groupId': 'scal64', 'policyId': 'pol4{}'.format(i),
-                    'trigger': 'now', 'cron': None, 'bucket': 1} for i in range(10)]
+        events1 = [{'tenantId': '1234',
+                    'groupId': 'scal44',
+                    'policyId': 'pol4{}'.format(i),
+                    'trigger': 'now',
+                    'cron': None,
+                    'bucket': 1} for i in range(100)]
+        events2 = [{'tenantId': '1235',
+                    'groupId': 'scal54',
+                    'policyId': 'pol4{}'.format(i),
+                    'trigger': 'now',
+                    'cron': None,
+                    'bucket': 1} for i in range(100)]
+        events3 = [{'tenantId': '1236',
+                    'groupId': 'scal64',
+                    'policyId': 'pol4{}'.format(i),
+                    'trigger': 'now',
+                    'cron': None,
+                    'bucket': 1} for i in range(10)]
         self.returns = [events1, events2, events3]
 
         d = check_events_in_bucket(self.log, self.mock_store, 1, 'now', 100)
@@ -464,9 +482,8 @@ class CheckEventsInBucketTests(SchedulerTests):
         self.assertEqual(self.mock_store.fetch_and_delete.mock_calls,
                          [mock.call(1, 'now', 100)] * 3)
         self.assertEqual(self.process_events.mock_calls,
-                         [mock.call(events1, self.mock_store, self.log.bind()),
-                          mock.call(events2, self.mock_store, self.log.bind()),
-                          mock.call(events3, self.mock_store, self.log.bind())])
+                         [mock.call(events, self.mock_store, self.log.bind())
+                          for events in [events1, events2, events3]])
 
 
 class ProcessEventsTests(SchedulerTests):
