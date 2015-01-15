@@ -2794,13 +2794,15 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         `webhook_info_by_hash` returns info from _webhook_info_from_table if avail
         """
-        self.collection._webhook_info_from_table = mock.Mock(return_value=defer.succeed('g'))
+        self.collection._webhook_info_from_table = mock.Mock(
+            return_value=defer.succeed('g'))
         self.collection._webhook_info_by_index = mock.Mock()
 
         d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
 
         self.assertEqual(self.successResultOf(d), 'g')
-        self.collection._webhook_info_from_table.assert_called_once_with(self.mock_log, 'hash')
+        self.collection._webhook_info_from_table.assert_called_once_with(
+            self.mock_log, 'hash')
         self.assertFalse(self.collection._webhook_info_by_index.called)
 
     def test_webhook_hash_from_index(self):
@@ -2810,28 +2812,34 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         self.collection._webhook_info_from_table = mock.Mock(
             return_value=defer.fail(UnrecognizedCapabilityError('hash', 1)))
-        self.collection._webhook_info_by_index = mock.Mock(return_value=defer.succeed('g'))
+        self.collection._webhook_info_by_index = mock.Mock(
+            return_value=defer.succeed('g'))
 
         d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
 
         self.assertEqual(self.successResultOf(d), 'g')
-        self.collection._webhook_info_from_table.assert_called_once_with(self.mock_log, 'hash')
-        self.collection._webhook_info_by_index.assert_called_once_with(self.mock_log, 'hash')
+        self.collection._webhook_info_from_table.assert_called_once_with(
+            self.mock_log, 'hash')
+        self.collection._webhook_info_by_index.assert_called_once_with(
+            self.mock_log, 'hash')
 
     def test_webhook_hash_from_index_logs_unknown_err(self):
         """
         `webhook_info_by_hash` returns info from _webhook_info_by_index if
-        _webhook_info_from_table fails with unknown error
+        _webhook_info_from_table fails with unknown error.
         """
         self.collection._webhook_info_from_table = mock.Mock(
             return_value=defer.fail(ValueError(1)))
-        self.collection._webhook_info_by_index = mock.Mock(return_value=defer.succeed('g'))
+        self.collection._webhook_info_by_index = mock.Mock(
+            return_value=defer.succeed('g'))
 
         d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
 
         self.assertEqual(self.successResultOf(d), 'g')
-        self.collection._webhook_info_from_table.assert_called_once_with(self.mock_log, 'hash')
-        self.collection._webhook_info_by_index.assert_called_once_with(self.mock_log, 'hash')
+        self.collection._webhook_info_from_table.assert_called_once_with(
+            self.mock_log, 'hash')
+        self.collection._webhook_info_by_index.assert_called_once_with(
+            self.mock_log, 'hash')
         self.mock_log.err.assert_called_once_with(
             CheckFailure(ValueError), 'Error getting webhook info from table')
 
@@ -2978,7 +2986,8 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         d = self.collection.kazoo_health_check()
 
         self.assertEqual(self.successResultOf(d), (True, {'total_time': 0}))
-        self.collection.kz_client.Lock.assert_called_once_with('/locks/test_uuid1')
+        self.collection.kz_client.Lock.assert_called_once_with(
+            '/locks/test_uuid1')
         self.lock._acquire.assert_called_once_with(timeout=5)
         self.lock.release.assert_called_once_with()
         self.collection.kz_client.delete.assert_called_once_with(
@@ -2989,13 +2998,15 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         Acquires sample lock and fails if it is not able to acquire.
         """
-        self.lock._acquire.side_effect = lambda timeout: defer.fail(ValueError('e'))
+        self.lock._acquire.side_effect = \
+            lambda timeout: defer.fail(ValueError('e'))
         mock_uuid.uuid1.return_value = 'uuid1'
 
         d = self.collection.kazoo_health_check()
 
         self.failureResultOf(d, ValueError)
-        self.collection.kz_client.Lock.assert_called_once_with('/locks/test_uuid1')
+        self.collection.kz_client.Lock.assert_called_once_with(
+            '/locks/test_uuid1')
         self.lock._acquire.assert_called_once_with(timeout=5)
         self.assertFalse(self.lock.release.called)
         self.assertFalse(self.collection.kz_client.delete.called)
