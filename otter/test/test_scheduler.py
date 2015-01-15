@@ -321,9 +321,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
 
 class CheckEventsInBucketTests(SchedulerTests):
-    """
-    Tests for `check_events_in_bucket`
-    """
+    """Tests for `check_events_in_bucket`"""
 
     def setUp(self):
         """Mock store.fetch_and_delete and `process_events`"""
