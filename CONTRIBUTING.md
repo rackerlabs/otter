@@ -44,3 +44,8 @@ their own changes.
   merge the branch immediately after making the change (and only that change).
 - If the PR has a "LGTM" but it conflicts with master, any party may merge
   it forward, give it a sanity check, and merge it.
+- If conversation on a PR comes up between multiple parties, anyone who wishes
+  to merge the PR must make a *reasonable* attempt at confirming consensus
+  before merging.
+- If any core contributor is outright opposed to a PR, it must not be merged
+  until consensus is reached.
