@@ -210,13 +210,13 @@ class VerifiedViewTests(SynchronousTestCase):
         """
         Returns a verified view, with some test arguments.
         """
-        view = verified_view(self.connection,
-                             'vq',
-                             'dq',
-                             {'d': 2},
-                             6,
-                             ValueError,
-                             self.log)
+        view = verified_view(connection=self.connection,
+                             view_query='vq',
+                             del_query='dq',
+                             data={'d': 2},
+                             consistency=6,
+                             exception_if_empty=ValueError,
+                             log=self.log)
         return view
 
     def test_valid_view(self):
