@@ -131,7 +131,7 @@ class AssembleWebhooksTests(SynchronousTestCase):
         self.assertEqual(assemble_webhooks_in_policies([], []), [])
         self.assertEqual(
             assemble_webhooks_in_policies(
-                [], [{'policyId': '1', 'webhookId': 'w'}])
+                [], [{'policyId': '1', 'webhookId': 'w'}]),
             [])
 
     def test_all_webhooks(self):
@@ -235,7 +235,8 @@ class VerifiedViewTests(SynchronousTestCase):
         """
         Raise empty error if resurrected view
         """
-        self.connection.execute.return_value = defer.succeed([{'c1': 2, 'created_at': None}])
+        self.connection.execute.return_value = defer.succeed(
+            [{'c1': 2, 'created_at': None}])
         r = self._verified_view()
         self.failureResultOf(r, ValueError)
         self.connection.execute.assert_has_calls(
@@ -349,7 +350,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin,
             'maxEntities': None,
             'metadata': {}
         })
-        self.launch_config = _de_identify(group_examples.launch_server_config()[0])
+        launch_config = group_examples.launch_server_config()[0]
+        self.launch_config = _de_identify(launch_config)
         self.policies = []
         self.mock_log = mock.MagicMock()
 
@@ -478,10 +480,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
-        self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
-                                       'a', {'A': 'R'},
-                                       {'P': 'R'}, '123', {'PT': 'R'}, False,
-                                       desired=10))
+
+        group_state = GroupState(tenant_id=self.tenant_id,
+                                 group_id=self.group_id,
+                                 group_name='a',
+                                 active={'A': 'R'},
+                                 pending={'P': 'R'},
+                                 group_touched='123', # REVIEW: is this
+                                                      # actually realistic?
+                                                      # Shouldn't this be an
+                                                      # iso8601-ish timestamp?
+                                 policy_touched={'PT': 'R'},
+                                 paused=False,
+                                 desired=10)
+        self.assertEqual(r, group_state)
 
     def test_view_state_no_desired_capacity(self):
         """
@@ -2740,15 +2752,19 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
-        group_state = GroupState(tenant_id='123',
-                                 group_id='group123',
-                                 grouo_name='test123',
-                                 active={},
-                                 pending={},
-                                 group_touched='0001-01-01T00:00:00Z',
-                                 policy_touched={},
-                                 paused=False)
-        self.assertEqual(r, [group_state, group_state])
+        def group_state_with_id(group_id):
+            group_state = GroupState(tenant_id='123',
+                                     group_id=group_id,
+                                     group_name='test',
+                                     active={},
+                                     pending={},
+                                     group_touched='0001-01-01T00:00:00Z',
+                                     policy_touched={},
+                                     paused=False)
+            return group_state
+
+        self.assertEqual(r, [group_state_with_id("group0"),
+                             group_state_with_id("group1")])
 
     def test_list_empty(self):
         """
@@ -2760,8 +2776,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at FROM '
-            'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
+            '"groupTouched", "policyTouched", paused, desired, created_at '
+            'FROM scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
         self.connection.execute.assert_called_once_with(
@@ -2844,7 +2860,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             mock.call(expectedCql, expectedData, ConsistencyLevel.QUORUM))
         self.assertEqual(r, [GroupState(tenant_id='123',
                                         group_id='group123',
-                                        grouo_name='test123',
+                                        group_name='test123',
                                         active={},
                                         pending={},
                                         group_touched='0001-01-01T00:00:00Z',
@@ -2933,7 +2949,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             mock.call(expectedCql, expectedData, ConsistencyLevel.QUORUM))
         self.assertEqual(r, [GroupState(tenant_id='123',
                                         group_id='group123',
-                                        grouo_name='test123',
+                                        group_name='test123',
                                         active={},
                                         pending={},
                                         group_touched='0001-01-01T00:00:00Z',
