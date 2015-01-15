@@ -34,10 +34,14 @@ from otter.test.utils import (
 
 
 class SchedulerTests(SynchronousTestCase):
-    """Tests for `scheduler.py`"""
+    """
+    Tests for `scheduler.py`.
+    """
 
     def setUp(self):
-        """mock common dependencies of methods in scheduler.py."""
+        """
+        Mock common dependencies of methods in scheduler.py.
+        """
         self.mock_store = iMock(
             IScalingGroupCollection, IScalingScheduleCollection)
         self.mock_generate_transaction_id = patch(
@@ -46,10 +50,13 @@ class SchedulerTests(SynchronousTestCase):
 
 
 class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
-    """Tests for `SchedulerService`"""
+    """
+    Tests for `SchedulerService`.
+    """
 
     def setUp(self):
-        """Mock all the dependencies of SchedulingService.
+        """
+        Mock all the dependencies of SchedulingService.
 
         This includes logging, store's fetch_and_delete, TxKazooClient
         stuff, TimerService, check_events_in_bucket and
@@ -94,8 +101,10 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.scheduler_service.running = True
 
     def test_start_service(self):
-        """startService() calls super's startService() and creates
-        SetPartitioner object."""
+        """
+        startService() calls super's startService() and creates
+        a SetPartitioner object.
+        """
         self._start_service()
         self.kz_client.SetPartitioner.assert_called_once_with(
             self.zk_partition_path,
@@ -107,8 +116,10 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
             self.scheduler_service)
 
     def test_stop_service(self):
-        """stopService() calls super's stopService() and stops the allocation
-        if it is already acquired."""
+        """
+        stopService() calls super's stopService() and stops the allocation
+        if it is already acquired.
+        """
         self._start_service()
         self.kz_partition.acquired = True
         d = self.scheduler_service.stopService()
@@ -118,8 +129,10 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.assertEqual(self.kz_partition.finish.return_value, d)
 
     def test_health_check_after_threshold(self):
-        """`service.health_check` returns False when trigger time is above
-        threshold."""
+        """
+        `service.health_check` returns False when trigger time is above
+        threshold.
+        """
         self.kz_partition.acquired = True
         self._start_service()
         self.kz_partition.__iter__.return_value = [2, 3]
@@ -137,8 +150,10 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
             [mock.call(2), mock.call(3)])
 
     def test_health_check_before_threshold(self):
-        """`service.health_check` returns True when trigger time is below
-        threshold."""
+        """
+        `service.health_check` returns True when trigger time is below
+        threshold.
+        """
         self.kz_partition.acquired = True
         self._start_service()
         self.kz_partition.__iter__.return_value = [2, 3]
@@ -156,7 +171,9 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
             [mock.call(2), mock.call(3)])
 
     def test_health_check_None(self):
-        """`service.health_check` returns True when there are no triggers."""
+        """
+        `service.health_check` returns True when there are no triggers.
+        """
         self.kz_partition.acquired = True
         self._start_service()
         self.kz_partition.__iter__.return_value = [2, 3]
@@ -170,8 +187,10 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
             [mock.call(2), mock.call(3)])
 
     def test_health_check_not_acquired(self):
-        """`service.health_check` returns False when partition is not
-        acquired."""
+        """
+        `service.health_check` returns False when partition is not
+        acquired.
+        """
         self.kz_partition.acquired = False
         self._start_service()
         self.kz_partition.__iter__.return_value = [2, 3]
@@ -183,7 +202,9 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.assertFalse(self.mock_store.get_oldest_event.called)
 
     def test_health_check_not_running(self):
-        """`service.health_check` returns False when scheduler is stopped."""
+        """
+        `service.health_check` returns False when scheduler is stopped.
+        """
         d = self.scheduler_service.health_check()
 
         self.assertEqual(self.successResultOf(d),
@@ -191,15 +212,19 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.assertFalse(self.mock_store.get_oldest_event.called)
 
     def test_stop_service_allocating(self):
-        """stopService() does not stop the allocation (i.e. call finish) if it
-        is not acquired."""
+        """
+        stopService() does not stop the allocation (i.e. call finish) if
+        it is not acquired.
+        """
         self._start_service()
         d = self.scheduler_service.stopService()
         self.assertFalse(self.kz_partition.finish.called)
         self.assertIsNone(d)
 
     def test_reset(self):
-        """reset() starts new partition based on new path."""
+        """
+        reset() starts new partition based on new path.
+        """
         self.scheduler_service.reset('/new_path')
         self.assertEqual(self.scheduler_service.zk_partition_path, '/new_path')
         self.kz_client.SetPartitioner.assert_called_once_with(
@@ -210,14 +235,18 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
                          self.kz_client.SetPartitioner.return_value)
 
     def test_reset_same_path(self):
-        """reset() raises error on same path."""
+        """
+        reset() raises error on same path.
+        """
         self.assertRaises(
             ValueError, self.scheduler_service.reset, '/part_path')
         self.assertFalse(self.kz_client.SetPartitioner.called)
 
     def test_check_events_allocating(self):
-        """`check_events` logs message and does not check events in buckets
-        when buckets are still allocating."""
+        """
+        `check_events` logs message and does not check events in buckets
+        when buckets are still allocating.
+        """
         self.kz_partition.allocating = True
         self._start_service()
         self.scheduler_service.check_events(100)
@@ -228,11 +257,10 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.assertFalse(self.check_events_in_bucket.called)
 
     def test_check_events_release(self):
-        """`check_events` logs message and does not check events in buckets
-        when partitioning has changed.
-
-        It calls release_set() to re-partition
-
+        """
+        `check_events` logs message and does not check events in buckets
+        when partitioning has changed. It calls release_set() to
+        re-partition.
         """
         self.kz_partition.release = True
         self._start_service()
@@ -245,11 +273,9 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.assertFalse(self.check_events_in_bucket.called)
 
     def test_check_events_failed(self):
-        """`check_events` logs message and does not check events in buckets
-        when partitioning has failed.
-
-        It creates a new partition
-
+        """
+        `check_events` logs message and does not check events in buckets
+        when partitioning has failed. It creates a new partition.
         """
         self.kz_partition.failed = True
         self._start_service()
@@ -308,8 +334,9 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
     @mock.patch('otter.scheduler.datetime')
     def test_check_events_acquired(self, mock_datetime):
-        """`check_events` checks events in each bucket when they are
-        partitoned."""
+        """
+        `check_events` checks events in each bucket when they are partitoned.
+        """
         self.kz_partition.acquired = True
         self._start_service()
         self.kz_partition.__iter__.return_value = [2, 3]
@@ -335,10 +362,14 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
 
 class CheckEventsInBucketTests(SchedulerTests):
-    """Tests for `check_events_in_bucket`"""
+    """
+    Tests for `check_events_in_bucket`
+    """
 
     def setUp(self):
-        """Mock store.fetch_and_delete and `process_events`"""
+        """
+        Mock store.fetch_and_delete and `process_events`
+        """
         super(CheckEventsInBucketTests, self).setUp()
 
         self.returns = [[]]
@@ -356,7 +387,9 @@ class CheckEventsInBucketTests(SchedulerTests):
         self.log = mock.Mock()
 
     def test_fetch_called(self):
-        """`fetch_and_delete` called correctly."""
+        """
+        `fetch_and_delete` called correctly
+        """
         d = check_events_in_bucket(self.log, self.mock_store, 1, 'utcnow', 100)
         self.successResultOf(d)
         self.mock_store.fetch_and_delete.assert_called_once_with(
@@ -371,7 +404,9 @@ class CheckEventsInBucketTests(SchedulerTests):
             [], self.mock_store, self.log.bind())
 
     def test_events_in_limit(self):
-        """When events fetched < 100, they are processed."""
+        """
+        When events fetched < 100, they are processed
+        """
         events = [{'tenantId': '1234',
                    'groupId': 'scal44',
                    'policyId': 'pol4{}'.format(i),
@@ -391,7 +426,9 @@ class CheckEventsInBucketTests(SchedulerTests):
             events, self.mock_store, self.log.bind())
 
     def test_events_process_error(self):
-        """error is logged if `process_events` returns error."""
+        """
+        Error is logged if `process_events` returns error.
+        """
         self.returns = [ValueError('e')]
 
         d = check_events_in_bucket(self.log, self.mock_store, 1, 'now', 100)
@@ -433,8 +470,10 @@ class CheckEventsInBucketTests(SchedulerTests):
                                     self.log.bind())])
 
     def test_events_batch_error(self):
-        """When error occurs after first batch of events are processed, then it
-        logs errors and does not try to fetch again."""
+        """
+        When error occurs after first batch of events are processed, then it
+        logs errors and does not try to fetch again.
+        """
         events = [{'tenantId': '1234',
                    'groupId': 'scal44',
                    'policyId': 'pol4{}'.format(i),
@@ -455,7 +494,10 @@ class CheckEventsInBucketTests(SchedulerTests):
                                                     self.log.bind())
 
     def test_events_batch_process(self):
-        """Events are processed in batches of 100 or fewer."""
+        """
+        When events fetched > 100, they are processed in batches until all
+        events are processed
+        """
         events1 = [{'tenantId': '1234',
                     'groupId': 'scal44',
                     'policyId': 'pol4{}'.format(i),
@@ -487,10 +529,14 @@ class CheckEventsInBucketTests(SchedulerTests):
 
 
 class ProcessEventsTests(SchedulerTests):
-    """Tests for `process_events`."""
+    """
+    Tests for `process_events`.
+    """
 
     def setUp(self):
-        """Mock `execute_event` and `add_cron_events`."""
+        """
+        Mock `execute_event` and `add_cron_events`.
+        """
         super(ProcessEventsTests, self).setUp()
         self.execute_event = patch(self, 'otter.scheduler.execute_event',
                                    return_value=defer.succeed(None))
@@ -504,7 +550,9 @@ class ProcessEventsTests(SchedulerTests):
         self.log = mock_log()
 
     def test_no_events(self):
-        """Does nothing on no events."""
+        """
+        Does nothing on no events.
+        """
         process_events([], self.mock_store, self.log)
         self.assertFalse(self.log.msg.called)
         self.assertFalse(self.execute_event.called)
@@ -513,7 +561,7 @@ class ProcessEventsTests(SchedulerTests):
     def test_success(self):
         """
         Test success path: Logs number of events, calls `execute_event` on
-        each event and calls `add_cron_events`.
+        each event and calls `add_cron_events.`
         """
         events = range(10)
         d = process_events(events, self.mock_store, self.log)
@@ -529,10 +577,14 @@ class ProcessEventsTests(SchedulerTests):
 
 
 class AddCronEventsTests(SchedulerTests):
-    """Tests for `add_cron_events`"""
+    """
+    Tests for `add_cron_events`.
+    """
 
     def setUp(self):
-        """Mock store.add_cron_events and next_cron_occurrence."""
+        """
+        Mock store.add_cron_events and next_cron_occurrence.
+        """
         super(AddCronEventsTests, self).setUp()
         self.mock_store.add_cron_events.return_value = defer.succeed(None)
         self.next_cron_occurrence = patch(
@@ -541,7 +593,9 @@ class AddCronEventsTests(SchedulerTests):
         self.log = mock_log()
 
     def test_no_events(self):
-        """Does nothing on no events."""
+        """
+        Does nothing on no events.
+        """
         d = add_cron_events(self.mock_store, self.log, [], set())
         self.assertIsNone(d)
         self.assertFalse(self.log.msg.called)
@@ -549,7 +603,9 @@ class AddCronEventsTests(SchedulerTests):
         self.assertFalse(self.mock_store.add_cron_events.called)
 
     def test_no_events_to_add(self):
-        """When all events passed are to be deleted, then does nothing."""
+        """
+        When all events passed are to be deleted, then does nothing
+        """
         events = [{'tenantId': '1234',
                    'groupId': 'scal44',
                    'policyId': 'pol4{}'.format(i),
@@ -591,10 +647,14 @@ class AddCronEventsTests(SchedulerTests):
 
 
 class ExecuteEventTests(SchedulerTests):
-    """Tests for `execute_event`."""
+    """
+    Tests for `execute_event`.
+    """
 
     def setUp(self):
-        """Mock execution of scaling policy."""
+        """
+        Mock execution of scaling policy.
+        """
         super(ExecuteEventTests, self).setUp()
         self.mock_group = iMock(IScalingGroup)
         self.mock_store.get_scaling_group.return_value = self.mock_group
@@ -631,7 +691,9 @@ class ExecuteEventTests(SchedulerTests):
         }
 
     def test_event_executed(self):
-        """Event is executed successfully and appropriate logs logged."""
+        """
+        Event is executed successfully and appropriate logs logged.
+        """
         del_pol_ids = set()
         d = execute_event(self.mock_store, self.log, self.event, del_pol_ids)
 
@@ -679,10 +741,9 @@ class ExecuteEventTests(SchedulerTests):
         self.assertFalse(self.maybe_exec_policy.called)
 
     def test_semantic_prob(self):
-        """Policy execution causes semantic error like cooldowns not met.
-
-        i.e. CannotExecutePolicyError is captured and logged
-
+        """
+        Policy execution causes semantic error like cooldowns not met.
+        i.e. CannotExecutePolicyError is captured and logged.
         """
         del_pol_ids = set()
         self.maybe_exec_policy.return_value = defer.fail(
@@ -697,7 +758,9 @@ class ExecuteEventTests(SchedulerTests):
             reason=CheckFailure(CannotExecutePolicyError))
 
     def test_unknown_error(self):
-        """Unexpected errors are logged and propagated."""
+        """
+        Unknown error occurs. It is logged and not propagated.
+        """
         del_pol_ids = set()
         self.log.bind.return_value.err.return_value = None
         self.maybe_exec_policy.return_value = defer.fail(ValueError(4))
