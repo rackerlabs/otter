@@ -450,18 +450,13 @@ class CheckEventsInBucketTests(SchedulerTests):
 
     def test_events_batch_process(self):
         """Events are processed in batches of 100 or fewer."""
-        tenants_and_groups = [("1234", "scal44"),
-                              ("1235", "scal54"),
-                              ("1236", "scal64")]
-        event_sets = [[{'tenantId': tenant_id,
-                        'groupId': group_id,
-                        'policyId': 'pol4{}'.format(i),
-                        'trigger': 'now',
-                        'cron': None,
-                        'bucket': 1} for i in range(100)]
-                      for (tenant_id, group_id) in tenants_and_groups]
-
-        self.returns = list(event_sets)
+        events1 = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol4{}'.format(i),
+                    'trigger': 'now', 'cron': None, 'bucket': 1} for i in range(100)]
+        events2 = [{'tenantId': '1235', 'groupId': 'scal54', 'policyId': 'pol4{}'.format(i),
+                    'trigger': 'now', 'cron': None, 'bucket': 1} for i in range(100)]
+        events3 = [{'tenantId': '1236', 'groupId': 'scal64', 'policyId': 'pol4{}'.format(i),
+                    'trigger': 'now', 'cron': None, 'bucket': 1} for i in range(10)]
+        self.returns = [events1, events2, events3]
 
         d = check_events_in_bucket(self.log, self.mock_store, 1, 'now', 100)
 
@@ -469,8 +464,9 @@ class CheckEventsInBucketTests(SchedulerTests):
         self.assertEqual(self.mock_store.fetch_and_delete.mock_calls,
                          [mock.call(1, 'now', 100)] * 3)
         self.assertEqual(self.process_events.mock_calls,
-                         [mock.call(events, self.mock_store, self.log.bind())
-                          for events in event_sets])
+                         [mock.call(events1, self.mock_store, self.log.bind()),
+                          mock.call(events2, self.mock_store, self.log.bind()),
+                          mock.call(events3, self.mock_store, self.log.bind())])
 
 
 class ProcessEventsTests(SchedulerTests):
