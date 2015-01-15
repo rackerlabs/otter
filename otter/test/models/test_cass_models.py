@@ -2775,8 +2775,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(
             self.connection.execute.call_args_list[1],
             mock.call(expectedCql, expectedData, ConsistencyLevel.QUORUM))
-        self.assertEqual(r, [
-            GroupState('123', 'group123', 'test123', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
+        self.assertEqual(r, [GroupState(tenant_id='123',
+                                        group_id='group123',
+                                        grouo_name='test123',
+                                        active={},
+                                        pending={},
+                                        group_touched='0001-01-01T00:00:00Z',
+                                        policy_touched={},
+                                        paused=False)])
 
     def test_get_scaling_group(self):
         """
