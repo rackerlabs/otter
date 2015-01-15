@@ -470,10 +470,10 @@ class CheckEventsInBucketTests(SchedulerTests):
 
 
 class ProcessEventsTests(SchedulerTests):
-    """Tests for `process_events`"""
+    """Tests for `process_events`."""
 
     def setUp(self):
-        """Mock `execute_event` and `add_cron_events`"""
+        """Mock `execute_event` and `add_cron_events`."""
         super(ProcessEventsTests, self).setUp()
         self.execute_event = patch(self, 'otter.scheduler.execute_event',
                                    return_value=defer.succeed(None))
