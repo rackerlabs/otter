@@ -51,8 +51,8 @@ def get_scaling_groups(client, props=None, batch_size=100, group_pred=None):
     :oaram int batch_size: Number of groups to fetch at a time
     :return: `Deferred` with ``list`` of ``dict``
     """
-    # TODO: Currently returning all groups as one giant list for now. Will try to use Twisted tubes
-    # to do streaming later
+    # TODO: Currently returning all groups as one giant list for now.
+    # Will try to use Twisted tubes to do streaming later
     _props = set(['"tenantId"', '"groupId"', 'desired',
                   'active', 'pending', 'created_at']) | set(props or [])
     query = ('SELECT ' + ','.join(sorted(list(_props))) +
