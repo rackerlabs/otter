@@ -266,6 +266,8 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
     # WARNING: This request func (and dispatcher) are configured to make
     # requests against the metrics region. The same request_func and dispatcher
     # can't be used for other purposes, like making requests to cloud servers.
+    # An issue for this problem is at
+    # https://github.com/rackerlabs/otter/issues/896
     req_func = get_request_func(authenticator, config['metrics']['tenant_id'],
                                 metrics_log, service_mapping,
                                 config['metrics']['region'])
