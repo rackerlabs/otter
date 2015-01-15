@@ -12,21 +12,21 @@ We do use the GitHub issue tracker, and it's nice to submit an issue requesting
 a change ahead of time, but not mandatory. It's particularly useful when some
 discussion about a change would be useful.
 
-## Making Changes
+## Pull Requests
 
-Here's are requirements for making a PR:
+Heres are the requirements for making a PR:
 
-- Code must be unit tested.
-- run "make lint" and "trial otter" before submitting your PR
-- If a PR introduces a user-visible feature or change:
-  - It must have end-user documentation. Usually this is done by a dedicated
-    technical writer. Make sure it's clear when a change needs documentation.
-    This can be done by creating an issue requesting documentation.
-  - It must have integration tests. This is also usually done by a dedicated
-    quality engineer. Make sure it's clear when a change needs tests. This can
-    be done by creating an issue requesting tests.
-  - An author may also feel free to submit end-user docs and functional tests
-    for their own changes.
+Code must be unit tested. run "make lint" and "trial otter" before submitting
+your PR.
+
+If a PR introduces a user-visible feature or change, it must have end-user
+documentation and integration tests. Usually these are done by dedicated
+technical writers and quality engineers. Make sure it's clear when a change
+needs these things. This can be done by creating issues requesting docs and
+integration tests.
+
+An author may also feel free to submit end-user docs and functional tests for
+their own changes.
 
 ## Review Process
 
