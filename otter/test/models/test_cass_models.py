@@ -2798,7 +2798,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def test_webhook_hash_from_table(self):
         """
-        `webhook_info_by_hash` returns info from _webhook_info_from_table if avail
+        `webhook_info_by_hash` returns info from _webhook_info_from_table
+        if available.
         """
         self.collection._webhook_info_from_table = mock.Mock(
             return_value=defer.succeed('g'))
@@ -2983,8 +2984,8 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
     @mock.patch('otter.models.cass.uuid')
     def test_zookeeper_lock_acquired(self, mock_uuid):
         """
-        Acquires sample lock and succeeds if it is able to acquire. Deletes the lock
-        path before returning
+        Acquires sample lock and succeeds if it is able to acquire. Deletes the
+        lock path before returning.
         """
         self.collection.kz_client.delete.return_value = defer.succeed(None)
         mock_uuid.uuid1.return_value = 'uuid1'
