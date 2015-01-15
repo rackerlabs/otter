@@ -2,17 +2,18 @@
 Tests for :mod:`otter.models.mock`
 """
 from collections import namedtuple
-import json
-import mock
 from datetime import datetime
+
+import json
+from jsonschema import ValidationError
+import mock
 import itertools
 from copy import deepcopy
 
 from twisted.trial.unittest import SynchronousTestCase
-from jsonschema import ValidationError
+
 
 from otter.json_schema import group_examples
-
 from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
@@ -22,18 +23,15 @@ from otter.models.cass import (
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
     WeakLocks)
-
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError,
     WebhooksOverLimitError, PoliciesOverLimitError, ScalingGroupStatus)
-
 from otter.test.utils import LockMixin, DummyException, mock_log, CheckFailure
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin,
     IScalingScheduleCollectionProviderMixin)
-
 from otter.test.utils import patch, matches
 from testtools.matchers import IsInstance
 from otter.util.timestamp import from_timestamp
@@ -132,7 +130,9 @@ class AssembleWebhooksTests(SynchronousTestCase):
         """
         self.assertEqual(assemble_webhooks_in_policies([], []), [])
         self.assertEqual(
-            assemble_webhooks_in_policies([], [{'policyId': '1', 'webhookId': 'w'}]), [])
+            assemble_webhooks_in_policies(
+                [], [{'policyId': '1', 'webhookId': 'w'}])
+            [])
 
     def test_all_webhooks(self):
         """
@@ -142,8 +142,8 @@ class AssembleWebhooksTests(SynchronousTestCase):
                     for i in range(len(self.policies)) for j in [0, 1]]
         policies = assemble_webhooks_in_policies(self.policies, webhooks)
         for i, policy in enumerate(policies):
-            self.assertEqual(
-                policy['webhooks'], ['{}p{}0'.format(i, i), '{}p{}1'.format(i, i)])
+            self.assertEqual(policy['webhooks'],
+                             ['{}p{}0'.format(i, i), '{}p{}1'.format(i, i)])
 
     def test_some_webhooks(self):
         """
@@ -209,7 +209,8 @@ class VerifiedViewTests(SynchronousTestCase):
         """
         Returns row if it is valid
         """
-        self.connection.execute.return_value = defer.succeed([{'c1': 2, 'created_at': 23}])
+        self.connection.execute.return_value = defer.succeed(
+            [{'c1': 2, 'created_at': 23}])
         r = verified_view(self.connection, 'vq', 'dq', {'d': 2}, 6, ValueError, self.log)
         self.assertEqual(self.successResultOf(r), {'c1': 2, 'created_at': 23})
         self.connection.execute.assert_called_once_with('vq', {'d': 2}, 6)
@@ -224,13 +225,16 @@ class VerifiedViewTests(SynchronousTestCase):
         self.failureResultOf(r, ValueError)
         self.connection.execute.assert_has_calls([mock.call('vq', {'d': 2}, 6),
                                                   mock.call('dq', {'d': 2}, 6)])
-        self.log.msg.assert_called_once_with('Resurrected row', row={'c1': 2, 'created_at': None},
-                                             row_params={'d': 2})
+        self.log.msg.assert_called_once_with(
+            'Resurrected row',
+            row={'c1': 2, 'created_at': None},
+            row_params={'d': 2})
 
     def test_del_does_not_wait(self):
         """
-        When a resurrected row is encountered it is triggered for deletion and `verified_view`
-        does not wait for its result before returning
+        When a resurrected row is encountered it is triggered for deletion
+        and `verified_view` does not wait for its result before
+        returning.
         """
         first_time = [True]
 
