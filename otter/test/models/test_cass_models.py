@@ -2,16 +2,19 @@
 Tests for :mod:`otter.models.mock`
 """
 from collections import namedtuple
-from datetime import datetime
-
-import json
-from jsonschema import ValidationError
-import mock
-import itertools
 from copy import deepcopy
+from datetime import datetime
+import json
+import itertools
 
+import mock
+from jsonschema import ValidationError
+from kazoo.protocol.states import KazooState
+from silverberg.client import ConsistencyLevel, CQLClient
+from testtools.matchers import IsInstance
+from twisted.internet import defer
+from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
-
 
 from otter.json_schema import group_examples
 from otter.models.cass import (
@@ -22,27 +25,29 @@ from otter.models.cass import (
     verified_view,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
-    WeakLocks)
+    WeakLocks,
+)
 from otter.models.interface import (
-    GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
-    NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError,
-    WebhooksOverLimitError, PoliciesOverLimitError, ScalingGroupStatus)
-from otter.test.utils import LockMixin, DummyException, mock_log, CheckFailure
+    GroupState,
+    GroupNotEmptyError,
+    NoSuchScalingGroupError,
+    NoSuchPolicyError,
+    NoSuchWebhookError,
+    UnrecognizedCapabilityError,
+    ScalingGroupOverLimitError,
+    WebhooksOverLimitError,
+    PoliciesOverLimitError,
+    ScalingGroupStatus
+)
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin,
-    IScalingScheduleCollectionProviderMixin)
+    IScalingScheduleCollectionProviderMixin
+)
+from otter.test.utils import LockMixin, DummyException, mock_log, CheckFailure
 from otter.test.utils import patch, matches
-from testtools.matchers import IsInstance
 from otter.util.timestamp import from_timestamp
 from otter.util.config import set_config_data
-
-from twisted.internet import defer
-from twisted.internet.task import Clock
-
-from silverberg.client import ConsistencyLevel, CQLClient
-
-from kazoo.protocol.states import KazooState
 
 
 def _de_identify(json_obj):
