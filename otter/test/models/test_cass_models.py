@@ -1948,7 +1948,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         """
         When viewing the manifest, if the group doesn't exist
         ``NoSuchScalingGroupError`` is raised and the policies is never
-        retreived.
+        retrieved.
         """
         self.group._naive_list_policies = mock.MagicMock(
             return_value=defer.succeed('policies'))
