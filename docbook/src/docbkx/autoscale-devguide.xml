@@ -57,9 +57,9 @@
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2014-12-04</pubdate>
+        <pubdate>2015-01-14</pubdate>
         <copyright>
-            <year>2014</year>
+            <year>2015</year>
             <holder>Rackspace US, Inc.</holder>
         </copyright>
         <legalnotice role="rs-api">
@@ -69,34 +69,31 @@
             </annotation>
         </legalnotice>
         <revhistory>
-            <revision
-                xmlns:raxm="http://docs.rackspace.com/api/metadata">
+            <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <date>2015-01-14</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Added additional notes to <link linkend="Launch_Configuration">Launch configuration
+                                </link>section regarding SSH key restrictions and launchConfiguration update operations. 
+                                Also added new <link linkend="How_Auto_Scale_Works">How Auto Scale Works </link>section.</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
+            <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
                 <date>2014-12-04</date>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Added new <code>purge</code> option
-                                to <methodname>Delete server from
-                                   group</methodname> operation.
-                                Updated links to Cloud Identity Guide
-                                in RBAC section and moved RBAC section
-                                to General API information section.
-                                Added <xref
-                                   linkend="createServerTemplate"/>
-                                information to <link
-                                   linkend="Launch_Configuration"
-                                   >Launch configuration
-                                </link>section in support of using
-                                Boot from Volume. Added <link
-                                   linkend="RCv3">Cloud Bursting with
-                                   RackConnectV3</link> concept and
-                                information about using the
-                                   <parameter>launchConfiguration
-                                   loadBalancers type</parameter>
-                                parameter to configure RackConnectV3
-                                for Auto Scale. See also <link
-                                   linkend="Launch_Configuration"
-                                   >Launch configurations</link>. </para>
+                            <para>Added new <code>purge</code> option to <methodname>Delete server from group</methodname> operation.
+                                Updated links to Cloud Identity Guide in RBAC section and moved RBAC section
+                                to General API information section. Added <xref linkend="createServerTemplate"/>
+                                information to <link linkend="Launch_Configuration">Launch configuration
+                                </link>section in support of using Boot from Volume. Added <link linkend="RCv3">Cloud Bursting with
+                                   RackConnectV3</link> concept and information about using the <parameter>launchConfiguration
+                                   loadBalancers type</parameter> parameter to configure RackConnectV3
+                                for Auto Scale. See also <link linkend="Launch_Configuration">Launch configurations</link>. </para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
@@ -461,12 +458,39 @@ is external so it's handy for Getting Started to share -->
         <title>Auto Scale core concepts</title>
         <para>To use the &PROD; API effectively, you should understand
             several key concepts: </para>
-        <section xml:id="Glossary">
-            <title>Glossary</title>
-            <!-- Glossary section, defining basic terms,
-is external so it's handy for Getting Started to share -->
-            <xi:include href="chapters/glossary.xml" xpointer="element(Glossary-000)"/>
-            <!-- -->
+        <section xml:id="How_Auto_Scale_Works">
+            <title>How Auto Scale Works</title>
+            <para>Rackspace &PROD; is an API-based tool that automatically scales resources in response to
+                an increase or decrease in overall workload based on user-defined thresholds.</para>
+            <para>&PROD; functions by linking these services:
+                <itemizedlist>
+                    <listitem>
+                        <para>&PROD; API, described in this guide.</para>
+                    </listitem>
+                    <listitem>
+                        <para>Load-balanced Cloud Servers. For more information, read the Rackspace
+                            <link xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/DB_Doc_Change_History.html">Load Balancers Getting Started Guide
+                            </link>.</para>
+                    </listitem>
+                </itemizedlist>You can set up a schedule for launching Auto Scale or define an event that triggers a
+                webhook. You can also specify a minimum and maximum number of cloud servers for your
+                scaling group, the amount of resources you want to increase or decrease, and policies
+                based on percentage or real numbers.</para>
+            <para>
+                <note>
+                    <para>&PROD; does not configure any information within a server. You must configure your
+                        services to function when each server is started. We recommend automating your
+                        servers' startup processes with
+                        <link xlink:href="http://www.opscode.com/chef/">Chef</link> or a similar tool.</para>
+                </note>
+            </para>
+            <para>
+                <note>
+                    <para>&PROD; can utilize all Rackspace Cloud Server API operations. For more details, see the 
+                        Cloud Server documentation in the Compute Services section on <link xlink:href="http://docs.rackspace.com/">
+                            docs.rackspace.com</link>.</para>
+                </note>
+            </para>
         </section>
         <section xml:id="Scaling_groups"
             xmlns:raxm="http://docs.rackspace.com/api/metadata">
@@ -523,7 +547,14 @@ is external so it's handy for Getting Started to share -->
                                 launch, what flavor the new server is,
                                 and which cloud load balancer or
                                 RackConnectV3 load balancer pool the
-                                new server connects to.</td>
+                                new server connects to.
+                                Note: The <parameter>launchConfiguration</parameter> uses the <emphasis role="bold">admin</emphasis> 
+                                user’s SSH key pair name, usually the first admin user found in the tenant. If there are 
+                                multiple <emphasis role="bold">admin</emphasis> accounts in the tenant, there is no guarantee 
+                                as to which is used. 
+                                Note: The launchConfiguration update operation overwrites all launchConfiguration settings. 
+                                Any parameters NOT specified in the update, are reset to null or default.      
+                                </td>
                         </tr>
                     </tbody>
                 </table>
@@ -2057,9 +2088,8 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
 }
                         </programlisting>
             </example>
-            <para>Error information for each API operation is included
-                with the description of that operation in <xref
-                    linkend="API_Operations"/>.</para>
+            <para>Error information for each API operation is included with the description of that 
+                operation in the API reference section.</para>
         </section>
     </chapter>
     <chapter xml:id="Autoscale_Components">
@@ -2089,9 +2119,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             </itemizedlist>
         </para>
         <note>
-            <para>For details on API parameters, see <link
-                    linkend="API_Operations">Chapter 6, API
-                    Operations</link>. </para>
+            <para>For details on API parameters, see Chapter 6, API Operations. </para>
         </note>
         <section xml:id="Group_Configuration">
             <title>Scaling groups</title>
@@ -2201,6 +2229,20 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 server is, and which cloud load balancer or
                 RackConnectV3 load balancer pool the new server
                 connects to.</para>
+            <note>
+                <itemizedlist>
+                    <listitem><para>
+                        The <parameter>launchConfiguration</parameter> uses the <emphasis role="bold">admin</emphasis> user’s SSH key pair name, 
+                        usually the first admin user found in the tenant. If there are multiple <emphasis role="bold">admin</emphasis> accounts in the tenant, there is no 
+                        guarantee as to which one will be chosen. So it is best for there to be one <emphasis role="bold">admin</emphasis> user in the tenant. 
+                        This restriction cannot be changed currently. There is no option to specify a user to impersonate. 
+                    </para></listitem>
+                    <listitem>
+                        <para>The launchConfiguration update operation overwrites all launchConfiguration settings. 
+                            Any parameters NOT specified in the update, are reset to null or default.</para>
+                    </listitem>
+                </itemizedlist>
+            </note>
             <para>The <parameter>launchConfiguration</parameter>
                 parameter specifies the following items:</para>
             <para>
@@ -2283,7 +2325,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </tbody>
                 </table>
             </para>
-            <para>The <parameter>server</parameter>group parameter specifies details about the server as described in the
+            <para>The <parameter>server</parameter> group parameter specifies details about the server as described in the
                 following table. Note the <parameter>server</parameter> arguments are directly passed to nova when creating a server.</para>
             <para>For more information see 
                 <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/nova_create_server.html">Create Your Server with the nova Client</link></para>
@@ -2935,9 +2977,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             </itemizedlist>
         </para>
         <note>
-            <para>For details on API parameters, see <link
-                    linkend="API_Operations">Chapter 6, API
-                    Operations</link>. </para>
+            <para>For details on API parameters, see Chapter 6, API Operations. </para>
         </note>
         <section xml:id="Manage_Launch_Configuration">
             <title>Create and manage scaling groups</title>
@@ -3557,5 +3597,10 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 the scaling policy is executed.</para>
         </section>
     </chapter>
-    <xi:include href="./chapters/apiref.xml"/>
+    <chapter xml:id="Glossary">
+        <title>Glossary</title>
+        <!-- Glossary section, defining basic terms, is external so it's handy for Getting Started to share. -->
+        <xi:include href="chapters/glossary.xml" xpointer="element(Glossary-000)"/>
+        <!-- -->
+    </chapter>
 </book>

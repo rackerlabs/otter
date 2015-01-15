@@ -54,7 +54,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
             <releaseinfo>API v1.0</releaseinfo>
             <productname>&PRODNAME;</productname>
             <!-- enter the publication date of this document; in revhistory, explain what changed -->
-            <pubdate>2014-08-14</pubdate>
+            <pubdate>2015-01-14</pubdate>
             <copyright>
             <year>2014</year>
             <holder>Rackspace US, Inc.</holder>
@@ -66,6 +66,16 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 </annotation>
             </legalnotice>
             <revhistory>
+                <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                    <date>2015-01-14</date>
+                    <revdescription>
+                        <itemizedlist spacing="compact">
+                            <listitem>
+                                <para>Added new info to <link linkend="Core_Concepts">How Auto Scale Works </link>section.</para>
+                            </listitem>
+                        </itemizedlist>
+                    </revdescription>
+                </revision>
                 <revision
                     xmlns:raxm="http://docs.rackspace.com/api/metadata">
                     <date>2014-08-14</date>
@@ -216,7 +226,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                         <para>How Auto Scale Works</para>
                     </listitem>
                 </itemizedlist>
-                <para>After going throught the examples in this guide, you will be able to complete the following
+                <para>After going through the examples in this guide, you will be able to complete the following
                     tasks:</para>
                 <itemizedlist>
                     <listitem>
@@ -399,7 +409,14 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                     <para>&PROD; does not configure any information within a server. You must configure your
                         services to function when each server is started. We recommend automating your
                         servers' startup processes with
-                        <link xlink:href="http://www.opscode.com/chef/">Chef</link>or a similar tool.</para>
+                        <link xlink:href="http://www.opscode.com/chef/">Chef</link> or a similar tool.</para>
+                </note>
+            </para>
+            <para>
+                <note>
+                    <para>&PROD; can utilize all Rackspace Cloud Server API operations. For more details, see the 
+                        Cloud Server documentation in the Compute Services section on <link xlink:href="http://docs.rackspace.com/">
+                            docs.rackspace.com</link>.</para>
                 </note>
             </para>
             <para>
