@@ -47,7 +47,9 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         otter_log.bind.return_value = self.log
 
         self.kz_client = mock.Mock(spec=['SetPartitioner'])
-        self.kz_partition = mock.MagicMock(allocating=False, release=False, failed=False,
+        self.kz_partition = mock.MagicMock(allocating=False,
+                                           release=False,
+                                           failed=False,
                                            acquired=False)
         self.kz_client.SetPartitioner.return_value = self.kz_partition
         self.zk_partition_path = '/part_path'
