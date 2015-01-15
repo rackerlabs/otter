@@ -309,7 +309,8 @@ class WeakLocksTests(SynchronousTestCase):
         self.assertIsNot(self.locks.get_lock('a'), self.locks.get_lock('b'))
 
 
-class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, SynchronousTestCase):
+class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin,
+                               SynchronousTestCase):
     """
     Tests for :class:`MockScalingGroup`
     """
@@ -319,7 +320,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, Synchronou
         Create a mock group
         """
         self.connection = mock.MagicMock(spec=CQLClient)
-        set_config_data({'limits': {'absolute': {'maxWebhooksPerPolicy': 1000}}})
+        set_config_data({'limits':
+                         {'absolute': {'maxWebhooksPerPolicy': 1000}}})
         self.addCleanup(set_config_data, {})
 
         self.returns = [None]
@@ -359,26 +361,33 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, Synchronou
         self.clock = Clock()
         locks = WeakLocks()
 
-        self.group = CassScalingGroup(self.mock_log, self.tenant_id,
+        self.group = CassScalingGroup(self.mock_log,
+                                      self.tenant_id,
                                       self.group_id,
-                                      self.connection, itertools.cycle(range(2, 10)),
-                                      self.kz_client, self.clock, locks)
+                                      self.connection,
+                                      itertools.cycle(range(2, 10)),
+                                      self.kz_client,
+                                      self.clock,
+                                      locks)
         self.assertIs(self.group.local_locks, locks)
-        self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
-                                                   tenant_id=self.tenant_id,
-                                                   scaling_group_id=self.group_id)
+        self.mock_log.bind.assert_called_once_with(
+            system='CassScalingGroup',
+            tenant_id=self.tenant_id,
+            scaling_group_id=self.group_id)
         self.mock_log = self.mock_log.bind()
 
         self.mock_key = patch(self, 'otter.models.cass.generate_key_str',
                               return_value='12345678')
-        self.mock_capability = patch(self, 'otter.models.cass.generate_capability',
-                                     return_value=('ver', 'hash'))
+        self.mock_capability = patch(
+            self, 'otter.models.cass.generate_capability',
+            return_value=('ver', 'hash'))
 
         self.uuid = patch(self, 'otter.models.cass.uuid')
         self.uuid.uuid1.return_value = 'timeuuid'
 
         self.mock_next_cron_occurrence = patch(
-            self, 'otter.models.cass.next_cron_occurrence', return_value='next_time')
+            self, 'otter.models.cass.next_cron_occurrence',
+            return_value='next_time')
 
 
 class CassScalingGroupTests(CassScalingGroupTestCase):
@@ -388,8 +397,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
     def test_with_timestamp(self):
         """
-        `with_timestamp` calls the decorated function with the timestamp got from
-        `get_client_ts`
+        `with_timestamp` calls the decorated function with the timestamp
+        got from `get_client_ts`
         """
         self.clock.advance(23.566783)
 
