@@ -491,8 +491,8 @@ class ProcessEventsTests(SchedulerTests):
 
     def test_success(self):
         """
-        Test success path: Logs number of events, calls `execute_event` on each event
-        and calls `add_cron_events`
+        Test success path: Logs number of events, calls `execute_event` on
+        each event and calls `add_cron_events`.
         """
         events = range(10)
         d = process_events(events, self.mock_store, self.log)
@@ -545,7 +545,8 @@ class AddCronEventsTests(SchedulerTests):
 
     def test_store_add_cron_called(self):
         """
-        Updates cron events for non-deleted policies by calling store.add_cron_events
+        Updates cron events for non-deleted policies by calling
+        store.add_cron_events.
         """
         events = [{'tenantId': '1234',
                    'groupId': 'scal44',
