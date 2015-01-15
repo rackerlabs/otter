@@ -214,7 +214,7 @@ class VerifiedViewTests(SynchronousTestCase):
                              view_query='vq',
                              del_query='dq',
                              data={'d': 2},
-                             consistency=6,
+                             consistency=ConsistencyLevel.TWO,
                              exception_if_empty=ValueError,
                              log=self.log)
         return view
@@ -227,7 +227,8 @@ class VerifiedViewTests(SynchronousTestCase):
             [{'c1': 2, 'created_at': 23}])
         r = self._verified_view()
         self.assertEqual(self.successResultOf(r), {'c1': 2, 'created_at': 23})
-        self.connection.execute.assert_called_once_with('vq', {'d': 2}, 6)
+        self.connection.execute.assert_called_once_with(
+            'vq', {'d': 2}, ConsistencyLevel.TWO)
         self.assertFalse(self.log.msg.called)
 
     def test_resurrected_view(self):
@@ -237,8 +238,9 @@ class VerifiedViewTests(SynchronousTestCase):
         self.connection.execute.return_value = defer.succeed([{'c1': 2, 'created_at': None}])
         r = self._verified_view()
         self.failureResultOf(r, ValueError)
-        self.connection.execute.assert_has_calls([mock.call('vq', {'d': 2}, 6),
-                                                  mock.call('dq', {'d': 2}, 6)])
+        self.connection.execute.assert_has_calls(
+            [mock.call('vq', {'d': 2}, ConsistencyLevel.TWO),
+             mock.call('dq', {'d': 2}, ConsistencyLevel.TWO)])
         self.log.msg.assert_called_once_with(
             'Resurrected row',
             row={'c1': 2, 'created_at': None},
@@ -261,8 +263,9 @@ class VerifiedViewTests(SynchronousTestCase):
         self.connection.execute.side_effect = _execute
         r = self._verified_view()
         self.failureResultOf(r, ValueError)
-        self.connection.execute.assert_has_calls([mock.call('vq', {'d': 2}, 6),
-                                                  mock.call('dq', {'d': 2}, 6)])
+        self.connection.execute.assert_has_calls(
+            [mock.call('vq', {'d': 2}, ConsistencyLevel.TWO),
+             mock.call('dq', {'d': 2}, ConsistencyLevel.TWO)])
 
     def test_empty_view(self):
         """
@@ -271,7 +274,8 @@ class VerifiedViewTests(SynchronousTestCase):
         self.connection.execute.return_value = defer.succeed([])
         r = self._verified_view()
         self.failureResultOf(r, ValueError)
-        self.connection.execute.assert_called_once_with('vq', {'d': 2}, 6)
+        self.connection.execute.assert_called_once_with(
+            'vq', {'d': 2}, ConsistencyLevel.TWO)
         self.assertFalse(self.log.msg.called)
 
 
