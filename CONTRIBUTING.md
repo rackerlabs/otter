@@ -14,8 +14,6 @@ discussion about a change would be useful.
 
 ## Pull Requests
 
-Heres are the requirements for making a PR:
-
 Code must be unit tested. run "make lint" and "trial otter" before submitting
 your PR.
 
