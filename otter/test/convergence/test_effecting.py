@@ -11,6 +11,7 @@ from otter.constants import ServiceType
 from otter.convergence.effecting import _reqs_to_effect, steps_to_effect
 from otter.convergence.steps import Request, IStep
 from otter.http import get_request_func
+from otter.test.utils import defaults_by_name
 from otter.util.pure_http import has_code
 
 
@@ -38,14 +39,14 @@ class PureRequestStubTests(SynchronousTestCase):
         """
         authenticator, log, = object(), object()
         request_func = get_request_func(authenticator, 1234, log, {}, "XYZ")
-        args, _, _, defaults = getargspec(request_func)
+        args = getargspec(request_func).args
         characteristic_attrs = _PureRequestStub.characteristic_attributes
         self.assertEqual(set(a.name for a in characteristic_attrs), set(args))
         characteristic_defaults = {a.name: a.default_value
                                    for a in characteristic_attrs
                                    if a.default_value is not NOTHING}
-        defaults_by_name = dict(zip(reversed(args), reversed(defaults)))
-        self.assertEqual(characteristic_defaults, defaults_by_name)
+        self.assertEqual(characteristic_defaults,
+                         defaults_by_name(request_func))
 
 
 class RequestsToEffectTests(SynchronousTestCase):
@@ -69,7 +70,7 @@ class RequestsToEffectTests(SynchronousTestCase):
             Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
                     method="GET",
                     path="/whatever",
-                    success_codes=(999,))]
+                    success_pred=has_code(999))]
         expected_effects = [
             _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
                              method="GET",
@@ -91,7 +92,7 @@ class RequestsToEffectTests(SynchronousTestCase):
             Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
                     method="GET",
                     path="/whatever/something/else",
-                    success_codes=(231,))]
+                    success_pred=has_code(231))]
         expected_effects = [
             _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
                              method="GET",
@@ -119,7 +120,7 @@ class RequestsToEffectTests(SynchronousTestCase):
             Request(service=ServiceType.CLOUD_LOAD_BALANCERS,
                     method="GET",
                     path="/whatever/something/else",
-                    success_codes=(231,)),
+                    success_pred=has_code(231)),
             Request(service=ServiceType.CLOUD_SERVERS,
                     method="POST",
                     path="/xyzzy",

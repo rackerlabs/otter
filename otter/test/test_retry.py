@@ -3,8 +3,8 @@ Tests for :mod:`otter.utils.retry`
 """
 import sys
 
-from effect import Effect, Delay, Func, Constant
-from effect.testing import resolve_effect, Stub
+from effect import Constant, Delay, Effect, Func
+from effect.testing import Stub, resolve_effect
 
 import mock
 
@@ -13,12 +13,22 @@ from twisted.internet.defer import CancelledError, Deferred, succeed
 from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.util.retry import (retry, repeating_interval, random_interval,
-                              transient_errors_except, retry_times,
-                              compose_retries, exponential_backoff_interval,
-                              terminal_errors_except, retry_effect, Retry,
-                              ShouldDelayAndRetry, perform_retry)
-from otter.test.utils import CheckFailure, DummyException, CheckFailureValue, resolve_stubs
+from otter.test.utils import (
+    CheckFailure, CheckFailureValue, DummyException, resolve_stubs)
+from otter.util.retry import (
+    Retry,
+    ShouldDelayAndRetry,
+    compose_retries,
+    exponential_backoff_interval,
+    perform_retry,
+    random_interval,
+    repeating_interval,
+    retry,
+    retry_effect,
+    retry_times,
+    terminal_errors_except,
+    transient_errors_except,
+)
 
 
 class RetryTests(SynchronousTestCase):
@@ -447,7 +457,9 @@ class EffectfulRetryTests(SynchronousTestCase):
     # attributes, I guess...
 
     def test_perform_retry(self):
-        """When the specified effect is successful, its result is propagated."""
+        """
+        When the specified effect is successful, its result is propagated.
+        """
         retry = Retry(effect=STUB, should_retry=lambda e: 1 / 0)
         eff = perform_retry(None, retry)
         self.assertEqual(resolve_stubs(eff), "foo")
@@ -478,11 +490,11 @@ def get_exc_info():
     """Get the exc_info tuple representing a ZeroDivisionError('foo')"""
     try:
         raise ZeroDivisionError("foo")
-    except:
+    except Exception:
         return sys.exc_info()
 
 
-def _perform_func(eff):
+def _perform_func_intent(eff):
     """Perform a func intent without recursing on effects."""
     assert type(eff.intent) is Func
     return eff.intent.func()
@@ -499,7 +511,7 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=lambda f: False,
                                    next_interval=lambda f: 1 / 0)
         eff = sdar(get_exc_info())
-        self.assertEqual(_perform_func(eff), False)
+        self.assertEqual(_perform_func_intent(eff), False)
 
     def test_should_retry(self):
         """
@@ -509,7 +521,7 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=lambda f: True,
                                    next_interval=lambda f: 1.5)
         eff = sdar(get_exc_info())
-        next_eff = _perform_func(eff)
+        next_eff = _perform_func_intent(eff)
         self.assertEqual(next_eff.intent, Delay(delay=1.5))
         self.assertEqual(resolve_effect(next_eff, None),
                          True)
@@ -533,6 +545,7 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=can_retry,
                                    next_interval=next_interval)
         eff = sdar(get_exc_info())
-        _perform_func(eff)
+        _perform_func_intent(eff)
         self.assertEqual(can_retry_failures, next_interval_failures)
-        self.assertEqual(can_retry_failures[0], CheckFailureValue(ZeroDivisionError("foo")))
+        self.assertEqual(can_retry_failures[0],
+                         CheckFailureValue(ZeroDivisionError("foo")))

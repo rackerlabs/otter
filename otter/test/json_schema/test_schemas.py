@@ -1104,3 +1104,80 @@ class UpdateWebhookTestCase(SynchronousTestCase):
         """
         invalid = {'name': 'foo'}
         self.assertRaises(ValidationError, validate, invalid, group_schemas.update_webhook)
+
+
+class HelperValidationFunctionsTestCase(SynchronousTestCase):
+    """
+    Tests for helper validation functions such as
+    :func:`group_schemas.validate_launch_config_servicenet`.
+    """
+    def test_servicenet_validation_fails_if_no_servicenet_but_has_clbs_old_style(self):
+        """
+        If CLBs are confgured on the launch configuration (old style load
+        balancer configuration), but no ServiceNet is supplied, raise
+        validation error.
+        """
+        bad_schema = {
+            "server": {"networks": [{'uuid': "00000000-0000-0000-0000-000000000000"}]},
+            "loadBalancers": [{'loadBalancerId': 1, "port": 80}]
+        }
+        self.assertRaises(ValidationError,
+                          group_schemas.validate_launch_config_servicenet,
+                          {'type': 'launch_server', 'args': bad_schema})
+
+    def test_servicenet_validation_fails_if_no_servicenet_but_has_clbs_new_style(self):
+        """
+        If CLBs are confgured on the launch configuration (new style load
+        balancer configuration), but no ServiceNet is supplied, raise
+        validation error.
+        """
+        bad_schema = {
+            "server": {"networks": [{'uuid': "00000000-0000-0000-0000-000000000000"}]},
+            "loadBalancers": [{'loadBalancerId': 1, "port": 80, 'type': 'CloudLoadBalancer'}]
+        }
+        self.assertRaises(ValidationError,
+                          group_schemas.validate_launch_config_servicenet,
+                          {'type': 'launch_server', 'args': bad_schema})
+
+    def test_servicenet_validation_succeeds_if_clbs_but_no_network_info(self):
+        """
+        If CLBs are confgured on the launch configuration, but no network
+        configuration is supplied, Nova sets up both ServiceNet and public
+        network, so validation succeeds.
+        """
+        good_schema = {
+            "server": {},
+            "loadBalancers": [{'loadBalancerId': 1, "port": 80}]
+        }
+        self.assertIsNone(
+            group_schemas.validate_launch_config_servicenet(
+                {'type': 'launch_server', 'args': good_schema}))
+
+    def test_servicenet_validation_succeeds_if_rackconnect_but_no_network_info(self):
+        """
+        If only RackConnect LBs are confgured on the launch configuration, and
+        no ServiceNet is supplied, that's still ok because RackConnect does not
+        need ServiceNet so validation succeeds.
+        """
+        good_schema = {
+            "server": {"networks": [{'uuid': "00000000-0000-0000-0000-000000000000"}]},
+            "loadBalancers": [{'loadBalancerId': '1234', 'type': 'RackConnectV3'}]
+        }
+        self.assertIsNone(
+            group_schemas.validate_launch_config_servicenet(
+                {'type': 'launch_server', 'args': good_schema}))
+
+    def test_servicenet_validation_succeeds_if_clbs_and_servicenet(self):
+        """
+        If CLBs are confgured on the launch configuration, but and ServiceNet
+        is specifically provided, validation succeeds
+        """
+        good_schema = {
+            "server": {"networks": [
+                {'uuid': "00000000-0000-0000-0000-000000000000"},
+                {'uuid': "11111111-1111-1111-1111-111111111111"}]},
+            "loadBalancers": [{'loadBalancerId': 1, "port": 80}]
+        }
+        self.assertIsNone(
+            group_schemas.validate_launch_config_servicenet(
+                {'type': 'launch_server', 'args': good_schema}))

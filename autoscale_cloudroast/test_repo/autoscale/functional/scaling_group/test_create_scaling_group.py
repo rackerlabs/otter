@@ -30,7 +30,8 @@ class CreateScalingGroupTest(AutoscaleFixture):
         self.lc_disk_config = 'AUTO'
         self.lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'},
                             {'uuid': '00000000-0000-0000-0000-000000000000'}]
-        self.lc_load_balancers = [{'loadBalancerId': 9099, 'port': 8080}]
+        self.lc_load_balancers = [{'loadBalancerId': 9099, 'port': 8080},
+                                  {'loadBalancerId': '8315', 'port': 80}]
         self.sp_list = [{
             'name': 'scale up by 1',
             'change': 1,

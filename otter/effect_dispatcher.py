@@ -2,16 +2,18 @@
 
 from functools import partial
 
-from effect import base_dispatcher, ComposedDispatcher, TypeDispatcher
+from effect import ComposedDispatcher, TypeDispatcher, base_dispatcher
 from effect.twisted import make_twisted_dispatcher
 
 from .auth import (
-    Authenticate, perform_authenticate,
-    InvalidateToken, perform_invalidate_token)
+    Authenticate,
+    InvalidateToken,
+    perform_authenticate,
+    perform_invalidate_token,
+)
+from .http import TenantScope, perform_tenant_scope
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
-
-from otter.http import TenantScope, perform_tenant_scope
 
 
 def get_simple_dispatcher(reactor):

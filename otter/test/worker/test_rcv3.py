@@ -1,14 +1,17 @@
 """
 Tests for RCv3-specific worker code.
 """
-from effect import Effect, ComposedDispatcher
-from otter.constants import ServiceType
-from otter.worker import _rcv3
-from otter.test.convergence.test_effecting import _PureRequestStub
-from otter.util.pure_http import has_code
+from uuid import uuid4
+
+from effect import ComposedDispatcher, Effect
+
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
-from uuid import uuid4
+
+from otter.constants import ServiceType
+from otter.test.convergence.test_effecting import _PureRequestStub
+from otter.util.pure_http import has_code
+from otter.worker import _rcv3
 
 
 def _rcv3_add_response(lb_id, server_id):

@@ -4,9 +4,9 @@ Module that provides retrying-at-a-particular-interval functionality.
 
 import random
 
-from characteristic import attributes, Attribute
+from characteristic import Attribute, attributes
 
-from effect import Effect, Delay, Func
+from effect import Delay, Effect, Func
 from effect.retry import retry as effect_retry
 
 from twisted.internet import defer

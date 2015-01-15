@@ -429,11 +429,11 @@ class FindPendingJobsToCancelTests(SynchronousTestCase):
         sorting.
         """
         self.data = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001'},
-            '2': {'created': '0001-01-04T00:02:02Z'},
-            '3': {'created': '0001-01-04T00:00:10Z'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513'},
-            '5': {'created': '0001-01-05T00:00:00Z'}
+            '1': {'created': '2014-01-01T00:00:05Z.1234'},
+            '2': {'created': '2014-01-04T00:02:02Z'},
+            '3': {'created': '2014-01-04T00:00:10Z'},
+            '4': {'created': '2014-01-01T01:00:00Z.3513'},
+            '5': {'created': '2014-01-05T00:00:00Z'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
 
         self.cancellable_state = GroupState('t', 'g', 'n', {}, self.data, None, {},
@@ -470,13 +470,13 @@ class FindServersToEvictTests(SynchronousTestCase):
         sorting.
         """
         self.data = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1',
+            '1': {'created': '2014-01-01T00:00:05Z.1234', 'id': '1',
                   'lb': 'lb'},
-            '2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
-            '3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4',
+            '2': {'created': '2014-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
+            '3': {'created': '2014-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
+            '4': {'created': '2014-01-01T01:00:00Z.3513', 'id': '4',
                   'lb': 'lb'},
-            '5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
+            '5': {'created': '2014-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
 
         self.deletable_state = GroupState('t', 'g', 'n', self.data, {}, None, {},
@@ -514,13 +514,13 @@ class DeleteActiveServersTests(SynchronousTestCase):
         """
         self.log = mock.Mock()
         self.data = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1',
+            '1': {'created': '2014-01-01T00:00:05Z.1234', 'id': '1',
                   'lb': 'lb'},
-            '2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
-            '3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4',
+            '2': {'created': '2014-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
+            '3': {'created': '2014-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
+            '4': {'created': '2014-01-01T01:00:00Z.3513', 'id': '4',
                   'lb': 'lb'},
-            '5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
+            '5': {'created': '2014-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
         self.fake_state = GroupState('t', 'g', 'n', self.data, {}, False, False,
                                      False)
@@ -681,20 +681,20 @@ class ExecScaleDownTests(SynchronousTestCase):
         """
         self.log = mock.Mock()
         self.pending = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001'},
-            '2': {'created': '0001-01-04T00:02:02Z'},
-            '3': {'created': '0001-01-04T00:00:10Z'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513'},
-            '5': {'created': '0001-01-05T00:00:00Z'}
+            '1': {'created': '2014-01-01T00:00:05Z.1234'},
+            '2': {'created': '2014-01-04T00:02:02Z'},
+            '3': {'created': '2014-01-04T00:00:10Z'},
+            '4': {'created': '2014-01-01T01:00:00Z.3513'},
+            '5': {'created': '2014-01-05T00:00:00Z'}
         }  # descending order by time would be: 5, 2, 3, 4, 1
         self.active = {
-            'a1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1',
+            'a1': {'created': '2014-01-01T00:00:05Z.1234', 'id': '1',
                    'lb': 'lb'},
-            'a2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
-            'a3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
-            'a4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4',
+            'a2': {'created': '2014-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
+            'a3': {'created': '2014-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
+            'a4': {'created': '2014-01-01T01:00:00Z.3513', 'id': '4',
                    'lb': 'lb'},
-            'a5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
+            'a5': {'created': '2014-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: a1, a4, a3, a2, a5
         self.fake_state = GroupState('t', 'g', '', self.active, self.pending,
                                      False, False, False)

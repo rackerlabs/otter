@@ -3,13 +3,16 @@
 
 At some point, this should just be moved into that module.
 """
-from effect.twisted import perform
 from functools import partial
 from operator import itemgetter
-from otter.effect_dispatcher import get_simple_dispatcher
-from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3
-from otter.convergence.effecting import steps_to_effect
+
+from effect.twisted import perform
+
 from twisted.internet import reactor
+
+from otter.convergence.effecting import steps_to_effect
+from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3
+from otter.effect_dispatcher import get_simple_dispatcher
 
 
 def _generic_rcv3_request(step_class, request_func, lb_id, server_id,
