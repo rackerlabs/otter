@@ -40,8 +40,6 @@ class AutoscaleFixture(BaseTestFixture):
         user_config = UserConfig()
         access_data = AuthProvider.get_access_data(cls.endpoint_config,
                                                    user_config)
-        print "Access Data ====================== "
-        pp.pprint(access_data)
         server_service = access_data.get_service(
             cls.autoscale_config.server_endpoint_name)
         load_balancer_service = access_data.get_service(
@@ -388,7 +386,6 @@ class AutoscaleFixture(BaseTestFixture):
             else:
                 # We're looking at the RackConnect API for our server list here.
                 nodes = self.rcv3_client.get_nodes_on_pool(group_id).entity
-                pp.pprint(nodes.nodes)
                 server_list = [n for n in nodes.nodes
                                if (safe_hasattr(n, "cloud_server")) and (n.status == "ACTIVE")]
                 if len(server_list) == expected_servers:
