@@ -919,7 +919,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
     @mock.patch('otter.models.cass.verified_view')
     def test_view_launch_resurrected_entry(self, mock_verfied_view):
         """
-        When viewing the launch config, if the returned row is rescurrected
+        When viewing the launch config, if the returned row is resurrected
         row, it is not returned and it is triggerred for deletion.
         """
         mock_verfied_view.return_value = defer.fail(
