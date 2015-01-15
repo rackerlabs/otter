@@ -583,8 +583,9 @@ class ExecuteEventTests(SchedulerTests):
             return d.addCallback(_set_new_state)
 
         self.mock_group.modify_state.side_effect = _mock_modify_state
-        self.maybe_exec_policy = patch(self, 'otter.scheduler.maybe_execute_scaling_policy',
-                                       return_value=defer.succeed('newstate'))
+        self.maybe_exec_policy = patch(
+            self, 'otter.scheduler.maybe_execute_scaling_policy',
+            return_value=defer.succeed('newstate'))
         self.log = mock.Mock()
         self.log_args = {
             'tenant_id': '1234',
