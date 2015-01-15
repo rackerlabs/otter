@@ -28,20 +28,19 @@ their own changes.
 
 ## Review Process
 
-- At least one review is required per Pull Request.
+- At least one review is required per Pull Request, before it can be merged.
 - If a PR does not have the "in progress" label, it is considered up for
   review. If an author realizes a PR needs more work (usually after a reviewer
-  has made a bunch of comments), they may add the "in progress" label.
+  has made some comments), they may add the "in progress" label.
 - Any party may request an additional reviewer, at which point the PR must not
   be merged until the additional review is done.
-- additional reviewers can be named explicitly or anonymous. e.g.:
+- additional reviewers can be named explicitly or anonymously. e.g.:
   - author says "@manishtomar or @cyli: you know about Cassandra code, so can
     one of you review this?"
   - First reviewer says "LGTM, but I'm not very confident. Can someone else
     please review this?"
-- If a reviewer gives a "LGTM" with caveat, such as "LGTM, after you (fix this
-  docstring typo)/(perform this trivial refactor)", then the author can merge
-  the branch immediately after making the change (and only that change).
+- If a reviewer gives a "LGTM" with a caveat, such as "LGTM, after you (fix
+  this docstring typo)/(perform this trivial refactor)", then the author can
+  merge the branch immediately after making the change (and only that change).
 - If the PR has a "LGTM" but it conflicts with master, any party may merge
   it forward, give it a sanity check, and merge it.
-
