@@ -1,21 +1,36 @@
 """
 Tests for :mod:`otter.scheduler`
 """
-
-from twisted.trial.unittest import SynchronousTestCase
-from twisted.internet import defer
-from twisted.internet.task import Clock
-
-import mock
 from datetime import datetime, timedelta
 
-from otter.scheduler import (
-    SchedulerService, check_events_in_bucket, process_events, add_cron_events, execute_event)
-from otter.test.utils import iMock, patch, CheckFailure, mock_log, DeferredFunctionMixin
-from otter.models.interface import (
-    IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection)
-from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
+import mock
+
+from twisted.internet import defer
+from twisted.internet.task import Clock
+from twisted.trial.unittest import SynchronousTestCase
+
 from otter.controller import CannotExecutePolicyError
+from otter.models.interface import (
+    IScalingGroup,
+    IScalingGroupCollection,
+    IScalingScheduleCollection,
+    NoSuchPolicyError,
+    NoSuchScalingGroupError
+)
+from otter.scheduler import (
+    SchedulerService,
+    add_cron_events,
+    check_events_in_bucket,
+    execute_event,
+    process_events
+)
+from otter.test.utils import (
+    CheckFailure,
+    DeferredFunctionMixin,
+    iMock,
+    mock_log,
+    patch
+)
 
 
 class SchedulerTests(SynchronousTestCase):
