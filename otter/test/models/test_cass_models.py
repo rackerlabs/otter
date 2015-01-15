@@ -2651,10 +2651,12 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         self.returns = [[]]
         expectedData = {'tenantId': '123', 'limit': 100, 'marker': '345'}
-        expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
-                       '"groupTouched", "policyTouched", paused, desired, created_at FROM '
-                       'scaling_group WHERE "tenantId" = :tenantId AND '
-                       '"groupId" > :marker LIMIT :limit;')
+        expectedCql = (
+            'SELECT "tenantId", "groupId", group_config, active, pending, '
+            '"groupTouched", "policyTouched", paused, desired, created_at '
+            'FROM scaling_group '
+            'WHERE "tenantId" = :tenantId '
+            'AND "groupId" > :marker LIMIT :limit;')
         self.collection.list_scaling_group_states(self.mock_log, '123',
                                                   marker='345')
         self.connection.execute.assert_called_once_with(
@@ -2745,18 +2747,25 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.returns = [group_dicts, None]
 
         expectedCql = ('BEGIN BATCH '
-                       'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND '
-                       '"groupId" = :groupId0 '
-                       'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND '
-                       '"groupId" = :groupId1 '
-                       'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND '
-                       '"groupId" = :groupId0 '
-                       'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND '
-                       '"groupId" = :groupId1 '
-                       'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND '
-                       '"groupId" = :groupId0 '
-                       'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND '
-                       '"groupId" = :groupId1 '
+
+                       'DELETE FROM scaling_group '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId0 '
+
+                       'DELETE FROM scaling_group '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId1 '
+
+                       'DELETE FROM scaling_policies '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId0 '
+
+                       'DELETE FROM scaling_policies '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId1 '
+
+                       'DELETE FROM policy_webhooks '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId0 '
+
+                       'DELETE FROM policy_webhooks '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId1 '
+
                        'APPLY BATCH;')
         expectedData = {'groupId0': 'group124',
                         'groupId1': 'group125',
@@ -2835,8 +2844,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             _cassandrify_data([{'data': '{}'}])
         ]
         expectedData = {'webhookKey': 'x'}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId" FROM policy_webhooks WHERE '
-                       '"webhookKey" = :webhookKey;')
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId" '
+                       'FROM policy_webhooks '
+                       'WHERE "webhookKey" = :webhookKey;')
         d = self.collection._webhook_info_by_index(self.mock_log, 'x')
         r = self.successResultOf(d)
         self.assertEqual(r, ('123', 'group1', 'pol1'))
@@ -2852,8 +2862,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             _cassandrify_data([{'data': '{}'}])
         ]
         expectedData = {'webhookKey': 'x'}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId" FROM webhook_keys WHERE '
-                       '"webhookKey" = :webhookKey;')
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId" '
+                       'FROM webhook_keys '
+                       'WHERE "webhookKey" = :webhookKey;')
         d = self.collection._webhook_info_from_table(self.mock_log, 'x')
         r = self.successResultOf(d)
         self.assertEqual(r, ('123', 'group1', 'pol1'))
@@ -2866,10 +2877,12 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         self.returns = [[], []]
         expectedData = {'webhookKey': 'x'}
-        expectedCql = [('SELECT "tenantId", "groupId", "policyId" FROM webhook_keys WHERE '
-                        '"webhookKey" = :webhookKey;'),
-                       ('SELECT "tenantId", "groupId", "policyId" FROM policy_webhooks WHERE '
-                        '"webhookKey" = :webhookKey;')]
+        expectedCql = [('SELECT "tenantId", "groupId", "policyId" '
+                        'FROM webhook_keys '
+                        'WHERE "webhookKey" = :webhookKey;'),
+                       ('SELECT "tenantId", "groupId", "policyId" '
+                        'FROM policy_webhooks '
+                        'WHERE "webhookKey" = :webhookKey;')]
         d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
         self.failureResultOf(d, UnrecognizedCapabilityError)
         self.connection.execute.assert_has_calls(
@@ -2892,9 +2905,12 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "policies": 101,
             "webhooks": 102
         }
-        config_query = ('SELECT COUNT(*) FROM scaling_group WHERE "tenantId" = :tenantId;')
-        policy_query = ('SELECT COUNT(*) FROM scaling_policies WHERE "tenantId" = :tenantId;')
-        webhook_query = ('SELECT COUNT(*) FROM policy_webhooks WHERE "tenantId" = :tenantId;')
+        config_query = ('SELECT COUNT(*) FROM scaling_group '
+                        'WHERE "tenantId" = :tenantId;')
+        policy_query = ('SELECT COUNT(*) FROM scaling_policies '
+                        'WHERE "tenantId" = :tenantId;')
+        webhook_query = ('SELECT COUNT(*) FROM policy_webhooks '
+                         'WHERE "tenantId" = :tenantId;')
 
         calls = [
             mock.call(config_query, expectedData, ConsistencyLevel.ONE),
