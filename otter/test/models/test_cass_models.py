@@ -195,12 +195,12 @@ class AssembleWebhooksTests(SynchronousTestCase):
 
 class VerifiedViewTests(SynchronousTestCase):
     """
-    Tests for `verified_view`
+    Tests for `verified_view`.
     """
 
     def setUp(self):
         """
-        mock connection object
+        Mock connection object.
         """
         self.connection = mock.MagicMock(spec=['execute'])
         self.log = mock_log()
