@@ -56,7 +56,7 @@ DIFF_TARGET = $(shell git merge-base master HEAD)
 endif
 
 flake8diff:
-	git diff --patch --no-prefix ${DIFF_TARGET} | flake8 --diff
+	git diff --patch --no-prefix ${DIFF_TARGET} | flake8 --diff; true
 
 flake8full:
 	flake8 ${PYDIRS}
