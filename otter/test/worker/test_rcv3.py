@@ -1,14 +1,17 @@
-
 """
 Tests for RCv3-specific worker code.
 """
-from effect import Effect
-from otter.constants import ServiceType
-from otter.worker import _rcv3
-from otter.test.convergence.test_effecting import _PureRequestStub
+from uuid import uuid4
+
+from effect import ComposedDispatcher, Effect
+
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
-from uuid import uuid4
+
+from otter.constants import ServiceType
+from otter.test.convergence.test_effecting import _PureRequestStub
+from otter.util.pure_http import has_code
+from otter.worker import _rcv3
 
 
 def _rcv3_add_response(lb_id, server_id):
@@ -38,14 +41,14 @@ class RCv3Tests(SynchronousTestCase):
         self.reactor = object()
         self.patch(_rcv3, "perform", self._fake_perform)
 
-    def _fake_perform(self, reactor, effect):
+    def _fake_perform(self, dispatcher, effect):
         """
         A test double for :func:`effect.twisted.perform`.
 
-        :param IReactorCore _reactor: The reactor used to "execute".
+        :param dispatcher: The Effect dispatcher.
         :param effect: The effect to "execute".
         """
-        self.assertIdentical(self.reactor, reactor)
+        self.assertTrue(isinstance(dispatcher, ComposedDispatcher))
 
         self.effect = effect
         self.assertTrue(isinstance(effect, Effect))
@@ -65,11 +68,11 @@ class RCv3Tests(SynchronousTestCase):
         self.assertIn(sub_effect.method, ["POST", "DELETE"])
 
         if sub_effect.method == "POST":
-            self.assertEqual(sub_effect.success_codes, (201,))
+            self.assertEqual(sub_effect.success_pred, has_code(201))
             # http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes
             response = _rcv3_add_response("lb_id", "server_id")
         elif sub_effect.method == "DELETE":
-            self.assertEqual(sub_effect.success_codes, (204,))
+            self.assertEqual(sub_effect.success_pred, has_code(204))
             # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes
             response = None
 

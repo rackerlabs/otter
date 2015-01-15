@@ -4,37 +4,35 @@ Script to collect metrics (total desired, actual and pending) from a DC
 
 from __future__ import print_function
 
-from functools import partial
-import sys
 import json
-from collections import namedtuple
-import time
 import operator
+import sys
+import time
+from collections import namedtuple
+from functools import partial
 
-from effect.twisted import perform, exc_info_to_failure
-
-from twisted.internet import task, defer
-from twisted.internet.endpoints import clientFromString
-from twisted.application.service import Service
-from twisted.application.internet import TimerService
-from twisted.python import usage
+from effect.twisted import exc_info_to_failure, perform
 
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
-from toolz.curried import groupby, filter, get_in
+from toolz.curried import filter, get_in, groupby
 from toolz.dicttoolz import merge
 from toolz.functoolz import identity
 
-from otter.auth import generate_authenticator, authenticate_user, extract_token
+from twisted.application.internet import TimerService
+from twisted.application.service import Service
+from twisted.internet import defer, task
+from twisted.internet.endpoints import clientFromString
+from twisted.python import usage
 
-from otter.auth import public_endpoint_url
-from otter.constants import get_service_mapping
-from otter.http import get_request_func
+from otter.auth import generate_authenticator
+from otter.constants import ServiceType, get_service_mapping
 from otter.convergence.gathering import get_scaling_group_servers
-from otter.util.http import append_segments, headers, check_success
-from otter.util.fp import predicate_all
+from otter.effect_dispatcher import get_dispatcher
+from otter.http import get_request_func
 from otter.log import log as otter_log
+from otter.util.fp import predicate_all
 
 
 # TODO: Remove this and pass it from service to other functions
@@ -159,8 +157,9 @@ def _perform_limited_effects(effects, clock, limit):
     It'd be nice if effect.parallel had a "limit" parameter.
     """
     # TODO: Use cooperator instead
+    dispatcher = get_dispatcher(clock)
     sem = defer.DeferredSemaphore(limit)
-    defs = [sem.run(perform, clock, eff) for eff in effects]
+    defs = [sem.run(perform, dispatcher, eff) for eff in effects]
     return defer.gatherResults(defs)
 
 
@@ -187,9 +186,8 @@ def get_all_metrics(cass_groups, authenticator, service_mapping, region,
     return d.addCallback(lambda x: reduce(operator.add, x, []))
 
 
-@defer.inlineCallbacks
-def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual,
-                         total_pending, _treq=None):
+def add_to_cloud_metrics(request_func, conf, region, total_desired, total_actual,
+                         total_pending, log=None):
     """
     Add total number of desired, actual and pending servers of a region to Cloud metrics
 
@@ -204,31 +202,15 @@ def add_to_cloud_metrics(conf, identity_url, region, total_desired, total_actual
 
     :return: `Deferred` with None
     """
-    # TODO: Have generic authentication function that auths, gets the service URL
-    # and returns the token
-    resp = yield authenticate_user(identity_url, conf['username'], conf['password'],
-                                   log=metrics_log)
-    token = extract_token(resp)
-
-    if _treq is None:  # pragma: no cover
-        from otter.util import logging_treq
-        _treq = logging_treq
-
-    url = public_endpoint_url(resp['access']['serviceCatalog'], conf['service'], conf['region'])
-
     metric_part = {'collectionTime': int(time.time() * 1000),
                    'ttlInSeconds': conf['ttl']}
     totals = [('desired', total_desired), ('actual', total_actual), ('pending', total_pending)]
-    d = _treq.post(
-        append_segments(url, 'ingest'), headers=headers(token),
-        data=json.dumps([merge(metric_part,
-                               {'metricValue': value,
-                                'metricName': '{}.{}'.format(region, metric)})
-                         for metric, value in totals]),
-        log=metrics_log)
-    d.addCallback(check_success, [200], _treq=_treq)
-    d.addCallback(_treq.content)
-    yield d
+    return request_func(ServiceType.CLOUD_METRICS_INGEST, 'POST', 'ingest',
+                        data=[merge(metric_part,
+                                    {'metricValue': value,
+                                     'metricName': '{}.{}'.format(region, metric)})
+                              for metric, value in totals],
+                        log=log)
 
 
 def connect_cass_servers(reactor, config):
@@ -274,9 +256,15 @@ def collect_metrics(reactor, config, client=None, authenticator=None, _print=Fal
     if _print:
         print('total desired: {}, total actual: {}, total pending: {}'.format(
             total_desired, total_actual, total_pending))
-    yield add_to_cloud_metrics(config['metrics'], config['identity']['url'],
-                               config['region'], total_desired, total_actual,
-                               total_pending)
+
+    # Add to cloud metrics
+    req_func = get_request_func(authenticator, config['metrics']['tenant_id'],
+                                metrics_log, service_mapping,
+                                config['metrics']['region'])
+    eff = add_to_cloud_metrics(req_func, config['metrics'], config['region'],
+                               total_desired, total_actual, total_pending,
+                               log=metrics_log)
+    yield perform(get_dispatcher(reactor), eff)
     metrics_log.msg('added to cloud metrics')
     if _print:
         print('added to cloud metrics')
@@ -300,9 +288,6 @@ class Options(usage.Options):
         Parse config file and add nova service name
         """
         self.open = getattr(self, 'open', None) or open  # For testing
-        # TODO: This is hard-coded here and in tap/api.py. Should be there in
-        # Inject nova service name in case it is not there in config
-        self.update({'cloudServersOpenStack': 'cloudServersOpenStack'})
         self.update(json.load(self.open(self['config'])))
 
 
@@ -355,7 +340,5 @@ def makeService(config):
 
 if __name__ == '__main__':
     config = json.load(open(sys.argv[1]))
-    # TODO: This should come from config only
-    config['cloudServersOpenStack'] = 'cloudServersOpenStack'
     # TODO: Take _print as cmd-line arg and pass it.
     task.react(collect_metrics, (config, None, None, True))

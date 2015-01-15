@@ -3,28 +3,32 @@
 import calendar
 from functools import partial
 
-from effect import Effect, ConstantIntent
-from effect.testing import StubIntent, resolve_effect
+from effect import Constant, Effect
+from effect.testing import Stub, resolve_effect
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
-    extract_drained_at,
+    get_all_convergence_data,
+    extract_CLB_drained_at,
     get_all_server_details,
-    get_load_balancer_contents,
+    get_clb_contents,
     get_scaling_group_servers,
-    json_to_LBConfigs,
-    to_nova_server)
+    to_nova_server,
+    _private_ipv4_addresses,
+    _servicenet_address)
+from otter.convergence.composition import json_to_LBConfigs
 from otter.convergence.model import (
-    LBConfig,
-    LBNode,
-    NodeCondition,
-    NodeType,
+    CLBDescription,
+    CLBNode,
+    CLBNodeCondition,
+    CLBNodeType,
     NovaServer,
     ServerState)
-from otter.test.utils import patch, resolve_retry_stubs
-from otter.util.retry import ShouldDelayAndRetry, exponential_backoff_interval, retry_times
+from otter.test.utils import patch, resolve_retry_stubs, resolve_stubs
+from otter.util.retry import (
+    ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import from_timestamp
 
 
@@ -32,8 +36,9 @@ def _request(requests):
     def request(service_type, method, url):
         response = requests.get((service_type, method, url))
         if response is None:
-            raise KeyError("{} not in {}".format((method, url), requests.keys()))
-        return Effect(StubIntent(ConstantIntent(response)))
+            raise KeyError("{} not in {}".format((method, url),
+                                                 requests.keys()))
+        return Effect(Stub(Constant(response)))
     return request
 
 
@@ -144,7 +149,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
 
 class ExtractDrainedTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.convergence.extract_drained_at`
+    Tests for :func:`otter.convergence.extract_CLB_drained_at`
     """
     summary = ("Node successfully updated with address: " +
                "'10.23.45.6', port: '8080', weight: '1', condition: 'DRAINING'")
@@ -159,7 +164,7 @@ class ExtractDrainedTests(SynchronousTestCase):
         Takes the first entry only
         """
         feed = self.feed.format(self.summary, self.updated)
-        self.assertEqual(extract_drained_at(feed),
+        self.assertEqual(extract_CLB_drained_at(feed),
                          calendar.timegm(from_timestamp(self.updated).utctimetuple()))
 
     def test_invalid_first_entry(self):
@@ -167,17 +172,17 @@ class ExtractDrainedTests(SynchronousTestCase):
         Raises error if first entry is not DRAINING entry
         """
         feed = self.feed.format("Node successfully updated with ENABLED", self.updated)
-        self.assertRaises(ValueError, extract_drained_at, feed)
+        self.assertRaises(ValueError, extract_CLB_drained_at, feed)
 
 
 class GetLBContentsTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.convergence.get_load_balancer_contents`
+    Tests for :func:`otter.convergence.get_clb_contents`
     """
 
     def setUp(self):
         """
-        Stub request function and mock `extract_drained_at`
+        Stub request function and mock `extract_CLB_drained_at`
         """
         self.reqs = {
             ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
@@ -196,14 +201,14 @@ class GetLBContentsTests(SynchronousTestCase):
         }
         self.feeds = {'11feed': 1.0, '22feed': 2.0}
         self.mock_eda = patch(
-            self, 'otter.convergence.gathering.extract_drained_at',
+            self, 'otter.convergence.gathering.extract_CLB_drained_at',
             side_effect=lambda f: self.feeds[f])
 
     def _request(self):
         def request(service_type, method, url, json_response=False):
             assert service_type is ServiceType.CLOUD_LOAD_BALANCERS
             response = self.reqs[(method, url, json_response)]
-            return Effect(StubIntent(ConstantIntent(response)))
+            return Effect(Stub(Constant(response)))
         return request
 
     def _resolve_retry_stubs(self, eff):
@@ -229,33 +234,47 @@ class GetLBContentsTests(SynchronousTestCase):
         lbnodes = resolve_effect(
             feed_fetches,
             map(self._resolve_retry_stubs, feed_fetches.intent.effects))
-        # and we finally have the LBNodes.
+        # and we finally have the CLBNodes.
         return lbnodes
 
     def test_success(self):
         """
         Gets LB contents with drained_at correctly
         """
-        eff = get_load_balancer_contents(self._request())
-        draining, enabled = NodeCondition.DRAINING, NodeCondition.ENABLED
-        make_config = partial(LBConfig, port=20, type=NodeType.PRIMARY)
+        eff = get_clb_contents(self._request())
+        draining, enabled = CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED
+        make_desc = partial(CLBDescription, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
             self._resolve_lb(eff),
-            [LBNode(lb_id=1, node_id='11', address='a11', drained_at=1.0,
-                    config=make_config(weight=2, condition=draining)),
-             LBNode(lb_id=1, node_id='12', address='a12',
-                    config=make_config(weight=2, condition=enabled)),
-             LBNode(lb_id=2, node_id='21', address='a21',
-                    config=make_config(weight=3, condition=enabled)),
-             LBNode(lb_id=2, node_id='22', address='a22', drained_at=2.0,
-                    config=make_config(weight=3, condition=draining))])
+            [CLBNode(node_id='11',
+                     address='a11',
+                     drained_at=1.0,
+                     description=make_desc(lb_id='1',
+                                           weight=2,
+                                           condition=draining)),
+             CLBNode(node_id='12',
+                     address='a12',
+                     description=make_desc(lb_id='1',
+                                           weight=2,
+                                           condition=enabled)),
+             CLBNode(node_id='21',
+                     address='a21',
+                     description=make_desc(lb_id='2',
+                                           weight=3,
+                                           condition=enabled)),
+             CLBNode(node_id='22',
+                     address='a22',
+                     drained_at=2.0,
+                     description=make_desc(lb_id='2',
+                                           weight=3,
+                                           condition=draining))])
 
     def test_no_lb(self):
         """
         Return empty list if there are no LB
         """
         self.reqs = {('GET', 'loadbalancers', True): []}
-        eff = get_load_balancer_contents(self._request())
+        eff = get_clb_contents(self._request())
         self.assertEqual(self._resolve_lb(eff), [])
 
     def test_no_nodes(self):
@@ -267,7 +286,7 @@ class GetLBContentsTests(SynchronousTestCase):
             ('GET', 'loadbalancers/1/nodes', True): [],
             ('GET', 'loadbalancers/2/nodes', True): []
         }
-        eff = get_load_balancer_contents(self._request())
+        eff = get_clb_contents(self._request())
         self.assertEqual(self._resolve_lb(eff), [])
 
     def test_no_draining(self):
@@ -285,13 +304,14 @@ class GetLBContentsTests(SynchronousTestCase):
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
             ]
         }
-        config = LBConfig(port=20, weight=2, condition=NodeCondition.ENABLED,
-                          type=NodeType.PRIMARY)
-        eff = get_load_balancer_contents(self._request())
+        make_desc = partial(CLBDescription, port=20, weight=2,
+                            condition=CLBNodeCondition.ENABLED,
+                            type=CLBNodeType.PRIMARY)
+        eff = get_clb_contents(self._request())
         self.assertEqual(
             self._resolve_lb(eff),
-            [LBNode(lb_id=1, node_id='11', address='a11', config=config),
-             LBNode(lb_id=2, node_id='21', address='a21', config=config)])
+            [CLBNode(node_id='11', address='a11', description=make_desc(lb_id='1')),
+             CLBNode(node_id='21', address='a21', description=make_desc(lb_id='2'))])
 
 
 class ToNovaServerTests(SynchronousTestCase):
@@ -304,9 +324,14 @@ class ToNovaServerTests(SynchronousTestCase):
         """
         self.createds = [('2020-10-10T10:00:00Z', 1602324000),
                          ('2020-10-20T11:30:00Z', 1603193400)]
-        self.servers = [{'id': 'a', 'state': 'ACTIVE', 'created': self.createds[0][0]},
-                        {'id': 'b', 'state': 'BUILD', 'created': self.createds[1][0],
-                         'addresses': {'private': [{'addr': 'ipv4', 'version': 4}]}}]
+        self.servers = [{'id': 'a',
+                         'state': 'ACTIVE',
+                         'created': self.createds[0][0]},
+                        {'id': 'b',
+                         'state': 'BUILD',
+                         'created': self.createds[1][0],
+                         'addresses': {'private': [{'addr': '10.0.0.1',
+                                                    'version': 4}]}}]
 
     def test_without_address(self):
         """
@@ -314,7 +339,9 @@ class ToNovaServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             to_nova_server(self.servers[0]),
-            NovaServer(id='a', state=ServerState.ACTIVE, created=self.createds[0][1],
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=self.createds[0][1],
                        servicenet_address=''))
 
     def test_without_private(self):
@@ -324,7 +351,9 @@ class ToNovaServerTests(SynchronousTestCase):
         self.servers[0]['addresses'] = {'public': 'p'}
         self.assertEqual(
             to_nova_server(self.servers[0]),
-            NovaServer(id='a', state=ServerState.ACTIVE, created=self.createds[0][1],
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=self.createds[0][1],
                        servicenet_address=''))
 
     def test_with_servicenet(self):
@@ -333,8 +362,10 @@ class ToNovaServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             to_nova_server(self.servers[1]),
-            NovaServer(id='b', state=ServerState.BUILD, created=self.createds[1][1],
-                       servicenet_address='ipv4'))
+            NovaServer(id='b',
+                       state=ServerState.BUILD,
+                       created=self.createds[1][1],
+                       servicenet_address='10.0.0.1'))
 
 
 class JsonToLBConfigTests(SynchronousTestCase):
@@ -349,7 +380,9 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 20, 'port': 800},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [LBConfig(port=80), LBConfig(port=800)], 21: [LBConfig(port=81)]})
+            {20: [CLBDescription(lb_id='20', port=80),
+                  CLBDescription(lb_id='20', port=800)],
+             21: [CLBDescription(lb_id='21', port=81)]})
 
     def test_with_rackconnect(self):
         """
@@ -359,4 +392,111 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 200, 'type': 'RackConnectV3'},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [LBConfig(port=80)], 21: [LBConfig(port=81)]})
+            {20: [CLBDescription(lb_id='20', port=80)],
+             21: [CLBDescription(lb_id='21', port=81)]})
+
+
+class IPAddressTests(SynchronousTestCase):
+    """
+    Tests for utility functions that extract IP addresses from server
+    dicts.
+    """
+    def setUp(self):
+        """
+        Set up a bunch of addresses and a server dict.
+        """
+        self.addresses = {
+            'private': [
+                {'addr': '192.168.1.1', 'version': 4},
+                {'addr': '10.0.0.1', 'version': 4},
+                {'addr': '10.0.0.2', 'version': 4},
+                {'addr': '::1', 'version': 6}
+            ],
+            'public': [
+                {'addr': '50.50.50.50', 'version': 4},
+                {'addr': '::::', 'version': 6}
+            ]}
+        self.server_dict = {'addresses': self.addresses}
+
+    def test_private_ipv4_addresses(self):
+        """
+        :func:`_private_ipv4_addresses` returns all private IPv4 addresses
+        from a complete server body.
+        """
+        result = _private_ipv4_addresses(self.server_dict)
+        self.assertEqual(result, ['192.168.1.1', '10.0.0.1', '10.0.0.2'])
+
+    def test_no_private_ip_addresses(self):
+        """
+        :func:`_private_ipv4_addresses` returns an empty list if the given
+        server has no private IPv4 addresses.
+        """
+        del self.addresses["private"]
+        result = _private_ipv4_addresses(self.server_dict)
+        self.assertEqual(result, [])
+
+    def test_servicenet_address(self):
+        """
+        :func:`_servicenet_address` returns the correct ServiceNet
+        address, which is the first IPv4 address in the ``private``
+        group in the 10.x.x.x range.
+
+        It even does this when there are other addresses in the
+        ``private`` group. This happens when the tenant specifies
+        their own network named ``private``.
+        """
+        self.assertEqual(_servicenet_address(self.server_dict), "10.0.0.1")
+
+    def test_no_servicenet_address(self):
+        """
+        :func:`_servicenet_address` returns :data:`None` if the server has no
+        ServiceNet address.
+        """
+        del self.addresses["private"]
+        self.assertEqual(_servicenet_address(self.server_dict), "")
+
+
+class GetAllConvergenceDataTests(SynchronousTestCase):
+    """Tests for :func:`get_all_convergence_data`."""
+
+    def setUp(self):
+        """Save some stuff."""
+        self.servers = [
+            {'id': 'a',
+             'state': 'ACTIVE',
+             'created': '1970-01-01T00:00:00Z',
+             'addresses': {'private': [{'addr': '10.0.0.1',
+                                        'version': 4}]}},
+            {'id': 'b',
+             'state': 'ACTIVE',
+             'created': '1970-01-01T00:00:01Z',
+             'addresses': {'private': [{'addr': '10.0.0.2',
+                                        'version': 4}]}}
+        ]
+
+    def test_success(self):
+        """The data is returned as a tuple of ([NovaServer], [CLBNode])."""
+        lb_nodes = [CLBNode(node_id='node1', address='ip1',
+                            description=CLBDescription(lb_id='lb1', port=80))]
+
+        reqfunc = lambda **k: Effect(k)
+        get_servers = lambda r: Effect(Stub(Constant({'gid': self.servers})))
+        get_lb = lambda r: Effect(Stub(Constant(lb_nodes)))
+
+        eff = get_all_convergence_data(
+            reqfunc,
+            'gid',
+            get_scaling_group_servers=get_servers,
+            get_clb_contents=get_lb)
+
+        expected_servers = [
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=0,
+                       servicenet_address='10.0.0.1'),
+            NovaServer(id='b',
+                       state=ServerState.ACTIVE,
+                       created=1,
+                       servicenet_address='10.0.0.2'),
+        ]
+        self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))

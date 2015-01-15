@@ -42,17 +42,23 @@ from functools import partial
 
 from characteristic import attributes
 
+from effect.twisted import deferred_performer
+
 from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
-from otter.util import logging_treq as treq
-from otter.util.retry import retry, retry_times, repeating_interval
-
 from otter.log import log as default_log
-from otter.util.http import (
-    headers, check_success, append_segments, wrap_upstream_error, retry_on_unauth)
+from otter.util import logging_treq as treq
 from otter.util.deferredutils import delay, wait
+from otter.util.http import (
+    append_segments,
+    check_success,
+    headers,
+    retry_on_unauth,
+    wrap_upstream_error,
+)
+from otter.util.retry import repeating_interval, retry, retry_times
 
 
 class IAuthenticator(Interface):
@@ -431,15 +437,19 @@ class Authenticate(object):
         self.tenant_id = tenant_id
         self.log = log
 
-    def perform_effect(self, dispatcher):
-        """Authenticate."""
-        return self.authenticator.authenticate_tenant(self.tenant_id, log=self.log)
+
+@deferred_performer
+def perform_authenticate(dispatcher, intent):
+    """Authenticate."""
+    return intent.authenticator.authenticate_tenant(intent.tenant_id,
+                                                    log=intent.log)
 
 
 @attributes(['authenticator', 'tenant_id'], apply_with_init=False)
 class InvalidateToken(object):
     """
-    An Effect intent that represents the invalidation of a token from a local cache.
+    An Effect intent that represents the invalidation of a token from a local
+    cache.
 
     The result type is None.
     """
@@ -447,9 +457,11 @@ class InvalidateToken(object):
         self.authenticator = authenticator
         self.tenant_id = tenant_id
 
-    def perform_effect(self, dispatcher):
-        """Invalidate the credential cache."""
-        return self.authenticator.invalidate(self.tenant_id)
+
+@deferred_performer
+def perform_invalidate_token(dispatcher, intent):
+    """Invalidate the credential cache."""
+    return intent.authenticator.invalidate(intent.tenant_id)
 
 
 def generate_authenticator(reactor, config):

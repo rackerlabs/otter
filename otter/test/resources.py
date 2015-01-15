@@ -22,13 +22,14 @@ from twisted.internet import endpoints, reactor
 
 
 def simple_create_keyspace(keyspace_name, replication_dict=None):
-    """
-    Given a keyspace name, produce keyspace creation CQL (version 3 CQL).  No
-    schema set up is done.  Uses a simple replication strategy and a
-    replication factor of 1.
+    """Given a keyspace name, produce the CQL3 statement that creates it.
+
+    No schema set-up is done.  Uses a simple replication strategy and
+    a replication factor of 1.
 
     :param keyspace_name: what the name of the keyspace is to create
     :type keyspace_name: ``str``
+
     """
     replication_dict = replication_dict or {
         'class': 'SimpleStrategy',
@@ -225,12 +226,12 @@ class RunningCassandraCluster(object):
 
 
 class CQLGenerator(object):
-    """
-    Reads all cql files from a particular directory in sorted order (by name),
-    mashes them together.
-    """
+    """Combines CQL files in a directory into one SQL statement, in order."""
+
     def __init__(self, directory, safe_only=True):
         """
+        Initialize :class:`CQLGenerator`.
+
         :param directory: directory in which all the cql files are that should
             be merged (the files should be named such that sorting them
             alphabetically will list them in the right order)
@@ -258,9 +259,10 @@ class CQLGenerator(object):
         self.cql = text.getvalue()
 
     def generate_cql(self, keyspace_name, replication_factor=1, outfile=None):
-        """
-        Replace keyspace and replication in the CQL.  Writes to a file if
-        outfile is passed.
+        """Interpolate keyspace and replication into the CQL statements.
+
+        If outfile is passed, the result will also be written
+        there. The file will not be closed.
         """
         output = self.cql.replace('@@KEYSPACE@@', keyspace_name)
         output = output.replace('@@REPLICATION_FACTOR@@',
