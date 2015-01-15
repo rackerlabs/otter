@@ -276,7 +276,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         self.scheduler_service.check_events(100)
 
-        self.log.err.assert_called_with('Unknown state bad. This cannot happen. Starting new')
+        self.log.err.assert_called_with(
+            'Unknown state bad. This cannot happen. Starting new')
         self.kz_partition.finish.assert_called_once_with()
 
         # Called once when starting and now again when got bad state
@@ -302,7 +303,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         mock_datetime.utcnow.return_value = 'utcnow'
 
         responses = [4, 5]
-        self.check_events_in_bucket.side_effect = lambda *_: defer.succeed(responses.pop(0))
+        self.check_events_in_bucket.side_effect = \
+            lambda *_: defer.succeed(responses.pop(0))
 
         d = self.scheduler_service.check_events(100)
 
