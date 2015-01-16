@@ -10,7 +10,7 @@ import itertools
 import mock
 from jsonschema import ValidationError
 from kazoo.protocol.states import KazooState
-from silverberg.client import ConsistencyLevel, CQLClient
+from silverberg.client import CQLClient, ConsistencyLevel
 from testtools.matchers import IsInstance
 from twisted.internet import defer
 from twisted.internet.task import Clock
