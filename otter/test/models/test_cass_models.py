@@ -2566,7 +2566,8 @@ class CassScalingScheduleCollectionTestCase(
 
         fetch_data = {'bucket': 2, 'now': 1234, 'size': 100}
         fetch_cql = (
-            'SELECT "tenantId", "groupId", "policyId", trigger, cron, version '
+            'SELECT "tenantId", "groupId", "policyId", "trigger", '
+            'cron, version '
             'FROM scaling_schedule_v2 '
             'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')
         del_cql = ('BEGIN BATCH '
