@@ -113,7 +113,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         Servers without metadata are not included in the result.
         """
         servers = [{'id': i} for i in range(10)]
-        eff = resolve_retry_stubs(get_scaling_group_servers(None))
+        eff = resolve_retry_stubs(get_scaling_group_servers())
         result = resolve_svcreq(eff, {'servers': servers}, *self.req)
         self.assertEqual(result, {})
 
@@ -122,7 +122,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         Does not include servers which have metadata but does not have AS info in it
         """
         servers = [{'id': i, 'metadata': {}} for i in range(10)]
-        eff = resolve_retry_stubs(get_scaling_group_servers(None))
+        eff = resolve_retry_stubs(get_scaling_group_servers())
         result = resolve_svcreq(eff, {'servers': servers}, *self.req)
         self.assertEqual(result, {})
 
@@ -135,7 +135,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i} for i in range(5, 8)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
         servers = as_servers + [{'metadata': 'junk'}] * 3
-        eff = resolve_retry_stubs(get_scaling_group_servers(None))
+        eff = resolve_retry_stubs(get_scaling_group_servers())
         result = resolve_svcreq(eff, {'servers': servers}, *self.req)
         self.assertEqual(
             result,
@@ -151,7 +151,6 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         servers = as_servers + [{'metadata': 'junk'}] * 3
         eff = resolve_retry_stubs(
             get_scaling_group_servers(
-                None,
                 server_predicate=lambda s: s['id'] % 3 == 0))
         result = resolve_svcreq(eff, {'servers': servers}, *self.req)
         self.assertEqual(
@@ -497,7 +496,7 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                             description=CLBDescription(lb_id='lb1', port=80))]
 
         reqfunc = lambda **k: Effect(k)
-        get_servers = lambda r: Effect(Stub(Constant({'gid': self.servers})))
+        get_servers = lambda: Effect(Stub(Constant({'gid': self.servers})))
         get_lb = lambda r: Effect(Stub(Constant(lb_nodes)))
 
         eff = get_all_convergence_data(

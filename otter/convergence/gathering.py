@@ -58,7 +58,7 @@ def get_all_server_details(batch_size=100):
     return get_server_details(marker=None)
 
 
-def get_scaling_group_servers(request_func, server_predicate=identity):
+def get_scaling_group_servers(server_predicate=identity):
     """
     Return tenant's servers that belong to a scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
@@ -190,7 +190,7 @@ def get_all_convergence_data(
     Returns an Effect of ([NovaServer], [LBNode]).
     """
     eff = parallel(
-        [get_scaling_group_servers(request_func)
+        [get_scaling_group_servers()
          .on(itemgetter(group_id))
          .on(map(to_nova_server)).on(list),
          get_clb_contents(request_func)]
