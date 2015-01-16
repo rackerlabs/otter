@@ -3,7 +3,9 @@ Tests for :mod:`otter.utils.retry`
 """
 import sys
 
-from effect import Constant, Delay, Effect, Func
+from effect import (
+    ComposedDispatcher, Constant, Delay, Effect, Func, TypeDispatcher,
+    base_dispatcher, sync_perform)
 from effect.testing import Stub, resolve_effect
 
 import mock
@@ -456,13 +458,19 @@ class EffectfulRetryTests(SynchronousTestCase):
     # an object which calls a function with arguments specified as public
     # attributes, I guess...
 
+    def setUp(self):
+        self.dispatcher = ComposedDispatcher([
+            base_dispatcher,
+            TypeDispatcher({Retry: perform_retry})])
+
     def test_perform_retry(self):
         """
         When the specified effect is successful, its result is propagated.
         """
-        retry = Retry(effect=STUB, should_retry=lambda e: 1 / 0)
-        eff = perform_retry(None, retry)
-        self.assertEqual(resolve_stubs(eff), "foo")
+        retry = Retry(effect=Effect(Constant('foo')),
+                      should_retry=lambda e: 1 / 0)
+        result = sync_perform(self.dispatcher, Effect(retry))
+        self.assertEqual(result, 'foo')
 
     def test_perform_retry_retries_on_error(self):
         """
@@ -476,14 +484,14 @@ class EffectfulRetryTests(SynchronousTestCase):
         def should_retry(exc_info):
             if (exc_info[0] is RuntimeError
                     and exc_info[1].message == "foo"):
-                return Effect(Stub(Constant(True)))
+                return Effect(Constant(True))
             else:
-                return Effect(Stub(Constant(False)))
+                return Effect(Constant(False))
 
-        retry = Retry(effect=Effect(Stub(Func(func))),
+        retry = Retry(effect=Effect(Func(func)),
                       should_retry=should_retry)
-        eff = perform_retry(None, retry)
-        self.assertEqual(resolve_stubs(eff), "final")
+        result = sync_perform(self.dispatcher, Effect(retry))
+        self.assertEqual(result, "final")
 
 
 def get_exc_info():
