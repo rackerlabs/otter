@@ -486,9 +486,10 @@ is external so it's handy for Getting Started to share -->
             </para>
             <para>
                 <note>
-                    <para>&PROD; can utilize all Rackspace Cloud Server API operations. For more details, see the 
-                        Cloud Server documentation in the Compute Services section on <link xlink:href="http://docs.rackspace.com/">
-                            docs.rackspace.com</link>.</para>
+                    <para>&PROD; can utilize all create and delete server Rackspace Cloud Server API operations. For more details, 
+                        see the 
+                        <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html">
+                            Create servers</link> documentation.</para>
                 </note>
             </para>
         </section>
@@ -547,11 +548,11 @@ is external so it's handy for Getting Started to share -->
                                 launch, what flavor the new server is,
                                 and which cloud load balancer or
                                 RackConnectV3 load balancer pool the
-                                new server connects to.
+                                new server connects to. 
                                 Note: The <parameter>launchConfiguration</parameter> uses the <emphasis role="bold">admin</emphasis> 
-                                user’s SSH key pair name, usually the first admin user found in the tenant. If there are 
-                                multiple <emphasis role="bold">admin</emphasis> accounts in the tenant, there is no guarantee 
-                                as to which is used. 
+                                user to scale up, 
+                                usually the first admin user found on the tenant. Only that particular 
+                                admin user's SSH key pair names can be used in the <parameter>launchConfiguration</parameter>.
                                 Note: The launchConfiguration update operation overwrites all launchConfiguration settings. 
                                 Any parameters NOT specified in the update, are reset to null or default.      
                                 </td>

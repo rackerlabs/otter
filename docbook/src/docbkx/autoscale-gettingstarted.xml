@@ -414,9 +414,10 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
             </para>
             <para>
                 <note>
-                    <para>&PROD; can utilize all Rackspace Cloud Server API operations. For more details, see the 
-                        Cloud Server documentation in the Compute Services section on <link xlink:href="http://docs.rackspace.com/">
-                            docs.rackspace.com</link>.</para>
+                    <para>&PROD; can utilize all create and delete server Rackspace Cloud Server API operations. For more details, 
+                        see the 
+                        <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html">
+                            Create servers</link> documentation.</para>
                 </note>
             </para>
             <para>
