@@ -16,7 +16,7 @@ from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.utils import (
-    CheckFailure, CheckFailureValue, DummyException, resolve_stubs)
+    CheckFailure, CheckFailureValue, DummyException)
 from otter.util.retry import (
     Retry,
     ShouldDelayAndRetry,
@@ -459,6 +459,7 @@ class EffectfulRetryTests(SynchronousTestCase):
     # attributes, I guess...
 
     def setUp(self):
+        """Save common objects."""
         self.dispatcher = ComposedDispatcher([
             base_dispatcher,
             TypeDispatcher({Retry: perform_retry})])
