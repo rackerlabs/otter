@@ -40,6 +40,7 @@ env:
 	./scripts/bootstrap-virtualenv.sh
 
 lint: listoutdated flake8diff
+	pyflakes ${PYDIRS}
 
 listoutdated:
 	pip list --outdated --allow-external=cafe,cloudcafe
