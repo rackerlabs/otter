@@ -2,7 +2,6 @@
 Tests for :mod:`otter.models.mock`
 """
 from collections import namedtuple
-from functools import partial
 import json
 import mock
 from datetime import datetime
