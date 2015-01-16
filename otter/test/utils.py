@@ -3,11 +3,10 @@ Mixins and utilities to be used for testing.
 """
 import json
 import os
-import sys
 from functools import partial
 from inspect import getargspec
 
-from effect import Effect, base_dispatcher
+from effect import base_dispatcher
 from effect.testing import resolve_effect, resolve_stubs as eff_resolve_stubs
 
 import mock

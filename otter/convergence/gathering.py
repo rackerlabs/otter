@@ -20,7 +20,8 @@ from otter.convergence.model import (
 from otter.http import service_request
 from otter.indexer import atom
 from otter.util.http import append_segments
-from otter.util.retry import exponential_backoff_interval, retry_effect, retry_times
+from otter.util.retry import (
+    exponential_backoff_interval, retry_effect, retry_times)
 from otter.util.timestamp import timestamp_to_epoch
 
 

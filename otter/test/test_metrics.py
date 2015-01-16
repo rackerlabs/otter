@@ -5,7 +5,7 @@ Tests for `metrics.py`
 import operator
 from io import StringIO
 
-from effect import Constant, Effect, Error
+from effect import Constant, Effect
 from effect.testing import Stub, resolve_effect
 
 import mock
@@ -47,7 +47,6 @@ from otter.test.utils import (
     matches,
     mock_log,
     patch,
-    resolve_retry_stubs,
     resolve_stubs,
 )
 
@@ -169,11 +168,14 @@ class GetTenantMetricsTests(SynchronousTestCase):
 
     def test_get_tenant_metrics(self):
         """Extracts metrics from the servers."""
-        servers = {'g1': [{'status': 'ACTIVE'}] * 3 + [{'status': 'BUILD'}] * 2}
-        groups = [{'groupId': 'g1', 'desired': 3}, {'groupId': 'g2', 'desired': 4}]
+        servers = {
+            'g1': [{'status': 'ACTIVE'}] * 3 + [{'status': 'BUILD'}] * 2}
+        groups = [{'groupId': 'g1', 'desired': 3},
+                  {'groupId': 'g2', 'desired': 4}]
         self.assertEqual(
             get_tenant_metrics('t', groups, servers),
-            [GroupMetrics('t', 'g1', 3, 3, 2), GroupMetrics('t', 'g2', 4, 0, 0)])
+            [GroupMetrics('t', 'g1', 3, 3, 2),
+             GroupMetrics('t', 'g2', 4, 0, 0)])
 
 
 def _server(group, state):
@@ -255,11 +257,12 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
         """Mock get_scaling_group_servers and get_request_func."""
         self.tenant_servers = {}
 
+        def concretize(authenticator, log, service_mapping, region,
+                       tenant_id, service_request):
+            return Effect(Constant(self.tenant_servers[tenant_id]))
         self.mock_concretize = patch(
             self, 'otter.http.concretize_service_request',
-            side_effect=lambda authenticator, log, service_mapping, region, \
-                               tenant_id, service_request:
-                Effect(Constant(self.tenant_servers[tenant_id])))
+            side_effect=concretize)
         self.service_mapping = {ServiceType.CLOUD_SERVERS: 'nova'}
 
     def test_get_all_metrics(self):

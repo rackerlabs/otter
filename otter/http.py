@@ -252,6 +252,7 @@ def perform_tenant_scope(
         # The reason this isn't set as the default kwarg value above is because
         # of a mock in test_metrics.py.
         _concretize = concretize_service_request
+
     @sync_performer
     def scoped_performer(dispatcher, service_request):
         return _concretize(
