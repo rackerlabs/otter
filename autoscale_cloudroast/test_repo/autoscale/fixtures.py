@@ -91,7 +91,8 @@ class AutoscaleFixture(BaseTestFixture):
             'json', 'json')
 
         cls.autoscale_behaviors = AutoscaleBehaviors(cls.autoscale_config,
-                                                     cls.autoscale_client)
+                                                     cls.autoscale_client,
+                                                     rcv3_client=cls.rcv3_client)
         cls.gc_name = cls.autoscale_config.gc_name
         cls.gc_cooldown = int(cls.autoscale_config.gc_cooldown)
         cls.gc_min_entities = int(cls.autoscale_config.gc_min_entities)
