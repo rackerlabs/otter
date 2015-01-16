@@ -38,6 +38,10 @@ def resolve_authenticate(eff, token='token'):
 class GetRequestFuncTests(SynchronousTestCase):
     """
     Tests for :func:`get_request_func`.
+
+    These are duplicates of the tests for :obj:`ServiceRequest`. When
+    everything is switched over to that, :func:`get_request_func` and these
+    tests should be deleted.
     """
 
     def setUp(self):
