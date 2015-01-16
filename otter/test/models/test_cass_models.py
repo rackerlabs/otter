@@ -3,9 +3,9 @@ Tests for :mod:`otter.models.mock`
 """
 from collections import namedtuple
 from copy import deepcopy
-import json
-import mock
 from datetime import datetime
+import itertools
+import json
 
 from jsonschema import ValidationError
 from kazoo.protocol.states import KazooState
