@@ -2105,7 +2105,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.QUORUM)
 
-        self.kz_client.Lock.assert_called_once_with('/locks/' + self.group.uuid)
+        self.kz_client.Lock.assert_called_once_with(
+            '/locks/' + self.group.uuid)
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
         self.kz_client.delete.assert_called_once_with(
