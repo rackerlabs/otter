@@ -57,7 +57,7 @@
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2015-01-14</pubdate>
+        <pubdate>2015-01-16</pubdate>
         <copyright>
             <year>2015</year>
             <holder>Rackspace US, Inc.</holder>
@@ -70,7 +70,7 @@
         </legalnotice>
         <revhistory>
             <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
-                <date>2015-01-14</date>
+                <date>2015-01-16</date>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
@@ -465,14 +465,16 @@ is external so it's handy for Getting Started to share -->
             <para>&PROD; functions by linking these services:
                 <itemizedlist>
                     <listitem>
-                        <para>&PROD; API, described in this guide.</para>
+                        <para>Rackspace Cloud Servers. Learn more at 
+                            <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/overview.html">Cloud Servers Getting Started guide</link></para>
                     </listitem>
                     <listitem>
-                        <para>Load-balanced Cloud Servers. For more information, read the Rackspace
-                            <link xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/DB_Doc_Change_History.html">Load Balancers Getting Started Guide
+                        <para>Load-balanced Cloud Servers. Learn more at
+                            <link xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/DB_Doc_Change_History.html">Load Balancers Getting Started guide
                             </link>.</para>
                     </listitem>
-                </itemizedlist>You can set up a schedule for launching Auto Scale or define an event that triggers a
+                </itemizedlist>
+                You can set up a schedule for launching Auto Scale or define an event that triggers a
                 webhook. You can also specify a minimum and maximum number of cloud servers for your
                 scaling group, the amount of resources you want to increase or decrease, and policies
                 based on percentage or real numbers.</para>
@@ -486,7 +488,7 @@ is external so it's handy for Getting Started to share -->
             </para>
             <para>
                 <note>
-                    <para>&PROD; can utilize all create and delete server Rackspace Cloud Server API operations. For more details, 
+                    <para>&PROD; can utilize all Rackspace Cloud Server create server API parameters. For more details, 
                         see the 
                         <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html">
                             Create servers</link> documentation.</para>
@@ -548,13 +550,11 @@ is external so it's handy for Getting Started to share -->
                                 launch, what flavor the new server is,
                                 and which cloud load balancer or
                                 RackConnectV3 load balancer pool the
-                                new server connects to. 
-                                Note: The <parameter>launchConfiguration</parameter> uses the <emphasis role="bold">admin</emphasis> 
-                                user to scale up, 
-                                usually the first admin user found on the tenant. Only that particular 
-                                admin user's SSH key pair names can be used in the <parameter>launchConfiguration</parameter>.
+                                new server connects to.
+                                Note: The <parameter>launchConfiguration</parameter> uses the <emphasis role="bold">admin</emphasis> user’s SSH key pair name, 
+                                usually the first admin user found in the tenant. 
                                 Note: The launchConfiguration update operation overwrites all launchConfiguration settings. 
-                                Any parameters NOT specified in the update, are reset to null or default.      
+                                For details, see <link linkend="Launch_Configuration">Launch configurations</link>.
                                 </td>
                         </tr>
                     </tbody>
