@@ -205,14 +205,14 @@ def add_to_cloud_metrics(request_func, conf, region, total_desired,
     to Cloud metrics
 
     :param dict conf: Metrics configuration, will contain tenant ID of tenant
-                      used to ingest metrics and other conf like ttl
+        used to ingest metrics and other conf like ttl
     :param str region: which region's metric is collected
     :param int total_desired: Total number of servers currently desired
-                              in the region
+        in the region
     :param int total_actual: Total number of servers currently
-                             there in the region
+        there in the region
     :param int total_pending: Total number of servers currently
-                              building in a region
+        building in a region
 
     :return: `Deferred` with None
     """
@@ -247,13 +247,13 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
 
     :param reactor: Twisted reactor
     :param dict config: Configuration got from file containing all info
-                        needed to collect metrics
+        needed to collect metrics
     :param :class:`silverberg.client.CQLClient` client:
-            Optional cassandra client. A new client will be created
-            if this is not given and disconnected before returing
+        Optional cassandra client. A new client will be created
+        if this is not given and disconnected before returing
     :param :class:`otter.auth.IAuthenticator` authenticator:
-            Optional authenticator. A new authenticator will be created
-            if this is not given
+        Optional authenticator. A new authenticator will be created
+        if this is not given
     :param bool _print: Should debug messages be printed to stdout?
 
     :return: :class:`Deferred` with None
@@ -332,7 +332,7 @@ class MetricsService(Service, object):
 
         :param reactor: Twisted reactor
         :param dict config: All the config necessary to run the service.
-                            Comes from config file
+            Comes from config file
         :param IReactorTime clock: Optional reactor for testing timer
         """
         self._client = connect_cass_servers(reactor, config['cassandra'])
