@@ -6,7 +6,7 @@ import operator
 from io import StringIO
 
 from effect import Constant, Effect, Error
-from effect.testing import Stub
+from effect.testing import Stub, resolve_effect
 
 import mock
 
@@ -190,14 +190,13 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         # Maybe this could use a parameterized "get_scaling_group_servers" call
         # to avoid needing to stub the nova responses, but it seems okay.
         servers_t1 = {
-            'servers': (
-                [self._server('g1', 'ACTIVE')] * 3
-                + [self._server('g1', 'BUILD')] * 2
-                + [self._server('g2', 'ACTIVE')])}
+            'g1': ([self._server('g1', 'ACTIVE')] * 3
+                   + [self._server('g1', 'BUILD')] * 2),
+            'g2': [self._server('g2', 'ACTIVE')]}
 
         servers_t2 = {
-            'servers': [self._server('g4', 'ACTIVE'),
-                        self._server('g4', 'BUILD')]}
+            'g4': [self._server('g4', 'ACTIVE'),
+                   self._server('g4', 'BUILD')]}
 
         groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 3},
                   {'tenantId': 't1', 'groupId': 'g2', 'desired': 4},
@@ -205,16 +204,13 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
 
         tenant_servers = {'t1': servers_t1, 't2': servers_t2}
 
-        def get_bound_request_func(tenant_id):
-            def request_func(service_type, method, url, headers=None,
-                             data=None):
-                return Effect(Stub(Constant(tenant_servers[tenant_id])))
-            return request_func
-        effs = get_all_metrics_effects(groups, get_bound_request_func,
-                                       mock_log())
-
-        # All of the HTTP requests are wrapped in retries, so unwrap them
-        results = map(resolve_retry_stubs, effs)
+        effs = get_all_metrics_effects(groups, mock_log())
+        # All the effs are wrapped in TenantScopes to indicate the tenant
+        # of ServiceRequests made under them. We use that tenant to get the
+        # stubbed result of get_scaling_group_servers.
+        results = [
+            resolve_effect(eff, tenant_servers[eff.intent.tenant_id])
+            for eff in effs]
 
         self.assertEqual(
             set(reduce(operator.add, results)),
@@ -230,20 +226,16 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         log = mock_log()
         log.err.return_value = None
 
-        def get_bound_request_func(tenant_id):
-            def request_func(service_type, method, url, headers=None,
-                             data=None):
-                if tenant_id == 't1':
-                    return Effect(Stub(Constant({'servers': []})))
-                else:
-                    return Effect(Stub(Error(ZeroDivisionError('foo bar'))))
-            return request_func
-
         groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
                   {'tenantId': 't2', 'groupId': 'g2', 'desired': 0}]
-
-        effs = get_all_metrics_effects(groups, get_bound_request_func, log)
-        results = map(resolve_retry_stubs, effs)
+        effs = get_all_metrics_effects(groups, log)
+        results = []
+        for eff in effs:
+            if eff.intent.tenant_id == 't1':
+                results.append(resolve_effect(eff, {}))
+            elif eff.intent.tenant_id == 't2':
+                err = (ZeroDivisionError, ZeroDivisionError('foo bar'), None)
+                results.append(resolve_effect(eff, err, is_error=True))
         self.assertEqual(
             results,
             [None, [GroupMetrics('t1', 'g1', desired=0, actual=0, pending=0)]])
@@ -263,18 +255,10 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
         self.tenant_servers = {}
         # This is pretty nasty.
 
-        # get_request_func is being mocked to just return the tenant id,
-        # instead of a function. Nothing will call it, so it works.
-        # Then, get_scaling_group_servers is being mocked to expect the tenant
-        # ID instead of a request function, to use it to look up the server
-        # data to return.
-        self.mock_get_request_func = patch(
-            self, 'otter.metrics.get_request_func',
-            side_effect=lambda a, tenant_id, *args, **kwargs: tenant_id)
-        self.mock_gsgs = patch(
-            self, 'otter.metrics.get_scaling_group_servers',
-            side_effect=lambda rf, server_predicate: (
-                Effect(Constant(self.tenant_servers[rf]))))
+        self.mock_concretize = patch(
+            self, 'otter.http.concretize_service_request',
+            side_effect=lambda authenticator, log, service_mapping, region, tenant_id, service_request:
+                Effect(Constant(self.tenant_servers[rf])))
         self.service_mapping = {ServiceType.CLOUD_SERVERS: 'nova'}
 
     def test_get_all_metrics(self):
