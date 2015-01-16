@@ -5,8 +5,6 @@ Tests for the otter-api tap plugin.
 import json
 import mock
 
-from silverberg.client import ConsistencyLevel
-
 from testtools.matchers import Contains
 
 from twisted.internet import defer
