@@ -113,18 +113,18 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         Servers without metadata are not included in the result.
         """
         servers = [{'id': i} for i in range(10)]
-        request = _request({self.req: {'servers': servers}})
-        eff = get_scaling_group_servers(request)
-        self.assertEqual(resolve_retry_stubs(eff), {})
+        eff = resolve_retry_stubs(get_scaling_group_servers(None))
+        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
+        self.assertEqual(result, {})
 
     def test_filters_no_as_metadata(self):
         """
         Does not include servers which have metadata but does not have AS info in it
         """
         servers = [{'id': i, 'metadata': {}} for i in range(10)]
-        request = _request({self.req: {'servers': servers}})
-        eff = get_scaling_group_servers(request)
-        self.assertEqual(resolve_retry_stubs(eff), {})
+        eff = resolve_retry_stubs(get_scaling_group_servers(None))
+        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
+        self.assertEqual(result, {})
 
     def test_returns_as_servers(self):
         """
@@ -135,10 +135,10 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i} for i in range(5, 8)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
         servers = as_servers + [{'metadata': 'junk'}] * 3
-        request = _request({self.req: {'servers': servers}})
-        eff = get_scaling_group_servers(request)
+        eff = resolve_retry_stubs(get_scaling_group_servers(None))
+        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
         self.assertEqual(
-            resolve_retry_stubs(eff),
+            result,
             {'a': as_servers[:5] + [as_servers[-1]], 'b': as_servers[5:8]})
 
     def test_filters_on_user_criteria(self):
@@ -149,10 +149,13 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i} for i in range(5)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i} for i in range(5, 8)])
         servers = as_servers + [{'metadata': 'junk'}] * 3
-        request = _request({self.req: {'servers': servers}})
-        eff = get_scaling_group_servers(request, server_predicate=lambda s: s['id'] % 3 == 0)
+        eff = resolve_retry_stubs(
+            get_scaling_group_servers(
+                None,
+                server_predicate=lambda s: s['id'] % 3 == 0))
+        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
         self.assertEqual(
-            resolve_retry_stubs(eff),
+            result,
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
 
 
@@ -235,6 +238,11 @@ class GetLBContentsTests(SynchronousTestCase):
         """Resolve the tree of effects used to fetch LB information."""
         # first resolve the request to list LBs
         lb_nodes_fetch = self._resolve_retry_stubs(eff)
+        if type(lb_nodes_fetch) is not Effect:
+            # If a parallel effect is *empty*, resolve_stubs will
+            # simply return an empty list immediately.
+            self.assertEqual(lb_nodes_fetch, []) # sanity check
+            return lb_nodes_fetch
         # which results in a parallel fetch of all nodes from all LBs
         feed_fetches = resolve_effect(
             lb_nodes_fetch,
