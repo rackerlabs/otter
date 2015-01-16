@@ -459,6 +459,7 @@ class EffectfulRetryTests(SynchronousTestCase):
     # attributes, I guess...
 
     def setUp(self):
+        """Save common objects."""
         self.dispatcher = ComposedDispatcher([
             base_dispatcher,
             TypeDispatcher({Retry: perform_retry})])
