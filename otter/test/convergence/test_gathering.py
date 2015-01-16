@@ -26,6 +26,7 @@ from otter.convergence.model import (
     CLBNodeType,
     NovaServer,
     ServerState)
+from otter.http import service_request
 from otter.test.utils import patch, resolve_retry_stubs, resolve_stubs
 from otter.util.retry import (
     ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
@@ -42,6 +43,15 @@ def _request(requests):
     return request
 
 
+def resolve_svcreq(eff, result, service_type,
+                   method, url, headers=None, data=None):
+    expected_eff = service_request(
+        service_type, method, url, headers=headers, data=data)
+    assert eff.intent == expected_eff.intent, "%r != %r" % (
+        eff.intent, expected_eff.intent)
+    return resolve_effect(eff, result)
+
+        
 class GetAllServerDetailsTests(SynchronousTestCase):
     """
     Tests for :func:`get_all_server_details`
@@ -58,9 +68,10 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         `get_all_server_details` will not fetch again if first get returns
         results with size < batch_size
         """
-        request = _request({self.req: {'servers': self.servers}})
-        eff = get_all_server_details(request, batch_size=10)
-        result = resolve_retry_stubs(eff)
+        response = {'servers': self.servers}
+        eff = get_all_server_details(batch_size=10)
+        svcreq = resolve_retry_stubs(eff)
+        result = resolve_svcreq(svcreq, response, *self.req)
         self.assertEqual(result, self.servers)
 
     def test_get_all_above_batch_size(self):
@@ -69,24 +80,22 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         size < batch_size
         """
         servers = [{'id': i} for i in range(19)]
-
         req2 = (ServiceType.CLOUD_SERVERS, 'GET',
                 'servers/detail?limit=10&marker=9')
-        request = _request({self.req: {'servers': servers[:10]},
-                            req2: {'servers': servers[10:]}})
-        eff = get_all_server_details(request, batch_size=10)
-        self.assertEqual(resolve_retry_stubs(resolve_retry_stubs(eff)), servers)
+        svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
+        next_retry = resolve_svcreq(svcreq, {'servers': servers[:10]},
+                                    *self.req)
+        next_req = resolve_retry_stubs(next_retry)
+        result = resolve_svcreq(next_req, {'servers': servers[10:]}, *req2)
+        self.assertEqual(result, servers)
 
     def test_retry(self):
         """The HTTP requests are retried with some appropriate policy."""
-        request = _request({self.req: {'servers': self.servers}})
-        eff = get_all_server_details(request, batch_size=10)
+        eff = get_all_server_details(batch_size=10)
         self.assertEqual(
             eff.intent.should_retry,
             ShouldDelayAndRetry(can_retry=retry_times(5),
                                 next_interval=exponential_backoff_interval(2)))
-        result = resolve_retry_stubs(eff)
-        self.assertEqual(result, self.servers)
 
 
 class GetScalingGroupServersTests(SynchronousTestCase):

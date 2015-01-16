@@ -7,7 +7,7 @@ import sys
 from functools import partial
 from inspect import getargspec
 
-from effect import base_dispatcher
+from effect import Effect, base_dispatcher
 from effect.testing import resolve_effect, resolve_stubs as eff_resolve_stubs
 
 import mock
@@ -602,14 +602,10 @@ def resolve_retry_stubs(eff):
     The *value* of the Retry (or at least, Retry.should_retry) should be tested
     separately to determine that the policy is as expected.
     """
-    assert type(eff.intent) is Retry
-    try:
-        intermediate_result = resolve_stubs(eff.intent.effect)
-        is_error = False
-    except Exception:
-        intermediate_result = sys.exc_info()
-        is_error = True
-    return resolve_effect(eff, intermediate_result, is_error=is_error)
+    assert type(eff.intent) is Retry, "%r is not a Retry" % (eff.intent,)
+    return resolve_stubs(eff.intent.effect.on(
+        success=partial(resolve_effect, eff),
+        error=partial(resolve_effect, eff, is_error=True)))
 
 
 def resolve_stubs(eff):
