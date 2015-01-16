@@ -32,6 +32,8 @@ their own changes.
 - If a PR does not have the "in progress" label, it is considered up for
   review. If an author realizes a PR needs more work (usually after a reviewer
   has made some comments), they may add the "in progress" label.
+- Reviewers may merge PRs immediately after the final review if no changes are
+  necessary.
 - Any party may request an additional reviewer, at which point the PR must not
   be merged until the additional review is done.
 - additional reviewers can be named explicitly or anonymously. e.g.:
