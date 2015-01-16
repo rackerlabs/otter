@@ -6,7 +6,7 @@ import random
 
 from characteristic import Attribute, attributes
 
-from effect import Delay, Effect, Func
+from effect import Delay, Effect, Func, sync_performer
 from effect.retry import retry as effect_retry
 
 from twisted.internet import defer
@@ -342,6 +342,7 @@ class Retry(object):
     """
 
 
+@sync_performer
 def perform_retry(dispatcher, intent):
     """
     Invoke :func:`effect.retry.retry` with the effect and the
