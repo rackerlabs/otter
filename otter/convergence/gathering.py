@@ -29,6 +29,7 @@ def get_all_server_details(batch_size=100):
     Return all servers of a tenant.
 
     :param batch_size: number of servers to fetch *per batch*.
+    :return: list of server objects as returned by Nova.
 
     NOTE: This really screams to be a independent fxcloud-type API
     """
@@ -65,6 +66,7 @@ def get_scaling_group_servers(server_predicate=identity):
 
     :param server_predicate: function of server -> bool that determines whether
         the server should be included in the result.
+    :return: dict mapping group IDs to lists of Nova servers.
     """
 
     def has_group_id(s):
