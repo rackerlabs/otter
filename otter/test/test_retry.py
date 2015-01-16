@@ -16,7 +16,7 @@ from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.utils import (
-    CheckFailure, CheckFailureValue, DummyException, resolve_stubs)
+    CheckFailure, CheckFailureValue, DummyException)
 from otter.util.retry import (
     Retry,
     ShouldDelayAndRetry,
