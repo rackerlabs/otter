@@ -1,17 +1,22 @@
 """
 Tests for :mod:`otter.models.mock`
 """
+import itertools
+import json
 from collections import namedtuple
 from copy import deepcopy
 from datetime import datetime
-import itertools
-import json
 
 from jsonschema import ValidationError
+
 from kazoo.protocol.states import KazooState
+
 import mock
+
 from silverberg.client import CQLClient, ConsistencyLevel
+
 from testtools.matchers import IsInstance
+
 from twisted.internet import defer
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
