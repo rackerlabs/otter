@@ -1,15 +1,15 @@
 """
 Tests for :mod:`otter.models.mock`
 """
+import itertools
+import json
 from collections import namedtuple
 from copy import deepcopy
 from datetime import datetime
-import json
-import itertools
 
-import mock
 from jsonschema import ValidationError
 from kazoo.protocol.states import KazooState
+import mock
 from silverberg.client import CQLClient, ConsistencyLevel
 from testtools.matchers import IsInstance
 from twisted.internet import defer
@@ -18,36 +18,41 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.json_schema import group_examples
 from otter.models.cass import (
+    CassAdmin,
     CassScalingGroup,
     CassScalingGroupCollection,
-    CassAdmin,
-    serialize_json_data,
-    verified_view,
+    WeakLocks,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
-    WeakLocks,
+    serialize_json_data,
+    verified_view
 )
 from otter.models.interface import (
-    GroupState,
     GroupNotEmptyError,
-    NoSuchScalingGroupError,
+    GroupState,
     NoSuchPolicyError,
+    NoSuchScalingGroupError,
     NoSuchWebhookError,
-    UnrecognizedCapabilityError,
-    ScalingGroupOverLimitError,
-    WebhooksOverLimitError,
     PoliciesOverLimitError,
-    ScalingGroupStatus
+    ScalingGroupOverLimitError,
+    ScalingGroupStatus,
+    UnrecognizedCapabilityError,
+    WebhooksOverLimitError
 )
 from otter.test.models.test_interface import (
-    IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin,
+    IScalingGroupProviderMixin,
     IScalingScheduleCollectionProviderMixin
 )
-from otter.test.utils import LockMixin, DummyException, mock_log, CheckFailure
-from otter.test.utils import patch, matches
-from otter.util.timestamp import from_timestamp
+from otter.test.utils import (
+    CheckFailure,
+    DummyException,
+    LockMixin,
+    matches,
+    mock_log,
+    patch)
 from otter.util.config import set_config_data
+from otter.util.timestamp import from_timestamp
 
 
 def _de_identify(json_obj):
