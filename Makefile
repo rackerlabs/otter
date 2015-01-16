@@ -40,6 +40,7 @@ env:
 	./scripts/bootstrap-virtualenv.sh
 
 lint: listoutdated flake8diff
+	pyflakes ${PYDIRS}
 
 listoutdated:
 	pip list --outdated --allow-external=cafe,cloudcafe
@@ -56,7 +57,7 @@ DIFF_TARGET = $(shell git merge-base master HEAD)
 endif
 
 flake8diff:
-	git diff --patch --no-prefix ${DIFF_TARGET} | flake8 --diff
+	git diff --patch --no-prefix ${DIFF_TARGET} | flake8 --diff; true
 
 flake8full:
 	flake8 ${PYDIRS}

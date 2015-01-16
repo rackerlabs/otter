@@ -1,10 +1,10 @@
 """
 Tests for :mod:`otter.models.mock`
 """
-import itertools
-import json
 from collections import namedtuple
 from copy import deepcopy
+import json
+import mock
 from datetime import datetime
 
 from jsonschema import ValidationError
