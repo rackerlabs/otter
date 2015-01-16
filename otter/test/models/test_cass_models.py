@@ -2494,8 +2494,10 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
             'APPLY BATCH;')
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111',
-                        "policy0data": ('{"name": "scale up by 10", "args": {"cron": "* * * * *"}, '
-                                        '"cooldown": 5, "_ver": 1, "type": "schedule", "change": 10}'),
+                        "policy0data": ('{"name": "scale up by 10", '
+                                        '"args": {"cron": "* * * * *"}, '
+                                        '"cooldown": 5, "_ver": 1, '
+                                        '"type": "schedule", "change": 10}'),
                         "policy0policyId": '12345678',
                         "policy0trigger": 'next_time',
                         "policy0cron": "* * * * *",
@@ -2515,7 +2517,9 @@ class CassScalingScheduleCollectionTestCase(
     """
 
     def setUp(self):
-        """ Setup the mocks """
+        """
+        Setup the mocks.
+        """
         self.connection = mock.MagicMock(spec=['execute'])
 
         self.returns = [None]
@@ -2539,16 +2543,24 @@ class CassScalingScheduleCollectionTestCase(
         """
         Tests that you can fetch and delete list of events
         """
-        self.returns = [[{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef',
-                          'trigger': 100, 'cron': 'c1', 'version': 'uuid1'},
-                         {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex',
-                          'trigger': 122, 'cron': 'c2', 'version': 'uuid2'}],
+        self.returns = [[{'tenantId': '1d2',
+                          'groupId': 'gr2',
+                          'policyId': 'ef',
+                          'trigger': 100,
+                          'cron': 'c1',
+                          'version': 'uuid1'},
+                         {'tenantId': '1d2',
+                          'groupId': 'gr2',
+                          'policyId': 'ex',
+                          'trigger': 122,
+                          'cron': 'c2',
+                          'version': 'uuid2'}],
                         None]
         events = self.returns[0]
 
         fetch_data = {'bucket': 2, 'now': 1234, 'size': 100}
         fetch_cql = (
-            'SELECT "tenantId", "groupId", "policyId", "trigger", cron, version '
+            'SELECT "tenantId", "groupId", "policyId", trigger, cron, version '
             'FROM scaling_schedule_v2 '
             'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')
         del_cql = ('BEGIN BATCH '
