@@ -176,12 +176,13 @@ class GetTenantMetricsTests(SynchronousTestCase):
             [GroupMetrics('t', 'g1', 3, 3, 2), GroupMetrics('t', 'g2', 4, 0, 0)])
 
 
+def _server(group, state):
+    return {'status': state,
+            'metadata': {'rax:auto_scaling_group_id': group}}
+
+
 class GetAllMetricsEffectsTests(SynchronousTestCase):
     """Tests for :func:`get_all_metrics_effects`"""
-
-    def _server(self, group, state):
-        return {'status': state,
-                'metadata': {'rax:auto_scaling_group_id': group}}
 
     def test_get_all_metrics(self):
         """
@@ -190,13 +191,13 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         # Maybe this could use a parameterized "get_scaling_group_servers" call
         # to avoid needing to stub the nova responses, but it seems okay.
         servers_t1 = {
-            'g1': ([self._server('g1', 'ACTIVE')] * 3
-                   + [self._server('g1', 'BUILD')] * 2),
-            'g2': [self._server('g2', 'ACTIVE')]}
+            'g1': ([_server('g1', 'ACTIVE')] * 3
+                   + [_server('g1', 'BUILD')] * 2),
+            'g2': [_server('g2', 'ACTIVE')]}
 
         servers_t2 = {
-            'g4': [self._server('g4', 'ACTIVE'),
-                   self._server('g4', 'BUILD')]}
+            'g4': [_server('g4', 'ACTIVE'),
+                   _server('g4', 'BUILD')]}
 
         groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 3},
                   {'tenantId': 't1', 'groupId': 'g2', 'desired': 4},
@@ -253,27 +254,27 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
     def setUp(self):
         """Mock get_scaling_group_servers and get_request_func."""
         self.tenant_servers = {}
-        # This is pretty nasty.
 
         self.mock_concretize = patch(
             self, 'otter.http.concretize_service_request',
-            side_effect=lambda authenticator, log, service_mapping, region, tenant_id, service_request:
-                Effect(Constant(self.tenant_servers[rf])))
+            side_effect=lambda authenticator, log, service_mapping, region, \
+                               tenant_id, service_request:
+                Effect(Constant(self.tenant_servers[tenant_id])))
         self.service_mapping = {ServiceType.CLOUD_SERVERS: 'nova'}
 
     def test_get_all_metrics(self):
         """
         Gets group's metrics
         """
-        servers_t1 = {'g1': [{'status': 'ACTIVE'}] * 3 + [{'status': 'BUILD'}] * 2,
-                      'g2': [{'status': 'ACTIVE'}]}
-        servers_t2 = {'g4': [{'status': 'ACTIVE'}, {'status': 'BUILD'}]}
+        g1 = [_server('g1', 'ACTIVE')] * 3 + [_server('g1', 'BUILD')] * 2
+        g2 = [_server('g2', 'ACTIVE')]
+        g4 = [_server('g4', 'ACTIVE'), _server('g4', 'BUILD')]
         groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 3},
                   {'tenantId': 't1', 'groupId': 'g2', 'desired': 4},
                   {'tenantId': 't2', 'groupId': 'g4', 'desired': 2}]
 
-        self.tenant_servers['t1'] = servers_t1
-        self.tenant_servers['t2'] = servers_t2
+        self.tenant_servers['t1'] = {'servers': g1 + g2}
+        self.tenant_servers['t2'] = {'servers': g4}
 
         authenticator = mock.Mock()
 
@@ -285,21 +286,13 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
             set([GroupMetrics('t1', 'g1', 3, 3, 2),
                  GroupMetrics('t1', 'g2', 4, 1, 0),
                  GroupMetrics('t2', 'g4', 2, 1, 1)]))
-        self.mock_gsgs.assert_any_call('t1', server_predicate=IsCallable())
-        self.mock_gsgs.assert_any_call('t2', server_predicate=IsCallable())
-
-        self.mock_get_request_func.assert_any_call(
-            authenticator, 't1', metrics_log, self.service_mapping, 'r')
-        self.mock_get_request_func.assert_any_call(
-            authenticator, 't2', metrics_log, self.service_mapping, 'r')
 
     def test_ignore_error_results(self):
         """
         When get_all_metrics_effects returns a list containing a None, those
         elements are ignored.
         """
-        def mock_game(cass_groups, get_request_func_for_tenant, log,
-                      _print=False):
+        def mock_game(cass_groups, log, _print=False):
             return [Effect(Constant(None)),
                     Effect(Constant([GroupMetrics('t1', 'g1', 0, 0, 0)]))]
         mock_game = patch(self, 'otter.metrics.get_all_metrics_effects',
