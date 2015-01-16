@@ -1,6 +1,6 @@
 """Tests for :module:`otter.effect_dispatcher`."""
 
-from effect import Constant, Delay, Effect
+from effect import Constant, Delay, Effect, sync_perform
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -42,9 +42,17 @@ class FullDispatcherTests(SynchronousTestCase):
     """Tests for :func:`get_full_dispatcher`."""
 
     def test_intent_support(self):
-        """
-        All intents are supported by the dispatcher.
-        """
+        """All intents are supported by the dispatcher."""
         dispatcher = get_full_dispatcher(None, None, None, None, None)
         for intent in all_intents():
             self.assertIsNot(dispatcher(intent), None)
+
+    def test_tenant_scope(self):
+        """The :obj:`TenantScope` performer passes through to child effects."""
+        # This is not testing much, but at least that it calls
+        # perform_tenant_scope in a vaguely working manner. There are
+        # more specific TenantScope performer tests in otter.test.test_http
+        dispatcher = get_full_dispatcher(None, None, None, None, None)
+        scope = TenantScope(Effect(Constant('foo')), 1)
+        eff = Effect(scope)
+        self.assertEqual(sync_perform(dispatcher, eff), 'foo')
