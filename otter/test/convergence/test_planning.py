@@ -1,5 +1,7 @@
 """Tests for convergence planning."""
 
+import itertools
+
 from pyrsistent import pmap, pbag, pset, s
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -462,6 +464,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
 class ConvergeTests(SynchronousTestCase):
     """Tests for :func:`converge`."""
 
+    def setUp(self):
+        self.lcs = itertools.count(0)
+
     def test_converge_give_me_a_server(self):
         """
         A server is added if there are not enough servers to meet
@@ -469,11 +474,11 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_config={}, desired=1),
+                DesiredGroupState(launch_configs=self.lcs, desired=1),
                 set(),
                 set(),
                 0),
-            pbag([CreateServer(launch_config=pmap())]))
+            pbag([CreateServer(launch_config=0)]))
 
     def test_converge_give_me_multiple_servers(self):
         """
@@ -482,13 +487,13 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_config={}, desired=2),
+                DesiredGroupState(launch_configs=self.lcs, desired=2),
                 set(),
                 set(),
                 0),
             pbag([
-                CreateServer(launch_config=pmap()),
-                CreateServer(launch_config=pmap())]))
+                CreateServer(launch_config=0),
+                CreateServer(launch_config=1)]))
 
     def test_count_building_as_meeting_capacity(self):
         """
