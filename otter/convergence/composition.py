@@ -80,3 +80,11 @@ def get_desired_group_state(launch_config, desired):
         launch_config={'server': launch_config['args']['server']},
         desired=desired, desired_lbs=lbs)
     return desired_state
+
+
+class Converger(object):
+    """
+    Converger
+    """
+    def __init__(self):
+        pass

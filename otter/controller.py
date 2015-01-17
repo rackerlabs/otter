@@ -144,6 +144,13 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
         :class:`otter.models.interface.GroupState` if successful. If no changes
         are to be made to the group, None will synchronously be returned.
     """
+    # Call convergence/ if tenant is enabled for it
+    if tenant_is_enabled(scaling_group.tenant_id, config_value):
+        get_converger().set_desired_capcity(
+            state.tenant_id, state.group_id, state.desired, launch_config)
+        return succeed(None)
+
+    # Otherwise do older worker code
     delta = calculate_delta(log, state, config, policy)
     execute_log = log.bind(server_delta=delta)
 
