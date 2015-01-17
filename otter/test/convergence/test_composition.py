@@ -101,8 +101,8 @@ class ExecConvergenceTests(SynchronousTestCase):
 
     def test_success(self):
         """
-        Executes optimized steps if state of world does not match desired and returns
-        True to be called again
+        Executes optimized steps if state of world does not match desired
+        and returns True to be called again
         """
         reqfunc = lambda **k: Effect(k)
         get_all_convergence_data = self._get_gacd_func(
@@ -141,7 +141,8 @@ class ExecConvergenceTests(SynchronousTestCase):
 
     def test_no_steps(self):
         """
-        If state of world matches desired, no steps are executed and False is returned
+        If state of world matches desired, no steps are executed
+        and False is returned
         """
         desired = DesiredGroupState(
             launch_configs=range(2),

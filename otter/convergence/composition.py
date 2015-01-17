@@ -2,10 +2,10 @@
 Code for composing all of the convergence functionality together.
 """
 
+import itertools
+import time
 from collections import defaultdict
 from functools import partial
-import time
-import itertools
 
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data

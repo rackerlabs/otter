@@ -5,8 +5,6 @@ representation across the different phases of convergence.
 
 from characteristic import attributes, Attribute
 
-from pyrsistent import freeze
-
 from twisted.python.constants import Names, NamedConstant
 
 from zope.interface import implementer, Interface
@@ -55,8 +53,10 @@ class NovaServer(object):
 
 
 @attributes(['launch_configs', 'desired',
-             Attribute('desired_lbs', default_factory=dict, instance_of=dict),
-             Attribute('draining_timeout', default_value=0.0, instance_of=float)])
+             Attribute('desired_lbs', default_factory=dict,
+                       instance_of=dict),
+             Attribute('draining_timeout', default_value=0.0,
+                       instance_of=float)])
 class DesiredGroupState(object):
     """
     The desired state for a scaling group.
