@@ -51,15 +51,23 @@ class JsonToLBConfigTests(SynchronousTestCase):
 class GetDesiredGroupStateTests(SynchronousTestCase):
     """Tests for :func:`get_desired_group_state`."""
     def test_convert(self):
-        """An Otter launch config is converted into a :obj:`DesiredGroupState`."""
+        """An Otter launch config is converted into a
+        :obj:`DesiredGroupState`."""
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config,
                        'loadBalancers': [{'loadBalancerId': 23, 'port': 80}]}}
-        state = get_desired_group_state(lc, 2)
+
+        twice = iter(range(2))
+        prepare_lc = lambda gid, sc: (
+            gid + sc['server']['name'] + str(next(twice)))
+
+        state = get_desired_group_state('gid', lc, 2, _prepare_lc=prepare_lc)
+
+        state.launch_configs = list(state.launch_configs)
         self.assertEqual(
             state,
             DesiredGroupState(
-                launch_config={'server': server_config},
+                launch_configs=['gidtest0', 'gidtest1'],
                 desired=2,
                 desired_lbs={23: [CLBDescription(lb_id='23', port=80)]}))
 
