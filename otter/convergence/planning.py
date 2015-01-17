@@ -190,16 +190,17 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         lambda server: now - server.created >= timeout,
         servers_in_build)
 
-    create_server = CreateServer(launch_config=desired_state.launch_config)
-
     # delete any servers that have been building for too long
     delete_timeout_steps = [DeleteServer(server_id=server.id)
                             for server in building_too_long]
 
     # create servers
-    create_steps = [create_server] * (desired_state.desired
-                                      - (len(servers_in_active)
-                                         + len(waiting_for_build)))
+    servers_to_create = (
+        desired_state.desired - (len(servers_in_active) +
+                                 len(waiting_for_build)))
+    create_steps = [
+        CreateServer(launch_config=next(desired_state.launch_configs))
+        for i in range(servers_to_create)]
 
     # Scale down over capacity, starting with building, then active,
     # preferring older.  Also, finish draining/deleting servers already in
