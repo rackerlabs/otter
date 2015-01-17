@@ -2,7 +2,6 @@
 Tests for :mod:`otter.models.mock`
 """
 from collections import namedtuple
-from functools import partial
 import json
 import mock
 from datetime import datetime
@@ -27,7 +26,7 @@ from otter.models.cass import (
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError,
-    WebhooksOverLimitError, PoliciesOverLimitError)
+    WebhooksOverLimitError, PoliciesOverLimitError, ScalingGroupStatus)
 
 from otter.test.utils import LockMixin, DummyException, mock_log, CheckFailure
 from otter.test.models.test_interface import (
@@ -42,7 +41,9 @@ from otter.util.config import set_config_data
 
 from twisted.internet import defer
 from twisted.internet.task import Clock
-from silverberg.client import ConsistencyLevel
+
+from silverberg.client import ConsistencyLevel, CQLClient
+
 from kazoo.protocol.states import KazooState
 
 
@@ -295,7 +296,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, Synchronou
         """
         Create a mock group
         """
-        self.connection = mock.MagicMock(spec=['execute'])
+        self.connection = mock.MagicMock(spec=CQLClient)
         set_config_data({'limits': {'absolute': {'maxWebhooksPerPolicy': 1000}}})
         self.addCleanup(set_config_data, {})
 
@@ -680,6 +681,35 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         f = self.failureResultOf(d)
         self.assertTrue(f.check(AssertionError))
         self.assertEqual(self.connection.execute.call_count, 0)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.succeed({}))
+    def test_update_status(self, mock_vc):
+        """
+        ``update_status`` updates the status column with given named constant
+        """
+        self.clock.advance(10.345)
+        d = self.group.update_status(ScalingGroupStatus.ERROR)
+        self.assertIsNone(self.successResultOf(d))  # update returns None
+        expectedCql = ('INSERT INTO scaling_group("tenantId", "groupId", status) '
+                       'VALUES (:tenantId, :groupId, :status) USING TIMESTAMP :ts')
+        expectedData = {"status": 'ERROR',
+                        "groupId": '12345678g',
+                        "tenantId": '11111', 'ts': 10345000}
+        self.connection.execute.assert_called_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.fail(NoSuchScalingGroupError('t', 'g')))
+    def test_update_status_raises_nogroup_error(self, mock_vc):
+        """
+        ``update_status`` raises ``NoSuchScalingGroupError`` if group in the object
+        does not exist
+        """
+        self.clock.advance(10.345)
+        d = self.group.update_status(ScalingGroupStatus.ACTIVE)
+        self.failureResultOf(d, NoSuchScalingGroupError)
+        self.assertFalse(self.connection.execute.called)
 
     def test_view_config_no_such_group(self):
         """
