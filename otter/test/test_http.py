@@ -210,10 +210,14 @@ class PerformServiceRequestTests(SynchronousTestCase):
         svcreq = service_request(ServiceType.CLOUD_SERVERS, "GET", "servers",
                                  data=input_json).intent
         eff = self._concrete(svcreq)
+
+        # Input is serialized
         next_eff = resolve_authenticate(eff)
+        self.assertEqual(next_eff.intent.data, json.dumps(input_json))
+
+        # Output is parsed
         result = resolve_effect(next_eff,
                                 stub_pure_response(json.dumps(output_json)))
-        self.assertEqual(next_eff.intent.data, json.dumps(input_json))
         self.assertEqual(result, output_json)
 
     def test_no_json_response(self):
