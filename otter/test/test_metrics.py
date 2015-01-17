@@ -51,6 +51,10 @@ from otter.test.utils import (
     resolve_stubs,
 )
 
+from testtools.matchers import IsInstance
+
+from silverberg.client import CQLClient
+
 
 class GetScalingGroupsTests(SynchronousTestCase):
     """
@@ -406,7 +410,28 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         self.assertEqual(self.k, dict(data=req_data, log=log))
 
 
-class CollectMetricsTests(SynchronousTestCase):
+class CommonMocks(SynchronousTestCase):
+    """
+    Common mocks including :func:`connect_cass_servers` and
+    :func:`generate_authenticator`
+    """
+
+    def setUp(self):
+        """
+        mock common stuff
+        """
+        self.connect_cass_servers = patch(
+            self, 'otter.metrics.connect_cass_servers')
+        self.client = mock.Mock(spec=['disconnect'])
+        self.client.disconnect.return_value = succeed('disconnected')
+        self.connect_cass_servers.return_value = self.client
+
+        self.authenticator = object()
+        self.mock_ga = patch(self, 'otter.metrics.generate_authenticator',
+                             return_value=self.authenticator)
+
+
+class CollectMetricsTests(CommonMocks):
     """
     Tests for :func:`collect_metrics`
     """
@@ -415,12 +440,7 @@ class CollectMetricsTests(SynchronousTestCase):
         """
         mock dependent functions
         """
-        self.connect_cass_servers = patch(
-            self, 'otter.metrics.connect_cass_servers')
-        self.client = mock.Mock(spec=['disconnect'])
-        self.client.disconnect.return_value = succeed(None)
-        self.connect_cass_servers.return_value = self.client
-
+        super(CollectMetricsTests, self).setUp()
         self.groups = mock.Mock()
         self.get_scaling_groups = patch(
             self, 'otter.metrics.get_scaling_groups',
@@ -460,11 +480,10 @@ class CollectMetricsTests(SynchronousTestCase):
         self.get_scaling_groups.assert_called_once_with(
             self.client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
-            self.groups, matches(Provides(IAuthenticator)),
-            service_mapping, 'r', clock=_reactor, _print=False)
+            self.groups, self.authenticator, service_mapping,
+            'r', clock=_reactor, _print=False)
         self.mock_grf.assert_called_once_with(
-            matches(Provides(IAuthenticator)), 'tid', metrics_log,
-            service_mapping, 'IAD')
+            self.authenticator, 'tid', metrics_log, service_mapping, 'IAD')
         self.add_to_cloud_metrics.assert_called_once_with(
             self.req_func, self.config['metrics'], 'r', 107, 26, 1,
             log=metrics_log)
@@ -508,7 +527,7 @@ class APIOptionsTests(SynchronousTestCase):
         self.assertEqual(config, {'a': 'b', 'config': 'file.json'})
 
 
-class ServiceTests(SynchronousTestCase):
+class ServiceTests(CommonMocks):
     """
     Tests for :func:`otter.metrics.makeService` and
     :class:`otter.metrics.MetricsService`
@@ -518,8 +537,7 @@ class ServiceTests(SynchronousTestCase):
         """
         Mock cass connection and authenticator
         """
-        self.client = mock.Mock(spec=['disconnect'])
-        self.client.disconnect.return_value = succeed('disconnected')
+        super(ServiceTests, self).setUp()
         self.mock_ccs = patch(
             self, 'otter.metrics.connect_cass_servers',
             return_value=self.client)
@@ -527,8 +545,6 @@ class ServiceTests(SynchronousTestCase):
                        'metrics': {'interval': 20}}
         self.mock_cm = patch(
             self, 'otter.metrics.collect_metrics', return_value=succeed(None))
-        self.log = mock_log()
-        self.clock = Clock()
 
     def _service(self):
         return MetricsService('r', self.config, self.log, self.clock)

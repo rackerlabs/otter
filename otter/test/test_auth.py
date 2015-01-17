@@ -774,7 +774,7 @@ class InvalidateTokenTests(SynchronousTestCase):
 
 
 identity_config = {
-    'username': 'uname', 'password': 'pwd', 'url': 'htp',
+    'credentials': 'cred_file', 'url': 'htp',
     'admin_url': 'ad', 'max_retries': 3, 'retry_interval': 5,
     'wait': 4, 'cache_ttl': 50
 }
@@ -790,13 +790,15 @@ class AuthenticatorTests(SynchronousTestCase):
         Config with identity settings
         """
         self.config = deepcopy(identity_config)
+        self._open = mock.mock_open(read_data='{"username": "uname", "password": "pwd"}')
+        self.remove = patch(self, 'otter.auth.os.remove', return_value=None)
 
     def test_composition(self):
         """
         authenticator is composed correctly with values from config
         """
         r = mock.Mock()
-        a = generate_authenticator(r, self.config)
+        a = generate_authenticator(r, self.config, _open=self._open)
         self.assertIsInstance(a, CachingAuthenticator)
         self.assertIdentical(a._reactor, r)
         self.assertEqual(a._ttl, 50)
@@ -824,8 +826,7 @@ class AuthenticatorTests(SynchronousTestCase):
         WaitingAuthenticator is created with default of 5 if not given
         """
         del self.config['wait']
-        r = mock.Mock()
-        a = generate_authenticator(r, self.config)
+        a = generate_authenticator(object(), self.config, _open=self._open)
         self.assertEqual(a._authenticator._wait, 5)
 
     def test_cache_ttl_defaults(self):
@@ -833,6 +834,12 @@ class AuthenticatorTests(SynchronousTestCase):
         CachingAuthenticator is created with default of 300 if not given
         """
         del self.config['cache_ttl']
-        r = mock.Mock()
-        a = generate_authenticator(r, self.config)
+        a = generate_authenticator(object(), self.config, _open=self._open)
         self.assertEqual(a._ttl, 300)
+
+    def test_creds_file_is_deleted(self):
+        """
+        Credentials file is deleted after reading username/password from it
+        """
+        generate_authenticator(object(), self.config, _open=self._open)
+        self.remove.assert_called_once_with('cred_file')
