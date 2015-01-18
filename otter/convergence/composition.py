@@ -92,7 +92,38 @@ def get_desired_group_state(group_id, launch_config, desired,
 
 class Converger(object):
     """
-    Converger
+    Converger implementation
     """
-    def __init__(self):
+    def __init__(self, reactor, authenticator, service_mapping, region, log,
+                 lock, clock=None):
+        self._reactor = reactor
+        self._authentictor = authenticator
+        self._service_mapping = service_mapping
+        self._region = region
+        self._lock = lock
+        self._clock = clock or reactor
+        self._log = log.bind('otter.converger')
+
+    def _get_lock(self, group_id):
+        """
+        Return group lock
+        """
         pass
+
+    def set_desired_capacity(self, tenant_id, group_id,
+                             desired, launch_config):
+        request_func = get_request_func(authenticator, tenant_id, self._log,
+                                        service_mapping, region)
+        desired_group_state = get_desired_group_state(
+            group_id, launch_config, desired)
+        lock = self._get_lock(group_id)
+        # TODO: Call this again at interval until execute_convergence returns False
+        return with_lock(
+            self._reactor, lock,
+            partial(self._exec_convergence, request_func,
+                    group_id, desired_group_state),
+            acquire_timeout=150, release_timeout=150)
+
+    def _exec_convergence(self, request_func, group_id, desired_group_state):
+        eff = execute_convergence(request_func, desired, launch_config)
+        return perform(self._reactor, eff)
