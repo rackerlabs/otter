@@ -2,14 +2,16 @@
 Code for composing all of the convergence functionality together.
 """
 
+import itertools
+import time
 from collections import defaultdict
 from functools import partial
-import time
 
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import DesiredGroupState, CLBDescription
 from otter.convergence.planning import plan
+from otter.worker.launch_server_v1 import prepare_launch_config
 
 
 def execute_convergence(request_func, group_id, desired_group_state,
@@ -66,18 +68,24 @@ def json_to_LBConfigs(lbs_json):
     return lbd
 
 
-def get_desired_group_state(launch_config, desired):
+def get_desired_group_state(group_id, launch_config, desired,
+                            _prepare_lc=prepare_launch_config):
     """
     Create a :obj:`DesiredGroupState` from a launch config and desired
     number of servers.
 
+    :param str group_id: Scaling group ID
     :param dict launch_config: Group's launch config as per
         :obj:`otter.json_schema.group_schemas.launch_config`
     :param int desired: Group's desired capacity
+    :param callable _prepare_lc: Optional implementation of
+        `prepare_launch_config` useful for testing
     """
     lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
+    server_lc = {'server': launch_config['args']['server']}
     desired_state = DesiredGroupState(
-        launch_config={'server': launch_config['args']['server']},
+        launch_configs=(_prepare_lc(group_id, server_lc)
+                        for _ in itertools.count()),
         desired=desired, desired_lbs=lbs)
     return desired_state
 
