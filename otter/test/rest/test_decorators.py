@@ -22,7 +22,6 @@ from otter.test.utils import mock_log
 
 class BlahError(Exception):
     """Null"""
-    pass
 
 
 class DetailsError(Exception):

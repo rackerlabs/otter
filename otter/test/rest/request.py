@@ -142,7 +142,6 @@ class DummyException(Exception):
 
     This way we are certain to throw a completely unhandled exception
     """
-    pass
 
 
 class RequestTestMixin(object):

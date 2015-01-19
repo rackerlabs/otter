@@ -22,7 +22,6 @@ class InvalidLaunchConfiguration(Exception):
     """
     Represents an invalid launch configuration
     """
-    pass
 
 
 class UnknownImage(InvalidLaunchConfiguration):
