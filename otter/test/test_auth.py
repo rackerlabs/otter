@@ -32,7 +32,7 @@ from otter.auth import (
     public_endpoint_url,
     user_for_tenant,
 )
-from otter.effect_dispatcher import get_dispatcher
+from otter.effect_dispatcher import get_simple_dispatcher
 from otter.test.utils import SameJSON, iMock, mock_log, patch
 from otter.util.http import APIError, UpstreamError
 
@@ -756,7 +756,8 @@ class AuthenticateTests(SynchronousTestCase):
         mock_auth.authenticate_tenant.return_value = succeed(result)
         log = object()
         eff = Effect(Authenticate(mock_auth, 'tenant_id1', log))
-        self.assertEqual(sync_perform(get_dispatcher(None), eff), result)
+        self.assertEqual(sync_perform(get_simple_dispatcher(None), eff),
+                         result)
         mock_auth.authenticate_tenant.assert_called_once_with('tenant_id1',
                                                               log=log)
 
@@ -769,7 +770,7 @@ class InvalidateTokenTests(SynchronousTestCase):
         mock_auth = iMock(ICachingAuthenticator)
         mock_auth.invalidate.return_value = None
         eff = Effect(InvalidateToken(mock_auth, 'tenant_id1'))
-        self.assertEqual(sync_perform(get_dispatcher(None), eff), None)
+        self.assertEqual(sync_perform(get_simple_dispatcher(None), eff), None)
         mock_auth.invalidate.assert_called_once_with('tenant_id1')
 
 

@@ -29,7 +29,7 @@ from twisted.python import usage
 from otter.auth import generate_authenticator
 from otter.constants import ServiceType, get_service_mapping
 from otter.convergence.gathering import get_scaling_group_servers
-from otter.effect_dispatcher import get_dispatcher
+from otter.effect_dispatcher import get_full_dispatcher
 from otter.http import get_request_func
 from otter.log import log as otter_log
 from otter.util.fp import predicate_all
@@ -160,14 +160,13 @@ def get_all_metrics_effects(cass_groups, get_request_func_for_tenant,
     return effs
 
 
-def _perform_limited_effects(effects, clock, limit):
+def _perform_limited_effects(dispatcher, effects, limit):
     """
     Perform the effects in parallel up to a limit.
 
     It'd be nice if effect.parallel had a "limit" parameter.
     """
     # TODO: Use cooperator instead
-    dispatcher = get_dispatcher(clock)
     sem = defer.DeferredSemaphore(limit)
     defs = [sem.run(perform, dispatcher, eff) for eff in effects]
     return defer.gatherResults(defs)
@@ -188,12 +187,16 @@ def get_all_metrics(cass_groups, authenticator, service_mapping, region,
 
     :return: ``list`` of `GroupMetrics` as `Deferred`
     """
+    dispatcher = get_full_dispatcher(clock, authenticator, metrics_log,
+                                     service_mapping, region)
+
     def req_func_for_tenant(tenant_id):
+        # TODO: Get rid of this when we switch everything to ServiceRequest
         return get_request_func(authenticator, tenant_id, metrics_log,
                                 service_mapping, region)
     effs = get_all_metrics_effects(
         cass_groups, req_func_for_tenant, metrics_log, _print=_print)
-    d = _perform_limited_effects(effs, clock, 10)
+    d = _perform_limited_effects(dispatcher, effs, 10)
     d.addCallback(filter(lambda x: x is not None))
     return d.addCallback(lambda x: reduce(operator.add, x, []))
 
@@ -285,13 +288,22 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
             total_desired, total_actual, total_pending))
 
     # Add to cloud metrics
-    req_func = get_request_func(
-        authenticator, config['metrics']['tenant_id'], metrics_log,
-        service_mapping, config['metrics']['region'])
+
+    # WARNING: This request func (and dispatcher) are configured to make
+    # requests against the metrics region. The same request_func and dispatcher
+    # can't be used for other purposes, like making requests to cloud servers.
+    # An issue for this problem is at
+    # https://github.com/rackerlabs/otter/issues/896
+    req_func = get_request_func(authenticator, config['metrics']['tenant_id'],
+                                metrics_log, service_mapping,
+                                config['metrics']['region'])
     eff = add_to_cloud_metrics(
         req_func, config['metrics'], config['region'], total_desired,
         total_actual, total_pending, log=metrics_log)
-    yield perform(get_dispatcher(reactor), eff)
+    dispatcher = get_full_dispatcher(
+        reactor, authenticator, metrics_log,
+        service_mapping, config['metrics']['region'])
+    yield perform(dispatcher, eff)
     metrics_log.msg('added to cloud metrics')
     if _print:
         print('added to cloud metrics')
