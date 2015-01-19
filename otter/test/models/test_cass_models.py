@@ -480,7 +480,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'group_config': '{"name": "a"}',
              'active': '{"A":"R"}',
              'pending': '{"P":"R"}',
-             'groupTouched': '123',
+             'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
              'paused': '\x00',
              'created_at': 23,
@@ -502,9 +502,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                  group_name='a',
                                  active={'A': 'R'},
                                  pending={'P': 'R'},
-                                 group_touched='123',
-                                 # REVIEW: is ^ this actually realistic?
-                                 # Shouldn't this be an iso8601-ish timestamp?
+                                 group_touched='2014-01-01T00:00:05Z.1234',
                                  policy_touched={'PT': 'R'},
                                  paused=False,
                                  desired=10)
@@ -520,7 +518,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'group_config': '{"name": "a"}',
              'active': '{"A":"R"}',
              'pending': '{"P":"R"}',
-             'groupTouched': '123',
+             'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
              'paused': '\x00',
              'created_at': 23,
@@ -528,8 +526,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.returns = [cass_response]
         r = self.successResultOf(self.group.view_state())
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
-                                       'a', {'A': 'R'},
-                                       {'P': 'R'}, '123', {'PT': 'R'}, False,
+                                       'a',
+                                       {'A': 'R'},
+                                       {'P': 'R'},
+                                       '2014-01-01T00:00:05Z.1234',
+                                       {'PT': 'R'},
+                                       False,
                                        desired=0))
 
     def test_view_respsects_consistency_argument(self):
@@ -543,7 +545,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'group_config': '{"name": "a"}',
              'active': '{"A":"R"}',
              'pending': '{"P":"R"}',
-             'groupTouched': '123',
+             'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
              'paused': '\x00',
              'desired': 0,
@@ -577,7 +579,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'group_config': '{"name": "a"}',
              'active': '{"A":"R"}',
              'pending': '{"P":"R"}',
-             'groupTouched': '123',
+             'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
              'paused': '\x00',
              'desired': None,
@@ -608,7 +610,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'group_config': '{"name": "a"}',
              'active': '{"A":"R"}',
              'pending': '{"P":"R"}',
-             'groupTouched': '123',
+             'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
              'paused': '\x01',
              'desired': 0,
@@ -618,8 +620,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.view_state()
         r = self.successResultOf(d)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
-                                       'a', {'A': 'R'}, {'P': 'R'},
-                                       '123', {'PT': 'R'}, True, desired=0))
+                                       'a',
+                                       {'A': 'R'}, {'P': 'R'},
+                                       '2014-01-01T00:00:05Z.1234',
+                                       {'PT': 'R'},
+                                       True,
+                                       desired=0))
 
     @mock.patch('otter.models.cass.serialize_json_data',
                 side_effect=lambda *args: _S(args[0]))
@@ -1835,7 +1841,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'launch_config': serialize_json_data(self.launch_config, 1.0),
             'active': '{"A":"R"}',
             'pending': '{"P":"R"}',
-            'groupTouched': '123',
+            'groupTouched': '2014-01-01T00:00:05Z.1234',
             'policyTouched': '{"PT":"R"}',
             'paused': '\x00',
             'desired': 0,
@@ -1853,7 +1859,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                 self.tenant_id,
                 self.group_id,
                 'a', {'A': 'R'},
-                {'P': 'R'}, '123',
+                {'P': 'R'}, '2014-01-01T00:00:05Z.1234',
                 {'PT': 'R'}, False)
         })
 
@@ -1890,7 +1896,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'launch_config': serialize_json_data(self.launch_config, 1.0),
             'active': '{"A":"R"}',
             'pending': '{"P":"R"}',
-            'groupTouched': '123',
+            'groupTouched': '2014-01-01T00:00:05Z.1234',
             'policyTouched': '{"PT":"R"}',
             'paused': '\x00',
             'desired': 0,
@@ -1928,7 +1934,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'launch_config': serialize_json_data(self.launch_config, 1.0),
             'active': '{"A":"R"}',
             'pending': '{"P":"R"}',
-            'groupTouched': '123',
+            'groupTouched': '2014-01-01T00:00:05Z.1234',
             'policyTouched': '{"PT":"R"}',
             'paused': '\x00',
             'desired': 0,
