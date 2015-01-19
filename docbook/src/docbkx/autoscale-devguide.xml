@@ -57,7 +57,7 @@
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2015-01-16</pubdate>
+        <pubdate>2015-01-18</pubdate>
         <copyright>
             <year>2015</year>
             <holder>Rackspace US, Inc.</holder>
@@ -70,7 +70,7 @@
         </legalnotice>
         <revhistory>
             <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
-                <date>2015-01-16</date>
+                <date>2015-01-18</date>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
@@ -91,8 +91,8 @@
                                 to General API information section. Added <xref linkend="createServerTemplate"/>
                                 information to <link linkend="Launch_Configuration">Launch configuration
                                 </link>section in support of using Boot from Volume. Added <link linkend="RCv3">Cloud Bursting with
-                                   RackConnectV3</link> concept and information about using the <parameter>launchConfiguration
-                                   loadBalancers type</parameter> parameter to configure RackConnectV3
+                                   RackConnect v3</link> concept and information about using the <parameter>launchConfiguration
+                                   loadBalancers type</parameter> parameter to configure RackConnect v3
                                 for Auto Scale. See also <link linkend="Launch_Configuration">Launch configurations</link>. </para>
                         </listitem>
                     </itemizedlist>
@@ -319,7 +319,7 @@
             and the thresholds in Cloud Monitoring that trigger the
             scaling activities.</para>
         <para> To use &PROD;, you define a scaling group consisting of
-            cloud servers and cloud load balancers or RackConnectV3.
+            cloud servers and cloud load balancers or RackConnect v3.
             Then you define policies, either schedule-based or
             monitoring-based. For monitoring-based policies, you
             define cloud monitoring alerts to watch the group's
@@ -549,10 +549,10 @@ is external so it's handy for Getting Started to share -->
                                 server image will be started on
                                 launch, what flavor the new server is,
                                 and which cloud load balancer or
-                                RackConnectV3 load balancer pool the
+                                RackConnect v3 load balancer pool the
                                 new server connects to.
-                                Note: The <parameter>launchConfiguration</parameter> uses the <emphasis role="bold">admin</emphasis> user’s SSH key pair name, 
-                                usually the first admin user found in the tenant. 
+                                Note: The <parameter>launchConfiguration</parameter> uses the <emphasis role="bold">admin</emphasis> user to scale up, 
+                                usually the first admin user found on the tenant. Only that particular admin user's SSH key pair names can be used in the launchConfiguration. 
                                 Note: The launchConfiguration update operation overwrites all launchConfiguration settings. 
                                 For details, see <link linkend="Launch_Configuration">Launch configurations</link>.
                                 </td>
@@ -699,17 +699,17 @@ is external so it's handy for Getting Started to share -->
             </para>
         </section>
         <section xml:id="RCv3" xmlns:raxm="http://docs.rackspace.com/api/metadata">
-            <title>Cloud Bursting with RackConnectV3</title>
+            <title>Cloud Bursting with RackConnect v3</title>
             <para>You can use Auto Scale with a hybrid, dedicated and
                 cloud, solution to "burst" into the cloud when extra
                 servers are temporarily needed. To do this, you use
-                RackConnectV3, proprietary software that works with
+                RackConnect v3, a Rackspace solution that works with
                 Rackspace cloud servers and creates a secure bridge
                 between the Rackspace cloud and your dedicated
                 hardware.</para>
-            <para>To get started with RackConnectV3 cloud bursting: <itemizedlist>
+            <para>To get started with RackConnect v3 cloud bursting: <itemizedlist>
                     <listitem>
-                        <para>Contact Rackspace Customer Support and
+                        <para>Contact your Rackspace Support team and
                             tell them what you want to do. They will
                             configure a load balancer pool for you and
                             give you the UUID. </para>
@@ -722,19 +722,19 @@ is external so it's handy for Getting Started to share -->
                             UUID that was given to you as the
                                 <parameter>loadBalancerId</parameter>
                             and use
-                                <parameter>"RackConnectV3"</parameter>
+                                <parameter>"RackConnect v3"</parameter>
                             for the <parameter>type</parameter>. Do
                             not set a value for
                                 <parameter>port</parameter>.</para>
                     </listitem>
                 </itemizedlist>
             </para>
-            <example><title>Example RackConnectV3 launchConfiguration with 2 load balancer
+            <example><title>Example RackConnect v3 launchConfiguration with 2 load balancer
                     pools</title>
                 <programlisting language="json">
                             <xi:include href="./samples/exampleRCv3launchConfig.json" parse="text"/>
                         </programlisting></example>
-            <para>For more information on RackConnectV3, see this
+            <para>For more information on RackConnect v3, see this
                     <link
                     xlink:href="http://www.rackspace.com/cloud/hybrid/rackconnect"
                     >Overview</link>, and there are several <link
@@ -2228,15 +2228,15 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 creating new servers. It specifies what type of server
                 image will be started on launch, what flavor the new
                 server is, and which cloud load balancer or
-                RackConnectV3 load balancer pool the new server
+                RackConnect v3 load balancer pool the new server
                 connects to.</para>
             <note>
                 <itemizedlist>
                     <listitem><para>
-                        The <parameter>launchConfiguration</parameter> uses the <emphasis role="bold">admin</emphasis> user’s SSH key pair name, 
-                        usually the first admin user found in the tenant. If there are multiple <emphasis role="bold">admin</emphasis> accounts in the tenant, there is no 
-                        guarantee as to which one will be chosen. So it is best for there to be one <emphasis role="bold">admin</emphasis> user in the tenant. 
-                        This restriction cannot be changed currently. There is no option to specify a user to impersonate. 
+                        The <parameter>launchConfiguration</parameter> uses the <emphasis role="bold">admin</emphasis> user to scale up, 
+                        usually the first admin user found on the tenant. Only that particular admin user's SSH key pair names can be used in the launchConfiguration, 
+                        if a key name is specified at all. If there are multiple <emphasis role="bold">admin</emphasis> accounts in the tenant, there is no 
+                        guarantee as to which one will be chosen, so it is best for there to be one <emphasis role="bold">admin</emphasis> user in the tenant.  
                     </para></listitem>
                     <listitem>
                         <para>The launchConfiguration update operation overwrites all launchConfiguration settings. 
@@ -2274,7 +2274,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                    <parameter>loadBalancers</parameter>.
                                 Most launch configurations have both a
                                 server and a load balancer (can be
-                                RackConnectV3) configured.</td>
+                                RackConnect v3) configured.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -2310,12 +2310,12 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>Specifies the configuration
                                 information for the load balancer(s)
                                 used in the cloud server deployment,
-                                including a RackConnectV3 load
+                                including a RackConnect v3 load
                                 balancer pool. For background
                                 information and an example
                                 configuration, see <link
                                    linkend="RCv3">Cloud Bursting with
-                                   RackConnectV3</link>. Please note
+                                   RackConnect v3</link>. Please note
                                 that you must include the
                                    <parameter>ServiceNet</parameter>
                                 network in your configuration if you
@@ -2409,7 +2409,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                    RackConnect, and F5 Load
                                    Balancers.</link> You do NOT use
                                 this parameter to configure Auto Scale
-                                and RackConnectV3, you use the
+                                and RackConnect v3, you use the
                                    <parameter>loadBalancers</parameter>
                                 parameter for that.</td>
                         </tr>
@@ -2510,7 +2510,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <para>Here is an example of a very simple create server template that you could base64 encode. This template simply 
                 installs the apache2 package and runs a shell command.</para>
             <example xml:id="createServerTemplate">
-                <title>Create server template for RackConnectV3 </title>
+                <title>Create server template for RackConnect v3 </title>
                 <programlisting language="json">
                             <xi:include href="./samples/exampleRCv3launchConfig.json" parse="text"/>
                         </programlisting>
@@ -2536,7 +2536,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <para>
                                 <link
                                    xlink:href="http://docs.rcv3.apiary.io/"
-                                   >RackConnectV3 API</link>
+                                   >RackConnect v3 API</link>
                             </para>
                         </listitem>
                     </itemizedlist>
