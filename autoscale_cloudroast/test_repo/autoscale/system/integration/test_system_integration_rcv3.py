@@ -109,7 +109,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             print "SetUpClass failed: background servers"
 
     @tags(speed='slow', type='rcv3')
-    @unittest.skip('')
+    #@unittest.skip('')
     def test_create_scaling_group_with_pool_on_cloud_network(self):
         """
         Test that it is possible to create a scaling group with 0 entities
@@ -123,7 +123,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self._common_scaling_group_assertions(pool_group_resp)
 
     @tags(speed='slow', type='rcv3')
-    @unittest.skip('')
+    #@unittest.skip('')
     def test_create_scaling_group_with_pool_on_private(self):
         """
         Test that it is possible to create a scaling group with 0 entities
@@ -137,7 +137,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self._common_scaling_group_assertions(pool_group_resp)
 
     @tags(speed='slow', type='rcv3')
-    @unittest.skip('')
+    #@unittest.skip('')
     def test_create_scaling_group_with_pool_on_public(self):
         """
         Test that it is possible to create a scaling group with 0 entities
@@ -154,7 +154,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
 
     @tags(speed='slow', type='rcv3')
-    @unittest.skip('')
+    #@unittest.skip('')
     def test_create_nonzero_scaling_group_with_pool_on_cloud_network(self):
         """
         Test that it is possible to create a scaling group with gc_min_entities_alt entities
@@ -172,7 +172,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.verify_group_state(pool_group_resp.entity.id, self.gc_min_entities_alt)
 
     @tags(speed='slow', type='rcv3')
-    @unittest.skip('')
+    #@unittest.skip('')
     def test_create_nonzero_scaling_group_with_pool_on_private(self):
         """
         Test that it is possible to create a scaling group with self.gc_min_entities_alt entities
@@ -190,7 +190,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.verify_group_state(pool_group_resp.entity.id, self.gc_min_entities_alt)
 
     @tags(speed='slow', type='rcv3')
-    @unittest.skip('')
+    #@unittest.skip('')
     def test_create_nonzero_scaling_group_with_pool_on_public(self):
         """
         Test that it is possible to create a scaling group with self.gc_min_entities_alt entities
@@ -299,7 +299,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           msg='LB Pool status {0} is not in expected ACTIVE state'.format(status))
 
     @tags(speed='slow', type='rcv3')
-    @unittest.skip('')
+    #@unittest.skip('')
     def test_scale_up_down_on_rcv3_pool(self):
         """
         Attempt to scale up and down on a correctly configured RCv3 pool.
