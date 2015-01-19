@@ -21,6 +21,10 @@ def get_simple_dispatcher(reactor):
     Get an Effect dispatcher that can handle most of the effects in Otter,
     suitable for passing to :func:`effect.perform`. Note that this does NOT
     handle :obj:`ServiceRequest` and :obj:`TenantScope`.
+
+    Usually, :func:`get_full_dispatcher` should be used instead of this
+    function. The simple dispatcher should only be used in tests or legacy
+    code.
     """
     return ComposedDispatcher([
         base_dispatcher,

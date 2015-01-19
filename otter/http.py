@@ -168,6 +168,11 @@ class ServiceRequest(object):
     Note that this intent does _not_ contain a tenant ID. To specify the tenant
     ID for any tree of effects that might contain a ServiceRequest, wrap the
     effect in a :obj:`TenantScope`.
+
+    If you wrap :obj:`TenantScope` around effects of :obj:`ServiceRequest`,
+    then you don't need to worry about including a performer for this
+    :obj:`ServiceRequest` in your dispatcher -- :obj:`TenantScope`'s performer
+    takes care of that.
     """
 
 
@@ -182,6 +187,9 @@ class TenantScope(object):
         perform(dispatcher, TenantScope(Effect(ServiceRequest(...))))
 
     will make the ServiceRequest bound to the specified tenant.
+
+    Use a partially-applied :func:`perform_tenant_scope` as the performer
+    for this intent in your dispatcher.
     """
     def __init__(self, effect, tenant_id):
         self.effect = effect
@@ -194,7 +202,8 @@ def concretize_service_request(
         service_request):
     """
     Translate a high-level :obj:`ServiceRequest` into a low-level :obj:`Effect`
-    of :obj:`pure_http.Request`.
+    of :obj:`pure_http.Request`. This doesn't directly conform to the Intent
+    performer interface, but it's intended to be used by a performer.
 
     :param ICachingAuthenticator authenticator: the caching authenticator
     :param tenant_id: tenant ID.
