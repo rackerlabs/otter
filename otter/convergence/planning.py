@@ -38,7 +38,7 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
 
     :param float timeout: the time the node should remain in draining until
         removed
-    :param list nodes: `list` of :obj:`LBNode` that should be
+    :param list nodes: `list` of :obj:`CLBNode` that should be
         drained, then removed
     :param float now: number of seconds since the POSIX epoch indicating the
         time at which the convergence was requested.
@@ -51,8 +51,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     # only put nodes into draining if a timeout is specified
     if timeout > 0:
         draining, to_drain = partition_groups(
-            lambda n: n.config.condition, nodes, [CLBNodeCondition.DRAINING,
-                                                  CLBNodeCondition.ENABLED])
+            lambda n: n.description.condition, nodes, [CLBNodeCondition.DRAINING,
+                                                       CLBNodeCondition.ENABLED])
 
         # Nothing should be done to these, because the timeout has not expired
         # and there are still active connections
@@ -60,14 +60,14 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
                     if (now - node.drained_at < timeout and
                         (node.connections is None or node.connections > 0))]
 
-    removes = [RemoveFromCLB(lb_id=node.lb_id, node_id=node.node_id)
+    removes = [RemoveFromCLB(lb_id=node.description.lb_id, node_id=node.node_id)
                for node in (set(nodes) - set(to_drain) - set(in_drain))]
 
-    changes = [ChangeCLBNode(lb_id=node.lb_id,
+    changes = [ChangeCLBNode(lb_id=node.description.lb_id,
                              node_id=node.node_id,
                              condition=CLBNodeCondition.DRAINING,
-                             weight=node.config.weight,
-                             type=node.config.type)
+                             weight=node.description.weight,
+                             type=node.description.type)
                for node in to_drain]
 
     return removes + changes
@@ -83,7 +83,7 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     weight, and correct status, to the desired load balancers.
 
     :param dict desired_lb_state: As per :obj:`DesiredGroupState`.desired_lbs
-    :param list current_lb_nodes: `list` of :obj:`LBNode`
+    :param list current_lb_nodes: `list` of :obj:`CLBNode`
     :param str ip_address: the IP address of the server to converge
 
     Note: this supports user customizable types (e.g. PRIMARY or SECONDARY), but
@@ -94,11 +94,11 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     :rtype: `list` of :class:`IStep`
     """
     desired = {
-        (lb_id, config.port): config
-        for lb_id, configs in desired_lb_state.items()
-        for config in configs}
+        (lb_id, desc.port): desc
+        for lb_id, descs in desired_lb_state.items()
+        for desc in descs}
     current = {
-        (node.lb_id, node.config.port): node
+        (node.description.lb_id, node.description.port): node
         for node in current_lb_nodes}
     desired_idports = set(desired)
     current_idports = set(current)
@@ -120,12 +120,12 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
         ChangeCLBNode(
             lb_id=lb_id,
             node_id=current[lb_id, port].node_id,
-            condition=desired_config.condition,
-            weight=desired_config.weight,
-            type=desired_config.type)
-        for (lb_id, port), desired_config in desired.iteritems()
+            condition=desired_desc.condition,
+            weight=desired_desc.weight,
+            type=desired_desc.type)
+        for (lb_id, port), desired_desc in desired.iteritems()
         if ((lb_id, port) in current
-            and current[lb_id, port].config != desired_config)]
+            and current[lb_id, port].description != desired_desc)]
     return adds + removes + changes
 
 
@@ -165,7 +165,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     :param set servers_with_cheese: a list of :obj:`NovaServer` instances.
         This must only contain servers that are being managed for the specified
         group.
-    :param load_balancer_contents: a set of :obj:`LBNode` instances.  This must
+    :param load_balancer_contents: a set of :obj:`CLBNode` instances.  This must
         contain all the load balancer mappings for all the load balancers on the
         tenant.
     :param float now: number of seconds since the POSIX epoch indicating the
@@ -218,7 +218,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # servers in error presumably are not serving traffic anyway
     delete_error_steps = (
         [DeleteServer(server_id=server.id) for server in servers_in_error] +
-        [RemoveFromCLB(lb_id=lb_node.lb_id,
+        [RemoveFromCLB(lb_id=lb_node.description.lb_id,
                        node_id=lb_node.node_id)
          for server in servers_in_error
          for lb_node in lbs_by_address.get(server.servicenet_address, [])])
@@ -300,3 +300,13 @@ def optimize_steps(steps):
     omg_optimized = concat(_optimizers[step_type](steps)
                            for step_type, steps in steps_by_type.iteritems())
     return pbag(concatv(omg_optimized, unoptimizable))
+
+
+def plan(desired_group_state, servers, lb_nodes, now):
+    """
+    Get an optimized convergence plan.
+
+    Takes the same arguments as :func:`converge`.
+    """
+    steps = converge(desired_group_state, servers, lb_nodes, now)
+    return optimize_steps(steps)

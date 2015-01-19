@@ -4,9 +4,9 @@ Module that provides retrying-at-a-particular-interval functionality.
 
 import random
 
-from characteristic import attributes, Attribute
+from characteristic import Attribute, attributes
 
-from effect import Effect, Delay, FuncIntent
+from effect import Delay, Effect, Func, sync_performer
 from effect.retry import retry as effect_retry
 
 from twisted.internet import defer
@@ -322,7 +322,7 @@ class ShouldDelayAndRetry(object):
                 return Effect(Delay(interval)).on(lambda r: True)
             else:
                 return False
-        return Effect(FuncIntent(doit))
+        return Effect(Func(doit))
 
 
 @attributes(['effect', 'should_retry'])
@@ -340,12 +340,15 @@ class Retry(object):
     :param should_retry: The function to call to determine whether retry
     should occur (usually an instance of :obj:`ShouldDelayAndRetry`).
     """
-    def perform_effect(self, dispatcher):
-        """
-        Invoke :func:`effect.retry.retry` with the effect and the
-        should_retry function.
-        """
-        return effect_retry(self.effect, self.should_retry)
+
+
+@sync_performer
+def perform_retry(dispatcher, intent):
+    """
+    Invoke :func:`effect.retry.retry` with the effect and the
+    should_retry function.
+    """
+    return effect_retry(intent.effect, intent.should_retry)
 
 
 def retry_effect(effect, can_retry, next_interval):

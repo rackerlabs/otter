@@ -14,7 +14,6 @@ from twisted.python.failure import Failure
 
 from otter.worker import launch_server_v1
 from otter.worker.launch_server_v1 import (
-    private_ip_addresses,
     add_to_clb,
     add_to_load_balancer,
     add_to_load_balancers,
@@ -43,9 +42,9 @@ from otter.worker.launch_server_v1 import (
 )
 
 
-from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq,
-                              matches, DummyException, IsBoundWith,
-                              StubTreq, StubTreq2, StubResponse)
+from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq, matches,
+                              DummyException, IsBoundWith, StubTreq, StubTreq2,
+                              StubResponse, defaults_by_name)
 from otter.test.worker.test_rcv3 import _rcv3_add_response
 from testtools.matchers import IsInstance, StartsWith, MatchesRegex
 
@@ -78,40 +77,12 @@ fake_service_catalog = [
      ]}
 ]
 
-
-class UtilityTests(SynchronousTestCase):
-    """
-    Tests for non-specific utilities that should be refactored out of the
-    worker implementation eventually.
-    """
-
-    def test_private_ip_addresses(self):
-        """
-        private_ip_addresses returns all private IPv4 addresses from a
-        complete server body.
-        """
-        addresses = {
-            'private': [
-                {'addr': '10.0.0.1', 'version': 4},
-                {'addr': '10.0.0.2', 'version': 4},
-                {'addr': '::1', 'version': 6}
-            ],
-            'public': [
-                {'addr': '50.50.50.50', 'version': 4},
-                {'addr': '::::', 'version': 6}
-            ]}
-
-        result = private_ip_addresses({'server': {'addresses': addresses}})
-        self.assertEqual(result, ['10.0.0.1', '10.0.0.2'])
-
-
 expected_headers = {
     'content-type': ['application/json'],
     'accept': ['application/json'],
     'x-auth-token': ['my-auth-token'],
     'User-Agent': ['OtterScale/0.0']
 }
-
 
 error_body = '{"code": 500, "message": "Internal Server Error"}'
 
@@ -139,6 +110,7 @@ class RequestFuncTestMixin(object):
                     'private': [
                         {'addr': '192.168.1.1', 'version': 4},
                         {'addr': '192.168.1.2', 'version': 4},
+                        {'addr': '10.0.0.1', 'version': 4},
                         {'addr': '::1', 'version': 6}
                     ],
                     'public': [
@@ -413,7 +385,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertEqual(log, self.log)
         self.assertEqual(endpoint, 'http://dfw.lbaas/')
         self.assertEqual(auth_token, self.auth_token)
-        self.assertEqual(ip_address, "192.168.1.1")
+        self.assertEqual(ip_address, "10.0.0.1")
         self.assertEqual(undo, self.undo)
         self.assertEqual(clock, self.clock)
         self.assertEqual(lb_config, self.lb_config)
@@ -1496,6 +1468,11 @@ class ServerTests(SynchronousTestCase):
         # the loop has stopped
         clock.advance(5)
         self.assertEqual(server_details.call_count, 2)
+
+    def test_wait_for_active_default_timeout(self):
+        """:func`wait_for_active` waits for 2 hours by default."""
+        self.assertEqual(defaults_by_name(wait_for_active)["timeout"],
+                         2 * 60 * 60)
 
     def _launch_server(self, launch_config, log=None, clock=None):
         """
