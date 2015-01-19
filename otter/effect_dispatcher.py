@@ -38,13 +38,13 @@ def get_simple_dispatcher(reactor):
     ])
 
 
-def get_full_dispatcher(reactor, authenticator, log, service_mapping, region):
+def get_full_dispatcher(reactor, authenticator, log, service_config):
     """
     Return a dispatcher that can perform all of Otter's effects.
     """
     return ComposedDispatcher([
         TypeDispatcher({
             TenantScope: partial(perform_tenant_scope, authenticator, log,
-                                 service_mapping, region)}),
+                                 service_config)}),
         get_simple_dispatcher(reactor),
     ])

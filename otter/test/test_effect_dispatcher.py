@@ -43,7 +43,7 @@ class FullDispatcherTests(SynchronousTestCase):
 
     def test_intent_support(self):
         """All intents are supported by the dispatcher."""
-        dispatcher = get_full_dispatcher(None, None, None, None, None)
+        dispatcher = get_full_dispatcher(None, None, None, None)
         for intent in all_intents():
             self.assertIsNot(dispatcher(intent), None)
 
@@ -52,7 +52,7 @@ class FullDispatcherTests(SynchronousTestCase):
         # This is not testing much, but at least that it calls
         # perform_tenant_scope in a vaguely working manner. There are
         # more specific TenantScope performer tests in otter.test.test_http
-        dispatcher = get_full_dispatcher(None, None, None, None, None)
+        dispatcher = get_full_dispatcher(None, None, None, None)
         scope = TenantScope(Effect(Constant('foo')), 1)
         eff = Effect(scope)
         self.assertEqual(sync_perform(dispatcher, eff), 'foo')
