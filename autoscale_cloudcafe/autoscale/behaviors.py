@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import logging
 import time
 import inspect
+import unittest
 
 from cafe.engine.behaviors import BaseBehavior
 from cloudcafe.common.tools.datagen import rand_name
@@ -23,26 +24,33 @@ def _line():
 
 
 class DefaultAsserter(object):
-    """DefaultAsserter objects are used when invoking AutoscaleBehaviors methods that take an asserter,
-    but you don't feel like or care about the assertion results.  For instance, legacy code ignorant of
-    asserters will just default to using one of these.  Alternatively, code you write but don't much care
-    about the results would also use them.
+    """DefaultAsserter objects are used when invoking AutoscaleBehaviors
+    methods that take an asserter, but you don't feel like or care about the
+    assertion results.  If an assertion failure happens, it raises
+    unittest.AssertionError.
 
-    However, this isn't recommended.  If you're verifying results, you REALLY want to know if something
-    failed.  Thus, you should subclass DefaultAsserter (or write a new class entirely which implements
-    an asserter-like interface) and implement your own functionality.  For example, you could call
-    various TestCase.assertX() functions.  Or, you could just flag when things aren't write in an error
-    attribute for later inspection independent of any test framework.
+    However, this isn't generally recommended.  If you're verifying results,
+    you REALLY want to know if something failed.  Thus, you should subclass
+    DefaultAsserter (or write a new class entirely which implements an
+    asserter-like interface) and implement your own functionality.  For
+    example, you could call various TestCase.assertX() functions.  Or, you
+    could just flag when things aren't correct in an error attribute for later
+    inspection independent of any test framework.
+
+    If you choose to subclass instead of compose an asserter-like interface,
+    all you need to override is the fail() method.
     """
 
     def assertEquals(self, a, b, msg=""):
-        pass
+        if a != b:
+            self.fail(msg)
 
     def assertNotEquals(self, a, b, msg=""):
-        pass
+        if a == b:
+            self.fail(msg)
 
     def fail(self, msg):
-        pass
+        raise unittest.AssertionError(msg)
 
 
 class AutoscaleBehaviors(BaseBehavior):
@@ -624,10 +632,6 @@ class AutoscaleBehaviors(BaseBehavior):
                               msg='Group {0} should have {1} servers, but is trying to '
                               'build {2} servers'.format(group_id, expected_servers,
                                                          group_state.desiredCapacity))
-            # We return just in case the asserter does nothing.
-            # This prevents us from dropping through to the timeout loop,
-            # wasting everyone's time.
-            return
 
         while time.time() < end_time:
             if api == 'Autoscale':
@@ -638,10 +642,21 @@ class AutoscaleBehaviors(BaseBehavior):
                     (group_state.activeCapacity + group_state.pendingCapacity), 0,
                     msg='Group Id {0} failed to attempt server creation. Group has no'
                     ' servers'.format(group_id))
+
+                # You might think this is duplicate code with the optimization
+                # above, but you'd be wrong!  For Otter w/out convergence, if a
+                # server created by Otter enters into an error state, the
+                # "desired" capacity drops by one.  Thus, we use this assert as
+                # an inexpensive way to early-detect when it is impossible to
+                # reach our desired goals.
+                #
+                # When Otter adopts convergence, this becomes dead code, and
+                # can be safely removed.
                 asserter.assertEquals(group_state.desiredCapacity, expected_servers,
                                   msg='Group {0} should have {1} servers, but has reduced the build {2}'
                                   'servers'.format(group_id, expected_servers,
                                                    group_state.desiredCapacity))
+
                 if len(active_list) == expected_servers:
                     print "Otter"
                     print "Achieved expected servers after ", time.time() - start_time, " seconds"
@@ -665,3 +680,8 @@ class AutoscaleBehaviors(BaseBehavior):
                     timeout, group_id, expected_servers)
             )
 
+
+def safe_hasattr(obj, key):
+    """This function provides a safe alternative to the hasattr() function."""
+    sentinel = object()
+    return getattr(obj, key, sentinel) is not sentinel
