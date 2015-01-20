@@ -32,7 +32,8 @@ def execute_convergence(request_func, group_id, desired_group_state,
     """
     eff = get_all_convergence_data(request_func, group_id)
     conv_eff = eff.on(
-        lambda (servers, lb_nodes): plan(desired_group_state, servers, lb_nodes, time.time()))
+        lambda (servers, lb_nodes): plan(desired_group_state, servers, lb_nodes,
+                                         time.time()))
     return conv_eff.on(partial(steps_to_effect, request_func)).on(bool)
 
 
