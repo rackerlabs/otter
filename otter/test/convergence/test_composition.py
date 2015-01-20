@@ -33,7 +33,8 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 20, 'port': 800},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80), CLBDescription(lb_id='20', port=800)],
+            {20: [CLBDescription(lb_id='20', port=80),
+                  CLBDescription(lb_id='20', port=800)],
              21: [CLBDescription(lb_id='21', port=81)]})
 
     def test_with_rackconnect(self):
@@ -41,9 +42,10 @@ class JsonToLBConfigTests(SynchronousTestCase):
         LB config with rackconnect
         """
         self.assertEqual(
-            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
-                               {'loadBalancerId': 200, 'type': 'RackConnectV3'},
-                               {'loadBalancerId': 21, 'port': 81}]),
+            json_to_LBConfigs(
+                [{'loadBalancerId': 20, 'port': 80},
+                 {'loadBalancerId': 200, 'type': 'RackConnectV3'},
+                 {'loadBalancerId': 21, 'port': 81}]),
             {20: [CLBDescription(lb_id='20', port=80)],
              21: [CLBDescription(lb_id='21', port=81)]})
 
@@ -51,7 +53,9 @@ class JsonToLBConfigTests(SynchronousTestCase):
 class GetDesiredGroupStateTests(SynchronousTestCase):
     """Tests for :func:`get_desired_group_state`."""
     def test_convert(self):
-        """An Otter launch config is converted into a :obj:`DesiredGroupState`."""
+        """
+        An Otter launch config is converted into a :obj:`DesiredGroupState`.
+        """
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config,
                        'loadBalancers': [{'loadBalancerId': 23, 'port': 80}]}}
@@ -93,8 +97,8 @@ class ExecConvergenceTests(SynchronousTestCase):
 
     def test_success(self):
         """
-        Executes optimized steps if state of world does not match desired and returns
-        True to be called again
+        Executes optimized steps if state of world does not match desired and
+        returns True to be called again.
         """
         reqfunc = lambda **k: Effect(k)
         get_all_convergence_data = self._get_gacd_func(
@@ -119,7 +123,7 @@ class ExecConvergenceTests(SynchronousTestCase):
              'data': {'nodes': mock.ANY},
              'method': 'POST',
              'success_pred': has_code(200)})
-        # separate check for nodes as it can be in any order but content is unique
+        # separate check for nodes; they are unique, but can be in any order
         self.assertEqual(
             set(map(pmap, eff.intent.effects[0].intent['data']['nodes'])),
             set([pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
@@ -133,7 +137,8 @@ class ExecConvergenceTests(SynchronousTestCase):
 
     def test_no_steps(self):
         """
-        If state of world matches desired, no steps are executed and False is returned
+        If state of world matches desired, no steps are executed and False
+        is returned.
         """
         desired = DesiredGroupState(
             launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
