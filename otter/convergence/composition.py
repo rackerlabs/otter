@@ -90,19 +90,33 @@ def get_desired_group_state(group_id, launch_config, desired,
     return desired_state
 
 
-class Converger(object):
+class Converger(Service, object):
     """
-    Converger implementation
+    Converger service
     """
     def __init__(self, reactor, authenticator, service_mapping, region, log,
-                 lock, clock=None):
+                 kz_client, store, clock=None):
         self._reactor = reactor
         self._authentictor = authenticator
         self._service_mapping = service_mapping
         self._region = region
-        self._lock = lock
+        self._kz_client = kz_client
+        self._store = store
         self._clock = clock or reactor
         self._log = log.bind('otter.converger')
+
+    def startService(self):
+        """
+        Setup partitioning / locking of any kind
+        """
+        pass
+
+    def stopService(self):
+        """
+        Return deferred that callbacks after currently executing
+        convergence cycles complete
+        """
+        pass
 
     def _get_lock(self, group_id):
         """
@@ -112,12 +126,16 @@ class Converger(object):
 
     def set_desired_capacity(self, tenant_id, group_id,
                              desired, launch_config):
+        """
+        Set desired capacity and launch config for given group
+        """
         request_func = get_request_func(authenticator, tenant_id, self._log,
                                         service_mapping, region)
         desired_group_state = get_desired_group_state(
             group_id, launch_config, desired)
         lock = self._get_lock(group_id)
-        # TODO: Call this again at interval until execute_convergence returns False
+        # TODO: Call this again at some interval until
+        # execute_convergence returns False
         return with_lock(
             self._reactor, lock,
             partial(self._exec_convergence, request_func,
@@ -125,5 +143,24 @@ class Converger(object):
             acquire_timeout=150, release_timeout=150)
 
     def _exec_convergence(self, request_func, group_id, desired_group_state):
+        # the desired and launch config can change in between the
+        # executions. So, this should probably take the latest desired & config
         eff = execute_convergence(request_func, desired, launch_config)
         return perform(self._reactor, eff)
+
+
+# Single converger service
+_converger = None
+
+
+def get_converger():
+    """
+    Return global converger service
+    """
+    return _converger
+
+def set_converger(converger):
+    """
+    Set global converger service
+    """
+    _converger = converger

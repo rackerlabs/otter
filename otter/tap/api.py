@@ -248,6 +248,14 @@ def makeService(config):
             s.addService(FunctionalService(stop=partial(call_after_supervisor,
                                                         kz_client.stop, supervisor)))
 
+            # setup converger service
+            from otter.convergence.composition import Converger
+            converger_service = Converger(
+                reactor, authenticator, get_service_mapping(config), region,
+                log, kz_client, store)
+            s.addService(converger_service)
+            set_converger(converger_service)
+
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
 
