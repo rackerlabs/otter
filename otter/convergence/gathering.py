@@ -84,17 +84,15 @@ def get_scaling_group_servers(server_predicate=identity):
     return eff.on(servers_apply)
 
 
-def get_clb_contents(request_func):
+def get_clb_contents():
     """
     Get Rackspace Cloud Load Balancer contents as list of `CLBNode`.
-
-    :param request_func: A tenant-bound, CLB-bound, auth-retry based request function
     """
 
     def lb_req(method, url, json_response=True):
         """Make a request to the LB service with retries."""
         return retry_effect(
-            request_func(
+            service_request(
                 ServiceType.CLOUD_LOAD_BALANCERS,
                 method, url, json_response=json_response),
             retry_times(5), exponential_backoff_interval(2))
@@ -182,7 +180,6 @@ def to_nova_server(server_json):
 
 
 def get_all_convergence_data(
-        request_func,
         group_id,
         get_scaling_group_servers=get_scaling_group_servers,
         get_clb_contents=get_clb_contents):
@@ -196,6 +193,6 @@ def get_all_convergence_data(
         [get_scaling_group_servers()
          .on(itemgetter(group_id))
          .on(map(to_nova_server)).on(list),
-         get_clb_contents(request_func)]
+         get_clb_contents()]
     ).on(tuple)
     return eff
