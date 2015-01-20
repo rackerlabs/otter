@@ -188,7 +188,7 @@ def get_all_metrics(dispatcher, cass_groups, _print=False,
     return d.addCallback(lambda x: reduce(operator.add, x, []))
 
 
-def add_to_cloud_metrics(conf, region, total_desired,
+def add_to_cloud_metrics(ttl, region, total_desired,
                          total_actual, total_pending, log=None):
     """
     Add total number of desired, actual and pending servers of a region
@@ -210,7 +210,7 @@ def add_to_cloud_metrics(conf, region, total_desired,
     :return: `Deferred` with None
     """
     metric_part = {'collectionTime': int(time.time() * 1000),
-                   'ttlInSeconds': conf['ttl']}
+                   'ttlInSeconds': ttl}
     totals = [('desired', total_desired), ('actual', total_actual),
               ('pending', total_pending)]
     data = [merge(metric_part,
@@ -233,7 +233,9 @@ def connect_cass_servers(reactor, config):
 
 @defer.inlineCallbacks
 def collect_metrics(reactor, config, client=None, authenticator=None,
-                    _print=False, get_full_dispatcher=get_full_dispatcher):
+                    _print=False,
+                    perform=perform,
+                    get_full_dispatcher=get_full_dispatcher):
     """
     Start collecting the metrics
 
@@ -280,8 +282,9 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
 
     # Add to cloud metrics
     eff = add_to_cloud_metrics(
-        config['metrics'], config['region'], total_desired,
+        config['metrics']['ttl'], config['region'], total_desired,
         total_actual, total_pending, log=metrics_log)
+    eff = Effect(TenantScope(eff, config['metrics']['tenant_id']))
     yield perform(dispatcher, eff)
     metrics_log.msg('added to cloud metrics')
     if _print:

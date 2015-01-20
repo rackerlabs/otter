@@ -5,7 +5,8 @@ Tests for `metrics.py`
 import operator
 from io import StringIO
 
-from effect import Constant, Effect, base_dispatcher
+from effect import (
+    ComposedDispatcher, Constant, Effect, TypeDispatcher, base_dispatcher)
 from effect.testing import resolve_effect
 
 import mock
@@ -24,7 +25,8 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import IAuthenticator
-from otter.constants import ServiceType, get_service_configs
+from otter.constants import ServiceType
+from otter.http import TenantScope
 from otter.metrics import (
     GroupMetrics,
     MetricsService,
@@ -323,11 +325,10 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         ma = merge(m, {'metricValue': ta, 'metricName': 'ord.actual'})
         mp = merge(m, {'metricValue': tp, 'metricName': 'ord.pending'})
         req_data = [md, ma, mp]
-        conf = {'ttl': m['ttlInSeconds']}
         log = object()
 
         eff = add_to_cloud_metrics(
-            conf, 'ord', td, ta, tp, log=log)
+            m['ttlInSeconds'], 'ord', td, ta, tp, log=log)
 
         req = eff.intent
         self.assertEqual(req.service_type, ServiceType.CLOUD_METRICS_INGEST)
@@ -369,12 +370,21 @@ class CollectMetricsTests(SynchronousTestCase):
 
         self.config = {'cassandra': 'c', 'identity': identity_config,
                        'metrics': {'service': 'ms', 'tenant_id': 'tid',
-                                   'region': 'IAD'},
+                                   'region': 'IAD',
+                                   'ttl': 200},
                        'region': 'r', 'cloudServersOpenStack': 'nova',
                        'cloudLoadBalancers': 'clb', 'rackconnect': 'rc'}
 
         self.dispatcher = base_dispatcher
         self.get_full_dispatcher = lambda r, auth, log, cfgs: self.dispatcher
+
+    def _fake_perform(self, dispatcher, effect):
+        """
+        Assert that the only effect passed to this perform is the scoped
+        result of add_to_cloud_metrics.
+        """
+        self.assertEqual(effect,
+                         Effect(TenantScope(Effect(Constant(None)), 'tid')))
 
     def test_metrics_collected(self):
         """
@@ -383,6 +393,7 @@ class CollectMetricsTests(SynchronousTestCase):
         """
         _reactor = mock.Mock()
         d = collect_metrics(_reactor, self.config,
+                            perform=self._fake_perform,
                             get_full_dispatcher=self.get_full_dispatcher)
         self.assertIsNone(self.successResultOf(d))
 
@@ -392,7 +403,7 @@ class CollectMetricsTests(SynchronousTestCase):
         self.get_all_metrics.assert_called_once_with(
             self.dispatcher, self.groups, _print=False)
         self.add_to_cloud_metrics.assert_called_once_with(
-            self.config['metrics'], 'r', 107, 26, 1,
+            self.config['metrics']['ttl'], 'r', 107, 26, 1,
             log=metrics_log)
         self.client.disconnect.assert_called_once_with()
 
@@ -402,6 +413,7 @@ class CollectMetricsTests(SynchronousTestCase):
         """
         client = mock.Mock(spec=['disconnect'])
         d = collect_metrics(mock.Mock(), self.config, client=client,
+                            perform=self._fake_perform,
                             get_full_dispatcher=self.get_full_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.assertFalse(self.connect_cass_servers.called)
@@ -413,6 +425,7 @@ class CollectMetricsTests(SynchronousTestCase):
         """
         _reactor, auth = mock.Mock(), mock.Mock()
         d = collect_metrics(_reactor, self.config, authenticator=auth,
+                            perform=self._fake_perform,
                             get_full_dispatcher=self.get_full_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.get_all_metrics.assert_called_once_with(
