@@ -5,7 +5,7 @@ Tests for `metrics.py`
 import operator
 from io import StringIO
 
-from effect import Constant, Effect
+from effect import Constant, Effect, base_dispatcher
 from effect.testing import Stub, resolve_effect
 
 import mock
@@ -276,68 +276,32 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
             CheckFailureValue(ZeroDivisionError('foo bar')))
 
 
-class GnarlyGetMetricsTests(SynchronousTestCase):
+class GetAllMetricsTests(SynchronousTestCase):
     """
     Tests for :func:`get_all_metrics`.
-
-    These tests aren't very nice -- they should eventually disappear, once more
-    code is converted to using effects, and we don't need as much mocking.
     """
 
-    def setUp(self):
-        """Mock get_scaling_group_servers and get_request_func."""
-        def concretize(authenticator, log, service_mapping,
-                       tenant_id, service_request):
-            return Effect(Constant(self.tenant_servers[tenant_id]))
-        self.mock_concretize = patch(
-            self, 'otter.http.concretize_service_request',
-            side_effect=concretize)
-        self.service_configs = {ServiceType.CLOUD_SERVERS: {'name': 'nova'}}
-        self.tenant_servers = {}
-
     def test_get_all_metrics(self):
-        """
-        Gets group's metrics
-        """
-        g1 = [_server('g1', 'ACTIVE')] * 3 + [_server('g1', 'BUILD')] * 2
-        g2 = [_server('g2', 'ACTIVE')]
-        g4 = [_server('g4', 'ACTIVE'), _server('g4', 'BUILD')]
-        groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 3},
-                  {'tenantId': 't1', 'groupId': 'g2', 'desired': 4},
-                  {'tenantId': 't2', 'groupId': 'g4', 'desired': 2}]
-
-        self.tenant_servers['t1'] = {'servers': g1 + g2}
-        self.tenant_servers['t2'] = {'servers': g4}
-
-        authenticator = mock.Mock()
-
-        d = get_all_metrics(groups, authenticator, self.service_configs, 'r',
-                            clock='c')
-
-        self.assertEqual(
-            set(self.successResultOf(d)),
-            set([GroupMetrics('t1', 'g1', 3, 3, 2),
-                 GroupMetrics('t1', 'g2', 4, 1, 0),
-                 GroupMetrics('t2', 'g4', 2, 1, 1)]))
+        """Gets group's metrics"""
+        def _game(groups, logs, _print=False):
+            return [Effect(Constant(['foo', 'bar'])),
+                    Effect(Constant(['baz']))]
+        d = get_all_metrics(base_dispatcher, object(),
+                            get_all_metrics_effects=_game)
+        self.assertEqual(set(self.successResultOf(d)),
+                         set(['foo', 'bar', 'baz']))
 
     def test_ignore_error_results(self):
         """
         When get_all_metrics_effects returns a list containing a None, those
         elements are ignored.
         """
-        def mock_game(cass_groups, log, _print=False):
+        def _game(groups, log, _print=False):
             return [Effect(Constant(None)),
-                    Effect(Constant([GroupMetrics('t1', 'g1', 0, 0, 0)]))]
-        mock_game = patch(self, 'otter.metrics.get_all_metrics_effects',
-                          side_effect=mock_game)
-        groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
-                  {'tenantId': 't2', 'groupId': 'g2', 'desired': 500}]
-        authenticator = mock.Mock()
-        d = get_all_metrics(groups, authenticator, self.service_configs, 'r',
-                            clock='c')
-        self.assertEqual(
-            self.successResultOf(d),
-            [GroupMetrics('t1', 'g1', 0, 0, 0)])
+                    Effect(Constant(['foo']))]
+        d = get_all_metrics(base_dispatcher, object(),
+                            get_all_metrics_effects=_game)
+        self.assertEqual(self.successResultOf(d), ['foo'])
 
 
 class AddToCloudMetricsTests(SynchronousTestCase):
@@ -420,6 +384,9 @@ class CollectMetricsTests(SynchronousTestCase):
                        'region': 'r', 'cloudServersOpenStack': 'nova',
                        'cloudLoadBalancers': 'clb', 'rackconnect': 'rc'}
 
+        self.dispatcher = base_dispatcher
+        self.get_full_dispatcher = lambda r, auth, log, cfgs: self.dispatcher
+
     def test_metrics_collected(self):
         """
         Metrics is collected after getting groups from cass and servers
@@ -428,15 +395,15 @@ class CollectMetricsTests(SynchronousTestCase):
         _reactor = mock.Mock()
         service_configs = get_service_configs(self.config)
 
-        d = collect_metrics(_reactor, self.config)
+        d = collect_metrics(_reactor, self.config,
+                            get_full_dispatcher=self.get_full_dispatcher)
         self.assertIsNone(self.successResultOf(d))
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_scaling_groups.assert_called_once_with(
             self.client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
-            self.groups, matches(Provides(IAuthenticator)),
-            service_configs, 'r', clock=_reactor, _print=False)
+            self.dispatcher, self.groups, _print=False)
         self.mock_grf.assert_called_once_with(
             matches(Provides(IAuthenticator)), 'tid', metrics_log,
             service_configs, 'IAD')
@@ -450,7 +417,8 @@ class CollectMetricsTests(SynchronousTestCase):
         Uses client provided and does not disconnect it before returning
         """
         client = mock.Mock(spec=['disconnect'])
-        d = collect_metrics(mock.Mock(), self.config, client=client)
+        d = collect_metrics(mock.Mock(), self.config, client=client,
+                            get_full_dispatcher=self.get_full_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.assertFalse(self.connect_cass_servers.called)
         self.assertFalse(client.disconnect.called)
@@ -460,11 +428,11 @@ class CollectMetricsTests(SynchronousTestCase):
         Uses authenticator provided instead of creating new
         """
         _reactor, auth = mock.Mock(), mock.Mock()
-        d = collect_metrics(_reactor, self.config, authenticator=auth)
+        d = collect_metrics(_reactor, self.config, authenticator=auth,
+                            get_full_dispatcher=self.get_full_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.get_all_metrics.assert_called_once_with(
-            self.groups, auth, get_service_configs(self.config),
-            'r', clock=_reactor, _print=False)
+            self.dispatcher, self.groups, _print=False)
 
 
 class APIOptionsTests(SynchronousTestCase):

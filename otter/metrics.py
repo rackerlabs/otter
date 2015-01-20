@@ -170,23 +170,18 @@ def _perform_limited_effects(dispatcher, effects, limit):
     return defer.gatherResults(defs)
 
 
-def get_all_metrics(cass_groups, authenticator, service_configs, region,
-                    clock=None, _print=False):
+def get_all_metrics(dispatcher, cass_groups, _print=False,
+                    get_all_metrics_effects=get_all_metrics_effects):
     """
     Gather server data and produce metrics for all groups across all tenants
     in a region.
 
+    :param dispatcher: An Effect dispatcher.
     :param iterable cass_groups: Groups as retrieved from cassandra
-    :param :obj:`otter.auth.IAuthenticator` authenticator:
-        object that impersonates a tenant
-    :param str service_configs: service mapping from config
-    :param str region: DC region
     :param bool _print: Should the function print while processing?
 
     :return: ``list`` of `GroupMetrics` as `Deferred`
     """
-    dispatcher = get_full_dispatcher(clock, authenticator, metrics_log,
-                                     service_configs)
     effs = get_all_metrics_effects(cass_groups, metrics_log, _print=_print)
     d = _perform_limited_effects(dispatcher, effs, 10)
     d.addCallback(filter(lambda x: x is not None))
@@ -236,7 +231,7 @@ def connect_cass_servers(reactor, config):
 
 @defer.inlineCallbacks
 def collect_metrics(reactor, config, client=None, authenticator=None,
-                    _print=False):
+                    _print=False, get_full_dispatcher=get_full_dispatcher):
     """
     Start collecting the metrics
 
@@ -258,13 +253,15 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
                                                             config['identity'])
     service_configs = get_service_configs(config)
 
+    dispatcher = get_full_dispatcher(reactor, authenticator, metrics_log,
+                                     service_configs)
+
     # calculate metrics
     cass_groups = yield get_scaling_groups(
         _client, props=['status'],
         group_pred=lambda g: g['status'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
-        cass_groups, authenticator, service_configs, config['region'],
-        clock=reactor, _print=_print)
+        dispatcher, cass_groups, _print=_print)
 
     # Calculate total desired, actual and pending
     total_desired, total_actual, total_pending = 0, 0, 0
@@ -282,17 +279,14 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
     # Add to cloud metrics
 
     # WARNING: This request func is configured to make requests against the
-    # metrics region. The same request_func and dispatcher can't be used for
-    # other purposes, like making requests to cloud servers.
+    # metrics region. The same request_func can't be used for other purposes,
+    # like making requests to cloud servers.
     req_func = get_request_func(authenticator, config['metrics']['tenant_id'],
                                 metrics_log, service_configs,
                                 config['metrics']['region'])
     eff = add_to_cloud_metrics(
         req_func, config['metrics'], config['region'], total_desired,
         total_actual, total_pending, log=metrics_log)
-    dispatcher = get_full_dispatcher(
-        reactor, authenticator, metrics_log,
-        service_configs)
     yield perform(dispatcher, eff)
     metrics_log.msg('added to cloud metrics')
     if _print:
@@ -301,7 +295,7 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
                            reverse=True)
         print('groups sorted as per divergence', *group_metrics, sep='\n')
 
-    # Diconnect only if we created the client
+    # Disconnect only if we created the client
     if not client:
         yield _client.disconnect()
 

@@ -248,7 +248,7 @@ def concretize_service_request(
 def perform_tenant_scope(
         authenticator, log, service_configs,
         dispatcher, tenant_scope, box,
-        _concretize=None):
+        _concretize=concretize_service_request):
     """
     Perform a :obj:`TenantScope` by performing its :attr:`TenantScope.effect`,
     with a dispatcher extended with a performer for :obj:`ServiceRequest`
@@ -259,11 +259,6 @@ def perform_tenant_scope(
     to be partially applied, and the result is a performer that can be put into
     a dispatcher.
     """
-    if _concretize is None:
-        # The reason this isn't set as the default kwarg value above is because
-        # of a mock in test_metrics.py.
-        _concretize = concretize_service_request
-
     @sync_performer
     def scoped_performer(dispatcher, service_request):
         return _concretize(
