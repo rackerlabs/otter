@@ -61,7 +61,7 @@ class DesiredGroupState(object):
     """
     The desired state for a scaling group.
 
-    :ivar iterable launch_configs: Nova launch configs
+    :ivar generator launch_configs: Generates nova launch configs
     :ivar int desired: the number of desired servers within the group.
     :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
         :class:`CLBDescription` instances.
