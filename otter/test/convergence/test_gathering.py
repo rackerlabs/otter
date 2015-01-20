@@ -26,6 +26,7 @@ from otter.convergence.model import (
     CLBNodeType,
     NovaServer,
     ServerState)
+from otter.http import service_request
 from otter.test.utils import patch, resolve_retry_stubs, resolve_stubs
 from otter.util.retry import (
     ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
@@ -40,6 +41,15 @@ def _request(requests):
                                                  requests.keys()))
         return Effect(Stub(Constant(response)))
     return request
+
+
+def resolve_svcreq(eff, result, service_type,
+                   method, url, headers=None, data=None):
+    expected_eff = service_request(
+        service_type, method, url, headers=headers, data=data)
+    assert eff.intent == expected_eff.intent, "%r != %r" % (
+        eff.intent, expected_eff.intent)
+    return resolve_effect(eff, result)
 
 
 class GetAllServerDetailsTests(SynchronousTestCase):
@@ -58,9 +68,10 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         `get_all_server_details` will not fetch again if first get returns
         results with size < batch_size
         """
-        request = _request({self.req: {'servers': self.servers}})
-        eff = get_all_server_details(request, batch_size=10)
-        result = resolve_retry_stubs(eff)
+        response = {'servers': self.servers}
+        eff = get_all_server_details(batch_size=10)
+        svcreq = resolve_retry_stubs(eff)
+        result = resolve_svcreq(svcreq, response, *self.req)
         self.assertEqual(result, self.servers)
 
     def test_get_all_above_batch_size(self):
@@ -69,24 +80,22 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         size < batch_size
         """
         servers = [{'id': i} for i in range(19)]
-
         req2 = (ServiceType.CLOUD_SERVERS, 'GET',
                 'servers/detail?limit=10&marker=9')
-        request = _request({self.req: {'servers': servers[:10]},
-                            req2: {'servers': servers[10:]}})
-        eff = get_all_server_details(request, batch_size=10)
-        self.assertEqual(resolve_retry_stubs(resolve_retry_stubs(eff)), servers)
+        svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
+        next_retry = resolve_svcreq(svcreq, {'servers': servers[:10]},
+                                    *self.req)
+        next_req = resolve_retry_stubs(next_retry)
+        result = resolve_svcreq(next_req, {'servers': servers[10:]}, *req2)
+        self.assertEqual(result, servers)
 
     def test_retry(self):
         """The HTTP requests are retried with some appropriate policy."""
-        request = _request({self.req: {'servers': self.servers}})
-        eff = get_all_server_details(request, batch_size=10)
+        eff = get_all_server_details(batch_size=10)
         self.assertEqual(
             eff.intent.should_retry,
             ShouldDelayAndRetry(can_retry=retry_times(5),
                                 next_interval=exponential_backoff_interval(2)))
-        result = resolve_retry_stubs(eff)
-        self.assertEqual(result, self.servers)
 
 
 class GetScalingGroupServersTests(SynchronousTestCase):
@@ -104,32 +113,35 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         Servers without metadata are not included in the result.
         """
         servers = [{'id': i} for i in range(10)]
-        request = _request({self.req: {'servers': servers}})
-        eff = get_scaling_group_servers(request)
-        self.assertEqual(resolve_retry_stubs(eff), {})
+        eff = resolve_retry_stubs(get_scaling_group_servers())
+        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
+        self.assertEqual(result, {})
 
     def test_filters_no_as_metadata(self):
         """
-        Does not include servers which have metadata but does not have AS info in it
+        Does not include servers which have metadata but does not have AS info
+        in it
         """
         servers = [{'id': i, 'metadata': {}} for i in range(10)]
-        request = _request({self.req: {'servers': servers}})
-        eff = get_scaling_group_servers(request)
-        self.assertEqual(resolve_retry_stubs(eff), {})
+        eff = resolve_retry_stubs(get_scaling_group_servers())
+        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
+        self.assertEqual(result, {})
 
     def test_returns_as_servers(self):
         """
         Returns servers with AS metadata in it grouped by scaling group ID
         """
         as_servers = (
-            [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i} for i in range(5)] +
-            [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i} for i in range(5, 8)] +
+            [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i}
+             for i in range(5)] +
+            [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i}
+             for i in range(5, 8)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
         servers = as_servers + [{'metadata': 'junk'}] * 3
-        request = _request({self.req: {'servers': servers}})
-        eff = get_scaling_group_servers(request)
+        eff = resolve_retry_stubs(get_scaling_group_servers())
+        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
         self.assertEqual(
-            resolve_retry_stubs(eff),
+            result,
             {'a': as_servers[:5] + [as_servers[-1]], 'b': as_servers[5:8]})
 
     def test_filters_on_user_criteria(self):
@@ -137,13 +149,17 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         Considers user provided filter if provided
         """
         as_servers = (
-            [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i} for i in range(5)] +
-            [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i} for i in range(5, 8)])
+            [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i}
+             for i in range(5)] +
+            [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i}
+             for i in range(5, 8)])
         servers = as_servers + [{'metadata': 'junk'}] * 3
-        request = _request({self.req: {'servers': servers}})
-        eff = get_scaling_group_servers(request, server_predicate=lambda s: s['id'] % 3 == 0)
+        eff = resolve_retry_stubs(
+            get_scaling_group_servers(
+                server_predicate=lambda s: s['id'] % 3 == 0))
+        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
         self.assertEqual(
-            resolve_retry_stubs(eff),
+            result,
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
 
 
@@ -226,6 +242,11 @@ class GetLBContentsTests(SynchronousTestCase):
         """Resolve the tree of effects used to fetch LB information."""
         # first resolve the request to list LBs
         lb_nodes_fetch = self._resolve_retry_stubs(eff)
+        if type(lb_nodes_fetch) is not Effect:
+            # If a parallel effect is *empty*, resolve_stubs will
+            # simply return an empty list immediately.
+            self.assertEqual(lb_nodes_fetch, [])  # sanity check
+            return lb_nodes_fetch
         # which results in a parallel fetch of all nodes from all LBs
         feed_fetches = resolve_effect(
             lb_nodes_fetch,
@@ -480,7 +501,7 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                             description=CLBDescription(lb_id='lb1', port=80))]
 
         reqfunc = lambda **k: Effect(k)
-        get_servers = lambda r: Effect(Stub(Constant({'gid': self.servers})))
+        get_servers = lambda: Effect(Stub(Constant({'gid': self.servers})))
         get_lb = lambda r: Effect(Stub(Constant(lb_nodes)))
 
         eff = get_all_convergence_data(

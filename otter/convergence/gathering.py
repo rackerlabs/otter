@@ -17,20 +17,22 @@ from otter.convergence.model import (
     CLBNodeType,
     NovaServer,
     ServerState)
+from otter.http import service_request
 from otter.indexer import atom
 from otter.util.http import append_segments
-from otter.util.retry import exponential_backoff_interval, retry_effect, retry_times
+from otter.util.retry import (
+    exponential_backoff_interval, retry_effect, retry_times)
 from otter.util.timestamp import timestamp_to_epoch
 
 
-def get_all_server_details(request_func, batch_size=100):
+def get_all_server_details(batch_size=100):
     """
     Return all servers of a tenant.
 
-    :param request_func: a request function.
     :param batch_size: number of servers to fetch *per batch*.
+    :return: list of server objects as returned by Nova.
 
-    NOTE: This really screams to be a independent effcloud-type API
+    NOTE: This really screams to be a independent fxcloud-type API
     """
     url = append_segments('servers', 'detail')
 
@@ -41,7 +43,7 @@ def get_all_server_details(request_func, batch_size=100):
             query.update({'marker': marker})
         urlparams = sorted(query.items())
         eff = retry_effect(
-            request_func(
+            service_request(
                 ServiceType.CLOUD_SERVERS,
                 'GET', '{}?{}'.format(url, urlencode(urlparams))),
             retry_times(5), exponential_backoff_interval(2))
@@ -58,13 +60,14 @@ def get_all_server_details(request_func, batch_size=100):
     return get_server_details(marker=None)
 
 
-def get_scaling_group_servers(request_func, server_predicate=identity):
+def get_scaling_group_servers(server_predicate=identity):
     """
     Return tenant's servers that belong to a scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
 
     :param server_predicate: function of server -> bool that determines whether
         the server should be included in the result.
+    :return: dict mapping group IDs to lists of Nova servers.
     """
 
     def has_group_id(s):
@@ -77,7 +80,7 @@ def get_scaling_group_servers(request_func, server_predicate=identity):
                             filter(server_predicate),
                             filter(has_group_id))
 
-    eff = get_all_server_details(request_func)
+    eff = get_all_server_details()
     return eff.on(servers_apply)
 
 
@@ -190,7 +193,7 @@ def get_all_convergence_data(
     Returns an Effect of ([NovaServer], [LBNode]).
     """
     eff = parallel(
-        [get_scaling_group_servers(request_func)
+        [get_scaling_group_servers()
          .on(itemgetter(group_id))
          .on(map(to_nova_server)).on(list),
          get_clb_contents(request_func)]
