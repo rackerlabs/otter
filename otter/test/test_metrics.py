@@ -24,7 +24,7 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import IAuthenticator
-from otter.constants import ServiceType, get_service_mapping
+from otter.constants import ServiceType, get_service_configs
 from otter.metrics import (
     GroupMetrics,
     MetricsService,
@@ -286,15 +286,14 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
 
     def setUp(self):
         """Mock get_scaling_group_servers and get_request_func."""
-        self.tenant_servers = {}
-
-        def concretize(authenticator, log, service_mapping, region,
+        def concretize(authenticator, log, service_mapping,
                        tenant_id, service_request):
             return Effect(Constant(self.tenant_servers[tenant_id]))
         self.mock_concretize = patch(
             self, 'otter.http.concretize_service_request',
             side_effect=concretize)
-        self.service_mapping = {ServiceType.CLOUD_SERVERS: 'nova'}
+        self.service_configs = {ServiceType.CLOUD_SERVERS: {'name': 'nova'}}
+        self.tenant_servers = {}
 
     def test_get_all_metrics(self):
         """
@@ -312,7 +311,7 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
 
         authenticator = mock.Mock()
 
-        d = get_all_metrics(groups, authenticator, self.service_mapping, 'r',
+        d = get_all_metrics(groups, authenticator, self.service_configs, 'r',
                             clock='c')
 
         self.assertEqual(
@@ -334,7 +333,7 @@ class GnarlyGetMetricsTests(SynchronousTestCase):
         groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
                   {'tenantId': 't2', 'groupId': 'g2', 'desired': 500}]
         authenticator = mock.Mock()
-        d = get_all_metrics(groups, authenticator, self.service_mapping, 'r',
+        d = get_all_metrics(groups, authenticator, self.service_configs, 'r',
                             clock='c')
         self.assertEqual(
             self.successResultOf(d),
@@ -427,7 +426,7 @@ class CollectMetricsTests(SynchronousTestCase):
         from nova and it is added to blueflood
         """
         _reactor = mock.Mock()
-        service_mapping = get_service_mapping(self.config)
+        service_configs = get_service_configs(self.config)
 
         d = collect_metrics(_reactor, self.config)
         self.assertIsNone(self.successResultOf(d))
@@ -437,10 +436,10 @@ class CollectMetricsTests(SynchronousTestCase):
             self.client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
             self.groups, matches(Provides(IAuthenticator)),
-            service_mapping, 'r', clock=_reactor, _print=False)
+            service_configs, 'r', clock=_reactor, _print=False)
         self.mock_grf.assert_called_once_with(
             matches(Provides(IAuthenticator)), 'tid', metrics_log,
-            service_mapping, 'IAD')
+            service_configs, 'IAD')
         self.add_to_cloud_metrics.assert_called_once_with(
             self.req_func, self.config['metrics'], 'r', 107, 26, 1,
             log=metrics_log)
@@ -464,7 +463,7 @@ class CollectMetricsTests(SynchronousTestCase):
         d = collect_metrics(_reactor, self.config, authenticator=auth)
         self.assertIsNone(self.successResultOf(d))
         self.get_all_metrics.assert_called_once_with(
-            self.groups, auth, get_service_mapping(self.config),
+            self.groups, auth, get_service_configs(self.config),
             'r', clock=_reactor, _print=False)
 
 

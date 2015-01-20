@@ -81,7 +81,7 @@ def get_request_func(authenticator, tenant_id, log, service_mapping, region):
         def got_auth((token, catalog)):
             request_ = add_bind_service(
                 catalog,
-                service_mapping[service_type],
+                service_mapping[service_type]['name'],
                 region,
                 log,
                 add_json_request_data(
@@ -197,7 +197,7 @@ class TenantScope(object):
 
 
 def concretize_service_request(
-        authenticator, log, service_mapping, region,
+        authenticator, log, service_configs,
         tenant_id,
         service_request):
     """
@@ -208,20 +208,22 @@ def concretize_service_request(
     :param ICachingAuthenticator authenticator: the caching authenticator
     :param tenant_id: tenant ID.
     :param BoundLog log: info about requests will be logged to this.
-    :param dict service_mapping: A mapping of otter.constants.ServiceType
-        constants to real service names as found in a tenant's catalog.
-    :param region: The region of the Rackspace services which requests will
-        be made to.
+    :param dict service_configs: As returned by
+        :func:`otter.constants.get_service_configs`.
     """
     auth_eff = Effect(Authenticate(authenticator, tenant_id, log))
     invalidate_eff = Effect(InvalidateToken(authenticator, tenant_id))
     if service_request.log is not None:
         log = service_request.log
 
+    service_config = service_configs[service_request.service_type]
+    region = service_config['region']
+    service_name = service_config['name']
+
     def got_auth((token, catalog)):
         request_ = add_bind_service(
             catalog,
-            service_mapping[service_request.service_type],
+            service_name,
             region,
             log,
             add_json_request_data(
@@ -244,7 +246,7 @@ def concretize_service_request(
 
 
 def perform_tenant_scope(
-        authenticator, log, service_mapping, region,
+        authenticator, log, service_configs,
         dispatcher, tenant_scope, box,
         _concretize=None):
     """
@@ -265,7 +267,7 @@ def perform_tenant_scope(
     @sync_performer
     def scoped_performer(dispatcher, service_request):
         return _concretize(
-            authenticator, log, service_mapping, region,
+            authenticator, log, service_configs,
             tenant_scope.tenant_id, service_request)
     new_disp = ComposedDispatcher([
         TypeDispatcher({ServiceRequest: scoped_performer}),

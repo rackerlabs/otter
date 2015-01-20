@@ -28,7 +28,7 @@ from twisted.internet.endpoints import clientFromString
 from twisted.python import usage
 
 from otter.auth import generate_authenticator
-from otter.constants import ServiceType, get_service_mapping
+from otter.constants import ServiceType, get_service_configs
 from otter.convergence.gathering import get_scaling_group_servers
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.http import TenantScope, get_request_func
@@ -170,7 +170,7 @@ def _perform_limited_effects(dispatcher, effects, limit):
     return defer.gatherResults(defs)
 
 
-def get_all_metrics(cass_groups, authenticator, service_mapping, region,
+def get_all_metrics(cass_groups, authenticator, service_configs, region,
                     clock=None, _print=False):
     """
     Gather server data and produce metrics for all groups across all tenants
@@ -179,14 +179,14 @@ def get_all_metrics(cass_groups, authenticator, service_mapping, region,
     :param iterable cass_groups: Groups as retrieved from cassandra
     :param :obj:`otter.auth.IAuthenticator` authenticator:
         object that impersonates a tenant
-    :param str services: service mapping from config
+    :param str service_configs: service mapping from config
     :param str region: DC region
     :param bool _print: Should the function print while processing?
 
     :return: ``list`` of `GroupMetrics` as `Deferred`
     """
     dispatcher = get_full_dispatcher(clock, authenticator, metrics_log,
-                                     service_mapping, region)
+                                     service_configs)
     effs = get_all_metrics_effects(cass_groups, metrics_log, _print=_print)
     d = _perform_limited_effects(dispatcher, effs, 10)
     d.addCallback(filter(lambda x: x is not None))
@@ -256,14 +256,14 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
     _client = client or connect_cass_servers(reactor, config['cassandra'])
     authenticator = authenticator or generate_authenticator(reactor,
                                                             config['identity'])
-    service_mapping = get_service_mapping(config)
+    service_configs = get_service_configs(config)
 
     # calculate metrics
     cass_groups = yield get_scaling_groups(
         _client, props=['status'],
         group_pred=lambda g: g['status'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
-        cass_groups, authenticator, service_mapping, config['region'],
+        cass_groups, authenticator, service_configs, config['region'],
         clock=reactor, _print=_print)
 
     # Calculate total desired, actual and pending
@@ -281,20 +281,18 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
 
     # Add to cloud metrics
 
-    # WARNING: This request func (and dispatcher) are configured to make
-    # requests against the metrics region. The same request_func and dispatcher
-    # can't be used for other purposes, like making requests to cloud servers.
-    # An issue for this problem is at
-    # https://github.com/rackerlabs/otter/issues/896
+    # WARNING: This request func is configured to make requests against the
+    # metrics region. The same request_func and dispatcher can't be used for
+    # other purposes, like making requests to cloud servers.
     req_func = get_request_func(authenticator, config['metrics']['tenant_id'],
-                                metrics_log, service_mapping,
+                                metrics_log, service_configs,
                                 config['metrics']['region'])
     eff = add_to_cloud_metrics(
         req_func, config['metrics'], config['region'], total_desired,
         total_actual, total_pending, log=metrics_log)
     dispatcher = get_full_dispatcher(
         reactor, authenticator, metrics_log,
-        service_mapping, config['metrics']['region'])
+        service_configs)
     yield perform(dispatcher, eff)
     metrics_log.msg('added to cloud metrics')
     if _print:
