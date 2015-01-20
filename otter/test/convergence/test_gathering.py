@@ -497,12 +497,10 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         lb_nodes = [CLBNode(node_id='node1', address='ip1',
                             description=CLBDescription(lb_id='lb1', port=80))]
 
-        reqfunc = lambda **k: Effect(k)
         get_servers = lambda: Effect(Stub(Constant({'gid': self.servers})))
-        get_lb = lambda r: Effect(Stub(Constant(lb_nodes)))
+        get_lb = lambda: Effect(Stub(Constant(lb_nodes)))
 
         eff = get_all_convergence_data(
-            reqfunc,
             'gid',
             get_scaling_group_servers=get_servers,
             get_clb_contents=get_lb)

@@ -84,7 +84,7 @@ def get_scaling_group_servers(server_predicate=identity):
     return eff.on(servers_apply)
 
 
-def get_clb_contents(blah=None):
+def get_clb_contents():
     """
     Get Rackspace Cloud Load Balancer contents as list of `CLBNode`.
     """
@@ -180,7 +180,6 @@ def to_nova_server(server_json):
 
 
 def get_all_convergence_data(
-        request_func,
         group_id,
         get_scaling_group_servers=get_scaling_group_servers,
         get_clb_contents=get_clb_contents):
@@ -194,6 +193,6 @@ def get_all_convergence_data(
         [get_scaling_group_servers()
          .on(itemgetter(group_id))
          .on(map(to_nova_server)).on(list),
-         get_clb_contents(request_func)]
+         get_clb_contents()]
     ).on(tuple)
     return eff
