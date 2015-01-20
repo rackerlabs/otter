@@ -106,7 +106,7 @@ class ExecConvergenceTests(SynchronousTestCase):
         reqfunc = lambda **k: Effect(k)
         get_all_convergence_data = self._get_gacd_func('gid')
         desired = DesiredGroupState(
-            launch_configs=range(2),
+            launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
             desired_lbs={23: [CLBDescription(lb_id='23', port=80)]},
             desired=2)
 
@@ -142,7 +142,7 @@ class ExecConvergenceTests(SynchronousTestCase):
         If state of world matches desired, no steps are executed and False is returned
         """
         desired = DesiredGroupState(
-            launch_configs=range(2),
+            launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
             desired_lbs={},
             desired=2)
         reqfunc = lambda **k: 1 / 0

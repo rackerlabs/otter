@@ -31,13 +31,6 @@ from otter.convergence.steps import (
     SetMetadataItemOnServer)
 
 
-def sample_lcs():
-    """
-    Sample launch configs
-    """
-    return itertools.count(0)
-
-
 class RemoveFromLBWithDrainingTests(SynchronousTestCase):
     """
     Tests for :func:`_remove_from_lb_with_draining`
@@ -328,7 +321,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=0,
+                DesiredGroupState(launch_config={}, desired=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE)]),
                 set(),
@@ -343,7 +336,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=0),
+                DesiredGroupState(launch_config={}, desired=0),
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1')]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
@@ -361,7 +354,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=0),
+                DesiredGroupState(launch_config={}, desired=0),
                 set([server('abc', state=ServerState.DRAINING,
                             servicenet_address='1.1.1.1')]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
@@ -380,7 +373,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=0,
+                DesiredGroupState(launch_config={}, desired=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.DRAINING,
                             servicenet_address='1.1.1.1')]),
@@ -399,7 +392,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=0,
+                DesiredGroupState(launch_config={}, desired=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1')]),
@@ -427,7 +420,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=0,
+                DesiredGroupState(launch_config={}, desired=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1')]),
@@ -454,7 +447,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=0,
+                DesiredGroupState(launch_config={}, desired=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.DRAINING,
                             servicenet_address='1.1.1.1')]),
@@ -471,6 +464,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
 class ConvergeTests(SynchronousTestCase):
     """Tests for :func:`converge`."""
 
+    def setUp(self):
+        self.lcs = itertools.count(0)
+
     def test_converge_give_me_a_server(self):
         """
         A server is added if there are not enough servers to meet
@@ -478,7 +474,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=1),
+                DesiredGroupState(launch_configs=self.lcs, desired=1),
                 set(),
                 set(),
                 0),
@@ -491,7 +487,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=2),
+                DesiredGroupState(launch_configs=self.lcs, desired=2),
                 set(),
                 set(),
                 0),
@@ -506,7 +502,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=1),
+                DesiredGroupState(launch_config={}, desired=1),
                 set([server('abc', ServerState.BUILD)]),
                 set(),
                 0),
@@ -519,13 +515,13 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=1),
+                DesiredGroupState(launch_config={}, desired=1),
                 set([server('abc', ServerState.ERROR)]),
                 set(),
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
-                CreateServer(launch_config=0),
+                CreateServer(launch_config=pmap()),
             ]))
 
     def test_delete_error_state_servers_with_lb_nodes(self):
@@ -536,7 +532,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=1),
+                DesiredGroupState(launch_config={}, desired=1),
                 set([server('abc', ServerState.ERROR, servicenet_address='1.1.1.1')]),
                 set([CLBNode(address='1.1.1.1', node_id='3',
                              description=CLBDescription(lb_id='5', port=80)),
@@ -547,14 +543,14 @@ class ConvergeTests(SynchronousTestCase):
                 DeleteServer(server_id='abc'),
                 RemoveFromCLB(lb_id='5', node_id='3'),
                 RemoveFromCLB(lb_id='5', node_id='5'),
-                CreateServer(launch_config=0),
+                CreateServer(launch_config=pmap()),
             ]))
 
     def test_scale_down(self):
         """If we have more servers than desired, we delete the oldest."""
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=1),
+                DesiredGroupState(launch_config={}, desired=1),
                 set([server('abc', ServerState.ACTIVE, created=0),
                      server('def', ServerState.ACTIVE, created=1)]),
                 set(),
@@ -569,7 +565,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=0),
+                DesiredGroupState(launch_config={}, desired=0),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1', created=0)]),
                 set([CLBNode(address='1.1.1.1', node_id='3',
@@ -587,7 +583,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=2),
+                DesiredGroupState(launch_config={}, desired=2),
                 set([server('abc', ServerState.ACTIVE, created=0),
                      server('def', ServerState.BUILD, created=1),
                      server('ghi', ServerState.ACTIVE, created=2)]),
@@ -602,14 +598,14 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=2),
+                DesiredGroupState(launch_config={}, desired=2),
                 set([server('slowpoke', ServerState.BUILD, created=0),
                      server('ok', ServerState.ACTIVE, created=0)]),
                 set(),
                 3600),
             pbag([
                 DeleteServer(server_id='slowpoke'),
-                CreateServer(launch_config=0)]))
+                CreateServer(launch_config=pmap())]))
 
     def test_timeout_replace_only_when_necessary(self):
         """
@@ -618,7 +614,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(), desired=2),
+                DesiredGroupState(launch_config={}, desired=2),
                 set([server('slowpoke', ServerState.BUILD, created=0),
                      server('old-ok', ServerState.ACTIVE, created=0),
                      server('new-ok', ServerState.ACTIVE, created=3600)]),
@@ -634,8 +630,7 @@ class ConvergeTests(SynchronousTestCase):
         desired_lbs = {'5': [CLBDescription(lb_id='5', port=80)]}
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_configs=sample_lcs(),
-                                  desired=1, desired_lbs=desired_lbs),
+                DesiredGroupState(launch_config={}, desired=1, desired_lbs=desired_lbs),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1', created=0),
                      server('bcd', ServerState.ACTIVE,
@@ -793,7 +788,7 @@ class PlanTests(SynchronousTestCase):
 
         desired_lbs = {5: [CLBDescription(lb_id='5', port=80)]}
         desired_group_state = DesiredGroupState(
-            launch_configs=sample_lcs(), desired=2, desired_lbs=desired_lbs)
+            launch_config={}, desired=2, desired_lbs=desired_lbs)
 
         result = plan(
             desired_group_state,
