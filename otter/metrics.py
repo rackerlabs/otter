@@ -231,8 +231,7 @@ def connect_cass_servers(reactor, config):
 
 @defer.inlineCallbacks
 def collect_metrics(reactor, config, client=None, authenticator=None,
-                    get_full_dispatcher=get_full_dispatcher,
-                    _print=False):
+                    _print=False, get_full_dispatcher=get_full_dispatcher):
     """
     Start collecting the metrics
 
