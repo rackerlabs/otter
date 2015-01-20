@@ -57,9 +57,9 @@
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2014-12-04</pubdate>
+        <pubdate>2015-01-18</pubdate>
         <copyright>
-            <year>2014</year>
+            <year>2015</year>
             <holder>Rackspace US, Inc.</holder>
         </copyright>
         <legalnotice role="rs-api">
@@ -69,34 +69,31 @@
             </annotation>
         </legalnotice>
         <revhistory>
-            <revision
-                xmlns:raxm="http://docs.rackspace.com/api/metadata">
+            <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <date>2015-01-18</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Added additional notes to <link linkend="Launch_Configuration">Launch configurations
+                                </link>section regarding SSH key restrictions and launchConfiguration update operations. 
+                                Also added new <link linkend="How_Auto_Scale_Works">How Auto Scale Works </link>section.</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
+            <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
                 <date>2014-12-04</date>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Added new <code>purge</code> option
-                                to <methodname>Delete server from
-                                   group</methodname> operation.
-                                Updated links to Cloud Identity Guide
-                                in RBAC section and moved RBAC section
-                                to General API information section.
-                                Added <xref
-                                   linkend="createServerTemplate"/>
-                                information to <link
-                                   linkend="Launch_Configuration"
-                                   >Launch configuration
-                                </link>section in support of using
-                                Boot from Volume. Added <link
-                                   linkend="RCv3">Cloud Bursting with
-                                   RackConnectV3</link> concept and
-                                information about using the
-                                   <parameter>launchConfiguration
-                                   loadBalancers type</parameter>
-                                parameter to configure RackConnectV3
-                                for Auto Scale. See also <link
-                                   linkend="Launch_Configuration"
-                                   >Launch configurations</link>. </para>
+                            <para>Added new <code>purge</code> option to <methodname>Delete server from group</methodname> operation.
+                                Updated links to Cloud Identity Guide in RBAC section and moved RBAC section
+                                to General API information section. Added <xref linkend="createServerTemplate"/>
+                                information to <link linkend="Launch_Configuration">Launch configuration
+                                </link>section in support of using Boot from Volume. Added <link linkend="RCv3">Cloud Bursting with
+                                   RackConnect v3</link> concept and information about using the <parameter>launchConfiguration
+                                   loadBalancers type</parameter> parameter to configure RackConnect v3
+                                for Auto Scale. See also <link linkend="Launch_Configuration">Launch configurations</link>. </para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
@@ -322,7 +319,7 @@
             and the thresholds in Cloud Monitoring that trigger the
             scaling activities.</para>
         <para> To use &PROD;, you define a scaling group consisting of
-            cloud servers and cloud load balancers or RackConnectV3.
+            cloud servers and cloud load balancers or RackConnect v3.
             Then you define policies, either schedule-based or
             monitoring-based. For monitoring-based policies, you
             define cloud monitoring alerts to watch the group's
@@ -389,8 +386,7 @@
                 described in the following table: </para>
             <?rax revhistory?>
         </section>
-        <!-- Resources section, suggesting other places to go for info,
-is external so it's handy for Getting Started to share -->
+        <!-- Resources section, suggesting other places to go for info, is external so it's handy for Getting Started to share -->
         <xi:include href="chapters/resources.xml"/>
         <!-- -->
         <section xml:id="Pricing_SLA-d1e1362">
@@ -415,14 +411,12 @@ is external so it's handy for Getting Started to share -->
                     </listitem>
                     <listitem>
                         <para>For Rackspace Cloud Monitoring, pricing
-                            is published at <link
-                                xlink:href="http://www.rackspace.com/cloud/monitoring/pricing/"
-                                >http://www.rackspace.com/cloud/monitoring/pricing/</link>.
+                            is published at <link xlink:href="http://www.rackspace.com/cloud/monitoring/pricing/">http://www.rackspace.com/cloud/monitoring/pricing/</link>.
                         </para>
                     </listitem>
                 </itemizedlist>
             </para>
-        </section>
+        </section> 
         <section xml:id="gettingHelp">
             <title>Getting help</title>
             <para>Rackspace provides fanatical support: <itemizedlist>
@@ -454,19 +448,49 @@ is external so it's handy for Getting Started to share -->
                 </listitem>
             </itemizedlist>
             </para>
-        </section>        
-        
+        </section>                
     </chapter>
+    
     <chapter xml:id="Auto_Scale_Core_Concepts">
         <title>Auto Scale core concepts</title>
         <para>To use the &PROD; API effectively, you should understand
             several key concepts: </para>
-        <section xml:id="Glossary">
-            <title>Glossary</title>
-            <!-- Glossary section, defining basic terms,
-is external so it's handy for Getting Started to share -->
-            <xi:include href="chapters/glossary.xml" xpointer="element(Glossary-000)"/>
-            <!-- -->
+        <section xml:id="How_Auto_Scale_Works">
+            <title>How Auto Scale works</title>
+            <para>Rackspace &PROD; is an API-based tool that automatically scales resources in response to
+                an increase or decrease in overall workload based on user-defined thresholds.</para>
+            <para>&PROD; functions by linking these services:
+                <itemizedlist>
+                    <listitem>
+                        <para>Rackspace Cloud Servers. Learn more at 
+                            <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/overview.html">Cloud Servers Getting Started guide</link></para>
+                    </listitem>
+                    <listitem>
+                        <para>Load-balanced Cloud Servers. Learn more at
+                            <link xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/DB_Doc_Change_History.html">Load Balancers Getting Started guide
+                            </link>.</para>
+                    </listitem>
+                </itemizedlist>
+                You can set up a schedule for launching Auto Scale or define an event that triggers a
+                webhook. You can also specify a minimum and maximum number of cloud servers for your
+                scaling group, the amount of resources you want to increase or decrease, and policies
+                based on percentage or real numbers.</para>
+            <para>
+                <note>
+                    <para>&PROD; does not configure any information within a server. You must configure your
+                        services to function when each server is started. We recommend automating your
+                        servers' startup processes with
+                        <link xlink:href="http://www.opscode.com/chef/">Chef</link> or a similar tool.</para>
+                </note>
+            </para>
+            <para>
+                <note>
+                    <para>&PROD; can utilize all Rackspace Cloud Server create server API parameters. For more details, 
+                        see the 
+                        <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html">
+                            Create servers</link> documentation.</para>
+                </note>
+            </para>
         </section>
         <section xml:id="Scaling_groups"
             xmlns:raxm="http://docs.rackspace.com/api/metadata">
@@ -522,8 +546,13 @@ is external so it's handy for Getting Started to share -->
                                 server image will be started on
                                 launch, what flavor the new server is,
                                 and which cloud load balancer or
-                                RackConnectV3 load balancer pool the
-                                new server connects to.</td>
+                                RackConnect v3 load balancer pool the
+                                new server connects to.
+                                Note: The <parameter>launchConfiguration</parameter> uses the <emphasis role="bold">admin</emphasis> user to scale up, 
+                                usually the first admin user found on the tenant. Only that particular admin user's SSH key pair names can be used in the launchConfiguration. 
+                                Note: The launchConfiguration update operation overwrites all launchConfiguration settings. 
+                                For details, see <link linkend="Launch_Configuration">Launch configurations</link>.
+                                </td>
                         </tr>
                     </tbody>
                 </table>
@@ -583,8 +612,7 @@ is external so it's handy for Getting Started to share -->
                 <command>POST</command>request against it, as shown in
                 the following example:</para>
             <example>
-                <title>POST request to execute a capability
-                    URL</title>
+                <title>POST request to execute a capability URL</title>
                 <programlisting language="json">
                         <xi:include href="./samples/reqExecuteCapabilityURL.json" parse="text"/>
                     </programlisting>
@@ -666,18 +694,92 @@ is external so it's handy for Getting Started to share -->
                 </note>
             </para>
         </section>
+        <section xml:id="Schedule_Based_Configuration">
+            <title>Schedule-based configurations</title>
+            <para>You can configure Auto Scale to be triggered based on a user-defined schedule that is
+                specified in one or more policies.</para>
+            <para>This configuration option is helpful if you know that your Cloud Servers deployment will
+                need additional resources during certain peak times. For example, if you need additional
+                server resources during the weekend, you can define a policy that adds 50 servers
+                on Friday evening and then removes these servers again on Sunday evening to return
+                to a regular operational state.</para>
+            <para>The following diagram outlines how Scaling by Schedule works:</para>
+            <informalfigure>
+                <mediaobject>
+                    <imageobject>
+                        <imagedata fileref="images/ScalebySchedule.png" contentwidth="6in" />
+                    </imageobject>
+                </mediaobject>
+            </informalfigure>
+        </section>
+        <section xml:id="Monitoring_Based_Configuration" security="writeonly">
+            <title>Monitoring-based configurations</title>
+            <para>You can configure Auto Scale to be triggered based on a predefined alarm or threshold
+                that has been previously set up in Cloud Monitoring.</para>
+            <para>Monitoring-based configuration works the following way:</para>
+            <para>
+                <orderedlist>
+                    <listitem>
+                        <para>In Cloud Monitoring, you configure alarms that are triggered when a high
+                            utilization of resources occurs.
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>When Cloud Monitoring sets off an alarm for high utilization of resources
+                            within a group, a webhook is triggered.</para>
+                    </listitem>
+                    <listitem>
+                        <para>The webhook launches the Rackspace Auto Scale service, which looks up the
+                            policy that has been defined in accordance with the webhook. This policy
+                            determines the amount of cloud servers that need to be added or removed
+                            in case the alarm is triggered.</para>
+                    </listitem>
+                </orderedlist>
+            </para>
+        </section>
+        <section xml:id="webhook_based_configuration">
+            <title>Event-based configurations</title>
+            <para>You can configure Auto Scale to be triggered through a webhook, based on a predefined
+                alarm or threshold that has been previously set up in a monitoring service. Event-based
+                configuration works the following way:</para>
+            <para>
+                <orderedlist>
+                    <listitem>
+                        <para>In your monitoring service, you configure alarms that are triggered when
+                            a high utilization of resources occurs
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>In Auto Scale, you configure a scaling group, scaling policies, and a webhook
+                            to be triggered when your monitoring service sets off an alarm for high
+                            utilization of resources.
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>The webhook launches the Auto Scale service, which looks up the policy that
+                            has been defined in accordance with the webhook. This policy determines
+                            the amount of cloud servers that need to be added or removed.
+                        </para>
+                    </listitem>
+                </orderedlist>
+            </para>
+            <note>
+                <para>Servers added through a webhook triggered by an external monitoring service will
+                    not be automatically monitored by the external monitoring service.</para>
+            </note>
+        </section>
         <section xml:id="RCv3" xmlns:raxm="http://docs.rackspace.com/api/metadata">
-            <title>Cloud Bursting with RackConnectV3</title>
+            <title>Cloud bursting with RackConnect v3</title>
             <para>You can use Auto Scale with a hybrid, dedicated and
                 cloud, solution to "burst" into the cloud when extra
                 servers are temporarily needed. To do this, you use
-                RackConnectV3, proprietary software that works with
+                RackConnect v3, a Rackspace solution that works with
                 Rackspace cloud servers and creates a secure bridge
                 between the Rackspace cloud and your dedicated
                 hardware.</para>
-            <para>To get started with RackConnectV3 cloud bursting: <itemizedlist>
+            <para>To get started with RackConnect v3 cloud bursting: <itemizedlist>
                     <listitem>
-                        <para>Contact Rackspace Customer Support and
+                        <para>Contact your Rackspace Support team and
                             tell them what you want to do. They will
                             configure a load balancer pool for you and
                             give you the UUID. </para>
@@ -690,19 +792,18 @@ is external so it's handy for Getting Started to share -->
                             UUID that was given to you as the
                                 <parameter>loadBalancerId</parameter>
                             and use
-                                <parameter>"RackConnectV3"</parameter>
+                                <parameter>"RackConnect v3"</parameter>
                             for the <parameter>type</parameter>. Do
                             not set a value for
                                 <parameter>port</parameter>.</para>
                     </listitem>
                 </itemizedlist>
             </para>
-            <example><title>Example RackConnectV3 launchConfiguration with 2 load balancer
-                    pools</title>
+            <example><title>Example RackConnect v3 launchConfiguration with two load balancer pools</title>
                 <programlisting language="json">
                             <xi:include href="./samples/exampleRCv3launchConfig.json" parse="text"/>
                         </programlisting></example>
-            <para>For more information on RackConnectV3, see this
+            <para>For more information on RackConnect v3, see this
                     <link
                     xlink:href="http://www.rackspace.com/cloud/hybrid/rackconnect"
                     >Overview</link>, and there are several <link
@@ -2057,9 +2158,8 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
 }
                         </programlisting>
             </example>
-            <para>Error information for each API operation is included
-                with the description of that operation in <xref
-                    linkend="API_Operations"/>.</para>
+            <para>Error information for each API operation is included with the description of that 
+                operation in the API reference section.</para>
         </section>
     </chapter>
     <chapter xml:id="Autoscale_Components">
@@ -2089,9 +2189,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             </itemizedlist>
         </para>
         <note>
-            <para>For details on API parameters, see <link
-                    linkend="API_Operations">Chapter 6, API
-                    Operations</link>. </para>
+            <para>For details on API parameters, see Chapter 6, API Operations. </para>
         </note>
         <section xml:id="Group_Configuration">
             <title>Scaling groups</title>
@@ -2199,8 +2297,22 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 creating new servers. It specifies what type of server
                 image will be started on launch, what flavor the new
                 server is, and which cloud load balancer or
-                RackConnectV3 load balancer pool the new server
+                RackConnect v3 load balancer pool the new server
                 connects to.</para>
+            <note>
+                <itemizedlist>
+                    <listitem><para>
+                        The <parameter>launchConfiguration</parameter> uses the <emphasis role="bold">admin</emphasis> user to scale up, 
+                        usually the first admin user found on the tenant. Only that particular admin user's SSH key pair names can be used in the launchConfiguration, 
+                        if a key name is specified at all. If there are multiple <emphasis role="bold">admin</emphasis> accounts in the tenant, there is no 
+                        guarantee as to which one will be chosen, so it is best for there to be one <emphasis role="bold">admin</emphasis> user in the tenant.  
+                    </para></listitem>
+                    <listitem>
+                        <para>The launchConfiguration update operation overwrites all launchConfiguration settings. 
+                            Any parameters NOT specified in the update, are reset to null or default.</para>
+                    </listitem>
+                </itemizedlist>
+            </note>
             <para>The <parameter>launchConfiguration</parameter>
                 parameter specifies the following items:</para>
             <para>
@@ -2231,7 +2343,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                    <parameter>loadBalancers</parameter>.
                                 Most launch configurations have both a
                                 server and a load balancer (can be
-                                RackConnectV3) configured.</td>
+                                RackConnect v3) configured.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -2267,12 +2379,12 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>Specifies the configuration
                                 information for the load balancer(s)
                                 used in the cloud server deployment,
-                                including a RackConnectV3 load
+                                including a RackConnect v3 load
                                 balancer pool. For background
                                 information and an example
                                 configuration, see <link
                                    linkend="RCv3">Cloud Bursting with
-                                   RackConnectV3</link>. Please note
+                                   RackConnect v3</link>. Please note
                                 that you must include the
                                    <parameter>ServiceNet</parameter>
                                 network in your configuration if you
@@ -2283,7 +2395,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </tbody>
                 </table>
             </para>
-            <para>The <parameter>server</parameter>group parameter specifies details about the server as described in the
+            <para>The <parameter>server</parameter> group parameter specifies details about the server as described in the
                 following table. Note the <parameter>server</parameter> arguments are directly passed to nova when creating a server.</para>
             <para>For more information see 
                 <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/nova_create_server.html">Create Your Server with the nova Client</link></para>
@@ -2366,7 +2478,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                    RackConnect, and F5 Load
                                    Balancers.</link> You do NOT use
                                 this parameter to configure Auto Scale
-                                and RackConnectV3, you use the
+                                and RackConnect v3, you use the
                                    <parameter>loadBalancers</parameter>
                                 parameter for that.</td>
                         </tr>
@@ -2458,7 +2570,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     </programlisting>
             </example>
             <example>
-                <title>LaunchConfiguration for boot from volume </title>
+                <title>Launch configuration for boot from volume </title>
                 <programlisting language="json">
                             <xi:include href="./samples/LaunchConfigurationBFV.json" parse="text"/>
                         </programlisting>
@@ -2467,7 +2579,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <para>Here is an example of a very simple create server template that you could base64 encode. This template simply 
                 installs the apache2 package and runs a shell command.</para>
             <example xml:id="createServerTemplate">
-                <title>Create server template for RackConnectV3 </title>
+                <title>Create server template for RackConnect v3 </title>
                 <programlisting language="json">
                             <xi:include href="./samples/exampleRCv3launchConfig.json" parse="text"/>
                         </programlisting>
@@ -2493,7 +2605,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <para>
                                 <link
                                    xlink:href="http://docs.rcv3.apiary.io/"
-                                   >RackConnectV3 API</link>
+                                   >RackConnect v3 API</link>
                             </para>
                         </listitem>
                     </itemizedlist>
@@ -2935,9 +3047,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             </itemizedlist>
         </para>
         <note>
-            <para>For details on API parameters, see <link
-                    linkend="API_Operations">Chapter 6, API
-                    Operations</link>. </para>
+            <para>For details on API parameters, see Chapter 6, API Operations. </para>
         </note>
         <section xml:id="Manage_Launch_Configuration">
             <title>Create and manage scaling groups</title>
@@ -2995,7 +3105,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     associated with the scaling group's
                     policies.</para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: get scaling group configuration </title>
                     <programlisting>GET /{tenantId}/groups/{groupId}/config</programlisting>
                 </example>
                 <para>If the <command>GET</command> request is
@@ -3003,16 +3113,14 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     the response in JSON format as shown in the
                     following example:</para>
                 <example>
-                    <title>Response to successful GET configuration
-                        request</title>
+                    <title>Response: successful get configuration request</title>
                     <programlisting language="json">
                             <xi:include href="./samples/resGetLaunchConfig.json" parse="text"/>
                         </programlisting>
                 </example>
             </section>
             <section xml:id="Edit_Configuration_for_Scaling_Group">
-                <title>Edit the current configuration for your scaling
-                    group </title>
+                <title>Update the current configuration for your scaling group </title>
                 <para>To edit the configuration for a scaling group,
                     which includes the minimum number of entities, the
                     maximum number of entities, global cooldown, and
@@ -3021,7 +3129,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     and <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: Update current scaling group configuration</title>
                     <programlisting>PUT /{tenantId}/groups/{groupId}/config</programlisting>
                     <programlisting language="json">
                             <xi:include href="./samples/reqPutGroupConfig.json" parse="text"/>
@@ -3033,8 +3141,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             </section>
             <section
                 xml:id="Get_Launch_Configuration_for_Scaling_Group">
-                <title>Get the launch configuration for your scaling
-                    group </title>
+                <title>Get the launch configuration for your scaling group </title>
                 <para>To obtain the launch configuration for a scaling
                     group, which includes the details of how to create
                     a server, from what image, which cloud load
@@ -3045,7 +3152,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: get scaling group launch configuration</title>
                     <programlisting>GET /{tenantId}/groups/{groupId}/launch</programlisting>
                 </example>
                 <para>If the <command>GET</command> request is
@@ -3053,16 +3160,14 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     of the response in JSON format as shown in the
                     following example:</para>
                 <example>
-                    <title>Response to a successful get launch
-                        configuration for a scaling group</title>
+                    <title>Response: successful get scaling group launch configuration</title>
                     <programlisting language="json">
                             <xi:include href="./samples/resGetLaunchConfig.json" parse="text"/>
                             </programlisting>
                 </example>
             </section>
             <section xml:id="Edit_Launch_Config">
-                <title>Edit the launch configuration for your scaling
-                    group </title>
+                <title>Update the launch configuration for your scaling group </title>
                 <para>To edit the launch configuration for a scaling
                     group, including how to create a server, from what
                     image, which cloud load balancers to join it to,
@@ -3086,7 +3191,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         >Disk Configuration Extension
                     </link>documentation.</para>
                 <example>
-                    <title>Request: Update launchConfiguration</title>
+                    <title>Request: Update launch configuration</title>
                     <programlisting>PUT /{tenantId}/groups/{groupId}/launch</programlisting>
                     <programlisting language="json">
                             <xi:include href="./samples/reqPutLaunchConfig.json" parse="text"/>
@@ -3096,7 +3201,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     successful, a 204 response code with an empty
                     response body will be returned. </para>
                 <example>
-                    <title>Request: Update launchConfiguration to boot from volume </title>
+                    <title>Request: Update launch configuration to boot from volume </title>
                     <programlisting>PUT /{tenantId}/groups/{groupId}/launch</programlisting>
                     <programlisting language="json">
                             <xi:include href="./samples/reqPutLaunchConfigBFV.json" parse="text"/>
@@ -3106,7 +3211,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 <para>For an example of a very simple create server template that you could base64 encode, see <xref linkend="createServerTemplate"></xref>.</para>             
             </section>
             <section xml:id="Pause_Execution_of_Scaling_Policies">
-                <title>Pause execution of all scaling policies</title>
+                <title>Pause execution of all scaling group policies</title>
                 <para>
                     <note>
                         <para>The Pause feature has not been
@@ -3121,7 +3226,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     and <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
-                    <title>Request </title>
+                    <title>Request: pause execution of all scaling group policies </title>
                     <programlisting>POST /{tenantId}/groups/{groupId}/pause</programlisting>
                 </example>
                 <para>If the <command>POST</command> request is
@@ -3129,8 +3234,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     an empty response body. </para>
             </section>
             <section xml:id="Resume_Execution_of_Scaling_Policies">
-                <title>Resume execution of all policies for a scaling
-                    group </title>
+                <title>Resume execution of all scaling group policies </title>
                 <para>
                     <note>
                         <para>The resume feature has not been
@@ -3144,7 +3248,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     and <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: resume execution of all scaling group policies</title>
                     <programlisting>POST /{tenantId}/groups/{groupId}/resume</programlisting>
                 </example>
                 <para>If the <command>POST</command> request is
@@ -3233,7 +3337,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     the group down by 5.5 percent with a cooldown
                     phase of 6 seconds.</para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: create a scaling policy</title>
                     <programlisting>
                             POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/
                         </programlisting>
@@ -3246,8 +3350,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     provided in the request body in JSON format, as
                     shown in the following example.</para>
                 <example>
-                    <title>Response to successful create a scaling
-                        policy request</title>
+                    <title>Response: successful create scaling policy request</title>
                     <programlisting language="json">
                             <xi:include href="./samples/resCreatePolicies.json" parse="text"/>
                             </programlisting>
@@ -3261,7 +3364,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     and <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: list scaling policies</title>
                     <programlisting>
                             GET /{tenantId}/groups/{groupId}/policies
                         </programlisting>
@@ -3271,8 +3374,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     JSON format as shown in the following
                     example:</para>
                 <example>
-                    <title>Response to successful list scaling
-                        policies request</title>
+                    <title>Response: successful list scaling policies request</title>
                     <programlisting language="json">
                             <xi:include href="./samples/resGetPolicies.json" parse="text"/>
                             </programlisting>
@@ -3289,7 +3391,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>policyId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: get an individual scaling policy</title>
                     <programlisting>
                             GET /{tenantId}/groups/{groupId}/policies/{policyId}
                         </programlisting>
@@ -3299,8 +3401,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     response body in JSON format as shown in the
                     following example:</para>
                 <example>
-                    <title>Response to a successful get an individual
-                        scaling policy request</title>
+                    <title>Response: successful get an individual scaling policy request</title>
                     <programlisting language="json">
                             <xi:include href="./samples/resGetPolicy.json" parse="text"/>
                             </programlisting>
@@ -3321,7 +3422,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     up by one server with a cooldown phase of 1800
                     seconds.</para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: update a scaling policy</title>
                     <programlisting>
                             PUT /{tenantId}/groups/{groupId}/policies/{policyId}
                         </programlisting>
@@ -3342,7 +3443,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>policyId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: delete a scaling policy</title>
                     <programlisting>
                             DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
                         </programlisting>
@@ -3410,7 +3511,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     the webhook. The following example shows how to
                     create a webhook for a scaling policy. </para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: create a webhook</title>
                     <programlisting>
                             POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/{policyID}/webhooks
                         </programlisting>
@@ -3422,15 +3523,14 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     successful, the data will be returned in JSON
                     format as shown in the following example:</para>
                 <example>
-                    <title>Response to a successful create a webhook
-                        request</title>
+                    <title>Response: successful create a webhook request</title>
                     <programlisting language="json">
                             <xi:include href="./samples/resCreateWebhook.json" parse="text"/>
                         </programlisting>
                 </example>
             </section>
             <section xml:id="Get_List_of_Scaling_Webhooks">
-                <title>List webhooks and their IDs</title>
+                <title>List webhooks</title>
                 <para>To obtain a list of all scaling webhooks and
                     their corresponding ids, submit a
                         <command>GET</command> request with the
@@ -3439,7 +3539,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>policyId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: list webhooks</title>
                     <programlisting>
                             GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                         </programlisting>
@@ -3449,8 +3549,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     response body in JSON format as shown in the
                     following example:</para>
                 <example>
-                    <title>Response to a successful list all webhooks
-                        request</title>
+                    <title>Response: successful list webhooks request</title>
                     <programlisting language="json">
                             <xi:include href="./samples/resGetWebhooks.json" parse="text"/>
                             </programlisting>
@@ -3468,7 +3567,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     specify a name and metadata for the webhook as
                     shown in the following example. </para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: update a webhook</title>
                     <programlisting>
                             PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                         </programlisting>
@@ -3481,9 +3580,8 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     response body will be returned. </para>
             </section>
             <section xml:id="Get_Info_About_Webhook">
-                <title>Get information about a specific
-                    webhook</title>
-                <para>To obtain details about a specific webhook,
+                <title>Get information about an individual webhook</title>
+                <para>To obtain details about an individual webhook,
                     submit a <command>GET</command> request with the
                         <parameter>tenantId</parameter>,
                         <parameter>groupId</parameter>,
@@ -3491,7 +3589,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>webhookId</parameter> parameters
                     specified in the request URL.</para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: get information about an individual webhook</title>
                     <programlisting>
                             GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                         </programlisting>
@@ -3500,8 +3598,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     successful, the data will be returned in JSON
                     format as shown in the following example:</para>
                 <example>
-                    <title>Response to successful get information
-                        about a webhook request</title>
+                    <title>Response: successful get information about an individual webhook request</title>
                     <programlisting language="json">
                             <xi:include href="./samples/resGetWebhook.json" parse="text"/>
                             </programlisting>
@@ -3517,7 +3614,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                         <parameter>webhookID</parameter> parameters
                     specified in the request URL.</para>
                 <example>
-                    <title>Request</title>
+                    <title>Request: delete a webhook</title>
                     <programlisting>
                             DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                         </programlisting>
@@ -3539,7 +3636,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <parameter>policyId</parameter>parameters
                 specified in the request URL.</para>
             <example>
-                <title>Request</title>
+                <title>Request: execute a scaling policy</title>
                 <programlisting>
                         POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute
                     </programlisting>
@@ -3557,5 +3654,10 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 the scaling policy is executed.</para>
         </section>
     </chapter>
-    <xi:include href="./chapters/apiref.xml"/>
+    <chapter xml:id="Glossary">
+        <title>Glossary</title>
+        <!-- Glossary section, defining basic terms, is external so it's handy for Getting Started to share. -->
+        <xi:include href="chapters/glossary.xml" xpointer="element(Glossary-000)"/>
+        <!-- -->
+    </chapter>
 </book>

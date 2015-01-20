@@ -92,9 +92,8 @@ class ExecConvergenceTests(SynchronousTestCase):
                        servicenet_address='10.0.0.2')
         ]
 
-    def _get_gacd_func(self, servers, group_id, reqfunc):
-        def get_all_convergence_data(request_func, grp_id):
-            self.assertIs(request_func, reqfunc)
+    def _get_gacd_func(self, group_id):
+        def get_all_convergence_data(grp_id):
             self.assertEqual(grp_id, group_id)
             return Effect(Stub(Constant((self.servers, []))))
         return get_all_convergence_data
@@ -105,8 +104,7 @@ class ExecConvergenceTests(SynchronousTestCase):
         and returns True to be called again
         """
         reqfunc = lambda **k: Effect(k)
-        get_all_convergence_data = self._get_gacd_func(
-            self.servers, 'gid', reqfunc)
+        get_all_convergence_data = self._get_gacd_func('gid')
         desired = DesiredGroupState(
             launch_configs=range(2),
             desired_lbs={23: [CLBDescription(lb_id='23', port=80)]},
@@ -149,8 +147,7 @@ class ExecConvergenceTests(SynchronousTestCase):
             desired_lbs={},
             desired=2)
         reqfunc = lambda **k: 1 / 0
-        get_all_convergence_data = self._get_gacd_func(
-            self.servers, 'gid', reqfunc)
+        get_all_convergence_data = self._get_gacd_func('gid')
         eff = execute_convergence(
             reqfunc, 'gid', desired,
             get_all_convergence_data=get_all_convergence_data)

@@ -11,6 +11,7 @@ import time
 from collections import namedtuple
 from functools import partial
 
+from effect import Effect
 from effect.twisted import exc_info_to_failure, perform
 
 from silverberg.client import ConsistencyLevel
@@ -27,10 +28,10 @@ from twisted.internet.endpoints import clientFromString
 from twisted.python import usage
 
 from otter.auth import generate_authenticator
-from otter.constants import ServiceType, get_service_mapping
+from otter.constants import ServiceType, get_service_configs
 from otter.convergence.gathering import get_scaling_group_servers
-from otter.effect_dispatcher import get_dispatcher
-from otter.http import get_request_func
+from otter.effect_dispatcher import get_full_dispatcher
+from otter.http import TenantScope, get_request_func
 from otter.log import log as otter_log
 from otter.util.fp import predicate_all
 
@@ -132,14 +133,12 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
     return metrics
 
 
-def get_all_metrics_effects(cass_groups, get_request_func_for_tenant,
-                            log, _print=False):
+def get_all_metrics_effects(cass_groups, log, _print=False):
     """
     Gather server data for and produce metrics for all groups
     across all tenants in a region
 
     :param iterable cass_groups: Groups as retrieved from cassandra
-    :param get_request_func_for_tenant: Function of tenant_id -> request
     :param bool _print: Should the function print while processing?
 
     :return: ``list`` of :obj:`Effect` of (``list`` of :obj:`GroupMetrics`)
@@ -148,52 +147,43 @@ def get_all_metrics_effects(cass_groups, get_request_func_for_tenant,
     tenanted_groups = groupby(lambda g: g['tenantId'], cass_groups)
     effs = []
     for tenant_id, groups in tenanted_groups.iteritems():
-        request_func = get_request_func_for_tenant(tenant_id)
         eff = get_scaling_group_servers(
-            request_func,
             server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'))
-        eff = eff.on(partial(get_tenant_metrics, tenant_id,
-                             groups, _print=_print))
+        eff = Effect(TenantScope(eff, tenant_id))
+        eff = eff.on(partial(get_tenant_metrics, tenant_id, groups,
+                             _print=_print))
         eff = eff.on(
             error=lambda exc_info: log.err(exc_info_to_failure(exc_info)))
         effs.append(eff)
     return effs
 
 
-def _perform_limited_effects(effects, clock, limit):
+def _perform_limited_effects(dispatcher, effects, limit):
     """
     Perform the effects in parallel up to a limit.
 
     It'd be nice if effect.parallel had a "limit" parameter.
     """
     # TODO: Use cooperator instead
-    dispatcher = get_dispatcher(clock)
     sem = defer.DeferredSemaphore(limit)
     defs = [sem.run(perform, dispatcher, eff) for eff in effects]
     return defer.gatherResults(defs)
 
 
-def get_all_metrics(cass_groups, authenticator, service_mapping, region,
-                    clock=None, _print=False):
+def get_all_metrics(dispatcher, cass_groups, _print=False,
+                    get_all_metrics_effects=get_all_metrics_effects):
     """
     Gather server data and produce metrics for all groups across all tenants
     in a region.
 
+    :param dispatcher: An Effect dispatcher.
     :param iterable cass_groups: Groups as retrieved from cassandra
-    :param :obj:`otter.auth.IAuthenticator` authenticator:
-        object that impersonates a tenant
-    :param str services: service mapping from config
-    :param str region: DC region
     :param bool _print: Should the function print while processing?
 
     :return: ``list`` of `GroupMetrics` as `Deferred`
     """
-    def req_func_for_tenant(tenant_id):
-        return get_request_func(authenticator, tenant_id, metrics_log,
-                                service_mapping, region)
-    effs = get_all_metrics_effects(
-        cass_groups, req_func_for_tenant, metrics_log, _print=_print)
-    d = _perform_limited_effects(effs, clock, 10)
+    effs = get_all_metrics_effects(cass_groups, metrics_log, _print=_print)
+    d = _perform_limited_effects(dispatcher, effs, 10)
     d.addCallback(filter(lambda x: x is not None))
     return d.addCallback(lambda x: reduce(operator.add, x, []))
 
@@ -241,7 +231,7 @@ def connect_cass_servers(reactor, config):
 
 @defer.inlineCallbacks
 def collect_metrics(reactor, config, client=None, authenticator=None,
-                    _print=False):
+                    _print=False, get_full_dispatcher=get_full_dispatcher):
     """
     Start collecting the metrics
 
@@ -261,15 +251,17 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
     _client = client or connect_cass_servers(reactor, config['cassandra'])
     authenticator = authenticator or generate_authenticator(reactor,
                                                             config['identity'])
-    service_mapping = get_service_mapping(config)
+    service_configs = get_service_configs(config)
+
+    dispatcher = get_full_dispatcher(reactor, authenticator, metrics_log,
+                                     service_configs)
 
     # calculate metrics
     cass_groups = yield get_scaling_groups(
         _client, props=['status'],
         group_pred=lambda g: g['status'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
-        cass_groups, authenticator, service_mapping, config['region'],
-        clock=reactor, _print=_print)
+        dispatcher, cass_groups, _print=_print)
 
     # Calculate total desired, actual and pending
     total_desired, total_actual, total_pending = 0, 0, 0
@@ -285,13 +277,17 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
             total_desired, total_actual, total_pending))
 
     # Add to cloud metrics
-    req_func = get_request_func(
-        authenticator, config['metrics']['tenant_id'], metrics_log,
-        service_mapping, config['metrics']['region'])
+
+    # WARNING: This request func is configured to make requests against the
+    # metrics region. The same request_func can't be used for other purposes,
+    # like making requests to cloud servers.
+    req_func = get_request_func(authenticator, config['metrics']['tenant_id'],
+                                metrics_log, service_configs,
+                                config['metrics']['region'])
     eff = add_to_cloud_metrics(
         req_func, config['metrics'], config['region'], total_desired,
         total_actual, total_pending, log=metrics_log)
-    yield perform(get_dispatcher(reactor), eff)
+    yield perform(dispatcher, eff)
     metrics_log.msg('added to cloud metrics')
     if _print:
         print('added to cloud metrics')
@@ -299,7 +295,7 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
                            reverse=True)
         print('groups sorted as per divergence', *group_metrics, sep='\n')
 
-    # Diconnect only if we created the client
+    # Disconnect only if we created the client
     if not client:
         yield _client.disconnect()
 

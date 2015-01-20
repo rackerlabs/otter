@@ -54,9 +54,9 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
             <releaseinfo>API v1.0</releaseinfo>
             <productname>&PRODNAME;</productname>
             <!-- enter the publication date of this document; in revhistory, explain what changed -->
-            <pubdate>2014-08-14</pubdate>
+            <pubdate>2015-01-16</pubdate>
             <copyright>
-            <year>2014</year>
+            <year>2015</year>
             <holder>Rackspace US, Inc.</holder>
         </copyright>
             <legalnotice role="rs-api">
@@ -66,6 +66,16 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 </annotation>
             </legalnotice>
             <revhistory>
+                <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                    <date>2015-01-16</date>
+                    <revdescription>
+                        <itemizedlist spacing="compact">
+                            <listitem>
+                                <para>Added new info to <link linkend="Auto_Scale_Core_Concepts-GSG">Auto Scale core concepts</link> section.</para>
+                            </listitem>
+                        </itemizedlist>
+                    </revdescription>
+                </revision>
                 <revision
                     xmlns:raxm="http://docs.rackspace.com/api/metadata">
                     <date>2014-08-14</date>
@@ -197,7 +207,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
             <para>Rackspace Auto Scale is an API-based tool that automatically scales resources in response
                 to an increase or decrease in overall workload based on user-defined thresholds.</para>
             <section xml:id="Doc_Change_History">
-                <title>Document Change History</title>
+                <title>Document change history</title>
                 <para>This version of the document replaces and obsoletes all previous versions. The most recent
                     changes are described in the following table:</para>
                 <?rax revhistory?>
@@ -206,7 +216,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
 <xi:include href="./chapters/resources.xml"/>
 -->
             <section xml:id="What_You_Will_Learn">
-                <title>What You Will Learn in this Guide</title>
+                <title>What you will learn in this guide</title>
                 <para>After reading the Auto Scale Getting Started Guide you will know the following:</para>
                 <itemizedlist>
                     <listitem>
@@ -216,7 +226,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                         <para>How Auto Scale Works</para>
                     </listitem>
                 </itemizedlist>
-                <para>After going throught the examples in this guide, you will be able to complete the following
+                <para>After going through the examples in this guide, you will be able to complete the following
                     tasks:</para>
                 <itemizedlist>
                     <listitem>
@@ -229,7 +239,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 </itemizedlist>
             </section>
             <section xml:id="Resources" xmlns:xlink="http://www.w3.org/1999/xlink">
-                <title>Before You Get Started</title>
+                <title>Before you get started</title>
                 <para>To go through the steps that are described in this guide, you need to have the following:</para>
                 <para>
                     <itemizedlist>
@@ -245,7 +255,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 </para>
             </section>
             <section xml:id="serviceEndpoints">
-                <title>Service Access Endpoints</title>
+                <title>Service access endpoints</title>
                 <para>&PRODNAME; is a regionalized service. The user of the service is therefore responsible
                     for appropriate replication, caching, and overall maintenance of &PRODNAME; data
                     across regional boundaries to other &PROD; servers.</para>
@@ -332,14 +342,14 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                         <emphasis role="bold">1100111</emphasis>") shows that the account number is 1100111.</para>
             </section>
             <section xml:id="contractVersion">
-                <title>Contract Versions</title>
+                <title>Contract versions</title>
                 <para>The &PROD; version defines the contract and build information for the API.</para>
                 <para>The contract version denotes the data model and behavior that the API supports. The requested
                     contract version is included in all request URLs. Different contract versions of
                     the API might be available at any given time and are not guaranteed to be compatible
                     with one another.</para>
                 <example>
-                    <title>Sample Request URL for Contract Version 1.0
+                    <title>Sample request URL for contract version 1.0
                     </title>
                     <programlisting>https://ord.autoscale.api.rackspacecloud.com/
                         <emphasis role="strong">v1.0</emphasis>/1234</programlisting>
@@ -351,7 +361,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 <para/>
             </section>
             <section xml:id="Sending_Requests_through_the_API">
-                <title>Sending Requests through the API</title>
+                <title>Sending requests through the API</title>
                 <para>There are several options for sending requests through an API:</para>
                 <itemizedlist>
                     <listitem>
@@ -375,22 +385,27 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 </itemizedlist>
             </section>
         </chapter>
-        <chapter xml:id="Core_Concepts">
-            <title>How Auto Scale Works</title>
+    <chapter xml:id="Auto_Scale_Core_Concepts-GSG">
+        <title>Auto Scale core concepts</title>
+        <para>To use the &PROD; API effectively, you should understand
+            several key concepts: </para>
+        <section xml:id="How_Auto_Scale_Works-GSG">
+            <title>How Auto Scale works</title>
             <para>Rackspace &PROD; is an API-based tool that automatically scales resources in response to
                 an increase or decrease in overall workload based on user-defined thresholds.</para>
             <para>&PROD; functions by linking these services:
                 <itemizedlist>
                     <listitem>
-                        <para>&PROD; API. For more information, see
-                            <olink targetdoc="autoscale-devguide" targetptr="autoscale-devguide">Rackspace Auto Scale DevGuide</olink>.</para>
+                        <para>Rackspace Cloud Servers. Learn more at 
+                            <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/overview.html">Cloud Servers Getting Started guide</link></para>
                     </listitem>
                     <listitem>
-                        <para>Load-balanced Cloud Servers. For more information, read the Rackspace
-                            <link xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/DB_Doc_Change_History.html">Load Balancers Getting Started Guide
+                        <para>Load-balanced Cloud Servers. Learn more at
+                            <link xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/DB_Doc_Change_History.html">Load Balancers Getting Started guide
                             </link>.</para>
                     </listitem>
-                </itemizedlist>You can set up a schedule for launching Auto Scale or define an event that triggers a
+                </itemizedlist>
+                You can set up a schedule for launching Auto Scale or define an event that triggers a
                 webhook. You can also specify a minimum and maximum number of cloud servers for your
                 scaling group, the amount of resources you want to increase or decrease, and policies
                 based on percentage or real numbers.</para>
@@ -399,104 +414,341 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                     <para>&PROD; does not configure any information within a server. You must configure your
                         services to function when each server is started. We recommend automating your
                         servers' startup processes with
-                        <link xlink:href="http://www.opscode.com/chef/">Chef</link>or a similar tool.</para>
+                        <link xlink:href="http://www.opscode.com/chef/">Chef</link> or a similar tool.</para>
                 </note>
             </para>
             <para>
-                <itemizedlist>
+                <note>
+                    <para>&PROD; can utilize all Rackspace Cloud Server create server API parameters. For more details, 
+                        see the 
+                        <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html">
+                            Create servers</link> documentation.</para>
+                </note>
+            </para>
+        </section>
+        <section xml:id="Scaling_groups-GSG"
+            xmlns:raxm="http://docs.rackspace.com/api/metadata">
+            <title>Scaling groups</title>
+            <para>The scaling group is at the heart of an Auto Scale
+                deployment. The scaling group specifies the basic
+                elements of the Auto Scale configuration. It manages
+                how many servers can participate in the scaling group.
+                It also specifies information related to load
+                balancers if your configuration uses a load
+                balancer.</para>
+            <para>When you create a scaling group, you specify the
+                details for the following two configurations:</para>
+            <itemizedlist>
+                <listitem>
+                    <para>Group Configuration</para>
+                </listitem>
+                <listitem>
+                    <para>Launch Configuration</para>
+                </listitem>
+            </itemizedlist>
+            <para>The following table provides a description of both
+                configuration types.</para>
+            <para>
+                <table>
+                    <caption>Scaling Group Configurations</caption>
+                    <col width="20%"/>
+                    <col width="60%"/>
+                    <thead>
+                        <tr>
+                            <td>Configuration</td>
+                            <td>Description</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Group Configuration</td>
+                            <td>Outlines the basic elements of the
+                                Auto Scale configuration. The group
+                                configuration manages how many servers
+                                can participate in the scaling group.
+                                It sets a minimum and maximum limit
+                                for the number of entities that can be
+                                used in the scaling process. It also
+                                specifies information related to load
+                                balancers. </td>
+                        </tr>
+                        <tr>
+                            <td>Launch Configuration</td>
+                            <td>Creates a blueprint for how new
+                                servers will be created. The launch
+                                configuration specifies what type of
+                                server image will be started on
+                                launch, what flavor the new server is,
+                                and which cloud load balancer or
+                                RackConnect v3 load balancer pool the
+                                new server connects to.
+                                Note: The <parameter>launchConfiguration</parameter> uses the <emphasis role="bold">admin</emphasis> user to scale up, 
+                                usually the first admin user found on the tenant. Only that particular admin user's SSH key pair names can be used in the launchConfiguration. 
+                                Note: The launchConfiguration update operation overwrites all launchConfiguration settings. 
+                                For details, see <link linkend="LaunchConfiguration">Launch configurations</link>.
+                                </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </para>
+        </section>
+        <section
+            xml:id="Authenticated_Webhooks_and_Anonymous_Webhooks-GSG"
+            xmlns:raxm="http://docs.rackspace.com/api/metadata">
+            <title>Webhooks and capability URLs</title>
+            <para>Auto Scale uses webhooks to initiate scaling events.
+                A webhook is an industry-standard protocol for sending
+                events between systems; for Auto Scale, they are used
+                to execute policies. A webhook consists of an HTTP
+                callback that is triggered by some user-defined event,
+                such as an alarm that is set through Cloud Monitoring
+                or another monitoring service. When that event occurs,
+                the source site makes an HTTP request to the URI
+                configured for the webhook.</para>
+            <para>A webhook contains a POST call to a defined URL,
+                potentially with a payload in the POST body. You can
+                send webhooks with a simple call in the library that
+                you are using. You can also send them manually via
+                cURL:</para>
+            <example>
+                <title>POST request to execute a webhook</title>
+                <programlisting>curl -v https://example.com/webhook -X POST -d "payload=payload"</programlisting>
+            </example>
+            <para>Auto Scale only supports anonymous webhooks. In
+                regular webhooks, the {webhook_version}/{webhook_hash}
+                is specified by URL. In anonymous webhooks, the URL is
+                replaced with a hash that is known only to the issuer—
+                because no authentication is needed, the webhook is
+                considered "anonymous."</para>
+            <para>Auto Scale uses Capability URLs in conjunction with
+                webhooks. Capability URLs are URLs that give
+                authorization for a certain action or event. If you
+                know the URL, you have access to it and you can use
+                the URL to trigger a specific event. Capability URLs
+                are usually long, and random, and cannot be guessed by
+                a user.</para>
+            <para>When a webhook is created, Auto Scale creates values
+                for the <parameter>capabilityVersion</parameter> and
+                    <parameter>capabilityHash</parameter> parameters.
+                These values are created per webhook, not per policy.
+                When you create a webhook, you associate it with a
+                policy. The response to the webhook creation request
+                includes a single capability URL that is also, by
+                inheritance, associated with the policy.</para>
+            <para>The Auto Scale webhook architecture allows Auto
+                Scale to be integrated with other systems, for
+                example, monitoring systems. So, now you have this URL
+                that will execute a specific policy and you can fire
+                off that URL based on events happening outside of Auto
+                Scale.</para>
+            <para>To execute a capability URL, locate the URL in your
+                webhook, and then submit a
+                <command>POST</command>request against it, as shown in
+                the following example:</para>
+            <example>
+                <title>POST request to execute a capability URL</title>
+                <programlisting language="json">
+                        <xi:include href="./samples/reqExecuteCapabilityURL.json" parse="text"/>
+                    </programlisting>
+            </example>
+            <para>Executing a capability URL or an anonymous webhook
+                will always return a 202,
+                    <parameter>Accepted</parameter>, response code,
+                even if the request fails because of an invalid
+                configuration. This is done to prevent information
+                leakage.</para>
+            <para>
+                <note>
+                    <para>To execute anonymous webhooks and capability
+                        URLs, no authentication is needed. You can use
+                        a capability URL to trigger multiple
+                        webhooks.</para>
+                </note>
+            </para>
+        </section>
+        <section xml:id="Scaling_policies-GSG"
+            xmlns:raxm="http://docs.rackspace.com/api/metadata">
+            <title>Scaling policies</title>
+            <para>Auto Scale uses policies to define the scaling
+                activity that will take place, as well as when and how
+                that scaling activity will take place. Scaling
+                policies specify how to modify the scaling group and
+                its behavior. You can specify multiple policies to
+                manage a scaling group.</para>
+            <para>You can create two kinds of Auto Scale
+                policies:</para>
+            <itemizedlist spacing="compact">
+                <listitem>
+                    <para>Policies that trigger Auto Scale activities
+                        through a webhook. </para>
+                </listitem>
+                <listitem>
+                    <para>Policies that trigger Auto Scale activities
+                        based on a schedule. </para>
+                </listitem>
+            </itemizedlist>
+        </section>
+        <section xml:id="Cooldowns-GSG"
+            xmlns:raxm="http://docs.rackspace.com/api/metadata">
+            <title>Cooldowns</title>
+            <para>Auto Scale supports a cooldown feature. A cooldown
+                is a configured period of time that must pass between
+                actions. Cooldowns only apply to webhook-based
+                configurations. By configuring group cooldowns, you
+                control how often a group can have a policy applied,
+                which can help servers scaling up to complete the
+                scale up before another policy is executed. By
+                configuring policy cooldowns, you control how often a
+                policy can be executed, which can help provide quick
+                scale-ups and gradual scale-downs.</para>
+            <para>Cooldowns work the following way: <itemizedlist>
                     <listitem>
-                        <para>
-                            <link linkend="Schedule_Based_Configuration">Scheduled-Based Configuration
-                            </link>
-                        </para>
+                        <para>Group cooldowns control how often a
+                            group can be modified by denying all
+                            policy executions until the cooldown
+                            expires—even if conditions exist that
+                            would trigger one.</para>
                     </listitem>
                     <listitem>
-                        <para>
-                            <link linkend="webhook_based_configuration">Event-Based Configuration
-                            </link>
-                        </para>
+                        <para>Policy cooldowns control how often a
+                            single, specific policy can be executed.
+                            For example, a policy cooldown can require
+                            at least six hours until any successive
+                            scale down policies are
+                            reactivated.</para>
                     </listitem>
                 </itemizedlist>
             </para>
-            <section xml:id="Schedule_Based_Configuration">
-                <title>Schedule-Based Configuration</title>
-                <para>You can configure Auto Scale to be triggered based on a user-defined schedule that is
-                    specified in one or more policies.</para>
-                <para>This configuration option is helpful if you know that your Cloud Servers deployment will
-                    need additional resources during certain peak times. For example, if you need additional
-                    server resources during the weekend, you can define a policy that adds 50 servers
-                    on Friday evening and then removes these servers again on Sunday evening to return
-                    to a regular operational state.</para>
-                <para>The following diagram outlines how Scaling by Schedule works:</para>
-                <informalfigure>
-                    <mediaobject>
-                        <imageobject>
-                            <imagedata fileref="images/ScalebySchedule.png" contentwidth="6in" />
-                        </imageobject>
-                    </mediaobject>
-                </informalfigure>
-            </section>
-            <section xml:id="Monitoring_Based_Configuration" security="writeonly">
-                <title>Monitoring-Based Configuration</title>
-                <para>You can configure Auto Scale to be triggered based on a predefined alarm or threshold
-                    that has been previously set up in Cloud Monitoring.</para>
-                <para>Monitoring-based configuration works the following way:</para>
-                <para>
-                    <orderedlist>
-                        <listitem>
-                            <para>In Cloud Monitoring, you configure alarms that are triggered when a high
-                                utilization of resources occurs.
-                            </para>
-                        </listitem>
-                        <listitem>
-                            <para>When Cloud Monitoring sets off an alarm for high utilization of resources
-                                within a group, a webhook is triggered.</para>
-                        </listitem>
-                        <listitem>
-                            <para>The webhook launches the Rackspace Auto Scale service, which looks up the
-                                policy that has been defined in accordance with the webhook. This policy
-                                determines the amount of cloud servers that need to be added or removed
-                                in case the alarm is triggered.</para>
-                        </listitem>
-                    </orderedlist>
-                </para>
-            </section>
-            <section xml:id="webhook_based_configuration">
-                <title>Event-Based Configuration</title>
-                <para>You can configure Auto Scale to be triggered through a webhook, based on a predefined
-                    alarm or threshold that has been previously set up in a monitoring service. Event-based
-                    configuration works the following way:</para>
-                <para>
-                    <orderedlist>
-                        <listitem>
-                            <para>In your monitoring service, you configure alarms that are triggered when
-                                a high utilization of resources occurs
-                            </para>
-                        </listitem>
-                        <listitem>
-                            <para>In Auto Scale, you configure a scaling group, scaling policies, and a webhook
-                                to be triggered when your monitoring service sets off an alarm for high
-                                utilization of resources.
-                            </para>
-                        </listitem>
-                        <listitem>
-                            <para>The webhook launches the Auto Scale service, which looks up the policy that
-                                has been defined in accordance with the webhook. This policy determines
-                                the amount of cloud servers that need to be added or removed.
-                            </para>
-                        </listitem>
-                    </orderedlist>
-                </para>
+            <para>
                 <note>
-                    <para>Servers added through a webhook triggered by an external monitoring service will
-                        not be automatically monitored by the external monitoring service.</para>
+                    <para>Cooldown configuration is irrelevant for
+                        schedule-based configurations and the Group
+                        Cooldown and Policy Cooldown can both be set
+                        to 0 (null).</para>
                 </note>
-            </section>
+            </para>
+        </section>
+        <section xml:id="Schedule_Based_Configuration-GSG">
+            <title>Schedule-based configurations</title>
+            <para>You can configure Auto Scale to be triggered based on a user-defined schedule that is
+                specified in one or more policies.</para>
+            <para>This configuration option is helpful if you know that your Cloud Servers deployment will
+                need additional resources during certain peak times. For example, if you need additional
+                server resources during the weekend, you can define a policy that adds 50 servers
+                on Friday evening and then removes these servers again on Sunday evening to return
+                to a regular operational state.</para>
+            <para>The following diagram outlines how Scaling by Schedule works:</para>
+            <informalfigure>
+                <mediaobject>
+                    <imageobject>
+                        <imagedata fileref="images/ScalebySchedule.png" contentwidth="6in" />
+                    </imageobject>
+                </mediaobject>
+            </informalfigure>
+        </section>
+        <section xml:id="Monitoring_Based_Configuration-GSG" security="writeonly">
+            <title>Monitoring-based configurations</title>
+            <para>You can configure Auto Scale to be triggered based on a predefined alarm or threshold
+                that has been previously set up in Cloud Monitoring.</para>
+            <para>Monitoring-based configuration works the following way:</para>
+            <para>
+                <orderedlist>
+                    <listitem>
+                        <para>In Cloud Monitoring, you configure alarms that are triggered when a high
+                            utilization of resources occurs.
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>When Cloud Monitoring sets off an alarm for high utilization of resources
+                            within a group, a webhook is triggered.</para>
+                    </listitem>
+                    <listitem>
+                        <para>The webhook launches the Rackspace Auto Scale service, which looks up the
+                            policy that has been defined in accordance with the webhook. This policy
+                            determines the amount of cloud servers that need to be added or removed
+                            in case the alarm is triggered.</para>
+                    </listitem>
+                </orderedlist>
+            </para>
+        </section>
+        <section xml:id="webhook_based_configuration-GSG">
+            <title>Event-based configurations</title>
+            <para>You can configure Auto Scale to be triggered through a webhook, based on a predefined
+                alarm or threshold that has been previously set up in a monitoring service. Event-based
+                configuration works the following way:</para>
+            <para>
+                <orderedlist>
+                    <listitem>
+                        <para>In your monitoring service, you configure alarms that are triggered when
+                            a high utilization of resources occurs
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>In Auto Scale, you configure a scaling group, scaling policies, and a webhook
+                            to be triggered when your monitoring service sets off an alarm for high
+                            utilization of resources.
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>The webhook launches the Auto Scale service, which looks up the policy that
+                            has been defined in accordance with the webhook. This policy determines
+                            the amount of cloud servers that need to be added or removed.
+                        </para>
+                    </listitem>
+                </orderedlist>
+            </para>
+            <note>
+                <para>Servers added through a webhook triggered by an external monitoring service will
+                    not be automatically monitored by the external monitoring service.</para>
+            </note>
+        </section>
+        <section xml:id="RCv3-GSG" xmlns:raxm="http://docs.rackspace.com/api/metadata">
+            <title>Cloud bursting with RackConnect v3</title>
+            <para>You can use Auto Scale with a hybrid, dedicated and
+                cloud, solution to "burst" into the cloud when extra
+                servers are temporarily needed. To do this, you use
+                RackConnect v3, a Rackspace solution that works with
+                Rackspace cloud servers and creates a secure bridge
+                between the Rackspace cloud and your dedicated
+                hardware.</para>
+            <para>To get started with RackConnect v3 cloud bursting: <itemizedlist>
+                    <listitem>
+                        <para>Contact your Rackspace Support team and
+                            tell them what you want to do. They will
+                            configure a load balancer pool for you and
+                            give you the UUID. </para>
+                    </listitem>
+                    <listitem>
+                        <para>Configure your
+                                <parameter>launchConfiguration</parameter>
+                            <parameter>loadBalancers</parameter>
+                            attributes with the load balancer pool
+                            UUID that was given to you as the
+                                <parameter>loadBalancerId</parameter>
+                            and use
+                                <parameter>"RackConnect v3"</parameter>
+                            for the <parameter>type</parameter>. Do
+                            not set a value for
+                                <parameter>port</parameter>.</para>
+                    </listitem>
+                </itemizedlist>
+            </para>
+            <example><title>Example RackConnect v3 launchConfiguration with two load balancer pools</title>
+                <programlisting language="json">
+                            <xi:include href="./samples/exampleRCv3launchConfig.json" parse="text"/>
+                        </programlisting></example>
+            <para>For more information on RackConnect v3, see this
+                    <link
+                    xlink:href="http://www.rackspace.com/cloud/hybrid/rackconnect"
+                    >Overview</link>, and there are several <link
+                    xlink:href="http://www.rackspace.com/knowledge_center/product-page/rackconnect"
+                    >Knowledge Center articles</link>.</para>
+        </section>
+    </chapter>
 
-        </chapter>
 
         <chapter xml:id="Autoscale_API">
-            <title>Creating your first &PROD; Group</title>
+            <title>Creating your first &PROD; group</title>
             <para>In this section, you will learn how to create your first Auto Scale Group using a schedule-based
                 configuration.
             </para>
@@ -537,7 +789,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                     for the API, but the Control Panel offers another resource for completing these tasks.</para>
             </note>
             <section xml:id="Generate_Authentication_Token">
-                <title>Generate an Authentication Token</title>
+                <title>Generate an authentication token</title>
                 <para>You need to generate a token whether you use cURL or a ReST client.</para>
                 <para>The authentication token will need to be passed in for each request using the
                     <code>X-Auth-Token</code>
@@ -610,7 +862,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                     <code>v2.0</code>component in the URL indicates that you are using version 2.0 of the Cloud
                     Auth API.</para>
                 <example>
-                    <title>cURL Authenticate Request: JSON</title>
+                    <title>cURL authenticate request: JSON</title>
                     <?dbfo keep-together="always" ?>
                         <screen language="bash">
                             <command>curl</command>
@@ -754,7 +1006,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 </para>
             </section>
             <section xml:id="List_Server_Images">
-                <title>List Cloud Server Images</title>
+                <title>List cloud server images</title>
                 <para>Before you create a server through the Cloud Server API, you need to obtain a list of
                     available images so that you can choose one for your new server.</para>
                 <para>After you choose an image, copy its image ID. You use this image ID when you create the
@@ -764,7 +1016,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                     your server. The following example shows how to request a list cloud server images.</para>
                 <para>
                     <example>
-                        <title>Requesting a List of Cloud Server Images</title>
+                        <title>Requesting a list of cloud server images</title>
                         <programlisting language="bash">$ curl -X GET \ -H "Content-Type: application/json" \ -H "X-Auth-token:{auth-token}"
                             \ https://ord.servers.api.rackspacecloud.com/v2/{tenant-id}/images?type=SNAPSHOT
                             | python -mjson.tool
@@ -787,7 +1039,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 </para>
             </section>
             <section xml:id="Create_Cloud_Server">
-                <title>Create a Cloud Server</title>
+                <title>Create a cloud server</title>
                 <para>After you have obtained the imageID for the server image you want to create, you need
                     to create your cloud server. Auto Scale will use the configuration info in this server
                     image as a blueprint for create new server images.</para>
@@ -805,7 +1057,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 </para>
             </section>
             <section xml:id="Create_a_Cloud_Server_Image">
-                <title>Create a Cloud Server Image</title>
+                <title>Create a cloud server image</title>
                 <para>After you have created a Cloud Server, you need to create an image, which Auto Scale
                     will use to create new servers.</para>
                 <para>You can create a server image using one of the following methods:
@@ -826,13 +1078,13 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 </para>
             </section>
             <section xml:id="Create_Group">
-                <title>Create a Scaling Group</title>
+                <title>Create a scaling group</title>
                 <para>Now you are ready to create your first scaling group. For this exercise, you will create
                     a schedule-based scaling group that will trigger a scaling event at 11 P.M. daily.
                     The following example shows how to create a schedule-based scaling group by submitting
                     a POST request using cURL.</para>
                 <example>
-                    <title>Creating a Scaling Group</title>
+                    <title>Creating a scaling group</title>
                     <programlisting language="json">
                         <xi:include href="./samples/reqCreateGroup.json" parse="text" />
                     </programlisting>
@@ -841,7 +1093,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                         format as shown in the following example:
                     </para>
                     <example>
-                        <title>Response for Successful Create a Scaling Group Request</title>
+                        <title>Response for successful create a scaling group request</title>
                         <programlisting language="json">
                             <xi:include href="./samples/resCreateGroup.json" parse="text" />
                         </programlisting>
@@ -849,7 +1101,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 </example>
             </section>
             <section xml:id="Delete_Scaling_Group">
-                <title>Delete a Scaling Group</title>
+                <title>Delete a scaling group</title>
                 <para>You can use the Auto Scale API to deactivate and delete one or more scaling groups. Your
                     options for deleting the scaling group depend on whether your scaling group has active
                     entities or not.</para>
@@ -881,7 +1133,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                     </itemizedlist>
                 </para>
                 <section xml:id="Delete_Scaling_Group_No_Active_Entities">
-                    <title>Delete a Scaling Group with no Active Entities
+                    <title>Delete a scaling group with no active entities
                     </title>
                     <para>To delete a scaling policy group that has no active entities, submit a
                         <command>DELETE</command>request with the
@@ -889,7 +1141,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                         <parameter>groupID</parameter>parameters specified in the request URL as shown in the following
                         example:</para>
                     <example>
-                        <title>Delete a Scaling Group</title>
+                        <title>Deleting a scaling group</title>
                         <programlisting language="json">
                             <xi:include href="./samples/reqDeleteGroup.json" parse="text" />
                         </programlisting>
@@ -900,14 +1152,14 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                         with a message stating that your group still has active entities as shown in
                         the following example:</para>
                     <example>
-                        <title>Response to Failed DELETE Request</title>
+                        <title>Response to a failed DELETE request</title>
                         <programlisting>
                             "Group d5f5f3ad-faef-4c8f-99c4-0e931189c521 for tenant 829409 still has entities."
                         </programlisting>
                     </example>
                 </section>
                 <section xml:id="Delete_Scaling_Group_with_Active_Entities">
-                    <title>Delete a Scaling Group with Active Entities
+                    <title>Delete a scaling group with active entities
                         <?sbr?>
                             <?sbr?>
                     </title>
@@ -924,7 +1176,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                                     <parameter>maxEntities</parameter>
                                     parameters to 0 as shown in the following example:</para>
                                 <example>
-                                    <title>PUT Request setting minEntities and maxEntities to 0</title>
+                                    <title>PUT request setting minEntities and maxEntities to zero</title>
                                     <programlisting>
                                         PUT /{tenantId}/groups/{groupId}/config
                                     </programlisting>
@@ -941,7 +1193,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                                     <parameter>groupId</parameter>
                                     parameters specified in the request URL:</para>
                                 <example>
-                                    <title>DELETE Request</title>
+                                    <title>DELETE request</title>
                                     <programlisting>
                                         DELETE /{tenantId}/groups/{groupId}
                                     </programlisting>
@@ -954,26 +1206,26 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                         body will be returned.</para>
                 </section>
                 <section xml:id="Delete_Scaling_Group_Using_Force_Delete">
-                    <title>Delete a Scaling Group using Force Delete
+                    <title>Delete a scaling group using FORCE DELETE
                     </title>
                     <para>The Auto Scale API provides an option for users to force delete a scaling group that
-                        has active servers. The Force Delete option will remove all servers in the configuration
+                        has active servers. The FORCE DELETE option will remove all servers in the configuration
                         from the load balancer(s) and then delete the server.</para>
                     <para>
                         <warning>
-                            <para>Using Force Delete will remove all servers that are associated with the scaling
-                                group. Users are discouraged from using the Force Delete option and to
+                            <para>Using FORCE DELETE will remove all servers that are associated with the scaling
+                                group. Users are discouraged from using the FORCE DELETE option and to
                                 manually delete servers instead.</para>
                         </warning>
                     </para>
-                    <para>To use the Force Delete option, submit a
+                    <para>To use the FORCE DELETE option, submit a
                         <command>DELETE</command>request with the
                         <parameter>tenantId</parameter>and
                         <parameter>groupId</parameter>parameters specified in the request URL, and set the
                         <parameter>force</parameter>parameter to
                         <parameter>true</parameter>.</para>
                     <example>
-                        <title>DELETE Request using Force Delete</title>
+                        <title>DELETE request using FORCE DELETE</title>
                         <programlisting>
                             DELETE /{tenantId}/groups/{groupId}?force=true
                         </programlisting>
@@ -988,7 +1240,7 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
             </section>
         </chapter>
         <chapter xml:id="Next_Steps">
-            <title>Next Steps</title>
+            <title>Next steps</title>
             <para>Now that you have created your scaling group, you are ready to take the next steps:</para>
             <para>
                 <itemizedlist>
@@ -1019,4 +1271,10 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                 </itemizedlist>
             </para>
         </chapter>
+    <chapter xml:id="Glossary">
+        <title>Glossary</title>
+        <!-- Glossary is external, good for Getting Started to share. -->
+        <xi:include href="chapters/glossary.xml" xpointer="element(Glossary-000)"/>
+        <!-- -->
+    </chapter>
 </book>
