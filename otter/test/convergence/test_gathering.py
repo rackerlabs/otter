@@ -220,28 +220,23 @@ class GetLBContentsTests(SynchronousTestCase):
             self, 'otter.convergence.gathering.extract_CLB_drained_at',
             side_effect=lambda f: self.feeds[f])
 
-    def _request(self):
-        def request(service_type, method, url, json_response=False):
-            assert service_type is ServiceType.CLOUD_LOAD_BALANCERS
-            response = self.reqs[(method, url, json_response)]
-            return Effect(Stub(Constant(response)))
-        return request
-
-    def _resolve_retry_stubs(self, eff):
+    def _resolve_request(self, eff):
         """
-        Like :func:`resolve_retry_stub`, but assert what we expect to be the
-        correct policy.
+        Resolve a :obj:`ServiceRequest` based on ``self.reqs`` and assert
+        that it's wrapped in a Retry with the expected policy.
         """
         self.assertEqual(
             eff.intent.should_retry,
             ShouldDelayAndRetry(can_retry=retry_times(5),
                                 next_interval=exponential_backoff_interval(2)))
-        return resolve_retry_stubs(eff)
+        req = eff.intent.effect.intent
+        response = self.reqs[req.method, req.url, req.json_response]
+        return resolve_effect(eff, response)
 
     def _resolve_lb(self, eff):
         """Resolve the tree of effects used to fetch LB information."""
         # first resolve the request to list LBs
-        lb_nodes_fetch = self._resolve_retry_stubs(eff)
+        lb_nodes_fetch = self._resolve_request(eff)
         if type(lb_nodes_fetch) is not Effect:
             # If a parallel effect is *empty*, resolve_stubs will
             # simply return an empty list immediately.
@@ -250,11 +245,11 @@ class GetLBContentsTests(SynchronousTestCase):
         # which results in a parallel fetch of all nodes from all LBs
         feed_fetches = resolve_effect(
             lb_nodes_fetch,
-            map(self._resolve_retry_stubs, lb_nodes_fetch.intent.effects))
+            map(self._resolve_request, lb_nodes_fetch.intent.effects))
         # which results in a list parallel fetch of feeds for the nodes
         lbnodes = resolve_effect(
             feed_fetches,
-            map(self._resolve_retry_stubs, feed_fetches.intent.effects))
+            map(self._resolve_request, feed_fetches.intent.effects))
         # and we finally have the CLBNodes.
         return lbnodes
 
@@ -262,7 +257,7 @@ class GetLBContentsTests(SynchronousTestCase):
         """
         Gets LB contents with drained_at correctly
         """
-        eff = get_clb_contents(self._request())
+        eff = get_clb_contents()
         draining, enabled = CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED
         make_desc = partial(CLBDescription, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
@@ -295,7 +290,7 @@ class GetLBContentsTests(SynchronousTestCase):
         Return empty list if there are no LB
         """
         self.reqs = {('GET', 'loadbalancers', True): []}
-        eff = get_clb_contents(self._request())
+        eff = get_clb_contents()
         self.assertEqual(self._resolve_lb(eff), [])
 
     def test_no_nodes(self):
@@ -307,7 +302,7 @@ class GetLBContentsTests(SynchronousTestCase):
             ('GET', 'loadbalancers/1/nodes', True): [],
             ('GET', 'loadbalancers/2/nodes', True): []
         }
-        eff = get_clb_contents(self._request())
+        eff = get_clb_contents()
         self.assertEqual(self._resolve_lb(eff), [])
 
     def test_no_draining(self):
@@ -328,11 +323,13 @@ class GetLBContentsTests(SynchronousTestCase):
         make_desc = partial(CLBDescription, port=20, weight=2,
                             condition=CLBNodeCondition.ENABLED,
                             type=CLBNodeType.PRIMARY)
-        eff = get_clb_contents(self._request())
+        eff = get_clb_contents()
         self.assertEqual(
             self._resolve_lb(eff),
-            [CLBNode(node_id='11', address='a11', description=make_desc(lb_id='1')),
-             CLBNode(node_id='21', address='a21', description=make_desc(lb_id='2'))])
+            [CLBNode(node_id='11', address='a11',
+                     description=make_desc(lb_id='1')),
+             CLBNode(node_id='21', address='a21',
+                     description=make_desc(lb_id='2'))])
 
 
 class ToNovaServerTests(SynchronousTestCase):
