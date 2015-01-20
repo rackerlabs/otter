@@ -28,10 +28,17 @@ class CommonTestUtilities(object):
         """
         network_list = []
         for each_server in server_ids_list:
-            network = self.server_client.list_addresses(each_server).entity
-            for each_network in network.private.addresses:
-                if str(each_network.version) is '4':
-                    network_list.append(each_network.addr)
+            server_info = self.server_client.get_server(each_server).entity
+            print server_info
+            network = self.server_client.list_addresses(each_server)
+            print "--------- network    ---- ", network
+            network = network.entity
+            try:
+                for each_network in network.private.addresses:
+                    if str(each_network.version) is '4':
+                        network_list.append(each_network.addr)
+            except:
+                pass
         return network_list
 
     def get_node_list_from_lb(self, load_balancer_id):
