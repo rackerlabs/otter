@@ -29,7 +29,8 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
         lc_name = rand_name('upd_server_name')
         lc_image_ref = self.lc_image_ref_alt
         lc_flavor_ref = '4'
-        lc_load_balancers = [{'loadBalancerId': 1234, 'port': 8181}]
+        lc_load_balancers = [{'loadBalancerId': 1234, 'port': 8181},
+                             {'loadBalancerId': '3245', 'port': 8181}]
         lc_disk_config = 'AUTO'
         lc_personality = [{'path': '/root/.ssh/authorized_keys',
                            'contents': ('DQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp')}]

@@ -1,28 +1,40 @@
 """
 Test authentication functions.
 """
-import mock
 from copy import deepcopy
 
-from twisted.trial.unittest import SynchronousTestCase
-from twisted.internet.defer import succeed, fail, Deferred
-from twisted.python.failure import Failure
+from effect import Effect, sync_perform
+
+import mock
+
+from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
+from twisted.python.failure import Failure
+from twisted.trial.unittest import SynchronousTestCase
 
 from zope.interface.verify import verifyObject
 
-from otter.test.utils import patch, SameJSON, iMock, mock_log
-
+from otter.auth import (
+    Authenticate,
+    CachingAuthenticator,
+    IAuthenticator,
+    ICachingAuthenticator,
+    ImpersonatingAuthenticator,
+    InvalidateToken,
+    RetryingAuthenticator,
+    WaitingAuthenticator,
+    authenticate_user,
+    endpoints,
+    endpoints_for_token,
+    extract_token,
+    generate_authenticator,
+    impersonate_user,
+    public_endpoint_url,
+    user_for_tenant,
+)
+from otter.effect_dispatcher import get_simple_dispatcher
+from otter.test.utils import SameJSON, iMock, mock_log, patch
 from otter.util.http import APIError, UpstreamError
-
-from otter.auth import (authenticate_user, extract_token, impersonate_user,
-                        endpoints_for_token, user_for_tenant,
-                        ImpersonatingAuthenticator,
-                        CachingAuthenticator, RetryingAuthenticator,
-                        WaitingAuthenticator, IAuthenticator,
-                        ICachingAuthenticator,
-                        Authenticate, InvalidateToken,
-                        endpoints, public_endpoint_url, generate_authenticator)
 
 
 expected_headers = {'accept': ['application/json'],
@@ -743,9 +755,11 @@ class AuthenticateTests(SynchronousTestCase):
         mock_auth = iMock(IAuthenticator)
         mock_auth.authenticate_tenant.return_value = succeed(result)
         log = object()
-        intent = Authenticate(mock_auth, 'tenant_id1', log)
-        self.assertEqual(self.successResultOf(intent.perform_effect(None)), result)
-        mock_auth.authenticate_tenant.assert_called_once_with('tenant_id1', log=log)
+        eff = Effect(Authenticate(mock_auth, 'tenant_id1', log))
+        self.assertEqual(sync_perform(get_simple_dispatcher(None), eff),
+                         result)
+        mock_auth.authenticate_tenant.assert_called_once_with('tenant_id1',
+                                                              log=log)
 
 
 class InvalidateTokenTests(SynchronousTestCase):
@@ -755,8 +769,8 @@ class InvalidateTokenTests(SynchronousTestCase):
         """Performig causes a call to authenticator.invalidate."""
         mock_auth = iMock(ICachingAuthenticator)
         mock_auth.invalidate.return_value = None
-        intent = InvalidateToken(mock_auth, 'tenant_id1')
-        self.assertEqual(intent.perform_effect(None), None)
+        eff = Effect(InvalidateToken(mock_auth, 'tenant_id1'))
+        self.assertEqual(sync_perform(get_simple_dispatcher(None), eff), None)
         mock_auth.invalidate.assert_called_once_with('tenant_id1')
 
 

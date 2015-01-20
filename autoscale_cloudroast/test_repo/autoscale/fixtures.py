@@ -2,7 +2,7 @@
 :summary: Base Classes for Autoscale Test Suites (Collections of Test Cases)
 """
 from cafe.drivers.unittest.fixtures import BaseTestFixture
-from autoscale.behaviors import AutoscaleBehaviors
+from autoscale.behaviors import AutoscaleBehaviors, safe_hasattr
 from cloudcafe.common.resources import ResourcePool
 from cloudcafe.common.tools.datagen import rand_name
 from autoscale.config import AutoscaleConfig
@@ -91,7 +91,8 @@ class AutoscaleFixture(BaseTestFixture):
             'json', 'json')
 
         cls.autoscale_behaviors = AutoscaleBehaviors(cls.autoscale_config,
-                                                     cls.autoscale_client)
+                                                     cls.autoscale_client,
+                                                     rcv3_client=cls.rcv3_client)
         cls.gc_name = cls.autoscale_config.gc_name
         cls.gc_cooldown = int(cls.autoscale_config.gc_cooldown)
         cls.gc_min_entities = int(cls.autoscale_config.gc_min_entities)
@@ -695,9 +696,3 @@ class ScalingGroupWebhookFixture(ScalingGroupPolicyFixture):
         Delete the webhook
         """
         super(ScalingGroupWebhookFixture, cls).tearDownClass()
-
-
-def safe_hasattr(obj, key):
-    """This function provides a safe alternative to the hasattr() function."""
-    sentinel = object()
-    return getattr(obj, key, sentinel) is not sentinel

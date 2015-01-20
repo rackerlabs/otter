@@ -3,8 +3,10 @@ Tests for :mod:`otter.utils.retry`
 """
 import sys
 
-from effect import Effect, Delay, FuncIntent, ConstantIntent
-from effect.testing import resolve_effect, StubIntent, resolve_stubs
+from effect import (
+    ComposedDispatcher, Constant, Delay, Effect, Func, TypeDispatcher,
+    base_dispatcher, sync_perform)
+from effect.testing import Stub, resolve_effect
 
 import mock
 
@@ -13,12 +15,22 @@ from twisted.internet.defer import CancelledError, Deferred, succeed
 from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.util.retry import (retry, repeating_interval, random_interval,
-                              transient_errors_except, retry_times,
-                              compose_retries, exponential_backoff_interval,
-                              terminal_errors_except, retry_effect, Retry,
-                              ShouldDelayAndRetry)
-from otter.test.utils import CheckFailure, DummyException, CheckFailureValue
+from otter.test.utils import (
+    CheckFailure, CheckFailureValue, DummyException)
+from otter.util.retry import (
+    Retry,
+    ShouldDelayAndRetry,
+    compose_retries,
+    exponential_backoff_interval,
+    perform_retry,
+    random_interval,
+    repeating_interval,
+    retry,
+    retry_effect,
+    retry_times,
+    terminal_errors_except,
+    transient_errors_except,
+)
 
 
 class RetryTests(SynchronousTestCase):
@@ -396,7 +408,7 @@ class NextIntervalHelperTests(SynchronousTestCase):
         self.assertEqual(next_interval(err), 12)
 
 
-STUB = Effect(StubIntent(ConstantIntent("foo")))
+STUB = Effect(Stub(Constant("foo")))
 
 
 class RetryEffectTests(SynchronousTestCase):
@@ -446,13 +458,22 @@ class EffectfulRetryTests(SynchronousTestCase):
     # an object which calls a function with arguments specified as public
     # attributes, I guess...
 
-    def test_perform_effect(self):
-        """When the specified effect is successful, its result is propagated."""
-        retry = Retry(effect=STUB, should_retry=lambda e: 1 / 0)
-        eff = retry.perform_effect(None)
-        self.assertEqual(resolve_stubs(eff), "foo")
+    def setUp(self):
+        """Save common objects."""
+        self.dispatcher = ComposedDispatcher([
+            base_dispatcher,
+            TypeDispatcher({Retry: perform_retry})])
 
-    def test_perform_effect_retries_on_error(self):
+    def test_perform_retry(self):
+        """
+        When the specified effect is successful, its result is propagated.
+        """
+        retry = Retry(effect=Effect(Constant('foo')),
+                      should_retry=lambda e: 1 / 0)
+        result = sync_perform(self.dispatcher, Effect(retry))
+        self.assertEqual(result, 'foo')
+
+    def test_perform_retry_retries_on_error(self):
         """
         When the specified effect raises, it is retried when should_retry
         returns an Effect of True.
@@ -464,22 +485,28 @@ class EffectfulRetryTests(SynchronousTestCase):
         def should_retry(exc_info):
             if (exc_info[0] is RuntimeError
                     and exc_info[1].message == "foo"):
-                return Effect(StubIntent(ConstantIntent(True)))
+                return Effect(Constant(True))
             else:
-                return Effect(StubIntent(ConstantIntent(False)))
+                return Effect(Constant(False))
 
-        retry = Retry(effect=Effect(StubIntent(FuncIntent(func))),
+        retry = Retry(effect=Effect(Func(func)),
                       should_retry=should_retry)
-        eff = retry.perform_effect(None)
-        self.assertEqual(resolve_stubs(eff), "final")
+        result = sync_perform(self.dispatcher, Effect(retry))
+        self.assertEqual(result, "final")
 
 
 def get_exc_info():
     """Get the exc_info tuple representing a ZeroDivisionError('foo')"""
     try:
         raise ZeroDivisionError("foo")
-    except:
+    except Exception:
         return sys.exc_info()
+
+
+def _perform_func_intent(eff):
+    """Perform a func intent without recursing on effects."""
+    assert type(eff.intent) is Func
+    return eff.intent.func()
 
 
 class ShouldDelayAndRetryTests(SynchronousTestCase):
@@ -493,9 +520,7 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=lambda f: False,
                                    next_interval=lambda f: 1 / 0)
         eff = sdar(get_exc_info())
-        self.assertEqual(
-            resolve_effect(eff, eff.intent.perform_effect(None)),
-            False)
+        self.assertEqual(_perform_func_intent(eff), False)
 
     def test_should_retry(self):
         """
@@ -505,7 +530,7 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=lambda f: True,
                                    next_interval=lambda f: 1.5)
         eff = sdar(get_exc_info())
-        next_eff = resolve_effect(eff, eff.intent.perform_effect(None))
+        next_eff = _perform_func_intent(eff)
         self.assertEqual(next_eff.intent, Delay(delay=1.5))
         self.assertEqual(resolve_effect(next_eff, None),
                          True)
@@ -529,6 +554,7 @@ class ShouldDelayAndRetryTests(SynchronousTestCase):
         sdar = ShouldDelayAndRetry(can_retry=can_retry,
                                    next_interval=next_interval)
         eff = sdar(get_exc_info())
-        resolve_effect(eff, eff.intent.perform_effect(None))
+        _perform_func_intent(eff)
         self.assertEqual(can_retry_failures, next_interval_failures)
-        self.assertEqual(can_retry_failures[0], CheckFailureValue(ZeroDivisionError("foo")))
+        self.assertEqual(can_retry_failures[0],
+                         CheckFailureValue(ZeroDivisionError("foo")))

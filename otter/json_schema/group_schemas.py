@@ -8,6 +8,7 @@ from datetime import datetime
 import calendar
 
 from croniter import croniter
+from toolz import get_in
 
 from otter.util.timestamp import from_timestamp
 from otter.json_schema import format_checker
@@ -125,9 +126,10 @@ _clb_lb = {
         "One load balancer all new servers should be "
         "added to."),
     "properties": {
-        # load balancer id's are NOT uuid's.  just an int.
+        # Cloud load balancer id's are NOT uuid's, just ints.  But accept
+        # strings also for backwards compatibility reasons.
         "loadBalancerId": {
-            "type": "integer",
+            "type": ["integer", "string"],
             "description": (
                 "The ID of the load balancer to which new "
                 "servers will be added."),
@@ -138,7 +140,7 @@ _clb_lb = {
             "description": (
                 "The port number of the service (on the "
                 "new servers) to load balance on for this "
-                "particular load balancer."),
+                "particular Cloud Load Balancer."),
             "required": True
         },
         "type": {
@@ -321,6 +323,21 @@ zero = {
 }
 
 
+def validate_launch_config_servicenet(lc):
+    """
+    Validate that if CLBs are provided, ServiceNet is also provided.
+    """
+    clb = any([lb.get('type', 'CloudLoadBalancer') == 'CloudLoadBalancer'
+               for lb in get_in(('args', 'loadBalancers'), lc, default=())])
+    networks = get_in(('args', 'server', 'networks'), lc, default=None)
+
+    if (clb and
+            networks is not None and
+            {'uuid': '11111111-1111-1111-1111-111111111111'} not in networks):
+        raise ValidationError("ServiceNet network must be present if one or "
+                              "more Cloud Load Balancers are configured.")
+
+
 # Datetime validator. Allow only zulu-based UTC timestamp
 @format_checker.checks('date-time', raises=ValueError)
 def validate_datetime(dt_str):
@@ -463,7 +480,7 @@ policy = {
                 {
                     "type": "object",
                     "properties": {"alarm_criteria": {"required": True},
-                                   "check": {"required":True}},
+                                   "check": {"required": True}},
                     "additionalProperties": False
                 }
             ],

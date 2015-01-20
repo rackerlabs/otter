@@ -2,58 +2,38 @@
 Code for composing all of the convergence functionality together.
 """
 
-from operator import itemgetter
+from collections import defaultdict
+from functools import partial
 import time
 
-from effect import parallel
-
-from toolz.curried import map
-
-from otter.convergence.effecting import _reqs_to_effect
-from otter.convergence.gathering import (
-    get_load_balancer_contents,
-    get_scaling_group_servers,
-    json_to_LBConfigs,
-    to_nova_server)
-from otter.convergence.model import DesiredGroupState
-from otter.convergence.planning import converge, optimize_steps
+from otter.convergence.effecting import steps_to_effect
+from otter.convergence.gathering import get_all_convergence_data
+from otter.convergence.model import DesiredGroupState, CLBDescription
+from otter.convergence.planning import plan
 
 
-def execute_convergence(request_func, group_id, desired, launch_config,
-                        get_servers=get_scaling_group_servers,
-                        get_lb=get_load_balancer_contents):
+def execute_convergence(request_func, group_id, desired_group_state,
+                        get_all_convergence_data=get_all_convergence_data):
     """
     Execute convergence. This function will do following:
     1. Get state of the nova, CLB and RCv3.
-    2. Call `converge` with above info and get steps to execute
-    3. Execute these steps
+    2. Get a plan for convergence
+    3. Return an Effect representing the execution of the steps in the plan.
+
     This is in effect single cycle execution. A layer above this is expected
     to keep calling this until this function returns False
 
     :param request_func: Tenant bound request function
     :param bytes group_id: Tenant's group
-    :param int desired: Group's desired capacity
-    :param dict launch_config: Group's launch config as per
-                              :obj:`otter.json_schema.group_schemas.launch_config`
-    :param callable get_servers: Optional arg to get scaling group servers useful for testing
-    :param callable get_lb: Optional arg to get load balancer info useful for testing
+    :param DesiredGroupState desired_group_state: the desired state
 
-    :return: Effect with Bool specifying if it should be called again
+    :return: Effect of bool specifying if the effect should be performed again
     :rtype: :class:`effect.Effect`
     """
-    eff = parallel(
-        [get_servers(request_func).on(itemgetter(group_id)).on(map(to_nova_server)),
-         get_lb(request_func)])
-
-    lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
-    desired_state = DesiredGroupState(launch_config={'server': launch_config['args']['server']},
-                                      desired=desired, desired_lbs=lbs)
-
-    conv_eff = eff.on(lambda (servers, lb_nodes): converge(desired_state, servers, lb_nodes,
-                                                           time.time()))
-    # TODO: Do request specific throttling. For ex create only 3 servers at a time
-    return conv_eff.on(optimize_steps).on(
-        lambda steps: _reqs_to_effect(request_func, [s.as_request() for s in steps])).on(bool)
+    eff = get_all_convergence_data(request_func, group_id)
+    conv_eff = eff.on(
+        lambda (servers, lb_nodes): plan(desired_group_state, servers, lb_nodes, time.time()))
+    return conv_eff.on(partial(steps_to_effect, request_func)).on(bool)
 
 
 def tenant_is_enabled(tenant_id, get_config_value):
@@ -66,3 +46,37 @@ def tenant_is_enabled(tenant_id, get_config_value):
     """
     enabled_tenant_ids = get_config_value("convergence-tenants")
     return (tenant_id in enabled_tenant_ids)
+
+
+def json_to_LBConfigs(lbs_json):
+    """
+    Convert load balancer config from JSON to :obj:`CLBDescription`
+
+    :param list lbs_json: List of load balancer configs
+    :return: `dict` of LBid -> [LBDescription] mapping
+
+    NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
+    implemented in convergence
+    """
+    lbd = defaultdict(list)
+    for lb in lbs_json:
+        if lb.get('type') != 'RackConnectV3':
+            lbd[lb['loadBalancerId']].append(CLBDescription(
+                lb_id=str(lb['loadBalancerId']), port=lb['port']))
+    return lbd
+
+
+def get_desired_group_state(launch_config, desired):
+    """
+    Create a :obj:`DesiredGroupState` from a launch config and desired
+    number of servers.
+
+    :param dict launch_config: Group's launch config as per
+        :obj:`otter.json_schema.group_schemas.launch_config`
+    :param int desired: Group's desired capacity
+    """
+    lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
+    desired_state = DesiredGroupState(
+        launch_config={'server': launch_config['args']['server']},
+        desired=desired, desired_lbs=lbs)
+    return desired_state

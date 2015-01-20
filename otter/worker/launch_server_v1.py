@@ -29,6 +29,7 @@ from twisted.internet.defer import (gatherResults, DeferredSemaphore,
 from twisted.internet.task import deferLater
 
 from otter.auth import public_endpoint_url
+from otter.convergence.gathering import _servicenet_address
 from otter.util import logging_treq as treq
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
@@ -102,7 +103,7 @@ def wait_for_active(log,
                     auth_token,
                     server_id,
                     interval=20,
-                    timeout=3600,
+                    timeout=7200,
                     clock=None):
     """
     Wait until the server specified by server_id's status is 'ACTIVE'
@@ -111,9 +112,9 @@ def wait_for_active(log,
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param int interval: Polling interval in seconds.  Default: 5.
+    :param int interval: Polling interval in seconds.  Default: 20.
     :param int timeout: timeout to poll for the server status in seconds.
-        Default 3600 (1 hour)
+        Default 7200 (2 hours).
 
     :return: Deferred that fires when the expected status has been seen.
     """
@@ -445,7 +446,7 @@ def add_to_load_balancer(log, request_func, lb_config, server_details, undo,
                                        cloudLoadBalancers,
                                        request_func.lb_region)
         auth_token = request_func.auth_token
-        ip_address = private_ip_addresses(server_details)[0]
+        ip_address = _servicenet_address(server_details["server"])
         return add_to_clb(log, endpoint, auth_token, lb_config, ip_address,
                           undo, clock)
     elif lb_type == "RackConnectV3":
@@ -539,17 +540,6 @@ def add_to_load_balancers(log, request_func, lb_configs, server, undo):
 
     d = gatherResults(map(_serial_add, lb_configs), consumeErrors=True)
     return d.addCallback(partial(zip, lb_configs))
-
-
-def private_ip_addresses(server):
-    """
-    Get all private IPv4 addresses from the addresses section of a server.
-
-    :param dict server: A server body.
-    :return: List of IP addresses as strings.
-    """
-    return [addr['addr'] for addr in server['server']['addresses']['private']
-            if addr['version'] == 4]
 
 
 def prepare_launch_config(scaling_group_uuid, launch_config):
@@ -694,7 +684,7 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
         # function
         expected = launch_config['server']['metadata']
         result = server['server'].get('metadata')
-        if  result != expected:
+        if result != expected:
             ilog[0].msg('Server metadata has changed.',
                         sanity_check=True,
                         expected_metadata=expected,

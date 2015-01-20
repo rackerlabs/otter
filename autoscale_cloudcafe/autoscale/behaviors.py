@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import logging
 import time
 import inspect
+import unittest
 
 from cafe.engine.behaviors import BaseBehavior
 from cloudcafe.common.tools.datagen import rand_name
@@ -22,20 +23,55 @@ def _line():
     return inspect.currentframe().f_back.f_lineno
 
 
+class DefaultAsserter(object):
+    """DefaultAsserter objects are used when invoking AutoscaleBehaviors
+    methods that take an asserter, but you don't feel like or care about the
+    assertion results.  If an assertion failure happens, it raises
+    unittest.AssertionError.
+
+    However, this isn't generally recommended.  If you're verifying results,
+    you REALLY want to know if something failed.  Thus, you should subclass
+    DefaultAsserter (or write a new class entirely which implements an
+    asserter-like interface) and implement your own functionality.  For
+    example, you could call various TestCase.assertX() functions.  Or, you
+    could just flag when things aren't correct in an error attribute for later
+    inspection independent of any test framework.
+
+    If you choose to subclass instead of compose an asserter-like interface,
+    all you need to override is the fail() method.
+    """
+
+    def assertEquals(self, a, b, msg=""):
+        if a != b:
+            self.fail(msg)
+
+    def assertNotEquals(self, a, b, msg=""):
+        if a == b:
+            self.fail(msg)
+
+    def fail(self, msg):
+        raise unittest.AssertionError(msg)
+
+
 class AutoscaleBehaviors(BaseBehavior):
 
     """
     :summary: Behavior Module for the Autoscale REST API
     :note: Should be the primary interface to a test case or external tool
+    :note: Instantiate this behaviors class without an rcv3_client keyword
+           option implies you cannot meaningfully call
+           wait_for_expected_number_of_active_servers() with the api set to
+           "RackConnect".  Doing so will throw an exception.
     """
 
-    def __init__(self, autoscale_config, autoscale_client):
+    def __init__(self, autoscale_config, autoscale_client, rcv3_client=None):
         """
         Instantiate config and client
         """
         super(AutoscaleBehaviors, self).__init__()
         self.autoscale_config = autoscale_config
         self.autoscale_client = autoscale_client
+        self.rcv3_client = rcv3_client
 
     def create_scaling_group_min(self, gc_name=None,
                                  gc_cooldown=None,
@@ -551,62 +587,101 @@ class AutoscaleBehaviors(BaseBehavior):
             webhook['count'] = len(webhook_list)
             return webhook
 
-    def wait_for_servers_to_build(self, group_id, expected_servers,
-                                  interval_time=None, timeout=None):
+    def wait_for_expected_number_of_active_servers(self, group_id, expected_servers,
+                                                   interval_time=None, timeout=None,
+                                                   api="Autoscale", asserter=None):
         """
-        Modification of wait_for_expected_number_of_servers without asserts.
-        This returns a tuple containing (list of server ids, error flag).  The
-        error flag is True if there was an error and False if everything
-        completed successfully.  (Note:  This likely needs reworked)
+        Wait for the expected_servers to arrive in either Autoscale or RackConnectV3 API.
+
+        :summary: verify the desired capacity in group state is equal to expected servers
+         and waits for the specified number of servers to be active on a group
+        :param group_id: Group id (AutoScale API), or pool ID (RackConnect API)
+        :param expected_servers: Total active servers expected on the group
+        :param interval_time: Time to wait during polling group state
+        :param timeout: Time to wait before exiting this function
+        :param api: Either "Autoscale" or "RackConnect".  Defaults to "Autoscale"
+        :param asserter: Object responsible for enforcing invariants through assertions.
+                         If none provided, a default do-nothing asserter will be assumed.
+                         You won't be able to tell if things pass or fail, though.
+                         It's best if you pass in your own asserter.
+        :return: returns the list of active servers in the group
         """
-        # Assume sane return defaults: no servers, and that an error occurred.
-        ret_list = []
-        err = True
 
-        # So as to not overload the API, we want to space our API queries to
-        # reasonable intervals.  This setting configures that span of time.
-        interval_time = interval_time or int(self.autoscale_config.interval_time)
-
-        # If no timeout is provided, assume the default setting in the configuration file.
-        # We don't want to wait forever for our servers to spin up, so using the timeout,
-        # determine when we should abort.
+        interval_time = interval_time or int(
+            self.autoscale_config.interval_time)
         timeout = timeout or int(self.autoscale_config.timeout)
-        end_time = time.time() + timeout
+        start_time = time.time()
+        end_time = start_time + timeout
 
-        # Verify that our autoscale group has the correct desired capacity.
-        # If not, log it, and return an error.
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            group_id)
-        group_state = group_state_response.entity
-        if (group_state.desiredCapacity != expected_servers):
-            log.info("{0}: {1}: Group {2} should have {3} servers, but is trying to "
-                     "build {4} servers".format(
-                         __file__, _line(), group_id, expected_servers,
-                         group_state.desiredCapacity))
-            return ret_list, err
+        # If we didn't receive an asserter, let's assume a do-nothing asserter.
+        if asserter is None:
+            asserter = DefaultAsserter()
 
-        # Check for server bring-up, for as long as is reasonable.
+        # If we're checking up on Autoscale, we need to make sure that our
+        # group is even attempting to build the right number of servers.  If
+        # we're not, there's no point in continuing; we'll never attain the
+        # desired capacity anyway.
+        #
+        # Unfortunately, there's no way to check this on RackConnect's API,
+        # since it has no mechanism to report back its current "plans."
+        if api == 'Autoscale':
+            group_state_response = self.autoscale_client.list_status_entities_sgroups(
+                group_id)
+            group_state = group_state_response.entity
+            asserter.assertEquals(group_state.desiredCapacity, expected_servers,
+                              msg='Group {0} should have {1} servers, but is trying to '
+                              'build {2} servers'.format(group_id, expected_servers,
+                                                         group_state.desiredCapacity))
+
         while time.time() < end_time:
-            resp = self.autoscale_client.list_status_entities_sgroups(group_id)
-            group_state = resp.entity
-            active_list = group_state.active
-            ret_list = [server.id for server in active_list]
-            if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
-                log.info("{0}: {1}: Group ID {2} failed server creation.".format(
-                    __file__, _line(), group_id))
-                return ret_list, err
-            if group_state.desiredCapacity != expected_servers:
-                log.info("{0}: {1}: Group {2} should have {3} servers, but has "
-                         "reduced in quantity to {4}".format(
-                             __file__, _line(), group_id, expected_servers,
-                             group_state.desiredCapacity))
-                return ret_list, err
-            if len(active_list) == expected_servers:
-                err = False
-                return (ret_list, err)
+            if api == 'Autoscale':
+                resp = self.autoscale_client.list_status_entities_sgroups(group_id)
+                group_state = resp.entity
+                active_list = group_state.active
+                asserter.assertNotEquals(
+                    (group_state.activeCapacity + group_state.pendingCapacity), 0,
+                    msg='Group Id {0} failed to attempt server creation. Group has no'
+                    ' servers'.format(group_id))
+
+                # You might think this is duplicate code with the optimization
+                # above, but you'd be wrong!  For Otter w/out convergence, if a
+                # server created by Otter enters into an error state, the
+                # "desired" capacity drops by one.  Thus, we use this assert as
+                # an inexpensive way to early-detect when it is impossible to
+                # reach our desired goals.
+                #
+                # When Otter adopts convergence, this becomes dead code, and
+                # can be safely removed.
+                asserter.assertEquals(group_state.desiredCapacity, expected_servers,
+                                  msg='Group {0} should have {1} servers, but has reduced the build {2}'
+                                  'servers'.format(group_id, expected_servers,
+                                                   group_state.desiredCapacity))
+
+                if len(active_list) == expected_servers:
+                    print "Otter"
+                    print "Achieved expected servers after ", time.time() - start_time, " seconds"
+                    return [server.id for server in active_list]
+            else:
+                # We're looking at the RackConnect API for our server list here.
+                nodes = self.rcv3_client.get_nodes_on_pool(group_id).entity
+                server_list = [n for n in nodes.nodes
+                               if (safe_hasattr(n, "cloud_server")) and (n.status == "ACTIVE")]
+                if len(server_list) == expected_servers:
+                    print "RCv3"
+                    print "Achieved expected servers after ", time.time() - start_time, " seconds"
+                    return [n.id for n in server_list]
+
             time.sleep(interval_time)
         else:
-            log.info("{0}: {1}: Group {2} did not complete its {3} servers "
-                     "within the {4} second timeout.".format(
-                         __file__, _line(), group_id, expected_servers, timeout))
-            return ret_list, err
+            asserter.fail(
+                "wait_for_active_list_in_group_state ran for {0} seconds "
+                "for group/pool ID {1} and did not observe the active "
+                "server list achieving the expected servers count: {2}.".format(
+                    timeout, group_id, expected_servers)
+            )
+
+
+def safe_hasattr(obj, key):
+    """This function provides a safe alternative to the hasattr() function."""
+    sentinel = object()
+    return getattr(obj, key, sentinel) is not sentinel

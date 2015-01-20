@@ -3,7 +3,7 @@ Common functionality between test_system_integration_rcv3.py and ..._lbaas.py.
 """
 
 
-from test_repo.autoscale.fixtures import safe_hasattr
+from autoscale.behaviors import safe_hasattr
 
 
 class CommonTestUtilities(object):

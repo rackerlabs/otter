@@ -8,6 +8,7 @@ class ServiceType(Names):
     CLOUD_SERVERS = NamedConstant()
     CLOUD_LOAD_BALANCERS = NamedConstant()
     RACKCONNECT_V3 = NamedConstant()
+    CLOUD_METRICS_INGEST = NamedConstant()
 
 
 def get_service_mapping(config):
@@ -21,5 +22,6 @@ def get_service_mapping(config):
     return {
         ServiceType.CLOUD_SERVERS: config['cloudServersOpenStack'],
         ServiceType.CLOUD_LOAD_BALANCERS: config["cloudLoadBalancers"],
-        ServiceType.RACKCONNECT_V3: config['rackconnect']
+        ServiceType.RACKCONNECT_V3: config['rackconnect'],
+        ServiceType.CLOUD_METRICS_INGEST: config['metrics']['service']
     }

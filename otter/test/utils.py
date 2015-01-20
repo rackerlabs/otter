@@ -1,32 +1,36 @@
 """
 Mixins and utilities to be used for testing.
 """
-from functools import partial
 import json
-import mock
 import os
-import treq
+import sys
+from functools import partial
+from inspect import getargspec
 
-from effect import guard
-from effect.testing import resolve_effect, resolve_stubs
+from effect import base_dispatcher
+from effect.testing import resolve_effect, resolve_stubs as eff_resolve_stubs
 
-from zope.interface import implementer, directlyProvides
-from zope.interface.verify import verifyObject
-
-from testtools.matchers import Mismatch, MatchesException
-
-from twisted.internet import defer
-from twisted.internet.defer import succeed, Deferred, maybeDeferred
-from twisted.python.failure import Failure
-from twisted.application.service import Service
-
-from otter.log.bound import BoundLog
-from otter.supervisor import ISupervisor
-from otter.models.interface import IScalingGroup
-from otter.util.deferredutils import DeferredPool
-from otter.util.retry import Retry
+import mock
 
 from pyrsistent import freeze
+
+from testtools.matchers import MatchesException, Mismatch
+
+import treq
+
+from twisted.application.service import Service
+from twisted.internet import defer
+from twisted.internet.defer import Deferred, maybeDeferred, succeed
+from twisted.python.failure import Failure
+
+from zope.interface import directlyProvides, implementer
+from zope.interface.verify import verifyObject
+
+from otter.log.bound import BoundLog
+from otter.models.interface import IScalingGroup
+from otter.supervisor import ISupervisor
+from otter.util.deferredutils import DeferredPool
+from otter.util.retry import Retry
 
 
 class matches(object):
@@ -599,5 +603,24 @@ def resolve_retry_stubs(eff):
     separately to determine that the policy is as expected.
     """
     assert type(eff.intent) is Retry
-    is_error, intermediate_result = guard(resolve_stubs, eff.intent.effect)
+    try:
+        intermediate_result = resolve_stubs(eff.intent.effect)
+        is_error = False
+    except Exception:
+        intermediate_result = sys.exc_info()
+        is_error = True
     return resolve_effect(eff, intermediate_result, is_error=is_error)
+
+
+def resolve_stubs(eff):
+    """
+    Invoke :func:`effect.testing.resolve_stubs` with the base and legacy
+    dispatchers from Effect.
+    """
+    return eff_resolve_stubs(base_dispatcher, eff)
+
+
+def defaults_by_name(fn):
+    """Returns a mapping of args of fn to their default values."""
+    args, _, _, defaults = getargspec(fn)
+    return dict(zip(reversed(args), reversed(defaults)))
