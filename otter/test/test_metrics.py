@@ -5,8 +5,9 @@ Tests for `metrics.py`
 import operator
 from io import StringIO
 
-from effect import Constant, Effect, Error
-from effect.testing import Stub
+from effect import (
+    ComposedDispatcher, Constant, Effect, TypeDispatcher, base_dispatcher)
+from effect.testing import resolve_effect
 
 import mock
 
@@ -24,7 +25,8 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import IAuthenticator
-from otter.constants import ServiceType, get_service_mapping
+from otter.constants import ServiceType
+from otter.http import TenantScope
 from otter.metrics import (
     GroupMetrics,
     MetricsService,
@@ -47,7 +49,6 @@ from otter.test.utils import (
     matches,
     mock_log,
     patch,
-    resolve_retry_stubs,
     resolve_stubs,
 )
 
@@ -68,7 +69,8 @@ class GetScalingGroupsTests(SynchronousTestCase):
             return succeed(self.exec_args[freeze((query, params))])
 
         self.client.execute.side_effect = _exec
-        self.select = ('SELECT "groupId","tenantId",active,created_at,desired,pending '
+        self.select = ('SELECT "groupId","tenantId",'
+                       'active,created_at,desired,pending '
                        'FROM scaling_group ')
 
     def _add_exec_args(self, query, params, ret):
@@ -78,9 +80,11 @@ class GetScalingGroupsTests(SynchronousTestCase):
         """
         Works when number of all groups of all tenants < batch size
         """
-        groups = [{'tenantId': i, 'groupId': j, 'desired': 3, 'created_at': 'c'}
+        groups = [{'tenantId': i, 'groupId': j,
+                   'desired': 3, 'created_at': 'c'}
                   for i in range(2) for j in range(2)]
-        self._add_exec_args(self.select + ' LIMIT :limit;', {'limit': 5}, groups)
+        self._add_exec_args(
+            self.select + ' LIMIT :limit;', {'limit': 5}, groups)
         d = get_scaling_groups(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups)
 
@@ -88,35 +92,50 @@ class GetScalingGroupsTests(SynchronousTestCase):
         """
         Does not include groups that do not have created_at or desired
         """
-        groups = [{'tenantId': 1, 'groupId': 2, 'desired': 3, 'created_at': None},
-                  {'tenantId': 1, 'groupId': 3, 'desired': None, 'created_at': 'c'},
-                  {'tenantId': 1, 'groupId': 4, 'desired': None, 'created_at': None},
-                  {'tenantId': 1, 'groupId': 5, 'desired': 3, 'created_at': 'c'}]
-        self._add_exec_args(self.select + ' LIMIT :limit;', {'limit': 5}, groups)
+        groups = [{'tenantId': 1, 'groupId': 2,
+                   'desired': 3, 'created_at': None},
+                  {'tenantId': 1, 'groupId': 3,
+                   'desired': None, 'created_at': 'c'},
+                  {'tenantId': 1, 'groupId': 4,
+                   'desired': None, 'created_at': None},
+                  {'tenantId': 1, 'groupId': 5,
+                   'desired': 3, 'created_at': 'c'}]
+        self._add_exec_args(
+            self.select + ' LIMIT :limit;', {'limit': 5}, groups)
         d = get_scaling_groups(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups[-1:])
 
     def test_filters_on_group_pred_arg(self):
         """
-        If group_pred arg is given then returns groups for which group_pred returns True
+        If group_pred arg is given then returns groups for which
+        group_pred returns True
         """
-        groups = [{'tenantId': 1, 'groupId': 2, 'desired': 3, 'created_at': 'c'},
-                  {'tenantId': 1, 'groupId': 3, 'desired': 2, 'created_at': 'c'},
-                  {'tenantId': 1, 'groupId': 4, 'desired': 6, 'created_at': 'c'},
-                  {'tenantId': 1, 'groupId': 5, 'desired': 4, 'created_at': 'c'}]
-        self._add_exec_args(self.select + ' LIMIT :limit;', {'limit': 5}, groups)
+        groups = [{'tenantId': 1, 'groupId': 2,
+                   'desired': 3, 'created_at': 'c'},
+                  {'tenantId': 1, 'groupId': 3,
+                   'desired': 2, 'created_at': 'c'},
+                  {'tenantId': 1, 'groupId': 4,
+                   'desired': 6, 'created_at': 'c'},
+                  {'tenantId': 1, 'groupId': 5,
+                   'desired': 4, 'created_at': 'c'}]
+        self._add_exec_args(
+            self.select + ' LIMIT :limit;', {'limit': 5}, groups)
         d = get_scaling_groups(self.client, batch_size=5,
                                group_pred=lambda g: g['desired'] % 3 == 0)
-        self.assertEqual(list(self.successResultOf(d)), [groups[0], groups[2]])
+        self.assertEqual(list(self.successResultOf(d)),
+                         [groups[0], groups[2]])
 
     def test_gets_props(self):
         """
         If props arg is given then returns groups with that property in it
         """
-        groups = [{'tenantId': 1, 'groupId': 2, 'desired': 3, 'created_at': 'c', 'launch': 'l'},
-                  {'tenantId': 1, 'groupId': 3, 'desired': 2, 'created_at': 'c', 'launch': 'b'}]
+        groups = [{'tenantId': 1, 'groupId': 2, 'desired': 3,
+                   'created_at': 'c', 'launch': 'l'},
+                  {'tenantId': 1, 'groupId': 3, 'desired': 2,
+                   'created_at': 'c', 'launch': 'b'}]
         self._add_exec_args(
-            ('SELECT "groupId","tenantId",active,created_at,desired,launch,pending '
+            ('SELECT "groupId","tenantId",active,created_at,'
+             'desired,launch,pending '
              'FROM scaling_group  LIMIT :limit;'),
             {'limit': 5}, groups)
         d = get_scaling_groups(self.client, props=['launch'], batch_size=5)
@@ -124,41 +143,53 @@ class GetScalingGroupsTests(SynchronousTestCase):
 
     def test_last_tenant_has_less_groups(self):
         """
-        Fetches initial batch, then gets all groups of last tenant in that batch
-        and stops when there are no more tenants
+        Fetches initial batch, then gets all groups of last tenant
+        in that batch and stops when there are no more tenants
         """
-        groups = [{'tenantId': 1, 'groupId': i, 'desired': 3, 'created_at': 'c'}
+        groups = [{'tenantId': 1, 'groupId': i,
+                   'desired': 3, 'created_at': 'c'}
                   for i in range(7)]
-        self._add_exec_args(self.select + ' LIMIT :limit;', {'limit': 5}, groups[:5])
         self._add_exec_args(
-            self.select + 'WHERE "tenantId"=:tenantId AND "groupId">:groupId LIMIT :limit;',
+            self.select + ' LIMIT :limit;', {'limit': 5}, groups[:5])
+        self._add_exec_args(
+            self.select + ('WHERE "tenantId"=:tenantId AND '
+                           '"groupId">:groupId LIMIT :limit;'),
             {'limit': 5, 'tenantId': 1, 'groupId': 4}, groups[5:])
         self._add_exec_args(
-            self.select + 'WHERE token("tenantId") > token(:tenantId) LIMIT :limit;',
+            self.select + ('WHERE token("tenantId") > token(:tenantId)'
+                           ' LIMIT :limit;'),
             {'limit': 5, 'tenantId': 1}, [])
         d = get_scaling_groups(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups)
 
     def test_many_tenants_having_more_than_batch_groups(self):
         """
-        Gets all groups when there are many tenants each of them having groups > batch size
+        Gets all groups when there are many tenants each of them
+        having groups > batch size
         """
-        groups1 = [{'tenantId': 1, 'groupId': i, 'desired': 3, 'created_at': 'c'}
+        groups1 = [{'tenantId': 1, 'groupId': i,
+                    'desired': 3, 'created_at': 'c'}
                    for i in range(7)]
-        groups2 = [{'tenantId': 2, 'groupId': i, 'desired': 4, 'created_at': 'c'}
+        groups2 = [{'tenantId': 2, 'groupId': i,
+                    'desired': 4, 'created_at': 'c'}
                    for i in range(9)]
-        self._add_exec_args(self.select + ' LIMIT :limit;', {'limit': 5}, groups1[:5])
         self._add_exec_args(
-            self.select + 'WHERE "tenantId"=:tenantId AND "groupId">:groupId LIMIT :limit;',
+            self.select + ' LIMIT :limit;', {'limit': 5}, groups1[:5])
+        where_tenant = ('WHERE "tenantId"=:tenantId AND '
+                        '"groupId">:groupId LIMIT :limit;')
+        where_token = ('WHERE token("tenantId") > token(:tenantId) '
+                       'LIMIT :limit;')
+        self._add_exec_args(
+            self.select + where_tenant,
             {'limit': 5, 'tenantId': 1, 'groupId': 4}, groups1[5:])
         self._add_exec_args(
-            self.select + 'WHERE token("tenantId") > token(:tenantId) LIMIT :limit;',
+            self.select + where_token,
             {'limit': 5, 'tenantId': 1}, groups2[:5])
         self._add_exec_args(
-            self.select + 'WHERE "tenantId"=:tenantId AND "groupId">:groupId LIMIT :limit;',
+            self.select + where_tenant,
             {'limit': 5, 'tenantId': 2, 'groupId': 4}, groups2[5:])
         self._add_exec_args(
-            self.select + 'WHERE token("tenantId") > token(:tenantId) LIMIT :limit;',
+            self.select + where_token,
             {'limit': 5, 'tenantId': 2}, [])
         d = get_scaling_groups(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups1 + groups2)
@@ -169,19 +200,23 @@ class GetTenantMetricsTests(SynchronousTestCase):
 
     def test_get_tenant_metrics(self):
         """Extracts metrics from the servers."""
-        servers = {'g1': [{'status': 'ACTIVE'}] * 3 + [{'status': 'BUILD'}] * 2}
-        groups = [{'groupId': 'g1', 'desired': 3}, {'groupId': 'g2', 'desired': 4}]
+        servers = {
+            'g1': [{'status': 'ACTIVE'}] * 3 + [{'status': 'BUILD'}] * 2}
+        groups = [{'groupId': 'g1', 'desired': 3},
+                  {'groupId': 'g2', 'desired': 4}]
         self.assertEqual(
             get_tenant_metrics('t', groups, servers),
-            [GroupMetrics('t', 'g1', 3, 3, 2), GroupMetrics('t', 'g2', 4, 0, 0)])
+            [GroupMetrics('t', 'g1', 3, 3, 2),
+             GroupMetrics('t', 'g2', 4, 0, 0)])
+
+
+def _server(group, state):
+    return {'status': state,
+            'metadata': {'rax:auto_scaling_group_id': group}}
 
 
 class GetAllMetricsEffectsTests(SynchronousTestCase):
     """Tests for :func:`get_all_metrics_effects`"""
-
-    def _server(self, group, state):
-        return {'status': state,
-                'metadata': {'rax:auto_scaling_group_id': group}}
 
     def test_get_all_metrics(self):
         """
@@ -190,14 +225,13 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         # Maybe this could use a parameterized "get_scaling_group_servers" call
         # to avoid needing to stub the nova responses, but it seems okay.
         servers_t1 = {
-            'servers': (
-                [self._server('g1', 'ACTIVE')] * 3
-                + [self._server('g1', 'BUILD')] * 2
-                + [self._server('g2', 'ACTIVE')])}
+            'g1': ([_server('g1', 'ACTIVE')] * 3
+                   + [_server('g1', 'BUILD')] * 2),
+            'g2': [_server('g2', 'ACTIVE')]}
 
         servers_t2 = {
-            'servers': [self._server('g4', 'ACTIVE'),
-                        self._server('g4', 'BUILD')]}
+            'g4': [_server('g4', 'ACTIVE'),
+                   _server('g4', 'BUILD')]}
 
         groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 3},
                   {'tenantId': 't1', 'groupId': 'g2', 'desired': 4},
@@ -205,16 +239,13 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
 
         tenant_servers = {'t1': servers_t1, 't2': servers_t2}
 
-        def get_bound_request_func(tenant_id):
-            def request_func(service_type, method, url, headers=None,
-                             data=None):
-                return Effect(Stub(Constant(tenant_servers[tenant_id])))
-            return request_func
-        effs = get_all_metrics_effects(groups, get_bound_request_func,
-                                       mock_log())
-
-        # All of the HTTP requests are wrapped in retries, so unwrap them
-        results = map(resolve_retry_stubs, effs)
+        effs = get_all_metrics_effects(groups, mock_log())
+        # All the effs are wrapped in TenantScopes to indicate the tenant
+        # of ServiceRequests made under them. We use that tenant to get the
+        # stubbed result of get_scaling_group_servers.
+        results = [
+            resolve_effect(eff, tenant_servers[eff.intent.tenant_id])
+            for eff in effs]
 
         self.assertEqual(
             set(reduce(operator.add, results)),
@@ -230,120 +261,55 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         log = mock_log()
         log.err.return_value = None
 
-        def get_bound_request_func(tenant_id):
-            def request_func(service_type, method, url, headers=None,
-                             data=None):
-                if tenant_id == 't1':
-                    return Effect(Stub(Constant({'servers': []})))
-                else:
-                    return Effect(Stub(Error(ZeroDivisionError('foo bar'))))
-            return request_func
-
         groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
                   {'tenantId': 't2', 'groupId': 'g2', 'desired': 0}]
-
-        effs = get_all_metrics_effects(groups, get_bound_request_func, log)
-        results = map(resolve_retry_stubs, effs)
+        effs = get_all_metrics_effects(groups, log)
+        results = []
+        for eff in effs:
+            if eff.intent.tenant_id == 't1':
+                results.append(resolve_effect(eff, {}))
+            elif eff.intent.tenant_id == 't2':
+                err = (ZeroDivisionError, ZeroDivisionError('foo bar'), None)
+                results.append(resolve_effect(eff, err, is_error=True))
         self.assertEqual(
             results,
             [None, [GroupMetrics('t1', 'g1', desired=0, actual=0, pending=0)]])
-        log.err.assert_called_once_with(CheckFailureValue(ZeroDivisionError('foo bar')))
+        log.err.assert_called_once_with(
+            CheckFailureValue(ZeroDivisionError('foo bar')))
 
 
-class GnarlyGetMetricsTests(SynchronousTestCase):
+class GetAllMetricsTests(SynchronousTestCase):
     """
     Tests for :func:`get_all_metrics`.
-
-    These tests aren't very nice -- they should eventually disappear, once more
-    code is converted to using effects, and we don't need as much mocking.
     """
 
-    def setUp(self):
-        """Mock get_scaling_group_servers and get_request_func."""
-        self.tenant_servers = {}
-        # This is pretty nasty.
-
-        # get_request_func is being mocked to just return the tenant id,
-        # instead of a function. Nothing will call it, so it works.
-        # Then, get_scaling_group_servers is being mocked to expect the tenant
-        # ID instead of a request function, to use it to look up the server
-        # data to return.
-        self.mock_get_request_func = patch(
-            self, 'otter.metrics.get_request_func',
-            side_effect=lambda a, tenant_id, *args, **kwargs: tenant_id)
-        self.mock_gsgs = patch(
-            self, 'otter.metrics.get_scaling_group_servers',
-            side_effect=lambda rf, server_predicate: (
-                Effect(Constant(self.tenant_servers[rf]))))
-        self.service_mapping = {ServiceType.CLOUD_SERVERS: 'nova'}
-
     def test_get_all_metrics(self):
-        """
-        Gets group's metrics
-        """
-        servers_t1 = {'g1': [{'status': 'ACTIVE'}] * 3 + [{'status': 'BUILD'}] * 2,
-                      'g2': [{'status': 'ACTIVE'}]}
-        servers_t2 = {'g4': [{'status': 'ACTIVE'}, {'status': 'BUILD'}]}
-        groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 3},
-                  {'tenantId': 't1', 'groupId': 'g2', 'desired': 4},
-                  {'tenantId': 't2', 'groupId': 'g4', 'desired': 2}]
-
-        self.tenant_servers['t1'] = servers_t1
-        self.tenant_servers['t2'] = servers_t2
-
-        authenticator = mock.Mock()
-
-        d = get_all_metrics(groups, authenticator, self.service_mapping, 'r',
-                            clock='c')
-
-        self.assertEqual(
-            set(self.successResultOf(d)),
-            set([GroupMetrics('t1', 'g1', 3, 3, 2),
-                 GroupMetrics('t1', 'g2', 4, 1, 0),
-                 GroupMetrics('t2', 'g4', 2, 1, 1)]))
-        self.mock_gsgs.assert_any_call('t1', server_predicate=IsCallable())
-        self.mock_gsgs.assert_any_call('t2', server_predicate=IsCallable())
-
-        self.mock_get_request_func.assert_any_call(
-            authenticator, 't1', metrics_log, self.service_mapping, 'r')
-        self.mock_get_request_func.assert_any_call(
-            authenticator, 't2', metrics_log, self.service_mapping, 'r')
+        """Gets group's metrics"""
+        def _game(groups, logs, _print=False):
+            return [Effect(Constant(['foo', 'bar'])),
+                    Effect(Constant(['baz']))]
+        d = get_all_metrics(base_dispatcher, object(),
+                            get_all_metrics_effects=_game)
+        self.assertEqual(set(self.successResultOf(d)),
+                         set(['foo', 'bar', 'baz']))
 
     def test_ignore_error_results(self):
         """
         When get_all_metrics_effects returns a list containing a None, those
         elements are ignored.
         """
-        def mock_game(cass_groups, get_request_func_for_tenant, log,
-                      _print=False):
+        def _game(groups, log, _print=False):
             return [Effect(Constant(None)),
-                    Effect(Constant([GroupMetrics('t1', 'g1', 0, 0, 0)]))]
-        mock_game = patch(self, 'otter.metrics.get_all_metrics_effects',
-                          side_effect=mock_game)
-        groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
-                  {'tenantId': 't2', 'groupId': 'g2', 'desired': 500}]
-        authenticator = mock.Mock()
-        d = get_all_metrics(groups, authenticator, self.service_mapping, 'r',
-                            clock='c')
-        self.assertEqual(
-            self.successResultOf(d),
-            [GroupMetrics('t1', 'g1', 0, 0, 0)])
+                    Effect(Constant(['foo']))]
+        d = get_all_metrics(base_dispatcher, object(),
+                            get_all_metrics_effects=_game)
+        self.assertEqual(self.successResultOf(d), ['foo'])
 
 
 class AddToCloudMetricsTests(SynchronousTestCase):
     """
     Tests for :func:`add_to_cloud_metrics`
     """
-
-    def setUp(self):
-        """
-        Setup treq
-        """
-        def request(*a, **k):
-            self.a, self.k = a, k
-            return Effect(Stub(Constant('r')))
-
-        self.request = request
 
     @mock.patch('otter.metrics.time')
     def test_added(self, mock_time):
@@ -359,14 +325,17 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         ma = merge(m, {'metricValue': ta, 'metricName': 'ord.actual'})
         mp = merge(m, {'metricValue': tp, 'metricName': 'ord.pending'})
         req_data = [md, ma, mp]
-        conf = {'ttl': m['ttlInSeconds']}
         log = object()
 
-        eff = add_to_cloud_metrics(self.request, conf, 'ord', td, ta, tp, log=log)
+        eff = add_to_cloud_metrics(
+            m['ttlInSeconds'], 'ord', td, ta, tp, log=log)
 
-        self.assertEqual(resolve_stubs(eff), 'r')
-        self.assertEqual(self.a, (ServiceType.CLOUD_METRICS_INGEST, 'POST', 'ingest'))
-        self.assertEqual(self.k, dict(data=req_data, log=log))
+        req = eff.intent
+        self.assertEqual(req.service_type, ServiceType.CLOUD_METRICS_INGEST)
+        self.assertEqual(req.method, 'POST')
+        self.assertEqual(req.url, 'ingest')
+        self.assertEqual(req.data, req_data)
+        self.assertEqual(req.log, log)
 
 
 class CollectMetricsTests(SynchronousTestCase):
@@ -378,7 +347,8 @@ class CollectMetricsTests(SynchronousTestCase):
         """
         mock dependent functions
         """
-        self.connect_cass_servers = patch(self, 'otter.metrics.connect_cass_servers')
+        self.connect_cass_servers = patch(
+            self, 'otter.metrics.connect_cass_servers')
         self.client = mock.Mock(spec=['disconnect'])
         self.client.disconnect.return_value = succeed(None)
         self.connect_cass_servers.return_value = self.client
@@ -397,37 +367,44 @@ class CollectMetricsTests(SynchronousTestCase):
         self.add_to_cloud_metrics = patch(self,
                                           'otter.metrics.add_to_cloud_metrics',
                                           return_value=Effect(Constant(None)))
-        self.req_func = object()
-        self.mock_grf = patch(self, 'otter.metrics.get_request_func',
-                              return_value=self.req_func)
 
         self.config = {'cassandra': 'c', 'identity': identity_config,
-                       'metrics': {'service': 'ms', 'tenant_id': 'tid', 'region': 'IAD'},
+                       'metrics': {'service': 'ms', 'tenant_id': 'tid',
+                                   'region': 'IAD',
+                                   'ttl': 200},
                        'region': 'r', 'cloudServersOpenStack': 'nova',
                        'cloudLoadBalancers': 'clb', 'rackconnect': 'rc'}
 
+        self.dispatcher = base_dispatcher
+        self.get_full_dispatcher = lambda r, auth, log, cfgs: self.dispatcher
+
+    def _fake_perform(self, dispatcher, effect):
+        """
+        Assert that the only effect passed to this perform is the scoped
+        result of add_to_cloud_metrics.
+        """
+        self.assertEqual(effect,
+                         Effect(TenantScope(Effect(Constant(None)), 'tid')))
+
     def test_metrics_collected(self):
         """
-        Metrics is collected after getting groups from cass and servers from nova
-        and it is added to blueflood
+        Metrics is collected after getting groups from cass and servers
+        from nova and it is added to blueflood
         """
         _reactor = mock.Mock()
-        service_mapping = get_service_mapping(self.config)
-
-        d = collect_metrics(_reactor, self.config)
+        d = collect_metrics(_reactor, self.config,
+                            perform=self._fake_perform,
+                            get_full_dispatcher=self.get_full_dispatcher)
         self.assertIsNone(self.successResultOf(d))
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_scaling_groups.assert_called_once_with(
             self.client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
-            self.groups, matches(Provides(IAuthenticator)),
-            service_mapping, 'r', clock=_reactor, _print=False)
-        self.mock_grf.assert_called_once_with(
-            matches(Provides(IAuthenticator)), 'tid', metrics_log,
-            service_mapping, 'IAD')
+            self.dispatcher, self.groups, _print=False)
         self.add_to_cloud_metrics.assert_called_once_with(
-            self.req_func, self.config['metrics'], 'r', 107, 26, 1, log=metrics_log)
+            self.config['metrics']['ttl'], 'r', 107, 26, 1,
+            log=metrics_log)
         self.client.disconnect.assert_called_once_with()
 
     def test_with_client(self):
@@ -435,7 +412,9 @@ class CollectMetricsTests(SynchronousTestCase):
         Uses client provided and does not disconnect it before returning
         """
         client = mock.Mock(spec=['disconnect'])
-        d = collect_metrics(mock.Mock(), self.config, client=client)
+        d = collect_metrics(mock.Mock(), self.config, client=client,
+                            perform=self._fake_perform,
+                            get_full_dispatcher=self.get_full_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.assertFalse(self.connect_cass_servers.called)
         self.assertFalse(client.disconnect.called)
@@ -445,11 +424,12 @@ class CollectMetricsTests(SynchronousTestCase):
         Uses authenticator provided instead of creating new
         """
         _reactor, auth = mock.Mock(), mock.Mock()
-        d = collect_metrics(_reactor, self.config, authenticator=auth)
+        d = collect_metrics(_reactor, self.config, authenticator=auth,
+                            perform=self._fake_perform,
+                            get_full_dispatcher=self.get_full_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.get_all_metrics.assert_called_once_with(
-            self.groups, auth, get_service_mapping(self.config),
-            'r', clock=_reactor, _print=False)
+            self.dispatcher, self.groups, _print=False)
 
 
 class APIOptionsTests(SynchronousTestCase):
@@ -459,8 +439,8 @@ class APIOptionsTests(SynchronousTestCase):
 
     def test_config_options(self):
         """
-        File given in --config option is parsed and its contents are added to `Options`
-        object
+        File given in --config option is parsed and its contents are
+        added to `Options` object
         """
         config = Options()
         config.open = mock.Mock(return_value=StringIO(u'{"a": "b"}'))
@@ -470,7 +450,8 @@ class APIOptionsTests(SynchronousTestCase):
 
 class ServiceTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.metrics.makeService` and :class:`otter.metrics.MetricsService`
+    Tests for :func:`otter.metrics.makeService` and
+    :class:`otter.metrics.MetricsService`
     """
 
     def setUp(self):
@@ -479,9 +460,13 @@ class ServiceTests(SynchronousTestCase):
         """
         self.client = mock.Mock(spec=['disconnect'])
         self.client.disconnect.return_value = succeed('disconnected')
-        self.mock_ccs = patch(self, 'otter.metrics.connect_cass_servers', return_value=self.client)
-        self.config = {'cassandra': 'c', 'identity': identity_config, 'metrics': {'interval': 20}}
-        self.mock_cm = patch(self, 'otter.metrics.collect_metrics', return_value=succeed(None))
+        self.mock_ccs = patch(
+            self, 'otter.metrics.connect_cass_servers',
+            return_value=self.client)
+        self.config = {'cassandra': 'c', 'identity': identity_config,
+                       'metrics': {'interval': 20}}
+        self.mock_cm = patch(
+            self, 'otter.metrics.collect_metrics', return_value=succeed(None))
         self.log = mock_log()
         self.clock = Clock()
 
@@ -490,8 +475,9 @@ class ServiceTests(SynchronousTestCase):
 
     def _cm_called(self, calls):
         self.assertEqual(len(self.mock_cm.mock_calls), calls)
-        self.mock_cm.assert_called_with('r', self.config, client=self.client,
-                                        authenticator=matches(Provides(IAuthenticator)))
+        self.mock_cm.assert_called_with(
+            'r', self.config, client=self.client,
+            authenticator=matches(Provides(IAuthenticator)))
 
     @mock.patch('otter.metrics.MetricsService')
     def test_make_service(self, mock_ms):
@@ -502,7 +488,8 @@ class ServiceTests(SynchronousTestCase):
         s = makeService(c)
         self.assertIs(s, mock_ms.return_value)
         from otter.metrics import metrics_log
-        mock_ms.assert_called_once_with(matches(IsInstance(ReactorBase)), c, metrics_log)
+        mock_ms.assert_called_once_with(
+            matches(IsInstance(ReactorBase)), c, metrics_log)
 
     def test_collect_metrics_called_again(self):
         """
@@ -517,7 +504,8 @@ class ServiceTests(SynchronousTestCase):
 
     def test_collect_metrics_called_again_on_error(self):
         """
-        `collect_metrics` is called again even if one of the previous call fails
+        `collect_metrics` is called again even if one of the
+        previous call fails
         """
         s = self._service()
         self.mock_cm.return_value = fail(ValueError('a'))

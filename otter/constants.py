@@ -11,17 +11,32 @@ class ServiceType(Names):
     CLOUD_METRICS_INGEST = NamedConstant()
 
 
-def get_service_mapping(config):
+def get_service_configs(config):
     """
-    Return a mapping of :class:`ServiceType` members to the actual configured
-    service names to look up in tenant catalogs.
+    Return service configurations for all services based on the config data.
+
+    Returns a dict, where keys are :obj:`ServiceType` members, and values are
+    service configs. A service config is a dict with ``name`` and ``region``
+    keys.
 
     :param dict config: Config from file containing service names that will be
         there in service catalog
     """
     return {
-        ServiceType.CLOUD_SERVERS: config['cloudServersOpenStack'],
-        ServiceType.CLOUD_LOAD_BALANCERS: config["cloudLoadBalancers"],
-        ServiceType.RACKCONNECT_V3: config['rackconnect'],
-        ServiceType.CLOUD_METRICS_INGEST: config['metrics']['service']
+        ServiceType.CLOUD_SERVERS: {
+            'name': config['cloudServersOpenStack'],
+            'region': config['region'],
+        },
+        ServiceType.CLOUD_LOAD_BALANCERS: {
+            'name': config['cloudLoadBalancers'],
+            'region': config['region'],
+        },
+        ServiceType.RACKCONNECT_V3: {
+            'name': config['rackconnect'],
+            'region': config['region'],
+        },
+        ServiceType.CLOUD_METRICS_INGEST: {
+            'name': config['metrics']['service'],
+            'region': config['metrics']['region'],
+        },
     }
