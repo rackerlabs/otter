@@ -6,7 +6,7 @@ import operator
 from io import StringIO
 
 from effect import Constant, Effect, base_dispatcher
-from effect.testing import Stub, resolve_effect
+from effect.testing import resolve_effect
 
 import mock
 
@@ -309,16 +309,6 @@ class AddToCloudMetricsTests(SynchronousTestCase):
     Tests for :func:`add_to_cloud_metrics`
     """
 
-    def setUp(self):
-        """
-        Setup treq
-        """
-        def request(*a, **k):
-            self.a, self.k = a, k
-            return Effect(Stub(Constant('r')))
-
-        self.request = request
-
     @mock.patch('otter.metrics.time')
     def test_added(self, mock_time):
         """
@@ -337,12 +327,14 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         log = object()
 
         eff = add_to_cloud_metrics(
-            self.request, conf, 'ord', td, ta, tp, log=log)
+            conf, 'ord', td, ta, tp, log=log)
 
-        self.assertEqual(resolve_stubs(eff), 'r')
-        self.assertEqual(
-            self.a, (ServiceType.CLOUD_METRICS_INGEST, 'POST', 'ingest'))
-        self.assertEqual(self.k, dict(data=req_data, log=log))
+        req = eff.intent
+        self.assertEqual(req.service_type, ServiceType.CLOUD_METRICS_INGEST)
+        self.assertEqual(req.method, 'POST')
+        self.assertEqual(req.url, 'ingest')
+        self.assertEqual(req.data, req_data)
+        self.assertEqual(req.log, log)
 
 
 class CollectMetricsTests(SynchronousTestCase):
@@ -374,9 +366,6 @@ class CollectMetricsTests(SynchronousTestCase):
         self.add_to_cloud_metrics = patch(self,
                                           'otter.metrics.add_to_cloud_metrics',
                                           return_value=Effect(Constant(None)))
-        self.req_func = object()
-        self.mock_grf = patch(self, 'otter.metrics.get_request_func',
-                              return_value=self.req_func)
 
         self.config = {'cassandra': 'c', 'identity': identity_config,
                        'metrics': {'service': 'ms', 'tenant_id': 'tid',
@@ -393,8 +382,6 @@ class CollectMetricsTests(SynchronousTestCase):
         from nova and it is added to blueflood
         """
         _reactor = mock.Mock()
-        service_configs = get_service_configs(self.config)
-
         d = collect_metrics(_reactor, self.config,
                             get_full_dispatcher=self.get_full_dispatcher)
         self.assertIsNone(self.successResultOf(d))
@@ -404,11 +391,8 @@ class CollectMetricsTests(SynchronousTestCase):
             self.client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
             self.dispatcher, self.groups, _print=False)
-        self.mock_grf.assert_called_once_with(
-            matches(Provides(IAuthenticator)), 'tid', metrics_log,
-            service_configs, 'IAD')
         self.add_to_cloud_metrics.assert_called_once_with(
-            self.req_func, self.config['metrics'], 'r', 107, 26, 1,
+            self.config['metrics'], 'r', 107, 26, 1,
             log=metrics_log)
         self.client.disconnect.assert_called_once_with()
 
