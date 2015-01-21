@@ -5,11 +5,11 @@ from pyrsistent import pbag, pmap, pset, s
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence.model import (
-    DesiredGroupState,
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
     CLBNodeType,
+    DesiredGroupState,
     NovaServer,
     ServerState)
 from otter.convergence.planning import (
