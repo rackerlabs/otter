@@ -3654,6 +3654,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 the scaling policy is executed.</para>
         </section>
     </chapter>
+        <xi:include href="chapters/apiref.xml"/>
     <chapter xml:id="Glossary">
         <title>Glossary</title>
         <!-- Glossary section, defining basic terms, is external so it's handy for Getting Started to share. -->

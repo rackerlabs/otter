@@ -1,14 +1,14 @@
 """
 Code for composing all of the convergence functionality together.
 """
+import time
 
 from collections import defaultdict
 from functools import partial
-import time
 
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
-from otter.convergence.model import DesiredGroupState, CLBDescription
+from otter.convergence.model import CLBDescription, DesiredGroupState
 from otter.convergence.planning import plan
 
 

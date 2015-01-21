@@ -230,7 +230,7 @@ class GetLBContentsTests(SynchronousTestCase):
             ShouldDelayAndRetry(can_retry=retry_times(5),
                                 next_interval=exponential_backoff_interval(2)))
         req = eff.intent.effect.intent
-        response = self.reqs[req.method, req.url, req.json_response]
+        response = self.reqs[(req.method, req.url, req.json_response)]
         return resolve_effect(eff, response)
 
     def _resolve_lb(self, eff):

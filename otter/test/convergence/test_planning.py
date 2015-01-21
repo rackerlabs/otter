@@ -1,15 +1,15 @@
 """Tests for convergence planning."""
 
-from pyrsistent import pmap, pbag, pset, s
+from pyrsistent import pbag, pmap, pset, s
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence.model import (
-    DesiredGroupState,
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
     CLBNodeType,
+    DesiredGroupState,
     NovaServer,
     ServerState)
 from otter.convergence.planning import (
@@ -53,8 +53,9 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         result = _remove_from_lb_with_draining(
             10,
             [CLBNode(node_id='123', address='1.1.1.1',
-                     description=CLBDescription(lb_id='5', port=80,
-                                                condition=CLBNodeCondition.DISABLED))],
+                     description=CLBDescription(
+                         lb_id='5', port=80,
+                         condition=CLBNodeCondition.DISABLED))],
             0)
 
         self.assertEqual(result, [RemoveFromCLB(lb_id='5', node_id='123')])
@@ -75,7 +76,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                            condition=CLBNodeCondition.DRAINING,
                            type=CLBNodeType.PRIMARY)])
 
-    def test_draining_state_is_ignored_if_connections_and_not_yet_timeout(self):
+    def test_draining_state_is_ignored_if_connections_before_timeout(self):
         """
         Nodes in draining state will be ignored if they still have connections
         and the timeout is not yet expired
@@ -83,14 +84,15 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         result = _remove_from_lb_with_draining(
             10,
             [CLBNode(node_id='123', address='1.1.1.1',
-                     description=CLBDescription(lb_id='5', port=80,
-                                                condition=CLBNodeCondition.DRAINING),
+                     description=CLBDescription(
+                         lb_id='5', port=80,
+                         condition=CLBNodeCondition.DRAINING),
                      drained_at=0.0, connections=1)],
             5)
 
         self.assertEqual(result, [])
 
-    def test_draining_state_removed_if_no_connections_and_not_yet_timeout(self):
+    def test_draining_state_removed_if_no_connections_before_timeout(self):
         """
         Nodes in draining state will be removed if they have no more
         connections, even if the timeout is not yet expired
@@ -98,14 +100,15 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         result = _remove_from_lb_with_draining(
             10,
             [CLBNode(node_id='123', address='1.1.1.1',
-                     description=CLBDescription(lb_id='5', port=80,
-                                                condition=CLBNodeCondition.DRAINING),
+                     description=CLBDescription(
+                         lb_id='5', port=80,
+                         condition=CLBNodeCondition.DRAINING),
                      drained_at=0.0, connections=0)],
             5)
 
         self.assertEqual(result, [RemoveFromCLB(lb_id='5', node_id='123')])
 
-    def test_draining_state_remains_if_connections_None_and_not_yet_timeout(self):
+    def test_draining_state_remains_if_connections_None_before_timeout(self):
         """
         Nodes in draining state will be ignored if timeout has not yet expired
         and the number of active connections are not provided
@@ -113,14 +116,15 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         result = _remove_from_lb_with_draining(
             10,
             [CLBNode(node_id='123', address='1.1.1.1',
-                     description=CLBDescription(lb_id='5', port=80,
-                                                condition=CLBNodeCondition.DRAINING),
+                     description=CLBDescription(
+                         lb_id='5', port=80,
+                         condition=CLBNodeCondition.DRAINING),
                      drained_at=0.0)],
             5)
 
         self.assertEqual(result, [])
 
-    def test_draining_state_removed_if_connections_None_and_timeout_expired(self):
+    def test_draining_state_removed_if_connections_None_after_timeout(self):
         """
         Nodes in draining state will be removed when the timeout expires if
         the number of active connections are not provided
@@ -128,8 +132,9 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         result = _remove_from_lb_with_draining(
             10,
             [CLBNode(node_id='123', address='1.1.1.1',
-                     description=CLBDescription(lb_id='5', port=80,
-                                                condition=CLBNodeCondition.DRAINING),
+                     description=CLBDescription(
+                         lb_id='5', port=80,
+                         condition=CLBNodeCondition.DRAINING),
                      drained_at=0.0)],
             15)
 
@@ -143,8 +148,9 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         result = _remove_from_lb_with_draining(
             10,
             [CLBNode(node_id='123', address='1.1.1.1',
-                     description=CLBDescription(lb_id='5', port=80,
-                                                condition=CLBNodeCondition.DRAINING),
+                     description=CLBDescription(
+                         lb_id='5', port=80,
+                         condition=CLBNodeCondition.DRAINING),
                      drained_at=0.0, connections=10)],
             15)
 
@@ -161,22 +167,26 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                     description=CLBDescription(lb_id='1', port=80)),
             # disabled, should be removed
             CLBNode(node_id='2', address='1.1.1.1',
-                    description=CLBDescription(lb_id='2', port=80,
-                                               condition=CLBNodeCondition.DISABLED)),
+                    description=CLBDescription(
+                        lb_id='2', port=80,
+                        condition=CLBNodeCondition.DISABLED)),
             # draining, still connections, should be ignored
             CLBNode(node_id='3', address='1.1.1.1',
-                    description=CLBDescription(lb_id='3', port=80,
-                                               condition=CLBNodeCondition.DRAINING),
+                    description=CLBDescription(
+                        lb_id='3', port=80,
+                        condition=CLBNodeCondition.DRAINING),
                     connections=3, drained_at=5.0),
             # draining, no connections, should be removed
             CLBNode(node_id='4', address='1.1.1.1',
-                    description=CLBDescription(lb_id='4', port=80,
-                                               condition=CLBNodeCondition.DRAINING),
+                    description=CLBDescription(
+                        lb_id='4', port=80,
+                        condition=CLBNodeCondition.DRAINING),
                     connections=0, drained_at=5.0),
             # draining, timeout exired, should be removed
             CLBNode(node_id='5', address='1.1.1.1',
-                    description=CLBDescription(lb_id='5', port=80,
-                                               condition=CLBNodeCondition.DRAINING),
+                    description=CLBDescription(
+                        lb_id='5', port=80,
+                        condition=CLBNodeCondition.DRAINING),
                     connections=10, drained_at=0.0)]
 
         result = _remove_from_lb_with_draining(10, current, 10)
@@ -199,14 +209,16 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If a desired LB config is not in the set of current configs,
         `converge_lb_state` returns a :class:`AddToLoadBalancer` object
         """
-        result = _converge_lb_state(desired_lb_state={'5': [CLBDescription(lb_id='5', port=80)]},
-                                    current_lb_nodes=[],
-                                    ip_address='1.1.1.1')
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        result = _converge_lb_state(
+            desired_lb_state={'5': [clb_desc]},
+            current_lb_nodes=[],
+            ip_address='1.1.1.1')
         self.assertEqual(
             list(result),
             [AddNodesToCLB(
                 lb_id='5',
-                address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=80))))])
+                address_configs=s(('1.1.1.1', clb_desc)))])
 
     def test_change_lb_node(self):
         """
@@ -216,7 +228,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         """
         desired = {'5': [CLBDescription(lb_id='5', port=80)]}
         current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(lb_id='5', port=80, weight=5))]
+                           description=CLBDescription(
+                               lb_id='5', port=80, weight=5))]
 
         result = _converge_lb_state(desired_lb_state=desired,
                                     current_lb_nodes=current,
@@ -233,7 +246,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         `converge_lb_state` returns a :class:`RemoveFromCLB` object
         """
         current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(lb_id='5', port=80, weight=5))]
+                           description=CLBDescription(
+                               lb_id='5', port=80, weight=5))]
 
         result = _converge_lb_state(desired_lb_state={},
                                     current_lb_nodes=current,
@@ -273,7 +287,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         self.assertEqual(set(result), set([
             AddNodesToCLB(
                 lb_id='5',
-                address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=80)))),
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='5', port=80)))),
             ChangeCLBNode(lb_id='6', node_id='234', weight=2,
                           condition=CLBNodeCondition.ENABLED,
                           type=CLBNodeType.PRIMARY),
@@ -288,7 +303,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         (use case: running multiple single-threaded server processes on a
         machine)
         """
-        desired = {'5': [CLBDescription(lb_id='5', port=8080), CLBDescription(lb_id='5', port=8081)]}
+        desired = {'5': [CLBDescription(lb_id='5', port=8080),
+                         CLBDescription(lb_id='5', port=8081)]}
         current = []
         result = _converge_lb_state(desired, current, '1.1.1.1')
         self.assertEqual(
@@ -296,10 +312,12 @@ class ConvergeLBStateTests(SynchronousTestCase):
             set([
                 AddNodesToCLB(
                     lb_id='5',
-                    address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=8080)))),
+                    address_configs=s(('1.1.1.1',
+                                       CLBDescription(lb_id='5', port=8080)))),
                 AddNodesToCLB(
                     lb_id='5',
-                    address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=8081))))
+                    address_configs=s(('1.1.1.1',
+                                       CLBDescription(lb_id='5', port=8081))))
                 ]))
 
 
@@ -356,8 +374,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 set([server('abc', state=ServerState.DRAINING,
                             servicenet_address='1.1.1.1')]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
-                             description=CLBDescription(lb_id='1', port=80,
-                                                        condition=CLBNodeCondition.DRAINING))]),
+                             description=CLBDescription(
+                                 lb_id='1', port=80,
+                                 condition=CLBNodeCondition.DRAINING))]),
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
@@ -376,8 +395,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 set([server('abc', state=ServerState.DRAINING,
                             servicenet_address='1.1.1.1')]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
-                             description=CLBDescription(lb_id='1', port=80,
-                                                        condition=CLBNodeCondition.DRAINING),
+                             description=CLBDescription(
+                                 lb_id='1', port=80,
+                                 condition=CLBNodeCondition.DRAINING),
                              drained_at=1.0, connections=1)]),
                 2),
             pbag([]))
@@ -423,8 +443,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1')]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
-                             description=CLBDescription(lb_id='1', port=80,
-                                                        condition=CLBNodeCondition.DRAINING),
+                             description=CLBDescription(
+                                 lb_id='1', port=80,
+                                 condition=CLBNodeCondition.DRAINING),
                              connections=1, drained_at=0.0)]),
                 1),
             pbag([
@@ -528,11 +549,14 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(launch_config={}, desired=1),
-                set([server('abc', ServerState.ERROR, servicenet_address='1.1.1.1')]),
+                set([server('abc', ServerState.ERROR,
+                            servicenet_address='1.1.1.1')]),
                 set([CLBNode(address='1.1.1.1', node_id='3',
-                             description=CLBDescription(lb_id='5', port=80)),
+                             description=CLBDescription(lb_id='5',
+                                                        port=80)),
                      CLBNode(address='1.1.1.1', node_id='5',
-                             description=CLBDescription(lb_id='5', port=8080))]),
+                             description=CLBDescription(lb_id='5',
+                                                        port=8080))]),
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
@@ -625,7 +649,8 @@ class ConvergeTests(SynchronousTestCase):
         desired_lbs = {'5': [CLBDescription(lb_id='5', port=80)]}
         self.assertEqual(
             converge(
-                DesiredGroupState(launch_config={}, desired=1, desired_lbs=desired_lbs),
+                DesiredGroupState(launch_config={}, desired=1,
+                                  desired_lbs=desired_lbs),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1', created=0),
                      server('bcd', ServerState.ACTIVE,
@@ -636,7 +661,8 @@ class ConvergeTests(SynchronousTestCase):
                 DeleteServer(server_id='abc'),
                 AddNodesToCLB(
                     lb_id='5',
-                    address_configs=s(('2.2.2.2', CLBDescription(lb_id='5', port=80))))
+                    address_configs=s(('2.2.2.2',
+                                       CLBDescription(lb_id='5', port=80))))
             ]))
 
 
@@ -651,10 +677,12 @@ class OptimizerTests(SynchronousTestCase):
         steps = pbag([
             AddNodesToCLB(
                 lb_id='5',
-                address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=80)))),
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='5', port=80)))),
             AddNodesToCLB(
                 lb_id='5',
-                address_configs=s(('1.2.3.4', CLBDescription(lb_id='5', port=80))))])
+                address_configs=s(('1.2.3.4',
+                                   CLBDescription(lb_id='5', port=80))))])
         self.assertEqual(
             optimize_steps(steps),
             pbag([
@@ -672,46 +700,57 @@ class OptimizerTests(SynchronousTestCase):
         steps = pbag([
             AddNodesToCLB(
                 lb_id='5',
-                address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=80)))),
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='5', port=80)))),
             AddNodesToCLB(
                 lb_id='5',
-                address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=8080))))])
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='5', port=8080))))])
 
         self.assertEqual(
             optimize_steps(steps),
             pbag([
                 AddNodesToCLB(
                     lb_id='5',
-                    address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=80)),
-                                      ('1.1.1.1', CLBDescription(lb_id='5', port=8080))))]))
+                    address_configs=s(
+                        ('1.1.1.1',
+                         CLBDescription(lb_id='5', port=80)),
+                        ('1.1.1.1',
+                         CLBDescription(lb_id='5', port=8080))))]))
 
     def test_multiple_load_balancers(self):
         """Aggregation is done on a per-load-balancer basis."""
         steps = pbag([
             AddNodesToCLB(
                 lb_id='5',
-                address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=80)))),
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='5', port=80)))),
             AddNodesToCLB(
                 lb_id='5',
-                address_configs=s(('1.1.1.2', CLBDescription(lb_id='5', port=80)))),
+                address_configs=s(('1.1.1.2',
+                                   CLBDescription(lb_id='5', port=80)))),
             AddNodesToCLB(
                 lb_id='6',
-                address_configs=s(('1.1.1.1', CLBDescription(lb_id='6', port=80)))),
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='6', port=80)))),
             AddNodesToCLB(
                 lb_id='6',
-                address_configs=s(('1.1.1.2', CLBDescription(lb_id='6', port=80)))),
+                address_configs=s(('1.1.1.2',
+                                   CLBDescription(lb_id='6', port=80)))),
         ])
         self.assertEqual(
             optimize_steps(steps),
             pbag([
                 AddNodesToCLB(
                     lb_id='5',
-                    address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=80)),
-                                      ('1.1.1.2', CLBDescription(lb_id='5', port=80)))),
+                    address_configs=s(
+                        ('1.1.1.1', CLBDescription(lb_id='5', port=80)),
+                        ('1.1.1.2', CLBDescription(lb_id='5', port=80)))),
                 AddNodesToCLB(
                     lb_id='6',
-                    address_configs=s(('1.1.1.1', CLBDescription(lb_id='6', port=80)),
-                                      ('1.1.1.2', CLBDescription(lb_id='6', port=80)))),
+                    address_configs=s(
+                        ('1.1.1.1', CLBDescription(lb_id='6', port=80)),
+                        ('1.1.1.2', CLBDescription(lb_id='6', port=80)))),
             ]))
 
     def test_optimize_leaves_other_steps(self):
@@ -721,7 +760,8 @@ class OptimizerTests(SynchronousTestCase):
         steps = pbag([
             AddNodesToCLB(
                 lb_id='5',
-                address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=80)))),
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='5', port=80)))),
             CreateServer(launch_config=pmap({})),
             BulkRemoveFromRCv3(lb_node_pairs=pset([("lb-1", "node-a")])),
             BulkAddToRCv3(lb_node_pairs=pset([("lb-2", "node-b")]))
@@ -742,16 +782,20 @@ class OptimizerTests(SynchronousTestCase):
             # CLB adds
             AddNodesToCLB(
                 lb_id='5',
-                address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=80)))),
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='5', port=80)))),
             AddNodesToCLB(
                 lb_id='5',
-                address_configs=s(('1.1.1.2', CLBDescription(lb_id='5', port=80)))),
+                address_configs=s(('1.1.1.2',
+                                   CLBDescription(lb_id='5', port=80)))),
             AddNodesToCLB(
                 lb_id='6',
-                address_configs=s(('1.1.1.1', CLBDescription(lb_id='6', port=80)))),
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='6', port=80)))),
             AddNodesToCLB(
                 lb_id='6',
-                address_configs=s(('1.1.1.2', CLBDescription(lb_id='6', port=80)))),
+                address_configs=s(('1.1.1.2',
+                                   CLBDescription(lb_id='6', port=80)))),
 
             # Unoptimizable steps
             CreateServer(launch_config=pmap({})),
@@ -763,12 +807,16 @@ class OptimizerTests(SynchronousTestCase):
                 # Optimized CLB adds
                 AddNodesToCLB(
                     lb_id='5',
-                    address_configs=s(('1.1.1.1', CLBDescription(lb_id='5', port=80)),
-                                      ('1.1.1.2', CLBDescription(lb_id='5', port=80)))),
+                    address_configs=s(('1.1.1.1',
+                                       CLBDescription(lb_id='5', port=80)),
+                                      ('1.1.1.2',
+                                       CLBDescription(lb_id='5', port=80)))),
                 AddNodesToCLB(
                     lb_id='6',
-                    address_configs=s(('1.1.1.1', CLBDescription(lb_id='6', port=80)),
-                                      ('1.1.1.2', CLBDescription(lb_id='6', port=80)))),
+                    address_configs=s(('1.1.1.1',
+                                       CLBDescription(lb_id='6', port=80)),
+                                      ('1.1.1.2',
+                                       CLBDescription(lb_id='6', port=80)))),
 
                 # Unoptimizable steps
                 CreateServer(launch_config=pmap({}))
