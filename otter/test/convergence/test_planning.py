@@ -1,6 +1,6 @@
 """Tests for convergence planning."""
 
-from pyrsistent import pmap, pbag, pset, s
+from pyrsistent import pbag, pmap, pset, s
 
 from twisted.trial.unittest import SynchronousTestCase
 
