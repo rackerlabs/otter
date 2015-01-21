@@ -1,10 +1,9 @@
 """Tests for convergence effecting."""
-from inspect import getargspec
 
-from characteristic import attributes, NOTHING
 from effect import parallel
-from mock import ANY
+
 from twisted.trial.unittest import SynchronousTestCase
+
 from zope.interface import implementer
 
 from otter.constants import ServiceType
