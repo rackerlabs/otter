@@ -214,8 +214,9 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     scale_down_steps = list(mapcat(drain_and_delete_a_server,
                                    servers_to_delete + draining_servers))
 
-    # delete all servers in error - draining does not need to be handled because
-    # servers in error presumably are not serving traffic anyway
+    # delete all servers in error - draining does not need to be
+    # handled because servers in error presumably are not serving
+    # traffic anyway
     delete_error_steps = (
         [DeleteServer(server_id=server.id) for server in servers_in_error] +
         [RemoveFromCLB(lb_id=lb_node.description.lb_id,
