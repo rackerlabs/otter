@@ -1,6 +1,6 @@
 """Code related to creating a plan for convergence."""
 
-from pyrsistent import pbag, s, pset
+from pyrsistent import pbag, pset, s
 
 from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
