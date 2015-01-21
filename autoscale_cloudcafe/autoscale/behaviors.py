@@ -629,9 +629,9 @@ class AutoscaleBehaviors(BaseBehavior):
                 group_id)
             group_state = group_state_response.entity
             asserter.assertEquals(group_state.desiredCapacity, expected_servers,
-                              msg='Group {0} should have {1} servers, but is trying to '
-                              'build {2} servers'.format(group_id, expected_servers,
-                                                         group_state.desiredCapacity))
+                                  msg='Group {0} should have {1} servers, but is trying to '
+                                  'build {2} servers'.format(group_id, expected_servers,
+                                                             group_state.desiredCapacity))
 
         while time.time() < end_time:
             if api == 'Autoscale':
@@ -653,13 +653,12 @@ class AutoscaleBehaviors(BaseBehavior):
                 # When Otter adopts convergence, this becomes dead code, and
                 # can be safely removed.
                 asserter.assertEquals(group_state.desiredCapacity, expected_servers,
-                                  msg='Group {0} should have {1} servers, but has reduced the build {2}'
-                                  'servers'.format(group_id, expected_servers,
-                                                   group_state.desiredCapacity))
+                                      msg='Group {0} should have {1} servers,'
+                                      ' but has reduced the build {2}'
+                                      'servers'.format(group_id, expected_servers,
+                                                       group_state.desiredCapacity))
 
                 if len(active_list) == expected_servers:
-                    print "Otter"
-                    print "Achieved expected servers after ", time.time() - start_time, " seconds"
                     return [server.id for server in active_list]
             else:
                 # We're looking at the RackConnect API for our server list here.
@@ -667,8 +666,6 @@ class AutoscaleBehaviors(BaseBehavior):
                 server_list = [n for n in nodes.nodes
                                if (safe_hasattr(n, "cloud_server")) and (n.status == "ACTIVE")]
                 if len(server_list) == expected_servers:
-                    print "RCv3"
-                    print "Achieved expected servers after ", time.time() - start_time, " seconds"
                     return [n.id for n in server_list]
 
             time.sleep(interval_time)
