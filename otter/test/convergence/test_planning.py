@@ -76,7 +76,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                            condition=CLBNodeCondition.DRAINING,
                            type=CLBNodeType.PRIMARY)])
 
-    def test_draining_state_is_ignored_if_connections_and_not_yet_timeout(self):
+    def test_draining_state_is_ignored_if_connections_before_timeout(self):
         """
         Nodes in draining state will be ignored if they still have connections
         and the timeout is not yet expired
@@ -92,7 +92,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
 
         self.assertEqual(result, [])
 
-    def test_draining_state_removed_if_no_connections_and_not_yet_timeout(self):
+    def test_draining_state_removed_if_no_connections_before_timeout(self):
         """
         Nodes in draining state will be removed if they have no more
         connections, even if the timeout is not yet expired
@@ -108,7 +108,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
 
         self.assertEqual(result, [RemoveFromCLB(lb_id='5', node_id='123')])
 
-    def test_draining_state_remains_if_connections_None_and_not_yet_timeout(self):
+    def test_draining_state_remains_if_connections_None_before_timeout(self):
         """
         Nodes in draining state will be ignored if timeout has not yet expired
         and the number of active connections are not provided
@@ -124,7 +124,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
 
         self.assertEqual(result, [])
 
-    def test_draining_state_removed_if_connections_None_and_timeout_expired(self):
+    def test_draining_state_removed_if_connections_None_after_timeout(self):
         """
         Nodes in draining state will be removed when the timeout expires if
         the number of active connections are not provided
