@@ -883,6 +883,14 @@ class LimitStepCount(SynchronousTestCase):
         }
         self._test_limit_step_count(in_step_counts, step_limits)
 
+    def test_default_step_limit(self):
+        """
+        The default limit limits server creation to up to 3 steps.
+        """
+        limits = _default_limit_step_count.keywords["step_limits"]
+        self.assertEqual(limits, pmap({CreateServer: 3}))
+
+
 class PlanTests(SynchronousTestCase):
     """Tests for :func:`plan`."""
 
