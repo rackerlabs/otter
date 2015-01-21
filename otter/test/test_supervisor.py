@@ -1,6 +1,9 @@
 """
 Tests for the worker supervisor.
 """
+
+from effect import Effect, Constant
+
 import mock
 
 from testtools.matchers import ContainsDict, Equals, IsInstance
@@ -13,6 +16,7 @@ from zope.interface.verify import verifyObject
 
 from otter import supervisor
 from otter.constants import ServiceType
+from otter.http import TenantScope
 from otter.models.interface import (
     IScalingGroup, GroupState, NoSuchScalingGroupError)
 from otter.supervisor import (
@@ -111,6 +115,11 @@ class SupervisorTests(SynchronousTestCase):
         self.assertEqual(request_func.service_catalog, self.service_catalog)
         self.assertEqual(request_func.region, "ORD")
         self.assertEqual(request_func.lb_region, "ORD")
+        self.assertEqual(request_func.tenant_id, self.group.tenant_id)
+        # make sure the dispatcher supports some interesting intent that is
+        # only provided by the full dispatcher
+        tscope = TenantScope(Effect(Constant(1)), 'tenant_id')
+        self.assertIsNot(request_func.dispatcher(tscope), None)
 
 
 class HealthCheckTests(SupervisorTests):
