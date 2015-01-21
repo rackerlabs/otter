@@ -11,15 +11,15 @@ from twisted.internet.defer import succeed
 from zope.interface import Interface, implementer
 
 from otter.effect_dispatcher import get_full_dispatcher
-from otter.models.interface import NoSuchScalingGroupError
 from otter.http import get_request_func
 from otter.log import audit
+from otter.models.interface import NoSuchScalingGroupError
+from otter.undo import InMemoryUndoStack
 from otter.util.config import config_value
 from otter.util.deferredutils import DeferredPool
 from otter.util.hashkey import generate_job_id
 from otter.util.timestamp import from_timestamp
 from otter.worker import launch_server_v1, validate_config
-from otter.undo import InMemoryUndoStack
 
 
 class ISupervisor(Interface):
@@ -107,6 +107,7 @@ class SupervisorService(object, Service):
         request_func.lb_region = lb_region or self.region
         request_func.region = self.region
         request_func.dispatcher = dispatcher
+        request_func.tenant_id = tenant_id
 
         log.msg("Authenticating for tenant")
         d = self.authenticator.authenticate_tenant(tenant_id, log=log)

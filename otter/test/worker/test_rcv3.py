@@ -3,7 +3,9 @@ Tests for RCv3-specific worker code.
 """
 from uuid import uuid4
 
-from effect import ComposedDispatcher, Effect
+from characteristic import attributes
+
+from effect import Effect
 
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
@@ -29,13 +31,12 @@ def _rcv3_add_response(lb_id, server_id):
     }]
 
 
+@attributes(['dispatcher', 'tenant_id'])
 class _RequestBag(object):
     """
     Something like the ``request_func`` (lol) that gets passed around from the
     supervisor, at least as far as _rcv3.py is concerned.
     """
-    def __init__(self, dispatcher):
-        self.dispatcher = dispatcher
 
 
 class RCv3Tests(SynchronousTestCase):
@@ -49,7 +50,8 @@ class RCv3Tests(SynchronousTestCase):
         self.reactor = object()
         self.patch(_rcv3, "perform", self._fake_perform)
         self.dispatcher = object()
-        self.request_bag = _RequestBag(self.dispatcher)
+        self.request_bag = _RequestBag(dispatcher=self.dispatcher,
+                                       tenant_id='thetenantid')
 
     def _fake_perform(self, dispatcher, effect):
         """
@@ -60,8 +62,11 @@ class RCv3Tests(SynchronousTestCase):
         """
         self.assertIdentical(dispatcher, self.dispatcher)
 
-        self.assertTrue(isinstance(effect, Effect))
-        (sub_effect,) = effect.intent.effects
+        self.assertIs(type(effect), Effect)
+        tenant_scope = effect.intent
+        self.assertEqual(tenant_scope.tenant_id, 'thetenantid')
+        parallel = effect.intent.effect.intent
+        (sub_effect,) = parallel.effects
         req = sub_effect.intent
 
         self.assertEqual(req.service_type, ServiceType.RACKCONNECT_V3)
