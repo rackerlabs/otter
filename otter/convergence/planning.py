@@ -1,6 +1,8 @@
 """Code related to creating a plan for convergence."""
 
-from pyrsistent import pbag, pset, s
+from functools import partial
+
+from pyrsistent import pbag, pmap, pset, s
 
 from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
@@ -301,6 +303,30 @@ def optimize_steps(steps):
     omg_optimized = concat(_optimizers[step_type](steps)
                            for step_type, steps in steps_by_type.iteritems())
     return pbag(concatv(omg_optimized, unoptimizable))
+
+
+_DEFAULT_STEP_LIMITS = pmap({
+    CreateServer: 3
+})
+
+
+def _limit_step_count(steps, step_limits):
+    """
+    Limits step count by type.
+
+    :param steps: An iterable of steps.
+    :param step_limits: A dict mapping step classes to their maximum allowable
+        count. Classes not present in this dict have no limit.
+    :return: The input steps
+    :rtype: pset
+    """
+    return pbag(concat(typed_steps[:step_limits.get(cls)]
+                       for (cls, typed_steps)
+                       in groupby(type, steps).iteritems()))
+
+
+_default_limit_step_count = partial(
+    _limit_step_count, step_limits=_DEFAULT_STEP_LIMITS)
 
 
 def plan(desired_group_state, servers, lb_nodes, now):
