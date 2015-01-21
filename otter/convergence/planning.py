@@ -165,15 +165,15 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     :param set servers_with_cheese: a list of :obj:`NovaServer` instances.
         This must only contain servers that are being managed for the specified
         group.
-    :param load_balancer_contents: a set of :obj:`CLBNode` instances.  This must
-        contain all the load balancer mappings for all the load balancers on the
-        tenant.
+    :param load_balancer_contents: a set of :obj:`CLBNode` instances.  This
+        must contain all the load balancer mappings for all the load balancers
+        on the tenant.
     :param float now: number of seconds since the POSIX epoch indicating the
         time at which the convergence was requested.
     :param float timeout: Number of seconds after which we will delete a server
         in BUILD.
-
     :rtype: :obj:`pbag` of `IStep`
+
     """
     lbs_by_address = groupby(lambda n: n.address, load_balancer_contents)
 
