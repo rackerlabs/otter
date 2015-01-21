@@ -5,8 +5,7 @@ Tests for `metrics.py`
 import operator
 from io import StringIO
 
-from effect import (
-    ComposedDispatcher, Constant, Effect, TypeDispatcher, base_dispatcher)
+from effect import Constant, Effect, base_dispatcher
 from effect.testing import resolve_effect
 
 import mock
@@ -48,8 +47,7 @@ from otter.test.utils import (
     Provides,
     matches,
     mock_log,
-    patch,
-    resolve_stubs,
+    patch
 )
 
 
