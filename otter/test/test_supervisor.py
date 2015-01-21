@@ -1,6 +1,9 @@
 """
 Tests for the worker supervisor.
 """
+
+from effect import Constant, Effect
+
 import mock
 
 from testtools.matchers import ContainsDict, Equals, IsInstance
@@ -13,14 +16,16 @@ from zope.interface.verify import verifyObject
 
 from otter import supervisor
 from otter.constants import ServiceType
+from otter.http import TenantScope
 from otter.models.interface import (
-    IScalingGroup, GroupState, NoSuchScalingGroupError)
+    GroupState, IScalingGroup, NoSuchScalingGroupError)
 from otter.supervisor import (
-    ISupervisor, SupervisorService, set_supervisor, remove_server_from_group,
-    execute_launch_config, CannotDeleteServerBelowMinError, ServerNotFoundError)
+    CannotDeleteServerBelowMinError, ISupervisor, ServerNotFoundError,
+    SupervisorService, execute_launch_config, remove_server_from_group,
+    set_supervisor)
 from otter.test.utils import (
-    iMock, patch, mock_log, CheckFailure, matches, FakeSupervisor, IsBoundWith,
-    DummyException, mock_group)
+    CheckFailure, DummyException, FakeSupervisor, IsBoundWith, iMock, matches,
+    mock_group, mock_log, patch)
 from otter.util.deferredutils import DeferredPool
 
 
@@ -111,6 +116,11 @@ class SupervisorTests(SynchronousTestCase):
         self.assertEqual(request_func.service_catalog, self.service_catalog)
         self.assertEqual(request_func.region, "ORD")
         self.assertEqual(request_func.lb_region, "ORD")
+        self.assertEqual(request_func.tenant_id, self.group.tenant_id)
+        # make sure the dispatcher supports some interesting intent that is
+        # only provided by the full dispatcher
+        tscope = TenantScope(Effect(Constant(1)), 'tenant_id')
+        self.assertIsNot(request_func.dispatcher(tscope), None)
 
 
 class HealthCheckTests(SupervisorTests):

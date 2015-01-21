@@ -5,7 +5,7 @@ from effect.testing import Stub, resolve_effect
 
 import mock
 
-from pyrsistent import pmap
+from pyrsistent import freeze, pmap
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -17,8 +17,8 @@ from otter.convergence.composition import (
     tenant_is_enabled)
 from otter.convergence.model import (
     CLBDescription, DesiredGroupState, NovaServer, ServerState)
+from otter.http import service_request
 from otter.test.utils import resolve_stubs
-from otter.util.pure_http import has_code
 
 
 class JsonToLBConfigTests(SynchronousTestCase):
@@ -99,7 +99,6 @@ class ExecConvergenceTests(SynchronousTestCase):
         Executes optimized steps if state of world does not match desired and
         returns True to be called again.
         """
-        reqfunc = lambda **k: Effect(k)
         get_all_convergence_data = self._get_gacd_func('gid')
         desired = DesiredGroupState(
             launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
@@ -107,23 +106,22 @@ class ExecConvergenceTests(SynchronousTestCase):
             desired=2)
 
         eff = execute_convergence(
-            reqfunc, 'gid', desired,
-            get_all_convergence_data=get_all_convergence_data)
+            'gid', desired, get_all_convergence_data=get_all_convergence_data)
 
         eff = resolve_stubs(eff)
         # The steps are optimized
         self.assertIsInstance(eff.intent, ParallelEffects)
         self.assertEqual(len(eff.intent.effects), 1)
-        self.assertEqual(
-            eff.intent.effects[0].intent,
-            {'url': 'loadbalancers/23', 'headers': None,
-             'service_type': ServiceType.CLOUD_LOAD_BALANCERS,
-             'data': {'nodes': mock.ANY},
-             'method': 'POST',
-             'success_pred': has_code(200)})
+        expected_req = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'POST',
+            'loadbalancers/23',
+            data=mock.ANY)
+        got_req = eff.intent.effects[0].intent
+        self.assertEqual(got_req, expected_req.intent)
         # separate check for nodes; they are unique, but can be in any order
         self.assertEqual(
-            set(map(pmap, eff.intent.effects[0].intent['data']['nodes'])),
+            set(freeze(got_req.data['nodes'])),
             set([pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
                        'condition': 'ENABLED', 'address': '10.0.0.2'}),
                  pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
@@ -142,10 +140,9 @@ class ExecConvergenceTests(SynchronousTestCase):
             launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
             desired_lbs={},
             desired=2)
-        reqfunc = lambda **k: 1 / 0
         get_all_convergence_data = self._get_gacd_func('gid')
         eff = execute_convergence(
-            reqfunc, 'gid', desired,
+            'gid', desired,
             get_all_convergence_data=get_all_convergence_data)
         self.assertIs(resolve_stubs(eff), False)
 
