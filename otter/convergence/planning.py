@@ -51,8 +51,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     # only put nodes into draining if a timeout is specified
     if timeout > 0:
         draining, to_drain = partition_groups(
-            lambda n: n.description.condition, nodes, [CLBNodeCondition.DRAINING,
-                                                       CLBNodeCondition.ENABLED])
+            lambda n: n.description.condition, nodes,
+            [CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED])
 
         # Nothing should be done to these, because the timeout has not expired
         # and there are still active connections
@@ -273,7 +273,8 @@ def _optimize_lb_adds(lb_add_steps):
         AddNodesToCLB(
             lb_id=lbid,
             address_configs=pset(reduce(lambda s, y: s.union(y),
-                                        [step.address_configs for step in steps])))
+                                        [step.address_configs
+                                         for step in steps])))
         for lbid, steps in steps_by_lb.iteritems()
     ]
 
