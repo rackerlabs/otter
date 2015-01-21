@@ -82,15 +82,14 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     is currently on, and it will be added on the correct port, with the correct
     weight, and correct status, to the desired load balancers.
 
-    :param dict desired_lb_state: As per :obj:`DesiredGroupState`.desired_lbs
-    :param list current_lb_nodes: `list` of :obj:`CLBNode`
-    :param str ip_address: the IP address of the server to converge
-
     Note: this supports user customizable types (e.g. PRIMARY or SECONDARY),
     but in practice it should probably only be added as PRIMARY.  SECONDARY can
     only be used if load balancer health monitoring is enabled, and would be
     used as backup servers anyway.
 
+    :param dict desired_lb_state: As per :obj:`DesiredGroupState`.desired_lbs
+    :param list current_lb_nodes: `list` of :obj:`CLBNode`
+    :param str ip_address: the IP address of the server to converge
     :rtype: `list` of :class:`IStep`
     """
     desired = {
