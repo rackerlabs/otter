@@ -9,8 +9,8 @@ from zope.interface import implementer
 
 from otter.constants import ServiceType
 from otter.convergence.effecting import _reqs_to_effect, steps_to_effect
-from otter.convergence.steps import Request, IStep
-from otter.http import get_request_func
+from otter.convergence.steps import IStep, Request
+from otter.http import get_request_func, service_request
 from otter.test.utils import defaults_by_name
 from otter.util.pure_http import has_code
 
@@ -26,6 +26,9 @@ from otter.util.pure_http import has_code
 class _PureRequestStub(object):
     """
     A bound request stub, suitable for testing.
+
+    NOTE: This is not used in this test module any more. Delete once it's
+    unused.
     """
 
 
@@ -59,7 +62,7 @@ class RequestsToEffectTests(SynchronousTestCase):
         Assert that the given convergence requests compile down to a parallel
         effect comprised of the given effects.
         """
-        effect = _reqs_to_effect(_PureRequestStub, conv_requests)
+        effect = _reqs_to_effect(conv_requests)
         self.assertEqual(effect, parallel(expected_effects))
 
     def test_single_request(self):
@@ -72,12 +75,13 @@ class RequestsToEffectTests(SynchronousTestCase):
                     path="/whatever",
                     success_pred=has_code(999))]
         expected_effects = [
-            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                             method="GET",
-                             url="/whatever",
-                             headers=None,
-                             data=None,
-                             success_pred=has_code(999))]
+            service_request(
+                service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                method="GET",
+                url="/whatever",
+                headers=None,
+                data=None,
+                success_pred=has_code(999))]
         self.assertCompileTo(conv_requests, expected_effects)
 
     def test_multiple_requests(self):
@@ -94,17 +98,19 @@ class RequestsToEffectTests(SynchronousTestCase):
                     path="/whatever/something/else",
                     success_pred=has_code(231))]
         expected_effects = [
-            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                             method="GET",
-                             url="/whatever",
-                             headers=None,
-                             data=None),
-            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                             method="GET",
-                             url="/whatever/something/else",
-                             headers=None,
-                             data=None,
-                             success_pred=has_code(231))]
+            service_request(
+                service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                method="GET",
+                url="/whatever",
+                headers=None,
+                data=None),
+            service_request(
+                service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                method="GET",
+                url="/whatever/something/else",
+                headers=None,
+                data=None,
+                success_pred=has_code(231))]
         self.assertCompileTo(conv_requests, expected_effects)
 
     def test_multiple_requests_of_different_type(self):
@@ -126,22 +132,25 @@ class RequestsToEffectTests(SynchronousTestCase):
                     path="/xyzzy",
                     data=data_sentinel)]
         expected_effects = [
-            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                             method="GET",
-                             url="/whatever",
-                             headers=None,
-                             data=None),
-            _PureRequestStub(service_type=ServiceType.CLOUD_LOAD_BALANCERS,
-                             method="GET",
-                             url="/whatever/something/else",
-                             headers=None,
-                             data=None,
-                             success_pred=has_code(231)),
-            _PureRequestStub(service_type=ServiceType.CLOUD_SERVERS,
-                             method="POST",
-                             url="/xyzzy",
-                             headers=None,
-                             data=data_sentinel)]
+            service_request(
+                service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                method="GET",
+                url="/whatever",
+                headers=None,
+                data=None),
+            service_request(
+                service_type=ServiceType.CLOUD_LOAD_BALANCERS,
+                method="GET",
+                url="/whatever/something/else",
+                headers=None,
+                data=None,
+                success_pred=has_code(231)),
+            service_request(
+                service_type=ServiceType.CLOUD_SERVERS,
+                method="POST",
+                url="/xyzzy",
+                headers=None,
+                data=data_sentinel)]
         self.assertCompileTo(conv_requests, expected_effects)
 
 
@@ -161,18 +170,18 @@ class StepsToEffectTests(SynchronousTestCase):
         """Steps are converted to requests."""
         steps = [Steppy(), Steppy()]
         expected_effects = [
-            _PureRequestStub(
+            service_request(
                 service_type=ServiceType.CLOUD_LOAD_BALANCERS,
                 method="GET",
                 url="whatever",
                 headers=None,
                 data=None),
-            _PureRequestStub(
+            service_request(
                 service_type=ServiceType.CLOUD_LOAD_BALANCERS,
                 method="GET",
                 url="whatever",
                 headers=None,
                 data=None),
         ]
-        effect = steps_to_effect(_PureRequestStub, steps)
+        effect = steps_to_effect(steps)
         self.assertEqual(effect, parallel(expected_effects))

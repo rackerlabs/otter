@@ -5,7 +5,7 @@ from effect.testing import Stub, resolve_effect
 
 import mock
 
-from pyrsistent import pmap
+from pyrsistent import freeze, pmap
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -17,8 +17,8 @@ from otter.convergence.composition import (
     tenant_is_enabled)
 from otter.convergence.model import (
     CLBDescription, DesiredGroupState, NovaServer, ServerState)
+from otter.http import service_request
 from otter.test.utils import resolve_stubs
-from otter.util.pure_http import has_code
 
 
 class JsonToLBConfigTests(SynchronousTestCase):
@@ -33,7 +33,8 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 20, 'port': 800},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80), CLBDescription(lb_id='20', port=800)],
+            {20: [CLBDescription(lb_id='20', port=80),
+                  CLBDescription(lb_id='20', port=800)],
              21: [CLBDescription(lb_id='21', port=81)]})
 
     def test_with_rackconnect(self):
@@ -41,9 +42,10 @@ class JsonToLBConfigTests(SynchronousTestCase):
         LB config with rackconnect
         """
         self.assertEqual(
-            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
-                               {'loadBalancerId': 200, 'type': 'RackConnectV3'},
-                               {'loadBalancerId': 21, 'port': 81}]),
+            json_to_LBConfigs(
+                [{'loadBalancerId': 20, 'port': 80},
+                 {'loadBalancerId': 200, 'type': 'RackConnectV3'},
+                 {'loadBalancerId': 21, 'port': 81}]),
             {20: [CLBDescription(lb_id='20', port=80)],
              21: [CLBDescription(lb_id='21', port=81)]})
 
@@ -51,7 +53,9 @@ class JsonToLBConfigTests(SynchronousTestCase):
 class GetDesiredGroupStateTests(SynchronousTestCase):
     """Tests for :func:`get_desired_group_state`."""
     def test_convert(self):
-        """An Otter launch config is converted into a :obj:`DesiredGroupState`."""
+        """
+        An Otter launch config is converted into a :obj:`DesiredGroupState`.
+        """
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config,
                        'loadBalancers': [{'loadBalancerId': 23, 'port': 80}]}}
@@ -84,44 +88,40 @@ class ExecConvergenceTests(SynchronousTestCase):
                        servicenet_address='10.0.0.2')
         ]
 
-    def _get_gacd_func(self, servers, group_id, reqfunc):
-        def get_all_convergence_data(request_func, grp_id):
-            self.assertIs(request_func, reqfunc)
+    def _get_gacd_func(self, group_id):
+        def get_all_convergence_data(grp_id):
             self.assertEqual(grp_id, group_id)
             return Effect(Stub(Constant((self.servers, []))))
         return get_all_convergence_data
 
     def test_success(self):
         """
-        Executes optimized steps if state of world does not match desired and returns
-        True to be called again
+        Executes optimized steps if state of world does not match desired and
+        returns True to be called again.
         """
-        reqfunc = lambda **k: Effect(k)
-        get_all_convergence_data = self._get_gacd_func(
-            self.servers, 'gid', reqfunc)
+        get_all_convergence_data = self._get_gacd_func('gid')
         desired = DesiredGroupState(
             launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
             desired_lbs={23: [CLBDescription(lb_id='23', port=80)]},
             desired=2)
 
         eff = execute_convergence(
-            reqfunc, 'gid', desired,
-            get_all_convergence_data=get_all_convergence_data)
+            'gid', desired, get_all_convergence_data=get_all_convergence_data)
 
         eff = resolve_stubs(eff)
         # The steps are optimized
         self.assertIsInstance(eff.intent, ParallelEffects)
         self.assertEqual(len(eff.intent.effects), 1)
+        expected_req = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'POST',
+            'loadbalancers/23',
+            data=mock.ANY)
+        got_req = eff.intent.effects[0].intent
+        self.assertEqual(got_req, expected_req.intent)
+        # separate check for nodes; they are unique, but can be in any order
         self.assertEqual(
-            eff.intent.effects[0].intent,
-            {'url': 'loadbalancers/23', 'headers': None,
-             'service_type': ServiceType.CLOUD_LOAD_BALANCERS,
-             'data': {'nodes': mock.ANY},
-             'method': 'POST',
-             'success_pred': has_code(200)})
-        # separate check for nodes as it can be in any order but content is unique
-        self.assertEqual(
-            set(map(pmap, eff.intent.effects[0].intent['data']['nodes'])),
+            set(freeze(got_req.data['nodes'])),
             set([pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
                        'condition': 'ENABLED', 'address': '10.0.0.2'}),
                  pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
@@ -133,17 +133,16 @@ class ExecConvergenceTests(SynchronousTestCase):
 
     def test_no_steps(self):
         """
-        If state of world matches desired, no steps are executed and False is returned
+        If state of world matches desired, no steps are executed and False
+        is returned.
         """
         desired = DesiredGroupState(
             launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
             desired_lbs={},
             desired=2)
-        reqfunc = lambda **k: 1 / 0
-        get_all_convergence_data = self._get_gacd_func(
-            self.servers, 'gid', reqfunc)
+        get_all_convergence_data = self._get_gacd_func('gid')
         eff = execute_convergence(
-            reqfunc, 'gid', desired,
+            'gid', desired,
             get_all_convergence_data=get_all_convergence_data)
         self.assertIs(resolve_stubs(eff), False)
 

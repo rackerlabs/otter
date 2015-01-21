@@ -38,7 +38,8 @@ test_config = {
     'cloudServersOpenStack': 'cloudServersOpenStack',
     'cloudLoadBalancers': 'cloudLoadBalancers',
     'rackconnect': 'rackconnect',
-    'metrics': {'service': 'cloudMetricsIngest'}
+    'metrics': {'service': 'cloudMetricsIngest',
+                'region': 'IAD'}
 }
 
 
