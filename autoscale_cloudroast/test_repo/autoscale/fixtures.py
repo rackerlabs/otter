@@ -40,6 +40,7 @@ class AutoscaleFixture(BaseTestFixture):
         user_config = UserConfig()
         access_data = AuthProvider.get_access_data(cls.endpoint_config,
                                                    user_config)
+        print access_data
         server_service = access_data.get_service(
             cls.autoscale_config.server_endpoint_name)
         load_balancer_service = access_data.get_service(
@@ -63,6 +64,7 @@ class AutoscaleFixture(BaseTestFixture):
                 'json', 'json')
             print "RCV3 URL: {}".format(rcv3_url)
         except:
+            cls.rcv3_client = None
             print "This account does not support rackconnect"
             # Skip rackconnect test? TO_DO
 
