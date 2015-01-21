@@ -36,7 +36,7 @@ their own changes.
   necessary.
 - Any party may request an additional reviewer, at which point the PR must not
   be merged until the additional review is done.
-- additional reviewers can be named explicitly or anonymously. e.g.:
+- Additional reviewers can be named explicitly or anonymously. e.g.:
   - author says "@manishtomar or @cyli: you know about Cassandra code, so can
     one of you review this?"
   - First reviewer says "LGTM, but I'm not very confident. Can someone else
