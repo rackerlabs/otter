@@ -21,7 +21,6 @@ from otter.http import (
     TenantScope,
     add_bind_service,
     concretize_service_request,
-    get_request_func,
     perform_tenant_scope,
     service_request)
 from otter.test.utils import stub_pure_response
@@ -33,80 +32,6 @@ from otter.util.pure_http import Request, has_code
 def resolve_authenticate(eff, token='token'):
     """Resolve an Authenticate effect with test data."""
     return resolve_effect(eff, (token, fake_service_catalog))
-
-
-class GetRequestFuncTests(SynchronousTestCase):
-    """
-    Tests for :func:`get_request_func`.
-
-    These are duplicates of the tests for :obj:`ServiceRequest`. When
-    everything is switched over to that, :func:`get_request_func` and these
-    tests should be deleted.
-    """
-
-    def setUp(self):
-        """Save some common parameters."""
-        self.log = object()
-        self.authenticator = object()
-        self.request_func = get_request_func(
-            self.authenticator, 1, self.log,
-            {ServiceType.CLOUD_SERVERS: {'name': 'cloudServersOpenStack'}},
-            'DFW')
-
-    def test_get_request_func_authenticates(self):
-        """
-        The request function returned from get_request_func performs
-        authentication before making the request.
-        """
-        eff = self.request_func(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
-        expected_intent = Authenticate(self.authenticator, 1, self.log)
-        self.assertEqual(eff.intent, expected_intent)
-        next_eff = resolve_authenticate(eff)
-        # The next effect in the chain is the requested HTTP request,
-        # with appropriate auth headers
-        self.assertEqual(
-            next_eff.intent,
-            Request(method='GET', url='http://dfw.openstack/servers',
-                    headers=headers('token'), log=self.log))
-
-    def test_invalidate_on_auth_error_code(self):
-        """
-        Upon authentication error, the auth cache is invalidated.
-        """
-        eff = self.request_func(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
-        next_eff = resolve_authenticate(eff)
-        # When the HTTP response is an auth error, the auth cache is
-        # invalidated, by way of the next effect:
-        invalidate_eff = resolve_effect(next_eff, stub_pure_response("", 401))
-        expected_intent = InvalidateToken(self.authenticator, 1)
-        self.assertEqual(invalidate_eff.intent, expected_intent)
-        self.assertRaises(APIError, resolve_effect, invalidate_eff, None)
-
-    def test_json(self):
-        """
-        JSON-serializable requests are dumped before being sent, and
-        JSON-serialized responses are parsed.
-        """
-        input_json = {"a": 1}
-        output_json = {"b": 2}
-        eff = self.request_func(ServiceType.CLOUD_SERVERS, "GET", "servers",
-                                data=input_json)
-        next_eff = resolve_authenticate(eff)
-        result = resolve_effect(next_eff,
-                                stub_pure_response(json.dumps(output_json)))
-        self.assertEqual(next_eff.intent.data, json.dumps(input_json))
-        self.assertEqual(result, output_json)
-
-    def test_no_json_response(self):
-        """
-        ``json_response`` can be set to :data:`False` to get the plaintext.
-        response.
-        """
-        eff = self.request_func(ServiceType.CLOUD_SERVERS, "GET", "servers",
-                                json_response=False)
-        next_eff = resolve_authenticate(eff)
-        result = resolve_effect(next_eff, stub_pure_response("foo"))
-        self.assertEqual(result, "foo")
 
 
 class BindServiceTests(SynchronousTestCase):
