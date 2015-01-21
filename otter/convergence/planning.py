@@ -60,7 +60,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
                     if (now - node.drained_at < timeout and
                         (node.connections is None or node.connections > 0))]
 
-    removes = [RemoveFromCLB(lb_id=node.description.lb_id, node_id=node.node_id)
+    removes = [RemoveFromCLB(lb_id=node.description.lb_id,
+                             node_id=node.node_id)
                for node in (set(nodes) - set(to_drain) - set(in_drain))]
 
     changes = [ChangeCLBNode(lb_id=node.description.lb_id,
