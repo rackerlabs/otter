@@ -86,10 +86,10 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     :param list current_lb_nodes: `list` of :obj:`CLBNode`
     :param str ip_address: the IP address of the server to converge
 
-    Note: this supports user customizable types (e.g. PRIMARY or SECONDARY), but
-    in practice it should probably only be added as PRIMARY.  SECONDARY can only
-    be used if load balancer health monitoring is enabled, and would be used as
-    backup servers anyway.
+    Note: this supports user customizable types (e.g. PRIMARY or SECONDARY),
+    but in practice it should probably only be added as PRIMARY.  SECONDARY can
+    only be used if load balancer health monitoring is enabled, and would be
+    used as backup servers anyway.
 
     :rtype: `list` of :class:`IStep`
     """
@@ -134,8 +134,8 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
     If server is not already in draining state, put it into draining state.
     If the server is free of load balancers, just delete it.
     """
-    lb_draining_steps = _remove_from_lb_with_draining(timeout, current_lb_nodes,
-                                                      now)
+    lb_draining_steps = _remove_from_lb_with_draining(
+        timeout, current_lb_nodes, now)
 
     # if there are no load balancers that are waiting on draining timeouts or
     # connections, just delete the server too
