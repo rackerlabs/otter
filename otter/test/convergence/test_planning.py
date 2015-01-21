@@ -552,9 +552,11 @@ class ConvergeTests(SynchronousTestCase):
                 set([server('abc', ServerState.ERROR,
                             servicenet_address='1.1.1.1')]),
                 set([CLBNode(address='1.1.1.1', node_id='3',
-                             description=CLBDescription(lb_id='5', port=80)),
+                             description=CLBDescription(lb_id='5',
+                                                        port=80)),
                      CLBNode(address='1.1.1.1', node_id='5',
-                             description=CLBDescription(lb_id='5', port=8080))]),
+                             description=CLBDescription(lb_id='5',
+                                                        port=8080))]),
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
