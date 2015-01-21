@@ -272,9 +272,7 @@ def _optimize_lb_adds(lb_add_steps):
     return [
         AddNodesToCLB(
             lb_id=lbid,
-            address_configs=pset(reduce(lambda s, y: s.union(y),
-                                        [step.address_configs
-                                         for step in steps])))
+            address_configs=pset(concat(s.address_configs for s in steps)))
         for lbid, steps in steps_by_lb.iteritems()
     ]
 
