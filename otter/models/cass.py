@@ -54,72 +54,94 @@ def serialize_json_data(data, ver):
 # Otherwise it won't.
 #
 # Thus, selects have a semicolon, everything else doesn't.
-_cql_view = ('SELECT {column}, created_at FROM {cf} WHERE "tenantId" = :tenantId AND '
+_cql_view = ('SELECT {column}, created_at FROM {cf} '
+             'WHERE "tenantId" = :tenantId AND '
              '"groupId" = :groupId;')
 _cql_view_policy = ('SELECT data, version FROM {cf} '
                     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
                     '"policyId" = :policyId;')
-_cql_view_webhook = ('SELECT data, capability FROM {cf} WHERE "tenantId" = :tenantId AND '
+_cql_view_webhook = ('SELECT data, capability FROM {cf} '
+                     'WHERE "tenantId" = :tenantId AND '
                      '"groupId" = :groupId AND "policyId" = :policyId AND '
                      '"webhookId" = :webhookId;')
-_cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, launch_config, active, '
-                     'pending, "policyTouched", paused, desired, created_at) '
-                     'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-                     ':pending, :policyTouched, :paused, :desired, :created_at) '
+_cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, '
+                     'launch_config, active, pending, "policyTouched", paused, '
+                     'desired, created_at) '
+                     'VALUES (:tenantId, :groupId, :group_config, '
+                     ':launch_config, :active, :pending, :policyTouched, '
+                     ':paused, :desired, :created_at) '
                      'USING TIMESTAMP :ts')
-_cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
-                      'pending, "groupTouched", "policyTouched", paused, desired, created_at '
-                      'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
+_cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, '
+                      'launch_config, active, pending, "groupTouched", '
+                      '"policyTouched", paused, desired, created_at '
+                      'FROM {cf} '
+                      'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", data, version) '
     'VALUES (:tenantId, :groupId, :{name}policyId, :{name}data, :{name}version)')
-_cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
-                           '"policyTouched", paused, desired) VALUES(:tenantId, :groupId, :active, '
-                           ':pending, :groupTouched, :policyTouched, :paused, :desired) '
-                           'USING TIMESTAMP :ts')
-_cql_view_group_state = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
-                         '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
-                         '"tenantId" = :tenantId AND "groupId" = :groupId;')
+_cql_insert_group_state = (
+    'INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
+    '"policyTouched", paused, desired) VALUES(:tenantId, :groupId, :active, '
+    ':pending, :groupTouched, :policyTouched, :paused, :desired) '
+    'USING TIMESTAMP :ts')
+_cql_view_group_state = (
+    'SELECT "tenantId", "groupId", group_config, active, pending, '
+    '"groupTouched", "policyTouched", paused, desired, created_at '
+    'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
 
 # --- Event related queries
 _cql_insert_group_event = (
-    'INSERT INTO {cf}(bucket, "tenantId", "groupId", "policyId", trigger, version) '
-    'VALUES (:{name}bucket, :tenantId, :groupId, :{name}policyId, :{name}trigger, :{name}version)')
+    'INSERT INTO {cf}(bucket, "tenantId", "groupId", "policyId", trigger, '
+    'version) '
+    'VALUES (:{name}bucket, :tenantId, :groupId, :{name}policyId, '
+    ':{name}trigger, :{name}version)')
 _cql_insert_group_event_with_cron = (
-    'INSERT INTO {cf}(bucket, "tenantId", "groupId", "policyId", trigger, cron, version) '
-    'VALUES (:{name}bucket, :tenantId, :groupId, :{name}policyId, :{name}trigger, '
-    ':{name}cron, :{name}version)')
+    'INSERT INTO {cf}(bucket, "tenantId", "groupId", "policyId", trigger, '
+    'cron, version) '
+    'VALUES (:{name}bucket, :tenantId, :groupId, :{name}policyId, '
+    ':{name}trigger, :{name}cron, :{name}version)')
 _cql_insert_cron_event = (
-    'INSERT INTO {cf}(bucket, "tenantId", "groupId", "policyId", trigger, cron, version) '
+    'INSERT INTO {cf}(bucket, "tenantId", "groupId", "policyId", trigger, '
+    'cron, version) '
     'VALUES (:{name}bucket, :{name}tenantId, :{name}groupId, :{name}policyId, '
     ':{name}trigger, :{name}cron, :{name}version);')
 _cql_fetch_batch_of_events = (
-    'SELECT "tenantId", "groupId", "policyId", "trigger", cron, version FROM {cf} '
+    'SELECT "tenantId", "groupId", "policyId", "trigger", cron, version '
+    'FROM {cf} '
     'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')
-_cql_delete_bucket_event = ('DELETE FROM {cf} WHERE bucket = :bucket '
-                            'AND trigger = :{name}trigger AND "policyId" = :{name}policyId;')
+_cql_delete_bucket_event = (
+    'DELETE FROM {cf} WHERE bucket = :bucket '
+    'AND trigger = :{name}trigger AND "policyId" = :{name}policyId;')
 _cql_oldest_event = 'SELECT * from {cf} WHERE bucket=:bucket LIMIT 1;'
 
 _cql_insert_webhook = (
-    'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
-    '"webhookKey") VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
-    ':{name}Capability, :{name}Key)')
-_cql_update = ('INSERT INTO {cf}("tenantId", "groupId", {column}) '
-               'VALUES (:tenantId, :groupId, {name}) USING TIMESTAMP :ts')
-_cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
-                       'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
-_cql_delete_group = ('DELETE FROM {cf} USING TIMESTAMP :ts '
-                     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
-_cql_delete_all_in_group = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
-                            '"groupId" = :groupId{name}')
-_cql_delete_all_in_policy = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId '
-                             'AND "groupId" = :groupId AND "policyId" = :policyId')
-_cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
-                           '"groupId" = :groupId AND "policyId" = :policyId AND '
-                           '"webhookId" = :webhookId')
-_cql_list_states = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
-                    '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
-                    '"tenantId" = :tenantId;')
+    'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, '
+    'capability, '
+    '"webhookKey") VALUES (:tenantId, :groupId, :policyId, :{name}Id, '
+    ':{name}, :{name}Capability, :{name}Key)')
+_cql_update = (
+    'INSERT INTO {cf}("tenantId", "groupId", {column}) '
+    'VALUES (:tenantId, :groupId, {name}) USING TIMESTAMP :ts')
+_cql_update_webhook = (
+    'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
+    'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
+_cql_delete_group = (
+    'DELETE FROM {cf} USING TIMESTAMP :ts '
+    'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
+_cql_delete_all_in_group = (
+    'DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
+    '"groupId" = :groupId{name}')
+_cql_delete_all_in_policy = (
+    'DELETE FROM {cf} WHERE "tenantId" = :tenantId '
+    'AND "groupId" = :groupId AND "policyId" = :policyId')
+_cql_delete_one_webhook = (
+    'DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
+    '"groupId" = :groupId AND "policyId" = :policyId AND '
+    '"webhookId" = :webhookId')
+_cql_list_states = (
+    'SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
+    '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
+    '"tenantId" = :tenantId;')
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE '
                     '"tenantId" = :tenantId AND "groupId" = :groupId;')
 _cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} '
