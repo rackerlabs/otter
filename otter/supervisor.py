@@ -5,10 +5,12 @@ This code is specific to the launch_server_v1 worker.
 """
 
 from twisted.application.service import Service
+from twisted.internet import reactor
 from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
+from otter.effect_dispatcher import get_full_dispatcher
 from otter.models.interface import NoSuchScalingGroupError
 from otter.http import get_request_func
 from otter.log import audit
@@ -82,12 +84,12 @@ class SupervisorService(object, Service):
     """
     name = "supervisor"
 
-    def __init__(self, authenticator, region, coiterate, service_mapping):
+    def __init__(self, authenticator, region, coiterate, service_configs):
         self.authenticator = authenticator
         self.region = region
         self.coiterate = coiterate
         self.deferred_pool = DeferredPool()
-        self.service_mapping = service_mapping
+        self.service_configs = service_configs
 
     def _get_request_func(self, log, scaling_group):
         """
@@ -95,12 +97,16 @@ class SupervisorService(object, Service):
         some attributes for backwards compatibility.
         """
         tenant_id = scaling_group.tenant_id
+        dispatcher = get_full_dispatcher(reactor, self.authenticator, log,
+                                         self.service_configs)
+
         request_func = get_request_func(self.authenticator, tenant_id,
-                                        log, self.service_mapping,
+                                        log, self.service_configs,
                                         self.region)
         lb_region = config_value('regionOverrides.cloudLoadBalancers')
         request_func.lb_region = lb_region or self.region
         request_func.region = self.region
+        request_func.dispatcher = dispatcher
 
         log.msg("Authenticating for tenant")
         d = self.authenticator.authenticate_tenant(tenant_id, log=log)
