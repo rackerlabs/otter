@@ -204,7 +204,8 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # Scale down over capacity, starting with building, then active,
     # preferring older.  Also, finish draining/deleting servers already in
     # draining state
-    servers_to_delete = (servers_in_active + waiting_for_build)[desired_state.desired:]
+    servers_in_preferred_order =servers_in_active + waiting_for_build
+    servers_to_delete = servers_in_preferred_order[desired_state.desired:]
 
     def drain_and_delete_a_server(server):
         return _drain_and_delete(
