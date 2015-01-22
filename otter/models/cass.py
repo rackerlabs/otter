@@ -1385,9 +1385,9 @@ class CassScalingGroupCollection:
         """
         see :meth:`IScalingScheduleCollection.get_oldest_event`
         """
-        d = self.connection.execute(_cql_oldest_event.format(cf=self.event_table),
-                                    {'bucket': bucket},
-                                    ConsistencyLevel.ONE)
+        d = self.connection.execute(
+            _cql_oldest_event.format(cf=self.event_table),
+            {'bucket': bucket}, ConsistencyLevel.ONE)
         d.addCallback(lambda r: r[0] if len(r) > 0 else None)
         return d
 
