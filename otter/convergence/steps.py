@@ -200,3 +200,16 @@ class BulkRemoveFromRCv3(object):
         return _rackconnect_bulk_request(
             self.lb_node_pairs, "DELETE",
             success_pred=has_code(204))
+
+
+def _rcv3_delete_successful(lb_node_pairs, response):
+    """
+    Checks if the RCv3 bulk deletion command was successful.
+
+    This means either the response code indicated unambiguous success
+    """
+    if response.code == 204:
+        return True
+
+    fatal_errors = []
+    return bool(fatal_errors)
