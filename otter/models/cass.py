@@ -1477,7 +1477,7 @@ class CassScalingGroupCollection:
 
         d.addCallback(lambda _:
                       (True, {'cassandra_time':
-                              (self.reactor.seconds() - start_time)}))
+                              self.reactor.seconds() - start_time}))
     return d
 
 
