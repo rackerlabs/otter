@@ -303,7 +303,8 @@ def _build_policies(policies, policies_table, event_table, queries, data, bucket
     return outpolicies
 
 
-def _build_schedule_policy(policy, event_table, queries, data, polname, buckets):
+def _build_schedule_policy(policy, event_table, queries, data, polname,
+                           buckets):
     """
     Build schedule-type policy
     """
