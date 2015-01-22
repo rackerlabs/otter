@@ -364,9 +364,10 @@ def _assemble_webhook_from_row(row, include_id=False):
 
     :param dict row: a dictionary of cassandra data containing the key
         ``data`` (the user-mutable data) and the key ``capability`` (the
-        capability info, stored in cassandra as: `{<version>: <capability hash>}`)
+        capability info, stored in cassandra as:
+        ``{<version>: <capability hash>}``)
 
-    :return: the webhook, as per :data:`otter.json_schema.model_schemas.webhook`
+    :return: the webhook, as per webhook schema
     :rtype: ``dict``
     """
     webhook_base = _jsonloads_data(row['data'])
