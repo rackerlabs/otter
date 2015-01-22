@@ -1315,7 +1315,7 @@ class CassScalingGroupCollection:
 
     def get_scaling_group(self, log, tenant_id, scaling_group_id):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.get_scaling_group`
+        see :meth:`IScalingGroupCollection.get_scaling_group`
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection, self.buckets, self.kz_client,
