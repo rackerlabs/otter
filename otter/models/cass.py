@@ -582,10 +582,11 @@ class CassScalingGroup(object):
         Decorator that calls the given function with timestamp
 
         The timestamp returned is used when inserting/deleting/updating group.
-        This is required because state updates very close in time can be corrupted
-        (even if they are serial). This is because of small clock drifts in cass nodes.
-        This ensures that state updates from same node is always serial. This however
-        does not (yet) handle simultaneous executions from multiple nodes.
+        This is required because state updates very close in time can be
+        corrupted (even if they are serial). This is because of small clock
+        drifts in cass nodes.  This ensures that state updates from same node
+        is always serial. This however does not (yet) handle simultaneous
+        executions from multiple nodes.
         """
         @functools.wraps(func)
         def wrapper(*args):
