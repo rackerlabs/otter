@@ -1070,7 +1070,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_webhook`
         """
-        self.log.bind(policy_id=policy_id, webhook_id=webhook_id).msg("Deleting webhook")
+        bound_log = self.log.bind(policy_id=policy_id, webhook_id=webhook_id)
+        bound_log.msg("Deleting webhook")
 
         def _do_delete(lastRev):
             queries = [_cql_delete_one_webhook.format(cf=self.webhooks_table),
