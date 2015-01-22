@@ -1249,8 +1249,9 @@ class CassScalingGroupCollection:
                 data['paused'],
                 desired=data['desired']
             )
-            outpolicies = _build_policies(policies, self.policies_table,
-                                          self.event_table, queries, data, self.buckets)
+            outpolicies = _build_policies(
+                policies, self.policies_table,
+                self.event_table, queries, data, self.buckets)
 
             b = Batch(queries, data,
                       consistency=DEFAULT_CONSISTENCY)
