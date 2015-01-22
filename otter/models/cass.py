@@ -1074,16 +1074,18 @@ class CassScalingGroup(object):
         bound_log.msg("Deleting webhook")
 
         def _do_delete(lastRev):
-            queries = [_cql_delete_one_webhook.format(cf=self.webhooks_table),
-                       _cql_del_on_key.format(cf=self.webhooks_keys_table, name='')]
+            queries = [
+                _cql_delete_one_webhook.format(cf=self.webhooks_table),
+                _cql_del_on_key.format(cf=self.webhooks_keys_table, name='')]
 
-            d = self.connection.execute(batch(queries),
-                                        {"tenantId": self.tenant_id,
-                                         "groupId": self.uuid,
-                                         "policyId": policy_id,
-                                         "webhookId": webhook_id,
-                                         "webhookKey": lastRev['capability']['hash']},
-                                        DEFAULT_CONSISTENCY)
+            d = self.connection.execute(
+                batch(queries),
+                {"tenantId": self.tenant_id,
+                 "groupId": self.uuid,
+                 "policyId": policy_id,
+                 "webhookId": webhook_id,
+                 "webhookKey": lastRev['capability']['hash']},
+                DEFAULT_CONSISTENCY)
             return d
 
         return self.get_webhook(policy_id, webhook_id).addCallback(_do_delete)
