@@ -743,8 +743,8 @@ class CassScalingGroup(object):
 
         @self.with_timestamp
         def _do_update_config(ts, lastRev):
-            queries = [_cql_update.format(cf=self.group_table, column='group_config',
-                                          name=":scaling")]
+            queries = [_cql_update.format(
+                cf=self.group_table, column='group_config', name=":scaling")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
@@ -765,8 +765,8 @@ class CassScalingGroup(object):
 
         @self.with_timestamp
         def _do_update_launch(ts, lastRev):
-            queries = [_cql_update.format(cf=self.group_table, column='launch_config',
-                                          name=":launch")]
+            queries = [_cql_update.format(
+                cf=self.group_table, column='launch_config', name=":launch")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
@@ -900,7 +900,8 @@ class CassScalingGroup(object):
                                            cqldata, '', self.buckets)
 
         def _do_update_policy(_):
-            queries.append(_cql_insert_policy.format(cf=self.policies_table, name=""))
+            queries.append(_cql_insert_policy.format(
+                cf=self.policies_table, name=""))
             cqldata['data'] = serialize_json_data(data, 1)
             b = Batch(queries, cqldata,
                       consistency=DEFAULT_CONSISTENCY)
