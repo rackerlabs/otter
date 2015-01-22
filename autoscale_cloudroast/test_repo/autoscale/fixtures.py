@@ -1,6 +1,8 @@
 """
 :summary: Base Classes for Autoscale Test Suites (Collections of Test Cases)
 """
+from __future__ import print_function
+
 
 import json
 import os
@@ -65,7 +67,7 @@ class AutoscaleFixture(BaseTestFixture):
                 'json', 'json')
         except:
             cls.rcv3_client = None
-            print "This account does not support rackconnect"
+            print("This account does not support rackconnect")
             # Skip rackconnect test? TO_DO
 
         cls.tenant_id = cls.autoscale_config.tenant_id
@@ -74,7 +76,7 @@ class AutoscaleFixture(BaseTestFixture):
         if ('preprod' in env.lower()) or ('dev' in env.lower()):
             cls.url = str(cls.autoscale_config.server_endpoint) + \
                 '/' + str(cls.tenant_id)
-            print " ------ Using dev or pre-prod otter --------"
+            print(" ------ Using dev or pre-prod otter --------")
         else:
             autoscale_service = access_data.get_service(
                 cls.autoscale_config.autoscale_endpoint_name)
@@ -410,8 +412,9 @@ class AutoscaleFixture(BaseTestFixture):
                                                    group_state.desiredCapacity)
                 )
                 if len(active_list) == expected_servers:
-                    print "Otter"
-                    print "Achieved expected servers after ", time.time() - start_time, " seconds"
+                    print("Otter")
+                    print("Achieved expected servers after ",
+                          time.time() - start_time, " seconds")
                     return [server.id for server in active_list]
             else:
                 # We're looking at the RackConnect API for our server list
@@ -421,8 +424,9 @@ class AutoscaleFixture(BaseTestFixture):
                                if (safe_hasattr(n, "cloud_server"))
                                and (n.status == "ACTIVE")]
                 if len(server_list) == expected_servers:
-                    print "RCv3"
-                    print "Achieved expected servers after ", time.time() - start_time, " seconds"
+                    print("RCv3")
+                    print("Achieved expected servers after ",
+                          time.time() - start_time, " seconds")
                     return [n.id for n in server_list]
 
             time.sleep(interval_time)
@@ -522,8 +526,8 @@ class AutoscaleFixture(BaseTestFixture):
                 else:
                     break
             else:
-                print 'Tried deleting node for 2 mins but lb {0} remained in PENDING_UPDATE'
-                ' state'.format(load_balancer)
+                print('Tried deleting node for 2 mins but lb {0} remained '
+                      'in PENDING_UPDATE state'.format(load_balancer))
 
     def get_total_num_groups(self):
         """

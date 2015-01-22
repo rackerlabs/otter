@@ -1,6 +1,8 @@
 """
 Client objects for all the autoscale api calls
 """
+from __future__ import print_function
+
 
 from urlparse import urlparse
 
@@ -937,7 +939,7 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         :rtype: Response Object
         """
         url = self.url + '/cloud_networks/{0}'.format(cloud_network_id)
-        print "### GETTING NETWORK INFO FROM: " + url
+        print("### GETTING NETWORK INFO FROM: " + url)
         return self.request('GET', url,
                             response_entity_type=RackConnectNetworkInfo)
 
@@ -948,7 +950,7 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         :rtype: Response Object
         """
         url = self.url + '/load_balancer_pools/{0}'.format(pool_id)
-        print "... RCV3 request ... ", url
+        print("... RCV3 request ... ", url)
         return self.request('GET', url, response_entity_type=RackConnectLBPool)
 
     def get_nodes_on_pool(self, pool_id):
@@ -958,7 +960,7 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         :rtype: Response Object
         """
         url = self.url + '/load_balancer_pools/{0}/nodes'.format(pool_id)
-        print "... RCV3 request ... ", url
+        print("... RCV3 request ... ", url)
         return self.request('GET', url,
                             response_entity_type=RackConnectLBNodes)
 
@@ -970,7 +972,7 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         """
         url = self.url + ('/load_balancer_pools/{0}/nodes/{1}/details'
                           .format(pool_id, node_id))
-        print "... RCV3 request ... ", url
+        print("... RCV3 request ... ", url)
         return self.request('GET', url,
                             response_entity_type=RackConnectLBNodeDetail)
 
@@ -980,6 +982,6 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         """
         url = self.url + '/load_balancer_pools/{0}/nodes/{1}'.format(pool_id,
                                                                      node_id)
-        print "... RCV3 request ... ", url
+        print("... RCV3 request ... ", url)
         return self.request('DELETE', url,
                             requestslib_kwargs=requestslib_kwargs)

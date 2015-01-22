@@ -1,6 +1,9 @@
 """
 System Integration tests for autoscaling with RackConnect V3 load balancers
 """
+from __future__ import print_function
+
+
 import random
 import time
 import unittest
@@ -132,7 +135,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         # If there was an error waiting for servers to build, abort the
         # testing.
         if dummy_asserter.err:
-            print "SetUpClass failed: background servers"
+            print("SetUpClass failed: background servers")
 
     @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
     def test_create_scaling_group_with_pool_on_cloud_network(self):
