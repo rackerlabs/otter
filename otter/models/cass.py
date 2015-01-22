@@ -171,8 +171,9 @@ _cql_count_for_group = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId 
                         'AND "groupId" = :groupId;')
 _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
 
-# seems to be pretty quick no matter the consistency - unfortunately this only checks
-# connectability to cassandra, and not whether the otter keyspace is correct, etc.
+# seems to be pretty quick no matter the consistency - unfortunately this only
+# checks connectability to cassandra, and not whether the otter keyspace is
+# correct, etc.
 _cql_health_check = ('SELECT now() FROM system.local;')
 
 
