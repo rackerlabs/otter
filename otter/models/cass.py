@@ -1318,8 +1318,8 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.get_scaling_group`
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
-                                self.connection, self.buckets, self.kz_client, self.reactor,
-                                self.local_locks)
+                                self.connection, self.buckets, self.kz_client,
+                                self.reactor, self.local_locks)
 
     def fetch_and_delete(self, bucket, now, size=100):
         """
