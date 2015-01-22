@@ -1341,9 +1341,9 @@ class CassScalingGroupCollection:
             b = Batch(queries, data, DEFAULT_CONSISTENCY)
             return b.execute(self.connection).addCallback(lambda _: events)
 
-        d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
-                                    {"size": size, "now": now, "bucket": bucket},
-                                    DEFAULT_CONSISTENCY)
+        d = self.connection.execute(
+            _cql_fetch_batch_of_events.format(cf=self.event_table),
+            {"size": size, "now": now, "bucket": bucket}, DEFAULT_CONSISTENCY)
         return d.addCallback(delete_events)
 
     def add_cron_events(self, cron_events):
