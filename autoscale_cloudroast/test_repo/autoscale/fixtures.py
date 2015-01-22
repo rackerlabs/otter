@@ -65,7 +65,7 @@ class AutoscaleFixture(BaseTestFixture):
             cls.rcv3_client = RackConnectV3APIClient(
                 rcv3_url, access_data.token.id_,
                 'json', 'json')
-        except:
+        except Exception:
             cls.rcv3_client = None
             print("This account does not support rackconnect")
             # Skip rackconnect test? TO_DO
@@ -157,7 +157,7 @@ class AutoscaleFixture(BaseTestFixture):
             cls.rcv3_load_balancer_pool = json.loads(
                 cls.autoscale_config.rcv3_load_balancer_pool)
             cls.rcv3_cloud_network = cls.autoscale_config.rcv3_cloud_network
-        except:
+        except Exception:
             # Skip all RCV3 testing
             pass
 
