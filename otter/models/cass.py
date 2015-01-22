@@ -1383,7 +1383,7 @@ class CassScalingGroupCollection:
 
     def get_oldest_event(self, bucket):
         """
-        see :meth:`otter.models.interface.IScalingScheduleCollection.get_oldest_event`
+        see :meth:`IScalingScheduleCollection.get_oldest_event`
         """
         d = self.connection.execute(_cql_oldest_event.format(cf=self.event_table),
                                     {'bucket': bucket},
