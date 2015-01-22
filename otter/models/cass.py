@@ -1103,7 +1103,9 @@ class CassScalingGroup(object):
                 _cql_delete_all_in_group.format(cf=table, name='') for table in
                 (self.policies_table, self.webhooks_table)])
             queries.append(_cql_delete_group.format(cf=self.group_table))
-            params.update({'tenantId': self.tenant_id, 'groupId': self.uuid, 'ts': ts})
+            params.update({'tenantId': self.tenant_id,
+                           'groupId': self.uuid,
+                           'ts': ts})
 
             b = Batch(queries, params,
                       consistency=DEFAULT_CONSISTENCY)
