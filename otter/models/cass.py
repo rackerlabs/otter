@@ -1194,7 +1194,8 @@ class CassScalingGroupCollection:
 
     def set_scheduler_buckets(self, buckets):
         """
-        Set round-robin list of buckets that will be used to store scheduled events
+        Set round-robin list of buckets that will be used to store scheduled
+        events.
         """
         self.buckets = itertools.cycle(buckets)
 
