@@ -640,29 +640,37 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_config`
         """
-        view_query = _cql_view.format(cf=self.group_table, column='group_config')
-        del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
+        view_query = _cql_view.format(
+            cf=self.group_table, column='group_config')
+        del_query = _cql_delete_all_in_group.format(
+            cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           DEFAULT_CONSISTENCY,
-                          NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
+                          NoSuchScalingGroupError(self.tenant_id, self.uuid),
+                          self.log)
 
-        return d.addCallback(lambda group: _jsonloads_data(group['group_config']))
+        return d.addCallback(lambda group:
+                             _jsonloads_data(group['group_config']))
 
     def view_launch_config(self):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_launch_config`
         """
-        view_query = _cql_view.format(cf=self.group_table, column='launch_config')
-        del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
+        view_query = _cql_view.format(
+            cf=self.group_table, column='launch_config')
+        del_query = _cql_delete_all_in_group.format(
+            cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           DEFAULT_CONSISTENCY,
-                          NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
+                          NoSuchScalingGroupError(self.tenant_id, self.uuid),
+                          self.log)
 
-        return d.addCallback(lambda group: _jsonloads_data(group['launch_config']))
+        return d.addCallback(lambda group:
+                             _jsonloads_data(group['launch_config']))
 
     def view_state(self, consistency=None):
         """
