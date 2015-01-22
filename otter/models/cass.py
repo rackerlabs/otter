@@ -1287,7 +1287,8 @@ class CassScalingGroupCollection:
         d.addCallback(lambda _: get_client_ts(self.reactor))
         return d.addCallback(_create_group)
 
-    def list_scaling_group_states(self, log, tenant_id, limit=100, marker=None):
+    def list_scaling_group_states(self, log, tenant_id, limit=100,
+                                  marker=None):
         """
         see :meth:`IScalingGroupCollection.list_scaling_group_states`.
         """
