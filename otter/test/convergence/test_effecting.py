@@ -1,55 +1,16 @@
 """Tests for convergence effecting."""
-from inspect import getargspec
 
-from characteristic import attributes, NOTHING
 from effect import parallel
-from mock import ANY
+
 from twisted.trial.unittest import SynchronousTestCase
+
 from zope.interface import implementer
 
 from otter.constants import ServiceType
 from otter.convergence.effecting import _reqs_to_effect, steps_to_effect
 from otter.convergence.steps import IStep, Request
-from otter.http import get_request_func, service_request
-from otter.test.utils import defaults_by_name
+from otter.http import service_request
 from otter.util.pure_http import has_code
-
-
-@attributes(["service_type", "method", "url", "headers", "data", "log",
-             "reauth_codes", "success_pred", "json_response"],
-            defaults={"headers": None,
-                      "data": None,
-                      "log": ANY,
-                      "reauth_codes": (401, 403),
-                      "success_pred": has_code(200),
-                      "json_response": True})
-class _PureRequestStub(object):
-    """
-    A bound request stub, suitable for testing.
-
-    NOTE: This is not used in this test module any more. Delete once it's
-    unused.
-    """
-
-
-class PureRequestStubTests(SynchronousTestCase):
-    """
-    Tests for :class:`_PureRequestStub`, the request func test double.
-    """
-    def test_signature_and_defaults(self):
-        """
-        Compare the test double to the real thing.
-        """
-        authenticator, log, = object(), object()
-        request_func = get_request_func(authenticator, 1234, log, {}, "XYZ")
-        args = getargspec(request_func).args
-        characteristic_attrs = _PureRequestStub.characteristic_attributes
-        self.assertEqual(set(a.name for a in characteristic_attrs), set(args))
-        characteristic_defaults = {a.name: a.default_value
-                                   for a in characteristic_attrs
-                                   if a.default_value is not NOTHING}
-        self.assertEqual(characteristic_defaults,
-                         defaults_by_name(request_func))
 
 
 class RequestsToEffectTests(SynchronousTestCase):
