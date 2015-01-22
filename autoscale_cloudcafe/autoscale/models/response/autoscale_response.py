@@ -428,8 +428,9 @@ class HistoryEvent(AutoMarshallingModel):
         Converts the dictionary representing a single event into an object
         """
         event = HistoryEvent(**event_dict)
-        # TODO: If the event type is a request event, convert the value associated with the 'data' key
-        # into a request object based on event_type
+        # TODO: If the event type is a request event, convert the value
+        # associated with the 'data' key into a request object based on
+        # event_type
         return event
 
 

@@ -1,15 +1,18 @@
 """
 Behaviors for Autoscale
 """
-from decimal import Decimal, ROUND_HALF_UP
-from datetime import datetime, timedelta
+import inspect
 import logging
 import time
-import inspect
 import unittest
 
+from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
+
 from cafe.engine.behaviors import BaseBehavior
+
 from cloudcafe.common.tools.datagen import rand_name
+
 from autoscale.models.servers import Metadata
 
 
@@ -587,23 +590,29 @@ class AutoscaleBehaviors(BaseBehavior):
             webhook['count'] = len(webhook_list)
             return webhook
 
-    def wait_for_expected_number_of_active_servers(self, group_id, expected_servers,
-                                                   interval_time=None, timeout=None,
-                                                   api="Autoscale", asserter=None):
+    def wait_for_expected_number_of_active_servers(
+            self, group_id, expected_servers, interval_time=None, timeout=None,
+            api="Autoscale", asserter=None
+    ):
         """
-        Wait for the expected_servers to arrive in either Autoscale or RackConnectV3 API.
+        Wait for the expected_servers to arrive in either Autoscale or
+        RackConnectV3 API.
 
-        :summary: verify the desired capacity in group state is equal to expected servers
-         and waits for the specified number of servers to be active on a group
+        :summary: verify the desired capacity in group state is equal to
+                  expected servers and waits for the specified number of
+                  servers to be active on a group
+
         :param group_id: Group id (AutoScale API), or pool ID (RackConnect API)
         :param expected_servers: Total active servers expected on the group
         :param interval_time: Time to wait during polling group state
         :param timeout: Time to wait before exiting this function
-        :param api: Either "Autoscale" or "RackConnect".  Defaults to "Autoscale"
-        :param asserter: Object responsible for enforcing invariants through assertions.
-                         If none provided, a default do-nothing asserter will be assumed.
-                         You won't be able to tell if things pass or fail, though.
-                         It's best if you pass in your own asserter.
+        :param api: Either "Autoscale" or "RackConnect".  Defaults to
+            "Autoscale"
+        :param asserter: Object responsible for enforcing invariants through
+            assertions.  If none provided, a default do-nothing asserter will
+            be assumed.  You won't be able to tell if things pass or fail,
+            though.  It's best if you pass in your own asserter.
+
         :return: returns the list of active servers in the group
         """
 
@@ -625,23 +634,29 @@ class AutoscaleBehaviors(BaseBehavior):
         # Unfortunately, there's no way to check this on RackConnect's API,
         # since it has no mechanism to report back its current "plans."
         if api == 'Autoscale':
-            group_state_response = self.autoscale_client.list_status_entities_sgroups(
-                group_id)
+            group_state_response = (
+                self.autoscale_client.list_status_entities_sgroups(group_id)
+            )
             group_state = group_state_response.entity
-            asserter.assertEquals(group_state.desiredCapacity, expected_servers,
-                                  msg='Group {0} should have {1} servers, but is trying to '
-                                  'build {2} servers'.format(group_id, expected_servers,
-                                                             group_state.desiredCapacity))
+            asserter.assertEquals(
+                group_state.desiredCapacity, expected_servers,
+                msg='Group {0} should have {1} servers, but is trying to '
+                'build {2} servers'.format(group_id, expected_servers,
+                                           group_state.desiredCapacity))
 
         while time.time() < end_time:
             if api == 'Autoscale':
-                resp = self.autoscale_client.list_status_entities_sgroups(group_id)
+                resp = (self.autoscale_client
+                        .list_status_entities_sgroups(group_id))
                 group_state = resp.entity
                 active_list = group_state.active
                 asserter.assertNotEquals(
-                    (group_state.activeCapacity + group_state.pendingCapacity), 0,
-                    msg='Group Id {0} failed to attempt server creation. Group has no'
-                    ' servers'.format(group_id))
+                    (group_state.activeCapacity +
+                     group_state.pendingCapacity),
+                    0,
+                    msg='Group Id {0} failed to attempt server creation. '
+                    'Group has no servers'.format(group_id)
+                )
 
                 # You might think this is duplicate code with the optimization
                 # above, but you'd be wrong!  For Otter w/out convergence, if a
@@ -652,19 +667,22 @@ class AutoscaleBehaviors(BaseBehavior):
                 #
                 # When Otter adopts convergence, this becomes dead code, and
                 # can be safely removed.
-                asserter.assertEquals(group_state.desiredCapacity, expected_servers,
-                                      msg='Group {0} should have {1} servers,'
-                                      ' but has reduced the build {2}'
-                                      'servers'.format(group_id, expected_servers,
-                                                       group_state.desiredCapacity))
+                asserter.assertEquals(
+                    group_state.desiredCapacity, expected_servers,
+                    msg='Group {0} should have {1} servers,'
+                    ' but has reduced the build {2}'
+                    'servers'.format(group_id, expected_servers,
+                                     group_state.desiredCapacity))
 
                 if len(active_list) == expected_servers:
                     return [server.id for server in active_list]
             else:
-                # We're looking at the RackConnect API for our server list here.
+                # We're looking at the RackConnect API for our server list
+                # here.
                 nodes = self.rcv3_client.get_nodes_on_pool(group_id).entity
                 server_list = [n for n in nodes.nodes
-                               if (safe_hasattr(n, "cloud_server")) and (n.status == "ACTIVE")]
+                               if (safe_hasattr(n, "cloud_server"))
+                               and (n.status == "ACTIVE")]
                 if len(server_list) == expected_servers:
                     return [n.id for n in server_list]
 
@@ -673,8 +691,8 @@ class AutoscaleBehaviors(BaseBehavior):
             asserter.fail(
                 "wait_for_active_list_in_group_state ran for {0} seconds "
                 "for group/pool ID {1} and did not observe the active "
-                "server list achieving the expected servers count: {2}.".format(
-                    timeout, group_id, expected_servers)
+                "server list achieving the expected servers count: {2}."
+                .format(timeout, group_id, expected_servers)
             )
 
 

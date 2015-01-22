@@ -7,7 +7,9 @@ from autoscale.behaviors import safe_hasattr
 
 
 class CommonTestUtilities(object):
-    """This class implements common behavior between the LBaaS and RCv3 tests."""
+    """
+    This class implements common behavior between the LBaaS and RCv3 tests.
+    """
 
     def __init__(self, server_client, autoscale_client, lbaas_client):
         self.server_client = server_client
@@ -18,8 +20,10 @@ class CommonTestUtilities(object):
         """
         Returns the list of ports in the luanch configs of the group_id
         """
-        launch_config = self.autoscale_client.view_launch_config(group_id).entity
-        return [lb.port for lb in launch_config.loadBalancers if safe_hasattr(lb, 'port')]
+        launch_config = self.autoscale_client.view_launch_config(
+            group_id).entity
+        return [lb.port for lb in launch_config.loadBalancers
+                if safe_hasattr(lb, 'port')]
 
     def get_ipv4_address_list_on_servers(self, server_ids_list):
         """
@@ -29,7 +33,8 @@ class CommonTestUtilities(object):
         network_list = []
         for each_server in server_ids_list:
             network = self.server_client.list_addresses(each_server).entity
-            # Since a CLB node must be on serviceNet, there should always be a private address
+            # Since a CLB node must be on serviceNet, there should always be a
+            # private address
             for each_network in network.private.addresses:
                 if str(each_network.version) is '4':
                     network_list.append(each_network.addr)
@@ -39,7 +44,8 @@ class CommonTestUtilities(object):
         """Returns the list of nodes on the load balancer."""
         return self.lbaas_client.list_nodes(load_balancer_id).entity
 
-    def verify_lbs_on_group_have_servers_as_nodes(self, asserter, group_id, server_ids_list, *lbaas_ids):
+    def verify_lbs_on_group_have_servers_as_nodes(self, asserter, group_id,
+                                                  server_ids_list, *lbaas_ids):
         """
         Given the list of active server ids on the group, create a list of the
         ip address of the servers on the group,
@@ -54,10 +60,12 @@ class CommonTestUtilities(object):
         to keep it simple.)
         """
         # call nova list server, filter by ID and create ip address list
-        servers_address_list = self.get_ipv4_address_list_on_servers(server_ids_list)
+        servers_address_list = self.get_ipv4_address_list_on_servers(
+            server_ids_list)
 
         # call otter, list launch config, create list of ports
-        port_list_from_group = self.get_ports_from_otter_launch_configs(group_id)
+        port_list_from_group = self.get_ports_from_otter_launch_configs(
+            group_id)
 
         # call list node for each lbaas, create list of Ips and ports
         ports_list = []
