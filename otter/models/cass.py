@@ -338,8 +338,8 @@ def _build_webhooks(bare_webhooks, webhooks_table, webhooks_keys_table,
         queries.append(_cql_insert_webhook_key.format(cf=webhooks_keys_table,
                                                       name=name))
 
-        # generate the real data that will be stored, which includes the webhook
-        # token, the capability stuff, and metadata by default
+        # generate the real data that will be stored, which includes the
+        # webhook token, the capability stuff, and metadata by default
         bare_webhooks[i].setdefault('metadata', {})
         version, cap_hash = generate_capability()
 
