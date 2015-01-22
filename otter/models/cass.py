@@ -57,25 +57,29 @@ def serialize_json_data(data, ver):
 _cql_view = ('SELECT {column}, created_at FROM {cf} '
              'WHERE "tenantId" = :tenantId AND '
              '"groupId" = :groupId;')
-_cql_view_policy = ('SELECT data, version FROM {cf} '
-                    'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
-                    '"policyId" = :policyId;')
-_cql_view_webhook = ('SELECT data, capability FROM {cf} '
-                     'WHERE "tenantId" = :tenantId AND '
-                     '"groupId" = :groupId AND "policyId" = :policyId AND '
-                     '"webhookId" = :webhookId;')
-_cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, '
-                     'launch_config, active, pending, "policyTouched", paused, '
-                     'desired, created_at) '
-                     'VALUES (:tenantId, :groupId, :group_config, '
-                     ':launch_config, :active, :pending, :policyTouched, '
-                     ':paused, :desired, :created_at) '
-                     'USING TIMESTAMP :ts')
-_cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, '
-                      'launch_config, active, pending, "groupTouched", '
-                      '"policyTouched", paused, desired, created_at '
-                      'FROM {cf} '
-                      'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
+_cql_view_policy = (
+    'SELECT data, version FROM {cf} '
+    'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+    'AND "policyId" = :policyId;')
+_cql_view_webhook = (
+    'SELECT data, capability FROM {cf} '
+    'WHERE "tenantId" = :tenantId AND '
+    '"groupId" = :groupId AND "policyId" = :policyId AND '
+    '"webhookId" = :webhookId;')
+_cql_create_group = (
+    'INSERT INTO {cf}("tenantId", "groupId", group_config, '
+    'launch_config, active, pending, "policyTouched", paused, '
+    'desired, created_at) '
+    'VALUES (:tenantId, :groupId, :group_config, '
+    ':launch_config, :active, :pending, :policyTouched, '
+    ':paused, :desired, :created_at) '
+    'USING TIMESTAMP :ts')
+_cql_view_manifest = (
+    'SELECT "tenantId", "groupId", group_config, '
+    'launch_config, active, pending, "groupTouched", '
+    '"policyTouched", paused, desired, created_at '
+    'FROM {cf} '
+    'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", data, version) '
     'VALUES (:tenantId, :groupId, :{name}policyId, :{name}data, :{name}version)')
