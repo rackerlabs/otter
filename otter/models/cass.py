@@ -139,14 +139,16 @@ _cql_delete_one_webhook = (
     '"groupId" = :groupId AND "policyId" = :policyId AND '
     '"webhookId" = :webhookId')
 _cql_list_states = (
-    'SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
-    '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
-    '"tenantId" = :tenantId;')
-_cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE '
-                    '"tenantId" = :tenantId AND "groupId" = :groupId;')
-_cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} '
-                     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
-                     '"policyId" = :policyId;')
+    'SELECT "tenantId", "groupId", group_config, active, pending, '
+    '"groupTouched", "policyTouched", paused, desired, created_at '
+    'FROM {cf} WHERE "tenantId" = :tenantId;')
+_cql_list_policy = (
+    'SELECT "policyId", data FROM {cf} WHERE '
+    '"tenantId" = :tenantId AND "groupId" = :groupId;')
+_cql_list_webhook = (
+    'SELECT "webhookId", data, capability FROM {cf} '
+    'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+    'AND "policyId" = :policyId;')
 _cql_list_all_in_group = ('SELECT * FROM {cf} WHERE "tenantId" = :tenantId '
                           'AND "groupId" = :groupId {order_by};')
 
@@ -154,14 +156,17 @@ _cql_list_all_in_group = ('SELECT * FROM {cf} WHERE "tenantId" = :tenantId '
 _cql_insert_webhook_key = (
     'INSERT INTO {cf}("webhookKey", "tenantId", "groupId", "policyId") '
     'VALUES (:{name}Key, :tenantId, :groupId, :policyId)')
-_cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} WHERE '
-                           '"webhookKey" = :webhookKey;')
+_cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} '
+                           'WHERE "webhookKey" = :webhookKey;')
 _cql_del_on_key = 'DELETE FROM {cf} WHERE "webhookKey"=:{name}webhookKey'
 
-_cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId;')
-_cql_count_for_policy = ('SELECT COUNT(*) FROM {cf} WHERE '
-                         '"tenantId" = :tenantId AND "groupId" = :groupId AND '
-                         '"policyId" = :policyId;')
+_cql_count_for_tenant = (
+    'SELECT COUNT(*) FROM {cf} '
+    'WHERE "tenantId" = :tenantId;')
+_cql_count_for_policy = (
+    'SELECT COUNT(*) FROM {cf} '
+    'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+    'AND "policyId" = :policyId;')
 _cql_count_for_group = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId '
                         'AND "groupId" = :groupId;')
 _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
