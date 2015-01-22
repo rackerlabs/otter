@@ -728,8 +728,12 @@ class CassScalingGroup(object):
         @self.with_timestamp
         def _do_update(ts, _):
             return self.connection.execute(
-                _cql_update.format(cf=self.group_table, column='status', name=':status'),
-                {'tenantId': self.tenant_id, 'groupId': self.uuid, 'ts': ts,
+                _cql_update.format(cf=self.group_table,
+                                   column='status',
+                                   name=':status'),
+                {'tenantId': self.tenant_id,
+                 'groupId': self.uuid,
+                 'ts': ts,
                  'status': status.name},
                 DEFAULT_CONSISTENCY)
 
