@@ -1437,8 +1437,8 @@ class CassScalingGroupCollection:
 
     def kazoo_health_check(self):
         """
-        Checks zookeer connection status and acquires a temporary lock to see if
-        that recipe is working fine
+        Checks zookeer connection status and acquires a temporary lock to see
+        if that recipe is working fine.
 
         return is same as described in
         :meth:`otter.models.interface.IScalingGroupCollection.health_check`
