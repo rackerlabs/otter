@@ -1,18 +1,17 @@
 """
 Code for composing all of the convergence functionality together.
 """
+import time
 
 from collections import defaultdict
-from functools import partial
-import time
 
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
-from otter.convergence.model import DesiredGroupState, CLBDescription
+from otter.convergence.model import CLBDescription, DesiredGroupState
 from otter.convergence.planning import plan
 
 
-def execute_convergence(request_func, group_id, desired_group_state,
+def execute_convergence(group_id, desired_group_state,
                         get_all_convergence_data=get_all_convergence_data):
     """
     Execute convergence. This function will do following:
@@ -23,17 +22,17 @@ def execute_convergence(request_func, group_id, desired_group_state,
     This is in effect single cycle execution. A layer above this is expected
     to keep calling this until this function returns False
 
-    :param request_func: Tenant bound request function
     :param bytes group_id: Tenant's group
     :param DesiredGroupState desired_group_state: the desired state
 
     :return: Effect of bool specifying if the effect should be performed again
     :rtype: :class:`effect.Effect`
     """
-    eff = get_all_convergence_data(request_func, group_id)
+    eff = get_all_convergence_data(group_id)
     conv_eff = eff.on(
-        lambda (servers, lb_nodes): plan(desired_group_state, servers, lb_nodes, time.time()))
-    return conv_eff.on(partial(steps_to_effect, request_func)).on(bool)
+        lambda (servers, lb_nodes): plan(desired_group_state, servers,
+                                         lb_nodes, time.time()))
+    return conv_eff.on(steps_to_effect).on(bool)
 
 
 def tenant_is_enabled(tenant_id, get_config_value):

@@ -3,13 +3,14 @@ Tests for RCv3-specific worker code.
 """
 from uuid import uuid4
 
-from effect import ComposedDispatcher, Effect
+from characteristic import attributes
+
+from effect import Effect
 
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
-from otter.test.convergence.test_effecting import _PureRequestStub
 from otter.util.pure_http import has_code
 from otter.worker import _rcv3
 
@@ -30,6 +31,14 @@ def _rcv3_add_response(lb_id, server_id):
     }]
 
 
+@attributes(['dispatcher', 'tenant_id'])
+class _RequestBag(object):
+    """
+    Something like the ``request_func`` (lol) that gets passed around from the
+    supervisor, at least as far as _rcv3.py is concerned.
+    """
+
+
 class RCv3Tests(SynchronousTestCase):
     """
     Tests for RCv3-specific worker logic.
@@ -40,6 +49,9 @@ class RCv3Tests(SynchronousTestCase):
         """
         self.reactor = object()
         self.patch(_rcv3, "perform", self._fake_perform)
+        self.dispatcher = object()
+        self.request_bag = _RequestBag(dispatcher=self.dispatcher,
+                                       tenant_id='thetenantid')
 
     def _fake_perform(self, dispatcher, effect):
         """
@@ -48,31 +60,30 @@ class RCv3Tests(SynchronousTestCase):
         :param dispatcher: The Effect dispatcher.
         :param effect: The effect to "execute".
         """
-        self.assertTrue(isinstance(dispatcher, ComposedDispatcher))
+        self.assertIdentical(dispatcher, self.dispatcher)
 
-        self.effect = effect
-        self.assertTrue(isinstance(effect, Effect))
-        (sub_effect,) = effect.intent.effects
+        self.assertIs(type(effect), Effect)
+        tenant_scope = effect.intent
+        self.assertEqual(tenant_scope.tenant_id, 'thetenantid')
+        parallel = effect.intent.effect.intent
+        (sub_effect,) = parallel.effects
+        req = sub_effect.intent
 
-        self.assertEqual(sub_effect.service_type, ServiceType.RACKCONNECT_V3)
-        self.assertEqual(sub_effect.data,
+        self.assertEqual(req.service_type, ServiceType.RACKCONNECT_V3)
+        self.assertEqual(req.data,
                          [{'load_balancer_pool': {'id': 'lb_id'},
                            'cloud_server': {'id': 'server_id'}}])
-        # The URL is actually a relative URL path. This is intentional,
-        # because the real request_func is service-bound.
-        self.assertEqual(sub_effect.url, 'load_balancer_pools/nodes')
-        # The headers are None (== unspecified). This is intentional,
-        # because the real request func injects auth headers.
-        self.assertEqual(sub_effect.headers, None)
+        self.assertEqual(req.url, 'load_balancer_pools/nodes')
+        self.assertEqual(req.headers, None)
         # The method is either POST (add) or DELETE (remove).
-        self.assertIn(sub_effect.method, ["POST", "DELETE"])
+        self.assertIn(req.method, ["POST", "DELETE"])
 
-        if sub_effect.method == "POST":
-            self.assertEqual(sub_effect.success_pred, has_code(201))
+        if req.method == "POST":
+            self.assertEqual(req.success_pred, has_code(201))
             # http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes
             response = _rcv3_add_response("lb_id", "server_id")
-        elif sub_effect.method == "DELETE":
-            self.assertEqual(sub_effect.success_pred, has_code(204))
+        elif req.method == "DELETE":
+            self.assertEqual(req.success_pred, has_code(204))
             # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes
             response = None
 
@@ -82,8 +93,7 @@ class RCv3Tests(SynchronousTestCase):
         """
         :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
         """
-        d = _rcv3.add_to_rcv3(_PureRequestStub, "lb_id", "server_id",
-                              _reactor=self.reactor)
+        d = _rcv3.add_to_rcv3(self.request_bag, "lb_id", "server_id")
         (add_result,) = self.successResultOf(d)
         self.assertEqual(add_result["cloud_server"], {"id": "server_id"})
         self.assertEqual(add_result["load_balancer_pool"], {"id": "lb_id"})
@@ -92,6 +102,5 @@ class RCv3Tests(SynchronousTestCase):
         """
         :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
         """
-        d = _rcv3.remove_from_rcv3(_PureRequestStub, "lb_id", "server_id",
-                                   _reactor=self.reactor)
+        d = _rcv3.remove_from_rcv3(self.request_bag, "lb_id", "server_id")
         self.assertIdentical(self.successResultOf(d), None)

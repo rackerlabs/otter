@@ -50,7 +50,7 @@ class GetRequestFuncTests(SynchronousTestCase):
         self.authenticator = object()
         self.request_func = get_request_func(
             self.authenticator, 1, self.log,
-            {ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'},
+            {ServiceType.CLOUD_SERVERS: {'name': 'cloudServersOpenStack'}},
             'DFW')
 
     def test_get_request_func_authenticates(self):
@@ -159,8 +159,11 @@ class PerformServiceRequestTests(SynchronousTestCase):
         """Save some common parameters."""
         self.log = object()
         self.authenticator = object()
-        self.service_mapping = {
-            ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'}
+        self.service_configs = {
+            ServiceType.CLOUD_SERVERS: {
+                'name': 'cloudServersOpenStack',
+                'region': 'DFW'}
+        }
         eff = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
         self.svcreq = eff.intent
 
@@ -169,10 +172,7 @@ class PerformServiceRequestTests(SynchronousTestCase):
         Call :func:`concretize_service_request` with premade test objects.
         """
         return concretize_service_request(
-            self.authenticator, self.log, self.service_mapping, 'DFW',
-            1,
-            svcreq
-        )
+            self.authenticator, self.log, self.service_configs, 1, svcreq)
 
     def test_authenticates(self):
         """Auth is done before making the request."""
@@ -240,17 +240,20 @@ class PerformTenantScopeTests(SynchronousTestCase):
         """Save some common parameters."""
         self.log = object()
         self.authenticator = object()
-        self.service_mapping = {
-            ServiceType.CLOUD_SERVERS: 'cloudServersOpenStack'}
+        self.service_configs = {
+            ServiceType.CLOUD_SERVERS: {
+                'name': 'cloudServersOpenStack',
+                'region': 'DFW'}
+        }
 
-        def concretize(au, lo, smap, reg, tenid, srvreq):
-            return Effect(Constant(('concretized', au, lo, smap, reg, tenid,
+        def concretize(au, lo, smap, tenid, srvreq):
+            return Effect(Constant(('concretized', au, lo, smap, tenid,
                                     srvreq)))
 
         self.dispatcher = ComposedDispatcher([
             TypeDispatcher({
                 TenantScope: partial(perform_tenant_scope, self.authenticator,
-                                     self.log, self.service_mapping, 'DFW',
+                                     self.log, self.service_configs,
                                      _concretize=concretize)}),
             base_dispatcher])
 
@@ -269,8 +272,8 @@ class PerformTenantScopeTests(SynchronousTestCase):
         tscope = TenantScope(ereq, 1)
         self.assertEqual(
             sync_perform(self.dispatcher, Effect(tscope)),
-            ('concretized', self.authenticator, self.log, self.service_mapping,
-             'DFW', 1, ereq.intent))
+            ('concretized', self.authenticator, self.log, self.service_configs,
+             1, ereq.intent))
 
     def test_perform_srvreq_nested(self):
         """
@@ -283,5 +286,5 @@ class PerformTenantScopeTests(SynchronousTestCase):
         tscope = TenantScope(eff, 1)
         self.assertEqual(
             sync_perform(self.dispatcher, Effect(tscope)),
-            ('concretized', self.authenticator, self.log, self.service_mapping,
-             'DFW', 1, ereq.intent))
+            ('concretized', self.authenticator, self.log, self.service_configs,
+             1, ereq.intent))
