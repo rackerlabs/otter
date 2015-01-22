@@ -152,11 +152,7 @@ def concretize_service_request(
             service_request.success_pred, request_)
         request_ = add_json_request_data(request_)
         request_ = add_bind_service(
-            catalog,
-            service_name,
-            region,
-            log,
-            request_)
+            catalog, service_name, region, log, request_)
         if service_request.json_response:
             request_ = add_json_response(request_)
         request_ = add_content_only(request_)
