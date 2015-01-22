@@ -413,14 +413,17 @@ def _unmarshal_state(state_dict):
 
 def assemble_webhooks_in_policies(policies, webhooks):
     """
-    Assemble webhooks inside policies. 'webhooks' property will be added to
-    each policy `dict` in `policies`. It will be list of webhooks taken from `webhooks`
+    Assemble webhooks inside policies.
 
-    :param policies: list of policy `dict` sorted based on 'id' based on `group_schemas.policy`
-    :param webhooks: list of webhook `dict` sorted based on 'policyId' and 'webhookId'
-                     based on `model_schemas.webhook`
+    'webhooks' property will be added to each policy `dict` in `policies`. It
+    will be list of webhooks taken from `webhooks`.
 
+    :param policies: list of policy `dict` sorted based on 'id' based on
+        `group_schemas.policy`
+    :param webhooks: list of webhook `dict` sorted based on 'policyId' and
+        'webhookId' based on `model_schemas.webhook`
     :return: policies with webhooks in them
+
     """
     # Assuming policies and webhooks are sorted based on policyId and
     # (policyId, webhookId) respectively
