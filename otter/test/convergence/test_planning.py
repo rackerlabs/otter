@@ -918,5 +918,4 @@ class PlanTests(SynchronousTestCase):
                     address_configs=s(
                         ('1.1.1.1', CLBDescription(lb_id='5', port=80)),
                         ('1.2.3.4', CLBDescription(lb_id='5', port=80)))
-                )] + [CreateServer(launch_config=pmap({}))] * 3
-             ))
+                )] + [CreateServer(launch_config=pmap({}))] * 3))
