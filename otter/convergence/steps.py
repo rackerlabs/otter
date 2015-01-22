@@ -4,6 +4,8 @@ from characteristic import attributes
 
 from effect import Effect, Func
 
+from pyrsistent import pvector
+
 from zope.interface import Interface, implementer
 
 from otter.constants import ServiceType
@@ -22,6 +24,26 @@ class IStep(Interface):
         """Return an Effect which performs this step."""
 
 
+def prepare_server_name(launch_config_args, name_suffix):
+    """
+    Append the given name_suffix to the name of the server in the launch
+    config, and make sure that rax:auto_scaling_server_name is set in the load
+    balancer metadata.
+    """
+    name = launch_config_args['server'].get('name')
+    if name is not None:
+        name = '{0}-{1}'.format(name, name_suffix)
+    else:
+        name = name_suffix
+
+    lcargs = launch_config_args.set_in(('server', 'name'), name)
+    new_lbcfgs = (
+        lbcfg.set_in(('metadata', 'rax:auto_scaling_server_name'), name)
+        for lbcfg in lcargs.get('loadBalancers', []))
+    lcargs = lcargs.set('loadBalancers', pvector(new_lbcfgs))
+    return lcargs
+
+
 @implementer(IStep)
 @attributes(['launch_config'])
 class CreateServer(object):
@@ -36,13 +58,8 @@ class CreateServer(object):
         eff = Effect(Func(generate_server_name))
 
         def got_name(random_name):
-            server_name = self.launch_config['server'].get('name')
-            if server_name is not None:
-                server_name = '{}-{}'.format(server_name, random_name)
-            else:
-                server_name = random_name
-            launch_config = self.launch_config['server'].set('name',
-                                                             server_name)
+            launch_config = prepare_server_name(self.launch_config,
+                                                random_name)
             return service_request(
                 ServiceType.CLOUD_SERVERS,
                 'POST',
