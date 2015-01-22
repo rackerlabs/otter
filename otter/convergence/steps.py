@@ -2,10 +2,13 @@
 
 from characteristic import attributes
 
+from effect import Effect, Func
+
 from zope.interface import Interface, implementer
 
 from otter.constants import ServiceType
 from otter.http import has_code, service_request
+from otter.util.hashkey import generate_server_name
 from otter.util.http import append_segments
 
 
@@ -30,11 +33,22 @@ class CreateServer(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to create a server."""
-        return service_request(
-            ServiceType.CLOUD_SERVERS,
-            'POST',
-            'servers',
-            data=self.launch_config)
+        eff = Effect(Func(generate_server_name))
+
+        def got_name(random_name):
+            server_name = self.launch_config['server'].get('name')
+            if server_name is not None:
+                server_name = '{}-{}'.format(server_name, random_name)
+            else:
+                server_name = random_name
+            launch_config = self.launch_config['server'].set('name',
+                                                             server_name)
+            return service_request(
+                ServiceType.CLOUD_SERVERS,
+                'POST',
+                'servers',
+                data=launch_config)
+        return eff.on(got_name)
 
 
 @implementer(IStep)
