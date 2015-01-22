@@ -855,6 +855,14 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
                         </listitem>
                     </itemizedlist>
                 </para>
+                <note>
+                    <para>This guide uses <emphasis role="bold">yourUserName</emphasis> and <emphasis
+                        role="bold">yourApiKey</emphasis> for authentication. For information about
+                        other supported authentication methods, see <link
+                            xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/Token_Calls.html"
+                            >Authentication tokens</link> in the <citetitle>Cloud Identity Client Developer
+                                Guide</citetitle>.</para>
+                </note>
                 <para>Notice that you authenticate using a special URL for Cloud authentication services. For
                     example, you may use
                     <code>https://identity.api.rackspacecloud.com/v2.0/tokens</code>, as shown in the following
