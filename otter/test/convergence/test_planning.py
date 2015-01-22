@@ -895,11 +895,11 @@ class PlanTests(SynchronousTestCase):
     """Tests for :func:`plan`."""
 
     def test_plan(self):
-        """An optimized plan is returned."""
+        """An optimized plan is returned. Steps are limited."""
 
         desired_lbs = {5: [CLBDescription(lb_id='5', port=80)]}
         desired_group_state = DesiredGroupState(
-            launch_config={}, desired=2, desired_lbs=desired_lbs)
+            launch_config={}, desired=8, desired_lbs=desired_lbs)
 
         result = plan(
             desired_group_state,
@@ -918,4 +918,5 @@ class PlanTests(SynchronousTestCase):
                     address_configs=s(
                         ('1.1.1.1', CLBDescription(lb_id='5', port=80)),
                         ('1.2.3.4', CLBDescription(lb_id='5', port=80)))
-                )]))
+                )] + [CreateServer(launch_config=pmap({}))] * 3
+             ))
