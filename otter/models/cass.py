@@ -173,7 +173,7 @@ _cql_count_for_group = (
 _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
 
 # seems to be pretty quick no matter the consistency - unfortunately this only
-# checks connectability to cassandra, and not whether the otter keyspace is
+# checks we can connect to Cassandra, and not whether the otter keyspace is
 # correct, etc.
 _cql_health_check = ('SELECT now() FROM system.local;')
 
