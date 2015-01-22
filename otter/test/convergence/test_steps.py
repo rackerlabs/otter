@@ -23,8 +23,7 @@ class StepAsRequestTests(SynchronousTestCase):
 
     def test_create_server(self):
         """
-        :obj:`CreateServer.as_request` produces a request for creating a
-        server.
+        :obj:`CreateServer.as_effect` produces a request for creating a server.
         """
         create = CreateServer(
             launch_config=pmap({'name': 'myserver', 'flavorRef': '1'}))
