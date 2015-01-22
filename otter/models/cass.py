@@ -451,9 +451,12 @@ def assemble_webhooks_in_policies(policies, webhooks):
 def verified_view(connection, view_query, del_query, data, consistency,
                   exception_if_empty, log):
     """
-    Ensures the view query does not get resurrected row, i.e. one that does not have "created_at" in it.
-    Any resurrected entry is deleted and `exception_if_empty` is raised.
-    TODO: Should there be seperate argument for view_consistency and del_consistency
+    Ensures the view query does not get resurrected row, i.e. one that does
+    not have "created_at" in it.  Any resurrected entry is deleted and
+    `exception_if_empty` is raised.
+
+    TODO: Should there be seperate argument for view_consistency and
+    del_consistency.
     """
     def _check_resurrection(result):
         if len(result) == 0:
