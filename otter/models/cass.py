@@ -920,7 +920,8 @@ class CassScalingGroup(object):
 
         def _do_delete(webhooks):
             # delete webhook keys
-            queries, params = _del_webhook_queries(self.webhooks_keys_table, webhooks)
+            queries, params = _del_webhook_queries(
+                self.webhooks_keys_table, webhooks)
             queries.extend([
                 _cql_delete_all_in_policy.format(cf=self.policies_table),
                 _cql_delete_all_in_policy.format(cf=self.webhooks_table)])
