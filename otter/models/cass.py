@@ -1283,8 +1283,9 @@ class CassScalingGroupCollection:
                     valid_groups.append(group)
                 else:
                     resurrected_groups.append(group)
-            # We can trigger deletion of resurrected groups and return valid_groups right away
-            # We need not wait till deletion completes.
+            # We can trigger deletion of resurrected groups and return
+            # valid_groups right away We need not wait till deletion
+            # completes.
             _delete_resurrected_groups(resurrected_groups)
             return valid_groups
 
