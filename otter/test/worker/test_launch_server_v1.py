@@ -1999,6 +1999,20 @@ class ConfigPreparationTests(SynchronousTestCase):
 
         self.assertEqual(expected_name, launch_config['server']['name'])
 
+    def test_change_name_empty(self):
+        """When ``change_name`` is False, the name is not created."""
+        test_config = {'server': {}}
+        launch_config = prepare_launch_config(self.scaling_group_uuid,
+                                              test_config, change_name=False)
+        self.assertTrue('name' not in launch_config['server'])
+
+    def test_change_name_existing_name(self):
+        """When ``change_name`` is False, the name is not altered."""
+        test_config = {'server': {'name': 'foo'}}
+        launch_config = prepare_launch_config(self.scaling_group_uuid,
+                                              test_config, change_name=False)
+        self.assertEqual(launch_config['server']['name'], 'foo')
+
     def test_server_metadata(self):
         """
         The auto scaling group should be added to the server metadata.
