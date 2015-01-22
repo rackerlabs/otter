@@ -672,12 +672,14 @@ class CassScalingGroup(object):
             consistency = DEFAULT_CONSISTENCY
 
         view_query = _cql_view_group_state.format(cf=self.group_table)
-        del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
+        del_query = _cql_delete_all_in_group.format(
+            cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           consistency,
-                          NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
+                          NoSuchScalingGroupError(self.tenant_id, self.uuid),
+                          self.log)
 
         return d.addCallback(_unmarshal_state)
 
@@ -700,7 +702,8 @@ class CassScalingGroup(object):
                 'paused': new_state.paused,
                 'desired': new_state.desired,
                 'groupTouched': new_state.group_touched,
-                'policyTouched': serialize_json_data(new_state.policy_touched, 1),
+                'policyTouched': serialize_json_data(new_state.policy_touched,
+                                                     1),
                 'ts': timestamp
             }
             return self.connection.execute(
@@ -709,15 +712,17 @@ class CassScalingGroup(object):
 
         def _modify_state():
             d = self.view_state(consistency)
-            d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
+            d.addCallback(lambda state: modifier_callable(
+                self, state, *args, **kwargs))
             return d.addCallback(_write_state)
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         local_lock = self.local_locks.get_lock(self.uuid)
-        return local_lock.run(with_lock, self.reactor, lock, _modify_state,
-                              log.bind(category='locking'), acquire_timeout=150,
-                              release_timeout=30)
+        return local_lock.run(
+            with_lock, self.reactor, lock, _modify_state,
+            log.bind(category='locking'), acquire_timeout=150,
+            release_timeout=30)
 
     def update_status(self, status):
         """
