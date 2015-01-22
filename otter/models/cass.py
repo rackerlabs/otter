@@ -884,7 +884,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_policy`
         """
-        self.log.bind(updated_policy=data, policy_id=policy_id).msg("Updating policy")
+        bound_log = self.log.bind(updated_policy=data, policy_id=policy_id)
+        bound_log.msg("Updating policy")
 
         queries = []
         cqldata = {'tenantId': self.tenant_id, 'groupId': self.uuid, 'policyId': policy_id,
