@@ -1471,9 +1471,10 @@ class CassScalingGroupCollection:
             _cql_health_check.format(cf=self.group_table), {},
             ConsistencyLevel.ONE)
 
-        d.addCallback(
-            lambda _: (True, {'cassandra_time': (self.reactor.seconds() - start_time)}))
-        return d
+        d.addCallback(lambda _:
+                      (True, {'cassandra_time':
+                              (self.reactor.seconds() - start_time)}))
+    return d
 
 
 @implementer(IAdmin)
