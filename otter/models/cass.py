@@ -1096,7 +1096,8 @@ class CassScalingGroup(object):
         @self.with_timestamp
         def _delete_everything(ts, webhooks):
             # delete webhook keys
-            queries, params = _del_webhook_queries(self.webhooks_keys_table, webhooks)
+            queries, params = _del_webhook_queries(
+                self.webhooks_keys_table, webhooks)
 
             queries.extend([
                 _cql_delete_all_in_group.format(cf=table, name='') for table in
@@ -1123,14 +1124,17 @@ class CassScalingGroup(object):
             return d
 
         def _delete_lock_znode(result):
-            d = self.kz_client.delete(LOCK_PATH + '/' + self.uuid, recursive=True)
+            d = self.kz_client.delete(LOCK_PATH + '/' + self.uuid,
+                                      recursive=True)
             d.addCallback(lambda _: result)
             return d
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
-        d = with_lock(self.reactor, lock, _delete_group, log.bind(category='locking'),
-                      acquire_timeout=150, release_timeout=30)
+        d = with_lock(self.reactor, lock, _delete_group,
+                      log.bind(category='locking'),
+                      acquire_timeout=150,
+                      release_timeout=30)
         # Cleanup /locks/<groupID> znode as it will not be required anymore
         d.addCallback(_delete_lock_znode)
         return d
