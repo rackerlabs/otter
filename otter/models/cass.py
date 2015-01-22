@@ -941,8 +941,9 @@ class CassScalingGroup(object):
         does not paginate
         """
         d = self.connection.execute(
-            _cql_list_all_in_group.format(cf=self.webhooks_table,
-                                          order_by='ORDER BY "groupId", "policyId", "webhookId"'),
+            _cql_list_all_in_group.format(
+                cf=self.webhooks_table,
+                order_by='ORDER BY "groupId", "policyId", "webhookId"'),
             {'tenantId': self.tenant_id, 'groupId': self.uuid},
             DEFAULT_CONSISTENCY)
         return d
