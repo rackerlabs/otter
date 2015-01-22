@@ -1458,8 +1458,11 @@ class CassScalingGroupCollection:
         d = with_lock(self.reactor, lock, lambda: None,
                       otter_log.bind(system='health_check'))
 
-        d.addCallback(lambda _: self.kz_client.delete(lock_path, recursive=True))
-        d.addCallback(lambda _: (True, {'total_time': self.reactor.seconds() - start_time}))
+        d.addCallback(lambda _:
+                      self.kz_client.delete(lock_path, recursive=True))
+        d.addCallback(lambda _:
+                      (True, {'total_time':
+                              self.reactor.seconds() - start_time}))
         return d
 
     def health_check(self):
