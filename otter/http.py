@@ -146,6 +146,8 @@ def concretize_service_request(
 
     def got_auth((token, catalog)):
         request_ = add_headers(otter_headers(token), request)
+        request_ = add_effect_on_response(
+            invalidate_eff, service_request.reauth_codes, request_)
         request_ = add_bind_service(
             catalog,
             service_name,
@@ -154,10 +156,7 @@ def concretize_service_request(
             add_json_request_data(
                 add_error_handling(
                     service_request.success_pred,
-                    add_effect_on_response(
-                        invalidate_eff,
-                        service_request.reauth_codes,
-                        request_))))
+                    request_)))
         if service_request.json_response:
             request_ = add_json_response(request_)
         request_ = add_content_only(request_)
