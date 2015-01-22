@@ -43,6 +43,24 @@ class StepAsRequestTests(SynchronousTestCase):
                 'servers',
                 data=pmap({'name': 'myserver-random-name', 'flavorRef': '1'})))
 
+    def test_create_server_noname(self):
+        """
+        When no name is provided in the launch config, the name will be
+        generated from scratch.
+        """
+        create = CreateServer(
+            launch_config=freeze({'server': {'flavorRef': '1'}}))
+        eff = create.as_effect()
+        self.assertEqual(eff.intent, Func(generate_server_name))
+        eff = resolve_effect(eff, 'random-name')
+        self.assertEqual(
+            eff,
+            service_request(
+                ServiceType.CLOUD_SERVERS,
+                'POST',
+                'servers',
+                data=pmap({'name': 'random-name', 'flavorRef': '1'})))
+
     def test_delete_server(self):
         """
         :obj:`DeleteServer.as_effect` produces a request for deleting a server.
