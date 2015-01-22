@@ -1015,8 +1015,9 @@ class CassScalingGroup(object):
         def _do_create(lastRev):
             queries = []
             cql_params = main_params.copy()
-            output = _build_webhooks(data, self.webhooks_table, self.webhooks_keys_table,
-                                     queries, cql_params)
+            output = _build_webhooks(
+                data, self.webhooks_table, self.webhooks_keys_table,
+                queries, cql_params)
 
             b = Batch(queries, cql_params,
                       consistency=DEFAULT_CONSISTENCY)
