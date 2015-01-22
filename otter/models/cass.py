@@ -1199,7 +1199,8 @@ class CassScalingGroupCollection:
         """
         self.buckets = itertools.cycle(buckets)
 
-    def create_scaling_group(self, log, tenant_id, config, launch, policies=None):
+    def create_scaling_group(self, log, tenant_id, config, launch,
+                             policies=None):
         """
         see :meth:`IScalingGroupCollection.create_scaling_group`
         """
