@@ -988,7 +988,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.create_webhooks`
         """
-        self.log.bind(policy_id=policy_id, webhook=data).msg("Creating webhooks")
+        bound_log = self.log.bind(policy_id=policy_id, webhook=data)
+        bound_log.msg("Creating webhooks")
 
         main_params = {"tenantId": self.tenant_id,
                        "groupId": self.uuid,
