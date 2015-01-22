@@ -1200,7 +1200,7 @@ class CassScalingGroupCollection:
 
     def create_scaling_group(self, log, tenant_id, config, launch, policies=None):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.create_scaling_group`
+        see :meth:`IScalingGroupCollection.create_scaling_group`
         """
         scaling_group_id = generate_key_str('scalinggroup')
         log = log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id)
@@ -1269,7 +1269,7 @@ class CassScalingGroupCollection:
 
     def list_scaling_group_states(self, log, tenant_id, limit=100, marker=None):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_group_states`
+        see :meth:`IScalingGroupCollection.list_scaling_group_states`.
         """
         def _build_states(group_states):
             return [_unmarshal_state(state) for state in group_states]
