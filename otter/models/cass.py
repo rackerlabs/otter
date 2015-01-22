@@ -621,13 +621,16 @@ class CassScalingGroup(object):
                 'state': _unmarshal_state(group)
             }
 
-        view_query = _cql_view_manifest.format(cf=self.group_table)
-        del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
+        view_query = _cql_view_manifest.format(
+            cf=self.group_table)
+        del_query = _cql_delete_all_in_group.format(
+            cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           DEFAULT_CONSISTENCY,
-                          NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
+                          NoSuchScalingGroupError(self.tenant_id, self.uuid),
+                          self.log)
         if with_webhooks:
             d.addCallback(_get_policies_and_webhooks)
             d.addCallback(_assemble_webhooks)
