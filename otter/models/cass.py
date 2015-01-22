@@ -1295,7 +1295,9 @@ class CassScalingGroupCollection:
 
             queries = [
                 _cql_delete_all_in_group.format(cf=table, name=i)
-                for table in (self.group_table, self.policies_table, self.webhooks_table)
+                for table in (self.group_table,
+                              self.policies_table,
+                              self.webhooks_table)
                 for i in range(len(groups))]
 
             params = {'groupId{0}'.format(i): group['groupId']
