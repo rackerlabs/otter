@@ -93,7 +93,8 @@ _cql_view_manifest = (
     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", data, version) '
-    'VALUES (:tenantId, :groupId, :{name}policyId, :{name}data, :{name}version)')
+    'VALUES (:tenantId, :groupId, :{name}policyId, :{name}data, '
+    ':{name}version)')
 _cql_insert_group_state = (
     'INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
     '"policyTouched", paused, desired) VALUES(:tenantId, :groupId, :active, '
@@ -171,8 +172,9 @@ _cql_list_all_in_group = ('SELECT * FROM {cf} WHERE "tenantId" = :tenantId '
 _cql_insert_webhook_key = (
     'INSERT INTO {cf}("webhookKey", "tenantId", "groupId", "policyId") '
     'VALUES (:{name}Key, :tenantId, :groupId, :policyId)')
-_cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} '
-                           'WHERE "webhookKey" = :webhookKey;')
+_cql_find_webhook_token = (
+    'SELECT "tenantId", "groupId", "policyId" FROM {cf} '
+    'WHERE "webhookKey" = :webhookKey;')
 _cql_del_on_key = 'DELETE FROM {cf} WHERE "webhookKey"=:{name}webhookKey'
 
 _cql_count_for_tenant = (
