@@ -547,12 +547,14 @@ class CassScalingGroup(object):
     exist.  Therefore, before doing an update, a read must be performed first
     else an entry is created where none should have been.
 
-    Cassandra doesn't have atomic read-update.  You can't be guaranteed that the
-    previous state (from the read) hasn't changed between when you got it back
-    from Cassandra and when you are sending your new update/insert request.
+    Cassandra doesn't have atomic read-update.  You can't be guaranteed that
+    the previous state (from the read) hasn't changed between when you got it
+    back from Cassandra and when you are sending your new update/insert
+    request.
 
     Also, because deletes are done as tombstones rather than actually deleting,
     deletes are also updates and hence a read must be performed before deletes.
+
     """
     def __init__(self, log, tenant_id, uuid, connection, buckets, kz_client,
                  reactor, local_locks):
