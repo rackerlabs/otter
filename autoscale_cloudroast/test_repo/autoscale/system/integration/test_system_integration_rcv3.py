@@ -23,11 +23,11 @@ class DummyAsserter(object):
     def __init__(self):
         self.err = None
 
-    def assertEquals(self, a, b, msg):
+    def assertEquals(self, a, b, msg):  # nopep8 - ignore N802
         if a != b:
             self.fail(msg)
 
-    def assertNotEquals(self, a, b, msg):
+    def assertNotEquals(self, a, b, msg):  # nopep8 - ignore N802
         if a == b:
             self.fail(msg)
 
@@ -40,7 +40,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
     System tests to verify lbaas integration with autoscale
     """
     @classmethod
-    def tearDownClass(cls):
+    def tearDownClass(cls):  # nopep8 - ignore N802
         """
         Class-level teardown.  This releases all the resources acquired by
         the setUpClass method.
@@ -48,7 +48,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         cls.resources.release()
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls):  # nopep8 - ignore N802
         """
         Capture the initial state of the shared load balancer pools.
         Since CloudCafe/unittest invokes this method exactly onced

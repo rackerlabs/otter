@@ -44,11 +44,11 @@ class DefaultAsserter(object):
     all you need to override is the fail() method.
     """
 
-    def assertEquals(self, a, b, msg=""):
+    def assertEquals(self, a, b, msg=""):  # nopep8 - ignore N802
         if a != b:
             self.fail(msg)
 
-    def assertNotEquals(self, a, b, msg=""):
+    def assertNotEquals(self, a, b, msg=""):  # nopep8 - ignore N802
         if a == b:
             self.fail(msg)
 
