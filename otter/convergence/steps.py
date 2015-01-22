@@ -29,7 +29,7 @@ class CreateServer(object):
     """
 
     def as_effect(self):
-        """Produce a :obj:`Request` to create a server."""
+        """Produce a :obj:`Effect` to create a server."""
         return service_request(
             ServiceType.CLOUD_SERVERS,
             'POST',
@@ -47,7 +47,7 @@ class DeleteServer(object):
     """
 
     def as_effect(self):
-        """Produce a :obj:`Request` to delete a server."""
+        """Produce a :obj:`Effect` to delete a server."""
         return service_request(
             ServiceType.CLOUD_SERVERS,
             'DELETE',
@@ -65,7 +65,7 @@ class SetMetadataItemOnServer(object):
     :ivar str value: The value to assign to the metadata key (<=256 characters)
     """
     def as_effect(self):
-        """Produce a :obj:`Request` to set a metadata item on a server"""
+        """Produce a :obj:`Effect` to set a metadata item on a server"""
         return service_request(
             ServiceType.CLOUD_SERVERS,
             'PUT',
@@ -83,7 +83,7 @@ class AddNodesToCLB(object):
         :obj:`CLBDescription`.
     """
     def as_effect(self):
-        """Produce a :obj:`Request` to add nodes to CLB"""
+        """Produce a :obj:`Effect` to add nodes to CLB"""
         return service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'POST',
@@ -103,7 +103,7 @@ class RemoveFromCLB(object):
     """
 
     def as_effect(self):
-        """Produce a :obj:`Request` to remove a load balancer node."""
+        """Produce a :obj:`Effect` to remove a load balancer node."""
         return service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'DELETE',
@@ -120,7 +120,7 @@ class ChangeCLBNode(object):
     """
 
     def as_effect(self):
-        """Produce a :obj:`Request` to modify a load balancer node."""
+        """Produce a :obj:`Effect` to modify a load balancer node."""
         return service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'PUT',
@@ -171,7 +171,7 @@ class BulkAddToRCv3(object):
 
     def as_effect(self):
         """
-        Produce a :obj:`Request` to add some nodes to some RCv3 load
+        Produce a :obj:`Effect` to add some nodes to some RCv3 load
         balancers.
         """
         return _rackconnect_bulk_request(self.lb_node_pairs, "POST", (201,))
@@ -192,7 +192,7 @@ class BulkRemoveFromRCv3(object):
 
     def as_effect(self):
         """
-        Produce a :obj:`Request` to remove some nodes from some RCv3 load
+        Produce a :obj:`Effect` to remove some nodes from some RCv3 load
         balancers.
         """
         return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE", (204,))

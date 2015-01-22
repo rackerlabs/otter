@@ -16,9 +16,9 @@ from otter.convergence.steps import (
 from otter.http import has_code, service_request
 
 
-class StepAsRequestTests(SynchronousTestCase):
+class StepAsEffectTests(SynchronousTestCase):
     """
-    Tests for converting :obj:`IStep` implementations to :obj:`Request`s.
+    Tests for converting :obj:`IStep` implementations to :obj:`Effect`s.
     """
 
     def test_create_server(self):
