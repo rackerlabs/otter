@@ -1,36 +1,39 @@
 """
 Cassandra implementation of the store for the front-end scaling groups engine
 """
-import time
-import itertools
-import uuid
+
 import functools
+import itertools
+import json
+import time
+import uuid
 import weakref
+
+from datetime import datetime
+
+from jsonschema import ValidationError
+
+from kazoo.protocol.states import KazooState
+
+from silverberg.client import ConsistencyLevel
+
+from twisted.internet import defer
 
 from zope.interface import implementer
 
-from twisted.internet import defer
-from jsonschema import ValidationError
+from otter.log import log as otter_log
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError,
     IScalingScheduleCollection, IAdmin, ScalingGroupOverLimitError,
     WebhooksOverLimitError, PoliciesOverLimitError)
-from otter.util.cqlbatch import Batch, batch
-from otter.util.hashkey import generate_capability, generate_key_str
+from otter.scheduler import next_cron_occurrence
 from otter.util import timestamp
 from otter.util.config import config_value
+from otter.util.cqlbatch import Batch, batch
 from otter.util.deferredutils import with_lock
-from otter.scheduler import next_cron_occurrence
-from otter.log import log as otter_log
-
-from silverberg.client import ConsistencyLevel
-
-import json
-from datetime import datetime
-
-from kazoo.protocol.states import KazooState
+from otter.util.hashkey import generate_capability, generate_key_str
 
 
 LOCK_PATH = '/locks'
