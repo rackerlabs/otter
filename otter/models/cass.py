@@ -1393,7 +1393,7 @@ class CassScalingGroupCollection:
 
     def webhook_info_by_hash(self, log, capability_hash):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`
+        see :meth:`IScalingGroupCollection.webhook_info_by_hash`
         """
         d = self._webhook_info_from_table(log, capability_hash)
 
