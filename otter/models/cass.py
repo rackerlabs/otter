@@ -888,13 +888,16 @@ class CassScalingGroup(object):
         bound_log.msg("Updating policy")
 
         queries = []
-        cqldata = {'tenantId': self.tenant_id, 'groupId': self.uuid, 'policyId': policy_id,
+        cqldata = {'tenantId': self.tenant_id,
+                   'groupId': self.uuid,
+                   'policyId': policy_id,
                    'version': uuid.uuid1()}
 
         def _do_update_schedule(lastRev):
             if "type" in lastRev:
                 if lastRev["type"] != data["type"]:
-                    raise ValidationError("Cannot change type of a scaling policy")
+                    raise ValidationError("Cannot change type of "
+                                          "a scaling policy")
                 if lastRev["type"] == 'schedule':
                     _build_schedule_policy(data, self.event_table, queries,
                                            cqldata, '', self.buckets)
