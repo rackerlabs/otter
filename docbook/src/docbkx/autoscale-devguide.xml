@@ -908,6 +908,14 @@
                     to your authentication request includes a catalog
                     of the services to which you have subscribed
                     rather than the sample values shown.</para>
+                <note>
+                    <para>This guide uses <emphasis role="bold">yourUserName</emphasis> and <emphasis
+                        role="bold">yourApiKey</emphasis> for authentication. For information about
+                        other supported authentication methods, see <link
+                            xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/Token_Calls.html"
+                            >Authentication tokens</link> in the <citetitle>Cloud Identity Client Developer
+                                Guide</citetitle>.</para>
+                </note>
                 <para>The following table describes a request for an
                     authentication token and the examples that follow
                     show the request and response in JSON
