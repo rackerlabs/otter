@@ -1,10 +1,11 @@
 """Steps for convergence."""
 
 from characteristic import attributes
-from zope.interface import implementer, Interface
+
+from zope.interface import Interface, implementer
 
 from otter.constants import ServiceType
-from otter.http import has_code
+from otter.http import has_code, service_request
 from otter.util.http import append_segments
 
 
@@ -14,11 +15,8 @@ class IStep(Interface):
     converge operation.
     """
 
-    def as_request():
-        """
-        Create a :class:`Request` object that contains relevant information for
-        performing the HTTP request required for this step
-        """
+    def as_effect():
+        """Return an Effect which performs this step."""
 
 
 @implementer(IStep)
@@ -30,12 +28,12 @@ class CreateServer(object):
     :ivar pmap launch_config: Nova launch configuration.
     """
 
-    def as_request(self):
-        """Produce a :obj:`Request` to create a server."""
-        return Request(
-            service=ServiceType.CLOUD_SERVERS,
-            method='POST',
-            path='servers',
+    def as_effect(self):
+        """Produce a :obj:`Effect` to create a server."""
+        return service_request(
+            ServiceType.CLOUD_SERVERS,
+            'POST',
+            'servers',
             data=self.launch_config)
 
 
@@ -48,12 +46,12 @@ class DeleteServer(object):
     :ivar str server_id: a Nova server ID.
     """
 
-    def as_request(self):
-        """Produce a :obj:`Request` to delete a server."""
-        return Request(
-            service=ServiceType.CLOUD_SERVERS,
-            method='DELETE',
-            path=append_segments('servers', self.server_id))
+    def as_effect(self):
+        """Produce a :obj:`Effect` to delete a server."""
+        return service_request(
+            ServiceType.CLOUD_SERVERS,
+            'DELETE',
+            append_segments('servers', self.server_id))
 
 
 @implementer(IStep)
@@ -66,13 +64,12 @@ class SetMetadataItemOnServer(object):
     :ivar str key: The metadata key to set (<=256 characters)
     :ivar str value: The value to assign to the metadata key (<=256 characters)
     """
-    def as_request(self):
-        """Produce a :obj:`Request` to set a metadata item on a server"""
-        return Request(
-            service=ServiceType.CLOUD_SERVERS,
-            method='PUT',
-            path=append_segments('servers', self.server_id, 'metadata',
-                                 self.key),
+    def as_effect(self):
+        """Produce a :obj:`Effect` to set a metadata item on a server"""
+        return service_request(
+            ServiceType.CLOUD_SERVERS,
+            'PUT',
+            append_segments('servers', self.server_id, 'metadata', self.key),
             data={'meta': {self.key: self.value}})
 
 
@@ -85,14 +82,15 @@ class AddNodesToCLB(object):
     :param address_configs: A collection of two-tuples of address and
         :obj:`CLBDescription`.
     """
-    def as_request(self):
-        """Produce a :obj:`Request` to add nodes to CLB"""
-        return Request(
-            service=ServiceType.CLOUD_LOAD_BALANCERS,
-            method='POST',
-            path=append_segments('loadbalancers', str(self.lb_id)),
+    def as_effect(self):
+        """Produce a :obj:`Effect` to add nodes to CLB"""
+        return service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'POST',
+            append_segments('loadbalancers', str(self.lb_id)),
             data={'nodes': [{'address': address, 'port': lbc.port,
-                             'condition': lbc.condition.name, 'weight': lbc.weight,
+                             'condition': lbc.condition.name,
+                             'weight': lbc.weight,
                              'type': lbc.type.name}
                             for address, lbc in self.address_configs]})
 
@@ -104,14 +102,13 @@ class RemoveFromCLB(object):
     A server must be removed from a load balancer.
     """
 
-    def as_request(self):
-        """Produce a :obj:`Request` to remove a load balancer node."""
-        return Request(
-            service=ServiceType.CLOUD_LOAD_BALANCERS,
-            method='DELETE',
-            path=append_segments('loadbalancers',
-                                 str(self.lb_id),
-                                 str(self.node_id)))
+    def as_effect(self):
+        """Produce a :obj:`Effect` to remove a load balancer node."""
+        return service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'DELETE',
+            append_segments('loadbalancers', str(self.lb_id),
+                            str(self.node_id)))
 
 
 @implementer(IStep)
@@ -122,14 +119,13 @@ class ChangeCLBNode(object):
     weight, or type modified.
     """
 
-    def as_request(self):
-        """Produce a :obj:`Request` to modify a load balancer node."""
-        return Request(
-            service=ServiceType.CLOUD_LOAD_BALANCERS,
-            method='PUT',
-            path=append_segments('loadbalancers',
-                                 self.lb_id,
-                                 'nodes', self.node_id),
+    def as_effect(self):
+        """Produce a :obj:`Effect` to modify a load balancer node."""
+        return service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'PUT',
+            append_segments('loadbalancers', self.lb_id,
+                            'nodes', self.node_id),
             data={'condition': self.condition,
                   'weight': self.weight})
 
@@ -148,11 +144,10 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
         node pairs.
     :rtype: :class:`Request`
     """
-    return Request(
-        service=ServiceType.RACKCONNECT_V3,
-        method=method,
-        path=append_segments("load_balancer_pools",
-                             "nodes"),
+    return service_request(
+        ServiceType.RACKCONNECT_V3,
+        method,
+        append_segments("load_balancer_pools", "nodes"),
         data=[{"cloud_server": {"id": node},
                "load_balancer_pool": {"id": lb}}
               for (lb, node) in lb_node_pairs],
@@ -174,9 +169,9 @@ class BulkAddToRCv3(object):
         connections to be made.
     """
 
-    def as_request(self):
+    def as_effect(self):
         """
-        Produce a :obj:`Request` to add some nodes to some RCv3 load
+        Produce a :obj:`Effect` to add some nodes to some RCv3 load
         balancers.
         """
         return _rackconnect_bulk_request(self.lb_node_pairs, "POST", (201,))
@@ -195,38 +190,9 @@ class BulkRemoveFromRCv3(object):
         connections to be removed.
     """
 
-    def as_request(self):
+    def as_effect(self):
         """
-        Produce a :obj:`Request` to remove some nodes from some RCv3 load
+        Produce a :obj:`Effect` to remove some nodes from some RCv3 load
         balancers.
         """
         return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE", (204,))
-
-
-@attributes(['service', 'method', 'path', 'headers', 'data', 'success_pred'],
-            defaults={'headers': None,
-                      'data': None,
-                      'success_pred': has_code(200)})
-class Request(object):
-    """
-    An object representing a Rackspace API request that must be performed.
-
-    A :class:`Request` only stores information - something else must use the
-    information to make an HTTP request, as a :class:`Request` itself has no
-    behaviors.
-
-    :ivar ServiceType service: The Rackspace service that the request
-        should be sent to. One of the members of :obj:`ServiceType`.
-    :ivar bytes method: The HTTP method.
-    :ivar bytes path: The path relative to a tenant namespace provided by the
-        service.  For example, for cloud servers, this path would be appended
-        to something like
-        ``https://dfw.servers.api.rackspacecloud.com/v2/010101/`` and would
-        therefore typically begin with ``servers/...``.
-    :ivar dict headers: a dict mapping bytes to lists of bytes.
-    :ivar object data: a Python object that will be JSON-serialized as the body
-        of the request.
-    :ivar callable success_pred: Function that takes a response object
-        and decides if it was successful. Defaults to just checking that
-        the response code is 200 (OK).
-    """
