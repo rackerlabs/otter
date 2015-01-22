@@ -307,7 +307,7 @@ def _build_schedule_policy(policy, event_table, queries, data, polname, buckets)
         data[polname + "trigger"] = at_time
     elif 'cron' in policy["args"]:
         queries.append(_cql_insert_group_event_with_cron
-                       .format(_table, name=polname))
+                       .format(event_table, name=polname))
         cron = policy["args"]["cron"]
         data[polname + "trigger"] = next_cron_occurrence(cron)
         data[polname + 'cron'] = cron
