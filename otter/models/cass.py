@@ -259,7 +259,8 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
 DEFAULT_CONSISTENCY = ConsistencyLevel.QUORUM
 
 
-def _build_policies(policies, policies_table, event_table, queries, data, buckets):
+def _build_policies(policies, policies_table, event_table, queries, data,
+                    buckets):
     """
     Because inserting many values into a table with compound keys with one
     insert statement is hard. This builds a bunch of insert statements and a
