@@ -18,7 +18,7 @@ from cloudcafe.common.resources import ResourcePool
 from cloudcafe.common.tools.datagen import rand_name
 from cloudcafe.compute.servers_api.client import ServersClient
 
-from autoscale.behaviors import AutoscaleBehaviors, safe_hasattr
+from autoscale.behaviors import AutoscaleBehaviors
 from autoscale.client import (
     AutoscalingAPIClient, LbaasAPIClient, RackConnectV3APIClient
 )
