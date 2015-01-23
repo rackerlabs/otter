@@ -9,7 +9,6 @@ from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import CLBDescription, DesiredGroupState
 from otter.convergence.planning import plan
-from otter.worker.launch_server_v1 import prepare_launch_config
 
 
 def execute_convergence(group_id, desired_group_state,
@@ -66,7 +65,7 @@ def json_to_LBConfigs(lbs_json):
     return lbd
 
 
-def get_desired_group_state(group_id, launch_config, desired):
+def get_desired_group_state(launch_config, desired):
     """
     Create a :obj:`DesiredGroupState` from a launch config and desired
     number of servers.
@@ -76,7 +75,6 @@ def get_desired_group_state(group_id, launch_config, desired):
     :param int desired: Group's desired capacity
     """
     lcargs = launch_config['args']
-    lcargs = prepare_launch_config(group_id, lcargs, change_name=False)
     lbs = json_to_LBConfigs(lcargs['loadBalancers'])
     desired_state = DesiredGroupState(
         launch_config={'server': lcargs['server']},

@@ -19,7 +19,6 @@ from otter.convergence.model import (
     CLBDescription, DesiredGroupState, NovaServer, ServerState)
 from otter.http import service_request
 from otter.test.utils import resolve_stubs
-from otter.worker.launch_server_v1 import prepare_launch_config
 
 
 class JsonToLBConfigTests(SynchronousTestCase):
@@ -60,12 +59,11 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config,
                        'loadBalancers': [{'loadBalancerId': 23, 'port': 80}]}}
-        state = get_desired_group_state('gid', lc, 2)
+        state = get_desired_group_state(lc, 2)
         self.assertEqual(
             state,
             DesiredGroupState(
-                launch_config=freeze(prepare_launch_config(
-                    'gid', lc['args'], change_name=False)),
+                launch_config=freeze({'server': lc['args']['server']}),
                 desired=2,
                 desired_lbs={23: [CLBDescription(lb_id='23', port=80)]}))
 

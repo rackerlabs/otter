@@ -4,7 +4,7 @@ from characteristic import attributes
 
 from effect import Effect, Func
 
-from pyrsistent import pvector
+from pyrsistent import pvector, thaw
 
 from zope.interface import Interface, implementer
 
@@ -37,10 +37,12 @@ def prepare_server_name(launch_config_args, name_suffix):
         name = name_suffix
 
     lcargs = launch_config_args.set_in(('server', 'name'), name)
-    new_lbcfgs = (
-        lbcfg.set_in(('metadata', 'rax:auto_scaling_server_name'), name)
-        for lbcfg in lcargs.get('loadBalancers', []))
-    lcargs = lcargs.set('loadBalancers', pvector(new_lbcfgs))
+    lbs = lcargs.get('loadBalancers')
+    if lbs is not None:
+        new_lbcfgs = (
+            lbcfg.set_in(('metadata', 'rax:auto_scaling_server_name'), name)
+            for lbcfg in lcargs.get('loadBalancers', []))
+        lcargs = lcargs.set('loadBalancers', pvector(new_lbcfgs))
     return lcargs
 
 
@@ -64,7 +66,7 @@ class CreateServer(object):
                 ServiceType.CLOUD_SERVERS,
                 'POST',
                 'servers',
-                data=launch_config)
+                data=thaw(launch_config))
         return eff.on(got_name)
 
 

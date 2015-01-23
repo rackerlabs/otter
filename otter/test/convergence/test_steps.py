@@ -3,7 +3,7 @@
 from effect import Func
 from effect.testing import resolve_effect
 
-from pyrsistent import freeze, pmap, pset
+from pyrsistent import freeze, pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -41,7 +41,8 @@ class StepAsEffectTests(SynchronousTestCase):
                 ServiceType.CLOUD_SERVERS,
                 'POST',
                 'servers',
-                data=pmap({'name': 'myserver-random-name', 'flavorRef': '1'})))
+                data={'server': {'name': 'myserver-random-name',
+                                 'flavorRef': '1'}}))
 
     def test_create_server_noname(self):
         """
@@ -59,7 +60,7 @@ class StepAsEffectTests(SynchronousTestCase):
                 ServiceType.CLOUD_SERVERS,
                 'POST',
                 'servers',
-                data=pmap({'name': 'random-name', 'flavorRef': '1'})))
+                data={'server': {'name': 'random-name', 'flavorRef': '1'}}))
 
     def test_delete_server(self):
         """
