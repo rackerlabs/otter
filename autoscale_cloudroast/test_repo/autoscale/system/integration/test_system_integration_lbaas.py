@@ -395,7 +395,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             self, group.id, activeservers_after_scaledown, self.load_balancer_3
         )
         ips_removed = set(ip_list_on_scale_up) - set(ip_list_on_scale_down)
-        self.common.verify_given_ips_do_not_exist_as_nodes_on_lb(
+        self._verify_given_ips_do_not_exist_as_nodes_on_lb(
             self.load_balancer_3, ips_removed)
         self.assert_servers_deleted_successfully(
             group.launchConfiguration.server.name,
