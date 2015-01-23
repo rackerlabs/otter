@@ -4,7 +4,7 @@ from characteristic import attributes
 
 from effect import Effect, Func
 
-from pyrsistent import pvector, thaw
+from pyrsistent import thaw
 
 from zope.interface import Interface, implementer
 
@@ -35,15 +35,7 @@ def prepare_server_name(launch_config_args, name_suffix):
         name = '{0}-{1}'.format(name, name_suffix)
     else:
         name = name_suffix
-
-    lcargs = launch_config_args.set_in(('server', 'name'), name)
-    lbs = lcargs.get('loadBalancers')
-    if lbs is not None:
-        new_lbcfgs = (
-            lbcfg.set_in(('metadata', 'rax:auto_scaling_server_name'), name)
-            for lbcfg in lcargs.get('loadBalancers', []))
-        lcargs = lcargs.set('loadBalancers', pvector(new_lbcfgs))
-    return lcargs
+    return launch_config_args.set_in(('server', 'name'), name)
 
 
 @implementer(IStep)

@@ -563,7 +563,6 @@ def prepare_launch_config(scaling_group_uuid, launch_config, change_name=True):
     :return dict: The prepared launch config.
     """
     launch_config = deepcopy(launch_config)
-
     server_config = launch_config['server']
 
     if 'metadata' not in server_config:
@@ -572,15 +571,17 @@ def prepare_launch_config(scaling_group_uuid, launch_config, change_name=True):
     server_config['metadata'].update(generate_server_metadata(
         scaling_group_uuid, launch_config))
 
-    for lb_config in launch_config.get('loadBalancers', []):
-        if 'metadata' not in lb_config:
-            lb_config['metadata'] = {}
-        lb_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
-
     if change_name:
         suffix = generate_server_name()
         launch_config = thaw(prepare_server_name(freeze(launch_config),
                                                  suffix))
+    for lb_config in launch_config.get('loadBalancers', []):
+        if 'metadata' not in lb_config:
+            lb_config['metadata'] = {}
+        lb_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
+        lb_config['metadata']['rax:auto_scaling_server_name'] = (
+            launch_config['server']['name'])
+
     return launch_config
 
 
