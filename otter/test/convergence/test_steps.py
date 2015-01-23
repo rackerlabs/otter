@@ -104,7 +104,7 @@ class StepAsEffectTests(SynchronousTestCase):
         :param step_class: The step class under test.
         :param str method: The expected HTTP method of the request.
         """
-        step = step_class(lb_node_pairs=pset([
+        lb_node_pairs = pset([
             ("lb-1", "node-a"),
             ("lb-1", "node-b"),
             ("lb-1", "node-c"),
@@ -113,13 +113,21 @@ class StepAsEffectTests(SynchronousTestCase):
             ("lb-2", "node-b"),
             ("lb-3", "node-c"),
             ("lb-3", "node-d")
-        ]))
+        ])
+        step = step_class(lb_node_pairs=lb_node_pairs)
         request = step.as_effect()
         self.assertEqual(request.intent.service_type,
                          ServiceType.RACKCONNECT_V3)
         self.assertEqual(request.intent.method, expected_method)
-        expected_code = 201 if request.intent.method == "POST" else 204
-        self.assertEqual(request.intent.success_pred, has_code(expected_code))
+
+        success_pred = request.intent.success_pred
+        if request.intent.method == "POST":
+            self.assertEqual(success_pred, has_code(201))
+        else:
+            self.assertEqual(success_pred.func, _rcv3_delete_successful)
+            self.assertEqual(success_pred.args, (lb_node_pairs,))
+            self.assertEqual(success_pred.keywords, None)
+
         self.assertEqual(request.intent.url, "load_balancer_pools/nodes")
         self.assertEqual(request.intent.headers, None)
 
