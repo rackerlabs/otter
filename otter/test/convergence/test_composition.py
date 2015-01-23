@@ -63,7 +63,7 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
         self.assertEqual(
             state,
             DesiredGroupState(
-                launch_config=freeze({'server': lc['args']['server']}),
+                launch_config={'server': server_config},
                 desired=2,
                 desired_lbs={23: [CLBDescription(lb_id='23', port=80)]}))
 

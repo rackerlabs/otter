@@ -74,9 +74,8 @@ def get_desired_group_state(launch_config, desired):
         :obj:`otter.json_schema.group_schemas.launch_config`
     :param int desired: Group's desired capacity
     """
-    lcargs = launch_config['args']
-    lbs = json_to_LBConfigs(lcargs['loadBalancers'])
+    lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
     desired_state = DesiredGroupState(
-        launch_config={'server': lcargs['server']},
+        launch_config={'server': launch_config['args']['server']},
         desired=desired, desired_lbs=lbs)
     return desired_state
