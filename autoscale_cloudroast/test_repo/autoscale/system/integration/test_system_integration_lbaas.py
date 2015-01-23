@@ -25,7 +25,8 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         """
         super(AutoscaleLbaasFixture, cls).setUpClass()
         cls.common = common.CommonTestUtilities(cls.server_client,
-                                                cls.autoscale_client)
+                                                cls.autoscale_client,
+                                                cls.lbaas_client)
 
         cls.load_balancer_1_response = cls.lbaas_client.create_load_balancer(
             'test', [], 'HTTP', 80, "PUBLIC")
