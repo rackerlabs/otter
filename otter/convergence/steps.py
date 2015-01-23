@@ -24,10 +24,14 @@ class IStep(Interface):
         """Return an Effect which performs this step."""
 
 
-def prepare_server_name(launch_config_args, name_suffix):
+def set_server_name(launch_config_args, name_suffix):
     """
     Append the given name_suffix to the name of the server in the launch
     config.
+
+    :param launch_config_args: The launch configuration args.
+    :param name_suffix: the suffix to append to the server name. If no name was
+        specified, it will be used as the name.
     """
     name = launch_config_args['server'].get('name')
     if name is not None:
@@ -51,8 +55,7 @@ class CreateServer(object):
         eff = Effect(Func(generate_server_name))
 
         def got_name(random_name):
-            launch_config = prepare_server_name(self.launch_config,
-                                                random_name)
+            launch_config = set_server_name(self.launch_config, random_name)
             return service_request(
                 ServiceType.CLOUD_SERVERS,
                 'POST',

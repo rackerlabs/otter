@@ -33,7 +33,7 @@ from twisted.python.failure import Failure
 
 from otter.auth import public_endpoint_url
 from otter.convergence.gathering import _servicenet_address
-from otter.convergence.steps import prepare_server_name
+from otter.convergence.steps import set_server_name
 from otter.util import logging_treq as treq
 from otter.util.config import config_value
 from otter.util.deferredutils import log_with_time, retry_and_timeout
@@ -569,8 +569,7 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
         scaling_group_uuid, launch_config))
 
     suffix = generate_server_name()
-    launch_config = thaw(prepare_server_name(freeze(launch_config),
-                                             suffix))
+    launch_config = thaw(set_server_name(freeze(launch_config), suffix))
 
     for lb_config in launch_config.get('loadBalancers', []):
         if 'metadata' not in lb_config:
