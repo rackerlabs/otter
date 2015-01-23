@@ -30,5 +30,12 @@ def measure_progress(previous_state, current_state, desired_state):
     :param DesiredState desired_state: The desired state of a scaling group.
     :return: The number of steps made towards the desired.
     :rtype: int
-
+    :raises AssertionError: If progress regressed.
     """
+    previous_capacity = len(previous_state.servers)
+    current_capacity = len(current_state.servers)
+    capacity_delta = current_capacity - previous_capacity
+    if capacity_delta < 0:
+        raise AssertionError("boo! capacity went down")
+
+    return capacity_delta
