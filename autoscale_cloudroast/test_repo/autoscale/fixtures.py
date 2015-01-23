@@ -351,92 +351,13 @@ class AutoscaleFixture(BaseTestFixture):
                                                    interval_time=None,
                                                    timeout=None,
                                                    api="Autoscale"):
+        """This thunks to its replacement in Behaviors.
+        Please refer to Autoscale's behaviors.py for more details.
         """
-        Wait for the expected_servers to arrive in either Autoscale or
-        RackConnectV3 API.
-
-        :summary: verify the desired capacity in group state is equal to
-                  expected servers and waits for the specified number of
-                  servers to be active on a group
-
-        :param group_id: Group id (AutoScale API), or pool ID (RackConnect API)
-        :param expected_servers: Total active servers expected on the group
-        :param interval_time: Time to wait during polling group state
-        :param timeout: Time to wait before exiting this function
-        :param api: Either "Autoscale" or "RackConnect".  Defaults to
-            "Autoscale"
-
-        :return: returns the list of active servers in the group
-        """
-        interval_time = interval_time or int(
-            self.autoscale_config.interval_time)
-        timeout = timeout or int(self.autoscale_config.timeout)
-        start_time = time.time()
-        end_time = start_time + timeout
-
-        # If we're checking up on Autoscale, we need to make sure that our
-        # group is even attempting to build the right number of servers.  If
-        # we're not, there's no point in continuing; we'll never attain the
-        # desired capacity anyway.
-        #
-        # Unfortunately, there's no way to check this on RackConnect's API,
-        # since it has no mechanism to report back its current "plans."
-        if api == 'Autoscale':
-            group_state_response = (
-                self.autoscale_client.list_status_entities_sgroups(group_id)
-            )
-            group_state = group_state_response.entity
-            self.assertEquals(
-                group_state.desiredCapacity, expected_servers,
-                msg='Group {0} should have {1} servers, '
-                'but is trying to build {2} servers'
-                .format(group_id, expected_servers,
-                        group_state.desiredCapacity))
-
-        while time.time() < end_time:
-            if api == 'Autoscale':
-                resp = self.autoscale_client.list_status_entities_sgroups(
-                    group_id)
-                group_state = resp.entity
-                active_list = group_state.active
-                self.assertNotEquals(
-                    (group_state.activeCapacity + group_state.pendingCapacity),
-                    0,
-                    msg='Group Id {0} failed to attempt server creation. '
-                    'Group has no servers'.format(group_id))
-                self.assertEquals(
-                    group_state.desiredCapacity,
-                    expected_servers,
-                    msg='Group {0} should have {1} servers, but has reduced '
-                    'the build {2} servers'.format(group_id, expected_servers,
-                                                   group_state.desiredCapacity)
-                )
-                if len(active_list) == expected_servers:
-                    print("Otter")
-                    print("Achieved expected servers after ",
-                          time.time() - start_time, " seconds")
-                    return [server.id for server in active_list]
-            else:
-                # We're looking at the RackConnect API for our server list
-                # here.
-                nodes = self.rcv3_client.get_nodes_on_pool(group_id).entity
-                server_list = [n for n in nodes.nodes
-                               if (safe_hasattr(n, "cloud_server"))
-                               and (n.status == "ACTIVE")]
-                if len(server_list) == expected_servers:
-                    print("RCv3")
-                    print("Achieved expected servers after ",
-                          time.time() - start_time, " seconds")
-                    return [n.id for n in server_list]
-
-            time.sleep(interval_time)
-        else:
-            self.fail(
-                "wait_for_active_list_in_group_state ran for {0} seconds "
-                "for group/pool ID {1} and did not observe the active "
-                "server list achieving the expected servers count: {2}."
-                .format(timeout, group_id, expected_servers)
-            )
+        return (self.autoscale_behaviors
+                .wait_for_expected_number_of_active_servers(
+                    group_id, expected_servers, interval_time, timeout,
+                    api=api, asserter=self))
 
     def wait_for_expected_group_state(self, group_id, expected_servers,
                                       wait_time=180):

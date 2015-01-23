@@ -626,24 +626,6 @@ class AutoscaleBehaviors(BaseBehavior):
         if asserter is None:
             asserter = DefaultAsserter()
 
-        # If we're checking up on Autoscale, we need to make sure that our
-        # group is even attempting to build the right number of servers.  If
-        # we're not, there's no point in continuing; we'll never attain the
-        # desired capacity anyway.
-        #
-        # Unfortunately, there's no way to check this on RackConnect's API,
-        # since it has no mechanism to report back its current "plans."
-        if api == 'Autoscale':
-            group_state_response = (
-                self.autoscale_client.list_status_entities_sgroups(group_id)
-            )
-            group_state = group_state_response.entity
-            asserter.assertEquals(
-                group_state.desiredCapacity, expected_servers,
-                msg='Group {0} should have {1} servers, but is trying to '
-                'build {2} servers'.format(group_id, expected_servers,
-                                           group_state.desiredCapacity))
-
         while time.time() < end_time:
             if api == 'Autoscale':
                 resp = (self.autoscale_client
@@ -658,15 +640,6 @@ class AutoscaleBehaviors(BaseBehavior):
                     'Group has no servers'.format(group_id)
                 )
 
-                # You might think this is duplicate code with the optimization
-                # above, but you'd be wrong!  For Otter w/out convergence, if a
-                # server created by Otter enters into an error state, the
-                # "desired" capacity drops by one.  Thus, we use this assert as
-                # an inexpensive way to early-detect when it is impossible to
-                # reach our desired goals.
-                #
-                # When Otter adopts convergence, this becomes dead code, and
-                # can be safely removed.
                 asserter.assertEquals(
                     group_state.desiredCapacity, expected_servers,
                     msg='Group {0} should have {1} servers,'
