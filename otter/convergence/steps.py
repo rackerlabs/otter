@@ -27,8 +27,7 @@ class IStep(Interface):
 def prepare_server_name(launch_config_args, name_suffix):
     """
     Append the given name_suffix to the name of the server in the launch
-    config, and make sure that rax:auto_scaling_server_name is set in the load
-    balancer metadata.
+    config.
     """
     name = launch_config_args['server'].get('name')
     if name is not None:
