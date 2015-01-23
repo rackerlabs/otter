@@ -200,7 +200,7 @@ class CLBNode(object):
         combination of IP and port number, on the CLB.  Also, see
         :obj:`ILBNode.node_id`.
     :ivar description: The description of how the node should be set up. See
-        :obj:`ILBNode.node_id`.
+        :obj:`ILBNode.description`.
     :type: :class:`ILBDescription` provider
 
     :ivar str address: The IP address of the node.  The IP and port form a
