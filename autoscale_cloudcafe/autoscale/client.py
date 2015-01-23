@@ -1,20 +1,28 @@
 """
 Client objects for all the autoscale api calls
 """
-from autoscale.models.response.autoscale_response import (Group, Config,
-                                                          Policy, Webhook,
-                                                          ScalingGroup, Groups,
-                                                          Policies, Webhooks,
-                                                          Audit)
-from autoscale.models.response.limits_response import Limits
-from autoscale.models.request.autoscale_requests import (
-    Group_Request, Policy_Request, Webhook_Request, Config_Request,
-    ScalingGroup_Request, Update_Policy_Request, Update_Webhook_Request,
-    Maas_Policy_Request, Update_Maas_Policy_Request, Policy_Batch_Request,
-    Webhook_Multi_Request)
-from autoscale.models.lbaas import NodeList, LoadBalancer
-from cafe.engine.clients.rest import AutoMarshallingRestClient
+from __future__ import print_function
+
+
 from urlparse import urlparse
+
+from cafe.engine.clients.rest import AutoMarshallingRestClient
+
+from autoscale.models.lbaas import LoadBalancer, NodeList
+from autoscale.models.request.autoscale_requests import (
+    Config_Request, Group_Request, Maas_Policy_Request, Policy_Batch_Request,
+    Policy_Request, ScalingGroup_Request, Update_Maas_Policy_Request,
+    Update_Policy_Request, Update_Webhook_Request, Webhook_Multi_Request,
+    Webhook_Request
+)
+from autoscale.models.response.autoscale_response import (
+    Audit, Config,
+    Group, Groups, Policies, Policy, RackConnectLBNodeDetail,
+    RackConnectLBNodes, RackConnectLBPool, RackConnectLBPools,
+    RackConnectNetworkInfo, ScalingGroup, Webhook, Webhooks
+)
+
+from autoscale.models.response.limits_response import Limits
 
 
 class AutoscalingAPIClient(AutoMarshallingRestClient):
@@ -136,6 +144,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
             lc_block_device_mapping=lc_block_device_mapping,
             lc_load_balancers=lc_load_balancers,
             sp_list=sp_list)
+
         return self.request('POST', url,
                             request_entity=scaling_group,
                             requestslib_kwargs=requestslib_kwargs,
@@ -233,6 +242,29 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
         self.group_id = group_id
         params = {'force': force}
+        url = '%s/groups/%s/' % (self.url, self.group_id)
+        return self.request('DELETE', url, params=params,
+                            requestslib_kwargs=requestslib_kwargs)
+
+    def delete_scaling_group_with_force(self, group_id,
+                                        requestslib_kwargs=None):
+        """
+        :summary: Deletes the scaling group even when there are servers on the
+                  group
+
+        :param group_id: The id of an existing scaling group.
+
+        :type group_id: String
+
+        :return: Response Object containing response code 204 on success and
+                 empty body
+        :rtype: Response Object
+
+            DELETE '/{tenantId}/groups/{groupId}?force=true'
+        """
+
+        self.group_id = group_id
+        params = {'force': True}
         url = '%s/groups/%s/' % (self.url, self.group_id)
         return self.request('DELETE', url, params=params,
                             requestslib_kwargs=requestslib_kwargs)
@@ -807,7 +839,7 @@ class LbaasAPIClient(AutoMarshallingRestClient):
         :param virtualIps: The virtualIps of the load balancer
         :type virtualIps: string
         :return: Response Object containing response code 202
-        on success and returns created load balancer json
+         on success and returns created load balancer json
         :rtype: Response Object
         """
         lb = LoadBalancer(name=name, nodes=nodes, protocol=protocol,
@@ -869,4 +901,87 @@ class LbaasAPIClient(AutoMarshallingRestClient):
         full_url = '/'.join([self.url, str(load_balancer_id), 'nodes',
                              str(node_id)])
         return self.request('DELETE', full_url,
+                            requestslib_kwargs=requestslib_kwargs)
+
+
+class RackConnectV3APIClient(AutoMarshallingRestClient):
+    """
+    Client objects for all Rackconnect V3 API calls.
+    """
+
+    def __init__(self, url, auth_token, serialize_format=None,
+                 deserialize_format=None):
+        super(RackConnectV3APIClient, self).__init__(serialize_format,
+                                                     deserialize_format)
+        self.url = url
+        self.auth_token = auth_token
+        self.default_headers['X-Auth-Token'] = auth_token
+        self.default_headers['Content-Type'] = (
+            'application/%s' % (self.serialize_format,))
+        self.default_headers['Accept'] = 'application/%s' % (
+            (self.deserialize_format,))
+
+    def list_pools(self):
+        """
+        :summary: Get the list of pools for the tenant's RCV3 account
+        :return: Response Object containing response code 202
+        on success and list of pools
+        :rtype: Response Object
+        """
+        url = self.url + "/load_balancer_pools"
+        return self.request('GET', url,
+                            response_entity_type=RackConnectLBPools)
+
+    def get_cloud_network_info(self, cloud_network_id):
+        """
+        :summary: Get information on a given cloud_network
+        :return: Response Object
+        :rtype: Response Object
+        """
+        url = self.url + '/cloud_networks/{0}'.format(cloud_network_id)
+        print("### GETTING NETWORK INFO FROM: " + url)
+        return self.request('GET', url,
+                            response_entity_type=RackConnectNetworkInfo)
+
+    def get_pool_info(self, pool_id):
+        """
+        :summary: Get information on a given load_balancer_pool
+        :return: Response Object
+        :rtype: Response Object
+        """
+        url = self.url + '/load_balancer_pools/{0}'.format(pool_id)
+        print("... RCV3 request ... ", url)
+        return self.request('GET', url, response_entity_type=RackConnectLBPool)
+
+    def get_nodes_on_pool(self, pool_id):
+        """
+        :summary: Get the list of nodes on a given load balancer pool
+        :return: List of RC Node objects
+        :rtype: Response Object
+        """
+        url = self.url + '/load_balancer_pools/{0}/nodes'.format(pool_id)
+        print("... RCV3 request ... ", url)
+        return self.request('GET', url,
+                            response_entity_type=RackConnectLBNodes)
+
+    def get_node_info_detail(self, pool_id, node_id):
+        """
+        :summary: Get the detailed information on a specific node on a pool
+        :return: List of RC Node objects
+        :rtype: Response Object
+        """
+        url = self.url + ('/load_balancer_pools/{0}/nodes/{1}/details'
+                          .format(pool_id, node_id))
+        print("... RCV3 request ... ", url)
+        return self.request('GET', url,
+                            response_entity_type=RackConnectLBNodeDetail)
+
+    def remove_node_from_pool(self, pool_id, node_id, requestslib_kwargs=None):
+        """
+        :summary: Remove a node from a lb pool
+        """
+        url = self.url + '/load_balancer_pools/{0}/nodes/{1}'.format(pool_id,
+                                                                     node_id)
+        print("... RCV3 request ... ", url)
+        return self.request('DELETE', url,
                             requestslib_kwargs=requestslib_kwargs)
