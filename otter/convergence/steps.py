@@ -1,5 +1,7 @@
 """Steps for convergence."""
 
+from functools import partial
+
 from characteristic import attributes
 
 from zope.interface import Interface, implementer
@@ -199,17 +201,21 @@ class BulkRemoveFromRCv3(object):
         """
         return _rackconnect_bulk_request(
             self.lb_node_pairs, "DELETE",
-            success_pred=has_code(204))
+            success_pred=partial(_rcv3_delete_successful, self.lb_node_pairs))
 
 
-def _rcv3_delete_successful(lb_node_pairs, response):
+def _rcv3_delete_successful(lb_node_pairs, response, body):
     """
     Checks if the RCv3 bulk deletion command was successful.
 
-    This means either the response code indicated unambiguous success
+    This means either the response code indicated unambiguous success,
+    or the machine we're trying to remove is already removed anyway.
     """
     if response.code == 204:
         return True
 
-    fatal_errors = []
-    return bool(fatal_errors)
+    template = "Node {node_id} is not a member of Load Balancer Pool {lb_id}"
+    allowable_errors = set([template.format(node_id=node_id, lb_id=lb_id)
+                            for (lb_id, node_id) in lb_node_pairs])
+    fatal_errors = set(body["errors"]) - allowable_errors
+    return not fatal_errors
