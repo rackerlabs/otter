@@ -6,14 +6,14 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
 from otter.convergence.steps import (
-    _rcv3_delete_successful,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
     CreateServer,
     DeleteServer,
     RemoveFromCLB,
-    SetMetadataItemOnServer)
+    SetMetadataItemOnServer,
+    _rcv3_delete_successful)
 from otter.http import has_code, service_request
 from otter.test.utils import StubResponse
 
