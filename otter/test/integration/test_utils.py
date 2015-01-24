@@ -40,11 +40,11 @@ class MeasureProgressTests(SynchronousTestCase):
         """
         previous_state = GroupState(
             servers=self._create_servers(2),
-            lb_connections=pset([]) # TODO: servers should already be attached to their load balancers
+            lb_connections=pset([])
         )
         current_state = GroupState(
             servers=self._create_servers(4),
-            lb_connections=pset([]) # TODO: old servers should still be attached
+            lb_connections=pset([])
         )
         desired_state = DesiredGroupState(
             launch_config=pmap(),
@@ -62,11 +62,11 @@ class MeasureProgressTests(SynchronousTestCase):
         """
         previous_state = GroupState(
             servers=self._create_servers(4),
-            lb_connections=pset([]) # TODO: servers should already be attached to their load balancers
+            lb_connections=pset([])
         )
         current_state = GroupState(
             servers=self._create_servers(2),
-            lb_connections=pset([]) # TODO: old servers should still be attached
+            lb_connections=pset([])
         )
         desired_state = DesiredGroupState(
             launch_config=pmap(),
@@ -83,11 +83,11 @@ class MeasureProgressTests(SynchronousTestCase):
         """
         previous_state = GroupState(
             servers=self._create_servers(4),
-            lb_connections=pset([]) # TODO: servers should already be attached to their load balancers
+            lb_connections=pset([])
         )
         current_state = GroupState(
             servers=self._create_servers(6),
-            lb_connections=pset([]) # TODO: old servers should still be attached
+            lb_connections=pset([])
         )
         desired_state = DesiredGroupState(
             launch_config=pmap(),
@@ -104,11 +104,11 @@ class MeasureProgressTests(SynchronousTestCase):
         """
         previous_state = GroupState(
             servers=self._create_servers(6),
-            lb_connections=pset([]) # TODO: servers should already be attached to their load balancers
+            lb_connections=pset([])
         )
         current_state = GroupState(
             servers=self._create_servers(4),
-            lb_connections=pset([]) # TODO: old servers should still be attached
+            lb_connections=pset([])
         )
         desired_state = DesiredGroupState(
             launch_config=pmap(),
