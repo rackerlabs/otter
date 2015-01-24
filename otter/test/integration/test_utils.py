@@ -158,6 +158,29 @@ class MeasureProgressTests(SynchronousTestCase):
             previous_state, current_state, desired_state)
         self.assertEqual(progress, 0)
 
+    def test_servers_going_from_build_to_error_with_reaping(self):
+        """
+        When some servers go from build to error, no progress was
+        made. That works correctly even if some of the errored
+        machines get reaped in the mean while.
+        """
+        previous_state = GroupState(
+            servers=self._create_servers(3, state=ServerState.BUILD),
+            lb_connections=pset([])
+        )
+        current_state = GroupState(
+            servers=(self._create_servers(1, state=ServerState.ACTIVE)
+                     | self._create_servers(1, state=ServerState.ERROR)),
+            lb_connections=pset([])
+        )
+        desired_state = DesiredGroupState(
+            launch_config=pmap(),
+            desired=5,
+        )
+        progress = measure_progress(
+            previous_state, current_state, desired_state)
+        self.assertEqual(progress, 0)
+
     def test_reaping_errored_servers(self):
         """
         Errored servers are removed; no progress is made.
