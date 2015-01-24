@@ -324,9 +324,12 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.successResultOf(d)
         self.assertEqual(
             self.log.msg.mock_calls[:len(bad_codes)],
-            [mock.call('Got unexpected LB status {status} while {msg}: {error}',
-                       status=bad_code, loadbalancer_id=12345, ip_address='192.168.1.1', msg='add_node',
-                       error=matches(IsInstance(APIError))) for bad_code in bad_codes])
+            [mock.call(
+                'Got unexpected LB status {status_code} while {msg}: {error}',
+                status_code=bad_code, loadbalancer_id=12345,
+                ip_address='192.168.1.1', msg='add_node',
+                error=matches(IsInstance(APIError)))
+             for bad_code in bad_codes])
 
     def test_pushes_remove_onto_undo_stack(self):
         """
@@ -770,10 +773,11 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.clock.pump([self.retry_interval] * 6)
         self.successResultOf(d)
         self.log.msg.assert_has_calls(
-            [mock.call('Got unexpected LB status {status} while {msg}: {error}',
-                       status=code, msg='remove_node',
-                       error=matches(IsInstance(APIError)), loadbalancer_id=12345,
-                       node_id="a")
+            [mock.call(
+                'Got unexpected LB status {status_code} while {msg}: {error}',
+                status_code=code, msg='remove_node',
+                error=matches(IsInstance(APIError)), loadbalancer_id=12345,
+                node_id="a")
              for code in bad_codes])
 
 
