@@ -96,3 +96,24 @@ class MeasureProgressTests(SynchronousTestCase):
         self.assertRaises(
             AssertionError,
             measure_progress, previous_state, current_state, desired_state)
+
+    def test_undershoot(self):
+        """
+        When undershooting the desired capacity (group was above desired,
+        and is now below desired), no progress was made.
+        """
+        previous_state = GroupState(
+            servers=self._create_servers(6),
+            lb_connections=pset([]) # TODO: servers should already be attached to their load balancers
+        )
+        current_state = GroupState(
+            servers=self._create_servers(4),
+            lb_connections=pset([]) # TODO: old servers should still be attached
+        )
+        desired_state = DesiredGroupState(
+            launch_config=pmap(),
+            desired=5,
+        )
+        self.assertRaises(
+            AssertionError,
+            measure_progress, previous_state, current_state, desired_state)
