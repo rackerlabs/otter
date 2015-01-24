@@ -35,7 +35,6 @@ def measure_progress(previous_state, current_state, desired_state):
     previous_capacity = len(previous_state.servers)
     current_capacity = len(current_state.servers)
     capacity_delta = current_capacity - previous_capacity
-    if capacity_delta < 0:
-        raise AssertionError("boo! capacity went down")
+    desired_capacity = desired_state.desired
 
-    return capacity_delta
+    return abs(capacity_delta)
