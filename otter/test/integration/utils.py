@@ -1,12 +1,12 @@
 from characteristic import Attribute, attributes
 
-from pyrsistent import pset
+from pyrsistent import pset, PSet
 
 from otter.convergence.model import NovaServer
 
 @attributes([
-    Attribute("servers"),
-    Attribute("lb_connections")
+    Attribute("servers", instance_of=PSet),
+    Attribute("lb_connections", instance_of=PSet)
 ])
 class GroupState(object):
     """
