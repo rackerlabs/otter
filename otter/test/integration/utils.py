@@ -2,7 +2,7 @@ from characteristic import Attribute, attributes
 
 from pyrsistent import pset, PSet
 
-from otter.convergence.model import NovaServer
+from otter.convergence.model import NovaServer, ServerState
 
 
 @attributes([Attribute("servers", instance_of=PSet),
@@ -16,7 +16,7 @@ class GroupState(object):
     :attr pset lb_nodes: Set of the load balancer nodes in the group.
     """
 
-def measure_progress(previous_state, current_state, desired_state):
+def measure_progress(prev_state, curr_state, desired_state):
     """
     How many steps have been made towards the desired state between
     the previous and current states?
@@ -25,15 +25,15 @@ def measure_progress(previous_state, current_state, desired_state):
     describe their own flavor/image, making it impossible to see if
     the new servers are of the correct type.
 
-    :param GroupState previous_state: The previous state of a scaling group.
-    :param GroupState current_state: The current state of a scaling group.
+    :param GroupState prev_state: The previous state of a scaling group.
+    :param GroupState curr_state: The current state of a scaling group.
     :param DesiredState desired_state: The desired state of a scaling group.
     :return: The number of steps made towards the desired.
     :rtype: int
     :raises AssertionError: If progress regressed.
     """
-    prev_capacity = len(previous_state.servers)
-    curr_capacity = len(current_state.servers)
+    prev_capacity = _count_live_servers(prev_state.servers)
+    curr_capacity = _count_live_servers(curr_state.servers)
     capacity_delta = curr_capacity - prev_capacity
     desired = desired_state.desired
 
@@ -42,7 +42,25 @@ def measure_progress(previous_state, current_state, desired_state):
     elif prev_capacity < desired and curr_capacity > desired:
         raise AssertionError("Overshot the desired capacity")
 
-    return abs(capacity_delta)
+    if capacity_delta < 0 and curr_capacity < desired:
+        return 0
+    elif capacity_delta > 0 and curr_capacity > desired:
+        return 0
+    else:
+        return abs(capacity_delta)
+
+def _count_live_servers(servers):
+    """
+    Count servers that are active or building.
+    """
+    live_states = [ServerState.BUILD, ServerState.ACTIVE]
+    return len([s for s in servers if s.state in live_states])
+
+def _count_dead_servers(servers):
+    """
+    Count servers that are in error state.
+    """
+    return len([s for s in servers if s.state is ServerState.ERROR])
 
 def _sign(n):
     """
