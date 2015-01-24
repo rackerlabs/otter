@@ -21,15 +21,12 @@ class MeasureProgressTests(SynchronousTestCase):
     """
     Tests for :func:`measure_progress`.
     """
-    def _create_servers(self, n):
+    def _create_servers(self, n, state=ServerState.ACTIVE):
         """
         Create some dummy test servers.
         """
         return pset([
-            NovaServer(
-                id=str(i),
-                state=ServerState.ACTIVE,
-                created=123456789.)
+            NovaServer(id=str(i), state=state, created=123456789.)
             for i in xrange(n)
         ])
 
