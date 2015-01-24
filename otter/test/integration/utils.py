@@ -32,9 +32,20 @@ def measure_progress(previous_state, current_state, desired_state):
     :rtype: int
     :raises AssertionError: If progress regressed.
     """
-    previous_capacity = len(previous_state.servers)
-    current_capacity = len(current_state.servers)
-    capacity_delta = current_capacity - previous_capacity
-    desired_capacity = desired_state.desired
+    prev_capacity = len(previous_state.servers)
+    curr_capacity = len(current_state.servers)
+    capacity_delta = curr_capacity - prev_capacity
+    desired = desired_state.desired
+
+    if prev_capacity > desired and curr_capacity < desired:
+        raise AssertionError("Undershot the desired capacity")
+    elif prev_capacity < desired and curr_capacity > desired:
+        raise AssertionError("Overshot the desired capacity")
 
     return abs(capacity_delta)
+
+def _sign(n):
+    """
+    Returns the sign of n.
+    """
+    return cmp(n, 0)
