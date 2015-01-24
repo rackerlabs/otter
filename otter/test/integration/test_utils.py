@@ -21,29 +21,29 @@ class MeasureProgressTests(SynchronousTestCase):
     """
     Tests for :func:`measure_progress`.
     """
-    def test_capacity_closer_to_desired(self):
+    def _create_servers(self, n):
+        """
+        Create some dummy test servers.
+        """
+        return pset([
+            NovaServer(
+                id=str(i),
+                state=ServerState.ACTIVE,
+                created=123456789.)
+            for i in xrange(n)
+        ])
+
+    def test_capacity_closer_to_desired_when_scaling_up(self):
         """
         If the capacity moves closer to the desired, progress has been
         made.
         """
         previous_state = GroupState(
-            servers=pset([
-                NovaServer(
-                    id=str(i),
-                    state=ServerState.ACTIVE,
-                    created=123456789.)
-                for i in xrange(2)
-            ]),
+            servers=self._create_servers(2),
             lb_connections=pset([]) # TODO: servers should already be attached to their load balancers
         )
         current_state = GroupState(
-            servers=pset([
-                NovaServer(
-                    id=str(i),
-                    state=ServerState.ACTIVE,
-                    created=123456789.)
-                for i in xrange(4)
-            ]),
+            servers=self._create_servers(4),
             lb_connections=pset([]) # TODO: old servers should still be attached
         )
         desired_state = DesiredGroupState(
