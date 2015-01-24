@@ -114,3 +114,25 @@ class MeasureProgressTests(SynchronousTestCase):
         self.assertRaises(
             AssertionError,
             measure_progress, previous_state, current_state, desired_state)
+
+    def test_building_servers_towards_desired_capacity(self):
+        """
+        When some servers are being built, which would put us closer to
+        the desired capacity, progress is being made.
+        """
+        previous_state = GroupState(
+            servers=self._create_servers(2),
+            lb_connections=pset([])
+        )
+        current_state = GroupState(
+            servers=(self._create_servers(2, state=ServerState.ACTIVE)
+                     | self._create_servers(2, state=ServerState.BUILD)),
+            lb_connections=pset([])
+        )
+        desired_state = DesiredGroupState(
+            launch_config=pmap(),
+            desired=5,
+        )
+        progress = measure_progress(
+            previous_state, current_state, desired_state)
+        self.assertEqual(progress, 2)
