@@ -17,31 +17,34 @@ initiating a launch_server job.
 
 import json
 import re
-
-from functools import partial
 from copy import deepcopy
-from toolz import comp
+from functools import partial
 from urllib import urlencode
 
-from twisted.python.failure import Failure
-from twisted.internet.defer import (gatherResults, DeferredSemaphore,
-                                    DeferredLock, inlineCallbacks, returnValue)
+from pyrsistent import freeze, thaw
+
+from toolz import comp
+
+from twisted.internet.defer import (
+    DeferredLock, DeferredSemaphore, gatherResults, inlineCallbacks,
+    returnValue)
 from twisted.internet.task import deferLater
+from twisted.python.failure import Failure
 
 from otter.auth import public_endpoint_url
 from otter.convergence.gathering import _servicenet_address
+from otter.convergence.steps import set_server_name
 from otter.util import logging_treq as treq
 from otter.util.config import config_value
-from otter.util.http import (append_segments, headers, check_success,
-                             wrap_request_error, raise_error_on_code,
-                             APIError, RequestError)
+from otter.util.deferredutils import log_with_time, retry_and_timeout
 from otter.util.hashkey import generate_server_name
-from otter.util.deferredutils import retry_and_timeout, log_with_time
-from otter.util.retry import (retry, retry_times, repeating_interval,
-                              transient_errors_except, TransientRetryError,
-                              random_interval, compose_retries,
-                              exponential_backoff_interval,
-                              terminal_errors_except)
+from otter.util.http import (
+    APIError, RequestError, append_segments, check_success, headers,
+    raise_error_on_code, wrap_request_error)
+from otter.util.retry import (
+    TransientRetryError, compose_retries, exponential_backoff_interval,
+    random_interval, repeating_interval, retry, retry_times,
+    terminal_errors_except, transient_errors_except)
 from otter.worker._rcv3 import add_to_rcv3, remove_from_rcv3
 
 # Number of times to retry when adding/removing nodes from LB
@@ -551,7 +554,6 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
 
     :param IScalingGroup scaling_group: The scaling group this server is
         getting launched for.
-
     :param dict launch_config: The complete launch_config args we want to build
         servers from.
 
@@ -566,17 +568,15 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
     server_config['metadata'].update(generate_server_metadata(
         scaling_group_uuid, launch_config))
 
-    if server_config.get('name'):
-        server_name = server_config.get('name')
-        server_config['name'] = '{0}-{1}'.format(server_name, generate_server_name())
-    else:
-        server_config['name'] = generate_server_name()
+    suffix = generate_server_name()
+    launch_config = thaw(set_server_name(freeze(launch_config), suffix))
 
     for lb_config in launch_config.get('loadBalancers', []):
         if 'metadata' not in lb_config:
             lb_config['metadata'] = {}
         lb_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
-        lb_config['metadata']['rax:auto_scaling_server_name'] = server_config['name']
+        lb_config['metadata']['rax:auto_scaling_server_name'] = (
+            launch_config['server']['name'])
 
     return launch_config
 
