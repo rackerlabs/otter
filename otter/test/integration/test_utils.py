@@ -53,3 +53,25 @@ class MeasureProgressTests(SynchronousTestCase):
         progress = measure_progress(
             previous_state, current_state, desired_state)
         self.assertEqual(progress, 2)
+
+
+    def test_capacity_closer_to_desired_when_scaling_down(self):
+        """
+        If the capacity moves closer to the desired, progress has been
+        made.
+        """
+        previous_state = GroupState(
+            servers=self._create_servers(4),
+            lb_connections=pset([]) # TODO: servers should already be attached to their load balancers
+        )
+        current_state = GroupState(
+            servers=self._create_servers(2),
+            lb_connections=pset([]) # TODO: old servers should still be attached
+        )
+        desired_state = DesiredGroupState(
+            launch_config=pmap(),
+            desired=1,
+        )
+        progress = measure_progress(
+            previous_state, current_state, desired_state)
+        self.assertEqual(progress, 2)
