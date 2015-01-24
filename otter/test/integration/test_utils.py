@@ -1,20 +1,19 @@
 """
 Tests for the utility functions for convergence black-box testing.
 """
-
 from pyrsistent import pmap, pset
 
+from twisted.trial.unittest import SynchronousTestCase
+
 from otter.convergence.model import (
-    NovaServer,
     DesiredGroupState,
+    NovaServer,
     ServerState
 )
 from otter.test.integration.utils import (
     GroupState,
     measure_progress
 )
-
-from twisted.trial.unittest import SynchronousTestCase
 
 
 class MeasureProgressTests(SynchronousTestCase):
@@ -50,7 +49,6 @@ class MeasureProgressTests(SynchronousTestCase):
         progress = measure_progress(
             previous_state, current_state, desired_state)
         self.assertEqual(progress, 2)
-
 
     def test_capacity_closer_to_desired_when_scaling_down(self):
         """
