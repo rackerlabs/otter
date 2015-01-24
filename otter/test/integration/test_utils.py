@@ -157,3 +157,24 @@ class MeasureProgressTests(SynchronousTestCase):
         progress = measure_progress(
             previous_state, current_state, desired_state)
         self.assertEqual(progress, 0)
+
+    def test_reaping_errored_servers(self):
+        """
+        Errored servers are removed; no progress is made.
+        """
+        previous_state = GroupState(
+            servers=(self._create_servers(1, state=ServerState.ACTIVE)
+                     | self._create_servers(2, state=ServerState.ERROR)),
+            lb_connections=pset([])
+        )
+        current_state = GroupState(
+            servers=(self._create_servers(1, state=ServerState.ACTIVE)),
+            lb_connections=pset([])
+        )
+        desired_state = DesiredGroupState(
+            launch_config=pmap(),
+            desired=5,
+        )
+        progress = measure_progress(
+            previous_state, current_state, desired_state)
+        self.assertEqual(progress, 0)
