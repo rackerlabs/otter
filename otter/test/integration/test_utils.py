@@ -136,3 +136,24 @@ class MeasureProgressTests(SynchronousTestCase):
         progress = measure_progress(
             previous_state, current_state, desired_state)
         self.assertEqual(progress, 2)
+
+    def test_servers_going_from_build_to_error(self):
+        """
+        When some servers go from build to error, no progress was made.
+        """
+        previous_state = GroupState(
+            servers=self._create_servers(3, state=ServerState.BUILD),
+            lb_connections=pset([])
+        )
+        current_state = GroupState(
+            servers=(self._create_servers(1, state=ServerState.ACTIVE)
+                     | self._create_servers(2, state=ServerState.ERROR)),
+            lb_connections=pset([])
+        )
+        desired_state = DesiredGroupState(
+            launch_config=pmap(),
+            desired=5,
+        )
+        progress = measure_progress(
+            previous_state, current_state, desired_state)
+        self.assertEqual(progress, 0)
