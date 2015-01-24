@@ -4,10 +4,10 @@ from pyrsistent import pset, PSet
 
 from otter.convergence.model import NovaServer
 
-@attributes([
-    Attribute("servers", instance_of=PSet),
-    Attribute("lb_connections", instance_of=PSet)
-])
+
+@attributes([Attribute("servers", instance_of=PSet),
+             Attribute("lb_connections", instance_of=PSet)],
+            apply_immutable=True)
 class GroupState(object):
     """
     The externally visible state of a group at a point in time.
