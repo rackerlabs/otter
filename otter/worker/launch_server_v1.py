@@ -383,8 +383,8 @@ def log_lb_unexpected_errors(f, log, msg):
         log.err(f, 'Unknown error while ' + msg)
     elif not (f.value.code == 404 or
               f.value.code == 422 and 'PENDING_UPDATE' in f.value.body):
-        log.msg('Got unexpected LB status {status} while {msg}: {error}',
-                status=f.value.code, msg=msg, error=f.value)
+        log.msg('Got unexpected LB status {status_code} while {msg}: {error}',
+                status_code=f.value.code, msg=msg, error=f.value)
     return f
 
 
