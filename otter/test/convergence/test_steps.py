@@ -253,7 +253,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         body = [{"cloud_server": {"id": node_id},
                  "load_balancer_pool": {"id": lb_id}}
                 for (lb_id, node_id) in self.LB_NODE_PAIRS]
-        self.assertTrue(self._rcv3_delete_successful(resp, body))
+        self.assertIdentical(self._rcv3_check_bulk_delete(resp, body), None)
 
     def test_ok_if_node_already_removed(self):
         """
