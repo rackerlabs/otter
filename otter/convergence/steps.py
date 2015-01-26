@@ -235,8 +235,14 @@ def _rcv3_delete_successful(lb_node_pairs, response, body):
     """
     Checks if the RCv3 bulk deletion command was successful.
 
-    This means either the response code indicated unambiguous success,
-    or the machine we're trying to remove is already removed anyway.
+    The request is considered successful if the response code
+    indicated unambiguous success, or the machine we're trying to
+    remove is already removed anyway.
+
+    If the machine was already removed, returns an effect to try and
+    remove the remaining pairs, unless a fatal error *also*
+    occurred. This is necessary because RCv3 bulk requests are
+    atomic-ish.
     """
     if response.code == 204:
         return True
