@@ -210,6 +210,34 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         ("l2", "n2")
     ])
 
+    def test_node_not_a_member_error_message_regex(self):
+        """
+        The error message regular expression correctly parses error
+        messages stating the node wasn't a member of a load
+        balancer. It correctly rejects messages saying anyhting else.
+        """
+        match = _RCV3_NODE_NOT_A_MEMBER_PATTERN.match
+
+        test_data = [
+            ('Node d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is not a member of '
+             'Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2',
+             {'lb_id': 'd95ae0c4-6ab8-4873-b82f-f8433840cff2',
+              'node_id': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'}),
+            ('Node D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is not a member of '
+             'Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+             {'lb_id': 'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+              'node_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'})
+        ]
+
+        for message, expected_group_dict in test_data:
+            res = match(message)
+            self.assertNotIdentical(res, None)
+            self.assertEqual(res.groupdict(), expected_group_dict)
+
+        for message in ["Load Balancer Pool {load_balancer_pool_id} is not "
+                        "in an ACTIVE state"]:
+            self.assertIdentical(match(message), None)
+
     def _rcv3_delete_successful(self, resp, body):
         """
         Calls :func:`_rcv3_delete_successful`, partially applied with test
