@@ -1,5 +1,7 @@
 """Steps for convergence."""
 
+import re
+
 from functools import partial
 
 from characteristic import attributes
@@ -229,6 +231,14 @@ class BulkRemoveFromRCv3(object):
         return _rackconnect_bulk_request(
             self.lb_node_pairs, "DELETE",
             success_pred=partial(_rcv3_delete_successful, self.lb_node_pairs))
+
+
+_UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
+                "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
+_RCV3_NODE_NOT_A_MEMBER_PATTERN = re.compile(
+    "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
+    "(?P<lb_id>{uuid})".format(uuid=_UUID4_REGEX),
+    re.IGNORECASE)
 
 
 def _rcv3_check_bulk_delete(lb_node_pairs, response, body):
