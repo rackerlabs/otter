@@ -4,10 +4,15 @@ from functools import partial
 
 from characteristic import attributes
 
+from effect import Effect, Func
+
+from pyrsistent import thaw
+
 from zope.interface import Interface, implementer
 
 from otter.constants import ServiceType
 from otter.http import has_code, service_request
+from otter.util.hashkey import generate_server_name
 from otter.util.http import append_segments
 
 
@@ -21,6 +26,23 @@ class IStep(Interface):
         """Return an Effect which performs this step."""
 
 
+def set_server_name(launch_config_args, name_suffix):
+    """
+    Append the given name_suffix to the name of the server in the launch
+    config.
+
+    :param launch_config_args: The launch configuration args.
+    :param name_suffix: the suffix to append to the server name. If no name was
+        specified, it will be used as the name.
+    """
+    name = launch_config_args['server'].get('name')
+    if name is not None:
+        name = '{0}-{1}'.format(name, name_suffix)
+    else:
+        name = name_suffix
+    return launch_config_args.set_in(('server', 'name'), name)
+
+
 @implementer(IStep)
 @attributes(['launch_config'])
 class CreateServer(object):
@@ -32,11 +54,16 @@ class CreateServer(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to create a server."""
-        return service_request(
-            ServiceType.CLOUD_SERVERS,
-            'POST',
-            'servers',
-            data=self.launch_config)
+        eff = Effect(Func(generate_server_name))
+
+        def got_name(random_name):
+            launch_config = set_server_name(self.launch_config, random_name)
+            return service_request(
+                ServiceType.CLOUD_SERVERS,
+                'POST',
+                'servers',
+                data=thaw(launch_config))
+        return eff.on(got_name)
 
 
 @implementer(IStep)

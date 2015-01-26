@@ -1,6 +1,9 @@
 """Tests for convergence steps."""
 
-from pyrsistent import pmap, pset
+from effect import Func
+from effect.testing import resolve_effect
+
+from pyrsistent import freeze, pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -16,6 +19,7 @@ from otter.convergence.steps import (
     _rcv3_delete_successful)
 from otter.http import has_code, service_request
 from otter.test.utils import StubResponse
+from otter.util.hashkey import generate_server_name
 
 
 class StepAsEffectTests(SynchronousTestCase):
@@ -28,14 +32,37 @@ class StepAsEffectTests(SynchronousTestCase):
         :obj:`CreateServer.as_effect` produces a request for creating a server.
         """
         create = CreateServer(
-            launch_config=pmap({'name': 'myserver', 'flavorRef': '1'}))
+            launch_config=freeze({'server': {'name': 'myserver',
+                                             'flavorRef': '1'}}))
+        eff = create.as_effect()
+        self.assertEqual(eff.intent, Func(generate_server_name))
+        eff = resolve_effect(eff, 'random-name')
         self.assertEqual(
-            create.as_effect(),
+            eff,
             service_request(
                 ServiceType.CLOUD_SERVERS,
                 'POST',
                 'servers',
-                data=pmap({'name': 'myserver', 'flavorRef': '1'})))
+                data={'server': {'name': 'myserver-random-name',
+                                 'flavorRef': '1'}}))
+
+    def test_create_server_noname(self):
+        """
+        When no name is provided in the launch config, the name will be
+        generated from scratch.
+        """
+        create = CreateServer(
+            launch_config=freeze({'server': {'flavorRef': '1'}}))
+        eff = create.as_effect()
+        self.assertEqual(eff.intent, Func(generate_server_name))
+        eff = resolve_effect(eff, 'random-name')
+        self.assertEqual(
+            eff,
+            service_request(
+                ServiceType.CLOUD_SERVERS,
+                'POST',
+                'servers',
+                data={'server': {'name': 'random-name', 'flavorRef': '1'}}))
 
     def test_delete_server(self):
         """
