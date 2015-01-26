@@ -231,7 +231,7 @@ class BulkRemoveFromRCv3(object):
             success_pred=partial(_rcv3_delete_successful, self.lb_node_pairs))
 
 
-def _rcv3_delete_successful(lb_node_pairs, response, body):
+def _rcv3_check_bulk_delete(lb_node_pairs, response, body):
     """
     Checks if the RCv3 bulk deletion command was successful.
 

@@ -16,7 +16,7 @@ from otter.convergence.steps import (
     DeleteServer,
     RemoveFromCLB,
     SetMetadataItemOnServer,
-    _rcv3_delete_successful)
+    _rcv3_check_bulk_delete)
 from otter.http import has_code, service_request
 from otter.test.utils import StubResponse
 from otter.util.hashkey import generate_server_name
@@ -201,9 +201,9 @@ class StepAsEffectTests(SynchronousTestCase):
             BulkRemoveFromRCv3, "DELETE")
 
 
-class RCv3DeleteSuccessfulTests(SynchronousTestCase):
+class RCv3CheckBulkDeleteTests(SynchronousTestCase):
     """
-    Tests for :func:`_rcv3_delete_successful`.
+    Tests for :func:`_rcv3_check_bulk_delete`.
     """
     LB_NODE_PAIRS = pset([
         ("l1", "n1"),
