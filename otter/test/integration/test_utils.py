@@ -11,6 +11,8 @@ from otter.convergence.model import (
     ServerState
 )
 from otter.test.integration.utils import (
+    OvershootError,
+    UndershootError,
     GroupState,
     measure_progress
 )
@@ -89,7 +91,7 @@ class MeasureProgressTests(SynchronousTestCase):
             desired=5,
         )
         self.assertRaises(
-            AssertionError,
+            OvershootError,
             measure_progress, previous_state, current_state, desired_state)
 
     def test_undershoot(self):
@@ -110,7 +112,7 @@ class MeasureProgressTests(SynchronousTestCase):
             desired=5,
         )
         self.assertRaises(
-            AssertionError,
+            UndershootError,
             measure_progress, previous_state, current_state, desired_state)
 
     def test_building_servers_towards_desired_capacity(self):

@@ -1,8 +1,24 @@
 from characteristic import Attribute, attributes
 
-from pyrsistent import pset, PSet
+from pyrsistent import PSet
 
-from otter.convergence.model import NovaServer, ServerState
+from otter.convergence.model import ServerState
+
+
+class OvershootError(AssertionError):
+    """
+    Raised when Otter creates more servers than a launch configuration
+    specifies.
+    """
+    pass
+
+
+class UndershootError(AssertionError):
+    """
+    Raised when Otter removes more servers than a launch configuration
+    specifies.
+    """
+    pass
 
 
 @attributes([Attribute("servers", instance_of=PSet),
@@ -15,6 +31,7 @@ class GroupState(object):
     :attr pset servers: Set of the servers in the group.
     :attr pset lb_nodes: Set of the load balancer nodes in the group.
     """
+
 
 def measure_progress(prev_state, curr_state, desired_state):
     """
@@ -30,7 +47,10 @@ def measure_progress(prev_state, curr_state, desired_state):
     :param DesiredState desired_state: The desired state of a scaling group.
     :return: The number of steps made towards the desired.
     :rtype: int
-    :raises AssertionError: If progress regressed.
+    :raises UndershootError: If Autoscale removes more servers than a launch
+     configuration specifies.
+    :raises OvershootError: If Autoscale creates more servers than a launch
+     configuration specifies.
     """
     prev_capacity = _count_live_servers(prev_state.servers)
     curr_capacity = _count_live_servers(curr_state.servers)
@@ -38,9 +58,15 @@ def measure_progress(prev_state, curr_state, desired_state):
     desired = desired_state.desired
 
     if prev_capacity > desired and curr_capacity < desired:
-        raise AssertionError("Undershot the desired capacity")
+        msg = "Undershoot: prev capacity = %d, desired = %d, current = %d"
+        raise UndershootError(msg.format(
+            prev_capacity, desired, curr_capacity
+        ))
     elif prev_capacity < desired and curr_capacity > desired:
-        raise AssertionError("Overshot the desired capacity")
+        msg = "Overshoot: prev capacity = %d, desired = %d, current = %d"
+        raise OvershootError(msg.format(
+            prev_capacity, desired, curr_capacity
+        ))
 
     if capacity_delta < 0 and curr_capacity < desired:
         return 0
@@ -49,12 +75,14 @@ def measure_progress(prev_state, curr_state, desired_state):
     else:
         return abs(capacity_delta)
 
+
 def _count_live_servers(servers):
     """
     Count servers that are active or building.
     """
     live_states = [ServerState.BUILD, ServerState.ACTIVE]
     return len([s for s in servers if s.state in live_states])
+
 
 def _count_dead_servers(servers):
     """
