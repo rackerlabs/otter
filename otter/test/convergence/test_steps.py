@@ -238,12 +238,12 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                         "in an ACTIVE state"]:
             self.assertIdentical(match(message), None)
 
-    def _rcv3_delete_successful(self, resp, body):
+    def _rcv3_check_bulk_delete(self, resp, body):
         """
-        Calls :func:`_rcv3_delete_successful` with test data and a
+        Calls :func:`_rcv3_check_bulk_delete` with test data and a
         ``(resp, body)`` tuple.
         """
-        return _rcv3_delete_successful(self.LB_NODE_PAIRS, (resp, body))
+        return _rcv3_check_bulk_delete(self.LB_NODE_PAIRS, (resp, body))
 
     def test_good_response(self):
         """
