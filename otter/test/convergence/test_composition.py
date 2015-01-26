@@ -59,11 +59,18 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config,
                        'loadBalancers': [{'loadBalancerId': 23, 'port': 80}]}}
-        state = get_desired_group_state(lc, 2)
+
+        expected_server_config = {
+            'server': {
+                'name': 'test',
+                'flavorRef': 'f',
+                'metadata': {
+                    'rax:auto_scaling_group_id': 'uuid'}}}
+        state = get_desired_group_state('uuid', lc, 2)
         self.assertEqual(
             state,
             DesiredGroupState(
-                launch_config={'server': server_config},
+                launch_config=expected_server_config,
                 desired=2,
                 desired_lbs={23: [CLBDescription(lb_id='23', port=80)]}))
 
