@@ -1,5 +1,7 @@
 """Steps for convergence."""
 
+from functools import partial
+
 from characteristic import attributes
 
 from effect import Effect, Func
@@ -157,7 +159,7 @@ class ChangeCLBNode(object):
                   'weight': self.weight})
 
 
-def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
+def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
     """
     Creates a bulk request for RackConnect v3.0 load balancers.
 
@@ -165,8 +167,8 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
         connections to be made or broken.
     :param str method: The method of the request ``"DELETE"`` or
         ``"POST"``.
-    :param iterable success_codes: Status codes considered successful for this
-        request.
+    :param success_pred: Predicate that determines if a response was
+        successful.
     :return: A bulk RackConnect v3.0 request for the given load balancer,
         node pairs.
     :rtype: :class:`Request`
@@ -178,7 +180,7 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
         data=[{"cloud_server": {"id": node},
                "load_balancer_pool": {"id": lb}}
               for (lb, node) in lb_node_pairs],
-        success_pred=has_code(*success_codes))
+        success_pred=success_pred)
 
 
 @implementer(IStep)
@@ -201,7 +203,9 @@ class BulkAddToRCv3(object):
         Produce a :obj:`Effect` to add some nodes to some RCv3 load
         balancers.
         """
-        return _rackconnect_bulk_request(self.lb_node_pairs, "POST", (201,))
+        return _rackconnect_bulk_request(
+            self.lb_node_pairs, "POST",
+            success_pred=has_code(201))
 
 
 @implementer(IStep)
@@ -222,4 +226,23 @@ class BulkRemoveFromRCv3(object):
         Produce a :obj:`Effect` to remove some nodes from some RCv3 load
         balancers.
         """
-        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE", (204,))
+        return _rackconnect_bulk_request(
+            self.lb_node_pairs, "DELETE",
+            success_pred=partial(_rcv3_delete_successful, self.lb_node_pairs))
+
+
+def _rcv3_delete_successful(lb_node_pairs, response, body):
+    """
+    Checks if the RCv3 bulk deletion command was successful.
+
+    This means either the response code indicated unambiguous success,
+    or the machine we're trying to remove is already removed anyway.
+    """
+    if response.code == 204:
+        return True
+
+    template = "Node {node_id} is not a member of Load Balancer Pool {lb_id}"
+    allowable_errors = set([template.format(node_id=node_id, lb_id=lb_id)
+                            for (lb_id, node_id) in lb_node_pairs])
+    fatal_errors = set(body["errors"]) - allowable_errors
+    return not fatal_errors

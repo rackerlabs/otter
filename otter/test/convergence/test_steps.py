@@ -15,8 +15,10 @@ from otter.convergence.steps import (
     CreateServer,
     DeleteServer,
     RemoveFromCLB,
-    SetMetadataItemOnServer)
+    SetMetadataItemOnServer,
+    _rcv3_delete_successful)
 from otter.http import has_code, service_request
+from otter.test.utils import StubResponse
 from otter.util.hashkey import generate_server_name
 
 
@@ -131,7 +133,7 @@ class StepAsEffectTests(SynchronousTestCase):
         :param step_class: The step class under test.
         :param str method: The expected HTTP method of the request.
         """
-        step = step_class(lb_node_pairs=pset([
+        lb_node_pairs = pset([
             ("lb-1", "node-a"),
             ("lb-1", "node-b"),
             ("lb-1", "node-c"),
@@ -140,13 +142,21 @@ class StepAsEffectTests(SynchronousTestCase):
             ("lb-2", "node-b"),
             ("lb-3", "node-c"),
             ("lb-3", "node-d")
-        ]))
+        ])
+        step = step_class(lb_node_pairs=lb_node_pairs)
         request = step.as_effect()
         self.assertEqual(request.intent.service_type,
                          ServiceType.RACKCONNECT_V3)
         self.assertEqual(request.intent.method, expected_method)
-        expected_code = 201 if request.intent.method == "POST" else 204
-        self.assertEqual(request.intent.success_pred, has_code(expected_code))
+
+        success_pred = request.intent.success_pred
+        if request.intent.method == "POST":
+            self.assertEqual(success_pred, has_code(201))
+        else:
+            self.assertEqual(success_pred.func, _rcv3_delete_successful)
+            self.assertEqual(success_pred.args, (lb_node_pairs,))
+            self.assertEqual(success_pred.keywords, None)
+
         self.assertEqual(request.intent.url, "load_balancer_pools/nodes")
         self.assertEqual(request.intent.headers, None)
 
@@ -189,3 +199,47 @@ class StepAsEffectTests(SynchronousTestCase):
         """
         self._generic_bulk_rcv3_step_test(
             BulkRemoveFromRCv3, "DELETE")
+
+
+class RCv3DeleteSuccessfulTests(SynchronousTestCase):
+    """
+    Tests for :func:`_rcv3_delete_successful`.
+    """
+    LB_NODE_PAIRS = pset([
+        ("l1", "n1"),
+        ("l2", "n2")
+    ])
+
+    def _rcv3_delete_successful(self, resp, body):
+        """
+        Calls :func:`_rcv3_delete_successful`, partially applied with test
+        data.
+        """
+        return _rcv3_delete_successful(self.LB_NODE_PAIRS, resp, body)
+
+    def test_good_response(self):
+        """
+        If the response code indicates success, the response was successful.
+        """
+        resp = StubResponse(204, {})
+        body = [{"cloud_server": {"id": node_id},
+                 "load_balancer_pool": {"id": lb_id}}
+                for (lb_id, node_id) in self.LB_NODE_PAIRS]
+        self.assertTrue(self._rcv3_delete_successful(resp, body))
+
+    def test_ok_if_node_already_removed(self):
+        """
+        If a node was already removed (or maybe was never part of the load
+        balancer pool to begin with), the response was successful.
+        """
+        resp = StubResponse(409, {})
+        body = {"errors": ["Node n1 is not a member of Load Balancer Pool l1"]}
+        self.assertTrue(self._rcv3_delete_successful(resp, body))
+
+    def test_not_ok_if_lb_inactive(self):
+        """
+        If the load balancer pool is inactive, the response was unsuccessful.
+        """
+        resp = StubResponse(409, {})
+        body = {"errors": ["Load Balancer Pool l1 is not in an ACTIVE state"]}
+        self.assertFalse(self._rcv3_delete_successful(resp, body))
