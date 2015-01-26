@@ -11,9 +11,9 @@ from otter.convergence.model import (
     ServerState
 )
 from otter.test.integration.utils import (
+    GroupState,
     OvershootError,
     UndershootError,
-    GroupState,
     measure_progress
 )
 
