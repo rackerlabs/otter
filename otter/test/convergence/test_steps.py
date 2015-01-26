@@ -16,7 +16,8 @@ from otter.convergence.steps import (
     DeleteServer,
     RemoveFromCLB,
     SetMetadataItemOnServer,
-    _rcv3_check_bulk_delete)
+    _rcv3_check_bulk_delete,
+    _RCV3_NODE_NOT_A_MEMBER_PATTERN)
 from otter.http import has_code, service_request
 from otter.test.utils import StubResponse
 from otter.util.hashkey import generate_server_name
