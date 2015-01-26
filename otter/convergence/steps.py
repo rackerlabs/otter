@@ -233,6 +233,7 @@ class BulkRemoveFromRCv3(object):
             success_pred=partial(_rcv3_delete_successful, self.lb_node_pairs))
 
 
+_CONSTANTLY_TRUE = lambda _: True
 _UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
                 "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
 _RCV3_NODE_NOT_A_MEMBER_PATTERN = re.compile(
