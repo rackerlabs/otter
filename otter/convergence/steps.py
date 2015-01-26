@@ -241,7 +241,7 @@ _RCV3_NODE_NOT_A_MEMBER_PATTERN = re.compile(
     re.IGNORECASE)
 
 
-def _rcv3_check_bulk_delete(lb_node_pairs, response, body):
+def _rcv3_check_bulk_delete(lb_node_pairs, result):
     """
     Checks if the RCv3 bulk deletion command was successful.
 
@@ -254,6 +254,8 @@ def _rcv3_check_bulk_delete(lb_node_pairs, response, body):
     occurred. This is necessary because RCv3 bulk requests are
     atomic-ish.
     """
+    response, body = result
+
     if response.code == 204:
         return True
 

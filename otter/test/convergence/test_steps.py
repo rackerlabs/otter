@@ -241,10 +241,10 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
 
     def _rcv3_delete_successful(self, resp, body):
         """
-        Calls :func:`_rcv3_delete_successful`, partially applied with test
-        data.
+        Calls :func:`_rcv3_delete_successful` with test data and a
+        ``(resp, body)`` tuple.
         """
-        return _rcv3_delete_successful(self.LB_NODE_PAIRS, resp, body)
+        return _rcv3_delete_successful(self.LB_NODE_PAIRS, (resp, body))
 
     def test_good_response(self):
         """
