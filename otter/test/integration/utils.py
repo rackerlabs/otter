@@ -61,9 +61,3 @@ def _count_dead_servers(servers):
     Count servers that are in error state.
     """
     return len([s for s in servers if s.state is ServerState.ERROR])
-
-def _sign(n):
-    """
-    Returns the sign of n.
-    """
-    return cmp(n, 0)
