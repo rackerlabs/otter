@@ -264,10 +264,10 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         body = {"errors": ["Node n1 is not a member of Load Balancer Pool l1"]}
         self.assertTrue(self._rcv3_delete_successful(resp, body))
 
-    def test_not_ok_if_lb_inactive(self):
+    def test_bail_if_group_inactive(self):
         """
         If the load balancer pool is inactive, the response was unsuccessful.
         """
         resp = StubResponse(409, {})
         body = {"errors": ["Load Balancer Pool l1 is not in an ACTIVE state"]}
-        self.assertFalse(self._rcv3_delete_successful(resp, body))
+        self.assertIdentical(self._rcv3_check_bulk_delete(resp, body), None)
