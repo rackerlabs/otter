@@ -27,6 +27,7 @@ import json
 
 from twisted.internet import defer
 
+from otter.util.config import config_value
 from otter.log import audit
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
@@ -144,32 +145,31 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
         :class:`otter.models.interface.GroupState` if successful. If no changes
         are to be made to the group, None will synchronously be returned.
     """
-    # Call convergence/ if tenant is enabled for it
-    if tenant_is_enabled(state.tenant_id, config_value):
-        get_converger().set_desired_capcity(
-            state.tenant_id, state.group_id, state.desired, launch_config)
-        return succeed(None)
-
-    # Otherwise do older worker code
-    delta = calculate_delta(log, state, config, policy)
-    execute_log = log.bind(server_delta=delta)
-
-    if delta == 0:
-        execute_log.msg("no change in servers")
-        return None
-    elif delta > 0:
-        execute_log.msg("executing launch configs")
-        deferred = execute_launch_config(execute_log, transaction_id, state,
-                                         launch_config, scaling_group,
-                                         delta)
+    if tenant_is_enabled(scaling_group.tenant_id, config_value):
+        apply_delta(log, state.desired, state, config, policy)
+        get_converger().set_desired_capacity(
+            state.tenant_id, state.group_id, launch_config, state.desired)
+        return succeed(state)
     else:
-        # delta < 0 (scale down)
-        execute_log.msg("scaling down")
-        deferred = exec_scale_down(execute_log, transaction_id, state,
-                                   scaling_group, -delta)
+        delta = calculate_delta(log, state, config, policy)
+        execute_log = log.bind(server_delta=delta)
 
-    deferred.addCallback(_do_convergence_audit_log, log, delta, state)
-    return deferred
+        if delta == 0:
+            execute_log.msg("no change in servers")
+            return None
+        elif delta > 0:
+            execute_log.msg("executing launch configs")
+            deferred = execute_launch_config(
+                execute_log, transaction_id, state, launch_config,
+                scaling_group, delta)
+        else:
+            # delta < 0 (scale down)
+            execute_log.msg("scaling down")
+            deferred = exec_scale_down(execute_log, transaction_id, state,
+                                       scaling_group, -delta)
+
+        deferred.addCallback(_do_convergence_audit_log, log, delta, state)
+        return deferred
 
 
 def maybe_execute_scaling_policy(
@@ -275,19 +275,18 @@ def check_cooldowns(log, state, config, policy, policy_id):
     return True
 
 
-def calculate_delta(log, state, config, policy):
+def apply_delta(log, current, state, config, policy):
     """
-    Calculate the desired change in the number of servers, keeping in mind the
-    minimum and maximum constraints.
+    Calculate a new desired number of servers based on a policy, assign that
+    new desired number to ``state.desired``, and return the difference.
 
-    :param log: A twiggy bound log for logging
-    :param dict state: the state dictionary
+    :param log: A bound log for logging
+    :param GroupState state: the group state
     :param dict config: the config dictionary
     :param dict policy: the policy dictionary
 
-    :return: C{int} representing the desired change - can be 0
+    :return: ``int`` representing the desired change - can be 0
     """
-    current = len(state.active) + len(state.pending)
     if "change" in policy:
         desired = current + policy['change']
     elif "changePercent" in policy:
@@ -316,3 +315,19 @@ def calculate_delta(log, state, config, policy):
             server_delta=delta, current_active=len(state.active),
             current_pending=len(state.pending))
     return delta
+
+
+def calculate_delta(log, state, config, policy):
+    """
+    Apply a delta based on the ``active`` and ``pending`` server data stored
+    away on ``state``.
+
+    :param log: A bound log for logging
+    :param dict state: the group state
+    :param dict config: the config dictionary
+    :param dict policy: the policy dictionary
+
+    :return: C{int} representing the desired change - can be 0
+    """
+    current = len(state.active) + len(state.pending)
+    return apply_delta(log, current, state, config, policy)
