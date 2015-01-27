@@ -54,7 +54,7 @@ class NovaServer(object):
     """
 
 
-@attributes(['launch_config', 'desired',
+@attributes(['launch_config', 'capacity',
              Attribute('desired_lbs', default_factory=dict, instance_of=dict),
              Attribute('draining_timeout', default_value=0.0, instance_of=float)])
 class DesiredGroupState(object):
@@ -62,7 +62,7 @@ class DesiredGroupState(object):
     The desired state for a scaling group.
 
     :ivar dict launch_config: nova launch config.
-    :ivar int desired: the number of desired servers within the group.
+    :ivar int capacity: the number of desired servers within the group.
     :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
         :class:`CLBDescription` instances.
     :ivar float draining_timeout: If greater than zero, when the server is
