@@ -242,7 +242,7 @@ _RCV3_NODE_NOT_A_MEMBER_PATTERN = re.compile(
     re.IGNORECASE)
 
 
-def _rcv3_check_bulk_delete(lb_node_pairs, result):
+def _rcv3_check_bulk_delete(result):
     """
     Checks if the RCv3 bulk deletion command was successful.
 
