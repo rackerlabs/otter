@@ -81,13 +81,16 @@ def get_desired_group_state(group_id, launch_config, desired):
         freeze({'server': launch_config['args']['server']}))
     lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
     desired_state = DesiredGroupState(
-        launch_config=server_lc,
+        server_config=server_lc,
         desired=desired, desired_lbs=lbs)
     return desired_state
 
 
-def prepare_server_launch_config(group_id, launch_config):
-    """Prepare a launch config with any necessary dynamic data."""
-    return launch_config.set_in(
+def prepare_server_launch_config(group_id, server_config):
+    """
+    Prepares a server config (the server part of the Group's launch config)
+    with any necessary dynamic data.
+    """
+    return server_config.set_in(
         ('server', 'metadata', 'rax:auto_scaling_group_id'),
         group_id)

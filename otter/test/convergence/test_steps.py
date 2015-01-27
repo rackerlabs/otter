@@ -30,7 +30,7 @@ class StepAsEffectTests(SynchronousTestCase):
         :obj:`CreateServer.as_effect` produces a request for creating a server.
         """
         create = CreateServer(
-            launch_config=freeze({'server': {'name': 'myserver',
+            server_config=freeze({'server': {'name': 'myserver',
                                              'flavorRef': '1'}}))
         eff = create.as_effect()
         self.assertEqual(eff.intent, Func(generate_server_name))
@@ -50,7 +50,7 @@ class StepAsEffectTests(SynchronousTestCase):
         generated from scratch.
         """
         create = CreateServer(
-            launch_config=freeze({'server': {'flavorRef': '1'}}))
+            server_config=freeze({'server': {'flavorRef': '1'}}))
         eff = create.as_effect()
         self.assertEqual(eff.intent, Func(generate_server_name))
         eff = resolve_effect(eff, 'random-name')
