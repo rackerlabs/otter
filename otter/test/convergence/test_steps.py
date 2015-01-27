@@ -205,11 +205,6 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
     """
     Tests for :func:`_rcv3_check_bulk_delete`.
     """
-    LB_NODE_PAIRS = pset([
-        ("l1", "n1"),
-        ("l2", "n2")
-    ])
-
     def test_node_not_a_member_error_message_regex(self):
         """
         The error message regular expression correctly parses error
@@ -243,7 +238,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         Calls :func:`_rcv3_check_bulk_delete` with test data and a
         ``(resp, body)`` tuple.
         """
-        return _rcv3_check_bulk_delete(self.LB_NODE_PAIRS, (resp, body))
+        return _rcv3_check_bulk_delete((resp, body))
 
     def test_good_response(self):
         """
