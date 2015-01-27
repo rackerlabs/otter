@@ -56,7 +56,8 @@ class NovaServer(object):
 
 @attributes(['launch_config', 'capacity',
              Attribute('desired_lbs', default_factory=dict, instance_of=dict),
-             Attribute('draining_timeout', default_value=0.0, instance_of=float)])
+             Attribute('draining_timeout', default_value=0.0,
+                       instance_of=float)])
 class DesiredGroupState(object):
     """
     The desired state for a scaling group.
