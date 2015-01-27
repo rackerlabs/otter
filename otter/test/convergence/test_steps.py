@@ -263,9 +263,22 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         body = {"errors":
                 ["Node {node_id} is not a member of Load Balancer "
                  "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
-        step = self._rcv3_check_bulk_delete(resp, body)
-        self.assertEqual(step, BulkRemoveFromRCv3(
-            lb_node_pairs=[(lb_id, node_id)]))
+        eff = self._rcv3_check_bulk_delete(resp, body)
+        expected_eff = (
+            service_request(
+                service_type=ServiceType.RACKCONNECT_V3,
+                method="DELETE",
+                url='load_balancer_pools/nodes',
+                data=[
+                    {'load_balancer_pool':
+                     {'id':
+                      'd95ae0c4-6ab8-4873-b82f-f8433840cff2'},
+                     'cloud_server':
+                     {'id':
+                      'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'}}],
+                success_pred=_CONSTANTLY_TRUE)
+            .on(_rcv3_check_bulk_delete))
+        self.assertEqual(eff, expected_eff)
 
     def test_bail_if_group_inactive(self):
         """
