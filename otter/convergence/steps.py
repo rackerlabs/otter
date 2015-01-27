@@ -2,8 +2,6 @@
 
 import re
 
-from functools import partial
-
 from characteristic import attributes
 
 from effect import Effect, Func
