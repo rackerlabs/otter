@@ -228,7 +228,7 @@ class BulkRemoveFromRCv3(object):
         """
         eff = _rackconnect_bulk_request(self.lb_node_pairs, "DELETE",
                                         success_pred=_CONSTANTLY_TRUE)
-        return eff.on(_rcv3_check_bulk_delete).on(_maybe_execute_step)
+        return eff.on(_rcv3_check_bulk_delete)
 
 
 _CONSTANTLY_TRUE = lambda _: True
@@ -267,19 +267,5 @@ def _rcv3_check_bulk_delete(result):
         node_id, lb_id = match.groups()
         pairs_to_delete.append((lb_id, node_id))
 
-    # REVIEW: cc @radix The best thing to return here would be an
-    # effect; that way it would get executed immediately. However, I
-    # want something that's better to introspect for testing, and
-    # that's definitely the step, not the effect.
-
-    return BulkRemoveFromRCv3(lb_node_pairs=pairs_to_delete)
-
-
-def _maybe_execute_step(maybe_step):
-    """
-    This is a hack; see review note above
-    """
-    if maybe_step is None:
-        return None
-    else:
-        return maybe_step.as_effect()
+    next_step = BulkRemoveFromRCv3(lb_node_pairs=pairs_to_delete)
+    return next_step.as_effect()
