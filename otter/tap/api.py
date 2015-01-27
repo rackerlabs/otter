@@ -26,6 +26,7 @@ from otter.util.config import set_config_data, config_value
 from otter.util.deferredutils import timeout_deferred
 from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.scheduler import SchedulerService
+from otter.log.cloudfeeds import CloudFeeds, set_cloud_feeds
 
 from otter.supervisor import SupervisorService, set_supervisor
 from otter.auth import generate_authenticator
@@ -188,9 +189,11 @@ def makeService(config):
     if bobby_url is not None:
         set_bobby(BobbyClient(bobby_url))
 
+    service_configs = get_service_configs(config)
+
     authenticator = generate_authenticator(reactor, config['identity'])
     supervisor = SupervisorService(authenticator, region, coiterate,
-                                   get_service_configs(config))
+                                   service_configs)
     supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
@@ -222,6 +225,15 @@ def makeService(config):
         admin_site.displayTracebacks = False
         admin_service = service(str(admin_port), admin_site)
         admin_service.setServiceParent(s)
+
+    # setup cloud feed,
+    cf_conf = config['cloudfeeds']
+    cf = CloudFeeds(reactor=reactor, authenticator=authenticator,
+                    region=region, tenant_id=cf_conf['tenant_id'],
+                    service_configs=service_configs)
+    # TODO: It would be nice to not store this as global state but
+    # observer factory is called by twistd before this step
+    set_cloud_feeds(cf)
 
     # Setup Kazoo client
     if config_value('zookeeper'):
