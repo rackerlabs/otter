@@ -27,6 +27,7 @@ import json
 
 from twisted.internet import defer
 
+from otter.convergence.composition import tenant_is_enabled
 from otter.util.config import config_value
 from otter.log import audit
 from otter.json_schema.group_schemas import MAX_ENTITIES
