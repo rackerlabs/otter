@@ -9,6 +9,7 @@ class ServiceType(Names):
     CLOUD_LOAD_BALANCERS = NamedConstant()
     RACKCONNECT_V3 = NamedConstant()
     CLOUD_METRICS_INGEST = NamedConstant()
+    CLOUD_FEEDS = NamedConstant()
 
 
 def get_service_configs(config):
@@ -39,4 +40,8 @@ def get_service_configs(config):
             'name': config['metrics']['service'],
             'region': config['metrics']['region'],
         },
+        ServiceType.CLOUD_FEEDS: {
+            'name': config['cloudfeeds']['service'],
+            'region': config['region']
+        }
     }
