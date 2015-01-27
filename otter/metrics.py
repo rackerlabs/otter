@@ -31,7 +31,7 @@ from otter.auth import generate_authenticator
 from otter.constants import ServiceType, get_service_configs
 from otter.convergence.gathering import get_scaling_group_servers
 from otter.effect_dispatcher import get_full_dispatcher
-from otter.http import TenantScope, get_request_func
+from otter.http import TenantScope, service_request
 from otter.log import log as otter_log
 from otter.util.fp import predicate_all
 
@@ -188,11 +188,14 @@ def get_all_metrics(dispatcher, cass_groups, _print=False,
     return d.addCallback(lambda x: reduce(operator.add, x, []))
 
 
-def add_to_cloud_metrics(request_func, conf, region, total_desired,
+def add_to_cloud_metrics(ttl, region, total_desired,
                          total_actual, total_pending, log=None):
     """
     Add total number of desired, actual and pending servers of a region
-    to Cloud metrics
+    to Cloud metrics.
+
+    WARNING: Even though this function returns an Effect, it is
+    not pure since it uses the current system time.
 
     :param dict conf: Metrics configuration, will contain tenant ID of tenant
         used to ingest metrics and other conf like ttl
@@ -207,16 +210,15 @@ def add_to_cloud_metrics(request_func, conf, region, total_desired,
     :return: `Deferred` with None
     """
     metric_part = {'collectionTime': int(time.time() * 1000),
-                   'ttlInSeconds': conf['ttl']}
+                   'ttlInSeconds': ttl}
     totals = [('desired', total_desired), ('actual', total_actual),
               ('pending', total_pending)]
-    return request_func(ServiceType.CLOUD_METRICS_INGEST, 'POST', 'ingest',
-                        data=[merge(metric_part,
-                                    {'metricValue': value,
-                                     'metricName': '{}.{}'.format(region,
-                                                                  metric)})
-                              for metric, value in totals],
-                        log=log)
+    data = [merge(metric_part,
+                  {'metricValue': value,
+                   'metricName': '{}.{}'.format(region, metric)})
+            for metric, value in totals]
+    return service_request(ServiceType.CLOUD_METRICS_INGEST,
+                           'POST', 'ingest', data=data, log=log)
 
 
 def connect_cass_servers(reactor, config):
@@ -231,7 +233,9 @@ def connect_cass_servers(reactor, config):
 
 @defer.inlineCallbacks
 def collect_metrics(reactor, config, client=None, authenticator=None,
-                    _print=False, get_full_dispatcher=get_full_dispatcher):
+                    _print=False,
+                    perform=perform,
+                    get_full_dispatcher=get_full_dispatcher):
     """
     Start collecting the metrics
 
@@ -277,16 +281,10 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
             total_desired, total_actual, total_pending))
 
     # Add to cloud metrics
-
-    # WARNING: This request func is configured to make requests against the
-    # metrics region. The same request_func can't be used for other purposes,
-    # like making requests to cloud servers.
-    req_func = get_request_func(authenticator, config['metrics']['tenant_id'],
-                                metrics_log, service_configs,
-                                config['metrics']['region'])
     eff = add_to_cloud_metrics(
-        req_func, config['metrics'], config['region'], total_desired,
+        config['metrics']['ttl'], config['region'], total_desired,
         total_actual, total_pending, log=metrics_log)
+    eff = Effect(TenantScope(eff, config['metrics']['tenant_id']))
     yield perform(dispatcher, eff)
     metrics_log.msg('added to cloud metrics')
     if _print:

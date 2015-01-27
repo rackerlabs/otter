@@ -1,6 +1,9 @@
 """
 Tests for the worker supervisor.
 """
+
+from effect import Constant, Effect
+
 import mock
 
 from testtools.matchers import ContainsDict, Equals, IsInstance
@@ -13,14 +16,16 @@ from zope.interface.verify import verifyObject
 
 from otter import supervisor
 from otter.constants import ServiceType
+from otter.http import TenantScope
 from otter.models.interface import (
-    IScalingGroup, GroupState, NoSuchScalingGroupError)
+    GroupState, IScalingGroup, NoSuchScalingGroupError)
 from otter.supervisor import (
-    ISupervisor, SupervisorService, set_supervisor, remove_server_from_group,
-    execute_launch_config, CannotDeleteServerBelowMinError, ServerNotFoundError)
+    CannotDeleteServerBelowMinError, ISupervisor, ServerNotFoundError,
+    SupervisorService, execute_launch_config, remove_server_from_group,
+    set_supervisor)
 from otter.test.utils import (
-    iMock, patch, mock_log, CheckFailure, matches, FakeSupervisor, IsBoundWith,
-    DummyException, mock_group)
+    CheckFailure, DummyException, FakeSupervisor, IsBoundWith, iMock, matches,
+    mock_group, mock_log, patch)
 from otter.util.deferredutils import DeferredPool
 
 
@@ -78,39 +83,27 @@ class SupervisorTests(SynchronousTestCase):
         self.undo = self.InMemoryUndoStack.return_value
         self.undo.rewind.return_value = succeed(None)
 
-        self.get_request_func = patch(self, 'otter.supervisor.get_request_func')
-
     def test_provides_ISupervisor(self):
         """
         SupervisorService provides ISupervisor
         """
         verifyObject(ISupervisor, self.supervisor)
 
-    def assertCorrectRequestFunc(self, request_func):
+    def assertCorrectRequestFunc(self, request_bag):
         """
-        Asserts that the given request_func is correct.
+        Asserts that the given request bag has all necessary data.
 
-        "Correct" here is mutable: ideally it will eventually mean "it
-        is literally the return value of :func:`get_request_func`", but
-        for now it is that return value, plus a few attributes to
-        support old code that hasn't been updated to use pure_http
-        yet. This also verifies that :func:`get_request_func` was called
-        with the appropriate arguments, since that obviously also
-        determines if the given ``request_func`` will work correctly.
-
-        :param callable request_func: The request function to check.
+        :param request_bag: The :obj:`otter.supervisor.RequestBag` to check.
         """
-        self.assertIdentical(request_func, self.get_request_func.return_value)
-        self.get_request_func.assert_called_with(self.authenticator,
-                                                 self.group.tenant_id,
-                                                 mock.ANY,
-                                                 self.service_mapping,
-                                                 self.region)
-
-        self.assertEqual(request_func.auth_token, self.auth_token)
-        self.assertEqual(request_func.service_catalog, self.service_catalog)
-        self.assertEqual(request_func.region, "ORD")
-        self.assertEqual(request_func.lb_region, "ORD")
+        self.assertEqual(request_bag.auth_token, self.auth_token)
+        self.assertEqual(request_bag.service_catalog, self.service_catalog)
+        self.assertEqual(request_bag.region, "ORD")
+        self.assertEqual(request_bag.lb_region, "ORD")
+        self.assertEqual(request_bag.tenant_id, self.group.tenant_id)
+        # make sure the dispatcher supports some interesting intent that is
+        # only provided by the full dispatcher
+        tscope = TenantScope(Effect(Constant(1)), 'tenant_id')
+        self.assertIsNot(request_bag.dispatcher(tscope), None)
 
 
 class HealthCheckTests(SupervisorTests):
@@ -210,10 +203,10 @@ class LaunchConfigTests(SupervisorTests):
                                   'name': 'meh', 'lb_info': {}})
 
         (args, _kwargs), = self.launch_server.call_args_list
-        log, request_func, scaling_group, launch_config, undo = args
+        log, request_bag, scaling_group, launch_config, undo = args
         self.assertEqual(log, matches(IsBoundWith(tenant_id=11111,
                                                   worker='launch_server')))
-        self.assertCorrectRequestFunc(request_func)
+        self.assertCorrectRequestFunc(request_bag)
         self.assertEqual(scaling_group, self.group)
         self.assertEqual(launch_config, {'server': {}})
         self.assertEqual(undo, self.undo)
@@ -293,10 +286,10 @@ class DeleteServerTests(SupervisorTests):
         self.supervisor.execute_delete_server(self.log, 'transaction-id',
                                               self.group, self.fake_server)
         (args, _kwargs), = self.delete_server.call_args_list
-        log, request_func, instance_details = args
+        log, request_bag, instance_details = args
         self.assertEqual(log, matches(IsBoundWith(tenant_id=11111,
                                                   server_id='server_id')))
-        self.assertCorrectRequestFunc(request_func)
+        self.assertCorrectRequestFunc(request_bag)
         expected_details = self.fake_server['id'], self.fake_server['lb_info']
         self.assertEqual(instance_details, expected_details)
 

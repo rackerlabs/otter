@@ -904,6 +904,16 @@
                     authentication request, use your own credentials
                     rather than the sample values shown for
                         <code>username</code> and <code>apiKey</code>.
+                </para>
+                    <note>
+                        <para>This guide uses <emphasis role="bold">yourUserName</emphasis> and <emphasis
+                            role="bold">yourApiKey</emphasis> for authentication. For information about
+                            other supported authentication methods, see <link
+                                xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/Token_Calls.html"
+                                >Authentication tokens</link> in the <citetitle>Cloud Identity Client Developer
+                                    Guide</citetitle>.</para>
+                    </note>
+                <para>
                     When you authenticate successfully, the response
                     to your authentication request includes a catalog
                     of the services to which you have subscribed
@@ -3654,6 +3664,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 the scaling policy is executed.</para>
         </section>
     </chapter>
+        <xi:include href="chapters/apiref.xml"/>
     <chapter xml:id="Glossary">
         <title>Glossary</title>
         <!-- Glossary section, defining basic terms, is external so it's handy for Getting Started to share. -->

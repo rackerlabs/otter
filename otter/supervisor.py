@@ -4,20 +4,23 @@ The Otter Supervisor manages a number of workers to execute a launch config.
 This code is specific to the launch_server_v1 worker.
 """
 
+from characteristic import attributes
+
 from twisted.application.service import Service
+from twisted.internet import reactor
 from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
-from otter.models.interface import NoSuchScalingGroupError
-from otter.http import get_request_func
+from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import audit
+from otter.models.interface import NoSuchScalingGroupError
+from otter.undo import InMemoryUndoStack
 from otter.util.config import config_value
 from otter.util.deferredutils import DeferredPool
 from otter.util.hashkey import generate_job_id
 from otter.util.timestamp import from_timestamp
 from otter.worker import launch_server_v1, validate_config
-from otter.undo import InMemoryUndoStack
 
 
 class ISupervisor(Interface):
@@ -67,6 +70,12 @@ class ISupervisor(Interface):
         """
 
 
+@attributes(['lb_region', 'region', 'dispatcher', 'tenant_id',
+             'auth_token', 'service_catalog'])
+class RequestBag(object):
+    """A bag of data useful for making HTTP requests."""
+
+
 @implementer(ISupervisor)
 class SupervisorService(object, Service):
     """
@@ -82,33 +91,36 @@ class SupervisorService(object, Service):
     """
     name = "supervisor"
 
-    def __init__(self, authenticator, region, coiterate, service_mapping):
+    def __init__(self, authenticator, region, coiterate, service_configs):
         self.authenticator = authenticator
         self.region = region
         self.coiterate = coiterate
         self.deferred_pool = DeferredPool()
-        self.service_mapping = service_mapping
+        self.service_configs = service_configs
 
-    def _get_request_func(self, log, scaling_group):
+    def _get_request_bag(self, log, scaling_group):
         """
-        Builds a request function for the given scaling group, adorned with
-        some attributes for backwards compatibility.
+        Builds :obj:`RequestBag` containing a bunch of useful stuff for making
+        HTTP requests.
         """
         tenant_id = scaling_group.tenant_id
-        request_func = get_request_func(self.authenticator, tenant_id,
-                                        log, self.service_mapping,
-                                        self.region)
+        dispatcher = get_full_dispatcher(reactor, self.authenticator, log,
+                                         self.service_configs)
         lb_region = config_value('regionOverrides.cloudLoadBalancers')
-        request_func.lb_region = lb_region or self.region
-        request_func.region = self.region
 
         log.msg("Authenticating for tenant")
         d = self.authenticator.authenticate_tenant(tenant_id, log=log)
 
         def when_authenticated((auth_token, service_catalog)):
-            request_func.auth_token = auth_token
-            request_func.service_catalog = service_catalog
-            return request_func
+            bag = RequestBag(
+                lb_region=lb_region or self.region,
+                region=self.region,
+                dispatcher=dispatcher,
+                tenant_id=tenant_id,
+                auth_token=auth_token,
+                service_catalog=service_catalog
+            )
+            return bag
 
         return d.addCallback(when_authenticated)
 
@@ -123,21 +135,22 @@ class SupervisorService(object, Service):
 
         undo = InMemoryUndoStack(self.coiterate)
 
-        d = self._get_request_func(log, scaling_group)
+        d = self._get_request_bag(log, scaling_group)
 
-        def got_request_func(request_func):
+        def got_request_bag(request_bag):
             log.msg("Executing launch config.")
             return launch_server_v1.launch_server(log,
-                                                  request_func,
+                                                  request_bag,
                                                   scaling_group,
                                                   launch_config['args'],
                                                   undo)
 
-        d.addCallback(got_request_func)
+        d.addCallback(got_request_bag)
 
         def when_launch_server_completed(result):
-            # XXX: Something should be done with this data. Currently only enough
-            # to pass to the controller to store in the active state is returned
+            # XXX: Something should be done with this data. Currently only
+            # enough to pass to the controller to store in the active state is
+            # returned
             server_details, lb_info = result
             log.msg("Done executing launch config.",
                     server_id=server_details['server']['id'])
@@ -164,17 +177,18 @@ class SupervisorService(object, Service):
         """
         See :meth:`ISupervisor.execute_delete_server`
         """
-        log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
+        log = log.bind(server_id=server['id'],
+                       tenant_id=scaling_group.tenant_id)
 
-        d = self._get_request_func(log, scaling_group)
+        d = self._get_request_bag(log, scaling_group)
 
-        def got_request_func(request_func):
+        def got_request_bag(request_bag):
             log.msg("Executing delete server.")
             instance_details = server['id'], server['lb_info']
-            return launch_server_v1.delete_server(log, request_func,
+            return launch_server_v1.delete_server(log, request_bag,
                                                   instance_details)
 
-        return d.addCallback(got_request_func)
+        return d.addCallback(got_request_bag)
 
     def scrub_otter_metadata(self, log, transaction_id, tenant_id, server_id):
         """

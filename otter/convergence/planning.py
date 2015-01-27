@@ -1,6 +1,8 @@
 """Code related to creating a plan for convergence."""
 
-from pyrsistent import pbag, s, pset
+from functools import partial
+
+from pyrsistent import pbag, pmap, pset, s
 
 from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
@@ -51,8 +53,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     # only put nodes into draining if a timeout is specified
     if timeout > 0:
         draining, to_drain = partition_groups(
-            lambda n: n.description.condition, nodes, [CLBNodeCondition.DRAINING,
-                                                       CLBNodeCondition.ENABLED])
+            lambda n: n.description.condition, nodes,
+            [CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED])
 
         # Nothing should be done to these, because the timeout has not expired
         # and there are still active connections
@@ -60,7 +62,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
                     if (now - node.drained_at < timeout and
                         (node.connections is None or node.connections > 0))]
 
-    removes = [RemoveFromCLB(lb_id=node.description.lb_id, node_id=node.node_id)
+    removes = [RemoveFromCLB(lb_id=node.description.lb_id,
+                             node_id=node.node_id)
                for node in (set(nodes) - set(to_drain) - set(in_drain))]
 
     changes = [ChangeCLBNode(lb_id=node.description.lb_id,
@@ -82,15 +85,14 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     is currently on, and it will be added on the correct port, with the correct
     weight, and correct status, to the desired load balancers.
 
+    Note: this supports user customizable types (e.g. PRIMARY or SECONDARY),
+    but in practice it should probably only be added as PRIMARY.  SECONDARY can
+    only be used if load balancer health monitoring is enabled, and would be
+    used as backup servers anyway.
+
     :param dict desired_lb_state: As per :obj:`DesiredGroupState`.desired_lbs
     :param list current_lb_nodes: `list` of :obj:`CLBNode`
     :param str ip_address: the IP address of the server to converge
-
-    Note: this supports user customizable types (e.g. PRIMARY or SECONDARY), but
-    in practice it should probably only be added as PRIMARY.  SECONDARY can only
-    be used if load balancer health monitoring is enabled, and would be used as
-    backup servers anyway.
-
     :rtype: `list` of :class:`IStep`
     """
     desired = {
@@ -134,8 +136,8 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
     If server is not already in draining state, put it into draining state.
     If the server is free of load balancers, just delete it.
     """
-    lb_draining_steps = _remove_from_lb_with_draining(timeout, current_lb_nodes,
-                                                      now)
+    lb_draining_steps = _remove_from_lb_with_draining(
+        timeout, current_lb_nodes, now)
 
     # if there are no load balancers that are waiting on draining timeouts or
     # connections, just delete the server too
@@ -165,15 +167,15 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     :param set servers_with_cheese: a list of :obj:`NovaServer` instances.
         This must only contain servers that are being managed for the specified
         group.
-    :param load_balancer_contents: a set of :obj:`CLBNode` instances.  This must
-        contain all the load balancer mappings for all the load balancers on the
-        tenant.
+    :param load_balancer_contents: a set of :obj:`CLBNode` instances.  This
+        must contain all the load balancer mappings for all the load balancers
+        on the tenant.
     :param float now: number of seconds since the POSIX epoch indicating the
         time at which the convergence was requested.
     :param float timeout: Number of seconds after which we will delete a server
         in BUILD.
-
     :rtype: :obj:`pbag` of `IStep`
+
     """
     lbs_by_address = groupby(lambda n: n.address, load_balancer_contents)
 
@@ -204,7 +206,8 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # Scale down over capacity, starting with building, then active,
     # preferring older.  Also, finish draining/deleting servers already in
     # draining state
-    servers_to_delete = (servers_in_active + waiting_for_build)[desired_state.desired:]
+    servers_in_preferred_order = servers_in_active + waiting_for_build
+    servers_to_delete = servers_in_preferred_order[desired_state.desired:]
 
     def drain_and_delete_a_server(server):
         return _drain_and_delete(
@@ -214,8 +217,9 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     scale_down_steps = list(mapcat(drain_and_delete_a_server,
                                    servers_to_delete + draining_servers))
 
-    # delete all servers in error - draining does not need to be handled because
-    # servers in error presumably are not serving traffic anyway
+    # delete all servers in error - draining does not need to be
+    # handled because servers in error presumably are not serving
+    # traffic anyway
     delete_error_steps = (
         [DeleteServer(server_id=server.id) for server in servers_in_error] +
         [RemoveFromCLB(lb_id=lb_node.description.lb_id,
@@ -272,8 +276,7 @@ def _optimize_lb_adds(lb_add_steps):
     return [
         AddNodesToCLB(
             lb_id=lbid,
-            address_configs=pset(reduce(lambda s, y: s.union(y),
-                                        [step.address_configs for step in steps])))
+            address_configs=pset(concat(s.address_configs for s in steps)))
         for lbid, steps in steps_by_lb.iteritems()
     ]
 
@@ -302,6 +305,30 @@ def optimize_steps(steps):
     return pbag(concatv(omg_optimized, unoptimizable))
 
 
+_DEFAULT_STEP_LIMITS = pmap({
+    CreateServer: 3
+})
+
+
+def _limit_step_count(steps, step_limits):
+    """
+    Limits step count by type.
+
+    :param steps: An iterable of steps.
+    :param step_limits: A dict mapping step classes to their maximum allowable
+        count. Classes not present in this dict have no limit.
+    :return: The input steps
+    :rtype: pset
+    """
+    return pbag(concat(typed_steps[:step_limits.get(cls)]
+                       for (cls, typed_steps)
+                       in groupby(type, steps).iteritems()))
+
+
+_default_limit_step_count = partial(
+    _limit_step_count, step_limits=_DEFAULT_STEP_LIMITS)
+
+
 def plan(desired_group_state, servers, lb_nodes, now):
     """
     Get an optimized convergence plan.
@@ -309,4 +336,5 @@ def plan(desired_group_state, servers, lb_nodes, now):
     Takes the same arguments as :func:`converge`.
     """
     steps = converge(desired_group_state, servers, lb_nodes, now)
+    steps = _default_limit_step_count(steps)
     return optimize_steps(steps)

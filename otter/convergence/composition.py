@@ -1,18 +1,19 @@
 """
 Code for composing all of the convergence functionality together.
 """
+import time
 
 from collections import defaultdict
-from functools import partial
-import time
+
+from pyrsistent import freeze
 
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
-from otter.convergence.model import DesiredGroupState, CLBDescription
+from otter.convergence.model import CLBDescription, DesiredGroupState
 from otter.convergence.planning import plan
 
 
-def execute_convergence(request_func, group_id, desired_group_state,
+def execute_convergence(group_id, desired_group_state,
                         get_all_convergence_data=get_all_convergence_data):
     """
     Execute convergence. This function will do following:
@@ -23,7 +24,6 @@ def execute_convergence(request_func, group_id, desired_group_state,
     This is in effect single cycle execution. A layer above this is expected
     to keep calling this until this function returns False
 
-    :param request_func: Tenant bound request function
     :param bytes group_id: Tenant's group
     :param DesiredGroupState desired_group_state: the desired state
 
@@ -34,7 +34,7 @@ def execute_convergence(request_func, group_id, desired_group_state,
     conv_eff = eff.on(
         lambda (servers, lb_nodes): plan(desired_group_state, servers,
                                          lb_nodes, time.time()))
-    return conv_eff.on(partial(steps_to_effect, request_func)).on(bool)
+    return conv_eff.on(steps_to_effect).on(bool)
 
 
 def tenant_is_enabled(tenant_id, get_config_value):
@@ -69,20 +69,30 @@ def json_to_LBConfigs(lbs_json):
     return lbd
 
 
-def get_desired_group_state(launch_config, desired):
+def get_desired_group_state(group_id, launch_config, desired):
     """
-    Create a :obj:`DesiredGroupState` from a launch config and desired
-    number of servers.
+    Create a :obj:`DesiredGroupState` from a group details.
 
+    :param str group_id: The group ID
     :param dict launch_config: Group's launch config as per
         :obj:`otter.json_schema.group_schemas.launch_config`
     :param int desired: Group's desired capacity
     """
+    server_lc = prepare_server_launch_config(
+        group_id,
+        freeze({'server': launch_config['args']['server']}))
     lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
     desired_state = DesiredGroupState(
-        launch_config={'server': launch_config['args']['server']},
+        launch_config=server_lc,
         desired=desired, desired_lbs=lbs)
     return desired_state
+
+
+def prepare_server_launch_config(group_id, launch_config):
+    """Prepare a launch config with any necessary dynamic data."""
+    return launch_config.set_in(
+        ('server', 'metadata', 'rax:auto_scaling_group_id'),
+        group_id)
 
 
 class Converger(Service, object):
