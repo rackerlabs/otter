@@ -251,14 +251,20 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                                          ("l2", "n2")]]
         self.assertIdentical(self._rcv3_check_bulk_delete(resp, body), None)
 
-    def test_ok_if_node_already_removed(self):
+    def test_try_again_for_partial_removal(self):
         """
         If a node was already removed (or maybe was never part of the load
-        balancer pool to begin with), the response was successful.
+        balancer pool to begin with), returns an effect that removes
+        the remaining load balancer.
         """
+        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
         resp = StubResponse(409, {})
-        body = {"errors": ["Node n1 is not a member of Load Balancer Pool l1"]}
-        self.assertTrue(self._rcv3_delete_successful(resp, body))
+        body = {"errors": ["Node {node_id} is not a member of Load Balancer "
+                           "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
+        step = self._rcv3_check_bulk_delete(resp, body)
+        self.assertEqual(step, BulkRemoveFromRCv3(
+            lb_node_pairs=[(lb_id, node_id)]))
 
     def test_bail_if_group_inactive(self):
         """
