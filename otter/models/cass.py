@@ -21,6 +21,7 @@ from twisted.internet import defer
 
 from zope.interface import implementer
 
+from otter.constants import LOCK_PATH
 from otter.log import log as otter_log
 from otter.models.interface import (
     GroupNotEmptyError,
@@ -42,9 +43,6 @@ from otter.util.config import config_value
 from otter.util.cqlbatch import Batch, batch
 from otter.util.deferredutils import with_lock
 from otter.util.hashkey import generate_capability, generate_key_str
-
-
-LOCK_PATH = '/locks'
 
 
 def serialize_json_data(data, ver):

@@ -28,12 +28,13 @@ import json
 from twisted.internet import defer
 
 from otter.convergence.composition import tenant_is_enabled
-from otter.util.config import config_value
-from otter.log import audit
+from otter.convergence.service import get_converger
 from otter.json_schema.group_schemas import MAX_ENTITIES
+from otter.log import audit
+from otter.supervisor import exec_scale_down, execute_launch_config
+from otter.util.config import config_value
 from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
-from otter.supervisor import execute_launch_config, exec_scale_down
 
 
 class CannotExecutePolicyError(Exception):
@@ -150,7 +151,7 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
         apply_delta(log, state.desired, state, config, policy)
         get_converger().set_desired_capacity(
             state.tenant_id, state.group_id, launch_config, state.desired)
-        return succeed(state)
+        return defer.succeed(state)
     else:
         delta = calculate_delta(log, state, config, policy)
         execute_log = log.bind(server_delta=delta)

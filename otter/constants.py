@@ -1,6 +1,9 @@
 """Constants."""
 
-from twisted.python.constants import Names, NamedConstant
+from twisted.python.constants import NamedConstant, Names
+
+
+LOCK_PATH = '/locks'
 
 
 class ServiceType(Names):
