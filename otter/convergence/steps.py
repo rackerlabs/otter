@@ -250,8 +250,8 @@ def _rcv3_check_bulk_delete(result):
     indicated unambiguous success, or the machine we're trying to
     remove is already removed anyway.
 
-    If the machine was already removed, returns an effect to try and
-    remove the remaining pairs, unless a fatal error *also*
+    If the machine was already removed, returns the next step to try
+    and remove the remaining pairs, unless a fatal error *also*
     occurred. This is necessary because RCv3 bulk requests are
     atomic-ish.
     """
