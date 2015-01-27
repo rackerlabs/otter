@@ -228,9 +228,9 @@ class BulkRemoveFromRCv3(object):
         Produce a :obj:`Effect` to remove some nodes from some RCv3 load
         balancers.
         """
-        return _rackconnect_bulk_request(
-            self.lb_node_pairs, "DELETE",
-            success_pred=partial(_rcv3_delete_successful, self.lb_node_pairs))
+        eff = _rackconnect_bulk_request(self.lb_node_pairs, "DELETE",
+                                        success_pred=_CONSTANTLY_TRUE)
+        return eff.on(_rcv3_check_bulk_delete)
 
 
 _CONSTANTLY_TRUE = lambda _: True
@@ -260,8 +260,27 @@ def _rcv3_check_bulk_delete(result):
     if response.code == 204:  # All done!
         return
 
-    template = "Node {node_id} is not a member of Load Balancer Pool {lb_id}"
-    allowable_errors = set([template.format(node_id=node_id, lb_id=lb_id)
-                            for (lb_id, node_id) in lb_node_pairs])
-    fatal_errors = set(body["errors"]) - allowable_errors
-    return not fatal_errors
+    pairs_to_delete = []
+    for error in body["errors"]:
+        match = _RCV3_NODE_NOT_A_MEMBER_PATTERN.match(error)
+        if not match:  # Unrecoverable error, bail!
+            return
+
+        node_id, lb_id = match.groups()
+        pairs_to_delete.append((lb_id, node_id))
+
+    # REVIEW: cc @radix The best thing to return here would be an
+    # effect; that way it would get executed immediately. However, I
+    # want something that's better to introspect for testing, and
+    # that's definitely the step, not the effect.
+
+    return BulkRemoveFromRCv3(lb_node_pairs=pairs_to_delete)
+
+def _maybe_execute_step(maybe_step):
+    """
+    This is a hack; see review note above
+    """
+    if maybe_step is None:
+        return None
+    else:
+        return maybe_step.as_effect()
