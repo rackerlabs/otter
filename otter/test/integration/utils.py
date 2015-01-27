@@ -55,7 +55,7 @@ def measure_progress(prev_state, curr_state, desired_state):
     prev_capacity = _count_live_servers(prev_state.servers)
     curr_capacity = _count_live_servers(curr_state.servers)
     capacity_delta = curr_capacity - prev_capacity
-    desired = desired_state.desired
+    desired = desired_state.capacity
 
     if prev_capacity > desired and curr_capacity < desired:
         msg = "Undershoot: prev capacity = %d, desired = %d, current = %d"
