@@ -276,6 +276,7 @@ def _rcv3_check_bulk_delete(result):
 
     return BulkRemoveFromRCv3(lb_node_pairs=pairs_to_delete)
 
+
 def _maybe_execute_step(maybe_step):
     """
     This is a hack; see review note above
