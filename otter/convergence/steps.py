@@ -257,8 +257,8 @@ def _rcv3_check_bulk_delete(result):
     """
     response, body = result
 
-    if response.code == 204:
-        return True
+    if response.code == 204:  # All done!
+        return
 
     template = "Node {node_id} is not a member of Load Balancer Pool {lb_id}"
     allowable_errors = set([template.format(node_id=node_id, lb_id=lb_id)
