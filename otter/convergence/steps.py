@@ -230,7 +230,7 @@ class BulkRemoveFromRCv3(object):
         """
         eff = _rackconnect_bulk_request(self.lb_node_pairs, "DELETE",
                                         success_pred=_CONSTANTLY_TRUE)
-        return eff.on(_rcv3_check_bulk_delete)
+        return eff.on(_rcv3_check_bulk_delete).on(_maybe_execute_step)
 
 
 _CONSTANTLY_TRUE = lambda _: True
