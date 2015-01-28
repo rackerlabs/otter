@@ -53,11 +53,29 @@ class CLBNodeType(Names):
 
 
 class ServerState(Names):
-    """Constants representing the state cloud servers can have"""
-    ACTIVE = NamedConstant()    # corresponds to Nova "ACTIVE"
-    ERROR = NamedConstant()     # corresponds to Nova "ERROR"
-    BUILD = NamedConstant()     # corresponds to Nova "BUILD" or "BUILDING"
-    DRAINING = NamedConstant()  # Autoscale is deleting the server
+    """
+    Constants representing the state of a Nova cloud server.
+    """
+
+    ACTIVE = NamedConstant()
+    """
+    Corresponds to Nova's ``ACTIVE`` state.
+    """
+
+    ERROR = NamedConstant()
+    """
+    Corresponds to Nova's ``ERROR`` state.
+    """
+
+    BUILD = NamedConstant()
+    """
+    Corresponds to Nova's ``BUILD`` and ``BUILDING`` states.
+    """
+
+    DRAINING = NamedConstant()
+    """"
+    Autoscale is deleting the server.
+    """
 
 
 class StepResult(Names):
