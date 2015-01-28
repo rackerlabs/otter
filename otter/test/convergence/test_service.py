@@ -14,7 +14,7 @@ class ConvergerTests(SynchronousTestCase):
 
     def setUp(self):
         clock = Clock()
-        self.kz_client = mock.Mock(Lock=LockMixin().mock_lock)
+        self.kz_client = mock.Mock(Lock=LockMixin().mock_lock())
         self.dispatcher = object()
         self.converger = Converger(clock, self.kz_client, self.dispatcher)
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
@@ -35,5 +35,8 @@ class ConvergerTests(SynchronousTestCase):
             'group-id', 5, self.lc,
             perform=perform,
             execute_convergence=lambda gid, dgs: exec_calls.get((gid, dgs)))
+        self.kz_client.Lock.assert_called_once_with('/locks/convergence/group-id')
+        self.kz_client.Lock().acquire.assert_called_once_with()
+        self.kz_client.Lock().release.assert_called_once_with()
         perform.assert_called_once_with(self.dispatcher,
                                         exec_convergence_result)
