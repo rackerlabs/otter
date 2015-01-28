@@ -1,9 +1,10 @@
 """Tests for convergence."""
 
+import json
+
 from effect import Constant, Effect, ParallelEffects
 from effect.testing import Stub, resolve_effect
 
-import json
 import mock
 
 from pyrsistent import freeze, pmap

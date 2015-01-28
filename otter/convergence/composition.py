@@ -78,6 +78,9 @@ def get_desired_group_state(group_id, launch_config, desired):
     :param dict launch_config: Group's launch config as per
         :obj:`otter.json_schema.group_schemas.launch_config`
     :param int desired: Group's desired capacity
+
+    NOTE: Currently this ignores draining timeout settings, since it has
+    not been added to any schema yet.
     """
     server_lc = prepare_server_launch_config(
         group_id,
@@ -103,6 +106,9 @@ def prepare_server_launch_config(group_id, server_args, lb_args):
     This function assumes that `lb_args` is mostly well-formed data, and is
     not missing any data, since it should have been sanitized before getting
     to this point.
+
+    NOTE: Currently this ignores RCv3 settings and draining timeout settings,
+    since they haven't been implemented yet.
     """
     server_args = server_args.set_in(
         ('server', 'metadata', 'rax:auto_scaling_group_id'), group_id)
