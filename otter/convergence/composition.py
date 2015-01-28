@@ -82,7 +82,7 @@ def get_desired_group_state(group_id, launch_config, desired):
     lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
     desired_state = DesiredGroupState(
         server_config=server_lc,
-        desired=desired, desired_lbs=lbs)
+        capacity=desired, desired_lbs=lbs)
     return desired_state
 
 

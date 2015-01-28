@@ -199,7 +199,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                             for server in building_too_long]
 
     # create servers
-    create_steps = [create_server] * (desired_state.desired
+    create_steps = [create_server] * (desired_state.capacity
                                       - (len(servers_in_active)
                                          + len(waiting_for_build)))
 
@@ -207,7 +207,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # preferring older.  Also, finish draining/deleting servers already in
     # draining state
     servers_in_preferred_order = servers_in_active + waiting_for_build
-    servers_to_delete = servers_in_preferred_order[desired_state.desired:]
+    servers_to_delete = servers_in_preferred_order[desired_state.capacity:]
 
     def drain_and_delete_a_server(server):
         return _drain_and_delete(

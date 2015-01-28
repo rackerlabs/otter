@@ -341,7 +341,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=0,
+                DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE)]),
                 set(),
@@ -356,7 +356,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=0),
+                DesiredGroupState(server_config={}, capacity=0),
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1')]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
@@ -374,7 +374,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=0),
+                DesiredGroupState(server_config={}, capacity=0),
                 set([server('abc', state=ServerState.DRAINING,
                             servicenet_address='1.1.1.1')]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
@@ -394,7 +394,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=0,
+                DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.DRAINING,
                             servicenet_address='1.1.1.1')]),
@@ -414,7 +414,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=0,
+                DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1')]),
@@ -442,7 +442,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=0,
+                DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1')]),
@@ -470,7 +470,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=0,
+                DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.DRAINING,
                             servicenet_address='1.1.1.1')]),
@@ -494,7 +494,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=1),
+                DesiredGroupState(server_config={}, capacity=1),
                 set(),
                 set(),
                 0),
@@ -507,7 +507,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=2),
+                DesiredGroupState(server_config={}, capacity=2),
                 set(),
                 set(),
                 0),
@@ -522,7 +522,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=1),
+                DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.BUILD)]),
                 set(),
                 0),
@@ -535,7 +535,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=1),
+                DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ERROR)]),
                 set(),
                 0),
@@ -552,7 +552,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=1),
+                DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ERROR,
                             servicenet_address='1.1.1.1')]),
                 set([CLBNode(address='1.1.1.1', node_id='3',
@@ -573,7 +573,7 @@ class ConvergeTests(SynchronousTestCase):
         """If we have more servers than desired, we delete the oldest."""
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=1),
+                DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE, created=0),
                      server('def', ServerState.ACTIVE, created=1)]),
                 set(),
@@ -588,7 +588,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=0),
+                DesiredGroupState(server_config={}, capacity=0),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1', created=0)]),
                 set([CLBNode(address='1.1.1.1', node_id='3',
@@ -606,7 +606,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=2),
+                DesiredGroupState(server_config={}, capacity=2),
                 set([server('abc', ServerState.ACTIVE, created=0),
                      server('def', ServerState.BUILD, created=1),
                      server('ghi', ServerState.ACTIVE, created=2)]),
@@ -621,7 +621,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=2),
+                DesiredGroupState(server_config={}, capacity=2),
                 set([server('slowpoke', ServerState.BUILD, created=0),
                      server('ok', ServerState.ACTIVE, created=0)]),
                 set(),
@@ -637,7 +637,7 @@ class ConvergeTests(SynchronousTestCase):
         """
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=2),
+                DesiredGroupState(server_config={}, capacity=2),
                 set([server('slowpoke', ServerState.BUILD, created=0),
                      server('old-ok', ServerState.ACTIVE, created=0),
                      server('new-ok', ServerState.ACTIVE, created=3600)]),
@@ -653,7 +653,7 @@ class ConvergeTests(SynchronousTestCase):
         desired_lbs = {'5': [CLBDescription(lb_id='5', port=80)]}
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, desired=1,
+                DesiredGroupState(server_config={}, capacity=1,
                                   desired_lbs=desired_lbs),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1', created=0),
@@ -899,7 +899,7 @@ class PlanTests(SynchronousTestCase):
 
         desired_lbs = {5: [CLBDescription(lb_id='5', port=80)]}
         desired_group_state = DesiredGroupState(
-            server_config={}, desired=8, desired_lbs=desired_lbs)
+            server_config={}, capacity=8, desired_lbs=desired_lbs)
 
         result = plan(
             desired_group_state,
