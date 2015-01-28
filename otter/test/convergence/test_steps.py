@@ -208,7 +208,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         """
         The error message regular expression correctly parses error
         messages stating the node wasn't a member of a load
-        balancer. It correctly rejects messages saying anyhting else.
+        balancer. It rejects messages saying anyhting else.
         """
         match = _RCV3_NODE_NOT_A_MEMBER_PATTERN.match
 
