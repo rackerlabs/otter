@@ -234,13 +234,6 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                          'D95AE0C4-6AB8-4873-B82F-F8433840CFF2']]:
             self.assertIdentical(match(message), None)
 
-    def _rcv3_check_bulk_delete(self, resp, body):
-        """
-        Calls :func:`_rcv3_check_bulk_delete` with test data and a
-        ``(resp, body)`` tuple.
-        """
-        return _rcv3_check_bulk_delete((resp, body))
-
     def test_good_response(self):
         """
         If the response code indicates success, the response was successful.
@@ -250,7 +243,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                  "load_balancer_pool": {"id": lb_id}}
                 for (lb_id, node_id) in [("l1", "n1"),
                                          ("l2", "n2")]]
-        self.assertIdentical(self._rcv3_check_bulk_delete(resp, body), None)
+        self.assertIdentical(_rcv3_check_bulk_delete((resp, body)), None)
 
     def test_try_again_for_partial_removal(self):
         """
@@ -264,7 +257,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         body = {"errors":
                 ["Node {node_id} is not a member of Load Balancer "
                  "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
-        eff = self._rcv3_check_bulk_delete(resp, body)
+        eff = _rcv3_check_bulk_delete((resp, body))
         expected_eff = (
             service_request(
                 service_type=ServiceType.RACKCONNECT_V3,
@@ -287,4 +280,4 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         """
         resp = StubResponse(409, {})
         body = {"errors": ["Load Balancer Pool l1 is not in an ACTIVE state"]}
-        self.assertIdentical(self._rcv3_check_bulk_delete(resp, body), None)
+        self.assertIdentical(_rcv3_check_bulk_delete((resp, body)), None)
