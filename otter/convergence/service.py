@@ -1,5 +1,6 @@
 """Converger service"""
 
+from effect import Effect
 from effect.twisted import perform
 
 from twisted.application.service import Service
@@ -32,7 +33,7 @@ class Converger(Service, object):
             desired_group_state = get_desired_group_state(
                 group_id, launch_config, desired)
             eff = execute_convergence(group_id, desired_group_state)
-            eff = TenantScope(eff, tenant_id)
+            eff = Effect(TenantScope(eff, tenant_id))
             d = perform(self._dispatcher, eff)
             return d.addErrback(log.err)
         return with_lock(

@@ -1,3 +1,5 @@
+from effect import Effect
+
 import mock
 
 from pyrsistent import pmap
@@ -45,7 +47,7 @@ class ConvergerTests(SynchronousTestCase):
         self.kz_client.Lock().release.assert_called_once_with()
         perform.assert_called_once_with(
             self.dispatcher,
-            TenantScope(exec_convergence_result, 'tenant-id'))
+            Effect(TenantScope(exec_convergence_result, 'tenant-id')))
 
     def test_converge_error_log(self):
         """If performance fails, the error is logged."""
