@@ -325,9 +325,11 @@ class ConvergeLBStateTests(SynchronousTestCase):
                 ]))
 
 
-def server(id, state, created=0, **kwargs):
+def server(id, state, created=0, image_id='image', flavor_id='flavor',
+           **kwargs):
     """Convenience for creating a :obj:`NovaServer`."""
-    return NovaServer(id=id, state=state, created=created, **kwargs)
+    return NovaServer(id=id, state=state, created=created, image_id=image_id,
+                      flavor_id=flavor_id, **kwargs)
 
 
 class DrainAndDeleteServerTests(SynchronousTestCase):

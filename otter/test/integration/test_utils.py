@@ -27,7 +27,8 @@ class MeasureProgressTests(SynchronousTestCase):
         Create some dummy test servers.
         """
         return pset([
-            NovaServer(id=str(i), state=state, created=123456789.)
+            NovaServer(id=str(i), state=state, created=123456789.,
+                       image_id='image', flavor_id='flavor')
             for i in xrange(n)
         ])
 

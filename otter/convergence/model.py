@@ -37,8 +37,9 @@ class ServerState(Names):
     DRAINING = NamedConstant()  # Autoscale is deleting the server
 
 
-@attributes(['id', 'state', 'created',
-             Attribute('servicenet_address', default_value='', instance_of=str)])
+@attributes(['id', 'state', 'created', 'image_id', 'flavor_id',
+             Attribute('servicenet_address', default_value='',
+                       instance_of=str)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -51,6 +52,8 @@ class NovaServer(object):
     :ivar float created: Timestamp at which the server was created.
     :ivar str servicenet_address: The private ServiceNet IPv4 address, if
         the server is on the ServiceNet network
+    :ivar str image_id: The ID of the image the server was launched with
+        :ivar str flavor_id: The ID of the flavor the server was launched with
     """
 
 

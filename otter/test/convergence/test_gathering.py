@@ -359,6 +359,8 @@ class ToNovaServerTests(SynchronousTestCase):
             to_nova_server(self.servers[0]),
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
+                       image_id='image',
+                       flavor_id='flavor',
                        created=self.createds[0][1],
                        servicenet_address=''))
 
@@ -371,6 +373,8 @@ class ToNovaServerTests(SynchronousTestCase):
             to_nova_server(self.servers[0]),
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
+                       image_id='image',
+                       flavor_id='flavor',
                        created=self.createds[0][1],
                        servicenet_address=''))
 
@@ -382,6 +386,8 @@ class ToNovaServerTests(SynchronousTestCase):
             to_nova_server(self.servers[1]),
             NovaServer(id='b',
                        state=ServerState.BUILD,
+                       image_id='image',
+                       flavor_id='flavor',
                        created=self.createds[1][1],
                        servicenet_address='10.0.0.1'))
 
@@ -508,10 +514,14 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         expected_servers = [
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
+                       image_id='image',
+                       flavor_id='flavor',
                        created=0,
                        servicenet_address='10.0.0.1'),
             NovaServer(id='b',
                        state=ServerState.ACTIVE,
+                       image_id='image',
+                       flavor_id='flavor',
                        created=1,
                        servicenet_address='10.0.0.2'),
         ]
