@@ -70,7 +70,7 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
         self.assertEqual(
             state,
             DesiredGroupState(
-                launch_config=expected_server_config,
+                server_config=expected_server_config,
                 capacity=2,
                 desired_lbs={23: [CLBDescription(lb_id='23', port=80)]}))
 
@@ -108,7 +108,7 @@ class ExecConvergenceTests(SynchronousTestCase):
         """
         get_all_convergence_data = self._get_gacd_func('gid')
         desired = DesiredGroupState(
-            launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
+            server_config={'server': {'name': 'test', 'flavorRef': 'f'}},
             desired_lbs={23: [CLBDescription(lb_id='23', port=80)]},
             capacity=2)
 
@@ -144,7 +144,7 @@ class ExecConvergenceTests(SynchronousTestCase):
         is returned.
         """
         desired = DesiredGroupState(
-            launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
+            server_config={'server': {'name': 'test', 'flavorRef': 'f'}},
             desired_lbs={},
             capacity=2)
         get_all_convergence_data = self._get_gacd_func('gid')
