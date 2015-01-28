@@ -42,7 +42,8 @@ class StepAsEffectTests(SynchronousTestCase):
                 'POST',
                 'servers',
                 data={'server': {'name': 'myserver-random-name',
-                                 'flavorRef': '1'}}))
+                                 'flavorRef': '1'}},
+                success_pred=has_code(202)))
 
     def test_create_server_noname(self):
         """
@@ -60,7 +61,8 @@ class StepAsEffectTests(SynchronousTestCase):
                 ServiceType.CLOUD_SERVERS,
                 'POST',
                 'servers',
-                data={'server': {'name': 'random-name', 'flavorRef': '1'}}))
+                data={'server': {'name': 'random-name', 'flavorRef': '1'}},
+                success_pred=has_code(202)))
 
     def test_delete_server(self):
         """

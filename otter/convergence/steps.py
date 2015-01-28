@@ -60,7 +60,8 @@ class CreateServer(object):
                 ServiceType.CLOUD_SERVERS,
                 'POST',
                 'servers',
-                data=thaw(server_config))
+                data=thaw(server_config),
+                success_pred=has_code(202))
         return eff.on(got_name)
 
 
