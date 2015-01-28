@@ -79,10 +79,24 @@ class ServerState(Names):
 
 
 class StepResult(Names):
-    """Constants representing the condition of a step's effect."""
+    """
+    Constants representing the condition of a step's effect.
+    """
+
     SUCCESS = NamedConstant()
+    """
+    The step was successful.
+    """
+
     RETRY = NamedConstant()
+    """
+    Convergence should be retried later.
+    """
+
     FAILURE = NamedConstant()
+    """
+    The step failed. Retrying convergence won't help.
+    """
 
 
 @attributes(['id', 'state', 'created',
