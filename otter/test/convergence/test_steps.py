@@ -16,7 +16,6 @@ from otter.convergence.steps import (
     DeleteServer,
     RemoveFromCLB,
     SetMetadataItemOnServer,
-    _CONSTANTLY_TRUE,
     _rcv3_check_bulk_delete,
     _RCV3_NODE_NOT_A_MEMBER_PATTERN)
 from otter.http import has_code, service_request
@@ -155,7 +154,7 @@ class StepAsEffectTests(SynchronousTestCase):
         if request.intent.method == "POST":
             self.assertEqual(success_pred, has_code(201))
         else:
-            self.assertIdentical(success_pred, _CONSTANTLY_TRUE)
+            self.assertEqual(success_pred, has_code(204, 409))
 
         self.assertEqual(request.intent.url, "load_balancer_pools/nodes")
         self.assertEqual(request.intent.headers, None)
@@ -276,7 +275,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                      'cloud_server':
                      {'id':
                       'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'}}],
-                success_pred=_CONSTANTLY_TRUE)
+                success_pred=has_code(204, 409))
             .on(_rcv3_check_bulk_delete))
         self.assertEqual(eff, expected_eff)
 
