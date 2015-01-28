@@ -81,7 +81,7 @@ def get_desired_group_state(group_id, launch_config, desired):
     server_lc = prepare_server_launch_config(
         group_id,
         freeze({'server': launch_config['args']['server']}))
-    lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
+    lbs = json_to_LBConfigs(launch_config['args'].get('loadBalancers', []))
     desired_state = DesiredGroupState(
         launch_config=server_lc,
         desired=desired, desired_lbs=lbs)

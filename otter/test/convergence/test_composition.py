@@ -74,6 +74,28 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 desired=2,
                 desired_lbs={23: [CLBDescription(lb_id='23', port=80)]}))
 
+    def test_no_lbs(self):
+        """
+        When no loadBalancers are specified, the returned DesiredGroupState has an
+        empty mapping for desired_lbs.
+        """
+        server_config = {'name': 'test', 'flavorRef': 'f'}
+        lc = {'args': {'server': server_config}}
+
+        expected_server_config = {
+            'server': {
+                'name': 'test',
+                'flavorRef': 'f',
+                'metadata': {
+                    'rax:auto_scaling_group_id': 'uuid'}}}
+        state = get_desired_group_state('uuid', lc, 2)
+        self.assertEqual(
+            state,
+            DesiredGroupState(
+                launch_config=expected_server_config,
+                desired=2,
+                desired_lbs={}))
+
 
 class ExecConvergenceTests(SynchronousTestCase):
     """
