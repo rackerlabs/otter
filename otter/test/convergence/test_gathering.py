@@ -18,7 +18,6 @@ from otter.convergence.gathering import (
     to_nova_server,
     _private_ipv4_addresses,
     _servicenet_address)
-from otter.convergence.composition import json_to_LBConfigs
 from otter.convergence.model import (
     CLBDescription,
     CLBNode,
