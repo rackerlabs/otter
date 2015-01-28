@@ -1,11 +1,14 @@
 """
 Code for composing all of the convergence functionality together.
 """
+import json
 import time
 
 from collections import defaultdict
 
 from pyrsistent import freeze
+
+from toolz.dicttoolz import keyfilter
 
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
@@ -78,7 +81,8 @@ def get_desired_group_state(group_id, launch_config, desired):
     """
     server_lc = prepare_server_launch_config(
         group_id,
-        freeze({'server': launch_config['args']['server']}))
+        freeze({'server': launch_config['args']['server']}),
+        freeze(launch_config['args']['loadBalancers']))
     lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
     desired_state = DesiredGroupState(
         launch_config=server_lc,
@@ -86,8 +90,32 @@ def get_desired_group_state(group_id, launch_config, desired):
     return desired_state
 
 
-def prepare_server_launch_config(group_id, launch_config):
-    """Prepare a launch config with any necessary dynamic data."""
-    return launch_config.set_in(
-        ('server', 'metadata', 'rax:auto_scaling_group_id'),
-        group_id)
+def prepare_server_launch_config(group_id, server_args, lb_args):
+    """
+    Prepare a launch config with any necessary dynamic data.
+
+    :param str group_id: The group ID
+    :param PMap launch_config: The server part of the Group's launch config,
+        as per :obj:`otter.json_schema.group_schemas.server` except as the
+        value of a one-element PMap with key "server".
+    :param PMap lb_args: The load balancer part of the Group's launch_config
+
+    This function assumes that `lb_args` is mostly well-formed data, and is
+    not missing any data, since it should have been sanitized before getting
+    to this point.
+    """
+    server_args = server_args.set_in(
+        ('server', 'metadata', 'rax:auto_scaling_group_id'), group_id)
+
+    for config in lb_args:
+        if config.get('type') != 'RackConnectV3':
+            sanitized = keyfilter(lambda k: k in ('type', 'port'), config)
+            # provide a default type
+            sanitized.setdefault('type', 'CloudLoadBalancer')
+
+            server_args = server_args.set_in(
+                ('server', 'metadata',
+                 'rax:autoscale:lb:{0}'.format(config['loadBalancerId'])),
+                json.dumps(sanitized))
+
+    return server_args

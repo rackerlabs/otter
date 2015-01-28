@@ -3,6 +3,7 @@
 from effect import Constant, Effect, ParallelEffects
 from effect.testing import Stub, resolve_effect
 
+import json
 import mock
 
 from pyrsistent import freeze, pmap
@@ -52,20 +53,28 @@ class JsonToLBConfigTests(SynchronousTestCase):
 
 class GetDesiredGroupStateTests(SynchronousTestCase):
     """Tests for :func:`get_desired_group_state`."""
+
     def test_convert(self):
         """
-        An Otter launch config is converted into a :obj:`DesiredGroupState`.
+        An Otter launch config a :obj:`DesiredGroupState`, ignoring extra
+        config information.
         """
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config,
-                       'loadBalancers': [{'loadBalancerId': 23, 'port': 80}]}}
+                       'loadBalancers': [{'loadBalancerId': 23, 'port': 80,
+                                          'whatsit': 'invalid'}]}}
 
         expected_server_config = {
             'server': {
                 'name': 'test',
                 'flavorRef': 'f',
                 'metadata': {
-                    'rax:auto_scaling_group_id': 'uuid'}}}
+                    'rax:auto_scaling_group_id': 'uuid',
+                    'rax:autoscale:lb:23': json.dumps(
+                        {"port": 80, "type": "CloudLoadBalancer"})
+                }
+            }
+        }
         state = get_desired_group_state('uuid', lc, 2)
         self.assertEqual(
             state,
