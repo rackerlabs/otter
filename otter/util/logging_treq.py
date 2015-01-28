@@ -9,6 +9,7 @@ import treq
 from twisted.internet import reactor
 
 from otter.log import log as default_log
+from otter.log import bound
 from otter.util.deferredutils import timeout_deferred
 
 
@@ -18,9 +19,14 @@ def _log_request(treq_call, url, **kwargs):
 
     :param callable f: a ``treq`` request method, such as ``treq.request``, or
         ``treq.get``, ``treq.post``, etc.
+    :param log: If provided, an instance of BoundLog.
+        Defaults to ``otter.log.log`` if not provided.
+    :type log: BoundLog or None.
     """
     clock = kwargs.pop('clock', reactor)
-    log = kwargs.pop('log', default_log)
+    log = kwargs.pop('log')
+    if not log:
+        log = default_log
     method = kwargs.get('method', treq_call.__name__)
 
     treq_transaction = str(uuid4())
