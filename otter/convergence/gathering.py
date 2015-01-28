@@ -97,7 +97,8 @@ def get_clb_contents():
                 method, url, json_response=json_response),
             retry_times(5), exponential_backoff_interval(2))
 
-    def fetch_nodes(lbs):
+    def fetch_nodes(result):
+        lbs = result['loadBalancers']
         lb_ids = [lb['id'] for lb in lbs]
         return parallel(
             [lb_req('GET', append_segments('loadbalancers', str(lb_id), 'nodes'))

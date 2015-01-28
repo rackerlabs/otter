@@ -200,7 +200,8 @@ class GetLBContentsTests(SynchronousTestCase):
         Stub request function and mock `extract_CLB_drained_at`
         """
         self.reqs = {
-            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers', True): {'loadBalancers':
+                                             [{'id': 1}, {'id': 2}]},
             ('GET', 'loadbalancers/1/nodes', True): [
                 {'id': '11', 'port': 20, 'address': 'a11',
                  'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
@@ -288,7 +289,7 @@ class GetLBContentsTests(SynchronousTestCase):
         """
         Return empty list if there are no LB
         """
-        self.reqs = {('GET', 'loadbalancers', True): []}
+        self.reqs = {('GET', 'loadbalancers', True): {'loadBalancers': []}}
         eff = get_clb_contents()
         self.assertEqual(self._resolve_lb(eff), [])
 
@@ -297,7 +298,8 @@ class GetLBContentsTests(SynchronousTestCase):
         Return empty if there are LBs but no nodes in them
         """
         self.reqs = {
-            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers', True): {'loadBalancers':
+                                             [{'id': 1}, {'id': 2}]},
             ('GET', 'loadbalancers/1/nodes', True): [],
             ('GET', 'loadbalancers/2/nodes', True): []
         }
@@ -309,7 +311,8 @@ class GetLBContentsTests(SynchronousTestCase):
         Doesnt fetch feeds if all nodes are ENABLED
         """
         self.reqs = {
-            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers', True): {'loadBalancers':
+                                             [{'id': 1}, {'id': 2}]},
             ('GET', 'loadbalancers/1/nodes', True): [
                 {'id': '11', 'port': 20, 'address': 'a11',
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
