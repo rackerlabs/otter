@@ -227,11 +227,12 @@ class BulkRemoveFromRCv3(object):
         balancers.
         """
         eff = _rackconnect_bulk_request(self.lb_node_pairs, "DELETE",
-                                        success_pred=_CONSTANTLY_TRUE)
+                                        success_pred=has_code(204, 409))
+        # While 409 isn't success, that has to be introspected by
+        # _rcv3_check_bulk_delete in order to recover from it.
         return eff.on(_rcv3_check_bulk_delete)
 
 
-_CONSTANTLY_TRUE = lambda _: True
 _UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
                 "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
 _RCV3_NODE_NOT_A_MEMBER_PATTERN = re.compile(
