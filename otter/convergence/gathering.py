@@ -190,7 +190,7 @@ def _lb_configs_from_metadata(server):
                     desired_lbs[lbid] = CLBDescription(
                         lb_id=lbid, port=config['port'])
 
-            except Exception:
+            except (KeyError, ValueError, TypeError):
                 pass
 
     return pmap(desired_lbs)
