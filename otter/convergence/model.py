@@ -3,14 +3,13 @@ Data classes for representing bits of information that need to share a
 representation across the different phases of convergence.
 """
 
-from characteristic import attributes, Attribute
+from characteristic import Attribute, attributes
 
-from pyrsistent import freeze
+from pyrsistent import PMap, freeze, pmap
 
-from twisted.python.constants import Names, NamedConstant
+from twisted.python.constants import NamedConstant, Names
 
-from zope.interface import implementer, Interface
-from zope.interface import Attribute as IAttribute
+from zope.interface import Attribute as IAttribute, Interface, implementer
 
 
 class CLBNodeCondition(Names):
@@ -100,6 +99,7 @@ class StepResult(Names):
 
 
 @attributes(['id', 'state', 'created',
+             Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
              Attribute('servicenet_address',
                        default_value='',
                        instance_of=str)])
@@ -115,6 +115,9 @@ class NovaServer(object):
     :ivar float created: Timestamp at which the server was created.
     :ivar str servicenet_address: The private ServiceNet IPv4 address, if
         the server is on the ServiceNet network
+
+    :ivar PMap desired_lbs: An immutable mapping of load balancer IDs to lists
+        of :class:`CLBDescription` instances.
     """
 
 
