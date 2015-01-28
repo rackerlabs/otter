@@ -26,30 +26,30 @@ class IStep(Interface):
         """Return an Effect which performs this step."""
 
 
-def set_server_name(launch_config_args, name_suffix):
+def set_server_name(server_config_args, name_suffix):
     """
-    Append the given name_suffix to the name of the server in the launch
+    Append the given name_suffix to the name of the server in the server
     config.
 
-    :param launch_config_args: The launch configuration args.
+    :param server_config_args: The server configuration args.
     :param name_suffix: the suffix to append to the server name. If no name was
         specified, it will be used as the name.
     """
-    name = launch_config_args['server'].get('name')
+    name = server_config_args['server'].get('name')
     if name is not None:
         name = '{0}-{1}'.format(name, name_suffix)
     else:
         name = name_suffix
-    return launch_config_args.set_in(('server', 'name'), name)
+    return server_config_args.set_in(('server', 'name'), name)
 
 
 @implementer(IStep)
-@attributes(['launch_config'])
+@attributes(['server_config'])
 class CreateServer(object):
     """
     A server must be created.
 
-    :ivar pmap launch_config: Nova launch configuration.
+    :ivar pmap server_config: Nova launch configuration.
     """
 
     def as_effect(self):
@@ -57,12 +57,12 @@ class CreateServer(object):
         eff = Effect(Func(generate_server_name))
 
         def got_name(random_name):
-            launch_config = set_server_name(self.launch_config, random_name)
+            server_config = set_server_name(self.server_config, random_name)
             return service_request(
                 ServiceType.CLOUD_SERVERS,
                 'POST',
                 'servers',
-                data=thaw(launch_config))
+                data=thaw(server_config))
         return eff.on(got_name)
 
 

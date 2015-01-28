@@ -14,31 +14,95 @@ from zope.interface import Attribute as IAttribute
 
 
 class CLBNodeCondition(Names):
-    """Constants representing the condition a load balancer node can be in"""
-    ENABLED = NamedConstant()   # Node can accept new connections.
-    DRAINING = NamedConstant()  # Node cannot accept any new connections.
-                                # Existing connections are forcibly terminated.
-    DISABLED = NamedConstant()  # Node cannot accept any new connections.
-                                # Existing connections are permitted to continue.
+    """
+    Constants representing the condition a load balancer node can be in.
+    """
+
+    ENABLED = NamedConstant()
+    """
+    The node can accept new connections.
+    """
+
+    DRAINING = NamedConstant()
+    """
+    Node cannot accept any new connections.  Existing connections are
+    forcibly terminated.
+    """
+
+    DISABLED = NamedConstant()
+    """
+    Node cannot accept any new connections.  Existing connections are
+    permitted to continue.
+    """
 
 
 class CLBNodeType(Names):
-    """Constants representing the type of a load balancer node"""
-    PRIMARY = NamedConstant()    # Node in normal rotation
-    SECONDARY = NamedConstant()  # Node only put into normal rotation if a
-                                 # primary node fails.
+    """
+    Constants representing the type of a Cloud Load Balancer node.
+    """
+
+    PRIMARY = NamedConstant()
+    """
+    Node in normal rotation.
+    """
+
+    SECONDARY = NamedConstant()
+    """
+    Node only put into normal rotation if a primary node fails.
+    """
 
 
 class ServerState(Names):
-    """Constants representing the state cloud servers can have"""
-    ACTIVE = NamedConstant()    # corresponds to Nova "ACTIVE"
-    ERROR = NamedConstant()     # corresponds to Nova "ERROR"
-    BUILD = NamedConstant()     # corresponds to Nova "BUILD" or "BUILDING"
-    DRAINING = NamedConstant()  # Autoscale is deleting the server
+    """
+    Constants representing the state of a Nova cloud server.
+    """
+
+    ACTIVE = NamedConstant()
+    """
+    Corresponds to Nova's ``ACTIVE`` state.
+    """
+
+    ERROR = NamedConstant()
+    """
+    Corresponds to Nova's ``ERROR`` state.
+    """
+
+    BUILD = NamedConstant()
+    """
+    Corresponds to Nova's ``BUILD`` and ``BUILDING`` states.
+    """
+
+    DRAINING = NamedConstant()
+    """"
+    Autoscale is deleting the server.
+    """
+
+
+class StepResult(Names):
+    """
+    Constants representing the condition of a step's effect.
+    """
+
+    SUCCESS = NamedConstant()
+    """
+    The step was successful.
+    """
+
+    RETRY = NamedConstant()
+    """
+    Convergence should be retried later.
+    """
+
+    FAILURE = NamedConstant()
+    """
+    The step failed. Retrying convergence won't help.
+    """
 
 
 @attributes(['id', 'state', 'created',
-             Attribute('servicenet_address', default_value='', instance_of=str)])
+             Attribute('servicenet_address',
+                       default_value='',
+                       instance_of=str)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -54,15 +118,16 @@ class NovaServer(object):
     """
 
 
-@attributes(['launch_config', 'desired',
+@attributes(['server_config', 'capacity',
              Attribute('desired_lbs', default_factory=dict, instance_of=dict),
-             Attribute('draining_timeout', default_value=0.0, instance_of=float)])
+             Attribute('draining_timeout', default_value=0.0,
+                       instance_of=float)])
 class DesiredGroupState(object):
     """
     The desired state for a scaling group.
 
-    :ivar dict launch_config: nova launch config.
-    :ivar int desired: the number of desired servers within the group.
+    :ivar dict server_config: compute/nova part of the group launch config.
+    :ivar int capacity: the number of desired servers within the group.
     :ivar dict desired_lbs: A mapping of load balancer IDs to lists of
         :class:`CLBDescription` instances.
     :ivar float draining_timeout: If greater than zero, when the server is
@@ -74,7 +139,7 @@ class DesiredGroupState(object):
         """
         Make attributes immutable.
         """
-        self.launch_config = freeze(self.launch_config)
+        self.server_config = freeze(self.server_config)
 
 
 class ILBDescription(Interface):
