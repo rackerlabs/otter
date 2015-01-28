@@ -12,6 +12,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter import controller
 
+from otter.convergence.service import get_converger, set_converger
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError)
 from otter.util.timestamp import MIN
@@ -1079,3 +1080,26 @@ class ConvergeTestCase(SynchronousTestCase):
             policy_id=None, webhook_id=None,
             active_capacity=3, desired_capacity=5, pending_capacity=2,
             audit_log=True)
+
+    def test_real_convergence(self):
+        """
+        When a tenant is configured to for convergence, the Convergence
+        service's ``converge`` method is invoked, and None is returned.
+        """
+        log = mock_log()
+        converger_mock = mock.Mock()
+        state = GroupState('tenant', 'group-id', "test", [], [], None, {},
+                           False)
+        group_config = {'maxEntities': 100, 'minEntities': 0}
+        policy = {'change': 5}
+        config_data = {'convergence-tenants': ['tenant']}
+
+        self.addCleanup(set_converger, get_converger())
+        set_converger(converger_mock)
+
+        result = controller.converge(log, 'txn-id', group_config, self.group,
+                                     state, 'launch', policy,
+                                     config_value=config_data.get)
+        self.assertIs(result, None)
+        converger_mock.converge.assert_called_once_with(
+            'group-id', 5, 'launch')

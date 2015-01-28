@@ -26,10 +26,9 @@ class Converger(Service, object):
 
     def converge(self, group_id, desired, launch_config):
         """Converge a group to a capacity with a launch config."""
-        desired_group_state = get_desired_group_state(
-            group_id, launch_config, desired)
-
         def exec_convergence():
+            desired_group_state = get_desired_group_state(
+                group_id, launch_config, desired)
             eff = execute_convergence(group_id, desired_group_state,
                                       launch_config)
             return perform(self._dispatcher, eff)
@@ -38,8 +37,7 @@ class Converger(Service, object):
             acquire_timeout=150, release_timeout=150)
 
 
-# Global converger service
-# We're using a global now because it's difficult to thread a new parameter
+# We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this
 # service is used.
 _converger = None

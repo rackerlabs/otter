@@ -126,7 +126,7 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
 
 
 def converge(log, transaction_id, config, scaling_group, state, launch_config,
-             policy):
+             policy, config_value=config_value):
     """
     Apply a policy's change to a scaling group, and attempt to make the
     resulting state a reality. This does no cooldown checking.
