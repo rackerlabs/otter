@@ -49,6 +49,7 @@ from twisted.internet.defer import succeed
 from zope.interface import Interface, implementer
 
 from otter.log import log as default_log
+from otter.log import BoundLog
 from otter.util import logging_treq as treq
 from otter.util.deferredutils import delay, wait
 from otter.util.http import (
@@ -59,6 +60,21 @@ from otter.util.http import (
     wrap_upstream_error,
 )
 from otter.util.retry import repeating_interval, retry, retry_times
+
+
+class _DoNothingLogger(BoundLog):
+    """This class implements a do-nothing logger for the benefit of
+    those wishing to call authenticate_user without a logger.
+    """
+
+    def _discard(self, *args, **kwArgs):
+        """Consumes the attempt at logging, but takes no action."""
+
+    def __init__(self, unused1, unused2):
+        """Requires two arguments, even if unused, because the :py:meth:`bind`
+        method invokes this constructor with two arguments.
+        """
+        super(_DoNothingLogger, self).__init__(self._discard, self._discard)
 
 
 class IAuthenticator(Interface):
@@ -330,9 +346,13 @@ def authenticate_user(auth_endpoint, username, password, log=None):
     :param str auth_endpoint: Identity API endpoint URL.
     :param str username: Username to authenticate as.
     :param str password: Password for the specified user.
+    :param log: If provided, a BoundLog object.
 
     :return: Decoded JSON response as dict.
     """
+    if not log:
+        log = _DoNothingLogger(None, None)
+
     d = treq.post(
         append_segments(auth_endpoint, 'tokens'),
         json.dumps(
