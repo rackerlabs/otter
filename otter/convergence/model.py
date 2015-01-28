@@ -19,7 +19,8 @@ class CLBNodeCondition(Names):
     DRAINING = NamedConstant()  # Node cannot accept any new connections.
                                 # Existing connections are forcibly terminated.
     DISABLED = NamedConstant()  # Node cannot accept any new connections.
-                                # Existing connections are permitted to continue.
+                                # Existing connections are permitted to
+                                # continue.
 
 
 class CLBNodeType(Names):
@@ -45,7 +46,9 @@ class StepResult(Names):
 
 
 @attributes(['id', 'state', 'created',
-             Attribute('servicenet_address', default_value='', instance_of=str)])
+             Attribute('servicenet_address',
+                       default_value='',
+                       instance_of=str)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
