@@ -3,14 +3,13 @@ Data classes for representing bits of information that need to share a
 representation across the different phases of convergence.
 """
 
-from characteristic import attributes, Attribute
+from characteristic import Attribute, attributes
 
-from pyrsistent import freeze, pmap, PMap
+from pyrsistent import PMap, freeze, pmap
 
-from twisted.python.constants import Names, NamedConstant
+from twisted.python.constants import NamedConstant, Names
 
-from zope.interface import implementer, Interface
-from zope.interface import Attribute as IAttribute
+from zope.interface import Attribute as IAttribute, Interface, implementer
 
 
 class CLBNodeCondition(Names):
