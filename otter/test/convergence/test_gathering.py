@@ -6,8 +6,6 @@ from functools import partial
 from effect import Constant, Effect
 from effect.testing import Stub, resolve_effect
 
-from pyrsistent import freeze
-
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
