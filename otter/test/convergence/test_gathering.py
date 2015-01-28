@@ -513,3 +513,14 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                        servicenet_address='10.0.0.2'),
         ]
         self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))
+
+    def test_no_group_servers(self):
+        get_servers = lambda: Effect(Stub(Constant({})))
+        get_lb = lambda: Effect(Stub(Constant([])))
+
+        eff = get_all_convergence_data(
+            'gid',
+            get_scaling_group_servers=get_servers,
+            get_clb_contents=get_lb)
+
+        self.assertEqual(resolve_stubs(eff), ([], []))
