@@ -6,9 +6,17 @@ from twisted.trial.unittest import SynchronousTestCase
 from zope.interface import implementer
 
 from otter.convergence.model import (
-    IDrainable, ILBDescription, ILBNode, NovaServer, ServerState,
-    CLBNodeCondition, CLBNodeType, CLBNode, CLBDescription,
-    StepResult)
+    CLBDescription,
+    CLBNode,
+    CLBNodeCondition,
+    CLBNodeType,
+    IDrainable,
+    ILBDescription,
+    ILBNode,
+    NovaServer,
+    ServerState,
+    StepResult
+)
 
 
 @implementer(ILBDescription)
