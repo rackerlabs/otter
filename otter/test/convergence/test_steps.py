@@ -15,8 +15,11 @@ from otter.convergence.steps import (
     CreateServer,
     DeleteServer,
     RemoveFromCLB,
-    SetMetadataItemOnServer)
+    SetMetadataItemOnServer,
+    _rcv3_check_bulk_delete,
+    _RCV3_NODE_NOT_A_MEMBER_PATTERN)
 from otter.http import has_code, service_request
+from otter.test.utils import StubResponse
 from otter.util.hashkey import generate_server_name
 
 
@@ -131,7 +134,7 @@ class StepAsEffectTests(SynchronousTestCase):
         :param step_class: The step class under test.
         :param str method: The expected HTTP method of the request.
         """
-        step = step_class(lb_node_pairs=pset([
+        lb_node_pairs = pset([
             ("lb-1", "node-a"),
             ("lb-1", "node-b"),
             ("lb-1", "node-c"),
@@ -140,13 +143,19 @@ class StepAsEffectTests(SynchronousTestCase):
             ("lb-2", "node-b"),
             ("lb-3", "node-c"),
             ("lb-3", "node-d")
-        ]))
+        ])
+        step = step_class(lb_node_pairs=lb_node_pairs)
         request = step.as_effect()
         self.assertEqual(request.intent.service_type,
                          ServiceType.RACKCONNECT_V3)
         self.assertEqual(request.intent.method, expected_method)
-        expected_code = 201 if request.intent.method == "POST" else 204
-        self.assertEqual(request.intent.success_pred, has_code(expected_code))
+
+        success_pred = request.intent.success_pred
+        if request.intent.method == "POST":
+            self.assertEqual(success_pred, has_code(201))
+        else:
+            self.assertEqual(success_pred, has_code(204, 409))
+
         self.assertEqual(request.intent.url, "load_balancer_pools/nodes")
         self.assertEqual(request.intent.headers, None)
 
@@ -189,3 +198,91 @@ class StepAsEffectTests(SynchronousTestCase):
         """
         self._generic_bulk_rcv3_step_test(
             BulkRemoveFromRCv3, "DELETE")
+
+
+class RCv3CheckBulkDeleteTests(SynchronousTestCase):
+    """
+    Tests for :func:`_rcv3_check_bulk_delete`.
+    """
+    def test_node_not_a_member_error_message_regex(self):
+        """
+        The error message regular expression correctly parses error
+        messages stating the node wasn't a member of a load
+        balancer. It correctly rejects messages saying anyhting else.
+        """
+        match = _RCV3_NODE_NOT_A_MEMBER_PATTERN.match
+
+        test_data = [
+            ('Node d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is not a member of '
+             'Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2',
+             {'lb_id': 'd95ae0c4-6ab8-4873-b82f-f8433840cff2',
+              'node_id': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'}),
+            ('Node D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is not a member of '
+             'Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+             {'lb_id': 'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+              'node_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'})
+        ]
+
+        for message, expected_group_dict in test_data:
+            res = match(message)
+            self.assertNotIdentical(res, None)
+            self.assertEqual(res.groupdict(), expected_group_dict)
+
+        for message in ["Load Balancer Pool {load_balancer_pool_id} is not "
+                        "in an ACTIVE state"]:
+            self.assertIdentical(match(message), None)
+
+    def _rcv3_check_bulk_delete(self, resp, body):
+        """
+        Calls :func:`_rcv3_check_bulk_delete` with test data and a
+        ``(resp, body)`` tuple.
+        """
+        return _rcv3_check_bulk_delete((resp, body))
+
+    def test_good_response(self):
+        """
+        If the response code indicates success, the response was successful.
+        """
+        resp = StubResponse(204, {})
+        body = [{"cloud_server": {"id": node_id},
+                 "load_balancer_pool": {"id": lb_id}}
+                for (lb_id, node_id) in [("l1", "n1"),
+                                         ("l2", "n2")]]
+        self.assertIdentical(self._rcv3_check_bulk_delete(resp, body), None)
+
+    def test_try_again_for_partial_removal(self):
+        """
+        If a node was already removed (or maybe was never part of the load
+        balancer pool to begin with), returns an effect that removes
+        the remaining load balancer.
+        """
+        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+        resp = StubResponse(409, {})
+        body = {"errors":
+                ["Node {node_id} is not a member of Load Balancer "
+                 "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
+        eff = self._rcv3_check_bulk_delete(resp, body)
+        expected_eff = (
+            service_request(
+                service_type=ServiceType.RACKCONNECT_V3,
+                method="DELETE",
+                url='load_balancer_pools/nodes',
+                data=[
+                    {'load_balancer_pool':
+                     {'id':
+                      'd95ae0c4-6ab8-4873-b82f-f8433840cff2'},
+                     'cloud_server':
+                     {'id':
+                      'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'}}],
+                success_pred=has_code(204, 409))
+            .on(_rcv3_check_bulk_delete))
+        self.assertEqual(eff, expected_eff)
+
+    def test_bail_if_group_inactive(self):
+        """
+        If the load balancer pool is inactive, the response was unsuccessful.
+        """
+        resp = StubResponse(409, {})
+        body = {"errors": ["Load Balancer Pool l1 is not in an ACTIVE state"]}
+        self.assertIdentical(self._rcv3_check_bulk_delete(resp, body), None)
