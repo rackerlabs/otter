@@ -278,7 +278,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         """
         If a node was already removed (or maybe was never part of the load
         balancer pool to begin with), returns an effect that removes
-        the remaining load balancer.
+        the remaining load balancer pairs.
         """
         node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
         lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
