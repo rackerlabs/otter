@@ -37,6 +37,13 @@ class ServerState(Names):
     DRAINING = NamedConstant()  # Autoscale is deleting the server
 
 
+class StepResult(Names):
+    """Constants representing the condition of a step's effect."""
+    SUCCESS = NamedConstant()
+    RETRY = NamedConstant()
+    FAILURE = NamedConstant()
+
+
 @attributes(['id', 'state', 'created',
              Attribute('servicenet_address', default_value='', instance_of=str)])
 class NovaServer(object):
