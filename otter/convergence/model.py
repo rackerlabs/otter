@@ -5,7 +5,7 @@ representation across the different phases of convergence.
 
 from characteristic import attributes, Attribute
 
-from pyrsistent import freeze
+from pyrsistent import freeze, pmap, PMap
 
 from twisted.python.constants import Names, NamedConstant
 
@@ -38,7 +38,9 @@ class ServerState(Names):
 
 
 @attributes(['id', 'state', 'created',
-             Attribute('servicenet_address', default_value='', instance_of=str)])
+             Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
+             Attribute('servicenet_address', default_value='',
+                       instance_of=str)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -51,6 +53,9 @@ class NovaServer(object):
     :ivar float created: Timestamp at which the server was created.
     :ivar str servicenet_address: The private ServiceNet IPv4 address, if
         the server is on the ServiceNet network
+
+    :ivar PMap desired_lbs: An immutable mapping of load balancer IDs to lists
+        of :class:`CLBDescription` instances.
     """
 
 
