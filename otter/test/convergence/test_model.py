@@ -1,6 +1,7 @@
 """
 Tests for convergence models.
 """
+
 from characteristic import attributes
 from twisted.trial.unittest import SynchronousTestCase
 from zope.interface import implementer
