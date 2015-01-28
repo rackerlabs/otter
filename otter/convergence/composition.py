@@ -66,7 +66,7 @@ def json_to_LBConfigs(lbs_json):
         if lb.get('type') != 'RackConnectV3':
             lbd[lb['loadBalancerId']].append(CLBDescription(
                 lb_id=str(lb['loadBalancerId']), port=lb['port']))
-    return lbd
+    return dict(lbd)
 
 
 def get_desired_group_state(group_id, launch_config, desired):

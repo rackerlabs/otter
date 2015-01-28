@@ -254,8 +254,7 @@ def makeService(config):
                              kz_client.stop, supervisor)))
 
             # setup converger service
-            converger_service = Converger(reactor, kz_client, store,
-                                          dispatcher)
+            converger_service = Converger(reactor, kz_client, dispatcher)
             s.addService(converger_service)
             set_converger(converger_service)
 

@@ -13,24 +13,24 @@ from otter.util.deferredutils import with_lock
 class Converger(Service, object):
     """Converger service"""
 
-    def __init__(self, reactor, kz_client, store, dispatcher):
+    def __init__(self, reactor, kz_client, dispatcher):
         self._reactor = reactor
         self._kz_client = kz_client
-        self._store = store
-        self._dispatcher = self.dispatcher
+        self._dispatcher = dispatcher
 
     def _get_lock(self, group_id):
         """Get a ZooKeeper-backed lock for converging the group."""
         path = '{}/convergence/{}'.format(LOCK_PATH, group_id)
         return self._kz_client.Lock(path)
 
-    def converge(self, group_id, desired, launch_config):
+    def converge(self, group_id, desired, launch_config,
+                 perform=perform,
+                 execute_convergence=execute_convergence):
         """Converge a group to a capacity with a launch config."""
         def exec_convergence():
             desired_group_state = get_desired_group_state(
                 group_id, launch_config, desired)
-            eff = execute_convergence(group_id, desired_group_state,
-                                      launch_config)
+            eff = execute_convergence(group_id, desired_group_state)
             return perform(self._dispatcher, eff)
         return with_lock(
             self._reactor, self._get_lock(group_id), exec_convergence,

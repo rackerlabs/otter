@@ -1,6 +1,6 @@
 """Tests for convergence planning."""
 
-from pyrsistent import pbag, pmap, pset, s
+from pyrsistent import freeze, pbag, pmap, pset, s
 
 from toolz import groupby
 
@@ -215,7 +215,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
         result = _converge_lb_state(
-            desired_lb_state={'5': [clb_desc]},
+            desired_lb_state=freeze({'5': [clb_desc]}),
             current_lb_nodes=[],
             ip_address='1.1.1.1')
         self.assertEqual(
@@ -230,7 +230,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         but the configuration is wrong, `converge_lb_state` returns a
         :class:`ChangeCLBNode` object
         """
-        desired = {'5': [CLBDescription(lb_id='5', port=80)]}
+        desired = freeze({'5': [CLBDescription(lb_id='5', port=80)]})
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(
                                lb_id='5', port=80, weight=5))]
@@ -253,7 +253,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                            description=CLBDescription(
                                lb_id='5', port=80, weight=5))]
 
-        result = _converge_lb_state(desired_lb_state={},
+        result = _converge_lb_state(desired_lb_state=freeze({}),
                                     current_lb_nodes=current,
                                     ip_address='1.1.1.1')
         self.assertEqual(
@@ -265,7 +265,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If the desired lb state matches the current lb state,
         `converge_lb_state` returns nothing
         """
-        desired = {'5': [CLBDescription(lb_id='5', port=80)]}
+        desired = freeze({'5': [CLBDescription(lb_id='5', port=80)]})
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(lb_id='5', port=80))]
 
@@ -278,8 +278,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         """
         Remove, change, and add a node to a load balancer all together
         """
-        desired = {'5': [CLBDescription(lb_id='5', port=80)],
-                   '6': [CLBDescription(lb_id='6', port=80, weight=2)]}
+        desired = freeze({'5': [CLBDescription(lb_id='5', port=80)],
+                          '6': [CLBDescription(lb_id='6', port=80, weight=2)]})
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(lb_id='5', port=8080)),
                    CLBNode(node_id='234', address='1.1.1.1',

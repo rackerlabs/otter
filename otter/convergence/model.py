@@ -55,7 +55,7 @@ class NovaServer(object):
 
 
 @attributes(['launch_config', 'desired',
-             Attribute('desired_lbs', default_factory=dict, instance_of=dict),
+             Attribute('desired_lbs', default_factory=dict),
              Attribute('draining_timeout', default_value=0.0, instance_of=float)])
 class DesiredGroupState(object):
     """
@@ -75,6 +75,7 @@ class DesiredGroupState(object):
         Make attributes immutable.
         """
         self.launch_config = freeze(self.launch_config)
+        self.desired_lbs = freeze(self.desired_lbs)
 
 
 class ILBDescription(Interface):

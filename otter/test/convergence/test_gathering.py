@@ -6,6 +6,8 @@ from functools import partial
 from effect import Constant, Effect
 from effect.testing import Stub, resolve_effect
 
+from pyrsistent import freeze
+
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
@@ -384,34 +386,6 @@ class ToNovaServerTests(SynchronousTestCase):
                        state=ServerState.BUILD,
                        created=self.createds[1][1],
                        servicenet_address='10.0.0.1'))
-
-
-class JsonToLBConfigTests(SynchronousTestCase):
-    """
-    Tests for :func:`json_to_LBConfigs`
-    """
-    def test_without_rackconnect(self):
-        """
-        LB config without rackconnect
-        """
-        self.assertEqual(
-            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
-                               {'loadBalancerId': 20, 'port': 800},
-                               {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80),
-                  CLBDescription(lb_id='20', port=800)],
-             21: [CLBDescription(lb_id='21', port=81)]})
-
-    def test_with_rackconnect(self):
-        """
-        LB config with rackconnect
-        """
-        self.assertEqual(
-            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
-                               {'loadBalancerId': 200, 'type': 'RackConnectV3'},
-                               {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80)],
-             21: [CLBDescription(lb_id='21', port=81)]})
 
 
 class IPAddressTests(SynchronousTestCase):
