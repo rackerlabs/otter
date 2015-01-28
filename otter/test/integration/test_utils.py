@@ -46,7 +46,7 @@ class MeasureProgressTests(SynchronousTestCase):
         )
         desired_state = DesiredGroupState(
             launch_config=pmap(),
-            desired=5,
+            capacity=5,
         )
         progress = measure_progress(
             previous_state, current_state, desired_state)
@@ -67,7 +67,7 @@ class MeasureProgressTests(SynchronousTestCase):
         )
         desired_state = DesiredGroupState(
             launch_config=pmap(),
-            desired=1,
+            capacity=1,
         )
         progress = measure_progress(
             previous_state, current_state, desired_state)
@@ -88,7 +88,7 @@ class MeasureProgressTests(SynchronousTestCase):
         )
         desired_state = DesiredGroupState(
             launch_config=pmap(),
-            desired=5,
+            capacity=5,
         )
         self.assertRaises(
             OvershootError,
@@ -109,7 +109,7 @@ class MeasureProgressTests(SynchronousTestCase):
         )
         desired_state = DesiredGroupState(
             launch_config=pmap(),
-            desired=5,
+            capacity=5,
         )
         self.assertRaises(
             UndershootError,
@@ -131,7 +131,7 @@ class MeasureProgressTests(SynchronousTestCase):
         )
         desired_state = DesiredGroupState(
             launch_config=pmap(),
-            desired=5,
+            capacity=5,
         )
         progress = measure_progress(
             previous_state, current_state, desired_state)
@@ -152,7 +152,7 @@ class MeasureProgressTests(SynchronousTestCase):
         )
         desired_state = DesiredGroupState(
             launch_config=pmap(),
-            desired=5,
+            capacity=5,
         )
         progress = measure_progress(
             previous_state, current_state, desired_state)
@@ -175,7 +175,7 @@ class MeasureProgressTests(SynchronousTestCase):
         )
         desired_state = DesiredGroupState(
             launch_config=pmap(),
-            desired=5,
+            capacity=5,
         )
         progress = measure_progress(
             previous_state, current_state, desired_state)
@@ -196,7 +196,7 @@ class MeasureProgressTests(SynchronousTestCase):
         )
         desired_state = DesiredGroupState(
             launch_config=pmap(),
-            desired=5,
+            capacity=5,
         )
         progress = measure_progress(
             previous_state, current_state, desired_state)
