@@ -176,8 +176,8 @@ def to_nova_server(server_json):
     return NovaServer(id=server_json['id'],
                       state=ServerState.lookupByName(server_json['state']),
                       created=timestamp_to_epoch(server_json['created']),
-                      image_id='image',
-                      flavor_id='flavor',
+                      image_id=server_json.get('image', {}).get('id'),
+                      flavor_id=server_json['flavor']['id'],
                       servicenet_address=_servicenet_address(server_json))
 
 
