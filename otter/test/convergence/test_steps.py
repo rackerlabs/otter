@@ -228,8 +228,10 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
             self.assertNotIdentical(res, None)
             self.assertEqual(res.groupdict(), expected_group_dict)
 
-        for message in ["Load Balancer Pool {load_balancer_pool_id} is not "
-                        "in an ACTIVE state"]:
+        for message in ["Load Balancer Pool {lb_id} is not in an ACTIVE state"
+                        .format(lb_id=lb_id) for lb_id in
+                        ['d95ae0c4-6ab8-4873-b82f-f8433840cff2',
+                         'D95AE0C4-6AB8-4873-B82F-F8433840CFF2']]:
             self.assertIdentical(match(message), None)
 
     def _rcv3_check_bulk_delete(self, resp, body):
