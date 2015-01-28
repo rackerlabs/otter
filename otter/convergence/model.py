@@ -37,10 +37,19 @@ class CLBNodeCondition(Names):
 
 
 class CLBNodeType(Names):
-    """Constants representing the type of a load balancer node"""
-    PRIMARY = NamedConstant()    # Node in normal rotation
-    SECONDARY = NamedConstant()  # Node only put into normal rotation if a
-                                 # primary node fails.
+    """
+    Constants representing the type of a load balancer node.
+    """
+
+    PRIMARY = NamedConstant()
+    """
+    Node in normal rotation.
+    """
+
+    SECONDARY = NamedConstant()
+    """
+    Node only put into normal rotation if a primary node fails.
+    """
 
 
 class ServerState(Names):
