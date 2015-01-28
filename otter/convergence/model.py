@@ -14,7 +14,10 @@ from zope.interface import Attribute as IAttribute
 
 
 class CLBNodeCondition(Names):
-    """Constants representing the condition a load balancer node can be in"""
+    """
+    Constants representing the condition a load balancer node can be in.
+    """
+
     ENABLED = NamedConstant()
     """
     The node can accept new connections.
