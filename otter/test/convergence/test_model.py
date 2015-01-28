@@ -17,8 +17,7 @@ from otter.convergence.model import (
     ILBDescription,
     ILBNode,
     NovaServer,
-    ServerState,
-    StepResult
+    ServerState
 )
 
 
