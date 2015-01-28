@@ -7,7 +7,8 @@ from zope.interface import implementer
 
 from otter.convergence.model import (
     IDrainable, ILBDescription, ILBNode, NovaServer, ServerState,
-    CLBNodeCondition, CLBNodeType, CLBNode, CLBDescription)
+    CLBNodeCondition, CLBNodeType, CLBNode, CLBDescription,
+    StepResult)
 
 
 @implementer(ILBDescription)
@@ -177,3 +178,29 @@ class CLBNodeTests(SynchronousTestCase):
         node = CLBNode(node_id='1234', description=self.drain_desc,
                        address='10.1.1.1', drained_at=0.0)
         self.assertFalse(node.is_done_draining(now=15, timeout=30))
+
+
+class StepResultTests(SynchronousTestCase):
+    """
+    Tests for :class:`StepResult`.
+    """
+    def test_ordered(self):
+        """
+        Step results are ordered; FAILURE > RETRY > SUCCESS.
+        """
+        self.assertGreater(StepResult.FAILURE, StepResult.RETRY)
+        self.assertGreater(StepResult.RETRY, StepResult.SUCCESS)
+        self.assertGreater(StepResult.FAILURE, StepResult.SUCCESS)
+        self.assertEqual(max([StepResult.SUCCESS,
+                              StepResult.SUCCESS,
+                              StepResult.SUCCESS]),
+                         StepResult.SUCCESS)
+        self.assertEqual(max([StepResult.SUCCESS,
+                              StepResult.RETRY,
+                              StepResult.SUCCESS]),
+                         StepResult.RETRY)
+        self.assertEqual(max([StepResult.FAILURE,
+                              StepResult.SUCCESS,
+                              StepResult.SUCCESS,
+                              StepResult.RETRY]),
+                         StepResult.FAILURE)
