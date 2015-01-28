@@ -17,6 +17,7 @@ from otter.convergence.steps import (
     RemoveFromCLB,
     SetMetadataItemOnServer,
     _rcv3_check_bulk_delete,
+    _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_NOT_A_MEMBER_PATTERN)
 from otter.http import has_code, service_request
 from otter.test.utils import StubResponse
@@ -232,6 +233,34 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                         .format(lb_id=lb_id) for lb_id in
                         ['d95ae0c4-6ab8-4873-b82f-f8433840cff2',
                          'D95AE0C4-6AB8-4873-B82F-F8433840CFF2']]:
+            self.assertIdentical(match(message), None)
+
+    def test_lb_inactive_regex(self):
+        """
+        The regex for parsing messages saying the load balancer is
+        inactive parses those messages. It rejects other messages.
+        """
+        match = _RCV3_LB_INACTIVE_PATTERN.match
+
+        test_data = [
+            ('Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 is '
+             'not in an ACTIVE state',
+             ("d95ae0c4-6ab8-4873-b82f-f8433840cff2",)),
+            ('Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2 is '
+             'not in an ACTIVE state',
+             ("D95AE0C4-6AB8-4873-B82F-F8433840CFF2",))
+        ]
+
+        for message, expected_groups in test_data:
+            res = match(message)
+            self.assertNotIdentical(res, None)
+            self.assertEqual(res.groups(), expected_groups)
+
+        for message in [
+                'Node d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is not a member '
+                'of Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2',
+                'Node D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is not a member '
+                'of Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2']:
             self.assertIdentical(match(message), None)
 
     def test_good_response(self):
