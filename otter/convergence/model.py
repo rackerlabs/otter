@@ -38,7 +38,7 @@ class CLBNodeCondition(Names):
 
 class CLBNodeType(Names):
     """
-    Constants representing the type of a load balancer node.
+    Constants representing the type of a Cloud Load Balancer node.
     """
 
     PRIMARY = NamedConstant()
