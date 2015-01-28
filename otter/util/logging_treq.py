@@ -24,7 +24,7 @@ def _log_request(treq_call, url, **kwargs):
     :type log: BoundLog or None.
     """
     clock = kwargs.pop('clock', reactor)
-    log = kwargs.pop('log')
+    log = kwargs.pop('log', None)
     if not log:
         log = default_log
     method = kwargs.get('method', treq_call.__name__)
