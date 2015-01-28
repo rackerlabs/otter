@@ -1102,4 +1102,4 @@ class ConvergeTestCase(SynchronousTestCase):
                                      config_value=config_data.get)
         self.assertIs(result, None)
         converger_mock.converge.assert_called_once_with(
-            'group-id', 5, 'launch')
+            log, 'group-id', 5, 'launch')

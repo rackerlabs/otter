@@ -2,12 +2,13 @@ import mock
 
 from pyrsistent import pmap
 
+from twisted.internet.defer import fail
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.service import Converger
-from otter.test.utils import LockMixin
+from otter.test.utils import CheckFailure, LockMixin, mock_log
 
 
 class ConvergerTests(SynchronousTestCase):
@@ -32,6 +33,7 @@ class ConvergerTests(SynchronousTestCase):
             ('group-id', expected_desired_group_state), exec_convergence_result
         )
         self.converger.converge(
+            mock_log(),
             'group-id', 5, self.lc,
             perform=perform,
             execute_convergence=lambda gid, dgs: exec_calls.get((gid, dgs)))
@@ -41,3 +43,15 @@ class ConvergerTests(SynchronousTestCase):
         self.kz_client.Lock().release.assert_called_once_with()
         perform.assert_called_once_with(self.dispatcher,
                                         exec_convergence_result)
+
+    def test_converge_error_log(self):
+        """If performance fails, the error is logged."""
+        perform = mock.MagicMock()
+        perform.return_value = fail(ZeroDivisionError('foo'))
+        log = mock_log()
+        self.converger.converge(
+            log,
+            'group-id', 5, self.lc,
+            perform=perform)
+
+        log.err.assert_called_once_with(CheckFailure(ZeroDivisionError))

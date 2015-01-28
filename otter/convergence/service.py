@@ -23,7 +23,7 @@ class Converger(Service, object):
         path = '{}/convergence/{}'.format(LOCK_PATH, group_id)
         return self._kz_client.Lock(path)
 
-    def converge(self, group_id, desired, launch_config,
+    def converge(self, log, group_id, desired, launch_config,
                  perform=perform,
                  execute_convergence=execute_convergence):
         """Converge a group to a capacity with a launch config."""
@@ -31,7 +31,8 @@ class Converger(Service, object):
             desired_group_state = get_desired_group_state(
                 group_id, launch_config, desired)
             eff = execute_convergence(group_id, desired_group_state)
-            return perform(self._dispatcher, eff)
+            d = perform(self._dispatcher, eff)
+            return d.addErrback(log.err)
         return with_lock(
             self._reactor, self._get_lock(group_id), exec_convergence,
             acquire_timeout=150, release_timeout=150)
