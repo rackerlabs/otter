@@ -239,6 +239,10 @@ _RCV3_NODE_NOT_A_MEMBER_PATTERN = re.compile(
     "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
     "(?P<lb_id>{uuid})".format(uuid=_UUID4_REGEX),
     re.IGNORECASE)
+_RCV3_LB_INACTIVE_PATTERN = re.compile(
+    "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state"
+    .format(uuid=_UUID4_REGEX),
+    re.IGNORECASE)
 
 
 def _rcv3_check_bulk_delete(result):
