@@ -88,17 +88,18 @@ def get_desired_group_state(group_id, launch_config, desired):
         freeze(launch_config['args']['loadBalancers']))
     lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
     desired_state = DesiredGroupState(
-        launch_config=server_lc,
-        desired=desired, desired_lbs=lbs)
+        server_config=server_lc,
+        capacity=desired, desired_lbs=lbs)
     return desired_state
 
 
-def prepare_server_launch_config(group_id, server_args, lb_args):
+def prepare_server_launch_config(group_id, server_config, lb_args):
     """
-    Prepare a launch config with any necessary dynamic data.
+    Prepares a server config (the server part of the Group's launch config)
+    with any necessary dynamic data.
 
     :param str group_id: The group ID
-    :param PMap launch_config: The server part of the Group's launch config,
+    :param PMap server_config: The server part of the Group's launch config,
         as per :obj:`otter.json_schema.group_schemas.server` except as the
         value of a one-element PMap with key "server".
     :param PMap lb_args: The load balancer part of the Group's launch_config
@@ -110,7 +111,7 @@ def prepare_server_launch_config(group_id, server_args, lb_args):
     NOTE: Currently this ignores RCv3 settings and draining timeout settings,
     since they haven't been implemented yet.
     """
-    server_args = server_args.set_in(
+    server_config = server_config.set_in(
         ('server', 'metadata', 'rax:auto_scaling_group_id'), group_id)
 
     for config in lb_args:
@@ -119,9 +120,9 @@ def prepare_server_launch_config(group_id, server_args, lb_args):
             # provide a default type
             sanitized.setdefault('type', 'CloudLoadBalancer')
 
-            server_args = server_args.set_in(
+            server_config = server_config.set_in(
                 ('server', 'metadata',
                  'rax:autoscale:lb:{0}'.format(config['loadBalancerId'])),
                 json.dumps(sanitized))
 
-    return server_args
+    return server_config
