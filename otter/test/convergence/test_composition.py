@@ -76,8 +76,8 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
 
     def test_no_lbs(self):
         """
-        When no loadBalancers are specified, the returned DesiredGroupState has an
-        empty mapping for desired_lbs.
+        When no loadBalancers are specified, the returned DesiredGroupState has
+        an empty mapping for desired_lbs.
         """
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config}}

@@ -8,6 +8,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.service import Converger
+from otter.http import TenantScope
 from otter.test.utils import CheckFailure, LockMixin, mock_log
 
 
@@ -34,6 +35,7 @@ class ConvergerTests(SynchronousTestCase):
         )
         self.converger.converge(
             mock_log(),
+            'tenant-id',
             'group-id', 5, self.lc,
             perform=perform,
             execute_convergence=lambda gid, dgs: exec_calls.get((gid, dgs)))
@@ -41,8 +43,9 @@ class ConvergerTests(SynchronousTestCase):
             '/locks/convergence/group-id')
         self.kz_client.Lock().acquire.assert_called_once_with()
         self.kz_client.Lock().release.assert_called_once_with()
-        perform.assert_called_once_with(self.dispatcher,
-                                        exec_convergence_result)
+        perform.assert_called_once_with(
+            self.dispatcher,
+            TenantScope(exec_convergence_result, 'tenant-id'))
 
     def test_converge_error_log(self):
         """If performance fails, the error is logged."""
@@ -51,6 +54,7 @@ class ConvergerTests(SynchronousTestCase):
         log = mock_log()
         self.converger.converge(
             log,
+            'tenant-id',
             'group-id', 5, self.lc,
             perform=perform)
 
