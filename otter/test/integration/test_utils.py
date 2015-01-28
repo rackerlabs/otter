@@ -45,8 +45,8 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         desired_state = DesiredGroupState(
-            launch_config=pmap(),
-            desired=5,
+            server_config=pmap(),
+            capacity=5,
         )
         progress = measure_progress(
             previous_state, current_state, desired_state)
@@ -66,8 +66,8 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         desired_state = DesiredGroupState(
-            launch_config=pmap(),
-            desired=1,
+            server_config=pmap(),
+            capacity=1,
         )
         progress = measure_progress(
             previous_state, current_state, desired_state)
@@ -87,8 +87,8 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         desired_state = DesiredGroupState(
-            launch_config=pmap(),
-            desired=5,
+            server_config=pmap(),
+            capacity=5,
         )
         self.assertRaises(
             OvershootError,
@@ -108,8 +108,8 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         desired_state = DesiredGroupState(
-            launch_config=pmap(),
-            desired=5,
+            server_config=pmap(),
+            capacity=5,
         )
         self.assertRaises(
             UndershootError,
@@ -130,8 +130,8 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         desired_state = DesiredGroupState(
-            launch_config=pmap(),
-            desired=5,
+            server_config=pmap(),
+            capacity=5,
         )
         progress = measure_progress(
             previous_state, current_state, desired_state)
@@ -151,8 +151,8 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         desired_state = DesiredGroupState(
-            launch_config=pmap(),
-            desired=5,
+            server_config=pmap(),
+            capacity=5,
         )
         progress = measure_progress(
             previous_state, current_state, desired_state)
@@ -174,8 +174,8 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         desired_state = DesiredGroupState(
-            launch_config=pmap(),
-            desired=5,
+            server_config=pmap(),
+            capacity=5,
         )
         progress = measure_progress(
             previous_state, current_state, desired_state)
@@ -195,8 +195,8 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         desired_state = DesiredGroupState(
-            launch_config=pmap(),
-            desired=5,
+            server_config=pmap(),
+            capacity=5,
         )
         progress = measure_progress(
             previous_state, current_state, desired_state)

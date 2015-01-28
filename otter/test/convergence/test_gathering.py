@@ -6,6 +6,8 @@ from functools import partial
 from effect import Constant, Effect
 from effect.testing import Stub, resolve_effect
 
+from pyrsistent import pmap
+
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
@@ -386,6 +388,27 @@ class ToNovaServerTests(SynchronousTestCase):
                        state=ServerState.BUILD,
                        created=self.createds[1][1],
                        servicenet_address='10.0.0.1'))
+
+    def test_with_lb_metadata(self):
+        """
+        Create a server that has load balancer config metadata in it.
+        The only desired load balancers created are the ones with valid
+        data.
+        """
+        self.servers[0]['metadata'] = {
+            'rax:autoscale:lb:12345': '{"port": 80}',
+            'rax:autoscale:lb:23456': '{"port": "80"}',
+            'rax:autoscale:lb:34567': 'invalid string'
+        }
+        self.assertEqual(
+            to_nova_server(self.servers[0]),
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       created=self.createds[0][1],
+                       desired_lbs=pmap({
+                           '12345': CLBDescription(lb_id='12345', port=80)
+                       }),
+                       servicenet_address=''))
 
 
 class IPAddressTests(SynchronousTestCase):

@@ -1,9 +1,11 @@
 """Code related to gathering data to inform convergence."""
-
+import json
 from operator import itemgetter
 from urllib import urlencode
 
 from effect import parallel
+
+from pyrsistent import pmap
 
 from toolz.curried import filter, groupby, map
 from toolz.dicttoolz import get_in
@@ -164,19 +166,45 @@ def _private_ipv4_addresses(server):
 
 def _servicenet_address(server):
     """
-    Finds the ServiceNet address for the given server.
+    Find the ServiceNet address for the given server.
     """
     return next((ip for ip in _private_ipv4_addresses(server)
                  if ip.startswith("10.")), "")
 
 
+def _lb_configs_from_metadata(server):
+    """
+    Construct a mapping of load balancer ID to :class:`ILBDescription` based
+    on the server metadata.
+    """
+    key_prefix = 'rax:autoscale:lb:'
+    desired_lbs = {}
+
+    # throw away any value that is malformed
+    for k in server.get('metadata', {}):
+        if k.startswith(key_prefix):
+            try:
+                config = json.loads(server['metadata'][k])
+
+                if config.get('type') != 'RackConnectV3':
+                    lbid = k[len(key_prefix):]
+                    desired_lbs[lbid] = CLBDescription(
+                        lb_id=lbid, port=config['port'])
+
+            except (KeyError, ValueError, TypeError):
+                pass
+
+    return pmap(desired_lbs)
+
+
 def to_nova_server(server_json):
     """
-    Convert from JSON format to :obj:`NovaServer` instance
+    Convert from JSON format to :obj:`NovaServer` instance.
     """
     return NovaServer(id=server_json['id'],
                       state=ServerState.lookupByName(server_json['state']),
                       created=timestamp_to_epoch(server_json['created']),
+                      desired_lbs=_lb_configs_from_metadata(server_json),
                       servicenet_address=_servicenet_address(server_json))
 
 
