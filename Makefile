@@ -104,7 +104,11 @@ sphinxdocs:
 	sphinx-build -b html _builddoc htmldoc
 
 docbook:
+ifneq ($(shell git diff --name-only ${DIFF_TARGET} -- docbook), )
 	cd docbook; mvn -q compile
+else
+	echo "Skipping, nothing changed between working tree and diff target"
+endif
 
 schema: FORCE schema-setup schema-teardown
 
