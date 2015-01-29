@@ -279,10 +279,12 @@ def check_cooldowns(log, state, config, policy, policy_id):
 
 def apply_delta(log, current, state, config, policy):
     """
-    Calculate a new desired number of servers based on a policy, assign that
-    new desired number to ``state.desired``, and return the difference.
+    Calculate a new desired number of servers based on a policy and current
+    number of servers, assign that new desired number to ``state.desired``, and
+    return the difference.
 
     :param log: A bound log for logging
+    :param current: The current number of servers in a scaling group.
     :param GroupState state: the group state
     :param dict config: the config dictionary
     :param dict policy: the policy dictionary
