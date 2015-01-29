@@ -343,3 +343,19 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                            .format(inactive_lb_id)]}
         result = _rcv3_check_bulk_delete(pairs, (resp, body))
         self.assertIdentical(result, None)
+
+    def test_node_not_a_member(self):
+        """
+        If the node is not a member of the load balancer pool it's being
+        removed from, the response was successful.
+        """
+        node_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
+        lb_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+        pairs = [(lb_id, node_id)]
+
+        resp = StubResponse(409, {})
+        body = {"errors": [
+            "Node {node_id} is not a member of Load Balancer "
+            "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
+        result = _rcv3_check_bulk_delete(pairs, (resp, body))
+        self.assertIdentical(result, None)
