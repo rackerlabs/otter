@@ -558,7 +558,10 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
 
 
 class ConvergeTests(SynchronousTestCase):
-    """Tests for :func:`converge`."""
+    """
+    Tests for :func:`converge` that do not specifically cover load balancers,
+    although some load balancer information may be included.
+    """
 
     def test_converge_give_me_a_server(self):
         """
@@ -621,7 +624,8 @@ class ConvergeTests(SynchronousTestCase):
         """
         If a server we created enters error state and it is attached to one
         or more load balancers, it will be removed from its load balancers
-        as well as get deleted.
+        as well as get deleted.  (Tests that error state servers are not
+        excluded from converging load balancer state.)
         """
         self.assertEqual(
             converge(
@@ -652,25 +656,6 @@ class ConvergeTests(SynchronousTestCase):
                 set(),
                 0),
             pbag([DeleteServer(server_id='abc')]))
-
-    def test_scale_down_with_lb_nodes(self):
-        """
-        When scaling down, if there are any servers to be deleted that are
-        attached to existing load balancers, they will also be also removed
-        from said load balancers
-        """
-        self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1', created=0)]),
-                set([CLBNode(address='1.1.1.1', node_id='3',
-                             description=CLBDescription(lb_id='5', port=80))]),
-                0),
-            pbag([
-                DeleteServer(server_id='abc'),
-                RemoveFromCLB(lb_id='5', node_id='3')
-            ]))
 
     def test_scale_down_building_first(self):
         """
