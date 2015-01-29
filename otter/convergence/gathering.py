@@ -1,5 +1,6 @@
 """Code related to gathering data to inform convergence."""
 import json
+from collections import defaultdict
 from operator import itemgetter
 from urllib import urlencode
 
@@ -171,26 +172,34 @@ def _servicenet_address(server):
                  if ip.startswith("10.")), "")
 
 
+_key_prefix = 'rax:autoscale:lb:'
+
+
 def _lb_configs_from_metadata(server):
     """
     Construct a mapping of load balancer ID to :class:`ILBDescription` based
     on the server metadata.
     """
-    key_prefix = 'rax:autoscale:lb:'
-    desired_lbs = {}
+    desired_lbs = defaultdict(list)
 
     # throw away any value that is malformed
-    for k in server.get('metadata', {}):
-        if k.startswith(key_prefix):
+
+    def parse_config(config, key):
+        if config.get('type') != 'RackConnectV3':
+            lbid = k[len(_key_prefix):]
             try:
-                config = json.loads(server['metadata'][k])
+                desired_lbs[lbid].append(
+                    CLBDescription(lb_id=lbid, port=config['port']))
+            except (KeyError, TypeError):
+                pass
 
-                if config.get('type') != 'RackConnectV3':
-                    lbid = k[len(key_prefix):]
-                    desired_lbs[lbid] = CLBDescription(
-                        lb_id=lbid, port=config['port'])
-
-            except (KeyError, ValueError, TypeError):
+    for k in server.get('metadata', {}):
+        if k.startswith(_key_prefix):
+            try:
+                configs = json.loads(server['metadata'][k])
+                for config in configs:
+                    parse_config(config, k)
+            except (ValueError, AttributeError):
                 pass
 
     return pmap(desired_lbs)
