@@ -35,9 +35,9 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 20, 'port': 800},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80),
-                  CLBDescription(lb_id='20', port=800)],
-             21: [CLBDescription(lb_id='21', port=81)]})
+            freeze({20: [CLBDescription(lb_id='20', port=80),
+                         CLBDescription(lb_id='20', port=800)],
+                    21: [CLBDescription(lb_id='21', port=81)]}))
 
     def test_with_rackconnect(self):
         """
@@ -48,8 +48,8 @@ class JsonToLBConfigTests(SynchronousTestCase):
                 [{'loadBalancerId': 20, 'port': 80},
                  {'loadBalancerId': 200, 'type': 'RackConnectV3'},
                  {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80)],
-             21: [CLBDescription(lb_id='21', port=81)]})
+            freeze({20: [CLBDescription(lb_id='20', port=80)],
+                    21: [CLBDescription(lb_id='21', port=81)]}))
 
 
 class GetDesiredGroupStateTests(SynchronousTestCase):
