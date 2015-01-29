@@ -3,42 +3,106 @@ Data classes for representing bits of information that need to share a
 representation across the different phases of convergence.
 """
 
-from characteristic import attributes, Attribute
+from characteristic import Attribute, attributes
 
-from pyrsistent import freeze
+from pyrsistent import PMap, freeze, pmap
 
-from twisted.python.constants import Names, NamedConstant
+from twisted.python.constants import NamedConstant, Names
 
-from zope.interface import implementer, Interface
-from zope.interface import Attribute as IAttribute
+from zope.interface import Attribute as IAttribute, Interface, implementer
 
 
 class CLBNodeCondition(Names):
-    """Constants representing the condition a load balancer node can be in"""
-    ENABLED = NamedConstant()   # Node can accept new connections.
-    DRAINING = NamedConstant()  # Node cannot accept any new connections.
-                                # Existing connections are forcibly terminated.
-    DISABLED = NamedConstant()  # Node cannot accept any new connections.
-                                # Existing connections are permitted to continue.
+    """
+    Constants representing the condition a load balancer node can be in.
+    """
+
+    ENABLED = NamedConstant()
+    """
+    The node can accept new connections.
+    """
+
+    DRAINING = NamedConstant()
+    """
+    Node cannot accept any new connections.  Existing connections are
+    forcibly terminated.
+    """
+
+    DISABLED = NamedConstant()
+    """
+    Node cannot accept any new connections.  Existing connections are
+    permitted to continue.
+    """
 
 
 class CLBNodeType(Names):
-    """Constants representing the type of a load balancer node"""
-    PRIMARY = NamedConstant()    # Node in normal rotation
-    SECONDARY = NamedConstant()  # Node only put into normal rotation if a
-                                 # primary node fails.
+    """
+    Constants representing the type of a Cloud Load Balancer node.
+    """
+
+    PRIMARY = NamedConstant()
+    """
+    Node in normal rotation.
+    """
+
+    SECONDARY = NamedConstant()
+    """
+    Node only put into normal rotation if a primary node fails.
+    """
 
 
 class ServerState(Names):
-    """Constants representing the state cloud servers can have"""
-    ACTIVE = NamedConstant()    # corresponds to Nova "ACTIVE"
-    ERROR = NamedConstant()     # corresponds to Nova "ERROR"
-    BUILD = NamedConstant()     # corresponds to Nova "BUILD" or "BUILDING"
-    DRAINING = NamedConstant()  # Autoscale is deleting the server
+    """
+    Constants representing the state of a Nova cloud server.
+    """
+
+    ACTIVE = NamedConstant()
+    """
+    Corresponds to Nova's ``ACTIVE`` state.
+    """
+
+    ERROR = NamedConstant()
+    """
+    Corresponds to Nova's ``ERROR`` state.
+    """
+
+    BUILD = NamedConstant()
+    """
+    Corresponds to Nova's ``BUILD`` and ``BUILDING`` states.
+    """
+
+    DRAINING = NamedConstant()
+    """"
+    Autoscale is deleting the server.
+    """
 
 
-@attributes(['id', 'state', 'created',
-             Attribute('servicenet_address', default_value='', instance_of=str)])
+class StepResult(Names):
+    """
+    Constants representing the condition of a step's effect.
+    """
+
+    SUCCESS = NamedConstant()
+    """
+    The step was successful.
+    """
+
+    RETRY = NamedConstant()
+    """
+    Convergence should be retried later.
+    """
+
+    FAILURE = NamedConstant()
+    """
+    The step failed. Retrying convergence won't help.
+    """
+
+
+@attributes(['id', 'state', 'created', 'image_id', 'flavor_id',
+             Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
+             Attribute('servicenet_address',
+                       default_value='',
+                       instance_of=str)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -51,6 +115,11 @@ class NovaServer(object):
     :ivar float created: Timestamp at which the server was created.
     :ivar str servicenet_address: The private ServiceNet IPv4 address, if
         the server is on the ServiceNet network
+    :ivar str image_id: The ID of the image the server was launched with
+    :ivar str flavor_id: The ID of the flavor the server was launched with
+
+    :ivar PMap desired_lbs: An immutable mapping of load balancer IDs to lists
+        of :class:`CLBDescription` instances.
     """
 
 

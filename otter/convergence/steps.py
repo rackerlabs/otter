@@ -78,7 +78,8 @@ class DeleteServer(object):
         return service_request(
             ServiceType.CLOUD_SERVERS,
             'DELETE',
-            append_segments('servers', self.server_id))
+            append_segments('servers', self.server_id),
+            success_pred=has_code(204))
 
 
 @implementer(IStep)

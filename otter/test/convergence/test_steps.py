@@ -72,7 +72,8 @@ class StepAsEffectTests(SynchronousTestCase):
             service_request(
                 ServiceType.CLOUD_SERVERS,
                 'DELETE',
-                'servers/abc123'))
+                'servers/abc123',
+                success_pred=has_code(204)))
 
     def test_set_metadata_item(self):
         """
