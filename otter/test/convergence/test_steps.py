@@ -267,12 +267,16 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         """
         If the response code indicates success, the response was successful.
         """
+        node_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
+        lb_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+        pairs = [(node_id, lb_id)]
+
         resp = StubResponse(204, {})
         body = [{"cloud_server": {"id": node_id},
                  "load_balancer_pool": {"id": lb_id}}
                 for (lb_id, node_id) in [("l1", "n1"),
                                          ("l2", "n2")]]
-        res = _rcv3_check_bulk_delete((resp, body))
+        res = _rcv3_check_bulk_delete(pairs, (resp, body))
         self.assertIdentical(res, None)
 
     def test_try_again_for_partial_removal(self):
