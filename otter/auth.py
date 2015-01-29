@@ -48,8 +48,7 @@ from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
-from otter.log import log as default_log
-from otter.log import BoundLog
+from otter.log import BoundLog, log as default_log
 from otter.util import logging_treq as treq
 from otter.util.deferredutils import delay, wait
 from otter.util.http import (
@@ -371,7 +370,10 @@ def authenticate_user(auth_endpoint, username, password, log=None, pool=None):
         log=log,
         pool=pool)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_upstream_error, 'identity', ('authenticating', username), auth_endpoint)
+    d.addErrback(
+        wrap_upstream_error, 'identity',
+        ('authenticating', username), auth_endpoint
+    )
     d.addCallback(treq.json_content)
     return d
 

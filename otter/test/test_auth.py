@@ -77,12 +77,7 @@ class HelperTests(SynchronousTestCase):
         resp = {'access': {'token': {'id': u'11111-111111-1111111-1111111'}}}
         self.assertEqual(extract_token(resp), '11111-111111-1111111-1111111')
 
-    def test_authenticate_user_with_pool(self):
-        """
-        authenticate_user sends the username and password to the tokens
-        endpoint.  This variant issues the call with a specified
-        HTTPConnectionPool.
-        """
+    def _verify_request_invoked_with_pool(self, pool):
         response = mock.Mock(code=200)
         response_body = {
             'access': {
@@ -93,7 +88,7 @@ class HelperTests(SynchronousTestCase):
         self.treq.post.return_value = succeed(response)
 
         d = authenticate_user('http://identity/v2.0', 'user', 'pass',
-                              log=self.log, pool='gene')
+                              log=self.log, pool=pool)
 
         self.assertEqual(self.successResultOf(d), response_body)
 
@@ -109,7 +104,15 @@ class HelperTests(SynchronousTestCase):
                      'content-type': ['application/json'],
                      'User-Agent': ['OtterScale/0.0']},
             log=self.log,
-            pool='gene')
+            pool=pool)
+
+    def test_authenticate_user_with_pool(self):
+        """
+        authenticate_user sends the username and password to the tokens
+        endpoint.  This variant issues the call with a specified
+        HTTPConnectionPool.
+        """
+        self._verify_request_invoked_with_pool('gene')
 
     def test_authenticate_user_without_pool(self):
         """
@@ -117,33 +120,7 @@ class HelperTests(SynchronousTestCase):
         endpoint.  This variant issues the call without a specified
         HTTPConnectionPool.
         """
-        response = mock.Mock(code=200)
-        response_body = {
-            'access': {
-                'token': {'id': '1111111111'}
-            }
-        }
-        self.treq.json_content.return_value = succeed(response_body)
-        self.treq.post.return_value = succeed(response)
-
-        d = authenticate_user('http://identity/v2.0', 'user', 'pass',
-                              log=self.log)
-
-        self.assertEqual(self.successResultOf(d), response_body)
-
-        self.treq.post.assert_called_once_with(
-            'http://identity/v2.0/tokens',
-            SameJSON({'auth': {
-                'passwordCredentials': {
-                    'username': 'user',
-                    'password': 'pass'
-                }
-            }}),
-            headers={'accept': ['application/json'],
-                     'content-type': ['application/json'],
-                     'User-Agent': ['OtterScale/0.0']},
-            log=self.log,
-            pool=None)
+        self._verify_request_invoked_with_pool(None)
 
     def test_authenticate_user_propagates_error(self):
         """
