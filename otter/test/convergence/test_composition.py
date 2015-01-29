@@ -7,7 +7,7 @@ from effect.testing import Stub, resolve_effect
 
 import mock
 
-from pyrsistent import freeze, pmap, pset
+from pyrsistent import freeze, pmap
 
 from twisted.trial.unittest import SynchronousTestCase
 
