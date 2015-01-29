@@ -200,3 +200,10 @@ class FeatureFlagTest(SynchronousTestCase):
         self.assertEqual(tenant_is_enabled(enabled_tenant_id,
                                            get_config_value),
                          False)
+
+    def test_unconfigured(self):
+        """
+        When no `convergence-tenants` key is available in the config, False is
+        returned.
+        """
+        self.assertEqual(tenant_is_enabled('foo', lambda x: None), False)
