@@ -20,7 +20,6 @@ from otter.convergence.gathering import (
     to_nova_server,
     _private_ipv4_addresses,
     _servicenet_address)
-from otter.convergence.composition import json_to_LBConfigs
 from otter.convergence.model import (
     CLBDescription,
     CLBNode,
@@ -203,7 +202,8 @@ class GetLBContentsTests(SynchronousTestCase):
         Stub request function and mock `extract_CLB_drained_at`
         """
         self.reqs = {
-            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers', True): {'loadBalancers':
+                                             [{'id': 1}, {'id': 2}]},
             ('GET', 'loadbalancers/1/nodes', True): [
                 {'id': '11', 'port': 20, 'address': 'a11',
                  'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
@@ -291,7 +291,7 @@ class GetLBContentsTests(SynchronousTestCase):
         """
         Return empty list if there are no LB
         """
-        self.reqs = {('GET', 'loadbalancers', True): []}
+        self.reqs = {('GET', 'loadbalancers', True): {'loadBalancers': []}}
         eff = get_clb_contents()
         self.assertEqual(self._resolve_lb(eff), [])
 
@@ -300,7 +300,8 @@ class GetLBContentsTests(SynchronousTestCase):
         Return empty if there are LBs but no nodes in them
         """
         self.reqs = {
-            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers', True): {'loadBalancers':
+                                             [{'id': 1}, {'id': 2}]},
             ('GET', 'loadbalancers/1/nodes', True): [],
             ('GET', 'loadbalancers/2/nodes', True): []
         }
@@ -312,7 +313,8 @@ class GetLBContentsTests(SynchronousTestCase):
         Doesnt fetch feeds if all nodes are ENABLED
         """
         self.reqs = {
-            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers', True): {'loadBalancers':
+                                             [{'id': 1}, {'id': 2}]},
             ('GET', 'loadbalancers/1/nodes', True): [
                 {'id': '11', 'port': 20, 'address': 'a11',
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
@@ -346,46 +348,81 @@ class ToNovaServerTests(SynchronousTestCase):
                          ('2020-10-20T11:30:00Z', 1603193400)]
         self.servers = [{'id': 'a',
                          'state': 'ACTIVE',
-                         'created': self.createds[0][0]},
+                         'created': self.createds[0][0],
+                         'image': {'id': 'valid_image'},
+                         'flavor': {'id': 'valid_flavor'}},
                         {'id': 'b',
                          'state': 'BUILD',
+                         'image': {'id': 'valid_image'},
+                         'flavor': {'id': 'valid_flavor'},
                          'created': self.createds[1][0],
                          'addresses': {'private': [{'addr': '10.0.0.1',
                                                     'version': 4}]}}]
 
     def test_without_address(self):
         """
-        Handles server json that does not have "addresses" in it
+        Handles server json that does not have "addresses" in it.
         """
         self.assertEqual(
             to_nova_server(self.servers[0]),
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
+                       image_id='valid_image',
+                       flavor_id='valid_flavor',
                        created=self.createds[0][1],
                        servicenet_address=''))
 
     def test_without_private(self):
         """
-        Creates server that does not have private/servicenet IP in it
+        Creates server that does not have private/servicenet IP in it.
         """
         self.servers[0]['addresses'] = {'public': 'p'}
         self.assertEqual(
             to_nova_server(self.servers[0]),
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
+                       image_id='valid_image',
+                       flavor_id='valid_flavor',
                        created=self.createds[0][1],
                        servicenet_address=''))
 
     def test_with_servicenet(self):
         """
-        Create server that has servicenet IP in it
+        Create server that has servicenet IP in it.
         """
         self.assertEqual(
             to_nova_server(self.servers[1]),
             NovaServer(id='b',
                        state=ServerState.BUILD,
+                       image_id='valid_image',
+                       flavor_id='valid_flavor',
                        created=self.createds[1][1],
                        servicenet_address='10.0.0.1'))
+
+    def test_without_image_id(self):
+        """
+        Create server that has missing image in it in various ways.
+        (for the case of BFV)
+        """
+        for image in ({}, {'id': None}):
+            self.servers[0]['image'] = image
+            self.assertEqual(
+                to_nova_server(self.servers[0]),
+                NovaServer(id='a',
+                           state=ServerState.ACTIVE,
+                           image_id=None,
+                           flavor_id='valid_flavor',
+                           created=self.createds[0][1],
+                           servicenet_address=''))
+        del self.servers[0]['image']
+        self.assertEqual(
+            to_nova_server(self.servers[0]),
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       image_id=None,
+                       flavor_id='valid_flavor',
+                       created=self.createds[0][1],
+                       servicenet_address=''))
 
     def test_with_lb_metadata(self):
         """
@@ -402,39 +439,13 @@ class ToNovaServerTests(SynchronousTestCase):
             to_nova_server(self.servers[0]),
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
+                       image_id='valid_image',
+                       flavor_id='valid_flavor',
                        created=self.createds[0][1],
                        desired_lbs=pmap({
                            '12345': CLBDescription(lb_id='12345', port=80)
                        }),
                        servicenet_address=''))
-
-
-class JsonToLBConfigTests(SynchronousTestCase):
-    """
-    Tests for :func:`json_to_LBConfigs`
-    """
-    def test_without_rackconnect(self):
-        """
-        LB config without rackconnect
-        """
-        self.assertEqual(
-            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
-                               {'loadBalancerId': 20, 'port': 800},
-                               {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80),
-                  CLBDescription(lb_id='20', port=800)],
-             21: [CLBDescription(lb_id='21', port=81)]})
-
-    def test_with_rackconnect(self):
-        """
-        LB config with rackconnect
-        """
-        self.assertEqual(
-            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
-                               {'loadBalancerId': 200, 'type': 'RackConnectV3'},
-                               {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80)],
-             21: [CLBDescription(lb_id='21', port=81)]})
 
 
 class IPAddressTests(SynchronousTestCase):
@@ -505,11 +516,15 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         self.servers = [
             {'id': 'a',
              'state': 'ACTIVE',
+             'image': {'id': 'image'},
+             'flavor': {'id': 'flavor'},
              'created': '1970-01-01T00:00:00Z',
              'addresses': {'private': [{'addr': '10.0.0.1',
                                         'version': 4}]}},
             {'id': 'b',
              'state': 'ACTIVE',
+             'image': {'id': 'image'},
+             'flavor': {'id': 'flavor'},
              'created': '1970-01-01T00:00:01Z',
              'addresses': {'private': [{'addr': '10.0.0.2',
                                         'version': 4}]}}
@@ -531,11 +546,30 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         expected_servers = [
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
+                       image_id='image',
+                       flavor_id='flavor',
                        created=0,
                        servicenet_address='10.0.0.1'),
             NovaServer(id='b',
                        state=ServerState.ACTIVE,
+                       image_id='image',
+                       flavor_id='flavor',
                        created=1,
                        servicenet_address='10.0.0.2'),
         ]
         self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))
+
+    def test_no_group_servers(self):
+        """
+        If there are no servers in a group, get_all_convergence_data includes
+        an empty list.
+        """
+        get_servers = lambda: Effect(Stub(Constant({})))
+        get_lb = lambda: Effect(Stub(Constant([])))
+
+        eff = get_all_convergence_data(
+            'gid',
+            get_scaling_group_servers=get_servers,
+            get_clb_contents=get_lb)
+
+        self.assertEqual(resolve_stubs(eff), ([], []))

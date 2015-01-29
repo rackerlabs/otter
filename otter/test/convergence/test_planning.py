@@ -397,9 +397,11 @@ class ConvergeLBStateTests(SynchronousTestCase):
                 ]))
 
 
-def server(id, state, created=0, **kwargs):
+def server(id, state, created=0, image_id='image', flavor_id='flavor',
+           **kwargs):
     """Convenience for creating a :obj:`NovaServer`."""
-    return NovaServer(id=id, state=state, created=created, **kwargs)
+    return NovaServer(id=id, state=state, created=created, image_id=image_id,
+                      flavor_id=flavor_id, **kwargs)
 
 
 class DrainAndDeleteServerTests(SynchronousTestCase):
@@ -712,7 +714,7 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=1,
-                                  desired_lbs=desired_lbs),
+                                  desired_lbs=freeze(desired_lbs)),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1', created=0,
                             desired_lbs=freeze(desired_lbs)),
@@ -959,7 +961,7 @@ class PlanTests(SynchronousTestCase):
 
         desired_lbs = {5: [CLBDescription(lb_id='5', port=80)]}
         desired_group_state = DesiredGroupState(
-            server_config={}, capacity=8, desired_lbs=desired_lbs)
+            server_config={}, capacity=8, desired_lbs=freeze(desired_lbs))
 
         result = plan(
             desired_group_state,

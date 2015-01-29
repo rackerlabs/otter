@@ -98,7 +98,7 @@ class StepResult(Names):
     """
 
 
-@attributes(['id', 'state', 'created',
+@attributes(['id', 'state', 'created', 'image_id', 'flavor_id',
              Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
              Attribute('servicenet_address',
                        default_value='',
@@ -115,6 +115,8 @@ class NovaServer(object):
     :ivar float created: Timestamp at which the server was created.
     :ivar str servicenet_address: The private ServiceNet IPv4 address, if
         the server is on the ServiceNet network
+    :ivar str image_id: The ID of the image the server was launched with
+    :ivar str flavor_id: The ID of the flavor the server was launched with
 
     :ivar PMap desired_lbs: An immutable mapping of load balancer IDs to lists
         of :class:`CLBDescription` instances.
@@ -122,7 +124,7 @@ class NovaServer(object):
 
 
 @attributes(['server_config', 'capacity',
-             Attribute('desired_lbs', default_factory=dict, instance_of=dict),
+             Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
              Attribute('draining_timeout', default_value=0.0,
                        instance_of=float)])
 class DesiredGroupState(object):

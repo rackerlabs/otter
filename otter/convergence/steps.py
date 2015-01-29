@@ -1,10 +1,14 @@
 """Steps for convergence."""
 
+import re
+
+from functools import partial
+
 from characteristic import attributes
 
 from effect import Effect, Func
 
-from pyrsistent import thaw
+from pyrsistent import pset, thaw
 
 from zope.interface import Interface, implementer
 
@@ -60,7 +64,8 @@ class CreateServer(object):
                 ServiceType.CLOUD_SERVERS,
                 'POST',
                 'servers',
-                data=thaw(server_config))
+                data=thaw(server_config),
+                success_pred=has_code(202))
         return eff.on(got_name)
 
 
@@ -78,7 +83,8 @@ class DeleteServer(object):
         return service_request(
             ServiceType.CLOUD_SERVERS,
             'DELETE',
-            append_segments('servers', self.server_id))
+            append_segments('servers', self.server_id),
+            success_pred=has_code(204))
 
 
 @implementer(IStep)
@@ -157,7 +163,7 @@ class ChangeCLBNode(object):
                   'weight': self.weight})
 
 
-def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
+def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
     """
     Creates a bulk request for RackConnect v3.0 load balancers.
 
@@ -165,8 +171,8 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
         connections to be made or broken.
     :param str method: The method of the request ``"DELETE"`` or
         ``"POST"``.
-    :param iterable success_codes: Status codes considered successful for this
-        request.
+    :param success_pred: Predicate that determines if a response was
+        successful.
     :return: A bulk RackConnect v3.0 request for the given load balancer,
         node pairs.
     :rtype: :class:`Request`
@@ -178,7 +184,7 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_codes):
         data=[{"cloud_server": {"id": node},
                "load_balancer_pool": {"id": lb}}
               for (lb, node) in lb_node_pairs],
-        success_pred=has_code(*success_codes))
+        success_pred=success_pred)
 
 
 @implementer(IStep)
@@ -201,7 +207,9 @@ class BulkAddToRCv3(object):
         Produce a :obj:`Effect` to add some nodes to some RCv3 load
         balancers.
         """
-        return _rackconnect_bulk_request(self.lb_node_pairs, "POST", (201,))
+        return _rackconnect_bulk_request(
+            self.lb_node_pairs, "POST",
+            success_pred=has_code(201))
 
 
 @implementer(IStep)
@@ -222,4 +230,56 @@ class BulkRemoveFromRCv3(object):
         Produce a :obj:`Effect` to remove some nodes from some RCv3 load
         balancers.
         """
-        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE", (204,))
+        eff = _rackconnect_bulk_request(self.lb_node_pairs, "DELETE",
+                                        success_pred=has_code(204, 409))
+        # While 409 isn't success, that has to be introspected by
+        # _rcv3_check_bulk_delete in order to recover from it.
+        return eff.on(partial(_rcv3_check_bulk_delete, self.lb_node_pairs))
+
+
+_UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
+                "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
+_RCV3_NODE_NOT_A_MEMBER_PATTERN = re.compile(
+    "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
+    "(?P<lb_id>{uuid})".format(uuid=_UUID4_REGEX),
+    re.IGNORECASE)
+_RCV3_LB_INACTIVE_PATTERN = re.compile(
+    "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state"
+    .format(uuid=_UUID4_REGEX),
+    re.IGNORECASE)
+
+
+def _rcv3_check_bulk_delete(attempted_pairs, result):
+    """Checks if the RCv3 bulk deletion command was successful.
+
+    The request is considered successful if the response code indicated
+    unambiguous success, or the nodes we're trying to remove aren't on the
+    respective load balancers we're trying to remove them from, or if the load
+    balancers we're trying to remove from aren't active.
+
+    If a node wasn't on the load balancer we tried to remove it from, or a
+    load balancer we were supposed to remove things from wasn't active,
+    returns the next step to try and remove the remaining pairs. This is
+    necessary because RCv3 bulk requests are atomic-ish.
+    """
+    response, body = result
+
+    if response.code == 204:  # All done!
+        return
+
+    to_retry = pset(attempted_pairs)
+    for error in body["errors"]:
+        match = _RCV3_NODE_NOT_A_MEMBER_PATTERN.match(error)
+        if match is not None:
+            to_retry -= pset([match.groups()[::-1]])
+
+        match = _RCV3_LB_INACTIVE_PATTERN.match(error)
+        if match is not None:
+            inactive_lb_id, = match.groups()
+            to_retry = pset([(lb_id, node_id)
+                             for (lb_id, node_id) in to_retry
+                             if lb_id != inactive_lb_id])
+
+    if to_retry:
+        next_step = BulkRemoveFromRCv3(lb_node_pairs=to_retry)
+        return next_step.as_effect()

@@ -1,6 +1,5 @@
 """Code related to gathering data to inform convergence."""
 import json
-from operator import itemgetter
 from urllib import urlencode
 
 from effect import parallel
@@ -99,10 +98,12 @@ def get_clb_contents():
                 method, url, json_response=json_response),
             retry_times(5), exponential_backoff_interval(2))
 
-    def fetch_nodes(lbs):
+    def fetch_nodes(result):
+        lbs = result['loadBalancers']
         lb_ids = [lb['id'] for lb in lbs]
         return parallel(
-            [lb_req('GET', append_segments('loadbalancers', str(lb_id), 'nodes'))
+            [lb_req('GET',
+                    append_segments('loadbalancers', str(lb_id), 'nodes'))
              for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
@@ -203,6 +204,8 @@ def to_nova_server(server_json):
     return NovaServer(id=server_json['id'],
                       state=ServerState.lookupByName(server_json['state']),
                       created=timestamp_to_epoch(server_json['created']),
+                      image_id=server_json.get('image', {}).get('id'),
+                      flavor_id=server_json['flavor']['id'],
                       desired_lbs=_lb_configs_from_metadata(server_json),
                       servicenet_address=_servicenet_address(server_json))
 
@@ -219,7 +222,7 @@ def get_all_convergence_data(
     """
     eff = parallel(
         [get_scaling_group_servers()
-         .on(itemgetter(group_id))
+         .on(lambda servers: servers.get(group_id, []))
          .on(map(to_nova_server)).on(list),
          get_clb_contents()]
     ).on(tuple)

@@ -35,9 +35,9 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 20, 'port': 800},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80),
-                  CLBDescription(lb_id='20', port=800)],
-             21: [CLBDescription(lb_id='21', port=81)]})
+            freeze({20: [CLBDescription(lb_id='20', port=80),
+                         CLBDescription(lb_id='20', port=800)],
+                    21: [CLBDescription(lb_id='21', port=81)]}))
 
     def test_with_rackconnect(self):
         """
@@ -48,8 +48,8 @@ class JsonToLBConfigTests(SynchronousTestCase):
                 [{'loadBalancerId': 20, 'port': 80},
                  {'loadBalancerId': 200, 'type': 'RackConnectV3'},
                  {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80)],
-             21: [CLBDescription(lb_id='21', port=81)]})
+            freeze({20: [CLBDescription(lb_id='20', port=80)],
+                    21: [CLBDescription(lb_id='21', port=81)]}))
 
 
 class GetDesiredGroupStateTests(SynchronousTestCase):
@@ -82,7 +82,30 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
             DesiredGroupState(
                 server_config=expected_server_config,
                 capacity=2,
-                desired_lbs={23: [CLBDescription(lb_id='23', port=80)]}))
+                desired_lbs=freeze({
+                    23: [CLBDescription(lb_id='23', port=80)]})))
+
+    def test_no_lbs(self):
+        """
+        When no loadBalancers are specified, the returned DesiredGroupState has
+        an empty mapping for desired_lbs.
+        """
+        server_config = {'name': 'test', 'flavorRef': 'f'}
+        lc = {'args': {'server': server_config}}
+
+        expected_server_config = {
+            'server': {
+                'name': 'test',
+                'flavorRef': 'f',
+                'metadata': {
+                    'rax:auto_scaling_group_id': 'uuid'}}}
+        state = get_desired_group_state('uuid', lc, 2)
+        self.assertEqual(
+            state,
+            DesiredGroupState(
+                server_config=expected_server_config,
+                capacity=2,
+                desired_lbs=pmap()))
 
 
 class ExecConvergenceTests(SynchronousTestCase):
@@ -94,18 +117,22 @@ class ExecConvergenceTests(SynchronousTestCase):
         """
         Sample server json
         """
-        self.desired_lbs = {23: [CLBDescription(lb_id='23', port=80)]}
+        self.desired_lbs = freeze({23: [CLBDescription(lb_id='23', port=80)]})
         self.servers = [
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
                        created=0,
+                       image_id='image',
+                       flavor_id='flavor',
                        servicenet_address='10.0.0.1',
-                       desired_lbs=freeze(self.desired_lbs)),
+                       desired_lbs=self.desired_lbs),
             NovaServer(id='b',
                        state=ServerState.ACTIVE,
                        created=0,
+                       image_id='image',
+                       flavor_id='flavor',
                        servicenet_address='10.0.0.2',
-                       desired_lbs=freeze(self.desired_lbs))
+                       desired_lbs=self.desired_lbs)
         ]
 
     def _get_gacd_func(self, group_id):
@@ -158,7 +185,7 @@ class ExecConvergenceTests(SynchronousTestCase):
         """
         desired = DesiredGroupState(
             server_config={'server': {'name': 'test', 'flavorRef': 'f'}},
-            desired_lbs={},
+            desired_lbs=pmap(),
             capacity=2)
 
         for server in self.servers:
@@ -203,3 +230,10 @@ class FeatureFlagTest(SynchronousTestCase):
         self.assertEqual(tenant_is_enabled(enabled_tenant_id,
                                            get_config_value),
                          False)
+
+    def test_unconfigured(self):
+        """
+        When no `convergence-tenants` key is available in the config, False is
+        returned.
+        """
+        self.assertEqual(tenant_is_enabled('foo', lambda x: None), False)
