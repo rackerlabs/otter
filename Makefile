@@ -17,7 +17,7 @@ CLOUDCAFE ?= $(shell which cafe-runner)
 
 mkfile_dir := $(shell dirname "$(MAKEFILE_LIST)")
 
-.PHONY: targets env-precheck
+.PHONY: targets env-precheck docbook
 
 targets:
 	@cat README.md
@@ -102,6 +102,9 @@ sphinxdocs:
 	sphinx-apidoc -F -T -o _builddoc ${TESTDIR1}
 	sphinx-apidoc -F -T -o _builddoc ${TESTDIR3}
 	sphinx-build -b html _builddoc htmldoc
+
+docbook:
+	cd docbook; mvn -q compile
 
 schema: FORCE schema-setup schema-teardown
 
