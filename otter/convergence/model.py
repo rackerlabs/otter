@@ -145,7 +145,6 @@ class DesiredGroupState(object):
         Make attributes immutable.
         """
         self.server_config = freeze(self.server_config)
-        self.desired_lbs = freeze(self.desired_lbs)
 
 
 class ILBDescription(Interface):
