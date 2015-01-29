@@ -1,6 +1,5 @@
 """Code related to gathering data to inform convergence."""
 import json
-from operator import itemgetter
 from urllib import urlencode
 
 from effect import parallel
@@ -221,7 +220,7 @@ def get_all_convergence_data(
     """
     eff = parallel(
         [get_scaling_group_servers()
-         .on(itemgetter(group_id))
+         .on(lambda servers: servers.get(group_id, []))
          .on(map(to_nova_server)).on(list),
          get_clb_contents()]
     ).on(tuple)
