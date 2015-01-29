@@ -2,6 +2,8 @@
 
 import re
 
+from functools import partial
+
 from characteristic import attributes
 
 from effect import Effect, Func
@@ -230,7 +232,7 @@ class BulkRemoveFromRCv3(object):
                                         success_pred=has_code(204, 409))
         # While 409 isn't success, that has to be introspected by
         # _rcv3_check_bulk_delete in order to recover from it.
-        return eff.on(_rcv3_check_bulk_delete)
+        return eff.on(partial(_rcv3_check_bulk_delete, self.lb_node_pairs))
 
 
 _UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
