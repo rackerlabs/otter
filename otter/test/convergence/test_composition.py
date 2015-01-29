@@ -82,7 +82,8 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
             DesiredGroupState(
                 server_config=expected_server_config,
                 capacity=2,
-                desired_lbs={23: [CLBDescription(lb_id='23', port=80)]}))
+                desired_lbs=freeze({
+                    23: [CLBDescription(lb_id='23', port=80)]})))
 
     def test_no_lbs(self):
         """
@@ -104,7 +105,7 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
             DesiredGroupState(
                 server_config=expected_server_config,
                 capacity=2,
-                desired_lbs={}))
+                desired_lbs=pmap()))
 
 
 class ExecConvergenceTests(SynchronousTestCase):
@@ -145,7 +146,7 @@ class ExecConvergenceTests(SynchronousTestCase):
         get_all_convergence_data = self._get_gacd_func('gid')
         desired = DesiredGroupState(
             server_config={'server': {'name': 'test', 'flavorRef': 'f'}},
-            desired_lbs={23: [CLBDescription(lb_id='23', port=80)]},
+            desired_lbs=freeze({23: [CLBDescription(lb_id='23', port=80)]}),
             capacity=2)
 
         eff = execute_convergence(
@@ -181,7 +182,7 @@ class ExecConvergenceTests(SynchronousTestCase):
         """
         desired = DesiredGroupState(
             server_config={'server': {'name': 'test', 'flavorRef': 'f'}},
-            desired_lbs={},
+            desired_lbs=pmap(),
             capacity=2)
         get_all_convergence_data = self._get_gacd_func('gid')
         eff = execute_convergence(
