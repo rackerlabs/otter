@@ -586,6 +586,10 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))
 
     def test_no_group_servers(self):
+        """
+        If there are no servers in a group, get_all_convergence_data includes
+        an empty list.
+        """
         get_servers = lambda: Effect(Stub(Constant({})))
         get_lb = lambda: Effect(Stub(Constant([])))
 
