@@ -320,9 +320,9 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
             .on(_rcv3_check_bulk_delete))
         self.assertEqual(eff, expected_eff)
 
-    def test_bail_if_group_inactive(self):
+    def test_ok_if_lb_inactive(self):
         """
-        If the load balancer pool is inactive, the response was unsuccessful.
+        If the load balancer pool is inactive, the response was successful.
         """
         node_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
         inactive_lb_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
