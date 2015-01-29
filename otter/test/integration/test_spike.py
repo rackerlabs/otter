@@ -1,4 +1,5 @@
 import json
+import os
 import treq
 
 from twisted.internet import defer, reactor
@@ -7,8 +8,9 @@ from twisted.trial import unittest
 from otter import auth
 
 
-username = 'sfalvo'
-password = 'Ahshe1aelep7ooth,'
+username = os.environ['CIT_USER']
+password = os.environ['CIT_PASSWORD']
+
 
 
 def dumpID(id):
@@ -39,7 +41,7 @@ class TestSpike(unittest.TestCase):
 #                 }
 #             }}
 #         )
-# 
+#
 #         def start():
 #             return (
 #                 treq.post(
@@ -53,10 +55,10 @@ class TestSpike(unittest.TestCase):
 #                 .addCallback(treq.json_content)
 #                 .addCallback(collectToken)
 #             )
-# 
+#
 #         def assertResultCode(r):
 #             self.assertEqual(r.code, 200)
 #             return r
-# 
+#
 #         return start().addCallback(dumpID)
-# 
+#
