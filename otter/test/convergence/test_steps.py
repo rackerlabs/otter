@@ -279,31 +279,43 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         res = _rcv3_check_bulk_delete(pairs, (resp, body))
         self.assertIdentical(res, None)
 
-    def test_try_again_for_partial_removal(self):
+    def test_try_again(self):
         """
         If a node was already removed (or maybe was never part of the load
         balancer pool to begin with), returns an effect that removes
         the remaining load balancer pairs.
         """
-        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
-        lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+        # This little piggy isn't even on this load balancer.
+        node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
+        lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+
+        # This little piggy is going to be removed from this load balancer.
+        node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+
+        # This little piggy isn't active!
+        node_c_id = '08944038-80ba-4ae1-a188-c827444e02e2'
+        lb_c_id = '150895a5-1aa7-45b7-b7a4-98b9c282f800'
+
         resp = StubResponse(409, {})
         body = {"errors":
                 ["Node {node_id} is not a member of Load Balancer "
-                 "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
-        eff = _rcv3_check_bulk_delete((resp, body))
+                 "Pool {lb_id}".format(node_id=node_a_id, lb_id=lb_a_id),
+                 "Load Balancer Pool {lb_id} is not in an ACTIVE state"
+                 .format(lb_id=lb_c_id)]}
+        eff = _rcv3_check_bulk_delete(
+            [(lb_a_id, node_a_id),
+             (lb_b_id, node_b_id),
+             (lb_c_id, node_c_id)],
+            (resp, body))
         expected_eff = (
             service_request(
                 service_type=ServiceType.RACKCONNECT_V3,
                 method="DELETE",
                 url='load_balancer_pools/nodes',
                 data=[
-                    {'load_balancer_pool':
-                     {'id':
-                      'd95ae0c4-6ab8-4873-b82f-f8433840cff2'},
-                     'cloud_server':
-                     {'id':
-                      'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'}}],
+                    {'load_balancer_pool': {'id': lb_b_id},
+                     'cloud_server': {'id': node_b_id}}],
                 success_pred=has_code(204, 409))
             .on(_rcv3_check_bulk_delete))
         self.assertEqual(eff, expected_eff)
