@@ -98,10 +98,14 @@ class ExecConvergenceTests(SynchronousTestCase):
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
                        created=0,
+                       image_id='image',
+                       flavor_id='flavor',
                        servicenet_address='10.0.0.1'),
             NovaServer(id='b',
                        state=ServerState.ACTIVE,
                        created=0,
+                       image_id='image',
+                       flavor_id='flavor',
                        servicenet_address='10.0.0.2')
         ]
 
