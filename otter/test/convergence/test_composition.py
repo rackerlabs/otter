@@ -63,7 +63,8 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config,
                        'loadBalancers': [{'loadBalancerId': 23, 'port': 80,
-                                          'whatsit': 'invalid'}]}}
+                                          'whatsit': 'invalid'},
+                                         {'loadBalancerId': 23, 'port': 90}]}}
 
         expected_server_config = {
             'server': {
@@ -72,7 +73,8 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 'metadata': {
                     'rax:auto_scaling_group_id': 'uuid',
                     'rax:autoscale:lb:23': json.dumps(
-                        {"port": 80, "type": "CloudLoadBalancer"})
+                        [{"port": 80, "type": "CloudLoadBalancer"},
+                         {"port": 90, "type": "CloudLoadBalancer"}])
                 }
             }
         }
@@ -82,8 +84,9 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
             DesiredGroupState(
                 server_config=expected_server_config,
                 capacity=2,
-                desired_lbs=freeze({
-                    23: [CLBDescription(lb_id='23', port=80)]})))
+                desired_lbs=freeze({23: [
+                    CLBDescription(lb_id='23', port=80),
+                    CLBDescription(lb_id='23', port=90)]})))
 
     def test_no_lbs(self):
         """

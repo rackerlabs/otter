@@ -431,9 +431,12 @@ class ToNovaServerTests(SynchronousTestCase):
         data.
         """
         self.servers[0]['metadata'] = {
-            'rax:autoscale:lb:12345': '{"port": 80}',
-            'rax:autoscale:lb:23456': '{"port": "80"}',
-            'rax:autoscale:lb:34567': 'invalid string'
+            # two correct lbconfigs and one incorrect one
+            'rax:autoscale:lb:12345': '[{"port":80},{"bad":"1"},{"port":90}]',
+            # a dictionary instead of a list
+            'rax:autoscale:lb:23456': '{"port": 80}',
+            # not even valid json
+            'rax:autoscale:lb:34567': 'invalid json string'
         }
         self.assertEqual(
             to_nova_server(self.servers[0]),
@@ -443,7 +446,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
                        desired_lbs=pmap({
-                           '12345': CLBDescription(lb_id='12345', port=80)
+                           '12345': [CLBDescription(lb_id='12345', port=80),
+                                     CLBDescription(lb_id='12345', port=90)]
                        }),
                        servicenet_address=''))
 

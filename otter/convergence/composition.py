@@ -9,6 +9,7 @@ from collections import defaultdict
 from pyrsistent import freeze
 
 from toolz.dicttoolz import keyfilter
+from toolz.itertoolz import groupby
 
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
@@ -96,6 +97,17 @@ def get_desired_group_state(group_id, launch_config, desired):
     return desired_state
 
 
+def _sanitize_lb_metadata(lb_config_json):
+    """
+    Takes load balancer config json, as from :obj:`otter.json_schema._clb_lb`
+    and :obj:`otter.json_schema._rcv3_lb` and normalizes it.
+    """
+    sanitized = keyfilter(lambda k: k in ('type', 'port'), lb_config_json)
+    # provide a default type
+    sanitized.setdefault('type', 'CloudLoadBalancer')
+    return sanitized
+
+
 def prepare_server_launch_config(group_id, server_config, lb_args):
     """
     Prepares a server config (the server part of the Group's launch config)
@@ -117,15 +129,14 @@ def prepare_server_launch_config(group_id, server_config, lb_args):
     server_config = server_config.set_in(
         ('server', 'metadata', 'rax:auto_scaling_group_id'), group_id)
 
-    for config in lb_args:
-        if config.get('type') != 'RackConnectV3':
-            sanitized = keyfilter(lambda k: k in ('type', 'port'), config)
-            # provide a default type
-            sanitized.setdefault('type', 'CloudLoadBalancer')
+    lbs = groupby(lambda conf: conf['loadBalancerId'], lb_args)
 
-            server_config = server_config.set_in(
-                ('server', 'metadata',
-                 'rax:autoscale:lb:{0}'.format(config['loadBalancerId'])),
-                json.dumps(sanitized))
+    for lb_id in lbs:
+        configs = [_sanitize_lb_metadata(config) for config in lbs[lb_id]
+                   if config.get('type') != 'RackConnectV3']
+
+        server_config = server_config.set_in(
+            ('server', 'metadata', 'rax:autoscale:lb:{0}'.format(lb_id)),
+            json.dumps(configs))
 
     return server_config
