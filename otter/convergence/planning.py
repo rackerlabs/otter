@@ -76,7 +76,7 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     return removes + changes
 
 
-def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
+def _converge_lb_state(server, current_lb_nodes):
     """
     Produce a series of steps to converge a server's current load balancer
     state towards its desired load balancer state.
@@ -90,14 +90,16 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     only be used if load balancer health monitoring is enabled, and would be
     used as backup servers anyway.
 
-    :param dict desired_lb_state: As per :obj:`DesiredGroupState`.desired_lbs
+    :param server: The server to be converged.
+    :type server: :class:`NovaServer`
+
     :param list current_lb_nodes: `list` of :obj:`CLBNode`
-    :param str ip_address: the IP address of the server to converge
+
     :rtype: `list` of :class:`IStep`
     """
     desired = {
         (lb_id, desc.port): desc
-        for lb_id, descs in desired_lb_state.items()
+        for lb_id, descs in server.desired_lbs.items()
         for desc in descs}
     current = {
         (node.description.lb_id, node.description.port): node
@@ -108,10 +110,11 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     adds = [
         AddNodesToCLB(
             lb_id=lb_id,
-            address_configs=s((ip_address, desired[lb_id, port])))
+            address_configs=s((server.servicenet_address,
+                               desired[lb_id, port])))
         for lb_id, port in desired_idports - current_idports]
 
-    # TODO: Removes could be replaced with _remove_from_lb_with_draining if
+    # Removes could be replaced with _remove_from_lb_with_draining if
     # we wanted to support draining for moving load balancers too
     removes = [
         RemoveFromCLB(
@@ -234,9 +237,8 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         step
         for server in still_active_servers
         for step in _converge_lb_state(
-            desired_state.desired_lbs,
-            lbs_by_address.get(server.servicenet_address, []),
-            server.servicenet_address)
+            server,
+            lbs_by_address.get(server.servicenet_address, []))
         if server.servicenet_address]
 
     return pbag(create_steps
