@@ -3,8 +3,6 @@
 from effect import Func
 from effect.testing import resolve_effect
 
-import json
-
 from mock import ANY
 
 from pyrsistent import freeze, pset
@@ -27,7 +25,6 @@ from otter.convergence.steps import (
     _rcv3_check_bulk_delete)
 from otter.http import has_code, service_request
 from otter.test.utils import StubResponse
-from otter.util.fp import predicate_any
 from otter.util.hashkey import generate_server_name
 
 

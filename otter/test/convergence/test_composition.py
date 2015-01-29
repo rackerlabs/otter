@@ -19,7 +19,7 @@ from otter.convergence.composition import (
     tenant_is_enabled)
 from otter.convergence.model import (
     CLBDescription, DesiredGroupState, NovaServer, ServerState)
-from otter.http import has_code, service_request
+from otter.http import service_request
 from otter.test.utils import resolve_stubs
 
 
@@ -164,7 +164,7 @@ class ExecConvergenceTests(SynchronousTestCase):
             'POST',
             'loadbalancers/23/nodes',
             data=mock.ANY,
-            success_pred=has_code(202, 413))
+            success_pred=mock.ANY)
         got_req = eff.intent.effects[0].intent
         self.assertEqual(got_req, expected_req.intent)
         # separate check for nodes; they are unique, but can be in any order

@@ -45,8 +45,9 @@ class PredicateAllTests(SynchronousTestCase):
         Works with multiple keyword argument predicates
         """
         self.assertTrue(
-            predicate_all(lambda **k: k['a'] % 2 == 0 and k['b'] % 2 == 0,
-                          lambda **k: k['a'] % 3 == 0 and k['b'] % 3 == 0)(a=6, b=12))
+            predicate_all(
+                lambda **k: k['a'] % 2 == 0 and k['b'] % 2 == 0,
+                lambda **k: k['a'] % 3 == 0 and k['b'] % 3 == 0)(a=6, b=12))
 
 
 class PredicateAnyTests(SynchronousTestCase):
