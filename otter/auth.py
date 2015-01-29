@@ -339,7 +339,7 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
     return d
 
 
-def authenticate_user(auth_endpoint, username, password, log=None):
+def authenticate_user(auth_endpoint, username, password, log=None, pool=None):
     """
     Authenticate to a Identity auth endpoint with a username and password.
 
@@ -347,6 +347,9 @@ def authenticate_user(auth_endpoint, username, password, log=None):
     :param str username: Username to authenticate as.
     :param str password: Password for the specified user.
     :param log: If provided, a BoundLog object.
+    :param twisted.web.client.HTTPConnectionPool pool: If provided,
+        a connection pool which an integration test can manually clean up
+        to avoid a race condition between Trial and Twisted.
 
     :return: Decoded JSON response as dict.
     """
@@ -365,7 +368,8 @@ def authenticate_user(auth_endpoint, username, password, log=None):
                 }
             }),
         headers=headers(),
-        log=log)
+        log=log,
+        pool=pool)
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_upstream_error, 'identity', ('authenticating', username), auth_endpoint)
     d.addCallback(treq.json_content)
