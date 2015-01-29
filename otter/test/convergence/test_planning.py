@@ -15,7 +15,6 @@ from otter.convergence.model import (
     NovaServer,
     ServerState)
 from otter.convergence.planning import (
-    _converge_lb_state,
     _default_limit_step_count,
     _limit_step_count,
     _remove_from_lb_with_draining,
@@ -206,7 +205,8 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
 
 class ConvergeLBStateTests(SynchronousTestCase):
     """
-    Tests for :func:`_converge_lb_state`
+    Tests for :func:`converge` with regards to converging the load balancer
+    state on active servers.  (:func:`_converge_lb_state`)
     """
     def test_add_to_lb(self):
         """
@@ -214,15 +214,19 @@ class ConvergeLBStateTests(SynchronousTestCase):
         `converge_lb_state` returns a :class:`AddToLoadBalancer` object
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
-        result = _converge_lb_state(
-            desired_lb_state={'5': [clb_desc]},
-            current_lb_nodes=[],
-            ip_address='1.1.1.1')
         self.assertEqual(
-            list(result),
-            [AddNodesToCLB(
-                lb_id='5',
-                address_configs=s(('1.1.1.1', clb_desc)))])
+            converge(
+                DesiredGroupState(server_config={}, capacity=1,
+                                  desired_lbs={'5': [clb_desc]}),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set(),
+                0),
+            pbag([
+                AddNodesToCLB(
+                    lb_id='5',
+                    address_configs=s(('1.1.1.1', clb_desc)))
+            ]))
 
     def test_change_lb_node(self):
         """
@@ -234,15 +238,18 @@ class ConvergeLBStateTests(SynchronousTestCase):
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(
                                lb_id='5', port=80, weight=5))]
-
-        result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_nodes=current,
-                                    ip_address='1.1.1.1')
         self.assertEqual(
-            list(result),
-            [ChangeCLBNode(lb_id='5', node_id='123', weight=1,
-                           condition=CLBNodeCondition.ENABLED,
-                           type=CLBNodeType.PRIMARY)])
+            converge(
+                DesiredGroupState(server_config={}, capacity=1,
+                                  desired_lbs=desired),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set(current),
+                0),
+            pbag([
+                ChangeCLBNode(lb_id='5', node_id='123', weight=1,
+                              condition=CLBNodeCondition.ENABLED,
+                              type=CLBNodeType.PRIMARY)]))
 
     def test_remove_lb_node(self):
         """
@@ -253,12 +260,15 @@ class ConvergeLBStateTests(SynchronousTestCase):
                            description=CLBDescription(
                                lb_id='5', port=80, weight=5))]
 
-        result = _converge_lb_state(desired_lb_state={},
-                                    current_lb_nodes=current,
-                                    ip_address='1.1.1.1')
         self.assertEqual(
-            list(result),
-            [RemoveFromCLB(lb_id='5', node_id='123')])
+            converge(
+                DesiredGroupState(server_config={}, capacity=1,
+                                  desired_lbs={}),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set(current),
+                0),
+            pbag([RemoveFromCLB(lb_id='5', node_id='123')]))
 
     def test_do_nothing(self):
         """
@@ -269,10 +279,15 @@ class ConvergeLBStateTests(SynchronousTestCase):
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(lb_id='5', port=80))]
 
-        result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_nodes=current,
-                                    ip_address='1.1.1.1')
-        self.assertEqual(list(result), [])
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=1,
+                                  desired_lbs=desired),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set(current),
+                0),
+            pbag([]))
 
     def test_all_changes(self):
         """
@@ -285,19 +300,24 @@ class ConvergeLBStateTests(SynchronousTestCase):
                    CLBNode(node_id='234', address='1.1.1.1',
                            description=CLBDescription(lb_id='6', port=80))]
 
-        result = _converge_lb_state(desired_lb_state=desired,
-                                    current_lb_nodes=current,
-                                    ip_address='1.1.1.1')
-        self.assertEqual(set(result), set([
-            AddNodesToCLB(
-                lb_id='5',
-                address_configs=s(('1.1.1.1',
-                                   CLBDescription(lb_id='5', port=80)))),
-            ChangeCLBNode(lb_id='6', node_id='234', weight=2,
-                          condition=CLBNodeCondition.ENABLED,
-                          type=CLBNodeType.PRIMARY),
-            RemoveFromCLB(lb_id='5', node_id='123')
-        ]))
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=1,
+                                  desired_lbs=desired),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set(current),
+                0),
+            pbag([
+                AddNodesToCLB(
+                    lb_id='5',
+                    address_configs=s(('1.1.1.1',
+                                       CLBDescription(lb_id='5', port=80)))),
+                ChangeCLBNode(lb_id='6', node_id='234', weight=2,
+                              condition=CLBNodeCondition.ENABLED,
+                              type=CLBNodeType.PRIMARY),
+                RemoveFromCLB(lb_id='5', node_id='123')
+            ]))
 
     def test_same_lb_multiple_ports(self):
         """
@@ -310,10 +330,15 @@ class ConvergeLBStateTests(SynchronousTestCase):
         desired = {'5': [CLBDescription(lb_id='5', port=8080),
                          CLBDescription(lb_id='5', port=8081)]}
         current = []
-        result = _converge_lb_state(desired, current, '1.1.1.1')
         self.assertEqual(
-            set(result),
-            set([
+            converge(
+                DesiredGroupState(server_config={}, capacity=1,
+                                  desired_lbs=desired),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1')]),
+                set(current),
+                0),
+            pbag([
                 AddNodesToCLB(
                     lb_id='5',
                     address_configs=s(('1.1.1.1',
