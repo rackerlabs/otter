@@ -93,7 +93,7 @@ cleandocs:
 	rm -rf htmldoc
 	rm -rf docbook/target
 
-docs: cleandocs
+docs:
 	cp -r ${DOCDIR} _builddoc
 	sphinx-apidoc -F -T -o _builddoc ${CODEDIR}
 	sphinx-apidoc -F -T -o _builddoc ${TESTDIR2}
