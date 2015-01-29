@@ -281,7 +281,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         but the configuration is wrong, `converge_lb_state` returns a
         :class:`ChangeCLBNode` object
         """
-        desired = freeze({'5': [CLBDescription(lb_id='5', port=80)]})
+        desired = {'5': [CLBDescription(lb_id='5', port=80)]}
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(
                                lb_id='5', port=80, weight=5))]
@@ -322,7 +322,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If the desired lb state matches the current lb state,
         `converge_lb_state` returns nothing
         """
-        desired = freeze({'5': [CLBDescription(lb_id='5', port=80)]})
+        desired = {'5': [CLBDescription(lb_id='5', port=80)]}
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(lb_id='5', port=80))]
 
@@ -340,8 +340,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         """
         Remove, change, and add a node to a load balancer all together
         """
-        desired = freeze({'5': [CLBDescription(lb_id='5', port=80)],
-                          '6': [CLBDescription(lb_id='6', port=80, weight=2)]})
+        desired = {'5': [CLBDescription(lb_id='5', port=80)],
+                   '6': [CLBDescription(lb_id='6', port=80, weight=2)]}
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(lb_id='5', port=8080)),
                    CLBNode(node_id='234', address='1.1.1.1',
