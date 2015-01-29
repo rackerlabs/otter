@@ -245,18 +245,18 @@ _RCV3_LB_INACTIVE_PATTERN = re.compile(
     re.IGNORECASE)
 
 
-    """
-    Checks if the RCv3 bulk deletion command was successful.
 def _rcv3_check_bulk_delete(attempted_pairs, result):
+    """Checks if the RCv3 bulk deletion command was successful.
 
-    The request is considered successful if the response code
-    indicated unambiguous success, or the machine we're trying to
-    remove is already removed anyway.
+    The request is considered successful if the response code indicated
+    unambiguous success, or the nodes we're trying to remove aren't on the
+    respective load balancers we're trying to remove them from, or if the load
+    balancers we're trying to remove from aren't active.
 
-    If the machine was already removed, returns the next step to try
-    and remove the remaining pairs, unless a fatal error *also*
-    occurred. This is necessary because RCv3 bulk requests are
-    atomic-ish.
+    If a node wasn't on the load balancer we tried to remove it from, or a
+    load balancer we were supposed to remove things from wasn't active,
+    returns the next step to try and remove the remaining pairs. This is
+    necessary because RCv3 bulk requests are atomic-ish.
     """
     response, body = result
 
