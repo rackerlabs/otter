@@ -308,17 +308,21 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
              (lb_b_id, node_b_id),
              (lb_c_id, node_c_id)],
             (resp, body))
-        expected_eff = (
-            service_request(
-                service_type=ServiceType.RACKCONNECT_V3,
-                method="DELETE",
-                url='load_balancer_pools/nodes',
-                data=[
-                    {'load_balancer_pool': {'id': lb_b_id},
-                     'cloud_server': {'id': node_b_id}}],
-                success_pred=has_code(204, 409))
-            .on(_rcv3_check_bulk_delete))
-        self.assertEqual(eff, expected_eff)
+        expected_intent = service_request(
+            service_type=ServiceType.RACKCONNECT_V3,
+            method="DELETE",
+            url='load_balancer_pools/nodes',
+            data=[
+                {'load_balancer_pool': {'id': lb_b_id},
+                 'cloud_server': {'id': node_b_id}}],
+            success_pred=has_code(204, 409)).intent
+        self.assertEqual(eff.intent, expected_intent)
+        (partial_check_bulk_delete, _), = eff.callbacks
+        self.assertEqual(partial_check_bulk_delete.func,
+                         _rcv3_check_bulk_delete)
+        expected_pairs = pset([(lb_b_id, node_b_id)])
+        self.assertEqual(partial_check_bulk_delete.args, (expected_pairs,))
+        self.assertEqual(partial_check_bulk_delete.keywords, None)
 
     def test_ok_if_lb_inactive(self):
         """
