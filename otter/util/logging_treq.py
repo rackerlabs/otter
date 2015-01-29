@@ -9,7 +9,6 @@ import treq
 from twisted.internet import reactor
 
 from otter.log import log as default_log
-from otter.log import bound
 from otter.util.deferredutils import timeout_deferred
 
 
