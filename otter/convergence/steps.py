@@ -156,13 +156,15 @@ class AddNodesToCLB(object):
     :param address_configs: A collection of two-tuples of address and
         :obj:`CLBDescription`.
 
-    Succeed unconditionally on 202 and 413 (over limit, which happens because
-    CLB locks for a few seconds and cannot be changed again after an update -
-    can be fixed next convergence cycle).
+    Succeed unconditionally on 202 and 413 (over limit, so try again later).
 
     Succeed conditionally on 422 if duplicate nodes are detected - the
     duplicate codes are not enumerated, so just try again the next convergence
     cycle.
+
+    Succeed conditionally on 422 if the load balancer is in PENDING_UPDATE
+    state, which happens because CLB locks for a few seconds and cannot be
+    changed again after an update - can be fixed next convergence cycle.
     """
     def as_effect(self):
         """Produce a :obj:`Effect` to add nodes to CLB"""
