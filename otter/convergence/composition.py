@@ -67,7 +67,7 @@ def json_to_LBConfigs(lbs_json):
         if lb.get('type') != 'RackConnectV3':
             lbd[lb['loadBalancerId']].append(CLBDescription(
                 lb_id=str(lb['loadBalancerId']), port=lb['port']))
-    return lbd
+    return dict(lbd)
 
 
 def get_desired_group_state(group_id, launch_config, desired):
@@ -82,11 +82,12 @@ def get_desired_group_state(group_id, launch_config, desired):
     NOTE: Currently this ignores draining timeout settings, since it has
     not been added to any schema yet.
     """
+    lbs = launch_config['args'].get('loadBalancers', [])
     server_lc = prepare_server_launch_config(
         group_id,
         freeze({'server': launch_config['args']['server']}),
-        freeze(launch_config['args']['loadBalancers']))
-    lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
+        freeze(lbs))
+    lbs = json_to_LBConfigs(lbs)
     desired_state = DesiredGroupState(
         server_config=server_lc,
         capacity=desired, desired_lbs=lbs)
