@@ -62,7 +62,7 @@ def json_to_LBConfigs(lbs_json):
     NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
     implemented in convergence
     """
-    lbd = defaultdict()
+    lbd = defaultdict(list)
     for lb in lbs_json:
         if lb.get('type') != 'RackConnectV3':
             lbd[lb['loadBalancerId']].append(CLBDescription(
