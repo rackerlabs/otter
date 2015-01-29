@@ -77,7 +77,8 @@ class HelperTests(SynchronousTestCase):
         resp = {'access': {'token': {'id': u'11111-111111-1111111-1111111'}}}
         self.assertEqual(extract_token(resp), '11111-111111-1111111-1111111')
 
-    def _verify_request_invoked_with_pool(self, pool):
+    def _verify_request_invoked_with_pool(self, **kwargs):
+        pool = kwargs.get("pool", None)
         response = mock.Mock(code=200)
         response_body = {
             'access': {
@@ -88,7 +89,7 @@ class HelperTests(SynchronousTestCase):
         self.treq.post.return_value = succeed(response)
 
         d = authenticate_user('http://identity/v2.0', 'user', 'pass',
-                              log=self.log, pool=pool)
+                              log=self.log, **kwargs)
 
         self.assertEqual(self.successResultOf(d), response_body)
 
@@ -112,7 +113,7 @@ class HelperTests(SynchronousTestCase):
         endpoint.  This variant issues the call with a specified
         HTTPConnectionPool.
         """
-        self._verify_request_invoked_with_pool('gene')
+        self._verify_request_invoked_with_pool(pool='gene')
 
     def test_authenticate_user_without_pool(self):
         """
@@ -120,7 +121,7 @@ class HelperTests(SynchronousTestCase):
         endpoint.  This variant issues the call without a specified
         HTTPConnectionPool.
         """
-        self._verify_request_invoked_with_pool(None)
+        self._verify_request_invoked_with_pool()
 
     def test_authenticate_user_propagates_error(self):
         """
