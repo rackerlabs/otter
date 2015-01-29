@@ -245,9 +245,9 @@ _RCV3_LB_INACTIVE_PATTERN = re.compile(
     re.IGNORECASE)
 
 
-def _rcv3_check_bulk_delete(result):
     """
     Checks if the RCv3 bulk deletion command was successful.
+def _rcv3_check_bulk_delete(attempted_pairs, result):
 
     The request is considered successful if the response code
     indicated unambiguous success, or the machine we're trying to
