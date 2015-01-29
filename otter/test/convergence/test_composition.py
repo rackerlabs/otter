@@ -7,7 +7,7 @@ from effect.testing import Stub, resolve_effect
 
 import mock
 
-from pyrsistent import freeze, pmap
+from pyrsistent import freeze, pmap, pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -94,15 +94,18 @@ class ExecConvergenceTests(SynchronousTestCase):
         """
         Sample server json
         """
+        self.desired_lbs = {23: [CLBDescription(lb_id='23', port=80)]}
         self.servers = [
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
                        created=0,
-                       servicenet_address='10.0.0.1'),
+                       servicenet_address='10.0.0.1',
+                       desired_lbs=freeze(self.desired_lbs)),
             NovaServer(id='b',
                        state=ServerState.ACTIVE,
                        created=0,
-                       servicenet_address='10.0.0.2')
+                       servicenet_address='10.0.0.2',
+                       desired_lbs=freeze(self.desired_lbs))
         ]
 
     def _get_gacd_func(self, group_id):
@@ -119,7 +122,7 @@ class ExecConvergenceTests(SynchronousTestCase):
         get_all_convergence_data = self._get_gacd_func('gid')
         desired = DesiredGroupState(
             server_config={'server': {'name': 'test', 'flavorRef': 'f'}},
-            desired_lbs={23: [CLBDescription(lb_id='23', port=80)]},
+            desired_lbs=self.desired_lbs,
             capacity=2)
 
         eff = execute_convergence(
@@ -157,6 +160,10 @@ class ExecConvergenceTests(SynchronousTestCase):
             server_config={'server': {'name': 'test', 'flavorRef': 'f'}},
             desired_lbs={},
             capacity=2)
+
+        for server in self.servers:
+            server.desired_lbs = pmap()
+
         get_all_convergence_data = self._get_gacd_func('gid')
         eff = execute_convergence(
             'gid', desired,
