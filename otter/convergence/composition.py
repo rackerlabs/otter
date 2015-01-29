@@ -50,15 +50,17 @@ def tenant_is_enabled(tenant_id, get_config_value):
     :param callable get_config_value: config key -> config value.
     """
     enabled_tenant_ids = get_config_value("convergence-tenants")
-    return (tenant_id in enabled_tenant_ids)
+    if enabled_tenant_ids is not None:
+        return (tenant_id in enabled_tenant_ids)
+    return False
 
 
 def json_to_LBConfigs(lbs_json):
     """
     Convert load balancer config from JSON to :obj:`CLBDescription`
 
-    :param list lbs_json: List of load balancer configs
-    :return: `dict` of LBid -> [LBDescription] mapping
+    :param lbs_json: Sequence of load balancer configs
+    :return: mapping of LBid -> Sequence of LBDescription
 
     NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
     implemented in convergence
@@ -68,7 +70,7 @@ def json_to_LBConfigs(lbs_json):
         if lb.get('type') != 'RackConnectV3':
             lbd[lb['loadBalancerId']].append(CLBDescription(
                 lb_id=str(lb['loadBalancerId']), port=lb['port']))
-    return lbd
+    return freeze(dict(lbd))
 
 
 def get_desired_group_state(group_id, launch_config, desired):
@@ -83,11 +85,12 @@ def get_desired_group_state(group_id, launch_config, desired):
     NOTE: Currently this ignores draining timeout settings, since it has
     not been added to any schema yet.
     """
+    lbs = freeze(launch_config['args'].get('loadBalancers', []))
     server_lc = prepare_server_launch_config(
         group_id,
         freeze({'server': launch_config['args']['server']}),
-        freeze(launch_config['args']['loadBalancers']))
-    lbs = json_to_LBConfigs(launch_config['args']['loadBalancers'])
+        lbs)
+    lbs = json_to_LBConfigs(lbs)
     desired_state = DesiredGroupState(
         server_config=server_lc,
         capacity=desired, desired_lbs=lbs)

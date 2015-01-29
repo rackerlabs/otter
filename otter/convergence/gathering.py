@@ -1,7 +1,6 @@
 """Code related to gathering data to inform convergence."""
 import json
 from collections import defaultdict
-from operator import itemgetter
 from urllib import urlencode
 
 from effect import parallel
@@ -100,10 +99,12 @@ def get_clb_contents():
                 method, url, json_response=json_response),
             retry_times(5), exponential_backoff_interval(2))
 
-    def fetch_nodes(lbs):
+    def fetch_nodes(result):
+        lbs = result['loadBalancers']
         lb_ids = [lb['id'] for lb in lbs]
         return parallel(
-            [lb_req('GET', append_segments('loadbalancers', str(lb_id), 'nodes'))
+            [lb_req('GET',
+                    append_segments('loadbalancers', str(lb_id), 'nodes'))
              for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
@@ -230,7 +231,7 @@ def get_all_convergence_data(
     """
     eff = parallel(
         [get_scaling_group_servers()
-         .on(itemgetter(group_id))
+         .on(lambda servers: servers.get(group_id, []))
          .on(map(to_nova_server)).on(list),
          get_clb_contents()]
     ).on(tuple)

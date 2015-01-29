@@ -20,7 +20,6 @@ from otter.convergence.gathering import (
     to_nova_server,
     _private_ipv4_addresses,
     _servicenet_address)
-from otter.convergence.composition import json_to_LBConfigs
 from otter.convergence.model import (
     CLBDescription,
     CLBNode,
@@ -203,7 +202,8 @@ class GetLBContentsTests(SynchronousTestCase):
         Stub request function and mock `extract_CLB_drained_at`
         """
         self.reqs = {
-            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers', True): {'loadBalancers':
+                                             [{'id': 1}, {'id': 2}]},
             ('GET', 'loadbalancers/1/nodes', True): [
                 {'id': '11', 'port': 20, 'address': 'a11',
                  'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
@@ -291,7 +291,7 @@ class GetLBContentsTests(SynchronousTestCase):
         """
         Return empty list if there are no LB
         """
-        self.reqs = {('GET', 'loadbalancers', True): []}
+        self.reqs = {('GET', 'loadbalancers', True): {'loadBalancers': []}}
         eff = get_clb_contents()
         self.assertEqual(self._resolve_lb(eff), [])
 
@@ -300,7 +300,8 @@ class GetLBContentsTests(SynchronousTestCase):
         Return empty if there are LBs but no nodes in them
         """
         self.reqs = {
-            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers', True): {'loadBalancers':
+                                             [{'id': 1}, {'id': 2}]},
             ('GET', 'loadbalancers/1/nodes', True): [],
             ('GET', 'loadbalancers/2/nodes', True): []
         }
@@ -312,7 +313,8 @@ class GetLBContentsTests(SynchronousTestCase):
         Doesnt fetch feeds if all nodes are ENABLED
         """
         self.reqs = {
-            ('GET', 'loadbalancers', True): [{'id': 1}, {'id': 2}],
+            ('GET', 'loadbalancers', True): {'loadBalancers':
+                                             [{'id': 1}, {'id': 2}]},
             ('GET', 'loadbalancers/1/nodes', True): [
                 {'id': '11', 'port': 20, 'address': 'a11',
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
@@ -450,34 +452,6 @@ class ToNovaServerTests(SynchronousTestCase):
                        servicenet_address=''))
 
 
-class JsonToLBConfigTests(SynchronousTestCase):
-    """
-    Tests for :func:`json_to_LBConfigs`
-    """
-    def test_without_rackconnect(self):
-        """
-        LB config without rackconnect
-        """
-        self.assertEqual(
-            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
-                               {'loadBalancerId': 20, 'port': 800},
-                               {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80),
-                  CLBDescription(lb_id='20', port=800)],
-             21: [CLBDescription(lb_id='21', port=81)]})
-
-    def test_with_rackconnect(self):
-        """
-        LB config with rackconnect
-        """
-        self.assertEqual(
-            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
-                               {'loadBalancerId': 200, 'type': 'RackConnectV3'},
-                               {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80)],
-             21: [CLBDescription(lb_id='21', port=81)]})
-
-
 class IPAddressTests(SynchronousTestCase):
     """
     Tests for utility functions that extract IP addresses from server
@@ -588,3 +562,18 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                        servicenet_address='10.0.0.2'),
         ]
         self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))
+
+    def test_no_group_servers(self):
+        """
+        If there are no servers in a group, get_all_convergence_data includes
+        an empty list.
+        """
+        get_servers = lambda: Effect(Stub(Constant({})))
+        get_lb = lambda: Effect(Stub(Constant([])))
+
+        eff = get_all_convergence_data(
+            'gid',
+            get_scaling_group_servers=get_servers,
+            get_clb_contents=get_lb)
+
+        self.assertEqual(resolve_stubs(eff), ([], []))
