@@ -6,7 +6,7 @@ from characteristic import attributes
 
 from effect import Effect, Func
 
-from pyrsistent import thaw
+from pyrsistent import pset, thaw
 
 from zope.interface import Interface, implementer
 
@@ -263,14 +263,17 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
     if response.code == 204:  # All done!
         return
 
-    pairs_to_delete = []
+    to_retry = pset(attempted_pairs)
     for error in body["errors"]:
         match = _RCV3_NODE_NOT_A_MEMBER_PATTERN.match(error)
-        if not match:  # Unrecoverable error, bail!
-            return
-
-        node_id, lb_id = match.groups()
-        pairs_to_delete.append((lb_id, node_id))
-
     next_step = BulkRemoveFromRCv3(lb_node_pairs=pairs_to_delete)
     return next_step.as_effect()
+        if match is not None:
+            to_retry -= pset([match.groups()[::-1]])
+
+        match = _RCV3_LB_INACTIVE_PATTERN.match(error)
+        if match is not None:
+            inactive_lb_id, = match.groups()
+            to_retry = pset([(lb_id, node_id)
+                             for (lb_id, node_id) in to_retry
+                             if lb_id != inactive_lb_id])
