@@ -112,10 +112,13 @@ class SetMetadataItemOnServer(object):
 _CLB_DUPLICATE_NODES_PATTERN = re.compile(
     "^Duplicate nodes detected. One or more nodes already configured "
     "on load balancer.$")
+_CLB_PENDING_UPDATE_PATTERN = re.compile(
+    "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
+    "immutable.$")
 
 
 @memoize
-def _check_clb_422(regex_match):
+def _check_clb_422(*regex_matches):
     """
     A success predicate that succeeds if the status code is 422 and the content
     matches the regex.  Used for detecting duplicate nodes on add to CLB, and
@@ -132,8 +135,10 @@ def _check_clb_422(regex_match):
         that the service request is called with ``json_response=True``,
         which it should be by default.
         """
-        return (response.code == 422 and
-                regex_match.search(content.get('message', '')))
+        if response.code == 422:
+            message = content.get('message', '')
+            return any([regex.search(message) for regex in regex_matches])
+        return False
 
     return check_response
 
@@ -172,7 +177,8 @@ class AddNodesToCLB(object):
                             for address, lbc in self.address_configs]},
             success_pred=predicate_any(
                 has_code(202, 413),
-                _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN)))
+                _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN,
+                               _CLB_PENDING_UPDATE_PATTERN)))
 
 
 @implementer(IStep)
