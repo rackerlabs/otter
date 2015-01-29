@@ -330,7 +330,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         self.assertEqual(partial_check_bulk_delete.args, (expected_pairs,))
         self.assertEqual(partial_check_bulk_delete.keywords, None)
 
-    def test_ok_if_lb_inactive(self):
+    def test_inactive_lb(self):
         """
         If the load balancer pool is inactive, the response was successful.
         """
