@@ -112,6 +112,10 @@ class AddNodesToCLB(object):
     """
     Multiple nodes must be added to a load balancer.
 
+    Note: This is not correctly documented in the load balancer documentation -
+    it is documented as "Add Node" (singular), but the examples show multiple
+    nodes being added.
+
     :param address_configs: A collection of two-tuples of address and
         :obj:`CLBDescription`.
     """
@@ -120,12 +124,16 @@ class AddNodesToCLB(object):
         return service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'POST',
-            append_segments('loadbalancers', str(self.lb_id)),
+            append_segments('loadbalancers', str(self.lb_id), "nodes"),
             data={'nodes': [{'address': address, 'port': lbc.port,
                              'condition': lbc.condition.name,
                              'weight': lbc.weight,
                              'type': lbc.type.name}
-                            for address, lbc in self.address_configs]})
+                            for address, lbc in self.address_configs]},
+            # if 413 (overLimit, which happens because CLB locks for a few
+            # seconds and cannot be changed again after an update), do not
+            # fail, just try again the next convegence cycle.
+            success_pred=has_code(202, 413))
 
 
 @implementer(IStep)
