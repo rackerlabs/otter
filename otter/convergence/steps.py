@@ -261,6 +261,12 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
     load balancer we were supposed to remove things from wasn't active,
     returns the next step to try and remove the remaining pairs. This is
     necessary because RCv3 bulk requests are atomic-ish.
+
+    :param attempted_pairs: The (lb, node) pairs that were attempted to be
+        removed. This is the :attr:`lb_node_pairs` attribute of
+        :class:`BulkRemoveFromRCv3` instances.
+    :param result: The result of the :class:`ServiceRequest`. This should be a
+        2-tuple of the response object and the (parsed) body.
     """
     response, body = result
 
