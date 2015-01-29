@@ -263,10 +263,10 @@ class ConvergeLBStateTests(SynchronousTestCase):
         clb_desc = CLBDescription(lb_id='5', port=80)
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, capacity=1,
-                                  desired_lbs=freeze({'5': [clb_desc]})),
+                DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=freeze({'5': [clb_desc]}))]),
                 set(),
                 0),
             pbag([
@@ -281,16 +281,16 @@ class ConvergeLBStateTests(SynchronousTestCase):
         but the configuration is wrong, `converge_lb_state` returns a
         :class:`ChangeCLBNode` object
         """
-        desired = {'5': [CLBDescription(lb_id='5', port=80)]}
+        desired = freeze({'5': [CLBDescription(lb_id='5', port=80)]})
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(
                                lb_id='5', port=80, weight=5))]
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, capacity=1,
-                                  desired_lbs=freeze(desired)),
+                DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set(current),
                 0),
             pbag([
@@ -309,10 +309,10 @@ class ConvergeLBStateTests(SynchronousTestCase):
 
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, capacity=1,
-                                  desired_lbs=pmap()),
+                DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=pmap())]),
                 set(current),
                 0),
             pbag([RemoveFromCLB(lb_id='5', node_id='123')]))
@@ -322,16 +322,16 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If the desired lb state matches the current lb state,
         `converge_lb_state` returns nothing
         """
-        desired = {'5': [CLBDescription(lb_id='5', port=80)]}
+        desired = freeze({'5': [CLBDescription(lb_id='5', port=80)]})
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(lb_id='5', port=80))]
 
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, capacity=1,
-                                  desired_lbs=freeze(desired)),
+                DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set(current),
                 0),
             pbag([]))
@@ -340,8 +340,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         """
         Remove, change, and add a node to a load balancer all together
         """
-        desired = {'5': [CLBDescription(lb_id='5', port=80)],
-                   '6': [CLBDescription(lb_id='6', port=80, weight=2)]}
+        desired = freeze({'5': [CLBDescription(lb_id='5', port=80)],
+                          '6': [CLBDescription(lb_id='6', port=80, weight=2)]})
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(lb_id='5', port=8080)),
                    CLBNode(node_id='234', address='1.1.1.1',
@@ -349,10 +349,10 @@ class ConvergeLBStateTests(SynchronousTestCase):
 
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, capacity=1,
-                                  desired_lbs=freeze(desired)),
+                DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set(current),
                 0),
             pbag([
@@ -374,15 +374,15 @@ class ConvergeLBStateTests(SynchronousTestCase):
         (use case: running multiple single-threaded server processes on a
         machine)
         """
-        desired = {'5': [CLBDescription(lb_id='5', port=8080),
-                         CLBDescription(lb_id='5', port=8081)]}
+        desired = freeze({'5': [CLBDescription(lb_id='5', port=8080),
+                                CLBDescription(lb_id='5', port=8081)]})
         current = []
         self.assertEqual(
             converge(
-                DesiredGroupState(server_config={}, capacity=1,
-                                  desired_lbs=freeze(desired)),
+                DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set(current),
                 0),
             pbag([
@@ -716,9 +716,11 @@ class ConvergeTests(SynchronousTestCase):
                 DesiredGroupState(server_config={}, capacity=1,
                                   desired_lbs=freeze(desired_lbs)),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1', created=0),
+                            servicenet_address='1.1.1.1', created=0,
+                            desired_lbs=freeze(desired_lbs)),
                      server('bcd', ServerState.ACTIVE,
-                            servicenet_address='2.2.2.2', created=1)]),
+                            servicenet_address='2.2.2.2', created=1,
+                            desired_lbs=freeze(desired_lbs))]),
                 set(),
                 0),
             pbag([
@@ -964,9 +966,11 @@ class PlanTests(SynchronousTestCase):
         result = plan(
             desired_group_state,
             set([server('server1', state=ServerState.ACTIVE,
-                        servicenet_address='1.1.1.1'),
+                        servicenet_address='1.1.1.1',
+                        desired_lbs=freeze(desired_lbs)),
                  server('server2', state=ServerState.ACTIVE,
-                        servicenet_address='1.2.3.4')]),
+                        servicenet_address='1.2.3.4',
+                        desired_lbs=freeze(desired_lbs))]),
             set(),
             0)
 
