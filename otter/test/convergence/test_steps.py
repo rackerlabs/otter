@@ -192,13 +192,19 @@ class StepAsEffectTests(SynchronousTestCase):
 
         self.assertTrue(predicate(StubResponse(202, {}), None))
         self.assertTrue(predicate(StubResponse(413, {}), None))
-
         self.assertTrue(predicate(
             StubResponse(422, {}),
             {
                 "message": "Duplicate nodes detected. One or more "
                            "nodes already configured on load "
                            "balancer.",
+                "code": 422
+            }))
+        self.assertTrue(predicate(
+            StubResponse(422, {}),
+            {
+                "message": "Load Balancer '12345' has a status of "
+                           "'PENDING_UPDATE' and is considered immutable.",
                 "code": 422
             }))
 
