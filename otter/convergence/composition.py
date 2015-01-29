@@ -58,8 +58,8 @@ def json_to_LBConfigs(lbs_json):
     """
     Convert load balancer config from JSON to :obj:`CLBDescription`
 
-    :param list lbs_json: List of load balancer configs
-    :return: `dict` of LBid -> [LBDescription] mapping
+    :param lbs_json: Sequence of load balancer configs
+    :return: mapping of LBid -> Sequence of LBDescription
 
     NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
     implemented in convergence
@@ -69,7 +69,7 @@ def json_to_LBConfigs(lbs_json):
         if lb.get('type') != 'RackConnectV3':
             lbd[lb['loadBalancerId']].append(CLBDescription(
                 lb_id=str(lb['loadBalancerId']), port=lb['port']))
-    return dict(lbd)
+    return freeze(dict(lbd))
 
 
 def get_desired_group_state(group_id, launch_config, desired):
@@ -84,11 +84,11 @@ def get_desired_group_state(group_id, launch_config, desired):
     NOTE: Currently this ignores draining timeout settings, since it has
     not been added to any schema yet.
     """
-    lbs = launch_config['args'].get('loadBalancers', [])
+    lbs = freeze(launch_config['args'].get('loadBalancers', []))
     server_lc = prepare_server_launch_config(
         group_id,
         freeze({'server': launch_config['args']['server']}),
-        freeze(lbs))
+        lbs)
     lbs = json_to_LBConfigs(lbs)
     desired_state = DesiredGroupState(
         server_config=server_lc,
