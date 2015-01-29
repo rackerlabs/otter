@@ -124,7 +124,7 @@ class NovaServer(object):
 
 
 @attributes(['server_config', 'capacity',
-             Attribute('desired_lbs', default_factory=dict, instance_of=dict),
+             Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
              Attribute('draining_timeout', default_value=0.0,
                        instance_of=float)])
 class DesiredGroupState(object):
