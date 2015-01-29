@@ -3,7 +3,7 @@
 from twisted.python.constants import NamedConstant, Names
 
 
-LOCK_PATH = '/locks'
+CONVERGENCE_LOCK_PATH = '/groups/{group_id}/converge_lock'
 
 
 class ServiceType(Names):

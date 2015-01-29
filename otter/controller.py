@@ -152,26 +152,26 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
         get_converger().converge(
             log, state.tenant_id, state.group_id, state.desired, launch_config)
         return None
+
+    delta = calculate_delta(log, state, config, policy)
+    execute_log = log.bind(server_delta=delta)
+
+    if delta == 0:
+        execute_log.msg("no change in servers")
+        return None
+    elif delta > 0:
+        execute_log.msg("executing launch configs")
+        deferred = execute_launch_config(
+            execute_log, transaction_id, state, launch_config,
+            scaling_group, delta)
     else:
-        delta = calculate_delta(log, state, config, policy)
-        execute_log = log.bind(server_delta=delta)
+        # delta < 0 (scale down)
+        execute_log.msg("scaling down")
+        deferred = exec_scale_down(execute_log, transaction_id, state,
+                                   scaling_group, -delta)
 
-        if delta == 0:
-            execute_log.msg("no change in servers")
-            return None
-        elif delta > 0:
-            execute_log.msg("executing launch configs")
-            deferred = execute_launch_config(
-                execute_log, transaction_id, state, launch_config,
-                scaling_group, delta)
-        else:
-            # delta < 0 (scale down)
-            execute_log.msg("scaling down")
-            deferred = exec_scale_down(execute_log, transaction_id, state,
-                                       scaling_group, -delta)
-
-        deferred.addCallback(_do_convergence_audit_log, log, delta, state)
-        return deferred
+    deferred.addCallback(_do_convergence_audit_log, log, delta, state)
+    return deferred
 
 
 def maybe_execute_scaling_policy(

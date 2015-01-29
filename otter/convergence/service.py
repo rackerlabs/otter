@@ -5,7 +5,7 @@ from effect.twisted import perform
 
 from twisted.application.service import Service
 
-from otter.constants import LOCK_PATH
+from otter.constants import CONVERGENCE_LOCK_PATH
 from otter.convergence.composition import (
     execute_convergence, get_desired_group_state)
 from otter.http import TenantScope
@@ -22,7 +22,7 @@ class Converger(Service, object):
 
     def _get_lock(self, group_id):
         """Get a ZooKeeper-backed lock for converging the group."""
-        path = '{}/convergence/{}'.format(LOCK_PATH, group_id)
+        path = CONVERGENCE_LOCK_PATH.format(group_id=group_id)
         return self._kz_client.Lock(path)
 
     def converge(self, log, tenant_id, group_id, desired, launch_config,

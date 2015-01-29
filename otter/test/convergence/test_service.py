@@ -42,7 +42,7 @@ class ConvergerTests(SynchronousTestCase):
             perform=perform,
             execute_convergence=lambda gid, dgs: exec_calls.get((gid, dgs)))
         self.kz_client.Lock.assert_called_once_with(
-            '/locks/convergence/group-id')
+            '/groups/group-id/converge_lock')
         self.kz_client.Lock().acquire.assert_called_once_with()
         self.kz_client.Lock().release.assert_called_once_with()
         perform.assert_called_once_with(
