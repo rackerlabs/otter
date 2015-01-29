@@ -10,10 +10,13 @@ from effect import Effect, Func
 
 from pyrsistent import pset, thaw
 
+from toolz.functoolz import memoize
+
 from zope.interface import Interface, implementer
 
 from otter.constants import ServiceType
 from otter.http import has_code, service_request
+from otter.util.fp import predicate_any
 from otter.util.hashkey import generate_server_name
 from otter.util.http import append_segments
 
@@ -106,26 +109,70 @@ class SetMetadataItemOnServer(object):
             data={'meta': {self.key: self.value}})
 
 
+_CLB_DUPLICATE_NODES_PATTERN = re.compile(
+    "^Duplicate nodes detected. One or more nodes already configured "
+    "on load balancer.$")
+
+
+@memoize
+def _check_clb_422(regex_match):
+    """
+    A success predicate that succeeds if the status code is 422 and the content
+    matches the regex.  Used for detecting duplicate nodes on add to CLB, and
+    the load balancer being deleted or pending delete on remove from CLB.
+
+    It's unfortunate this involves parsing the body.
+    """
+    def check_response(response, content):
+        """
+        Check that the given response has a 422 code and its body matches the
+        regex.
+
+        Expects the content to be JSON, so whatever uses this should make sure
+        that the service request is called with ``json_response=True``,
+        which it should be by default.
+        """
+        return (response.code == 422 and
+                regex_match.search(content.get('message', '')))
+
+    return check_response
+
+
 @implementer(IStep)
 @attributes(['lb_id', 'address_configs'])
 class AddNodesToCLB(object):
     """
     Multiple nodes must be added to a load balancer.
 
+    Note: This is not correctly documented in the load balancer documentation -
+    it is documented as "Add Node" (singular), but the examples show multiple
+    nodes being added.
+
     :param address_configs: A collection of two-tuples of address and
         :obj:`CLBDescription`.
+
+    Succeed unconditionally on 202 and 413 (over limit, which happens because
+    CLB locks for a few seconds and cannot be changed again after an update -
+    can be fixed next convergence cycle).
+
+    Succeed conditionally on 422 if duplicate nodes are detected - the
+    duplicate codes are not enumerated, so just try again the next convergence
+    cycle.
     """
     def as_effect(self):
         """Produce a :obj:`Effect` to add nodes to CLB"""
         return service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'POST',
-            append_segments('loadbalancers', str(self.lb_id)),
+            append_segments('loadbalancers', str(self.lb_id), "nodes"),
             data={'nodes': [{'address': address, 'port': lbc.port,
                              'condition': lbc.condition.name,
                              'weight': lbc.weight,
                              'type': lbc.type.name}
-                            for address, lbc in self.address_configs]})
+                            for address, lbc in self.address_configs]},
+            success_pred=predicate_any(
+                has_code(202, 413),
+                _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN)))
 
 
 @implementer(IStep)

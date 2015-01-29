@@ -3,12 +3,16 @@
 from effect import Func
 from effect.testing import resolve_effect
 
+from mock import ANY
+
 from pyrsistent import freeze, pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
+from otter.convergence.model import CLBDescription
 from otter.convergence.steps import (
+    AddNodesToCLB,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
@@ -16,9 +20,9 @@ from otter.convergence.steps import (
     DeleteServer,
     RemoveFromCLB,
     SetMetadataItemOnServer,
-    _rcv3_check_bulk_delete,
     _RCV3_LB_INACTIVE_PATTERN,
-    _RCV3_NODE_NOT_A_MEMBER_PATTERN)
+    _RCV3_NODE_NOT_A_MEMBER_PATTERN,
+    _rcv3_check_bulk_delete)
 from otter.http import has_code, service_request
 from otter.test.utils import StubResponse
 from otter.util.hashkey import generate_server_name
@@ -51,8 +55,8 @@ class StepAsEffectTests(SynchronousTestCase):
 
     def test_create_server_noname(self):
         """
-        When no name is provided in the launch config, the name will be
-        generated from scratch.
+        :obj:`CreateServer.as_effect`, when no name is provided in the launch
+        config, will generate the name will from scratch.
         """
         create = CreateServer(
             server_config=freeze({'server': {'flavorRef': '1'}}))
@@ -130,6 +134,90 @@ class StepAsEffectTests(SynchronousTestCase):
                 'loadbalancers/abc123/nodes/node1',
                 data={'condition': 'DRAINING',
                       'weight': 50}))
+
+    def test_add_nodes_to_clb(self):
+        """
+        :obj:`AddNodesToCLB` produces a request for adding any number of nodes
+        to a cloud load balancer.
+        """
+        lb_id = "12345"
+        lb_nodes = pset([
+            ('1.2.3.4', CLBDescription(lb_id=lb_id, port=80)),
+            ('1.2.3.4', CLBDescription(lb_id=lb_id, port=8080)),
+            ('2.3.4.5', CLBDescription(lb_id=lb_id, port=80))
+        ])
+        step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
+        request = step.as_effect()
+
+        self.assertEqual(request.intent.service_type,
+                         ServiceType.CLOUD_LOAD_BALANCERS)
+        self.assertEqual(request.intent.method, 'POST')
+        self.assertEqual(request.intent.url, "loadbalancers/12345/nodes")
+        self.assertEqual(request.intent.headers, None)
+        self.assertTrue(request.intent.json_response)
+
+        self.assertEqual(request.intent.data, {"nodes": ANY})
+        node_data = sorted(request.intent.data['nodes'],
+                           key=lambda n: (n['address'], n['port']))
+        self.assertEqual(node_data, [
+            {'address': '1.2.3.4',
+             'port': 80,
+             'condition': 'ENABLED',
+             'type': 'PRIMARY',
+             'weight': 1},
+            {'address': '1.2.3.4',
+             'port': 8080,
+             'condition': 'ENABLED',
+             'type': 'PRIMARY',
+             'weight': 1},
+            {'address': '2.3.4.5',
+             'port': 80,
+             'condition': 'ENABLED',
+             'type': 'PRIMARY',
+             'weight': 1}
+        ])
+
+    def test_add_nodes_to_clb_predicate(self):
+        """
+        :obj:`AddNodesToCLB` only accepts 202, 413, and some 422 responses.
+        """
+        lb_id = "12345"
+        lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
+        step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
+        request = step.as_effect()
+
+        self.assertTrue(request.intent.json_response)
+
+        predicate = request.intent.success_pred
+
+        self.assertTrue(predicate(StubResponse(202, {}), None))
+        self.assertTrue(predicate(StubResponse(413, {}), None))
+
+        self.assertTrue(predicate(
+            StubResponse(422, {}),
+            {
+                "message": "Duplicate nodes detected. One or more "
+                           "nodes already configured on load "
+                           "balancer.",
+                "code": 422
+            }))
+
+        self.assertFalse(predicate(StubResponse(404, {}), None))
+        self.assertFalse(predicate(
+            StubResponse(422, {}),
+            {
+                "message": "The load balancer is deleted and considered "
+                           "immutable.",
+                "code": 422
+            }))
+        self.assertFalse(predicate(
+            StubResponse(422, {}),
+            {
+                "message": "Load Balancer '{0}' has a status of "
+                           "'PENDING_DELETE' and is considered immutable."
+                           .format(lb_id),
+                "code": 422
+            }))
 
     def _generic_bulk_rcv3_step_test(self, step_class, expected_method):
         """

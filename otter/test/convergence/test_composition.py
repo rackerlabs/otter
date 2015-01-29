@@ -165,8 +165,9 @@ class ExecConvergenceTests(SynchronousTestCase):
         expected_req = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'POST',
-            'loadbalancers/23',
-            data=mock.ANY)
+            'loadbalancers/23/nodes',
+            data=mock.ANY,
+            success_pred=mock.ANY)
         got_req = eff.intent.effects[0].intent
         self.assertEqual(got_req, expected_req.intent)
         # separate check for nodes; they are unique, but can be in any order
