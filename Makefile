@@ -17,7 +17,7 @@ CLOUDCAFE ?= $(shell which cafe-runner)
 
 mkfile_dir := $(shell dirname "$(MAKEFILE_LIST)")
 
-.PHONY: targets env-precheck
+.PHONY: targets env-precheck docbook
 
 targets:
 	@cat README.md
@@ -93,14 +93,22 @@ cleandocs:
 	rm -rf htmldoc
 	rm -rf docbook/target
 
-docs: cleandocs
+docs: sphinxdocs docbook
+
+sphinxdocs:
 	cp -r ${DOCDIR} _builddoc
 	sphinx-apidoc -F -T -o _builddoc ${CODEDIR}
 	sphinx-apidoc -F -T -o _builddoc ${TESTDIR2}
 	sphinx-apidoc -F -T -o _builddoc ${TESTDIR1}
 	sphinx-apidoc -F -T -o _builddoc ${TESTDIR3}
 	sphinx-build -b html _builddoc htmldoc
-	rm -rf _builddoc
+
+docbook:
+ifneq ($(shell git diff --name-only ${DIFF_TARGET} -- docbook), )
+	cd docbook; mvn -q compile
+else
+	echo "Skipping, nothing changed between working tree and diff target"
+endif
 
 schema: FORCE schema-setup schema-teardown
 
