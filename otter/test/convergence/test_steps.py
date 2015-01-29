@@ -324,6 +324,12 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         """
         If the load balancer pool is inactive, the response was unsuccessful.
         """
+        node_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
+        inactive_lb_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+        pairs = [(inactive_lb_id, node_id)]
+
         resp = StubResponse(409, {})
-        body = {"errors": ["Load Balancer Pool l1 is not in an ACTIVE state"]}
-        self.assertIdentical(_rcv3_check_bulk_delete((resp, body)), None)
+        body = {"errors": ["Load Balancer Pool {} is not in an ACTIVE state"
+                           .format(inactive_lb_id)]}
+        result = _rcv3_check_bulk_delete(pairs, (resp, body))
+        self.assertIdentical(result, None)
