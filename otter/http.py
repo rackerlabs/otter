@@ -44,7 +44,7 @@ def add_bind_service(catalog, service_name, region, log, request_func):
 
 def service_request(
         service_type, method, url, headers=None, data=None,
-        log=None,
+        params=None, log=None,
         reauth_codes=(401, 403),
         success_pred=has_code(200),
         json_response=True):
@@ -58,6 +58,8 @@ def service_request(
     :param url: partial URL (appended to service endpoint)
     :param dict headers: base headers; will have auth headers added.
     :param data: JSON-able object or None.
+    :param params: dict of query param ids to lists of values, or a list of
+        tuples of query key to query value.
     :param log: log to send request info to.
     :param sequence success_pred: A predicate of responses which determines if
         a response indicates success or failure.
@@ -66,8 +68,8 @@ def service_request(
     :param bool json_response: Specifies whether the response should be
         parsed as JSON.
 
-    :raise APIError: Raised asynchronously when the response HTTP code is not in
-        success_codes.
+    :raise APIError: Raised asynchronously when the response HTTP code is not
+        in success_codes.
     :return: Effect of :obj:`ServiceRequest`, resulting in a JSON-parsed HTTP
         response body.
     """
@@ -77,13 +79,14 @@ def service_request(
         url=url,
         headers=headers,
         data=data,
+        params=params,
         log=log,
         reauth_codes=reauth_codes,
         success_pred=success_pred,
         json_response=json_response))
 
 
-@attributes(["service_type", "method", "url", "headers", "data",
+@attributes(["service_type", "method", "url", "headers", "data", "params",
              "log", "reauth_codes", "success_pred", "json_response"])
 class ServiceRequest(object):
     """
