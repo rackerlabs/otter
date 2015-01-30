@@ -142,9 +142,9 @@ class PerformServiceRequestTests(SynchronousTestCase):
         self.assertEqual(next_eff.intent.data, json.dumps(input_json))
 
         # Output is parsed
-        result = resolve_effect(next_eff,
-                                stub_pure_response(json.dumps(output_json)))
-        self.assertEqual(result, output_json)
+        response, body = stub_pure_response(json.dumps(output_json))
+        result = resolve_effect(next_eff, (response, body))
+        self.assertEqual(result, (response, output_json))
 
     def test_no_json_response(self):
         """
