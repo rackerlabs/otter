@@ -155,8 +155,9 @@ class PerformServiceRequestTests(SynchronousTestCase):
                                  json_response=False).intent
         eff = self._concrete(svcreq)
         next_eff = resolve_authenticate(eff)
-        result = resolve_effect(next_eff, stub_pure_response("foo"))
-        self.assertEqual(result, "foo")
+        stub_response = stub_pure_response("foo")
+        result = resolve_effect(next_eff, stub_response)
+        self.assertEqual(result, stub_response)
 
 
 class PerformTenantScopeTests(SynchronousTestCase):
