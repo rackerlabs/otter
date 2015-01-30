@@ -5,6 +5,7 @@ import jsonfig
 from functools import partial
 
 from twisted.python import usage
+from twisted.python.log import addObserver
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, maybeDeferred
@@ -231,9 +232,7 @@ def makeService(config):
     cf = CloudFeeds(reactor=reactor, authenticator=authenticator,
                     region=region, tenant_id=cf_conf['tenant_id'],
                     service_configs=service_configs)
-    # TODO: It would be nice to not store this as global state but
-    # observer factory is called by twistd before this step
-    set_cloud_feeds(cf)
+    addObserver(cf)
 
     # Setup Kazoo client
     if config_value('zookeeper'):
