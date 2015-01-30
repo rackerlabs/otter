@@ -39,9 +39,5 @@ def get_service_configs(config):
         ServiceType.CLOUD_METRICS_INGEST: {
             'name': config['metrics']['service'],
             'region': config['metrics']['region'],
-        },
-        ServiceType.CLOUD_FEEDS: {
-            'name': config['cloudfeeds']['service'],
-            'region': config['region']
         }
     }

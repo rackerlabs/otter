@@ -227,12 +227,15 @@ def makeService(config):
         admin_service = service(str(admin_port), admin_site)
         admin_service.setServiceParent(s)
 
-    # setup cloud feed,
-    cf_conf = config['cloudfeeds']
-    cf = CloudFeeds(reactor=reactor, authenticator=authenticator,
-                    region=region, tenant_id=cf_conf['tenant_id'],
-                    service_configs=service_configs)
-    addObserver(cf)
+    # setup cloud feed
+    cf_conf = config.get('cloudfeeds', None)
+    if cf_conf is not None:
+        service_configs[ServiceType.CLOUD_FEEDS] = {
+            'name': cf_conf['service'], 'region': region}
+        cf = CloudFeeds(reactor=reactor, authenticator=authenticator,
+                        region=region, tenant_id=cf_conf['tenant_id'],
+                        service_configs=service_configs)
+        addObserver(cf)
 
     # Setup Kazoo client
     if config_value('zookeeper'):
