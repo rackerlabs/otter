@@ -57,13 +57,15 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         maxentities = 2
         group = self._create_group(
             cooldown=0, minentities=minentities, maxentities=maxentities)
-        self.autoscale_behaviors.create_schedule_policy_given(
+        policy_dict = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=group.id,
             sp_cooldown=0,
             sp_change=maxentities + 1,
             schedule_cron='* * * * *')
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, group.groupConfiguration.maxEntities)
+        self.autoscale_client.delete_scaling_policy(
+            group.id, policy_dict['id'])
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=group.id,
             sp_cooldown=0,
