@@ -735,7 +735,7 @@ class ConvergeTests(SynchronousTestCase):
 class OptimizerTests(SynchronousTestCase):
     """Tests for :func:`optimize_steps`."""
 
-    def test_optimize_lb_adds(self):
+    def test_optimize_clb_adds(self):
         """
         Multiple :class:`AddNodesToCLB` steps for the same LB
         are merged into one.
@@ -759,9 +759,10 @@ class OptimizerTests(SynchronousTestCase):
                         ('1.2.3.4', CLBDescription(lb_id='5', port=80)))
                 )]))
 
-    def test_optimize_maintain_unique_ports(self):
+    def test_optimize_clb_adds_maintain_unique_ports(self):
         """
-        Multiple ports can be specified for the same address and LB ID.
+        Multiple ports can be specified for the same address and LB ID when
+        adding to a CLB.
         """
         steps = pbag([
             AddNodesToCLB(
@@ -784,8 +785,10 @@ class OptimizerTests(SynchronousTestCase):
                         ('1.1.1.1',
                          CLBDescription(lb_id='5', port=8080))))]))
 
-    def test_multiple_load_balancers(self):
-        """Aggregation is done on a per-load-balancer basis."""
+    def test_clb_adds_multiple_load_balancers(self):
+        """
+        Aggregation is done on a per-load-balancer basis when adding to a CLB.
+        """
         steps = pbag([
             AddNodesToCLB(
                 lb_id='5',
@@ -819,6 +822,41 @@ class OptimizerTests(SynchronousTestCase):
                         ('1.1.1.2', CLBDescription(lb_id='6', port=80)))),
             ]))
 
+    def test_optimize_clb_removes(self):
+        """
+        Aggregation is done on a per-load-balancer basis when remove nodes from
+        a CLB.
+        """
+        steps = pbag([
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('2')),
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('3')),
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('4'))])
+
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                RemoveNodesFromCLB(lb_id='5', node_ids=s('1', '2', '3', '4'))
+            ]))
+
+    def test_clb_remove_multiple_load_balancers(self):
+        """
+        Multiple :class:`RemoveNodesFromCLB` steps for the same LB
+        are merged into one.
+        """
+        steps = pbag([
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('2')),
+            RemoveNodesFromCLB(lb_id='6', node_ids=s('3')),
+            RemoveNodesFromCLB(lb_id='6', node_ids=s('4'))])
+
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                RemoveNodesFromCLB(lb_id='5', node_ids=s('1', '2')),
+                RemoveNodesFromCLB(lb_id='6', node_ids=s('3', '4'))
+            ]))
+
     def test_optimize_leaves_other_steps(self):
         """
         Unoptimizable steps pass the optimizer unchanged.
@@ -828,6 +866,7 @@ class OptimizerTests(SynchronousTestCase):
                 lb_id='5',
                 address_configs=s(('1.1.1.1',
                                    CLBDescription(lb_id='5', port=80)))),
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
             CreateServer(server_config=pmap({})),
             BulkRemoveFromRCv3(lb_node_pairs=pset([("lb-1", "node-a")])),
             BulkAddToRCv3(lb_node_pairs=pset([("lb-2", "node-b")]))
@@ -862,6 +901,10 @@ class OptimizerTests(SynchronousTestCase):
                 lb_id='6',
                 address_configs=s(('1.1.1.2',
                                    CLBDescription(lb_id='6', port=80)))),
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('2')),
+            RemoveNodesFromCLB(lb_id='6', node_ids=s('3')),
+            RemoveNodesFromCLB(lb_id='6', node_ids=s('4')),
 
             # Unoptimizable steps
             CreateServer(server_config=pmap({})),
@@ -883,6 +926,8 @@ class OptimizerTests(SynchronousTestCase):
                                        CLBDescription(lb_id='6', port=80)),
                                       ('1.1.1.2',
                                        CLBDescription(lb_id='6', port=80)))),
+                RemoveNodesFromCLB(lb_id='5', node_ids=s('1', '2')),
+                RemoveNodesFromCLB(lb_id='6', node_ids=s('3', '4')),
 
                 # Unoptimizable steps
                 CreateServer(server_config=pmap({}))
