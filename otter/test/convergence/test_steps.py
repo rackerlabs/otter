@@ -287,6 +287,38 @@ class StepAsEffectTests(SynchronousTestCase):
                 "code": 422
             }))
 
+    def test_remove_nodes_from_clb_retry(self):
+        """
+        :obj:`RemoveNodesFromCLB`, on receiving a 400, parses out the nodes
+        that are no longer on the load balancer, and retries the bulk delete
+        with those nodes removed.
+        """
+        lb_id = "12345"
+        node_ids = pset([str(i) for i in range(5)])
+        error_body = {
+            "validationErrors": {
+                "messages": [
+                    "Node ids 1,2,3 are not a part of your loadbalancer"
+                ]
+            },
+            "message": "Validation Failure",
+            "code": 400,
+            "details": "The object is not valid"
+        }
+
+        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=node_ids)
+        eff = resolve_effect(step.as_effect(),
+                             (StubResponse(400, {}), error_body))
+        self.assertEqual(
+            eff.intent,
+            service_request(
+                ServiceType.CLOUD_LOAD_BALANCERS,
+                'DELETE',
+                'loadbalancers/12345/nodes',
+                params={'id': ['0', '4']},
+                success_pred=ANY,
+                json_response=True).intent)
+
     def _generic_bulk_rcv3_step_test(self, step_class, expected_method):
         """
         A generic test for bulk RCv3 steps.
