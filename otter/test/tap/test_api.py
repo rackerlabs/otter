@@ -436,6 +436,20 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.assertEqual(get_supervisor(), supervisor_service)
 
+    @mock.patch('otter.tap.api.addObserver')
+    def test_cloudfeeds_setup(self, mock_addobserver):
+        """
+        Cloud feeds observer is setup if it is there in config
+        """
+        conf = deepcopy(test_config)
+        conf['cloudfeeds'] = {'service': 'cloudFeeds', 'tenant_id': 'tid'}
+        makeService(conf)
+        mock_addobserver.assert_called_once_with(
+            matches(IsInstance(CloudFeedsObserver))
+        cf = mock_addobserver.mock_calls[0][0]
+        #self.assertEqual(
+        #    CloudFeedsObserver(reactor=self.reactor, ))
+
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     def test_kazoo_client_success(self, mock_txkz, mock_setup_scheduler):
