@@ -1084,7 +1084,9 @@ class ServerTests(SynchronousTestCase):
         """
         req = ('POST', 'http://url/servers',
                headers('my-auth-token'),
-               json.dumps({'server': {'some': 'stuff'}}), {'log': mock.ANY})
+               json.dumps({'server': {'some': 'stuff'}}),
+               None,
+               {'log': mock.ANY})
         resp = StubResponse(202, {})
 
         _treq = StubTreq([(req, resp)], [(resp, '{"server": "created"}')])
@@ -1137,7 +1139,9 @@ class ServerTests(SynchronousTestCase):
         """
         req = ('POST', 'http://url/servers',
                headers('my-auth-token'),
-               json.dumps({'server': {}}), {'log': mock.ANY})
+               json.dumps({'server': {}}),
+               None,
+               {'log': mock.ANY})
         resp = StubResponse(500, {})
 
         clock = Clock()
@@ -1167,7 +1171,9 @@ class ServerTests(SynchronousTestCase):
         """
         req = ('POST', 'http://url/servers',
                headers('my-auth-token'),
-               json.dumps({'server': {'some': 'stuff'}}), {'log': mock.ANY})
+               json.dumps({'server': {'some': 'stuff'}}),
+               None,
+               {'log': mock.ANY})
         resp = StubResponse(500, {})
 
         clock = Clock()
@@ -1193,7 +1199,9 @@ class ServerTests(SynchronousTestCase):
         """
         req = ('POST', 'http://url/servers',
                headers('my-auth-token'),
-               json.dumps({'server': {}}), {'log': mock.ANY})
+               json.dumps({'server': {}}),
+               None,
+               {'log': mock.ANY})
         resp = StubResponse(500, {})
 
         clock = Clock()
@@ -1226,7 +1234,9 @@ class ServerTests(SynchronousTestCase):
         """
         req = ('POST', 'http://url/servers',
                headers('my-auth-token'),
-               json.dumps({'server': {}}), {'log': mock.ANY})
+               json.dumps({'server': {}}),
+               None,
+               {'log': mock.ANY})
         resp = StubResponse(500, {})
 
         _treq = StubTreq([(req, resp)], [(resp, error_body)])
@@ -1253,7 +1263,9 @@ class ServerTests(SynchronousTestCase):
         """
         req = ('POST', 'http://url/servers',
                headers('my-auth-token'),
-               json.dumps({'server': {}}), {'log': mock.ANY})
+               json.dumps({'server': {}}),
+               None,
+               {'log': mock.ANY})
         resp = StubResponse(400, {})
 
         _treq = StubTreq([(req, resp)], [(resp, "User error!")])
