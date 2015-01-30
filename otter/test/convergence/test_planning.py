@@ -27,7 +27,7 @@ from otter.convergence.steps import (
     ChangeCLBNode,
     CreateServer,
     DeleteServer,
-    RemoveFromCLB,
+    RemoveNodesFromCLB,
     SetMetadataItemOnServer)
 
 
@@ -37,7 +37,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
     balanacer and removing them from the load balancer when finished draining.
     (:func:`_remove_from_lb_with_draining`).
     """
-    LB_STEPS = (AddNodesToCLB, RemoveFromCLB, ChangeCLBNode)
+    LB_STEPS = (AddNodesToCLB, RemoveNodesFromCLB, ChangeCLBNode)
 
     def _filter_only_lb_steps(self, steps):
         """
@@ -60,7 +60,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                 set([CLBNode(node_id='123', address='1.1.1.1',
                      description=CLBDescription(lb_id='5', port=80))]),
                 now=0)),
-            pbag([RemoveFromCLB(lb_id='5', node_id='123')]))
+            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=('123',))]))
 
     def test_disabled_state_is_removed(self):
         """
@@ -79,7 +79,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1')]),
                 set(current),
                 now=0)),
-            pbag([RemoveFromCLB(lb_id='5', node_id='123')]))
+            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=('123',))]))
 
     def test_enabled_state_is_drained(self):
         """
@@ -137,7 +137,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1')]),
                 set(current),
                 now=5)),
-            pbag([RemoveFromCLB(lb_id='5', node_id='123')]))
+            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=('123',))]))
 
     def test_draining_state_remains_if_connections_none_before_timeout(self):
         """
@@ -177,7 +177,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1')]),
                 set(current),
                 now=15)),
-            pbag([RemoveFromCLB(lb_id='5', node_id='123')]))
+            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=('123',))]))
 
     def test_draining_state_removed_if_connections_and_timeout_expired(self):
         """
@@ -197,7 +197,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1')]),
                 set(current),
                 now=15)),
-            pbag([RemoveFromCLB(lb_id='5', node_id='123')]))
+            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=('123',))]))
 
     def test_all_changes_together(self):
         """
@@ -244,9 +244,9 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                 ChangeCLBNode(lb_id='1', node_id='1', weight=1,
                               condition=CLBNodeCondition.DRAINING,
                               type=CLBNodeType.PRIMARY),
-                RemoveFromCLB(lb_id='2', node_id='2'),
-                RemoveFromCLB(lb_id='4', node_id='4'),
-                RemoveFromCLB(lb_id='5', node_id='5'),
+                RemoveNodesFromCLB(lb_id='2', node_ids=('2',)),
+                RemoveNodesFromCLB(lb_id='4', node_ids=('4',)),
+                RemoveNodesFromCLB(lb_id='5', node_ids=('5',)),
             ]))
 
 
@@ -315,7 +315,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                             desired_lbs=pmap())]),
                 set(current),
                 0),
-            pbag([RemoveFromCLB(lb_id='5', node_id='123')]))
+            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=('123',))]))
 
     def test_do_nothing(self):
         """
@@ -363,7 +363,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                 ChangeCLBNode(lb_id='6', node_id='234', weight=2,
                               condition=CLBNodeCondition.ENABLED,
                               type=CLBNodeType.PRIMARY),
-                RemoveFromCLB(lb_id='5', node_id='123')
+                RemoveNodesFromCLB(lb_id='5', node_ids=('123',))
             ]))
 
     def test_same_lb_multiple_ports(self):
@@ -439,7 +439,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
-                RemoveFromCLB(lb_id='1', node_id='1')
+                RemoveNodesFromCLB(lb_id='1', node_ids=('1',))
             ]))
 
     def test_draining_server_can_be_deleted_if_all_lbs_can_be_removed(self):
@@ -459,7 +459,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
-                RemoveFromCLB(lb_id='1', node_id='1')
+                RemoveNodesFromCLB(lb_id='1', node_ids=('1',))
             ]))
 
     def test_draining_server_ignored_if_waiting_for_timeout(self):
@@ -643,8 +643,8 @@ class ConvergeTests(SynchronousTestCase):
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
-                RemoveFromCLB(lb_id='5', node_id='3'),
-                RemoveFromCLB(lb_id='5', node_id='5'),
+                RemoveNodesFromCLB(lb_id='5', node_ids=('3',)),
+                RemoveNodesFromCLB(lb_id='5', node_ids=('5',)),
                 CreateServer(server_config=pmap()),
             ]))
 
@@ -906,8 +906,8 @@ class LimitStepCount(SynchronousTestCase):
                           for i in xrange(counts.get(CreateServer, 0))]
         delete_servers = [DeleteServer(server_id='abc-' + str(i))
                           for i in xrange(counts.get(DeleteServer, 0))]
-        remove_from_clbs = [RemoveFromCLB(lb_id='1', node_id=str(i))
-                            for i in xrange(counts.get(RemoveFromCLB, 0))]
+        remove_from_clbs = [RemoveNodesFromCLB(lb_id='1', node_ids=(str(i),))
+                            for i in xrange(counts.get(RemoveNodesFromCLB, 0))]
 
         return pbag(create_servers + delete_servers + remove_from_clbs)
 
