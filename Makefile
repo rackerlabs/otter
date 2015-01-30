@@ -66,7 +66,7 @@ unit:
 ifneq ($(JENKINS_URL), )
 	trial --jobs=4 --random 0 --reporter=subunit ${UNITTESTS} \
 		| tee subunit-output.txt
-	tail -n +3 subunit-output.txt | subunit2junitxml > test-report.xml
+	tail -n +4 subunit-output.txt | subunit2junitxml > test-report.xml
 else
 	trial --jobs=4 --random 0 ${UNITTESTS}
 endif
