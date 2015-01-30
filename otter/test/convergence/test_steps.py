@@ -18,7 +18,7 @@ from otter.convergence.steps import (
     ChangeCLBNode,
     CreateServer,
     DeleteServer,
-    RemoveFromCLB,
+    RemoveNodesFromCLB,
     SetMetadataItemOnServer,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
@@ -100,21 +100,6 @@ class StepAsEffectTests(SynchronousTestCase):
                 'servers/abc123/metadata/metadata_key',
                 data={'meta': {'metadata_key': 'teapot'}}))
 
-    def test_remove_from_load_balancer(self):
-        """
-        :obj:`RemoveFromCLB.as_effect` produces a request for
-        removing a node from a load balancer.
-        """
-        lbremove = RemoveFromCLB(
-            lb_id='abc123',
-            node_id='node1')
-        self.assertEqual(
-            lbremove.as_effect(),
-            service_request(
-                ServiceType.CLOUD_LOAD_BALANCERS,
-                'DELETE',
-                'loadbalancers/abc123/node1'))
-
     def test_change_load_balancer_node(self):
         """
         :obj:`ChangeCLBNode.as_effect` produces a request for
@@ -154,6 +139,7 @@ class StepAsEffectTests(SynchronousTestCase):
         self.assertEqual(request.intent.method, 'POST')
         self.assertEqual(request.intent.url, "loadbalancers/12345/nodes")
         self.assertEqual(request.intent.headers, None)
+        self.assertEqual(request.intent.params, None)
         self.assertTrue(request.intent.json_response)
 
         self.assertEqual(request.intent.data, {"nodes": ANY})
@@ -222,6 +208,82 @@ class StepAsEffectTests(SynchronousTestCase):
                 "message": "Load Balancer '{0}' has a status of "
                            "'PENDING_DELETE' and is considered immutable."
                            .format(lb_id),
+                "code": 422
+            }))
+
+    def test_remove_nodes_from_clb(self):
+        """
+        :obj:`RemoveNodesToCLB` produces a request for deleting any number of
+        nodes from a cloud load balancer.
+        """
+        lb_id = "12345"
+        node_ids = pset([str(i) for i in range(5)])
+
+        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=node_ids)
+        request = step.as_effect()
+
+        self.assertEqual(request.intent.service_type,
+                         ServiceType.CLOUD_LOAD_BALANCERS)
+        self.assertEqual(request.intent.method, 'DELETE')
+        self.assertEqual(request.intent.url, "loadbalancers/12345/nodes")
+        self.assertEqual(request.intent.params, {'id': list(node_ids)})
+        self.assertEqual(request.intent.headers, None)
+        self.assertTrue(request.intent.json_response)
+        self.assertEqual(request.intent.data, None)
+
+    def test_remove_nodes_from_clb_predicate(self):
+        """
+        :obj:`RemoveNodesFromCLB` only accepts 202, 413, 400, and some 422
+        responses.  However, only 202, 413, and 422s are covered by this test.
+        400's will be covered by another test as they require retry.
+        """
+        lb_id = "12345"
+        node_ids = pset([str(i) for i in range(5)])
+        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=node_ids)
+        request = step.as_effect()
+
+        self.assertTrue(request.intent.json_response)
+
+        predicate = request.intent.success_pred
+
+        self.assertTrue(predicate(StubResponse(202, {}), None))
+        self.assertTrue(predicate(StubResponse(413, {}), None))
+        self.assertTrue(predicate(
+            StubResponse(422, {}),
+            {
+                "message": "The load balancer is deleted and considered "
+                           "immutable.",
+                "code": 422
+            }))
+        self.assertTrue(predicate(
+            StubResponse(422, {}),
+            {
+                "message": "Load Balancer '12345' has a status of "
+                           "'PENDING_UPDATE' and is considered immutable.",
+                "code": 422
+            }))
+        self.assertTrue(predicate(
+            StubResponse(422, {}),
+            {
+                "message": "Load Balancer '12345' has a status of "
+                           "'PENDING_DELETE' and is considered immutable.",
+                "code": 422
+            }))
+
+        self.assertFalse(predicate(StubResponse(404, {}), None))
+        self.assertFalse(predicate(
+            StubResponse(422, {}),
+            {
+                "message": "Duplicate nodes detected. One or more "
+                           "nodes already configured on load "
+                           "balancer.",
+                "code": 422
+            }))
+        # This one is just malformed but similar to a good message.
+        self.assertFalse(predicate(
+            StubResponse(422, {}),
+            {
+                "message": "The load balancer is considered immutable.",
                 "code": 422
             }))
 

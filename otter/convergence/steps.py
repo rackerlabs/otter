@@ -115,6 +115,9 @@ _CLB_DUPLICATE_NODES_PATTERN = re.compile(
 _CLB_PENDING_UPDATE_PATTERN = re.compile(
     "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
     "immutable.$")
+_CLB_DELETED_PATTERN = re.compile(
+    "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
+    "The load balancer is deleted and) considered immutable.$")
 
 
 @memoize
@@ -153,7 +156,8 @@ class AddNodesToCLB(object):
     it is documented as "Add Node" (singular), but the examples show multiple
     nodes being added.
 
-    :param address_configs: A collection of two-tuples of address and
+    :ivar str lb_id: The cloud load balancer ID to add nodes to.
+    :ivar iterable address_configs: A collection of two-tuples of address and
         :obj:`CLBDescription`.
 
     Succeed unconditionally on 202 and 413 (over limit, so try again later).
@@ -166,6 +170,7 @@ class AddNodesToCLB(object):
     state, which happens because CLB locks for a few seconds and cannot be
     changed again after an update - can be fixed next convergence cycle.
     """
+
     def as_effect(self):
         """Produce a :obj:`Effect` to add nodes to CLB"""
         return service_request(
@@ -184,10 +189,22 @@ class AddNodesToCLB(object):
 
 
 @implementer(IStep)
-@attributes(['lb_id', 'node_id'])
-class RemoveFromCLB(object):
+@attributes(['lb_id', 'node_ids'])
+class RemoveNodesFromCLB(object):
     """
-    A server must be removed from a load balancer.
+    One or more IPs must be removed from a load balancer.
+
+    :ivar str lb_id: The cloud load balancer ID to add nodes to.
+    :ivar iterable node_ids: A collection of node IDs to remove from the CLB.
+
+    Succeed unconditionally on 202 and 413 (over limit, so try again later).
+
+    Succeed conditionally on 422 if the load balancer is in PENDING_UPDATE
+    state, which happens because CLB locks for a few seconds and cannot be
+    changed again after an update - can be fixed next convergence cycle.
+
+    Succeed conditionally on 422 if the load balancer is in PENDING_DELETE
+    state, or already deleted, which means we don't have to remove any nodes.
     """
 
     def as_effect(self):
@@ -195,8 +212,12 @@ class RemoveFromCLB(object):
         return service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'DELETE',
-            append_segments('loadbalancers', str(self.lb_id),
-                            str(self.node_id)))
+            append_segments('loadbalancers', str(self.lb_id), 'nodes'),
+            params={'id': [str(node_id) for node_id in self.node_ids]},
+            success_pred=predicate_any(
+                has_code(202, 413),
+                _check_clb_422(_CLB_PENDING_UPDATE_PATTERN,
+                               _CLB_DELETED_PATTERN)))
 
 
 @implementer(IStep)
