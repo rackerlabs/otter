@@ -10,7 +10,8 @@ from effect import Effect, Func
 
 from pyrsistent import pset, thaw
 
-from toolz.functoolz import memoize
+from toolz.dicttoolz import get_in
+from toolz.itertoolz import concat
 
 from zope.interface import Interface, implementer
 
@@ -115,9 +116,13 @@ _CLB_DUPLICATE_NODES_PATTERN = re.compile(
 _CLB_PENDING_UPDATE_PATTERN = re.compile(
     "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
     "immutable.$")
+_CLB_DELETED_PATTERN = re.compile(
+    "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
+    "The load balancer is deleted and) considered immutable.$")
+_CLB_NODE_REMOVED_PATTERN = re.compile(
+    "^Node ids ((?:\d+,)*(?:\d+)) are not a part of your loadbalancer\s*$")
 
 
-@memoize
 def _check_clb_422(*regex_matches):
     """
     A success predicate that succeeds if the status code is 422 and the content
@@ -153,7 +158,8 @@ class AddNodesToCLB(object):
     it is documented as "Add Node" (singular), but the examples show multiple
     nodes being added.
 
-    :param address_configs: A collection of two-tuples of address and
+    :ivar str lb_id: The cloud load balancer ID to add nodes to.
+    :ivar iterable address_configs: A collection of two-tuples of address and
         :obj:`CLBDescription`.
 
     Succeed unconditionally on 202 and 413 (over limit, so try again later).
@@ -166,6 +172,7 @@ class AddNodesToCLB(object):
     state, which happens because CLB locks for a few seconds and cannot be
     changed again after an update - can be fixed next convergence cycle.
     """
+
     def as_effect(self):
         """Produce a :obj:`Effect` to add nodes to CLB"""
         return service_request(
@@ -184,19 +191,69 @@ class AddNodesToCLB(object):
 
 
 @implementer(IStep)
-@attributes(['lb_id', 'node_id'])
-class RemoveFromCLB(object):
+@attributes(['lb_id', 'node_ids'])
+class RemoveNodesFromCLB(object):
     """
-    A server must be removed from a load balancer.
+    One or more IPs must be removed from a load balancer.
+
+    :ivar str lb_id: The cloud load balancer ID to remove nodes from.
+    :ivar iterable node_ids: A collection of node IDs to remove from the CLB.
+
+    Succeed unconditionally on 202 and 413 (over limit, so try again later).
+
+    Succeed conditionally on 422 if the load balancer is in PENDING_UPDATE
+    state, which happens because CLB locks for a few seconds and cannot be
+    changed again after an update - can be fixed next convergence cycle.
+
+    Succeed conditionally on 422 if the load balancer is in PENDING_DELETE
+    state, or already deleted, which means we don't have to remove any nodes.
     """
 
     def as_effect(self):
         """Produce a :obj:`Effect` to remove a load balancer node."""
-        return service_request(
+        eff = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'DELETE',
-            append_segments('loadbalancers', str(self.lb_id),
-                            str(self.node_id)))
+            append_segments('loadbalancers', str(self.lb_id), 'nodes'),
+            params={'id': [str(node_id) for node_id in self.node_ids]},
+            success_pred=predicate_any(
+                has_code(202, 413, 400),
+                _check_clb_422(_CLB_PENDING_UPDATE_PATTERN,
+                               _CLB_DELETED_PATTERN)))
+        # 400 means that there are some nodes that are no longer on the
+        # load balancer.  Parse them out and try again.
+        return eff.on(partial(
+            _clb_check_bulk_delete, self.lb_id, self.node_ids))
+
+
+def _clb_check_bulk_delete(lb_id, attempted_nodes, result):
+    """
+    Check if the CLB bulk deletion command failed with a 400, and if so,
+    returns the next step to try and remove the remaining nodes. This is
+    necessary because CLB bulk deletes are atomic-ish.
+
+    This seems to be the only case in which this API endpoint returns a 400.
+
+    All other cases are considered unambiguous successes.
+
+    :param result: The result of the :class:`ServiceRequest`. This should be a
+        2-tuple of the response object and the (parsed) body.
+    :ivar str lb_id: The cloud load balancer ID to remove nodes from.
+    :param attempted_nodes: The node IDs that were attempted to be
+        removed. This is the :attr:`node_ids` attribute of
+        :class:`RemoveNodesFromCLB` instances.
+
+    This assumes that the result body is already parsed into JSON.
+    """
+    response, body = result
+    if response.code == 400:
+        message = get_in(["validationErrors", "messages", 0], body)
+        match = _CLB_NODE_REMOVED_PATTERN.match(message)
+        if match:
+            removed = concat([group.split(',') for group in match.groups()])
+            retry = RemoveNodesFromCLB(
+                lb_id=lb_id, node_ids=pset(attempted_nodes) - pset(removed))
+            return retry.as_effect()
 
 
 @implementer(IStep)

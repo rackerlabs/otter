@@ -13,7 +13,7 @@ from otter.convergence.steps import (
     ChangeCLBNode,
     CreateServer,
     DeleteServer,
-    RemoveFromCLB,
+    RemoveNodesFromCLB,
     SetMetadataItemOnServer,
 )
 from otter.util.fp import partition_bool, partition_groups
@@ -62,8 +62,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
                     if (now - node.drained_at < timeout and
                         (node.connections is None or node.connections > 0))]
 
-    removes = [RemoveFromCLB(lb_id=node.description.lb_id,
-                             node_id=node.node_id)
+    removes = [RemoveNodesFromCLB(lb_id=node.description.lb_id,
+                                  node_ids=(node.node_id,))
                for node in (set(nodes) - set(to_drain) - set(in_drain))]
 
     changes = [ChangeCLBNode(lb_id=node.description.lb_id,
@@ -117,9 +117,9 @@ def _converge_lb_state(server, current_lb_nodes):
     # Removes could be replaced with _remove_from_lb_with_draining if
     # we wanted to support draining for moving load balancers too
     removes = [
-        RemoveFromCLB(
+        RemoveNodesFromCLB(
             lb_id=lb_id,
-            node_id=current[lb_id, port].node_id)
+            node_ids=(current[lb_id, port].node_id,))
         for lb_id, port in current_idports - desired_idports]
     changes = [
         ChangeCLBNode(
@@ -145,7 +145,7 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
     # if there are no load balancers that are waiting on draining timeouts or
     # connections, just delete the server too
     if (len(lb_draining_steps) == len(current_lb_nodes) and
-        all([isinstance(step, RemoveFromCLB)
+        all([isinstance(step, RemoveNodesFromCLB)
              for step in lb_draining_steps])):
         return lb_draining_steps + [DeleteServer(server_id=server.id)]
 
@@ -225,8 +225,8 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # traffic anyway
     delete_error_steps = (
         [DeleteServer(server_id=server.id) for server in servers_in_error] +
-        [RemoveFromCLB(lb_id=lb_node.description.lb_id,
-                       node_id=lb_node.node_id)
+        [RemoveNodesFromCLB(lb_id=lb_node.description.lb_id,
+                            node_ids=(lb_node.node_id,))
          for server in servers_in_error
          for lb_node in lbs_by_address.get(server.servicenet_address, [])])
 

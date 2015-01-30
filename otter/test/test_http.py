@@ -69,6 +69,7 @@ class ServiceRequestTests(SynchronousTestCase):
                     url='foo',
                     headers=None,
                     data=None,
+                    params=None,
                     log=None,
                     reauth_codes=(401, 403),
                     success_pred=has_code(200),
