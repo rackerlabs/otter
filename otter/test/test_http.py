@@ -148,8 +148,8 @@ class PerformServiceRequestTests(SynchronousTestCase):
 
     def test_no_json_response(self):
         """
-        ``json_response`` can be set to :data:`False` to get the plaintext.
-        response.
+        ``json_response`` can be set to :data:`False` to get the response
+        object and the plaintext body of the response.
         """
         svcreq = service_request(ServiceType.CLOUD_SERVERS, "GET", "servers",
                                  json_response=False).intent
