@@ -2,8 +2,9 @@
 Tests for the lib functions for convergence black-box testing.
 """
 
-from otter.test.integration import lib
 from twisted.trial.unittest import SynchronousTestCase
+
+from otter.test.integration import lib
 
 
 class IdentityV2Tests(SynchronousTestCase):
