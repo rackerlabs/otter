@@ -134,15 +134,16 @@ class StepAsEffectTests(SynchronousTestCase):
         step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
         request = step.as_effect()
 
-        self.assertEqual(request.intent.service_type,
-                         ServiceType.CLOUD_LOAD_BALANCERS)
-        self.assertEqual(request.intent.method, 'POST')
-        self.assertEqual(request.intent.url, "loadbalancers/12345/nodes")
-        self.assertEqual(request.intent.headers, None)
-        self.assertEqual(request.intent.params, None)
-        self.assertTrue(request.intent.json_response)
+        self.assertEqual(
+            request.intent,
+            service_request(
+                ServiceType.CLOUD_LOAD_BALANCERS,
+                'POST',
+                "loadbalancers/12345/nodes",
+                json_response=True,
+                success_pred=ANY,
+                data={"nodes": ANY}).intent)
 
-        self.assertEqual(request.intent.data, {"nodes": ANY})
         node_data = sorted(request.intent.data['nodes'],
                            key=lambda n: (n['address'], n['port']))
         self.assertEqual(node_data, [
@@ -217,19 +218,19 @@ class StepAsEffectTests(SynchronousTestCase):
         nodes from a cloud load balancer.
         """
         lb_id = "12345"
-        node_ids = pset([str(i) for i in range(5)])
+        node_ids = [str(i) for i in range(5)]
 
         step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=node_ids)
         request = step.as_effect()
-
-        self.assertEqual(request.intent.service_type,
-                         ServiceType.CLOUD_LOAD_BALANCERS)
-        self.assertEqual(request.intent.method, 'DELETE')
-        self.assertEqual(request.intent.url, "loadbalancers/12345/nodes")
-        self.assertEqual(request.intent.params, {'id': list(node_ids)})
-        self.assertEqual(request.intent.headers, None)
-        self.assertTrue(request.intent.json_response)
-        self.assertEqual(request.intent.data, None)
+        self.assertEqual(
+            request.intent,
+            service_request(
+                ServiceType.CLOUD_LOAD_BALANCERS,
+                'DELETE',
+                "loadbalancers/12345/nodes",
+                params={'id': list(node_ids)},
+                json_response=True,
+                success_pred=ANY).intent)
 
     def test_remove_nodes_from_clb_predicate(self):
         """
@@ -238,7 +239,7 @@ class StepAsEffectTests(SynchronousTestCase):
         400's will be covered by another test as they require retry.
         """
         lb_id = "12345"
-        node_ids = pset([str(i) for i in range(5)])
+        node_ids = [str(i) for i in range(5)]
         step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=node_ids)
         request = step.as_effect()
 
@@ -294,7 +295,7 @@ class StepAsEffectTests(SynchronousTestCase):
         with those nodes removed.
         """
         lb_id = "12345"
-        node_ids = pset([str(i) for i in range(5)])
+        node_ids = [str(i) for i in range(5)]
         error_body = {
             "validationErrors": {
                 "messages": [
