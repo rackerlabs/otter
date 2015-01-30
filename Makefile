@@ -64,10 +64,11 @@ flake8full:
 
 unit:
 ifneq ($(JENKINS_URL), )
-	trial --random 0 --reporter=subunit ${UNITTESTS} | tee subunit-output.txt
-	tail -n +3 subunit-output.txt | subunit2junitxml > test-report.xml
+	trial --jobs=4 --random 0 --reporter=subunit ${UNITTESTS} \
+		| tee subunit-output.txt
+	tail -n +4 subunit-output.txt | subunit2junitxml > test-report.xml
 else
-	trial --random 0 ${UNITTESTS}
+	trial --jobs=4 --random 0 ${UNITTESTS}
 endif
 
 integration:
