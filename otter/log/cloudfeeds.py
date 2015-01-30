@@ -1,44 +1,29 @@
 """
-Ingesting events to Cloud feeds
+Publishing events to Cloud feeds
 """
 
 import uuid
 from copy import deepcopy
+from datetime import datetime
 
 from characteristic import attributes
 
-from effect import Effect, perform
+from effect import Effect
+from effect.twisted import perform
+
+from toolz.dicttoolz import dissoc
 
 from otter.constants import ServiceType
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.http import TenantScope, service_request
 from otter.log import log as otter_log
+from otter.log.formatters import PEP3101FormattingWrapper
 from otter.util.http import append_segments
 from otter.util.pure_http import has_code
 from otter.util.retry import (
     exponential_backoff_interval,
     retry_effect,
     retry_times)
-
-
-# Global single cloud feeds instance
-_cloud_feeds = None
-
-
-def set_cloud_feeds(cf):
-    """
-    Set single global cloud feed instance
-    """
-    global _cloud_feeds
-    _cloud_feeds = cf
-
-
-@attributes(['reactor', 'authenticator', 'region', 'tenant_id',
-             'service_configs'])
-class CloudFeeds(object):
-    """
-    A placeholder for cloud feeds config
-    """
 
 
 class UnsuitableMessage(Exception):
@@ -65,12 +50,22 @@ def sanitize_event(event):
     """
     Sanitize event by removing all items except the ones in autoscale schema.
 
-    :param dict event: Event to sanitize
+    :param dict event: Event to sanitize as given by Twisted
 
-    :return: Sanitized CF formatted event
+    :return: (dict, bool, str) tuple where dict -> sanitized event,
+        bool -> is it error event?, str -> ISO8601 formatted UTC time of event
     """
     cf_event = {}
     error = False
+
+    # format message
+    event_copy = deepcopy(event)
+    PEP3101FormattingWrapper(lambda e: None)(event_copy)
+    msg = event_copy["message"]
+    try:
+        event["message"] = msg[0]
+    except KeyError:
+        raise UnsuitableMessage("No message in event")
 
     # map keys in event to CF keys
     for log_key, cf_key in log_cf_mapping.iteritems():
@@ -83,7 +78,8 @@ def sanitize_event(event):
            'exception' in cf_event['message']):
             raise UnsuitableMessage(cf_event['message'])
 
-    return cf_event, error
+    return (cf_event, error,
+            datetime.utcfromtimestamp(event["time"]).isoformat())
 
 
 request_format = {
@@ -110,49 +106,68 @@ request_format = {
 }
 
 
-def add_event(event, error, timestamp, region, log, _uuid=uuid.uuid4):
+def prepare_request(req_fmt, event, error, timestamp, region,
+                    _uuid=uuid.uuid4):
     """
-    Add event to cloud feeds
+    Prepare request based on request format
     """
-    request = deepcopy(request_format)
+    request = deepcopy(req_fmt)
     if error:
         request['entry']['content']['event']['type'] = 'ERROR'
     request['entry']['content']['event']['region'] = region
     request['entry']['content']['event']['eventTime'] = timestamp
     request['entry']['content']['event']['product'].update(event)
     request['entry']['content']['event']['id'] = str(_uuid())
-    return retry_effect(
+    return request
+
+
+def add_event(event, tenant_id, region, log,
+              _prep_req=prepare_request):
+    """
+    Add event to cloud feeds
+    # Review: Is taking _prep_req as argument really required?
+    """
+    event, error, timestamp = sanitize_event(event)
+    eff = retry_effect(
         service_request(
             ServiceType.CLOUD_FEEDS, 'POST',
-            append_segments('autoscale', 'events'), data=request,
+            append_segments('autoscale', 'events'),
+            data=_prep_req(request_format, event, error, timestamp, region),
             log=log, success_pred=has_code(201)),
         retry_times(5), exponential_backoff_interval(2))
+    return Effect(TenantScope(tenant_id=tenant_id, effect=eff))
 
 
-def add_event_to_cloud_feed(event, timestamp, log=otter_log,
-                            get_disp=get_full_dispatcher):
+@attributes(['reactor', 'authenticator', 'tenant_id', 'region',
+             'service_configs', 'log', 'get_disp', 'add_event'],
+            defaults={'log': otter_log, 'get_disp': get_full_dispatcher,
+                      'add_event': add_event})
+class CloudFeedsObserver(object):
     """
-    Add event to cloud feed by sanityzing it first
-
-    :param dict event: Event dict as it would be passed to observer
-    :param str timestamp: ISO8601 formatted timestamp of the event
+    Log observer that pushes events to cloud feeds
     """
-    cf = _cloud_feeds
-    # Take out cloud_feed to avoid coming back here in infinite recursion
-    event.pop('cloud_feed', None)
-    log = log.bind('otter.cloud_feed', **event)
-    try:
-        event, error = sanitize_event(event)
-    except UnsuitableMessage as me:
-        log.err(me, ('Tried to add unsuitable message in cloud feeds: '
-                     '{unsuitable_message}'),
-                unsuitable_message=me.unsuitable_message)
-    else:
-        eff = Effect(TenantScope(cf.tenant_id,
-                                 add_event(event, error, timestamp,
-                                           cf.region, log)))
-        # TODO: Log error if event was not added
-        perform(
-            get_disp(cf.reactor, cf.authenticator, cf.log,
-                     cf.service_configs),
-            eff)
+    def __init__(self):
+        # This is needed for attributes to work
+        pass
+
+    def __call__(self, event_dict):
+        """
+        Process event and push it to Cloud feeds
+        """
+        if not event_dict.get('cloud_feed', False):
+            return
+        # Do further logging without cloud_feed to avoid coming back here
+        # in infinite recursion
+        log = self.log.bind(system='otter.cloud_feed',
+                            **dissoc(event_dict, 'cloud_feed'))
+        try:
+            eff = self.add_event(event_dict, self.tenant_id, self.region, log)
+        except UnsuitableMessage as me:
+            log.err(None, ('Tried to add unsuitable message in cloud feeds: '
+                           '{unsuitable_message}'),
+                    unsuitable_message=me.unsuitable_message)
+        else:
+            return perform(
+                self.get_disp(self.reactor, self.authenticator, log,
+                              self.service_configs),
+                eff).addErrback(log.err, "Failed to add event")
