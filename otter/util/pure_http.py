@@ -20,8 +20,9 @@ from otter.util import logging_treq
 from otter.util.http import APIError
 
 
-@attributes(['method', 'url', 'headers', 'data', 'log'],
-            defaults={'headers': None, 'data': None, 'log': None})
+@attributes(['method', 'url', 'headers', 'data', 'params', 'log'],
+            defaults={'headers': None, 'data': None, 'params': None,
+                      'log': None})
 class Request(object):
     """
     An effect request for performing HTTP requests.
@@ -42,7 +43,9 @@ def perform_request(dispatcher, intent):
     """
     response = yield intent.treq.request(intent.method.upper(), intent.url,
                                          headers=intent.headers,
-                                         data=intent.data, log=intent.log)
+                                         data=intent.data,
+                                         params=intent.params,
+                                         log=intent.log)
     content = yield intent.treq.content(response)
     returnValue((response, content))
 
