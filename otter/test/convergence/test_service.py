@@ -60,4 +60,7 @@ class ConvergerTests(SynchronousTestCase):
             'group-id', 5, self.lc,
             perform=perform)
 
-        log.err.assert_called_once_with(CheckFailure(ZeroDivisionError))
+        log.err.assert_called_once_with(
+            CheckFailure(ZeroDivisionError),
+            "Error when performing convergence",
+            otter_event_type='convergence-perform-error')

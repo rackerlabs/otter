@@ -35,7 +35,8 @@ class Converger(Service, object):
             eff = execute_convergence(group_id, desired_group_state)
             eff = Effect(TenantScope(eff, tenant_id))
             d = perform(self._dispatcher, eff)
-            return d.addErrback(log.err)
+            return d.addErrback(log.err, "Error when performing convergence",
+                                otter_event_type='convergence-perform-error')
         return with_lock(
             self._reactor, self._get_lock(group_id), exec_convergence,
             acquire_timeout=150, release_timeout=150)
