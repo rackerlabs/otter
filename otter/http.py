@@ -158,7 +158,6 @@ def concretize_service_request(
             request_ = add_json_response(request_)
         request_ = add_error_handling(
             service_request.success_pred, request_)
-        request_ = add_content_only(request_)
         return request_(
             service_request.method,
             service_request.url,
