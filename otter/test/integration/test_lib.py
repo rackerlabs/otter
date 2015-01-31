@@ -36,12 +36,16 @@ class IdentityV2Tests(SynchronousTestCase):
                 return "{}"
 
         stub = Stub()
-        (lib.IdentityV2(stub, "username", "password", "endpoint")
-            .authenticate_user())
+        lib.IdentityV2(
+            auth=stub, username="username",
+            password="password", endpoint="endpoint"
+        ).authenticate_user()
         self.assertFalse(stub.pool)
 
-        (lib.IdentityV2(stub, "username", "password", "endpoint", pool=42)
-            .authenticate_user())
+        lib.IdentityV2(
+            auth=stub, username="username",
+            password="password", endpoint="endpoint", pool=42
+        ).authenticate_user()
         self.assertEquals(stub.pool, 42)
 
 

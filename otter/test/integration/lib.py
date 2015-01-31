@@ -12,7 +12,7 @@ from characteristic import Attribute, attributes
     Attribute('username', instance_of=str),
     Attribute('password', instance_of=str),
     Attribute('endpoint', instance_of=str),
-    Attribute('pool', instance_of=HTTPConnectionPool, default_value=None),
+    Attribute('pool', default_value=None),
 ])
 class IdentityV2(object):
     """This class provides a way to configure commonly used parameters
