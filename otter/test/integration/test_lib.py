@@ -43,3 +43,74 @@ class IdentityV2Tests(SynchronousTestCase):
         (lib.IdentityV2(stub, "username", "password", "endpoint", pool=42)
             .authenticate_user())
         self.assertEquals(stub.pool, 42)
+
+
+
+_test_catalog = {
+    "access": {
+        "serviceCatalog": [
+            {
+                "endpoints": [
+                    {
+                        "publicURL": "https://syd.localhost/v1/775360",
+                        "region": "SYD",
+                        "tenantId": "123456"
+                    },
+                    {
+                        "publicURL": "https://dfw.localhost/v1/123456",
+                        "region": "DFW",
+                        "tenantId": "123456"
+                    },
+                ],
+                "name": "cloudBlockStorage",
+                "type": "volume"
+            },
+            {
+                "endpoints": [
+                    {
+                        "publicURL": "https://iad.localhost/v2",
+                        "region": "IAD",
+                        "tenantId": "123456"
+                    },
+                    {
+                        "publicURL": "https://ord.localhost/v2",
+                        "region": "ORD",
+                        "tenantId": "123456"
+                    },
+                ],
+                "name": "cloudImages",
+                "type": "image"
+            }
+        ],
+        "token": {
+            "RAX-AUTH:authenticatedBy": [
+                "PASSWORD"
+            ],
+            "expires": "2015-02-01T00:56:59.631Z",
+            "id": "18363c2fe021475789be10d361753481",
+            "tenant": {
+                "id": "123456",
+                "name": "123456"
+            }
+        }
+    }
+}
+
+
+
+
+class FindEndpointTests(SynchronousTestCase):
+    """These tests exercise the :func:`find_endpoint` library function."""
+
+    def test_happy_path(self):
+        """If the region and the service type exists, then we should receive
+        an endpoint.
+        """
+        self.assertEqual(
+            lib.find_endpoint(_test_catalog, "volume", "DFW"),
+            "https://dfw.localhost/v1/123456"
+        )
+        self.assertEqual(
+            lib.find_endpoint(_test_catalog, "image", "IAD"),
+            "https://iad.localhost/v2"
+        )

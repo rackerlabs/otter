@@ -51,3 +51,23 @@ class IdentityV2(object):
         return self.auth.authenticate_user(
             self.endpoint, self.username, self.password, pool=self.pool
         )
+
+
+def find_endpoint(catalog, kind, region):
+    """Locate an endpoint in a service catalog, as returned by IdentityV2.
+
+    :param dict catalog: The Identity service catalog.
+    :param str kind: The "type" of service to look for.
+        We name the parameter ``kind`` only because ``type`` is a reserved
+        word in Python.
+    :param str region: The service region the desired endpoint must service.
+    :return: The endpoint offering the desired kind of service for the
+        desired region, if available.  None otherwise.
+    """
+    for entry in catalog["access"]["serviceCatalog"]:
+        if entry["type"] != kind:
+            continue
+        for endpoint in entry["endpoints"]:
+            if endpoint["region"] == region:
+                return endpoint["publicURL"]
+    return None
