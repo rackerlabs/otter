@@ -635,24 +635,43 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         has been removed from the loadbalancer pool outside of autoscale.
         """
 
-        # Create a group with an RCVe loadbalancer pool and a minimum of zero
+        # Create a group with an RCVe loadbalancer pool and a minimum number
+        # of servers
         lb_pools = [{'loadBalancerId': self.pool.id, 'type': 'RackConnectV3'}]
         pool_group_resp = self._create_rcv3_group(
-            lb_list=lb_pools, group_min=0,
+            lb_list=lb_pools, group_min=self.min_servers,
             network_list=[self.rackconnect_network])
         pool_group = pool_group_resp.entity
+
+        print('\n Create initial group')
+        # Wait for the servers and capture the oldest server ids
+        self.asb.\
+            wait_for_expected_number_of_active_servers(pool_group.id,
+                                                       self.min_servers,
+                                                       timeout=600,
+                                                       asserter=self)
+
+        # Wait for RackConnect to reflect Otter's preferred configuration.
+        # Capture the initial node ids
+        self.asb.wait_for_expected_number_of_active_servers(
+            pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
+            self.min_servers, timeout=300, api="RackConnect",
+            asserter=self)
 
         # Create and execute a policy to scale up  servers
         server_count_before_autoscaling = self._get_node_counts_on_pool(
             self.pool.id)['cloud_servers']
         # Capture the list of nodes before scaling
-        pool_node_set_pre = (self._get_cloud_servers_on_pool(self.pool.id))
+        pool_node_list_pre = self._get_cloud_servers_on_pool(self.pool.id)
+        pool_node_set_pre = set([n['node_id'] for n in pool_node_list_pre])
+
         scale_amt = 2
         policy_up_data = {'change': scale_amt, 'cooldown': 0}
         expected_rcv3_server_count = (server_count_before_autoscaling
                                       + scale_amt)
         as_server_count = scale_amt
 
+        print('\n create and execute policy')
         # Create the policy and execute it immediately
         self.asb.create_policy_webhook(pool_group.id,
                                        policy_up_data,
@@ -670,12 +689,18 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             expected_rcv3_server_count, timeout=300, api="RackConnect",
             asserter=self)
 
+
         print('nodes_after: {}'.format(nodes_after))
         print('server_list: {}'.format(server_list_after_scale_up))
 
+
+        # Get a list of new nodes after scaling
+        pool_node_set_post = set([n['node_id'] for n in nodes_after])
+        new_nodes = pool_node_set_post.difference(pool_node_set_pre)
+
         # Remove one of the servers from the LB pool
         self.rcv3_client.remove_node_from_pool(self.pool.id,
-                                               nodes_after[0])
+                                               new_nodes[0])
 
         # Ensure that the deletion was completed by rackconnect
         self.asb.wait_for_expected_number_of_active_servers(
@@ -684,13 +709,13 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             asserter=self)
 
         # Vefity that Autoscale still has the correct number of servers
-        self.verify_server_count_using_server_metadata(pool_group.id)
+        self.verify_server_count_using_server_metadata(pool_group.id,
+                                                       as_server_count)
 
         # Create and execute policy to scale back to zero
         policy_down_data = {'change': -scale_amt, 'cooldown': 0}
         expected_rcv3_server_count = server_count_before_autoscaling
-
-        as_server_count = 0
+        as_server_count = as_server_count - scale_amt
 
         # Create the policy and execute it immediately
         self.asb.create_policy_webhook(pool_group.id,
@@ -715,8 +740,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
         # Confirm that the pre and post scale node_lists are the same
         pool_node_set_post = (self._get_cloud_servers_on_pool(
-                                 self.pool.id))
-        self.assertEquals(pool_node_set_pre, pool_node_set_post,
+                              self.pool.id))
+        self.assertEquals(pool_node_list_pre, pool_node_set_post,
                           msg='The set of nodes on the pool is incorrect'
                           'after scaling')
 
