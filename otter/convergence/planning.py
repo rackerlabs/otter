@@ -267,20 +267,32 @@ def _optimizer(step_type):
     return _add_to_optimizers
 
 
-@_optimizer(AddNodesToCLB)
-def _optimize_lb_adds(lb_add_steps):
+def _register_bulk_clb_optimizer(step_class, attr_name):
     """
-    Merge together multiple :obj:`AddNodesToCLB`, per load balancer.
+    Merge together multiple CLB bulk steps per load balancer.  This function
+    is for generating and registering the :obj:`AddNodesToCLB` and
+    :obj:`RemoveNodesFromCLB` optimizers.
 
-    :param steps_by_lb: Iterable of :obj:`AddNodesToCLB`.
+    :param step_class: One of :obj:`AddNodesToCLB` or :obj:`RemoveNodesFromCLB`
+    :param attr_name: The attribute name on the class that is the iterable that
+        needs to be concatenated together to make an optimized step.
+
+    :return: Nothing, because this just registers the optimizers with the
+        module.
     """
-    steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
-    return [
-        AddNodesToCLB(
-            lb_id=lbid,
-            address_configs=pset(concat(s.address_configs for s in steps)))
-        for lbid, steps in steps_by_lb.iteritems()
-    ]
+    def optimize_steps(clb_steps):
+        steps_by_lb = groupby(lambda s: s.lb_id, clb_steps)
+        return [
+            step_class(**{
+                'lb_id': lb_id,
+                attr_name: pset(concat(getattr(s, attr_name) for s in steps))})
+            for lb_id, steps in steps_by_lb.iteritems()
+        ]
+
+    _optimizer(step_class)(optimize_steps)
+
+_register_bulk_clb_optimizer(AddNodesToCLB, 'address_configs')
+_register_bulk_clb_optimizer(RemoveNodesFromCLB, 'node_ids')
 
 
 def optimize_steps(steps):
