@@ -3,29 +3,33 @@ Tests for the otter-api tap plugin.
 """
 
 import json
-import mock
 from copy import deepcopy
+
+import mock
 
 from testtools.matchers import Contains, IsInstance
 
+from twisted.application.service import MultiService
 from twisted.internet import defer
 from twisted.internet.task import Clock
-
-from twisted.application.service import MultiService
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import CachingAuthenticator
-from otter.constants import get_service_configs, ServiceType
+from otter.constants import ServiceType, get_service_configs
 from otter.log.cloudfeeds import CloudFeedsObserver
-from otter.models.cass import CassScalingGroupCollection as original_store
-from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
+from otter.models.cass import CassScalingGroupCollection as OriginalStore
+from otter.supervisor import SupervisorService, get_supervisor, set_supervisor
 from otter.tap.api import (
-    Options, HealthChecker, makeService, setup_scheduler, call_after_supervisor)
-from otter.test.utils import matches, patch, CheckFailure
+    HealthChecker,
+    Options,
+    call_after_supervisor,
+    makeService,
+    setup_scheduler
+)
+from otter.test.test_auth import identity_config
+from otter.test.utils import CheckFailure, matches, patch
 from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
-
-from otter.test.test_auth import identity_config
 
 
 test_config = {
@@ -270,7 +274,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.reactor = patch(self, 'otter.tap.api.reactor')
 
         def scaling_group_collection(*args, **kwargs):
-            self.store = original_store(*args, **kwargs)
+            self.store = OriginalStore(*args, **kwargs)
             return self.store
 
         patch(self, 'otter.tap.api.CassScalingGroupCollection',
