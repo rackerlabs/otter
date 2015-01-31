@@ -12,7 +12,6 @@ from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
     add_bind_root,
-    add_content_only,
     add_effect_on_response,
     add_error_handling,
     add_headers,
