@@ -1,5 +1,7 @@
 """Converger service"""
 
+from functools import partial
+
 from effect import Effect
 from effect.twisted import perform
 
@@ -23,7 +25,9 @@ class Converger(Service, object):
     def _get_lock(self, group_id):
         """Get a ZooKeeper-backed lock for converging the group."""
         path = CONVERGENCE_LOCK_PATH.format(group_id=group_id)
-        return self._kz_client.Lock(path)
+        lock = self._kz_client.Lock(path)
+        lock.acquire = partial(lock.acquire, timeout=120)
+        return lock
 
     def converge(self, log, tenant_id, group_id, desired, launch_config,
                  perform=perform,

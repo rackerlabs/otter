@@ -43,7 +43,8 @@ class ConvergerTests(SynchronousTestCase):
             execute_convergence=lambda gid, dgs: exec_calls.get((gid, dgs)))
         self.kz_client.Lock.assert_called_once_with(
             '/groups/group-id/converge_lock')
-        self.kz_client.Lock().acquire.assert_called_once_with()
+        # acquire is a monkey-patched partial function. :-(
+        self.kz_client.Lock().acquire.func.assert_called_once_with(timeout=120)
         self.kz_client.Lock().release.assert_called_once_with()
         perform.assert_called_once_with(
             self.dispatcher,
