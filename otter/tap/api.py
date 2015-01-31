@@ -27,11 +27,11 @@ from otter.util.config import set_config_data, config_value
 from otter.util.deferredutils import timeout_deferred
 from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.scheduler import SchedulerService
-from otter.log.cloudfeeds import CloudFeeds, set_cloud_feeds
+from otter.log.cloudfeeds import CloudFeedsObserver
 
 from otter.supervisor import SupervisorService, set_supervisor
 from otter.auth import generate_authenticator
-from otter.constants import get_service_configs
+from otter.constants import get_service_configs, ServiceType
 
 from otter.log import log
 from silverberg.cluster import RoundRobinCassandraCluster
@@ -232,9 +232,10 @@ def makeService(config):
     if cf_conf is not None:
         service_configs[ServiceType.CLOUD_FEEDS] = {
             'name': cf_conf['service'], 'region': region}
-        cf = CloudFeeds(reactor=reactor, authenticator=authenticator,
-                        region=region, tenant_id=cf_conf['tenant_id'],
-                        service_configs=service_configs)
+        cf = CloudFeedsObserver(
+                reactor=reactor, authenticator=authenticator,
+                region=region, tenant_id=cf_conf['tenant_id'],
+                service_configs=service_configs)
         addObserver(cf)
 
     # Setup Kazoo client

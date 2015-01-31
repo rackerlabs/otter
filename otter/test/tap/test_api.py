@@ -4,8 +4,9 @@ Tests for the otter-api tap plugin.
 
 import json
 import mock
+from copy import deepcopy
 
-from testtools.matchers import Contains
+from testtools.matchers import Contains, IsInstance
 
 from twisted.internet import defer
 from twisted.internet.task import Clock
@@ -13,6 +14,9 @@ from twisted.internet.task import Clock
 from twisted.application.service import MultiService
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.auth import CachingAuthenticator
+from otter.constants import get_service_configs, ServiceType
+from otter.log.cloudfeeds import CloudFeedsObserver
 from otter.models.cass import CassScalingGroupCollection as original_store
 from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
 from otter.tap.api import (
@@ -444,11 +448,23 @@ class APIMakeServiceTests(SynchronousTestCase):
         conf = deepcopy(test_config)
         conf['cloudfeeds'] = {'service': 'cloudFeeds', 'tenant_id': 'tid'}
         makeService(conf)
-        mock_addobserver.assert_called_once_with(
-            matches(IsInstance(CloudFeedsObserver))
-        cf = mock_addobserver.mock_calls[0][0]
-        #self.assertEqual(
-        #    CloudFeedsObserver(reactor=self.reactor, ))
+        serv_confs = get_service_configs(conf)
+        serv_confs[ServiceType.CLOUD_FEEDS] = {
+            'name': 'cloudFeeds', 'region': 'ord'}
+        cf = CloudFeedsObserver(
+            reactor=self.reactor,
+            authenticator=matches(IsInstance(CachingAuthenticator)),
+            region='ord', tenant_id='tid',
+            service_configs=serv_confs)
+        mock_addobserver.assert_called_once_with(cf)
+
+    @mock.patch('otter.tap.api.addObserver')
+    def test_cloudfeeds_no_setup(self, mock_addobserver):
+        """
+        Cloud feeds observer is not setup if it is not there in config
+        """
+        makeService(test_config)
+        self.assertFalse(mock_addobserver.called)
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
