@@ -29,9 +29,10 @@ class Converger(Service, object):
         lock.acquire = partial(lock.acquire, timeout=120)
         return lock
 
-    def converge(self, log, tenant_id, group_id, desired, launch_config,
-                 perform=perform,
-                 execute_convergence=execute_convergence):
+    def start_convergence(self, log, tenant_id, group_id, desired,
+                          launch_config,
+                          perform=perform,
+                          execute_convergence=execute_convergence):
         """Converge a group to a capacity with a launch config."""
         def exec_convergence():
             desired_group_state = get_desired_group_state(

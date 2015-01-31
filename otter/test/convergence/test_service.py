@@ -35,7 +35,7 @@ class ConvergerTests(SynchronousTestCase):
         exec_calls = pmap().set(
             ('group-id', expected_desired_group_state), exec_convergence_result
         )
-        self.converger.converge(
+        self.converger.start_convergence(
             mock_log(),
             'tenant-id',
             'group-id', 5, self.lc,
@@ -55,7 +55,7 @@ class ConvergerTests(SynchronousTestCase):
         perform = mock.MagicMock()
         perform.return_value = fail(ZeroDivisionError('foo'))
         log = mock_log()
-        self.converger.converge(
+        self.converger.start_convergence(
             log,
             'tenant-id',
             'group-id', 5, self.lc,

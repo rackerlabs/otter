@@ -1101,5 +1101,5 @@ class ConvergeTestCase(SynchronousTestCase):
                                      state, 'launch', policy,
                                      config_value=config_data.get)
         self.assertIs(result, None)
-        converger_mock.converge.assert_called_once_with(
+        converger_mock.start_convergence.assert_called_once_with(
             log, 'tenant', 'group-id', 5, 'launch')
