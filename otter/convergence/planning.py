@@ -1,6 +1,8 @@
 """Code related to creating a plan for convergence."""
 
-from pyrsistent import pbag, pset, s
+from functools import partial
+
+from pyrsistent import pbag, pmap, pset, s
 
 from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
@@ -11,7 +13,7 @@ from otter.convergence.steps import (
     ChangeCLBNode,
     CreateServer,
     DeleteServer,
-    RemoveFromCLB,
+    RemoveNodesFromCLB,
     SetMetadataItemOnServer,
 )
 from otter.util.fp import partition_bool, partition_groups
@@ -60,8 +62,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
                     if (now - node.drained_at < timeout and
                         (node.connections is None or node.connections > 0))]
 
-    removes = [RemoveFromCLB(lb_id=node.description.lb_id,
-                             node_id=node.node_id)
+    removes = [RemoveNodesFromCLB(lb_id=node.description.lb_id,
+                                  node_ids=(node.node_id,))
                for node in (set(nodes) - set(to_drain) - set(in_drain))]
 
     changes = [ChangeCLBNode(lb_id=node.description.lb_id,
@@ -74,7 +76,7 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     return removes + changes
 
 
-def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
+def _converge_lb_state(server, current_lb_nodes):
     """
     Produce a series of steps to converge a server's current load balancer
     state towards its desired load balancer state.
@@ -88,14 +90,16 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     only be used if load balancer health monitoring is enabled, and would be
     used as backup servers anyway.
 
-    :param dict desired_lb_state: As per :obj:`DesiredGroupState`.desired_lbs
+    :param server: The server to be converged.
+    :type server: :class:`NovaServer`
+
     :param list current_lb_nodes: `list` of :obj:`CLBNode`
-    :param str ip_address: the IP address of the server to converge
+
     :rtype: `list` of :class:`IStep`
     """
     desired = {
         (lb_id, desc.port): desc
-        for lb_id, descs in desired_lb_state.items()
+        for lb_id, descs in server.desired_lbs.items()
         for desc in descs}
     current = {
         (node.description.lb_id, node.description.port): node
@@ -106,15 +110,16 @@ def _converge_lb_state(desired_lb_state, current_lb_nodes, ip_address):
     adds = [
         AddNodesToCLB(
             lb_id=lb_id,
-            address_configs=s((ip_address, desired[lb_id, port])))
+            address_configs=s((server.servicenet_address,
+                               desired[lb_id, port])))
         for lb_id, port in desired_idports - current_idports]
 
-    # TODO: Removes could be replaced with _remove_from_lb_with_draining if
+    # Removes could be replaced with _remove_from_lb_with_draining if
     # we wanted to support draining for moving load balancers too
     removes = [
-        RemoveFromCLB(
+        RemoveNodesFromCLB(
             lb_id=lb_id,
-            node_id=current[lb_id, port].node_id)
+            node_ids=(current[lb_id, port].node_id,))
         for lb_id, port in current_idports - desired_idports]
     changes = [
         ChangeCLBNode(
@@ -140,7 +145,7 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
     # if there are no load balancers that are waiting on draining timeouts or
     # connections, just delete the server too
     if (len(lb_draining_steps) == len(current_lb_nodes) and
-        all([isinstance(step, RemoveFromCLB)
+        all([isinstance(step, RemoveNodesFromCLB)
              for step in lb_draining_steps])):
         return lb_draining_steps + [DeleteServer(server_id=server.id)]
 
@@ -190,14 +195,14 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         lambda server: now - server.created >= timeout,
         servers_in_build)
 
-    create_server = CreateServer(launch_config=desired_state.launch_config)
+    create_server = CreateServer(server_config=desired_state.server_config)
 
     # delete any servers that have been building for too long
     delete_timeout_steps = [DeleteServer(server_id=server.id)
                             for server in building_too_long]
 
     # create servers
-    create_steps = [create_server] * (desired_state.desired
+    create_steps = [create_server] * (desired_state.capacity
                                       - (len(servers_in_active)
                                          + len(waiting_for_build)))
 
@@ -205,7 +210,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # preferring older.  Also, finish draining/deleting servers already in
     # draining state
     servers_in_preferred_order = servers_in_active + waiting_for_build
-    servers_to_delete = servers_in_preferred_order[desired_state.desired:]
+    servers_to_delete = servers_in_preferred_order[desired_state.capacity:]
 
     def drain_and_delete_a_server(server):
         return _drain_and_delete(
@@ -220,8 +225,8 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # traffic anyway
     delete_error_steps = (
         [DeleteServer(server_id=server.id) for server in servers_in_error] +
-        [RemoveFromCLB(lb_id=lb_node.description.lb_id,
-                       node_id=lb_node.node_id)
+        [RemoveNodesFromCLB(lb_id=lb_node.description.lb_id,
+                            node_ids=(lb_node.node_id,))
          for server in servers_in_error
          for lb_node in lbs_by_address.get(server.servicenet_address, [])])
 
@@ -232,9 +237,8 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         step
         for server in still_active_servers
         for step in _converge_lb_state(
-            desired_state.desired_lbs,
-            lbs_by_address.get(server.servicenet_address, []),
-            server.servicenet_address)
+            server,
+            lbs_by_address.get(server.servicenet_address, []))
         if server.servicenet_address]
 
     return pbag(create_steps
@@ -263,20 +267,32 @@ def _optimizer(step_type):
     return _add_to_optimizers
 
 
-@_optimizer(AddNodesToCLB)
-def _optimize_lb_adds(lb_add_steps):
+def _register_bulk_clb_optimizer(step_class, attr_name):
     """
-    Merge together multiple :obj:`AddNodesToCLB`, per load balancer.
+    Merge together multiple CLB bulk steps per load balancer.  This function
+    is for generating and registering the :obj:`AddNodesToCLB` and
+    :obj:`RemoveNodesFromCLB` optimizers.
 
-    :param steps_by_lb: Iterable of :obj:`AddNodesToCLB`.
+    :param step_class: One of :obj:`AddNodesToCLB` or :obj:`RemoveNodesFromCLB`
+    :param attr_name: The attribute name on the class that is the iterable that
+        needs to be concatenated together to make an optimized step.
+
+    :return: Nothing, because this just registers the optimizers with the
+        module.
     """
-    steps_by_lb = groupby(lambda s: s.lb_id, lb_add_steps)
-    return [
-        AddNodesToCLB(
-            lb_id=lbid,
-            address_configs=pset(concat(s.address_configs for s in steps)))
-        for lbid, steps in steps_by_lb.iteritems()
-    ]
+    def optimize_steps(clb_steps):
+        steps_by_lb = groupby(lambda s: s.lb_id, clb_steps)
+        return [
+            step_class(**{
+                'lb_id': lb_id,
+                attr_name: pset(concat(getattr(s, attr_name) for s in steps))})
+            for lb_id, steps in steps_by_lb.iteritems()
+        ]
+
+    _optimizer(step_class)(optimize_steps)
+
+_register_bulk_clb_optimizer(AddNodesToCLB, 'address_configs')
+_register_bulk_clb_optimizer(RemoveNodesFromCLB, 'node_ids')
 
 
 def optimize_steps(steps):
@@ -303,6 +319,30 @@ def optimize_steps(steps):
     return pbag(concatv(omg_optimized, unoptimizable))
 
 
+_DEFAULT_STEP_LIMITS = pmap({
+    CreateServer: 3
+})
+
+
+def _limit_step_count(steps, step_limits):
+    """
+    Limits step count by type.
+
+    :param steps: An iterable of steps.
+    :param step_limits: A dict mapping step classes to their maximum allowable
+        count. Classes not present in this dict have no limit.
+    :return: The input steps
+    :rtype: pset
+    """
+    return pbag(concat(typed_steps[:step_limits.get(cls)]
+                       for (cls, typed_steps)
+                       in groupby(type, steps).iteritems()))
+
+
+_default_limit_step_count = partial(
+    _limit_step_count, step_limits=_DEFAULT_STEP_LIMITS)
+
+
 def plan(desired_group_state, servers, lb_nodes, now):
     """
     Get an optimized convergence plan.
@@ -310,4 +350,5 @@ def plan(desired_group_state, servers, lb_nodes, now):
     Takes the same arguments as :func:`converge`.
     """
     steps = converge(desired_group_state, servers, lb_nodes, now)
+    steps = _default_limit_step_count(steps)
     return optimize_steps(steps)

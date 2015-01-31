@@ -23,82 +23,6 @@ from otter.util.pure_http import (
 )
 
 
-def get_request_func(authenticator, tenant_id, log, service_mapping, region):
-    """
-    Deprecated. :func:`service_request` should be used instead.
-
-    Return a pure_http.Request-returning function extended with:
-
-    - authentication for Rackspace APIs
-    - HTTP status code checking
-    - JSON bodies and return values
-    - returning only content of the result, not response objects
-    - logging
-    - abstraction away from specific endpoints -- requests only need
-      to specify an :obj:`otter.constants.ServiceType` and a relative path.
-
-    :param ICachingAuthenticator authenticator: the caching authenticator
-    :param tenant_id: tenant ID.
-    :param BoundLog log: info about requests will be logged to this.
-    :param dict service_mapping: A mapping of otter.constants.ServiceType
-        constants to real service names as found in a tenant's catalog.
-    :param region: The region of the Rackspace services which requests will
-        be made to.
-    """
-    auth_eff = Effect(Authenticate(authenticator, tenant_id, log))
-    invalidate_eff = Effect(InvalidateToken(authenticator, tenant_id))
-    default_log = log
-
-    @wraps(request)
-    def service_request(service_type, method, url, headers=None, data=None,
-                        log=default_log,
-                        reauth_codes=(401, 403),
-                        success_pred=has_code(200),
-                        json_response=True):
-        # TODO: We may want to parameterize some retry options *here*, but only
-        # if it's really necessary.
-        """
-        Make an HTTP request to a Rackspace service, with a bunch of awesome
-        behavior!
-
-        :param otter.constants.ServiceType service_type: The service against
-            which the request should be made.
-        :param bytes method: as :func:`request`.
-        :param url: as :func:`request`.
-        :param dict headers: as :func:`request`, but will have
-            authentication headers added.
-        :param data: JSON-able object.
-        :param log: as :func:`request`.
-        :param sequence success_codes: HTTP codes to consider successful.
-        :param sequence reauth_codes: HTTP codes upon which to invalidate the
-            auth cache.
-        :param bool json_response: Specifies whether the response should be
-            parsed as JSON.
-
-        :raise APIError: When the response HTTP code is not in success_codes.
-        :return: Effect resulting in a JSON-parsed HTTP response body.
-        """
-        def got_auth((token, catalog)):
-            request_ = add_bind_service(
-                catalog,
-                service_mapping[service_type]['name'],
-                region,
-                log,
-                add_json_request_data(
-                    add_error_handling(
-                        success_pred,
-                        add_effect_on_response(
-                            invalidate_eff,
-                            reauth_codes,
-                            add_headers(otter_headers(token), request)))))
-            if json_response:
-                request_ = add_json_response(request_)
-            request_ = add_content_only(request_)
-            return request_(method, url, headers=headers, data=data, log=log)
-        return auth_eff.on(got_auth)
-    return service_request
-
-
 def add_bind_service(catalog, service_name, region, log, request_func):
     """
     Decorate a request function so requests are relative to a particular
@@ -120,7 +44,7 @@ def add_bind_service(catalog, service_name, region, log, request_func):
 
 def service_request(
         service_type, method, url, headers=None, data=None,
-        log=None,
+        params=None, log=None,
         reauth_codes=(401, 403),
         success_pred=has_code(200),
         json_response=True):
@@ -134,6 +58,8 @@ def service_request(
     :param url: partial URL (appended to service endpoint)
     :param dict headers: base headers; will have auth headers added.
     :param data: JSON-able object or None.
+    :param params: dict of query param ids to lists of values, or a list of
+        tuples of query key to query value.
     :param log: log to send request info to.
     :param sequence success_pred: A predicate of responses which determines if
         a response indicates success or failure.
@@ -142,8 +68,8 @@ def service_request(
     :param bool json_response: Specifies whether the response should be
         parsed as JSON.
 
-    :raise APIError: Raised asynchronously when the response HTTP code is not in
-        success_codes.
+    :raise APIError: Raised asynchronously when the response HTTP code is not
+        in success_codes.
     :return: Effect of :obj:`ServiceRequest`, resulting in a JSON-parsed HTTP
         response body.
     """
@@ -153,13 +79,14 @@ def service_request(
         url=url,
         headers=headers,
         data=data,
+        params=params,
         log=log,
         reauth_codes=reauth_codes,
         success_pred=success_pred,
         json_response=json_response))
 
 
-@attributes(["service_type", "method", "url", "headers", "data",
+@attributes(["service_type", "method", "url", "headers", "data", "params",
              "log", "reauth_codes", "success_pred", "json_response"])
 class ServiceRequest(object):
     """
@@ -221,20 +148,16 @@ def concretize_service_request(
     service_name = service_config['name']
 
     def got_auth((token, catalog)):
+        request_ = add_headers(otter_headers(token), request)
+        request_ = add_effect_on_response(
+            invalidate_eff, service_request.reauth_codes, request_)
+        request_ = add_json_request_data(request_)
         request_ = add_bind_service(
-            catalog,
-            service_name,
-            region,
-            log,
-            add_json_request_data(
-                add_error_handling(
-                    service_request.success_pred,
-                    add_effect_on_response(
-                        invalidate_eff,
-                        service_request.reauth_codes,
-                        add_headers(otter_headers(token), request)))))
+            catalog, service_name, region, log, request_)
         if service_request.json_response:
             request_ = add_json_response(request_)
+        request_ = add_error_handling(
+            service_request.success_pred, request_)
         request_ = add_content_only(request_)
         return request_(
             service_request.method,

@@ -1,13 +1,24 @@
 """
 Tests for convergence models.
 """
+
 from characteristic import attributes
+
 from twisted.trial.unittest import SynchronousTestCase
+
 from zope.interface import implementer
 
 from otter.convergence.model import (
-    IDrainable, ILBDescription, ILBNode, NovaServer, ServerState,
-    CLBNodeCondition, CLBNodeType, CLBNode, CLBDescription)
+    CLBDescription,
+    CLBNode,
+    CLBNodeCondition,
+    CLBNodeType,
+    IDrainable,
+    ILBDescription,
+    ILBNode,
+    NovaServer,
+    ServerState
+)
 
 
 @implementer(ILBDescription)
@@ -107,21 +118,26 @@ class CLBNodeTests(SynchronousTestCase):
         :func:`CLBNode.matches` returns false if the server is not an instance
         of :class:`NovaServer`.
         """
-        node = CLBNode(node_id='1234', description=self.desc, address='10.1.1.1')
-        self.assertFalse(node.matches(DummyServer(servicenet_address="10.1.1.1")))
+        node = CLBNode(node_id='1234', description=self.desc,
+                       address='10.1.1.1')
+        self.assertFalse(
+            node.matches(DummyServer(servicenet_address="10.1.1.1")))
 
-    def test_matches_only_if_NovaServer_address_matches_node_address(self):
+    def test_matches_only_if_server_address_matches_node_address(self):
         """
-        :func:`CLBNode.matches` returns True only if the :class:`NovaServer` has
-        the same ServiceNet address as the node address
+        :func:`CLBNode.matches` returns True only if the :class:`NovaServer`
+        has the same ServiceNet address as the node address
         """
-        node = CLBNode(node_id='1234', description=self.desc, address='10.1.1.1')
+        node = CLBNode(node_id='1234', description=self.desc,
+                       address='10.1.1.1')
         self.assertFalse(node.matches(
             NovaServer(id='1', state=ServerState.ACTIVE, created=0.0,
-                       servicenet_address="10.1.1.2")))
+                       servicenet_address="10.1.1.2",
+                       image_id='image', flavor_id='flavor')))
         self.assertTrue(node.matches(
             NovaServer(id='1', state=ServerState.ACTIVE, created=0.0,
-                       servicenet_address="10.1.1.1")))
+                       servicenet_address="10.1.1.1",
+                       image_id='image', flavor_id='flavor')))
 
     def test_current_draining_true_if_description_is_draining(self):
         """

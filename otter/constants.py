@@ -1,6 +1,9 @@
 """Constants."""
 
-from twisted.python.constants import Names, NamedConstant
+from twisted.python.constants import NamedConstant, Names
+
+
+CONVERGENCE_LOCK_PATH = '/groups/{group_id}/converge_lock'
 
 
 class ServiceType(Names):

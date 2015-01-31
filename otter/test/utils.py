@@ -369,7 +369,7 @@ class StubTreq(object):
         BoundLog, that's being ignored for now.
         """
         key = (method, url, kwargs.pop('headers', None),
-               kwargs.pop('data', None), kwargs)
+               kwargs.pop('data', None), kwargs.pop('params', None), kwargs)
         return succeed(alist_get(self.reqs, key))
 
     def content(self, response):

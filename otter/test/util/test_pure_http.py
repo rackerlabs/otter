@@ -49,7 +49,7 @@ class RequestEffectTests(SynchronousTestCase):
         The Request effect dispatches a request to treq, and returns a
         two-tuple of the Twisted Response object and the content as bytes.
         """
-        req = ('GET', 'http://google.com/', None, None,  {'log': None})
+        req = ('GET', 'http://google.com/', None, None, None, {'log': None})
         response = StubResponse(200, {})
         treq = StubTreq(reqs=[(req, response)],
                         contents=[(response, "content")])
@@ -66,7 +66,7 @@ class RequestEffectTests(SynchronousTestCase):
         implementation.
         """
         log = object()
-        req = ('GET', 'http://google.com/', None, None, {'log': log})
+        req = ('GET', 'http://google.com/', None, None, None, {'log': log})
         response = StubResponse(200, {})
         treq = StubTreq(reqs=[(req, response)],
                         contents=[(response, "content")])

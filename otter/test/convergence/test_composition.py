@@ -1,5 +1,7 @@
 """Tests for convergence."""
 
+import json
+
 from effect import Constant, Effect, ParallelEffects
 from effect.testing import Stub, resolve_effect
 
@@ -33,9 +35,9 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 20, 'port': 800},
                                {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80),
-                  CLBDescription(lb_id='20', port=800)],
-             21: [CLBDescription(lb_id='21', port=81)]})
+            freeze({20: [CLBDescription(lb_id='20', port=80),
+                         CLBDescription(lb_id='20', port=800)],
+                    21: [CLBDescription(lb_id='21', port=81)]}))
 
     def test_with_rackconnect(self):
         """
@@ -46,26 +48,67 @@ class JsonToLBConfigTests(SynchronousTestCase):
                 [{'loadBalancerId': 20, 'port': 80},
                  {'loadBalancerId': 200, 'type': 'RackConnectV3'},
                  {'loadBalancerId': 21, 'port': 81}]),
-            {20: [CLBDescription(lb_id='20', port=80)],
-             21: [CLBDescription(lb_id='21', port=81)]})
+            freeze({20: [CLBDescription(lb_id='20', port=80)],
+                    21: [CLBDescription(lb_id='21', port=81)]}))
 
 
 class GetDesiredGroupStateTests(SynchronousTestCase):
     """Tests for :func:`get_desired_group_state`."""
+
     def test_convert(self):
         """
-        An Otter launch config is converted into a :obj:`DesiredGroupState`.
+        An Otter launch config a :obj:`DesiredGroupState`, ignoring extra
+        config information.
         """
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config,
-                       'loadBalancers': [{'loadBalancerId': 23, 'port': 80}]}}
-        state = get_desired_group_state(lc, 2)
+                       'loadBalancers': [{'loadBalancerId': 23, 'port': 80,
+                                          'whatsit': 'invalid'},
+                                         {'loadBalancerId': 23, 'port': 90}]}}
+
+        expected_server_config = {
+            'server': {
+                'name': 'test',
+                'flavorRef': 'f',
+                'metadata': {
+                    'rax:auto_scaling_group_id': 'uuid',
+                    'rax:autoscale:lb:23': json.dumps(
+                        [{"port": 80, "type": "CloudLoadBalancer"},
+                         {"port": 90, "type": "CloudLoadBalancer"}])
+                }
+            }
+        }
+        state = get_desired_group_state('uuid', lc, 2)
         self.assertEqual(
             state,
             DesiredGroupState(
-                launch_config={'server': server_config},
-                desired=2,
-                desired_lbs={23: [CLBDescription(lb_id='23', port=80)]}))
+                server_config=expected_server_config,
+                capacity=2,
+                desired_lbs=freeze({23: [
+                    CLBDescription(lb_id='23', port=80),
+                    CLBDescription(lb_id='23', port=90)]})))
+
+    def test_no_lbs(self):
+        """
+        When no loadBalancers are specified, the returned DesiredGroupState has
+        an empty mapping for desired_lbs.
+        """
+        server_config = {'name': 'test', 'flavorRef': 'f'}
+        lc = {'args': {'server': server_config}}
+
+        expected_server_config = {
+            'server': {
+                'name': 'test',
+                'flavorRef': 'f',
+                'metadata': {
+                    'rax:auto_scaling_group_id': 'uuid'}}}
+        state = get_desired_group_state('uuid', lc, 2)
+        self.assertEqual(
+            state,
+            DesiredGroupState(
+                server_config=expected_server_config,
+                capacity=2,
+                desired_lbs=pmap()))
 
 
 class ExecConvergenceTests(SynchronousTestCase):
@@ -77,15 +120,22 @@ class ExecConvergenceTests(SynchronousTestCase):
         """
         Sample server json
         """
+        self.desired_lbs = freeze({23: [CLBDescription(lb_id='23', port=80)]})
         self.servers = [
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
                        created=0,
-                       servicenet_address='10.0.0.1'),
+                       image_id='image',
+                       flavor_id='flavor',
+                       servicenet_address='10.0.0.1',
+                       desired_lbs=self.desired_lbs),
             NovaServer(id='b',
                        state=ServerState.ACTIVE,
                        created=0,
-                       servicenet_address='10.0.0.2')
+                       image_id='image',
+                       flavor_id='flavor',
+                       servicenet_address='10.0.0.2',
+                       desired_lbs=self.desired_lbs)
         ]
 
     def _get_gacd_func(self, group_id):
@@ -101,9 +151,9 @@ class ExecConvergenceTests(SynchronousTestCase):
         """
         get_all_convergence_data = self._get_gacd_func('gid')
         desired = DesiredGroupState(
-            launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
-            desired_lbs={23: [CLBDescription(lb_id='23', port=80)]},
-            desired=2)
+            server_config={'server': {'name': 'test', 'flavorRef': 'f'}},
+            desired_lbs=self.desired_lbs,
+            capacity=2)
 
         eff = execute_convergence(
             'gid', desired, get_all_convergence_data=get_all_convergence_data)
@@ -115,8 +165,9 @@ class ExecConvergenceTests(SynchronousTestCase):
         expected_req = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'POST',
-            'loadbalancers/23',
-            data=mock.ANY)
+            'loadbalancers/23/nodes',
+            data=mock.ANY,
+            success_pred=mock.ANY)
         got_req = eff.intent.effects[0].intent
         self.assertEqual(got_req, expected_req.intent)
         # separate check for nodes; they are unique, but can be in any order
@@ -137,9 +188,13 @@ class ExecConvergenceTests(SynchronousTestCase):
         is returned.
         """
         desired = DesiredGroupState(
-            launch_config={'server': {'name': 'test', 'flavorRef': 'f'}},
-            desired_lbs={},
-            desired=2)
+            server_config={'server': {'name': 'test', 'flavorRef': 'f'}},
+            desired_lbs=pmap(),
+            capacity=2)
+
+        for server in self.servers:
+            server.desired_lbs = pmap()
+
         get_all_convergence_data = self._get_gacd_func('gid')
         eff = execute_convergence(
             'gid', desired,
@@ -179,3 +234,10 @@ class FeatureFlagTest(SynchronousTestCase):
         self.assertEqual(tenant_is_enabled(enabled_tenant_id,
                                            get_config_value),
                          False)
+
+    def test_unconfigured(self):
+        """
+        When no `convergence-tenants` key is available in the config, False is
+        returned.
+        """
+        self.assertEqual(tenant_is_enabled('foo', lambda x: None), False)

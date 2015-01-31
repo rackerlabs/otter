@@ -63,7 +63,9 @@ Run tests, check code quality:
 
 Build the documentation:
 
-- `make docs` builds customer-facing documentation.
+- `make docs` builds all other documentation targets (listed below).
+- `make sphinxdocs` builds all Sphinx documentation.
+- `make docbook` builds all user-facing Docbook documentation.
 
 ### Deployment
 
@@ -73,7 +75,7 @@ Build the documentation:
 
 ### Cleaning up
 
-- `make cleandocs` removes customer-facing documentation without
+- `make cleandocs` removes all documentation artifacts without
   removing other artifacts.
 - `make clean` removes all build-time artifacts, leaving the
   repository in a distributable state.
