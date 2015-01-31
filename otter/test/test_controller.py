@@ -1001,6 +1001,9 @@ class ConvergeTestCase(SynchronousTestCase):
         self.mock_log = mock.MagicMock()
         self.mock_state = mock_group_state()
         self.group = mock_group()
+        self.converger_mock = mock.Mock()
+        self.addCleanup(set_converger, get_converger())
+        set_converger(self.converger_mock)
 
     def test_no_change_returns_none(self):
         """
@@ -1030,6 +1033,9 @@ class ConvergeTestCase(SynchronousTestCase):
             bound_log, 'transaction', self.mock_state, 'launch', self.group, 5)
         bound_log.msg.assert_any_call('executing launch configs')
 
+        # And converger service is _not_ called
+        self.assertFalse(self.converger_mock.start_convergence.called)
+
     def test_scale_down_exec_scale_down(self):
         """
         Converge will invoke exec_scale_down when the delta is negative.
@@ -1045,6 +1051,8 @@ class ConvergeTestCase(SynchronousTestCase):
         self.mocks['exec_scale_down'].assert_called_once_with(
             bound_log, 'transaction', self.mock_state, self.group, 5)
         bound_log.msg.assert_any_call('scaling down')
+        # And converger service is _not_ called
+        self.assertFalse(self.converger_mock.start_convergence.called)
 
     def test_audit_log_scale_up(self):
         """
@@ -1087,19 +1095,18 @@ class ConvergeTestCase(SynchronousTestCase):
         service's ``converge`` method is invoked, and None is returned.
         """
         log = mock_log()
-        converger_mock = mock.Mock()
         state = GroupState('tenant', 'group-id', "test", [], [], None, {},
                            False)
         group_config = {'maxEntities': 100, 'minEntities': 0}
         policy = {'change': 5}
         config_data = {'convergence-tenants': ['tenant']}
 
-        self.addCleanup(set_converger, get_converger())
-        set_converger(converger_mock)
-
         result = controller.converge(log, 'txn-id', group_config, self.group,
                                      state, 'launch', policy,
                                      config_value=config_data.get)
         self.assertIs(result, None)
-        converger_mock.start_convergence.assert_called_once_with(
+        self.converger_mock.start_convergence.assert_called_once_with(
             log, 'tenant', 'group-id', 5, 'launch')
+
+        # And execute_launch_config is _not_ called
+        self.assertFalse(self.mocks['execute_launch_config'].called)
