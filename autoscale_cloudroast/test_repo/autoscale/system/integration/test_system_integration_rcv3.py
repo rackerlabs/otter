@@ -642,15 +642,20 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             lb_list=lb_pools, group_min=self.min_servers,
             network_list=[self.rackconnect_network])
         pool_group = pool_group_resp.entity
+        server_count_before_autoscaling = self._get_node_counts_on_pool(
+            self.pool.id)['cloud_servers']
+
 
         print('\n Create initial group')
         # Wait for the servers and capture the oldest server ids
+
         self.asb.\
             wait_for_expected_number_of_active_servers(pool_group.id,
                                                        self.min_servers,
                                                        timeout=600,
                                                        asserter=self)
 
+        print('We now have one server')
         # Wait for RackConnect to reflect Otter's preferred configuration.
         # Capture the initial node ids
         self.asb.wait_for_expected_number_of_active_servers(
