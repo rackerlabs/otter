@@ -144,8 +144,9 @@ def extract_CLB_drained_at(feed):
     :rtype: float
     """
     # TODO: This function temporarily only looks at last entry assuming that
-    # it was draining operation. May need to look at all entries in reverse order
-    # and check for draining operation. This could include paging to further entries
+    # it was draining operation. May need to look at all entries in reverse
+    # order and check for draining operation. This could include paging to
+    # further entries
     entry = atom.entries(atom.parse(feed))[0]
     summary = atom.summary(entry)
     if 'Node successfully updated' in summary and 'DRAINING' in summary:
