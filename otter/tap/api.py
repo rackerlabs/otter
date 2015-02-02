@@ -19,6 +19,8 @@ from twisted.web.server import Site
 
 from txkazoo import TxKazooClient
 
+from otter.convergence.service import Converger, set_converger
+from otter.effect_dispatcher import get_full_dispatcher
 from otter.rest.admin import OtterAdmin
 from otter.rest.application import Otter
 from otter.rest.bobby import set_bobby
@@ -189,6 +191,8 @@ def makeService(config):
         set_bobby(BobbyClient(bobby_url))
 
     authenticator = generate_authenticator(reactor, config['identity'])
+    dispatcher = get_full_dispatcher(reactor, authenticator, log,
+                                     get_service_configs(config))
     supervisor = SupervisorService(authenticator, region, coiterate,
                                    get_service_configs(config))
     supervisor.setServiceParent(s)
@@ -245,8 +249,14 @@ def makeService(config):
             # delete will fail
             store.kz_client = kz_client
             # Setup kazoo to stop when shutting down
-            s.addService(FunctionalService(stop=partial(call_after_supervisor,
-                                                        kz_client.stop, supervisor)))
+            s.addService(FunctionalService(
+                stop=partial(call_after_supervisor,
+                             kz_client.stop, supervisor)))
+
+            # setup converger service
+            converger_service = Converger(reactor, kz_client, dispatcher)
+            s.addService(converger_service)
+            set_converger(converger_service)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
