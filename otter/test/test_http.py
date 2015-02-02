@@ -40,7 +40,12 @@ class BindServiceTests(SynchronousTestCase):
     def setUp(self):
         """Save some common parameters."""
         self.log = object()
-        self.request_func = lambda method, url, headers=None, data=None: (method, url, headers, data)
+
+    def request_func(self, method, url, headers=None, data=None):
+        """
+        A request func for testing that just returns its args.
+        """
+        return method, url, headers, data
 
     def test_add_bind_service(self):
         """
