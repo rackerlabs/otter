@@ -109,14 +109,18 @@ def get_clb_contents():
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
         nodes = [
-            CLBNode(node_id=str(node['id']), address=node['address'],
-                    description=CLBDescription(
-                        lb_id=str(_id), port=node['port'], weight=node['weight'],
-                        condition=CLBNodeCondition.lookupByName(node['condition']),
-                        type=CLBNodeType.lookupByName(node['type'])))
-            for _id, nodes in zip(ids, all_lb_nodes)
-            for node in nodes]
-        draining = [n for n in nodes if n.description.condition == CLBNodeCondition.DRAINING]
+            CLBNode(
+                node_id=str(node['id']),
+                address=node['address'],
+                description=CLBDescription(
+                    lb_id=str(_id),
+                    port=node['port'],
+                    weight=node['weight'],
+                    condition=CLBNodeCondition.lookupByName(node['condition']),
+                    type=CLBNodeType.lookupByName(node['type'])))
+            for _id, nodes in zip(ids, all_lb_nodes) for node in nodes]
+        draining = [n for n in nodes
+                    if n.description.condition == CLBNodeCondition.DRAINING]
         return parallel(
             [lb_req(
                 'GET',
