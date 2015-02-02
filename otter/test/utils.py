@@ -603,7 +603,7 @@ def resolve_effect(effect, result, is_error=False):
     pred = getattr(effect.intent, 'intent_result_pred', None)
     if pred is not None:
         assert pred(result), \
-            "%r does not conform to %s.intent_result_pred" %(
+            "%r does not conform to %s.intent_result_pred" % (
                 result, type(effect.intent).__name__)
     return eff_resolve_effect(effect, result, is_error=is_error)
 
