@@ -249,8 +249,9 @@ class GetLBContentsTests(SynchronousTestCase):
             ShouldDelayAndRetry(can_retry=retry_times(5),
                                 next_interval=exponential_backoff_interval(2)))
         req = eff.intent.effect.intent
-        response = self.reqs[(req.method, req.url, req.json_response)]
-        return resolve_effect(eff, response)
+        body = self.reqs[(req.method, req.url, req.json_response)]
+        fake_response = object()
+        return resolve_effect(eff, (fake_response, body))
 
     def _resolve_lb(self, eff):
         """Resolve the tree of effects used to fetch LB information."""
