@@ -600,11 +600,11 @@ def resolve_effect(effect, result, is_error=False):
     type-check on ``result`` based on a declared type in the intent's
     ``intent_result_type`` attribute.
     """
-    expected_type = getattr(effect.intent, 'intent_result_type', None)
-    if expected_type is not None:
-        assert isinstance(result, expected_type), \
-            "%r is not of type %s, as declared by %r" % (
-                result, expected_type, effect.intent)
+    pred = getattr(effect.intent, 'intent_result_pred', None)
+    if pred is not None:
+        assert pred(result), \
+            "%r does not conform to %s.intent_result_pred" %(
+                result, type(effect.intent).__name__)
     return eff_resolve_effect(effect, result, is_error=is_error)
 
 

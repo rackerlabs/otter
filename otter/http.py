@@ -101,10 +101,13 @@ class ServiceRequest(object):
     :obj:`ServiceRequest` in your dispatcher -- :obj:`TenantScope`'s performer
     takes care of that.
     """
-    # This intent_result_type is not wide enough -- json objects can be strings
-    # and numbers, too. It's also not *thin* enough, since this will allow
-    # lists and dicts of *anything*.
-    intent_result_type = (dict, list)
+    def intent_result_pred(self, result):
+        """Check if the result is a JSON-compatible object."""
+        # This type is not wide enough -- json objects can be strings and
+        # numbers, too. It's also not *thin* enough, since this will allow
+        # lists and dicts of *anything*. But it's a good approximation of what
+        # rackspace/openstack services can return.
+        return isinstance(result, (dict, list))
 
 
 @attributes(['effect', 'tenant_id'], apply_with_init=False)
