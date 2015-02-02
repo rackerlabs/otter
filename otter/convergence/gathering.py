@@ -109,19 +109,26 @@ def get_clb_contents():
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
         nodes = [
-            CLBNode(node_id=str(node['id']), address=node['address'],
-                    description=CLBDescription(
-                        lb_id=str(_id), port=node['port'], weight=node['weight'],
-                        condition=CLBNodeCondition.lookupByName(node['condition']),
-                        type=CLBNodeType.lookupByName(node['type'])))
-            for _id, nodes in zip(ids, all_lb_nodes)
-            for node in nodes]
-        draining = [n for n in nodes if n.description.condition == CLBNodeCondition.DRAINING]
+            CLBNode(
+                node_id=str(node['id']),
+                address=node['address'],
+                description=CLBDescription(
+                    lb_id=str(_id),
+                    port=node['port'],
+                    weight=node['weight'],
+                    condition=CLBNodeCondition.lookupByName(node['condition']),
+                    type=CLBNodeType.lookupByName(node['type'])))
+            for _id, nodes in zip(ids, all_lb_nodes) for node in nodes]
+        draining = [n for n in nodes
+                    if n.description.condition == CLBNodeCondition.DRAINING]
         return parallel(
             [lb_req(
                 'GET',
-                append_segments('loadbalancers', str(n.description.lb_id), 'nodes',
-                                '{}.atom'.format(n.node_id)),
+                append_segments(
+                    'loadbalancers',
+                    str(n.description.lb_id),
+                    'nodes',
+                    '{}.atom'.format(n.node_id)),
                 json_response=False)
              for n in draining]).on(lambda feeds: (nodes, draining, feeds))
 
@@ -144,8 +151,9 @@ def extract_CLB_drained_at(feed):
     :rtype: float
     """
     # TODO: This function temporarily only looks at last entry assuming that
-    # it was draining operation. May need to look at all entries in reverse order
-    # and check for draining operation. This could include paging to further entries
+    # it was draining operation. May need to look at all entries in reverse
+    # order and check for draining operation. This could include paging to
+    # further entries
     entry = atom.entries(atom.parse(feed))[0]
     summary = atom.summary(entry)
     if 'Node successfully updated' in summary and 'DRAINING' in summary:
