@@ -141,7 +141,7 @@ def get_clb_contents():
                     str(n.description.lb_id),
                     'nodes',
                     '{}.atom'.format(n.node_id)),
-                json_response=False)
+                json_response=False).on(_discard_response)
              for n in draining]).on(lambda feeds: (nodes, draining, feeds))
 
     def fill_drained_at((nodes, draining, feeds)):
