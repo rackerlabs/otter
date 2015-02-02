@@ -101,6 +101,10 @@ class ServiceRequest(object):
     :obj:`ServiceRequest` in your dispatcher -- :obj:`TenantScope`'s performer
     takes care of that.
     """
+    # This intent_result_type is not wide enough -- json objects can be strings
+    # and numbers, too. It's also not *thin* enough, since this will allow
+    # lists and dicts of *anything*.
+    intent_result_type = (dict, list)
 
 
 @attributes(['effect', 'tenant_id'], apply_with_init=False)

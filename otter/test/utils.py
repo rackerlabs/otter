@@ -7,7 +7,9 @@ from functools import partial
 from inspect import getargspec
 
 from effect import base_dispatcher
-from effect.testing import resolve_effect, resolve_stubs as eff_resolve_stubs
+from effect.testing import (
+    resolve_effect as eff_resolve_effect,
+    resolve_stubs as eff_resolve_stubs)
 
 import mock
 
@@ -590,6 +592,20 @@ def alist_get(data, key):
         if dkey == key:
             return dvalue
     raise KeyError(key)
+
+
+def resolve_effect(effect, result, is_error=False):
+    """
+    Just like :func:`effect.testing.resolve_effect`, except it performs a
+    type-check on ``result`` based on a declared type in the intent's
+    ``intent_result_type`` attribute.
+    """
+    expected_type = getattr(effect.intent, 'intent_result_type', None)
+    if expected_type is not None:
+        assert isinstance(result, expected_type), \
+            "%r is not of type %s, as declared by %r" % (
+                result, expected_type, effect.intent)
+    return eff_resolve_effect(effect, result, is_error=is_error)
 
 
 def resolve_retry_stubs(eff):
