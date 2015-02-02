@@ -69,10 +69,11 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         `get_all_server_details` will not fetch again if first get returns
         results with size < batch_size
         """
-        response = {'servers': self.servers}
+        fake_response = object()
+        body = {'servers': self.servers}
         eff = get_all_server_details(batch_size=10)
         svcreq = resolve_retry_stubs(eff)
-        result = resolve_svcreq(svcreq, response, *self.req)
+        result = resolve_svcreq(svcreq, (fake_response, body), *self.req)
         self.assertEqual(result, self.servers)
 
     def test_get_all_above_batch_size(self):
@@ -84,10 +85,14 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         req2 = (ServiceType.CLOUD_SERVERS, 'GET',
                 'servers/detail?limit=10&marker=9')
         svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
-        next_retry = resolve_svcreq(svcreq, {'servers': servers[:10]},
+        fake_response = object()
+        body = {'servers': servers[:10]}
+
+        next_retry = resolve_svcreq(svcreq, (fake_response, body),
                                     *self.req)
         next_req = resolve_retry_stubs(next_retry)
-        result = resolve_svcreq(next_req, {'servers': servers[10:]}, *req2)
+        body = {'servers': servers[10:]}
+        result = resolve_svcreq(next_req, (fake_response, body), *req2)
         self.assertEqual(result, servers)
 
     def test_retry(self):
