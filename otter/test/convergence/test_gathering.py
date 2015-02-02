@@ -124,7 +124,9 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         """
         servers = [{'id': i} for i in range(10)]
         eff = resolve_retry_stubs(get_scaling_group_servers())
-        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
+        fake_response = object()
+        body = {'servers': servers}
+        result = resolve_svcreq(eff, (fake_response, body), *self.req)
         self.assertEqual(result, {})
 
     def test_filters_no_as_metadata(self):
@@ -134,7 +136,9 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         """
         servers = [{'id': i, 'metadata': {}} for i in range(10)]
         eff = resolve_retry_stubs(get_scaling_group_servers())
-        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
+        fake_response = object()
+        body = {'servers': servers}
+        result = resolve_svcreq(eff, (fake_response, body), *self.req)
         self.assertEqual(result, {})
 
     def test_returns_as_servers(self):
@@ -149,7 +153,9 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
         servers = as_servers + [{'metadata': 'junk'}] * 3
         eff = resolve_retry_stubs(get_scaling_group_servers())
-        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
+        fake_response = object()
+        body = {'servers': servers}
+        result = resolve_svcreq(eff, (fake_response, body), *self.req)
         self.assertEqual(
             result,
             {'a': as_servers[:5] + [as_servers[-1]], 'b': as_servers[5:8]})
@@ -167,7 +173,9 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         eff = resolve_retry_stubs(
             get_scaling_group_servers(
                 server_predicate=lambda s: s['id'] % 3 == 0))
-        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
+        fake_response = object()
+        body = {'servers': servers}
+        result = resolve_svcreq(eff, (fake_response, body), *self.req)
         self.assertEqual(
             result,
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
