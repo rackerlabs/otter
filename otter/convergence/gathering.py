@@ -63,6 +63,13 @@ def get_all_server_details(batch_size=100):
     return get_server_details(marker=None)
 
 
+def _discard_response((response, body)):
+    """
+    Takes a response, body tuple and discards the response.
+    """
+    return body
+
+
 def get_scaling_group_servers(server_predicate=identity):
     """
     Return tenant's servers that belong to a scaling group as
@@ -108,8 +115,7 @@ def get_clb_contents():
         _response, body = result
         lbs = body['loadBalancers']
         lb_ids = [lb['id'] for lb in lbs]
-        lb_reqs = [lb_req('GET', _lb_path(lb_id))
-                   .on(lambda (_resp, all_nodes): all_nodes)
+        lb_reqs = [lb_req('GET', _lb_path(lb_id)).on(_discard_response)
                    for lb_id in lb_ids]
         return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
 
