@@ -51,8 +51,9 @@ def get_all_server_details(batch_size=100):
             retry_times(5), exponential_backoff_interval(2))
         return eff.on(continue_)
 
-    def continue_(response):
-        servers = response['servers']
+    def continue_(result):
+        _response, body = result
+        servers = body['servers']
         if len(servers) < batch_size:
             return servers
         else:
