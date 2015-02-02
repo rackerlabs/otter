@@ -100,14 +100,18 @@ def get_clb_contents():
                 method, url, json_response=json_response),
             retry_times(5), exponential_backoff_interval(2))
 
+    def _lb_path(lb_id):
+        """Return the URL path to lb with given id's nodes."""
+        return append_segments('loadbalancers', str(lb_id), 'nodes')
+
     def fetch_nodes(result):
         _response, body = result
         lbs = body['loadBalancers']
         lb_ids = [lb['id'] for lb in lbs]
-        return parallel(
-            [lb_req('GET',
-                    append_segments('loadbalancers', str(lb_id), 'nodes'))
-             for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
+        lb_reqs = [lb_req('GET', _lb_path(lb_id))
+                   .on(lambda (_resp, all_nodes): all_nodes)
+                   for lb_id in lb_ids]
+        return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
         nodes = [
