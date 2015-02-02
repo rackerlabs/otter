@@ -120,8 +120,11 @@ def get_clb_contents():
         return parallel(
             [lb_req(
                 'GET',
-                append_segments('loadbalancers', str(n.description.lb_id), 'nodes',
-                                '{}.atom'.format(n.node_id)),
+                append_segments(
+                    'loadbalancers',
+                    str(n.description.lb_id),
+                    'nodes',
+                    '{}.atom'.format(n.node_id)),
                 json_response=False)
              for n in draining]).on(lambda feeds: (nodes, draining, feeds))
 
