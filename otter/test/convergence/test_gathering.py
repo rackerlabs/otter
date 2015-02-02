@@ -28,7 +28,11 @@ from otter.convergence.model import (
     NovaServer,
     ServerState)
 from otter.http import service_request
-from otter.test.utils import patch, resolve_retry_stubs, resolve_stubs
+from otter.test.utils import (
+    patch,
+    resolve_retry_stubs,
+    resolve_stubs
+)
 from otter.util.retry import (
     ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import from_timestamp
