@@ -101,7 +101,8 @@ def get_clb_contents():
             retry_times(5), exponential_backoff_interval(2))
 
     def fetch_nodes(result):
-        lbs = result['loadBalancers']
+        _response, body = result
+        lbs = body['loadBalancers']
         lb_ids = [lb['id'] for lb in lbs]
         return parallel(
             [lb_req('GET',
