@@ -168,6 +168,18 @@
             <para>If the request succeeds, the response body describes
                 the created group in JSON format. The response
                 includes an ID and links for the group.</para>
+            <para>The number of resources entities that are specified in <parameter>minEntities</parameter> and <parameter>maxEntities</parameter> overrides the
+                amount of resources that can be specified in a policy. See also <link linkend="Min_and_Max_Policies">Using the min and max values with policies</link>.</para>
+            <para>You can specify custom metadata for your group
+                configuration using the optional <parameter>metadata</parameter>parameter.</para>
+            <para>
+                <note>
+                    <para>Group metadata is stored within the Auto
+                        Scale API and can be queried. You can use the <parameter>metadata</parameter> parameter
+                        for customer automation, but it does not
+                        change any functionality in Auto Scale.</para>
+                </note>
+            </para>
         </wadl:doc>
         <request>
             <param style="plain" name="launchConfiguration"
@@ -183,7 +195,7 @@
                         RackConnectV3 load balancer pool to
                         which to connect. You must set the
                         <parameter>type</parameter> parameter to <parameter>launch_server</parameter>.
-                    </para></wadl:doc>
+                        For more details, see <link linkend="Launch_Configuration">Launch configurations</link>.</para></wadl:doc>
             </param>
             <param style="plain" name="loadBalancers" required="false"
                 type="array"
@@ -191,12 +203,16 @@
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN">
                     <para>One or more cloud load balancers or RackConnectV3 load balancer pools to which to add
-                        new servers. All servers are added to these
+                        new servers. For background
+                        information and an example
+                        configuration, see <link linkend="RCv3">Cloud Bursting with
+                            RackConnect v3</link>. All servers are added to these
                         load balancers with the IP addresses of their
                         ServiceNet network. All servers are enabled
                         and equally weighted. Any new servers that are
                         not connected to the ServiceNet network are
-                        not added to any load balancers.</para></wadl:doc>
+                        not added to any load balancers.</para>
+</wadl:doc>
             </param>
             <param style="plain" name="port" required="true"
                 type="integer"
@@ -231,7 +247,10 @@
                         The attributes that
                         you specify for the server entity apply to all
                         new servers in the scaling group, including
-                        the server name.</para></wadl:doc>
+                        the server name. Note the server arguments are directly passed to nova when creating a server.</para>
+                    <para>For more information see 
+                        <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/nova_create_server.html">Create Your Server with the nova Client</link></para>
+                    <para></para></wadl:doc>
             </param>
             <param style="plain" name="flavorRef" required="true"
                 type="string"
@@ -241,7 +260,7 @@
                         image. Specifies the flavor ID for the
                         server.</para><para>A flavor is a resource
                         configuration for a server. For more
-                        information, see Server Flavors<olink
+                        information, see <olink
                             targetdoc="autoscale-devguide"
                             targetptr="server-flavors">“Server
                             Flavors”</olink>
@@ -254,6 +273,22 @@
                     xml:lang="EN"><para>The ID of the cloud server
                         image, after which new server images are
                         created.</para></wadl:doc>
+            </param>
+            
+            <param style="plain" name="OS-DCF:diskConfig" required="true"
+                type="string"
+                path="$.launchConfiguration.args.server.diskConfig">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>How the disk on new servers
+                        is partitioned. Valid values are
+                        <parameter>AUTO</parameter>" or <parameter>MANUAL</parameter>. For non-Rackspace
+                        server images, this value must always be
+                        <parameter>MANUAL</parameter>. A non-Rackspace server
+                        image would be one that you imported using a non-Rackspace server. For more information, see the
+                        <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html">
+                            Disk Configuration Extension
+                        </link>documentation for Rackspace
+                        Cloud Servers.</para></wadl:doc>
             </param>
 
             <param style="plain" name="path" required="true"
@@ -589,7 +624,7 @@
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >The base64 encoded string containing your create server template. 
                         You can create this template to install packages and run commands via cloud init. You use this for boot from volume. 
-                        For an example create server template, see <link linkend="Edit_Launch_Config">Edit the launch configuration 
+                        For an example create server template, see <link linkend="Configurations">Edit the launch configuration 
                             for your scaling group</link>. </wadl:doc>
                 </param>
                 <param style="plain" name="type" required="true"
@@ -1014,8 +1049,7 @@
             <para role="shortdesc">Shows the configuration for a
                 scaling group.</para>
             <para>Shows the configuration for a specified scaling
-                group, including the maximum and minimum number
-                of entities, the global cooldown time, and other metadata. The configuration is
+                group, including group settings, launch configuration settings, and policy settings. The configuration is
                 returned in the response body in JSON format.</para>
         </wadl:doc>
         <response status="200"><doc title="OK">The request succeeded and the response 
@@ -1033,7 +1067,7 @@
         </response> &commonFaults; &getGroupConfigurationFaults; </method>
     <method id="putGroupConfig" name="PUT">
         <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN"
-            title="Update scaling group configuration">
+            title="Update scaling group configuration" xml:id="updateGroup">
             <para role="shortdesc">Updates the configuration for the
                 scaling group.</para>
             <para>Updates the configuration of an existing scaling
@@ -1181,7 +1215,8 @@
                 <varname>{ }</varname>)in the update 
                 are accepted and overwrite previously specified parameters. New parameters can be specified. 
                 All create (<methodname>POST</methodname>) parameters, even optional ones, 
-                are required for the update operation. </para></note>
+                are required for the update operation. 
+                For more details, see <link linkend="Launch_Configuration">Launch configurations</link>.</para></note>
         </wadl:doc>
         <request>
             <param style="plain" name="args" required="false"
