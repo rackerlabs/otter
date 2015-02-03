@@ -422,6 +422,10 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             expected_rcv3_server_count, timeout=300, api="RackConnect",
             asserter=self)
 
+        # Confirm that the expected server count also exists according to Nova
+        self.verify_server_count_using_server_metadata(pool_group.id,
+                                                       as_server_count)
+
         # Get node count after scaling and confirm that the expected number of
         # nodes are present on the load_balancer_pool.
         scale_up_node_count = (self._get_node_counts_on_pool(self.pool.id)
@@ -460,6 +464,10 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             msg='The actual '
             'cloud_server count of [{0}] does not match the expected count '
             'of [{1}]'.format(scale_up_node_count, expected_rcv3_server_count))
+
+        # Confirm that the expected server count also exists according to Nova
+        self.verify_server_count_using_server_metadata(pool_group.id,
+                                                       as_server_count)
 
         # Capture a list of the node_ids of all nodes on the pool after scaling
         final_node_ids = []
@@ -547,6 +555,10 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             expected_rcv3_server_count, timeout=300, api="RackConnect",
             asserter=self)
 
+        # Confirm that the expected server count also exists according to Nova
+        self.verify_server_count_using_server_metadata(pool_group.id,
+                                                       as_server_count)
+
         # Get node count after scaling and confirm that the expected number of
         # nodes are present on the load_balancer_pool.
         scale_up_node_count = (self._get_node_counts_on_pool(self.pool.id)
@@ -591,6 +603,10 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
             expected_rcv3_server_count, timeout=300, api="RackConnect",
             asserter=self)
+
+        # Confirm that the expected server count also exists according to Nova
+        self.verify_server_count_using_server_metadata(pool_group.id,
+                                                       as_server_count)
 
         # Get node count after scaling and confirm that the expected number of
         # nodes are present on the load_balancer_pool
