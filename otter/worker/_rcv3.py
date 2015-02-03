@@ -4,7 +4,6 @@
 At some point, this should just be moved into that module.
 """
 from functools import partial
-from operator import itemgetter
 
 from effect import Effect
 from effect.twisted import perform
