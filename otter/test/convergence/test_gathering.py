@@ -4,7 +4,7 @@ import calendar
 from functools import partial
 
 from effect import Constant, Effect
-from effect.testing import Stub, resolve_effect
+from effect.testing import Stub
 
 from pyrsistent import pmap
 
@@ -28,7 +28,8 @@ from otter.convergence.model import (
     NovaServer,
     ServerState)
 from otter.http import service_request
-from otter.test.utils import patch, resolve_retry_stubs, resolve_stubs
+from otter.test.utils import (
+    patch, resolve_effect, resolve_retry_stubs, resolve_stubs)
 from otter.util.retry import (
     ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import from_timestamp
