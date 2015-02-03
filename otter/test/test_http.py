@@ -39,7 +39,12 @@ class BindServiceTests(SynchronousTestCase):
     def setUp(self):
         """Save some common parameters."""
         self.log = object()
-        self.request_func = lambda method, url, headers=None, data=None: (method, url, headers, data)
+
+    def request_func(self, method, url, headers=None, data=None):
+        """
+        A request func for testing that just returns its args.
+        """
+        return method, url, headers, data
 
     def test_add_bind_service(self):
         """
@@ -141,21 +146,22 @@ class PerformServiceRequestTests(SynchronousTestCase):
         self.assertEqual(next_eff.intent.data, json.dumps(input_json))
 
         # Output is parsed
-        result = resolve_effect(next_eff,
-                                stub_pure_response(json.dumps(output_json)))
-        self.assertEqual(result, output_json)
+        response, body = stub_pure_response(json.dumps(output_json))
+        result = resolve_effect(next_eff, (response, body))
+        self.assertEqual(result, (response, output_json))
 
     def test_no_json_response(self):
         """
-        ``json_response`` can be set to :data:`False` to get the plaintext.
-        response.
+        ``json_response`` can be set to :data:`False` to get the response
+        object and the plaintext body of the response.
         """
         svcreq = service_request(ServiceType.CLOUD_SERVERS, "GET", "servers",
                                  json_response=False).intent
         eff = self._concrete(svcreq)
         next_eff = resolve_authenticate(eff)
-        result = resolve_effect(next_eff, stub_pure_response("foo"))
-        self.assertEqual(result, "foo")
+        stub_response = stub_pure_response("foo")
+        result = resolve_effect(next_eff, stub_response)
+        self.assertEqual(result, stub_response)
 
 
 class PerformTenantScopeTests(SynchronousTestCase):

@@ -51,8 +51,9 @@ def get_all_server_details(batch_size=100):
             retry_times(5), exponential_backoff_interval(2))
         return eff.on(continue_)
 
-    def continue_(response):
-        servers = response['servers']
+    def continue_(result):
+        _response, body = result
+        servers = body['servers']
         if len(servers) < batch_size:
             return servers
         else:
@@ -60,6 +61,13 @@ def get_all_server_details(batch_size=100):
             return more_eff.on(lambda more_servers: servers + more_servers)
 
     return get_server_details(marker=None)
+
+
+def _discard_response((response, body)):
+    """
+    Takes a response, body tuple and discards the response.
+    """
+    return body
 
 
 def get_scaling_group_servers(server_predicate=identity):
@@ -99,30 +107,41 @@ def get_clb_contents():
                 method, url, json_response=json_response),
             retry_times(5), exponential_backoff_interval(2))
 
+    def _lb_path(lb_id):
+        """Return the URL path to lb with given id's nodes."""
+        return append_segments('loadbalancers', str(lb_id), 'nodes')
+
     def fetch_nodes(result):
-        lbs = result['loadBalancers']
+        _response, body = result
+        lbs = body['loadBalancers']
         lb_ids = [lb['id'] for lb in lbs]
-        return parallel(
-            [lb_req('GET',
-                    append_segments('loadbalancers', str(lb_id), 'nodes'))
-             for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
+        lb_reqs = [lb_req('GET', _lb_path(lb_id)).on(_discard_response)
+                   for lb_id in lb_ids]
+        return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
         nodes = [
-            CLBNode(node_id=str(node['id']), address=node['address'],
-                    description=CLBDescription(
-                        lb_id=str(_id), port=node['port'], weight=node['weight'],
-                        condition=CLBNodeCondition.lookupByName(node['condition']),
-                        type=CLBNodeType.lookupByName(node['type'])))
-            for _id, nodes in zip(ids, all_lb_nodes)
-            for node in nodes]
-        draining = [n for n in nodes if n.description.condition == CLBNodeCondition.DRAINING]
+            CLBNode(
+                node_id=str(node['id']),
+                address=node['address'],
+                description=CLBDescription(
+                    lb_id=str(_id),
+                    port=node['port'],
+                    weight=node['weight'],
+                    condition=CLBNodeCondition.lookupByName(node['condition']),
+                    type=CLBNodeType.lookupByName(node['type'])))
+            for _id, nodes in zip(ids, all_lb_nodes) for node in nodes]
+        draining = [n for n in nodes
+                    if n.description.condition == CLBNodeCondition.DRAINING]
         return parallel(
             [lb_req(
                 'GET',
-                append_segments('loadbalancers', str(n.description.lb_id), 'nodes',
-                                '{}.atom'.format(n.node_id)),
-                json_response=False)
+                append_segments(
+                    'loadbalancers',
+                    str(n.description.lb_id),
+                    'nodes',
+                    '{}.atom'.format(n.node_id)),
+                json_response=False).on(_discard_response)
              for n in draining]).on(lambda feeds: (nodes, draining, feeds))
 
     def fill_drained_at((nodes, draining, feeds)):
@@ -144,8 +163,9 @@ def extract_CLB_drained_at(feed):
     :rtype: float
     """
     # TODO: This function temporarily only looks at last entry assuming that
-    # it was draining operation. May need to look at all entries in reverse order
-    # and check for draining operation. This could include paging to further entries
+    # it was draining operation. May need to look at all entries in reverse
+    # order and check for draining operation. This could include paging to
+    # further entries
     entry = atom.entries(atom.parse(feed))[0]
     summary = atom.summary(entry)
     if 'Node successfully updated' in summary and 'DRAINING' in summary:

@@ -12,7 +12,6 @@ from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
     add_bind_root,
-    add_content_only,
     add_effect_on_response,
     add_error_handling,
     add_headers,
@@ -107,7 +106,9 @@ class ServiceRequest(object):
         # numbers, too. It's also not *thin* enough, since this will allow
         # lists and dicts of *anything*. But it's a good approximation of what
         # rackspace/openstack services can return.
-        return isinstance(result, (dict, list))
+        return (isinstance(result, tuple)
+                and isinstance(result[1],
+                               (dict, list) if self.json_response else str))
 
 
 @attributes(['effect', 'tenant_id'], apply_with_init=False)
@@ -170,7 +171,6 @@ def concretize_service_request(
             request_ = add_json_response(request_)
         request_ = add_error_handling(
             service_request.success_pred, request_)
-        request_ = add_content_only(request_)
         return request_(
             service_request.method,
             service_request.url,
