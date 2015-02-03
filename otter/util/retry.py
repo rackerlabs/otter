@@ -341,14 +341,6 @@ class Retry(object):
     should occur (usually an instance of :obj:`ShouldDelayAndRetry`).
     """
 
-    def intent_result_pred(self, result):
-        """Pass through to the wrapped intent's predicate."""
-        pred = getattr(self.effect.intent, 'intent_result_pred', None)
-        if pred is not None:
-            return pred(result)
-        else:
-            return True
-
 
 @sync_performer
 def perform_retry(dispatcher, intent):
