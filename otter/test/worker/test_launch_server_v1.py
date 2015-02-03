@@ -45,7 +45,7 @@ from otter.worker.launch_server_v1 import (
 from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq, matches,
                               DummyException, IsBoundWith, StubTreq, StubTreq2,
                               StubResponse, defaults_by_name)
-from otter.test.worker.test_rcv3 import _rcv3_add_response
+from otter.test.worker.test_rcv3 import _rcv3_add_response_body
 from testtools.matchers import IsInstance, StartsWith, MatchesRegex
 
 from otter.auth import headers
@@ -377,7 +377,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertIdentical(request_func, self.request_func)
         self.assertEqual(lb_id, self.lb_config["loadBalancerId"])
         self.assertEqual(server_id, self.server_details["server"]["id"])
-        rcv3_add_response = _rcv3_add_response(lb_id, server_id)
+        rcv3_add_response = _rcv3_add_response_body(lb_id, server_id)
         return succeed(rcv3_add_response)
 
     def _fake_add_to_clb(self, log, endpoint, auth_token, lb_config,
@@ -817,7 +817,7 @@ class RemoveFromRCv3Tests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         lb_id = "my-rcv3-lb-id"
         rcv3_config = {"type": "RackConnectV3", "loadBalancerId": lb_id}
-        rcv3_response = _rcv3_add_response(lb_id, "my-server-id")
+        rcv3_response = _rcv3_add_response_body(lb_id, "my-server-id")
         d = remove_from_load_balancer(self.log, self.request_func,
                                       rcv3_config, rcv3_response)
         self.assertIdentical(self.successResultOf(d), None)
