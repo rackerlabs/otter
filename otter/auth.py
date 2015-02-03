@@ -463,6 +463,12 @@ class Authenticate(object):
         self.tenant_id = tenant_id
         self.log = log
 
+    def intent_result_pred(self, result):
+        """Check that the result looks like (auth_token, service_catalog)."""
+        return (isinstance(result, tuple)
+                and len(result) == 2
+                and isinstance(result[1], list))
+
 
 @deferred_performer
 def perform_authenticate(dispatcher, intent):
@@ -482,6 +488,10 @@ class InvalidateToken(object):
     def __init__(self, authenticator, tenant_id):
         self.authenticator = authenticator
         self.tenant_id = tenant_id
+
+    def intent_result_pred(self, result):
+        """Check that the result is None."""
+        return result is None
 
 
 @deferred_performer
