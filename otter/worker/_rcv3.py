@@ -4,7 +4,6 @@
 At some point, this should just be moved into that module.
 """
 from functools import partial
-from operator import itemgetter
 
 from effect import Effect
 from effect.twisted import perform
@@ -33,11 +32,13 @@ def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
     # performing.
     scoped = Effect(TenantScope(effect, request_bag.tenant_id))
 
-    # The result of steps_to_effect will be a list (added by ParallelEffects)
-    # of results. In this code, we're only performing one request, so we know
-    # there will only be one element in that list. Our contract is that we
-    # return the result of the request, so we discard the outer list.
-    return perform(request_bag.dispatcher, scoped).addCallback(itemgetter(0))
+    d = perform(request_bag.dispatcher, scoped)
+
+    def get_response_body(result):
+        _response, body = result[0]
+        return body
+
+    return d.addCallback(get_response_body)
 
 
 add_to_rcv3 = partial(_generic_rcv3_request, BulkAddToRCv3)
