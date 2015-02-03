@@ -99,9 +99,13 @@ class ServiceRequest(object):
     then you don't need to worry about including a performer for this
     :obj:`ServiceRequest` in your dispatcher -- :obj:`TenantScope`'s performer
     takes care of that.
+
+    The result will be a two-tuple of a treq response object and the body
+    of the response (either a json-compatible object or a string, depending
+    on ``json_response``).
     """
     def intent_result_pred(self, result):
-        """Check if the result is a JSON-compatible object."""
+        """Check if the result looks like (treq response, body)."""
         # This type is not wide enough -- json objects can be strings and
         # numbers, too. It's also not *thin* enough, since this will allow
         # lists and dicts of *anything*. But it's a good approximation of what
