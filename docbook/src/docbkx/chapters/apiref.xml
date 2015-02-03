@@ -7,7 +7,7 @@
 <chapter xmlns="http://docbook.org/ns/docbook" xml:id="API_Operations"
    xmlns:wadl="http://wadl.dev.java.net/2009/02" role="api-reference">
    <title>API Operations</title>
-   <para>The operations described in this chapter allow developers to
+   <para>The operations described in this chapter allow you to
       manage groups, configurations, policies, executions, and
       webhooks.</para>
    <section xml:id="autoscale-groups">
@@ -17,6 +17,10 @@
          <wadl:resource href="../../wadl/autoscale.wadl#groups">
             <wadl:method href="#listGroups"/>
             <wadl:method href="#createGroup"/>
+         </wadl:resource>
+         <wadl:resource href="../../wadl/autoscale.wadl#config">
+            <wadl:method href="#getGroupConfig"/>
+            <wadl:method href="#putGroupConfig"/>
          </wadl:resource>
          <wadl:resource href="../../wadl/autoscale.wadl#groupId">
             <wadl:method href="#showGroupManifest"/>
@@ -32,14 +36,9 @@
       </wadl:resources>
    </section>
    <section xml:id="Configurations">
-      <title>Configurations</title>
-      <para>The operations described in this chapter allow developers
-         to manage configurations.</para>
+      <title>Launch configurations</title>
+      <para>The operations described in this chapter allow you to manage launch configurations.</para>
       <wadl:resources xmlns="http://wadl.dev.java.net/2009/02">
-         <wadl:resource href="../../wadl/autoscale.wadl#config">
-            <wadl:method href="#getGroupConfig"/>
-            <wadl:method href="#putGroupConfig"/>
-         </wadl:resource>
          <wadl:resource href="../../wadl/autoscale.wadl#launch">
             <wadl:method href="#getLaunchConfig"/>
             <wadl:method href="#putLaunchConfig"/>
