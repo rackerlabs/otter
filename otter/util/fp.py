@@ -2,6 +2,7 @@
 
 """Functional programming utilities."""
 
+from copy import deepcopy
 
 from toolz.itertoolz import groupby
 
@@ -78,3 +79,10 @@ def predicate_any(*preds):
     with or operator
     """
     return lambda *a, **kw: any(p(*a, **kw) for p in preds)
+
+
+def obj_assoc(o, **k):
+    """Update attributes on an object, returning a new one."""
+    new_o = deepcopy(o)
+    new_o.update(k)
+    return new_o

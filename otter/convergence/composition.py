@@ -17,7 +17,7 @@ from otter.convergence.model import CLBDescription, DesiredGroupState
 from otter.convergence.planning import plan
 
 
-def execute_convergence(group_id, desired_group_state,
+def execute_convergence(servers, lb_nodes, desired_group_state,
                         get_all_convergence_data=get_all_convergence_data):
     """
     Execute convergence. This function will do following:
@@ -34,10 +34,7 @@ def execute_convergence(group_id, desired_group_state,
     :return: Effect of bool specifying if the effect should be performed again
     :rtype: :class:`effect.Effect`
     """
-    eff = get_all_convergence_data(group_id)
-    conv_eff = eff.on(
-        lambda (servers, lb_nodes): plan(desired_group_state, servers,
-                                         lb_nodes, time.time()))
+    conv_eff = plan(desired_group_state, servers, lb_nodes, time.time())
     return conv_eff.on(steps_to_effect).on(bool)
 
 
