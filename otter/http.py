@@ -134,10 +134,13 @@ class TenantScope(object):
         self.effect = effect
         self.tenant_id = tenant_id
 
-    @property
-    def intent_result_pred(self):
+    def intent_result_pred(self, result):
         """Pass through to the wrapped intent's predicate."""
-        return getattr(self.effect.intent, 'intent_result_pred', None)
+        pred = getattr(self.effect.intent, 'intent_result_pred', None)
+        if pred is not None:
+            return pred(result)
+        else:
+            return True
 
 
 def concretize_service_request(

@@ -604,8 +604,13 @@ def resolve_effect(effect, result, is_error=False):
         pred = getattr(effect.intent, 'intent_result_pred', None)
         if pred is not None:
             assert pred(result), \
-                "%r does not conform to %s.intent_result_pred" % (
-                    result, type(effect.intent).__name__)
+                "%r does not conform to the intent_result_pred of %r" % (
+                    result, effect.intent)
+        else:
+            # allow non-otter intents to not define the predicate.
+            assert not effect.intent.__module__.startswith('otter'), \
+                "%r should define an intent_result_pred method" % (
+                    effect.intent,)
     return eff_resolve_effect(effect, result, is_error=is_error)
 
 
