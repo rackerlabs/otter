@@ -146,9 +146,6 @@ class CloudFeedsObserver(object):
     """
     Log observer that pushes events to cloud feeds
     """
-    def __init__(self):
-        # This is needed for attributes to work
-        pass
 
     def __call__(self, event_dict):
         """
