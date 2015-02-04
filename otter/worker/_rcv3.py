@@ -35,7 +35,14 @@ def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
     d = perform(request_bag.dispatcher, scoped)
 
     def get_response_body(result):
+        # The body must be provided for adding, because that is stored in
+        # the DB so that the worker can delete the server and remove it
+        # from all the load balancers later.  The body is unimportant for
+        # deletes.
+
+        # TODO: when/before #956 lands, this needs refactoring
         if result[0] is None:
+            assert step_class == BulkRemoveFromRCv3
             return None
         else:
             _response, body = result[0]
