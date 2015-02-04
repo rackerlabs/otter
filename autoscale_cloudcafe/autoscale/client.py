@@ -425,8 +425,11 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             desired_capacity=None, policy_type=None,
                             args=None, requestslib_kwargs=None, batch_size=1):
         """
-        :summary: Create multiple scaling policies with the same configuration in a single API call
-        :param name: Name root - Names take the form "name_#" with numbers from 0 to batch_size
+        Create multiple scaling policies with the same configuration in a
+            single API call
+
+        :param name: Name root - Names take the form "name_#" with numbers from
+            0 to batch_size
         :type name: str
         :param cooldown: The cooldown time for the policy
         :type cooldown: int|float
