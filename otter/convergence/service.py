@@ -8,12 +8,15 @@ from effect import Effect
 from effect.do import do, do_return
 from effect.twisted import deferred_performer, perform
 
+from toolz.itertoolz import concat
+
 from twisted.application.service import Service
 
 from otter.constants import CONVERGENCE_LOCK_PATH
 from otter.convergence.composition import (
     execute_convergence, get_desired_group_state)
 from otter.convergence.gathering import get_all_convergence_data
+from otter.convergence.steps import AddNodesToCLB, BulkAddToRCv3, CreateServer
 from otter.http import TenantScope
 from otter.util.deferredutils import with_lock
 from otter.util.fp import obj_assoc
@@ -32,15 +35,39 @@ def perform_modify_group_state(mgs):
     return mgs.scaling_group.modify_state(lambda: mgs.state)
 
 
-def extract_active_and_pending(servers):
-    # This is _totally_ wrong. Actives need to be servers that are ACTIVE *and*
-    # which have been added to the load balancer, if appropriate.
-    # And pendings are servers that haven't yet been added to the LB.
-    # (is there a list of states exclusive of pending? like ERROR? Or is it a
-    # whitelist of pending states instead?)
-    actives = [x for x in servers if x['state'] == 'ACTIVE']
-    pendings = [x for x in servers if x['state'] == '???']
-    return actives, pendings
+def server_to_json(server):
+    return {'id': server.id}
+
+
+def calculate_active_and_pending(servers, steps):
+    """
+    Given the current NovaServers and the planned (unthrottled) steps,
+    determine which servers are active and which servers are pending.
+
+    :return: Two-tuple of (active, pending) where `active` is a dict of server
+    IDs to server info, and `pending` is a dict of arbitrary integers to
+    pending server info.
+    """
+    all_rcv3_server_adds = set(concat([
+        [pair[1] for pair in s.lb_node_pairs]
+        for s in steps if type(s) is BulkAddToRCv3]))
+
+    all_clb_ips = set(concat([
+        [c[0] for c in s.address_configs]
+        for s in steps if type(s) is AddNodesToCLB]))
+
+    num_pending = (len(all_rcv3_server_adds)
+                   + len(all_clb_ips)
+                   + len(s for s in steps if type(s) is CreateServer))
+
+    pending = {job_id: {'convergence-job': True}
+               for job_id in range(num_pending)}
+
+    complete = [server for server in servers
+                if server.id not in all_rcv3_server_adds
+                and server.servicenet_address not in all_clb_ips]
+    active = {server.id: server_to_json(server) for server in complete}
+    return active, pending
 
 
 class Converger(Service, object):
@@ -62,7 +89,7 @@ class Converger(Service, object):
     def _converge_eff(self, scaling_group, group_state, launch_config,
                       execute_convergence):
         servers, lb_nodes = yield get_all_convergence_data(group_state.group_id)
-        actives, pendings = extract_active_and_pending(servers)
+        actives, pendings = calculate_active_and_pending(servers)
         new_state = obj_assoc(group_state, active=actives, pending=pendings)
         yield Effect(ModifyGroupState(scaling_group=scaling_group,
                                       group_state=new_state))
