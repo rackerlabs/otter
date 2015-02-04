@@ -62,10 +62,7 @@ def sanitize_event(event):
     event_copy = deepcopy(event)
     PEP3101FormattingWrapper(lambda e: None)(event_copy)
     msg = event_copy["message"]
-    try:
-        event["message"] = msg[0]
-    except KeyError:
-        raise UnsuitableMessage("No message in event")
+    event["message"] = msg[0]
 
     # map keys in event to CF keys
     for log_key, cf_key in log_cf_mapping.iteritems():
