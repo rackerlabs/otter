@@ -16,7 +16,7 @@ import common
 
 from autoscale.behaviors import safe_hasattr
 
-from test_repo.autoscale.fixtures import AutoscaleFixture
+from test_repo.autoscale.fixtures import AutoscaleFixture, autoscale_config
 
 
 class DummyAsserter(object):
@@ -200,6 +200,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.verify_group_state(pool_group_resp.entity.id, self.min_servers)
 
     @tags(speed='slow', type='rcv3', rcv3_mimic='fail')
+    @unittest.skipIf(autoscale_config.mimic,
+                     "This test fails on mimic because it does not implement "
+                     "cloud networks yet.")
     def test_create_nonzero_scaling_group_with_pool_on_private(self):
         """
         Test that it is possible to create a scaling group with
@@ -229,6 +232,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                  asserter=self))
 
     @tags(speed='slow', type='rcv3', rcv3_mimic='fail')
+    @unittest.skipIf(autoscale_config.mimic,
+                     "This test fails on mimic because it does not implement "
+                     "cloud networks yet.")
     def test_create_nonzero_scaling_group_with_pool_on_public(self):
         """
         Test that it is possible to create a scaling group with
@@ -304,6 +310,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                      self.min_servers))
 
     @tags(speed='slow', type='rcv3', rcv3_mimic='fail')
+    @unittest.skipIf(autoscale_config.mimic,
+                     "This test fails on mimic because it does not implement "
+                     "cloud networks yet.")
     def test_create_scaling_group_with_pool_and_nonzero_min(self):
         """
         Create group with min_entities servers, a single RCv3 LB, ServiceNet

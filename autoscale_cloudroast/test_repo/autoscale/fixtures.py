@@ -25,6 +25,9 @@ from autoscale.config import AutoscaleConfig
 from autoscale.otter_constants import OtterConstants
 
 
+autoscale_config = AutoscaleConfig()
+
+
 class AutoscaleFixture(BaseTestFixture):
     """
     :summary: Fixture for an Autoscale test.
@@ -37,7 +40,7 @@ class AutoscaleFixture(BaseTestFixture):
         """
         super(AutoscaleFixture, cls).setUpClass()
         cls.resources = ResourcePool()
-        cls.autoscale_config = AutoscaleConfig()
+        cls.autoscale_config = autoscale_config
         cls.endpoint_config = UserAuthConfig()
         user_config = UserConfig()
         access_data = AuthProvider.get_access_data(cls.endpoint_config,
@@ -71,7 +74,7 @@ class AutoscaleFixture(BaseTestFixture):
 
         cls.tenant_id = cls.autoscale_config.tenant_id
 
-        if cls.autoscale_config.environment in ('production', 'staging'):
+        if autoscale_config.environment in ('production', 'staging'):
             autoscale_service = access_data.get_service(
                 cls.autoscale_config.autoscale_endpoint_name)
             cls.url = autoscale_service.get_endpoint(
@@ -81,7 +84,7 @@ class AutoscaleFixture(BaseTestFixture):
         # endpoint instead of what's in the service catalog.
         else:
             cls.url = "{0}/{1}".format(
-                cls.autoscale_config.server_endpoint, cls.tenant_id)
+                autoscale_config.server_endpoint, cls.tenant_id)
             print(" ------ Using non-production, non-staging otter --------")
 
         cls.autoscale_client = AutoscalingAPIClient(

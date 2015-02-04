@@ -350,3 +350,10 @@ class AutoscaleConfig(ConfigSectionInterface):
         Default is production.
         """
         return self.get('environment', 'production')
+
+    @property
+    def mimic(self):
+        """
+        Specify whether this configuration is against a mimic instance.
+        """
+        return bool(self.get('mimic'))
