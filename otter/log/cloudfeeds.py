@@ -8,7 +8,7 @@ from datetime import datetime
 
 from characteristic import attributes
 
-from effect import Effect
+from effect import Effect, Func
 from effect.twisted import perform
 
 from toolz.dicttoolz import keyfilter
@@ -103,10 +103,11 @@ request_format = {
 }
 
 
-def prepare_request(req_fmt, event, error, timestamp, region,
-                    _uuid=uuid.uuid4):
+def prepare_request(req_fmt, event, error, timestamp, region):
     """
     Prepare request based on request format
+
+    :returns: Effect of `str` containing request
     """
     request = deepcopy(req_fmt)
     if error:
@@ -114,25 +115,31 @@ def prepare_request(req_fmt, event, error, timestamp, region,
     request['entry']['content']['event']['region'] = region
     request['entry']['content']['event']['eventTime'] = timestamp
     request['entry']['content']['event']['product'].update(event)
-    request['entry']['content']['event']['id'] = str(_uuid())
-    return request
+
+    def set_id(_id):
+        request['entry']['content']['event']['id'] = _id
+        return request
+
+    return Effect(Func(uuid.uuid4)).on(set_id)
 
 
-def add_event(event, tenant_id, region, log,
-              _prep_req=prepare_request):
+def add_event(event, tenant_id, region, log):
     """
     Add event to cloud feeds
-    # Review: Is taking _prep_req as argument really required?
     """
     event, error, timestamp = sanitize_event(event)
-    eff = retry_effect(
-        service_request(
-            ServiceType.CLOUD_FEEDS, 'POST',
-            append_segments('autoscale', 'events'),
-            data=_prep_req(request_format, event, error, timestamp, region),
-            log=log, success_pred=has_code(201)),
-        retry_times(5), exponential_backoff_interval(2))
-    return Effect(TenantScope(tenant_id=tenant_id, effect=eff))
+    req_eff = prepare_request(request_format, event, error, timestamp, region)
+
+    def _send_event(req):
+        eff = retry_effect(
+            service_request(
+                ServiceType.CLOUD_FEEDS, 'POST',
+                append_segments('autoscale', 'events'),
+                data=req, log=log, success_pred=has_code(201)),
+            retry_times(5), exponential_backoff_interval(2))
+        return Effect(TenantScope(tenant_id=tenant_id, effect=eff))
+
+    return req_eff.on(_send_event)
 
 
 @attributes(['reactor', 'authenticator', 'tenant_id', 'region',

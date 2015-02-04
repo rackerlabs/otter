@@ -2,6 +2,7 @@
 Tests for otter.cloudfeeds
 """
 
+import uuid
 from functools import partial
 
 from effect import Effect, TypeDispatcher
@@ -22,7 +23,7 @@ from otter.log.cloudfeeds import (
     request_format,
     sanitize_event
 )
-from otter.test.utils import CheckFailure, mock_log
+from otter.test.utils import CheckFailure, mock_log, resolve_effect
 from otter.util.retry import (
     ShouldDelayAndRetry,
     exponential_backoff_interval,
@@ -133,22 +134,54 @@ class EventTests(SynchronousTestCase):
         Sample event and request format
         """
         self.event, self.cf_event = sample_event_pair()
-        self.fmt = {'entry': {'content': {'event': {'type': 'INFO',
-                                                    'product': {}}}}}
+        self.req = {
+            "entry": {
+                "@type": "http://www.w3.org/2005/Atom",
+                "title": "autoscale",
+                "content": {
+                    "event": {
+                        "@type": "http://docs.rackspace.com/core/event",
+                        "id": "",
+                        "version": "2",
+                        "eventTime": "1970-01-01T00:00:00",
+                        "type": "INFO",
+                        "region": "ord",
+                        "product": {
+                            "@type": ("http://docs.rackspace.com/event/"
+                                      "autoscale"),
+                            "serviceCode": "Autoscale",
+                            "version": "1",
+                            "scalingGroupId": "gid",
+                            "policyId": "pid",
+                            "webhookId": "wid",
+                            "username": "abc",
+                            "desiredCapacity": 5,
+                            "currentCapacity": 3,
+                            "message": "human"
+                        }
+                    }
+                }
+            }
+        }
+
+    def _get_request(self, _type, _id):
+        """
+        Sample formatted request
+        """
+        self.req['entry']['content']['event']['type'] = _type
+        self.req['entry']['content']['event']['id'] = _id
+        return self.req
 
     def test_add_event(self):
         """
         add_event pushes event by calling cloud feed with retries
         """
         log = object()
+        eff = add_event(self.event, 'tid', 'ord', log)
 
-        def prep_req(*args):
-            if args != (request_format, self.cf_event, False,
-                        '1970-01-01T00:00:00', 'ord'):
-                raise Exception('bad')
-            return 'req'
-
-        eff = add_event(self.event, 'tid', 'ord', log, prep_req)
+        # effect is to generate UUID
+        self.assertIs(eff.intent.func, uuid.uuid4)
+        eff = resolve_effect(eff, 'uuid')
 
         # effect scoped on on tenant id
         self.assertIs(type(eff.intent), TenantScope)
@@ -167,39 +200,19 @@ class EventTests(SynchronousTestCase):
             eff,
             service_request(
                 ServiceType.CLOUD_FEEDS, 'POST', 'autoscale/events',
-                data='req', log=log, success_pred=has_code(201)))
-
-    def _check_request(self, req, ev_type):
-        """
-        Check request matches with event type
-        """
-        self.assertEqual(
-            req,
-            {'entry': {
-                'content': {
-                    'event': {
-                        'region': 'ord', 'eventTime': 'ts',
-                        'id': 'uuid', 'product': {'a': 'b'},
-                        'type': ev_type
-                    }
-                }
-            }})
-
-    def test_prepare_request(self):
-        """
-        `prepare_request` returns formatted request
-        """
-        req = prepare_request(self.fmt, {'a': 'b'}, False, 'ts', 'ord',
-                              lambda: 'uuid')
-        self._check_request(req, 'INFO')
+                data=self._get_request('INFO', 'uuid'), log=log,
+                success_pred=has_code(201)))
 
     def test_prepare_request_error(self):
         """
         `prepare_request` returns formatted request with error in type
         """
-        req = prepare_request(self.fmt, {'a': 'b'}, True, 'ts', 'ord',
-                              lambda: 'uuid')
-        self._check_request(req, 'ERROR')
+        eff = prepare_request(
+            request_format, self.cf_event, True, "1970-01-01T00:00:00", 'ord')
+        self.assertIs(eff.intent.func, uuid.uuid4)
+        self.assertEqual(
+            resolve_effect(eff, 'uuid'),
+            self._get_request('ERROR', 'uuid'))
 
 
 class CloudFeedsObserverTests(SynchronousTestCase):
