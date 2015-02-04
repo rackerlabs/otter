@@ -3,7 +3,7 @@
 import json
 
 from effect import Constant, Effect, ParallelEffects
-from effect.testing import Stub, resolve_effect
+from effect.testing import Stub
 
 import mock
 
@@ -20,7 +20,7 @@ from otter.convergence.composition import (
 from otter.convergence.model import (
     CLBDescription, DesiredGroupState, NovaServer, ServerState)
 from otter.http import service_request
-from otter.test.utils import resolve_stubs
+from otter.test.utils import resolve_effect, resolve_stubs
 
 
 class JsonToLBConfigTests(SynchronousTestCase):

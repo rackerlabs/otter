@@ -32,6 +32,12 @@ class Request(object):
 
     treq = logging_treq
 
+    def intent_result_pred(self, result):
+        """Check that the result looks like (response, content)."""
+        return (isinstance(result, tuple)
+                and len(result) == 2
+                and isinstance(result[1], str))
+
 
 @deferred_performer
 @inlineCallbacks
