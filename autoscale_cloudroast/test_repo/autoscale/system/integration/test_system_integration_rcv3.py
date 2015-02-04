@@ -3,7 +3,7 @@ System Integration tests for autoscaling with RackConnect V3 load balancers
 """
 from __future__ import print_function
 
-
+import inspect
 import random
 import time
 import unittest
@@ -56,6 +56,16 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         across all tests which can benefit from it.
         """
         super(AutoscaleRackConnectFixture, cls).setUpClass()
+
+        if cls.rcv3_client is None:
+            # don't bother with the rest of the set-up; skip all tests
+            skip = unittest.skip("This account does not support RCv3.")
+
+            for test in inspect.getmembers(cls, predicate=inspect.ismethod):
+                # test is a tuple of name, object
+                if test[0].startswith("test_"):
+                    setattr(cls, test[0], skip(test[1]))
+            return
 
         cls.common = common.CommonTestUtilities(cls.server_client,
                                                 cls.autoscale_client,

@@ -68,7 +68,6 @@ class AutoscaleFixture(BaseTestFixture):
         except Exception:
             cls.rcv3_client = None
             print("This account does not support rackconnect")
-            # Skip rackconnect test? TO_DO
 
         cls.tenant_id = cls.autoscale_config.tenant_id
 
