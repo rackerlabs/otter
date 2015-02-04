@@ -10,7 +10,6 @@ from effect import (
     TypeDispatcher,
     base_dispatcher,
     sync_perform)
-from effect.testing import resolve_effect
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -23,7 +22,7 @@ from otter.http import (
     concretize_service_request,
     perform_tenant_scope,
     service_request)
-from otter.test.utils import stub_pure_response
+from otter.test.utils import resolve_effect, stub_pure_response
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
