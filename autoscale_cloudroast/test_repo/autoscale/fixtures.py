@@ -112,14 +112,6 @@ class AutoscaleFixture(BaseTestFixture):
         cls.sp_change_percent = int(cls.autoscale_config.sp_change_percent)
         cls.sp_desired_capacity = int(cls.autoscale_config.sp_desired_capacity)
         cls.sp_policy_type = cls.autoscale_config.sp_policy_type
-        cls.check_type = cls.autoscale_config.check_type
-        cls.check_url = cls.autoscale_config.check_url
-        cls.check_method = cls.autoscale_config.check_method
-        cls.check_timeout = cls.autoscale_config.check_timeout
-        cls.check_period = cls.autoscale_config.check_period
-        cls.monitoring_zones = ['mzord', 'mzdfw', 'mziad']
-        cls.target_alias = cls.autoscale_config.target_alias
-        cls.alarm_criteria = cls.autoscale_config.alarm_criteria
         cls.upd_sp_change = int(cls.autoscale_config.upd_sp_change)
         cls.lc_load_balancers = cls.autoscale_config.lc_load_balancers
         cls.sp_list = cls.autoscale_config.sp_list
@@ -224,9 +216,9 @@ class AutoscaleFixture(BaseTestFixture):
 
     def assert_get_policy(self, created_policy, get_policy, args=False):
         """
-        Given the newly created policy dict and the response object from the get
-        policy call, asserts all the attributes are equal. args can be at_style,
-        cron_style or maas
+        Given the newly created policy dict and the response object from the
+        get policy call, asserts all the attributes are equal. args can be
+        at_style or  cron_style
         """
         self.assertEquals(
             get_policy.id, created_policy['id'],
