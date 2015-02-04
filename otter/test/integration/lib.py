@@ -3,6 +3,7 @@ writing integration tests in the context of the Otter project.
 """
 
 from characteristic import Attribute, attributes
+from pyrsistent import freeze
 
 
 @attributes([
@@ -71,7 +72,7 @@ class IdentityV2(object):
         """
 
         def record_result(r):
-            rcs.access = r
+            rcs.access = freeze(r)
             return rcs
 
         return self.auth.authenticate_user(
