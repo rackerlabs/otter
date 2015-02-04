@@ -8,6 +8,8 @@ from characteristic import Attribute, attributes
 @attributes([
     Attribute('access', default_value=None),
     Attribute('other', default_value=None),
+    Attribute('endpoints', default_value={}),
+    Attribute('groups', default_value=[]),
 ])
 class TestResources(object):
     """This class records the various resources used by a test.
@@ -77,19 +79,19 @@ class IdentityV2(object):
         ).addCallback(record_result)
 
 
-def find_endpoint(catalog, kind, region):
+def find_endpoint(catalog, service_type, region):
     """Locate an endpoint in a service catalog, as returned by IdentityV2.
+    Please note that both :param:`service_type` and :param:`region` are
+    case sensitive.
 
     :param dict catalog: The Identity service catalog.
-    :param str kind: The "type" of service to look for.
-        We name the parameter ``kind`` only because ``type`` is a reserved
-        word in Python.
+    :param str service_type: The type of service to look for.
     :param str region: The service region the desired endpoint must service.
-    :return: The endpoint offering the desired kind of service for the
+    :return: The endpoint offering the desired type of service for the
         desired region, if available.  None otherwise.
     """
     for entry in catalog["access"]["serviceCatalog"]:
-        if entry["type"] != kind:
+        if entry["type"] != service_type:
             continue
         for endpoint in entry["endpoints"]:
             if endpoint["region"] == region:

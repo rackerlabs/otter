@@ -2,7 +2,7 @@
 Tests for the lib functions for convergence black-box testing.
 """
 
-from twisted.internet.defer import Deferred
+from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.integration import lib
@@ -36,7 +36,7 @@ class IdentityV2Tests(SynchronousTestCase):
 
             def authenticate_user(self, endpt, user, passwd, pool=None):
                 self.pool = pool
-                return Deferred().addCallback(lambda: {})
+                return defer.succeed({})
 
         stub = Stub()
         lib.IdentityV2(
@@ -57,7 +57,7 @@ class IdentityV2Tests(SynchronousTestCase):
         """
         class Stub(object):
             def authenticate_user(self, *unused_args, **unused_kwargs):
-                return Deferred().addCallback(lambda _: "cached")
+                return defer.succeed("cached")
 
         rcs = lib.TestResources()
         stub = Stub()
@@ -65,7 +65,7 @@ class IdentityV2Tests(SynchronousTestCase):
             auth=stub, username="username",
             password="password", endpoint="endpoint"
         )
-        i.authenticate_user(rcs).callback(None)
+        i.authenticate_user(rcs)
         self.assertEqual(rcs.access, "cached")
 
 
