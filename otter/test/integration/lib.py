@@ -3,6 +3,7 @@ writing integration tests in the context of the Otter project.
 """
 
 from characteristic import Attribute, attributes
+
 from pyrsistent import freeze
 
 
