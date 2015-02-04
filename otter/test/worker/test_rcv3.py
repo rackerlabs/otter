@@ -11,9 +11,9 @@ from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
+from otter.test.utils import StubResponse
 from otter.util.pure_http import has_code
 from otter.worker import _rcv3
-from otter.test.utils import StubResponse
 
 
 def _rcv3_add_response_body(lb_id, server_id):
