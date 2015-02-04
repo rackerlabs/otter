@@ -26,6 +26,9 @@ from autoscale.config import AutoscaleConfig
 from autoscale.otter_constants import OtterConstants
 
 
+autoscale_config = AutoscaleConfig()
+
+
 class AutoscaleFixture(BaseTestFixture):
     """
     :summary: Fixture for an Autoscale test.
