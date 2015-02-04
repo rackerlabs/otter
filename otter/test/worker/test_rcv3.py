@@ -13,6 +13,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.constants import ServiceType
 from otter.util.pure_http import has_code
 from otter.worker import _rcv3
+from otter.test.utils import StubResponse
 
 
 def _rcv3_add_response_body(lb_id, server_id):
@@ -81,14 +82,14 @@ class RCv3Tests(SynchronousTestCase):
         if req.method == "POST":
             self.assertEqual(req.success_pred, has_code(201))
             # http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes
-            body = _rcv3_add_response_body("lb_id", "server_id")
+            response = (StubResponse(201, {}),
+                        _rcv3_add_response_body("lb_id", "server_id"))
         elif req.method == "DELETE":
             self.assertEqual(req.success_pred, has_code(204, 409))
             # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnode
-            body = None
+            response = None
 
-        fake_response = object()
-        return succeed([(fake_response, body)])
+        return succeed([response])
 
     def test_add_to_rcv3(self):
         """

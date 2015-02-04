@@ -35,8 +35,11 @@ def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
     d = perform(request_bag.dispatcher, scoped)
 
     def get_response_body(result):
-        _response, body = result[0]
-        return body
+        if result[0] is None:
+            return None
+        else:
+            _response, body = result[0]
+            return body
 
     return d.addCallback(get_response_body)
 
