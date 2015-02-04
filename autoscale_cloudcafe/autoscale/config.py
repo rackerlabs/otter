@@ -342,3 +342,10 @@ class AutoscaleConfig(ConfigSectionInterface):
         Specify the cloud network to use with RackConnect
         """
         return self.get('rcv3_cloud_network')
+
+    @property
+    def mimic(self):
+        """
+        Specify whether this configuration is against a mimic instance.
+        """
+        return bool(self.get('mimic'))
