@@ -72,16 +72,17 @@ class AutoscaleFixture(BaseTestFixture):
 
         cls.tenant_id = cls.autoscale_config.tenant_id
 
-        env = os.environ['OSTNG_CONFIG_FILE']
-        if ('preprod' in env.lower()) or ('dev' in env.lower()):
-            cls.url = str(cls.autoscale_config.server_endpoint) + \
-                '/' + str(cls.tenant_id)
-            print(" ------ Using dev or pre-prod otter --------")
-        else:
+        # If not production or staging, always use the configured server
+        # endpoint instead of what's in the service catalog.
+        if cls.autoscale_config.environment in ('production', 'staging'):
             autoscale_service = access_data.get_service(
                 cls.autoscale_config.autoscale_endpoint_name)
             cls.url = autoscale_service.get_endpoint(
                 cls.autoscale_config.region).public_url
+        else:
+            cls.url = "{0}/{1}".format(
+                cls.autoscale_config.server_endpoint, cls.tenant_id)
+            print(" ------ Using non-production, non-staging otter --------")
 
         cls.autoscale_client = AutoscalingAPIClient(
             cls.url, access_data.token.id_,

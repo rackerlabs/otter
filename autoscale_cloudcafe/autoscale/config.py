@@ -342,3 +342,11 @@ class AutoscaleConfig(ConfigSectionInterface):
         Specify the cloud network to use with RackConnect
         """
         return self.get('rcv3_cloud_network')
+
+    @property
+    def environment(self):
+        """
+        Read the environment for the config.  For example, dev, ci, etc.
+        Default is production.
+        """
+        return self.get('environment', 'production')
