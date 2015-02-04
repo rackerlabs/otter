@@ -8,6 +8,23 @@ from characteristic import Attribute, attributes
 
 
 @attributes([
+    Attribute('access', default_value=None),
+    Attribute('other', default_value=None),
+])
+class TestResources(object):
+    """This class records the various resources used by a test.
+    It is NOT intended to be used for clean-up purposes (use
+    :func:`unittest.addCleanup` for this purpose).  Instead, it's just a
+    useful scratchpad for passing test resource availability amongst Twisted
+    callbacks.
+
+    If you have custom state you'd like to pass around, use the :attr:`other`
+    attribute for this purpose.  The library will not interpret this attribute,
+    nor will it change it (bugs notwithstanding).
+    """
+
+
+@attributes([
     Attribute('auth'),
     Attribute('username', instance_of=str),
     Attribute('password', instance_of=str),
@@ -35,10 +52,31 @@ class IdentityV2(object):
         test/test_treq_integration.py#L60-L74 for more information.
     """
 
-    def authenticate_user(self):
+    def __init__(self):
+        self.access = None
+
+    def authenticate_user(self, rcs):
+        """Authenticates against the Identity API.  Prior to success, the
+        :attr:`access` member will be set to `None`.  After authentication
+        completes, :attr:`access` will hold the raw Identity V2 API results as
+        a Python dictionary, including service catalog and API authentication
+        token.
+
+        :param TestResources rcs: A :class:`TestResources` instance used to
+            record the identity results.
+
+        :return: A Deferred which, when fired, returns a copy of the resources
+            given.  The :attr:`access` field will be set to the Python
+            dictionary representation of the Identity authentication results.
+        """
+
+        def record_result(r):
+            rcs.access = r
+            return rcs
+
         return self.auth.authenticate_user(
             self.endpoint, self.username, self.password, pool=self.pool
-        )
+        ).addCallback(record_result)
 
 
 def find_endpoint(catalog, kind, region):

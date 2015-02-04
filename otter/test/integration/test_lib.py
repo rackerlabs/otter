@@ -2,6 +2,7 @@
 Tests for the lib functions for convergence black-box testing.
 """
 
+from twisted.internet.defer import Deferred
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.integration import lib
@@ -27,27 +28,45 @@ class IdentityV2Tests(SynchronousTestCase):
         """The pool keyword argument should be passed through to the
         authenticate_user Otter function.
         """
+        rcs = lib.TestResources()
+
         class Stub(object):
             def __init__(self):
                 self.pool = None
 
             def authenticate_user(self, endpt, user, passwd, pool=None):
                 self.pool = pool
-                return "{}"
+                return Deferred().addCallback(lambda: {})
 
         stub = Stub()
         lib.IdentityV2(
             auth=stub, username="username",
             password="password", endpoint="endpoint"
-        ).authenticate_user()
+        ).authenticate_user(rcs)
         self.assertFalse(stub.pool)
 
         lib.IdentityV2(
             auth=stub, username="username",
             password="password", endpoint="endpoint", pool=42
-        ).authenticate_user()
+        ).authenticate_user(rcs)
         self.assertEquals(stub.pool, 42)
 
+    def test_records_results(self):
+        """The IdentityV2 instance you create should cache its
+        results when it receives them.
+        """
+        class Stub(object):
+            def authenticate_user(self, *unused_args, **unused_kwargs):
+                return Deferred().addCallback(lambda _: "cached")
+
+        rcs = lib.TestResources()
+        stub = Stub()
+        i = lib.IdentityV2(
+            auth=stub, username="username",
+            password="password", endpoint="endpoint"
+        )
+        i.authenticate_user(rcs).callback(None)
+        self.assertEqual(rcs.access, "cached")
 
 
 _test_catalog = {
