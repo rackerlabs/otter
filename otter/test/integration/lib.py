@@ -2,8 +2,6 @@
 writing integration tests in the context of the Otter project.
 """
 
-from twisted.web.client import HTTPConnectionPool
-
 from characteristic import Attribute, attributes
 
 

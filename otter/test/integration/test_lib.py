@@ -120,8 +120,6 @@ _test_catalog = {
 }
 
 
-
-
 class FindEndpointTests(SynchronousTestCase):
     """These tests exercise the :func:`find_endpoint` library function."""
 
