@@ -245,7 +245,7 @@ class CloudFeedsObserverTests(SynchronousTestCase):
             add_event=lambda *a: Effect(AddEvent()),
             get_disp=lambda *a: TypeDispatcher(
                 {AddEvent: add_event_performer}))
-        d = cf({'event': 'dict', 'cloud_feed': True})
+        d = cf({'event': 'dict', 'cloud_feed': True, 'message': ('m', )})
 
         self.assertEqual(self.successResultOf(d), 'performed')
         self.assertFalse(self.log.err.called)
@@ -264,13 +264,13 @@ class CloudFeedsObserverTests(SynchronousTestCase):
             add_event=lambda *a: Effect(AddEvent()),
             get_disp=lambda *a: TypeDispatcher(
                 {AddEvent: add_event_performer}))
-        d = cf({'event': 'dict', 'cloud_feed': True})
+        d = cf({'event': 'dict', 'cloud_feed': True, 'message': ('m', )})
 
         self.successResultOf(d)
         # log doesn't have cloud_feed in it
         self.log.err.assert_called_once_with(
             CheckFailure(ValueError), "Failed to add event", event='dict',
-            system='otter.cloud_feed')
+            system='otter.cloud_feed', cf_msg='m')
 
     def test_unsuitable_msg_logs(self):
         """
@@ -281,8 +281,9 @@ class CloudFeedsObserverTests(SynchronousTestCase):
             raise UnsuitableMessage("bad")
 
         cf = self.make_cf(add_event=add_event, get_disp=lambda *a: 1 / 0)
-        cf({'event': 'dict', 'cloud_feed': True})
+        cf({'event': 'dict', 'cloud_feed': True, 'message': ('m', )})
         self.log.err.assert_called_once_with(
             None, ('Tried to add unsuitable message in cloud feeds: '
                    '{unsuitable_message}'),
-            unsuitable_message='bad', event='dict', system='otter.cloud_feed')
+            unsuitable_message='bad', event='dict', system='otter.cloud_feed',
+            cf_msg='m')

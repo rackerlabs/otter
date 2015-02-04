@@ -11,7 +11,7 @@ from characteristic import attributes
 from effect import Effect
 from effect.twisted import perform
 
-from toolz.dicttoolz import dissoc
+from toolz.dicttoolz import keyfilter
 
 from otter.constants import ServiceType
 from otter.effect_dispatcher import get_full_dispatcher
@@ -152,8 +152,11 @@ class CloudFeedsObserver(object):
             return
         # Do further logging without cloud_feed to avoid coming back here
         # in infinite recursion
-        log = self.log.bind(system='otter.cloud_feed',
-                            **dissoc(event_dict, 'cloud_feed'))
+        log_keys = keyfilter(
+            lambda k: k not in ('message', 'cloud_feed'), event_dict)
+        log = self.log.bind(
+            system='otter.cloud_feed', cf_msg=event_dict['message'][0],
+            **log_keys)
         try:
             eff = self.add_event(event_dict, self.tenant_id, self.region, log)
         except UnsuitableMessage as me:
