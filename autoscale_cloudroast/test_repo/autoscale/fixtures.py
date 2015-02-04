@@ -5,7 +5,6 @@ from __future__ import print_function
 
 
 import json
-import os
 import time
 from functools import partial
 
@@ -41,7 +40,7 @@ class AutoscaleFixture(BaseTestFixture):
         """
         super(AutoscaleFixture, cls).setUpClass()
         cls.resources = ResourcePool()
-        cls.autoscale_config = AutoscaleConfig()
+        cls.autoscale_config = autoscale_config
         cls.endpoint_config = UserAuthConfig()
         user_config = UserConfig()
         access_data = AuthProvider.get_access_data(cls.endpoint_config,
@@ -75,16 +74,18 @@ class AutoscaleFixture(BaseTestFixture):
 
         cls.tenant_id = cls.autoscale_config.tenant_id
 
-        env = os.environ['OSTNG_CONFIG_FILE']
-        if ('preprod' in env.lower()) or ('dev' in env.lower()):
-            cls.url = str(cls.autoscale_config.server_endpoint) + \
-                '/' + str(cls.tenant_id)
-            print(" ------ Using dev or pre-prod otter --------")
-        else:
+        if autoscale_config.environment in ('production', 'staging'):
             autoscale_service = access_data.get_service(
                 cls.autoscale_config.autoscale_endpoint_name)
             cls.url = autoscale_service.get_endpoint(
                 cls.autoscale_config.region).public_url
+
+        # If not production or staging, always use the configured server
+        # endpoint instead of what's in the service catalog.
+        else:
+            cls.url = "{0}/{1}".format(
+                autoscale_config.server_endpoint, cls.tenant_id)
+            print(" ------ Using non-production, non-staging otter --------")
 
         cls.autoscale_client = AutoscalingAPIClient(
             cls.url, access_data.token.id_,
