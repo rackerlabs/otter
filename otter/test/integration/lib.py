@@ -6,9 +6,9 @@ import json
 
 from characteristic import Attribute, attributes
 
-import treq
-
 from pyrsistent import freeze
+
+import treq
 
 from otter.util.http import check_success
 
@@ -107,8 +107,7 @@ class ScalingGroup(object):
         any tests which create them yet.)
         """
 
-        return (self.get_scaling_group_state(rcs)
-                .addCallback(self.delete_scaling_group_if_present, rcs))
+        return self.delete_scaling_group(rcs)
 
     def delete_scaling_group(self, rcs):
         """Unconditionally delete the scaling group.  You may call this only
@@ -125,24 +124,7 @@ class ScalingGroup(object):
                 'Accept': 'application/xml',
             },
             pool=self.pool
-        ).addCallback(check_success, [204]))
-
-    def delete_scaling_group_if_present(self, tup, rcs):
-        """If the scaling group exists, dispose of it.  Otherwise,
-        take no further action.  Use :method:`get_scaling_group_state`
-        to feed this method.
-
-        :param tuple tup: (code, json) tuple from
-            :func:`get_scaling_group_state`.  If code is 200, then the
-            scaling group is removed (the json blob is ignored).  Otherwise,
-            do nothing.
-
-        :return: Either a :class:`Deferred` which, upon firing, disposes of the
-            scaling group, or None.
-        """
-
-        if tup[0] == 200:
-            return self.delete_scaling_group(rcs)
+        ).addCallback(check_success, [204, 404]))
 
     def get_scaling_group_state(self, rcs):
         """Retrieve the state of the scaling group.
