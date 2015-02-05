@@ -3,9 +3,10 @@ writing integration tests in the context of the Otter project.
 """
 
 import json
-import treq
 
 from characteristic import Attribute, attributes
+
+import treq
 
 from pyrsistent import freeze
 
