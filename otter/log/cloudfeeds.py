@@ -166,9 +166,11 @@ class CloudFeedsObserver(object):
         except UnsuitableMessage as me:
             log.err(None, ('Tried to add unsuitable message in cloud feeds: '
                            '{unsuitable_message}'),
+                    otter_msg_type='cf-unsuitable-message',
                     unsuitable_message=me.unsuitable_message)
         else:
             return perform(
                 self.get_disp(self.reactor, self.authenticator, log,
                               self.service_configs),
-                eff).addErrback(log.err, "Failed to add event")
+                eff).addErrback(log.err, "Failed to add event",
+                                otter_msg_type='cf-add-failure')

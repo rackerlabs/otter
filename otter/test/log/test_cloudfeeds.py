@@ -281,7 +281,8 @@ class CloudFeedsObserverTests(SynchronousTestCase):
         # log doesn't have cloud_feed in it
         self.log.err.assert_called_once_with(
             CheckFailure(ValueError), "Failed to add event", event='dict',
-            system='otter.cloud_feed', cf_msg='m')
+            system='otter.cloud_feed', cf_msg='m',
+            otter_msg_type='cf-add-failure')
 
     def test_unsuitable_msg_logs(self):
         """
@@ -297,4 +298,4 @@ class CloudFeedsObserverTests(SynchronousTestCase):
             None, ('Tried to add unsuitable message in cloud feeds: '
                    '{unsuitable_message}'),
             unsuitable_message='bad', event='dict', system='otter.cloud_feed',
-            cf_msg='m')
+            cf_msg='m', otter_msg_type='cf-unsuitable-message')
