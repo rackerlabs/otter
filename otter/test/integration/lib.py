@@ -2,9 +2,15 @@
 writing integration tests in the context of the Otter project.
 """
 
+import json
+
 from characteristic import Attribute, attributes
 
 from pyrsistent import freeze
+
+import treq
+
+from otter.util.http import check_success, headers
 
 
 @attributes([
@@ -79,6 +85,96 @@ class IdentityV2(object):
         return self.auth.authenticate_user(
             self.endpoint, self.username, self.password, pool=self.pool
         ).addCallback(record_result)
+
+
+@attributes([
+    Attribute('group_config', instance_of=dict),
+    Attribute('pool', default_value=None),
+])
+class ScalingGroup(object):
+    """This class encapsulates a scaling group resource.  It provides a means
+    which lets you create new scaling groups and, later, automatically
+    dispose of them upon integration test completion.
+    """
+
+    def stop(self, rcs):
+        """Clean up a scaling group.  Although safe to call yourself, you
+        should think twice about it.  Let :method:`start` handle registering
+        this function for you.
+
+        At the present time, this function DOES NOT stop to verify
+        servers are removed.  (This is because I haven't created
+        any tests which create them yet.)
+        """
+
+        return self.delete_scaling_group(rcs)
+
+    def delete_scaling_group(self, rcs):
+        """Unconditionally delete the scaling group.  You may call this only
+        once.
+
+        :return: A :class:`Deferred` which, upon firing, disposes of the
+            scaling group.
+        """
+
+        return (treq.delete(
+            "%s/groups/%s" % (str(rcs.endpoints["otter"]), self.group_id),
+            headers=headers(str(rcs.token)),
+            pool=self.pool
+        ).addCallback(check_success, [204, 404]))
+
+    def get_scaling_group_state(self, rcs):
+        """Retrieve the state of the scaling group.
+
+        :return: A :class:`Deferred` which, upon firing, returns the result
+            code and, optionally, scaling group state as a 2-tuple, in that
+            order.  If not found, the result code will be 404, and the state
+            will be None.
+        """
+
+        def decide(resp):
+            if resp.code == 200:
+                return treq.json_content(resp).addCallback(lambda x: (200, x))
+            return (404, None)
+
+        return (
+            treq.get(
+                "%s/groups/%s/state" % (
+                    str(rcs.endpoints["otter"]), self.group_id
+                ),
+                headers=headers(str(rcs.token)),
+                pool=self.pool
+            ).addCallback(check_success, [200, 404])
+            .addCallback(decide)
+        )
+
+    def start(self, rcs, test):
+        """Create a scaling group.
+
+        :param TestResources rcs: A set of OpenStack resources encapsulated
+            in a TestResources instance.
+
+        :return: The same instance of TestResources.
+        """
+
+        test.addCleanup(self.stop, rcs)
+
+        def record_results(resp):
+            rcs.groups.append(resp)
+            self.group_id = str(resp["group"]["id"])
+            return rcs
+
+        return (
+            treq.post(
+                "%s/groups" % str(rcs.endpoints["otter"]),
+                json.dumps(self.group_config),
+                headers=headers(str(rcs.token)),
+                pool=self.pool
+            )
+            .addCallback(check_success, [201])
+            .addCallback(treq.json_content)
+            .addCallback(record_results)
+        )
 
 
 def find_endpoint(catalog, service_type, region):
