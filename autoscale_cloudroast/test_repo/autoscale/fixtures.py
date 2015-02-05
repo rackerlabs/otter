@@ -63,6 +63,11 @@ def _set_up_clients():
     user_config = UserConfig()
     access_data = AuthProvider.get_access_data(endpoint_config, user_config)
 
+    if access_data is None:
+        raise Exception(
+            "Unable to authenticate against identity to get auth token and "
+            "service catalog.")
+
     autoscale_client = _make_client(
         access_data,
         autoscale_config.autoscale_endpoint_name,
@@ -92,6 +97,11 @@ def _set_up_clients():
             autoscale_config.rcv3_region_override or autoscale_config.region,
             RackConnectV3APIClient,
             "RackConnect v3")
+
+    if not all([x is not None for x in (autoscale_client, server_client,
+                                        lbaas_client)]):
+        raise Exception(
+            "Unable to instantiate all necessary clients.")
 
     return (autoscale_client, server_client, lbaas_client, rcv3_client)
 
