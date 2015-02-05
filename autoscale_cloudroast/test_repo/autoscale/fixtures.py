@@ -58,7 +58,12 @@ def _make_client(access_data, service_name, region, client_cls, debug_name):
 
 def _set_up_clients():
     """
-    Function
+    Read the user creds from the configuration file in and constructs all the
+    service clients.  If it can't authenticate, or it cannot construct the
+    autoscale/server/lbaas clients, then it fails.
+
+    The RCv3 client is not created if the account does not have access to RCv3
+    or if RCv3 configuration parameters are not present or invalid.
     """
     user_config = UserConfig()
     access_data = AuthProvider.get_access_data(endpoint_config, user_config)
