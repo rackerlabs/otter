@@ -10,7 +10,7 @@ from pyrsistent import freeze
 
 import treq
 
-from otter.util.http import check_success
+from otter.util.http import check_success, headers
 
 
 @attributes([
@@ -119,10 +119,7 @@ class ScalingGroup(object):
 
         return (treq.delete(
             "%s/groups/%s" % (str(rcs.endpoints["otter"]), self.group_id),
-            headers={
-                'X-Auth-Token': str(rcs.token),
-                'Accept': 'application/xml',
-            },
+            headers=headers(str(rcs.token)),
             pool=self.pool
         ).addCallback(check_success, [204, 404]))
 
@@ -145,17 +142,20 @@ class ScalingGroup(object):
                 "%s/groups/%s/state" % (
                     str(rcs.endpoints["otter"]), self.group_id
                 ),
-                headers={
-                    'X-Auth-Token': str(rcs.token),
-                    'Accept': 'application/xml',
-                },
+                headers=headers(str(rcs.token)),
                 pool=self.pool
             ).addCallback(check_success, [200, 404])
             .addCallback(decide)
         )
 
     def start(self, rcs, test):
-        """Create a scaling group."""
+        """Create a scaling group.
+        
+        :param TestResources rcs: A set of OpenStack resources encapsulated
+            in a TestResources instance.
+        
+        :return: The same instance of TestResources.
+        """
 
         test.addCleanup(self.stop, rcs)
 
@@ -168,11 +168,7 @@ class ScalingGroup(object):
             treq.post(
                 "%s/groups" % str(rcs.endpoints["otter"]),
                 json.dumps(self.group_config),
-                headers={
-                    'X-Auth-Token': str(rcs.token),
-                    'Content-Type': 'application/xml',
-                    'Accept': 'application/xml',
-                },
+                headers=headers(str(rcs.token)),
                 pool=self.pool
             )
             .addCallback(check_success, [201])
