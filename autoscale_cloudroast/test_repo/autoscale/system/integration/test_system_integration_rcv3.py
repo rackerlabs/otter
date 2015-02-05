@@ -3,7 +3,6 @@ System Integration tests for autoscaling with RackConnect V3 load balancers
 """
 from __future__ import print_function
 
-import inspect
 import random
 import time
 import unittest
@@ -16,7 +15,8 @@ import common
 
 from autoscale.behaviors import safe_hasattr
 
-from test_repo.autoscale.fixtures import AutoscaleFixture, autoscale_config
+from test_repo.autoscale.fixtures import (
+    AutoscaleFixture, autoscale_config, rcv3_client)
 
 
 class DummyAsserter(object):
@@ -35,6 +35,7 @@ class DummyAsserter(object):
         self.err = msg
 
 
+@unittest.skipUnless(rcv3_client, "RCv3 is not supported by this account.")
 class AutoscaleRackConnectFixture(AutoscaleFixture):
     """
     System tests to verify lbaas integration with autoscale
@@ -56,17 +57,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         across all tests which can benefit from it.
         """
         super(AutoscaleRackConnectFixture, cls).setUpClass()
-
-        if cls.rcv3_client is None:
-            # don't bother with the rest of the set-up; skip all tests
-            skip = unittest.skip("This account does not support RCv3.")
-
-            for test in inspect.getmembers(cls, predicate=inspect.ismethod):
-                # test is a tuple of name, object
-                if test[0].startswith("test_"):
-                    setattr(cls, test[0], skip(test[1]))
-            return
-
         cls.common = common.CommonTestUtilities(cls.server_client,
                                                 cls.autoscale_client,
                                                 cls.lbaas_client)
