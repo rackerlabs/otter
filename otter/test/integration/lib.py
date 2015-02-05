@@ -150,10 +150,10 @@ class ScalingGroup(object):
 
     def start(self, rcs, test):
         """Create a scaling group.
-        
+
         :param TestResources rcs: A set of OpenStack resources encapsulated
             in a TestResources instance.
-        
+
         :return: The same instance of TestResources.
         """
 
