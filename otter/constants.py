@@ -12,6 +12,7 @@ class ServiceType(Names):
     CLOUD_LOAD_BALANCERS = NamedConstant()
     RACKCONNECT_V3 = NamedConstant()
     CLOUD_METRICS_INGEST = NamedConstant()
+    CLOUD_FEEDS = NamedConstant()
 
 
 def get_service_configs(config):
@@ -25,7 +26,7 @@ def get_service_configs(config):
     :param dict config: Config from file containing service names that will be
         there in service catalog
     """
-    return {
+    configs = {
         ServiceType.CLOUD_SERVERS: {
             'name': config['cloudServersOpenStack'],
             'region': config['region'],
@@ -41,5 +42,12 @@ def get_service_configs(config):
         ServiceType.CLOUD_METRICS_INGEST: {
             'name': config['metrics']['service'],
             'region': config['metrics']['region'],
-        },
+        }
     }
+
+    cf = config.get('cloudfeeds')
+    if cf is not None:
+        configs[ServiceType.CLOUD_FEEDS] = {
+            'name': cf['service'], 'region': config['region']}
+
+    return configs

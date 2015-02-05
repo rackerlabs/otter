@@ -64,4 +64,4 @@ class ConvergerTests(SynchronousTestCase):
         log.err.assert_called_once_with(
             CheckFailure(ZeroDivisionError),
             "Error when performing convergence",
-            otter_event_type='convergence-perform-error')
+            otter_msg_type='convergence-perform-error')
