@@ -2,9 +2,14 @@
 writing integration tests in the context of the Otter project.
 """
 
+import json
+import treq
+
 from characteristic import Attribute, attributes
 
 from pyrsistent import freeze
+
+from otter.util.http import check_success
 
 
 @attributes([
@@ -79,6 +84,118 @@ class IdentityV2(object):
         return self.auth.authenticate_user(
             self.endpoint, self.username, self.password, pool=self.pool
         ).addCallback(record_result)
+
+
+@attributes([
+    Attribute('group_config', instance_of=dict),
+    Attribute('pool', default_value=None),
+])
+class ScalingGroup(object):
+    """This class encapsulates a scaling group resource.  It provides a means
+    which lets you create new scaling groups and, later, automatically
+    dispose of them upon integration test completion.
+    """
+
+    def stop(self, rcs):
+        """Clean up a scaling group.  Although safe to call yourself, you
+        should think twice about it.  Let :method:`start` handle registering
+        this function for you.
+
+        At the present time, this function DOES NOT stop to verify
+        servers are removed.  (This is because I haven't created
+        any tests which create them yet.)
+        """
+
+        return (self.get_scaling_group_state(rcs)
+                .addCallback(self.delete_scaling_group_if_present, rcs))
+
+    def delete_scaling_group(self, rcs):
+        """Unconditionally delete the scaling group.  You may call this only
+        once.
+
+        :return: A :class:`Deferred` which, upon firing, disposes of the
+            scaling group.
+        """
+
+        return (treq.delete(
+            "%s/groups/%s" % (str(rcs.endpoints["otter"]), self.group_id),
+            headers={
+                'X-Auth-Token': str(rcs.token),
+                'Accept': 'application/xml',
+            },
+            pool=self.pool
+        ).addCallback(check_success, [204]))
+
+    def delete_scaling_group_if_present(self, tup, rcs):
+        """If the scaling group exists, dispose of it.  Otherwise,
+        take no further action.  Use :method:`get_scaling_group_state`
+        to feed this method.
+
+        :param tuple tup: (code, json) tuple from
+            :func:`get_scaling_group_state`.  If code is 200, then the
+            scaling group is removed (the json blob is ignored).  Otherwise,
+            do nothing.
+
+        :return: Either a :class:`Deferred` which, upon firing, disposes of the
+            scaling group, or None.
+        """
+
+        if tup[0] == 200:
+            return self.delete_scaling_group(rcs)
+
+    def get_scaling_group_state(self, rcs):
+        """Retrieve the state of the scaling group.
+
+        :return: A :class:`Deferred` which, upon firing, returns the result
+            code and, optionally, scaling group state as a 2-tuple, in that
+            order.  If not found, the result code will be 404, and the state
+            will be None.
+        """
+
+        def decide(resp):
+            if resp.code == 200:
+                return treq.json_content(resp).addCallback(lambda x: (200, x))
+            return (404, None)
+
+        return (
+            treq.get(
+                "%s/groups/%s/state" % (
+                    str(rcs.endpoints["otter"]), self.group_id
+                ),
+                headers={
+                    'X-Auth-Token': str(rcs.token),
+                    'Accept': 'application/xml',
+                },
+                pool=self.pool
+            ).addCallback(check_success, [200, 404])
+            .addCallback(decide)
+        )
+
+    def start(self, rcs, test):
+        """Create a scaling group."""
+
+        test.addCleanup(self.stop, rcs)
+
+        def record_results(resp):
+            rcs.groups.append(resp)
+            self.group_id = str(resp["group"]["id"])
+            return rcs
+
+        return (
+            treq.post(
+                "%s/groups" % str(rcs.endpoints["otter"]),
+                json.dumps(self.group_config),
+                headers={
+                    'X-Auth-Token': str(rcs.token),
+                    'Content-Type': 'application/xml',
+                    'Accept': 'application/xml',
+                },
+                pool=self.pool
+            )
+            .addCallback(check_success, [201])
+            .addCallback(treq.json_content)
+            .addCallback(record_results)
+        )
 
 
 def find_endpoint(catalog, service_type, region):
