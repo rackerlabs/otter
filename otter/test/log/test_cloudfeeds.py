@@ -207,12 +207,10 @@ class EventTests(SynchronousTestCase):
         """
         `prepare_request` returns formatted request with error in type
         """
-        eff = prepare_request(
-            request_format, self.cf_event, True, "1970-01-01T00:00:00", 'ord')
-        self.assertIs(eff.intent.func, uuid.uuid4)
-        self.assertEqual(
-            resolve_effect(eff, 'uuid'),
-            self._get_request('ERROR', 'uuid'))
+        req = prepare_request(
+            request_format, self.cf_event, True, "1970-01-01T00:00:00",
+            'ord', 'uuid')
+        self.assertEqual(req, self._get_request('ERROR', 'uuid'))
 
 
 class CloudFeedsObserverTests(SynchronousTestCase):

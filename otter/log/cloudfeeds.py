@@ -5,6 +5,7 @@ Publishing events to Cloud feeds
 import uuid
 from copy import deepcopy
 from datetime import datetime
+from functools import partial
 
 from characteristic import attributes
 
@@ -103,11 +104,9 @@ request_format = {
 }
 
 
-def prepare_request(req_fmt, event, error, timestamp, region):
+def prepare_request(req_fmt, event, error, timestamp, region, _id):
     """
     Prepare request based on request format
-
-    :returns: Effect of `str` containing request
     """
     request = deepcopy(req_fmt)
     if error:
@@ -115,12 +114,8 @@ def prepare_request(req_fmt, event, error, timestamp, region):
     request['entry']['content']['event']['region'] = region
     request['entry']['content']['event']['eventTime'] = timestamp
     request['entry']['content']['event']['product'].update(event)
-
-    def set_id(_id):
-        request['entry']['content']['event']['id'] = _id
-        return request
-
-    return Effect(Func(uuid.uuid4)).on(set_id)
+    request['entry']['content']['event']['id'] = _id
+    return request
 
 
 def add_event(event, tenant_id, region, log):
@@ -128,7 +123,9 @@ def add_event(event, tenant_id, region, log):
     Add event to cloud feeds
     """
     event, error, timestamp = sanitize_event(event)
-    req_eff = prepare_request(request_format, event, error, timestamp, region)
+    eff = Effect(Func(uuid.uuid4)).on(
+        partial(prepare_request, request_format, event,
+                error, timestamp, region))
 
     def _send_event(req):
         eff = retry_effect(
@@ -139,7 +136,7 @@ def add_event(event, tenant_id, region, log):
             retry_times(5), exponential_backoff_interval(2))
         return Effect(TenantScope(tenant_id=tenant_id, effect=eff))
 
-    return req_eff.on(_send_event)
+    return eff.on(_send_event)
 
 
 @attributes(['reactor', 'authenticator', 'tenant_id', 'region',
