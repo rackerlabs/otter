@@ -11,12 +11,11 @@ from cafe.drivers.unittest.decorators import tags
 
 from cloudcafe.common.tools.datagen import rand_name
 
-import common
-
 from autoscale.behaviors import safe_hasattr
 
 from test_repo.autoscale.fixtures import (
     AutoscaleFixture, autoscale_config, rcv3_client)
+from test_repo.autoscale.system.integration import common
 
 
 class DummyAsserter(object):
