@@ -23,7 +23,7 @@ from txkazoo import TxKazooClient
 
 from otter.auth import generate_authenticator
 from otter.bobby import BobbyClient
-from otter.constants import ServiceType, get_service_configs
+from otter.constants import get_service_configs
 from otter.convergence.service import Converger, set_converger
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log
@@ -231,8 +231,6 @@ def makeService(config):
     # setup cloud feed
     cf_conf = config.get('cloudfeeds', None)
     if cf_conf is not None:
-        service_configs[ServiceType.CLOUD_FEEDS] = {
-            'name': cf_conf['service'], 'region': region}
         addObserver(
             CloudFeedsObserver(
                 reactor=reactor, authenticator=authenticator,
