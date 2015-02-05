@@ -58,5 +58,5 @@
         "ttl": 432000,
         "interval": 60
     },
-    "cloudfeeds": {"service": "cloudFeeds"}
+    "cloudfeeds": {"service": "cloudFeeds", "tenant_id": "tenant"}
 }
