@@ -54,6 +54,7 @@ def _make_client(access_data, service_name, region, client_cls, debug_name):
         return client_cls(url, access_data.token.id_, 'json', 'json')
     else:
         print("This account does not support {0}.".format(debug_name))
+        return None
 
 
 def _set_up_clients():
@@ -73,30 +74,30 @@ def _set_up_clients():
             "Unable to authenticate against identity to get auth token and "
             "service catalog.")
 
-    autoscale_client = _make_client(
+    _autoscale_client = _make_client(
         access_data,
         autoscale_config.autoscale_endpoint_name,
         autoscale_config.region,
         AutoscalingAPIClient,
         "Autoscale")
 
-    server_client = _make_client(
+    _server_client = _make_client(
         access_data,
         autoscale_config.server_endpoint_name,
         autoscale_config.server_region_override or autoscale_config.region,
         ServersClient,
         "Nova Compute")
 
-    lbaas_client = _make_client(
+    _lbaas_client = _make_client(
         access_data,
         autoscale_config.load_balancer_endpoint_name,
         autoscale_config.lbaas_region_override or autoscale_config.region,
         LbaasAPIClient,
         "Cloud Load Balancers")
 
-    rcv3_client = None
+    _rcv3_client = None
     if _rcv3_cloud_network and _rcv3_load_balancer_pool:
-        rcv3_client = _make_client(
+        _rcv3_client = _make_client(
             access_data,
             autoscale_config.rcv3_endpoint_name,
             autoscale_config.rcv3_region_override or autoscale_config.region,
@@ -111,7 +112,7 @@ def _set_up_clients():
         raise Exception(
             "Unable to instantiate all necessary clients.")
 
-    return (autoscale_client, server_client, lbaas_client, rcv3_client)
+    return (_autoscale_client, _server_client, _lbaas_client, _rcv3_client)
 
 
 # Global testing state - unfortunate, but only needs to be done once and also
