@@ -1,7 +1,6 @@
 CODEDIR=otter
 TESTDIR1=autoscale_cloudroast/test_repo
 TESTDIR2=autoscale_cloudcafe/autoscale
-TESTDIR3=autoscale_cloudcafe/bobby
 SCRIPTSDIR=scripts
 PYDIRS=${CODEDIR} ${SCRIPTSDIR} autoscale_cloudcafe autoscale_cloudroast
 CQLSH ?= $(shell which cqlsh)
@@ -17,7 +16,7 @@ CLOUDCAFE ?= $(shell which cafe-runner)
 
 mkfile_dir := $(shell dirname "$(MAKEFILE_LIST)")
 
-.PHONY: targets env-precheck
+.PHONY: targets env-precheck docbook
 
 targets:
 	@cat README.md
@@ -64,10 +63,11 @@ flake8full:
 
 unit:
 ifneq ($(JENKINS_URL), )
-	trial --random 0 --reporter=subunit ${UNITTESTS} | tee subunit-output.txt
-	tail -n +3 subunit-output.txt | subunit2junitxml > test-report.xml
+	trial --jobs=4 --random 0 --reporter=subunit ${UNITTESTS} \
+		| tee subunit-output.txt
+	tail -n +4 subunit-output.txt | subunit2junitxml > test-report.xml
 else
-	trial --random 0 ${UNITTESTS}
+	trial --jobs=4 --random 0 ${UNITTESTS}
 endif
 
 integration:
@@ -93,14 +93,21 @@ cleandocs:
 	rm -rf htmldoc
 	rm -rf docbook/target
 
-docs: cleandocs
+docs: sphinxdocs docbook
+
+sphinxdocs:
 	cp -r ${DOCDIR} _builddoc
 	sphinx-apidoc -F -T -o _builddoc ${CODEDIR}
 	sphinx-apidoc -F -T -o _builddoc ${TESTDIR2}
 	sphinx-apidoc -F -T -o _builddoc ${TESTDIR1}
-	sphinx-apidoc -F -T -o _builddoc ${TESTDIR3}
 	sphinx-build -b html _builddoc htmldoc
-	rm -rf _builddoc
+
+docbook:
+ifneq ($(shell git diff --name-only ${DIFF_TARGET} -- docbook), )
+	cd docbook; mvn -q compile
+else
+	echo "Skipping, nothing changed between working tree and diff target"
+endif
 
 schema: FORCE schema-setup schema-teardown
 

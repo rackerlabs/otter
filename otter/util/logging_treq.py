@@ -18,9 +18,14 @@ def _log_request(treq_call, url, **kwargs):
 
     :param callable f: a ``treq`` request method, such as ``treq.request``, or
         ``treq.get``, ``treq.post``, etc.
+    :param log: If provided, an instance of BoundLog.
+        Defaults to ``otter.log.default_log`` if not provided.
+    :type log: BoundLog or None.
     """
     clock = kwargs.pop('clock', reactor)
-    log = kwargs.pop('log', default_log)
+    log = kwargs.pop('log', None)
+    if not log:
+        log = default_log
     method = kwargs.get('method', treq_call.__name__)
 
     treq_transaction = str(uuid4())

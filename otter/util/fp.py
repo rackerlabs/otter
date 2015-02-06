@@ -70,3 +70,11 @@ def predicate_all(*preds):
     with and operator
     """
     return lambda *a, **kw: all(p(*a, **kw) for p in preds)
+
+
+def predicate_any(*preds):
+    """
+    Return a predicate function that combines all the given predicate functions
+    with or operator
+    """
+    return lambda *a, **kw: any(p(*a, **kw) for p in preds)

@@ -6,7 +6,6 @@ import operator
 from io import StringIO
 
 from effect import Constant, Effect, base_dispatcher
-from effect.testing import resolve_effect
 
 import mock
 
@@ -47,7 +46,8 @@ from otter.test.utils import (
     Provides,
     matches,
     mock_log,
-    patch
+    patch,
+    resolve_effect,
 )
 
 

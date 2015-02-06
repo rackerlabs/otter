@@ -10,7 +10,7 @@ from cafe.drivers.unittest.decorators import tags
 
 from test_repo.autoscale.fixtures import AutoscaleFixture
 
-from . import common
+from test_repo.autoscale.system.integration import common
 
 
 class AutoscaleLbaasFixture(AutoscaleFixture):
@@ -356,7 +356,8 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         """
         load_balancer_list = [self.lb_other_region]
         for each_load_balancer in load_balancer_list:
-            group = self._create_group_given_lbaas_id(each_load_balancer)
+            group = self._create_group_given_lbaas_id(each_load_balancer,
+                                                      server_building="3")
             self._wait_for_servers_to_be_deleted_when_lb_invalid(
                 group.id, group.groupConfiguration.minEntities)
             self.assert_servers_deleted_successfully(

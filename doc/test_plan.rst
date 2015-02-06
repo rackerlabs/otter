@@ -18,13 +18,3 @@ Autoscale Functional Tests
     test_repo.autoscale.functional.scaling_policy
     test_repo.autoscale.functional.webhooks
     test_repo.autoscale.functional.scheduler
-
-Bobby Functional Tests
-======================
-
-.. toctree::
-
-    test_repo.bobby.functional.bobby_groups
-    test_repo.bobby.functional.policy_groups
-    test_repo.bobby.functional.server_groups
-

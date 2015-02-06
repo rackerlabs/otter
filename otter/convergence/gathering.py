@@ -1,6 +1,6 @@
 """Code related to gathering data to inform convergence."""
 import json
-from operator import itemgetter
+from collections import defaultdict
 from urllib import urlencode
 
 from effect import parallel
@@ -51,8 +51,9 @@ def get_all_server_details(batch_size=100):
             retry_times(5), exponential_backoff_interval(2))
         return eff.on(continue_)
 
-    def continue_(response):
-        servers = response['servers']
+    def continue_(result):
+        _response, body = result
+        servers = body['servers']
         if len(servers) < batch_size:
             return servers
         else:
@@ -60,6 +61,13 @@ def get_all_server_details(batch_size=100):
             return more_eff.on(lambda more_servers: servers + more_servers)
 
     return get_server_details(marker=None)
+
+
+def _discard_response((response, body)):
+    """
+    Takes a response, body tuple and discards the response.
+    """
+    return body
 
 
 def get_scaling_group_servers(server_predicate=identity):
@@ -99,28 +107,41 @@ def get_clb_contents():
                 method, url, json_response=json_response),
             retry_times(5), exponential_backoff_interval(2))
 
-    def fetch_nodes(lbs):
+    def _lb_path(lb_id):
+        """Return the URL path to lb with given id's nodes."""
+        return append_segments('loadbalancers', str(lb_id), 'nodes')
+
+    def fetch_nodes(result):
+        _response, body = result
+        lbs = body['loadBalancers']
         lb_ids = [lb['id'] for lb in lbs]
-        return parallel(
-            [lb_req('GET', append_segments('loadbalancers', str(lb_id), 'nodes'))
-             for lb_id in lb_ids]).on(lambda all_nodes: (lb_ids, all_nodes))
+        lb_reqs = [lb_req('GET', _lb_path(lb_id)).on(_discard_response)
+                   for lb_id in lb_ids]
+        return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
         nodes = [
-            CLBNode(node_id=str(node['id']), address=node['address'],
-                    description=CLBDescription(
-                        lb_id=str(_id), port=node['port'], weight=node['weight'],
-                        condition=CLBNodeCondition.lookupByName(node['condition']),
-                        type=CLBNodeType.lookupByName(node['type'])))
-            for _id, nodes in zip(ids, all_lb_nodes)
-            for node in nodes]
-        draining = [n for n in nodes if n.description.condition == CLBNodeCondition.DRAINING]
+            CLBNode(
+                node_id=str(node['id']),
+                address=node['address'],
+                description=CLBDescription(
+                    lb_id=str(_id),
+                    port=node['port'],
+                    weight=node['weight'],
+                    condition=CLBNodeCondition.lookupByName(node['condition']),
+                    type=CLBNodeType.lookupByName(node['type'])))
+            for _id, nodes in zip(ids, all_lb_nodes) for node in nodes]
+        draining = [n for n in nodes
+                    if n.description.condition == CLBNodeCondition.DRAINING]
         return parallel(
             [lb_req(
                 'GET',
-                append_segments('loadbalancers', str(n.description.lb_id), 'nodes',
-                                '{}.atom'.format(n.node_id)),
-                json_response=False)
+                append_segments(
+                    'loadbalancers',
+                    str(n.description.lb_id),
+                    'nodes',
+                    '{}.atom'.format(n.node_id)),
+                json_response=False).on(_discard_response)
              for n in draining]).on(lambda feeds: (nodes, draining, feeds))
 
     def fill_drained_at((nodes, draining, feeds)):
@@ -142,8 +163,9 @@ def extract_CLB_drained_at(feed):
     :rtype: float
     """
     # TODO: This function temporarily only looks at last entry assuming that
-    # it was draining operation. May need to look at all entries in reverse order
-    # and check for draining operation. This could include paging to further entries
+    # it was draining operation. May need to look at all entries in reverse
+    # order and check for draining operation. This could include paging to
+    # further entries
     entry = atom.entries(atom.parse(feed))[0]
     summary = atom.summary(entry)
     if 'Node successfully updated' in summary and 'DRAINING' in summary:
@@ -171,26 +193,34 @@ def _servicenet_address(server):
                  if ip.startswith("10.")), "")
 
 
+_key_prefix = 'rax:autoscale:lb:'
+
+
 def _lb_configs_from_metadata(server):
     """
     Construct a mapping of load balancer ID to :class:`ILBDescription` based
     on the server metadata.
     """
-    key_prefix = 'rax:autoscale:lb:'
-    desired_lbs = {}
+    desired_lbs = defaultdict(list)
 
     # throw away any value that is malformed
-    for k in server.get('metadata', {}):
-        if k.startswith(key_prefix):
+
+    def parse_config(config, key):
+        if config.get('type') != 'RackConnectV3':
+            lbid = k[len(_key_prefix):]
             try:
-                config = json.loads(server['metadata'][k])
+                desired_lbs[lbid].append(
+                    CLBDescription(lb_id=lbid, port=config['port']))
+            except (KeyError, TypeError):
+                pass
 
-                if config.get('type') != 'RackConnectV3':
-                    lbid = k[len(key_prefix):]
-                    desired_lbs[lbid] = CLBDescription(
-                        lb_id=lbid, port=config['port'])
-
-            except (KeyError, ValueError, TypeError):
+    for k in server.get('metadata', {}):
+        if k.startswith(_key_prefix):
+            try:
+                configs = json.loads(server['metadata'][k])
+                for config in configs:
+                    parse_config(config, k)
+            except (ValueError, AttributeError):
                 pass
 
     return pmap(desired_lbs)
@@ -203,6 +233,8 @@ def to_nova_server(server_json):
     return NovaServer(id=server_json['id'],
                       state=ServerState.lookupByName(server_json['state']),
                       created=timestamp_to_epoch(server_json['created']),
+                      image_id=server_json.get('image', {}).get('id'),
+                      flavor_id=server_json['flavor']['id'],
                       desired_lbs=_lb_configs_from_metadata(server_json),
                       servicenet_address=_servicenet_address(server_json))
 
@@ -219,7 +251,7 @@ def get_all_convergence_data(
     """
     eff = parallel(
         [get_scaling_group_servers()
-         .on(itemgetter(group_id))
+         .on(lambda servers: servers.get(group_id, []))
          .on(map(to_nova_server)).on(list),
          get_clb_contents()]
     ).on(tuple)

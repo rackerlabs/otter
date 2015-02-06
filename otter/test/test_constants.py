@@ -19,7 +19,8 @@ class GetServiceMappingTests(SynchronousTestCase):
                        'rackconnect': 'rc',
                        'region': 'DFW',
                        'metrics': {'service': 'm',
-                                   'region': 'IAD'}}
+                                   'region': 'IAD'},
+                       'cloudfeeds': {'service': 'cf'}}
 
     def test_takes_from_config(self):
         """
@@ -44,4 +45,16 @@ class GetServiceMappingTests(SynchronousTestCase):
                     'name': 'm',
                     'region': 'IAD',
                 },
+                ServiceType.CLOUD_FEEDS: {
+                    'name': 'cf',
+                    'region': 'DFW',
+                }
             })
+
+    def test_cloudfeeds_optional(self):
+        """
+        Does not return cloud feeds service if the config is not there
+        """
+        del self.config['cloudfeeds']
+        self.assertNotIn(ServiceType.CLOUD_FEEDS,
+                         get_service_configs(self.config))

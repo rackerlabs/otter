@@ -48,7 +48,7 @@ from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
-from otter.log import log as default_log
+from otter.log import BoundLog, log as default_log
 from otter.util import logging_treq as treq
 from otter.util.deferredutils import delay, wait
 from otter.util.http import (
@@ -59,6 +59,21 @@ from otter.util.http import (
     wrap_upstream_error,
 )
 from otter.util.retry import repeating_interval, retry, retry_times
+
+
+class _DoNothingLogger(BoundLog):
+    """This class implements a do-nothing logger for the benefit of
+    those wishing to call authenticate_user without a logger.
+    """
+
+    def _discard(self, *args, **kwArgs):
+        """Consumes the attempt at logging, but takes no action."""
+
+    def __init__(self, unused1, unused2):
+        """Requires two arguments, even if unused, because the :py:meth:`bind`
+        method invokes this constructor with two arguments.
+        """
+        super(_DoNothingLogger, self).__init__(self._discard, self._discard)
 
 
 class IAuthenticator(Interface):
@@ -323,16 +338,23 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
     return d
 
 
-def authenticate_user(auth_endpoint, username, password, log=None):
+def authenticate_user(auth_endpoint, username, password, log=None, pool=None):
     """
     Authenticate to a Identity auth endpoint with a username and password.
 
     :param str auth_endpoint: Identity API endpoint URL.
     :param str username: Username to authenticate as.
     :param str password: Password for the specified user.
+    :param log: If provided, a BoundLog object.
+    :param twisted.web.client.HTTPConnectionPool pool: If provided,
+        a connection pool which an integration test can manually clean up
+        to avoid a race condition between Trial and Twisted.
 
     :return: Decoded JSON response as dict.
     """
+    if not log:
+        log = _DoNothingLogger(None, None)
+
     d = treq.post(
         append_segments(auth_endpoint, 'tokens'),
         json.dumps(
@@ -345,9 +367,13 @@ def authenticate_user(auth_endpoint, username, password, log=None):
                 }
             }),
         headers=headers(),
-        log=log)
+        log=log,
+        pool=pool)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_upstream_error, 'identity', ('authenticating', username), auth_endpoint)
+    d.addErrback(
+        wrap_upstream_error, 'identity',
+        ('authenticating', username), auth_endpoint
+    )
     d.addCallback(treq.json_content)
     return d
 
@@ -437,6 +463,12 @@ class Authenticate(object):
         self.tenant_id = tenant_id
         self.log = log
 
+    def intent_result_pred(self, result):
+        """Check that the result looks like (auth_token, service_catalog)."""
+        return (isinstance(result, tuple)
+                and len(result) == 2
+                and isinstance(result[1], list))
+
 
 @deferred_performer
 def perform_authenticate(dispatcher, intent):
@@ -456,6 +488,10 @@ class InvalidateToken(object):
     def __init__(self, authenticator, tenant_id):
         self.authenticator = authenticator
         self.tenant_id = tenant_id
+
+    def intent_result_pred(self, result):
+        """Check that the result is None."""
+        return result is None
 
 
 @deferred_performer

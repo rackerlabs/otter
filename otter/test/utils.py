@@ -7,7 +7,9 @@ from functools import partial
 from inspect import getargspec
 
 from effect import base_dispatcher
-from effect.testing import resolve_effect, resolve_stubs as eff_resolve_stubs
+from effect.testing import (
+    resolve_effect as eff_resolve_effect,
+    resolve_stubs as eff_resolve_stubs)
 
 import mock
 
@@ -369,7 +371,7 @@ class StubTreq(object):
         BoundLog, that's being ignored for now.
         """
         key = (method, url, kwargs.pop('headers', None),
-               kwargs.pop('data', None), kwargs)
+               kwargs.pop('data', None), kwargs.pop('params', None), kwargs)
         return succeed(alist_get(self.reqs, key))
 
     def content(self, response):
@@ -590,6 +592,21 @@ def alist_get(data, key):
         if dkey == key:
             return dvalue
     raise KeyError(key)
+
+
+def resolve_effect(effect, result, is_error=False):
+    """
+    Just like :func:`effect.testing.resolve_effect`, except it performs a
+    type-check on ``result`` based on a declared type in the intent's
+    ``intent_result_type`` attribute.
+    """
+    if not is_error:
+        pred = getattr(effect.intent, 'intent_result_pred', None)
+        if pred is not None:
+            assert pred(result), \
+                "%r does not conform to the intent_result_pred of %r" % (
+                    result, effect.intent)
+    return eff_resolve_effect(effect, result, is_error=is_error)
 
 
 def resolve_retry_stubs(eff):

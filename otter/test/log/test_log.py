@@ -3,21 +3,24 @@ Tests for logging integration.
 """
 
 import json
-import mock
 from datetime import datetime
+
+import mock
+
+from testtools.matchers import Contains, ContainsDict, Equals
 
 from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
 
-from testtools.matchers import Contains, ContainsDict, Equals
-
 from otter.log import audit
 from otter.log.bound import BoundLog
-
 from otter.log.formatters import (
-    ObserverWrapper, JSONObserverWrapper, PEP3101FormattingWrapper,
-    StreamObserverWrapper, SystemFilterWrapper, audit_log_formatter)
-
+    JSONObserverWrapper,
+    ObserverWrapper,
+    PEP3101FormattingWrapper,
+    StreamObserverWrapper,
+    SystemFilterWrapper,
+    audit_log_formatter)
 from otter.test.utils import SameJSON, matches
 
 
@@ -377,8 +380,8 @@ class ObserverWrapperTests(SynchronousTestCase):
         The observer includes 'why' in the short_message when isError is true.
         """
         self.wrapper({'failure': Failure(ValueError()),
-                     'isError': True,
-                     'why': 'Everything is terrible.'})
+                      'isError': True,
+                      'why': 'Everything is terrible.'})
 
         self.observer.assert_called_once_with(
             matches(
@@ -506,7 +509,8 @@ class AuditLogFormatterTests(SynchronousTestCase):
         """
         self.assertEquals(
             audit_log_formatter({'message': ('meh',), 'isError': 'yes',
-                                 'fault': {'details': {'x': 'y'}, 'message': '1'},
+                                 'fault': {'details': {'x': 'y'},
+                                           'message': '1'},
                                  'failure': Failure(ValueError('boo'))}, 0,
                                 'hostname'),
             {
@@ -530,7 +534,8 @@ class AuditLogFormatterTests(SynchronousTestCase):
         exc.details = {'1': 2, '3': 5}
         self.assertEquals(
             audit_log_formatter({'message': ('meh',), 'isError': 'yes',
-                                 'fault': {'details': {'x': 'y'}, 'message': '1'},
+                                 'fault': {'details': {'x': 'y'},
+                                           'message': '1'},
                                  'failure': Failure(exc)}, 0, 'hostname'),
             {
                 '@version': 1,
@@ -546,10 +551,12 @@ class AuditLogFormatterTests(SynchronousTestCase):
 
     def test_error_pulls_some_fault_details_keys_into_main_log(self):
         """
-        If audit log parameters are in the details dictionary, they are removed.
+        If audit log parameters are in the details dictionary,
+        they are removed.
 
-        If they are valid values, they are pulled out and put in the main audit
-        log, but without clobbering existing values in the main audit log.
+        If they are valid values, they are pulled out and put in the
+        main audit log, but without clobbering existing values in the
+        main audit log.
         """
         exc = ValueError('boo')
         exc.details = {'1': 2, 'scaling_group_id': '5', 'tenant_id': '1',
@@ -557,7 +564,8 @@ class AuditLogFormatterTests(SynchronousTestCase):
         self.assertEquals(
             audit_log_formatter({'message': ('meh',), 'isError': 'yes',
                                  'tenant_id': '5',
-                                 'fault': {'details': {'x': 'y'}, 'message': '1'},
+                                 'fault': {'details': {'x': 'y'},
+                                           'message': '1'},
                                  'failure': Failure(exc)}, 0, 'hostname'),
             {
                 '@version': 1,

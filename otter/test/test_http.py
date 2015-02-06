@@ -10,7 +10,6 @@ from effect import (
     TypeDispatcher,
     base_dispatcher,
     sync_perform)
-from effect.testing import resolve_effect
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -23,7 +22,7 @@ from otter.http import (
     concretize_service_request,
     perform_tenant_scope,
     service_request)
-from otter.test.utils import stub_pure_response
+from otter.test.utils import resolve_effect, stub_pure_response
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
@@ -40,7 +39,12 @@ class BindServiceTests(SynchronousTestCase):
     def setUp(self):
         """Save some common parameters."""
         self.log = object()
-        self.request_func = lambda method, url, headers=None, data=None: (method, url, headers, data)
+
+    def request_func(self, method, url, headers=None, data=None):
+        """
+        A request func for testing that just returns its args.
+        """
+        return method, url, headers, data
 
     def test_add_bind_service(self):
         """
@@ -69,6 +73,7 @@ class ServiceRequestTests(SynchronousTestCase):
                     url='foo',
                     headers=None,
                     data=None,
+                    params=None,
                     log=None,
                     reauth_codes=(401, 403),
                     success_pred=has_code(200),
@@ -141,21 +146,22 @@ class PerformServiceRequestTests(SynchronousTestCase):
         self.assertEqual(next_eff.intent.data, json.dumps(input_json))
 
         # Output is parsed
-        result = resolve_effect(next_eff,
-                                stub_pure_response(json.dumps(output_json)))
-        self.assertEqual(result, output_json)
+        response, body = stub_pure_response(json.dumps(output_json))
+        result = resolve_effect(next_eff, (response, body))
+        self.assertEqual(result, (response, output_json))
 
     def test_no_json_response(self):
         """
-        ``json_response`` can be set to :data:`False` to get the plaintext.
-        response.
+        ``json_response`` can be set to :data:`False` to get the response
+        object and the plaintext body of the response.
         """
         svcreq = service_request(ServiceType.CLOUD_SERVERS, "GET", "servers",
                                  json_response=False).intent
         eff = self._concrete(svcreq)
         next_eff = resolve_authenticate(eff)
-        result = resolve_effect(next_eff, stub_pure_response("foo"))
-        self.assertEqual(result, "foo")
+        stub_response = stub_pure_response("foo")
+        result = resolve_effect(next_eff, stub_response)
+        self.assertEqual(result, stub_response)
 
 
 class PerformTenantScopeTests(SynchronousTestCase):
