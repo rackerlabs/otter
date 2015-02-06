@@ -25,7 +25,113 @@ from autoscale.config import AutoscaleConfig
 from autoscale.otter_constants import OtterConstants
 
 
+def _make_client(access_data, service_name, region, client_cls, debug_name):
+    """
+    Create a client using the `client_cls`, assuming it takes a url, an
+    auth token, serialize format, and deserialize format.
+
+    Extacts the URL and token from the access_data.
+
+    The autoscale client is special in that it extracts the URL from the
+    config, in some cases.
+    """
+    url = None
+
+    # If not production or staging, always use the configured server
+    # endpoint for autoscale instead of what's in the service catalog.
+    if (service_name == "autoscale" and
+            autoscale_config.environment not in ('production', 'staging')):
+        url = "{0}/{1}".format(
+            autoscale_config.server_endpoint, autoscale_config.tenant_id)
+        print(" ------ Using non-production, non-staging otter --------")
+
+    else:
+        service = access_data.get_service(service_name)
+        if service is not None:
+            url = service.get_endpoint(region).public_url
+
+    if url is not None:
+        return client_cls(url, access_data.token.id_, 'json', 'json')
+    else:
+        print("This account does not support {0}.".format(debug_name))
+        return None
+
+
+def _set_up_clients():
+    """
+    Read the user creds from the configuration file in and constructs all the
+    service clients.  If it can't authenticate, or it cannot construct the
+    autoscale/server/lbaas clients, then it fails.
+
+    The RCv3 client is not created if the account does not have access to RCv3
+    or if RCv3 configuration parameters are not present or invalid.
+    """
+    user_config = UserConfig()
+    access_data = AuthProvider.get_access_data(endpoint_config, user_config)
+
+    if access_data is None:
+        raise Exception(
+            "Unable to authenticate against identity to get auth token and "
+            "service catalog.")
+
+    _autoscale_client = _make_client(
+        access_data,
+        autoscale_config.autoscale_endpoint_name,
+        autoscale_config.region,
+        AutoscalingAPIClient,
+        "Autoscale")
+
+    _server_client = _make_client(
+        access_data,
+        autoscale_config.server_endpoint_name,
+        autoscale_config.server_region_override or autoscale_config.region,
+        ServersClient,
+        "Nova Compute")
+
+    _lbaas_client = _make_client(
+        access_data,
+        autoscale_config.load_balancer_endpoint_name,
+        autoscale_config.lbaas_region_override or autoscale_config.region,
+        LbaasAPIClient,
+        "Cloud Load Balancers")
+
+    _rcv3_client = None
+    if _rcv3_cloud_network and _rcv3_load_balancer_pool:
+        _rcv3_client = _make_client(
+            access_data,
+            autoscale_config.rcv3_endpoint_name,
+            autoscale_config.rcv3_region_override or autoscale_config.region,
+            RackConnectV3APIClient,
+            "RackConnect v3")
+    else:
+        print("Not enough test configuration for RCv3 provided. "
+              "Will not run RCv3 tests.")
+
+    if not all([x is not None for x in (autoscale_client, server_client,
+                                        lbaas_client)]):
+        raise Exception(
+            "Unable to instantiate all necessary clients.")
+
+    return (_autoscale_client, _server_client, _lbaas_client, _rcv3_client)
+
+
+# Global testing state - unfortunate, but only needs to be done once and also
+# makes it easier to skip tests based on configs and clients.
+
 autoscale_config = AutoscaleConfig()
+endpoint_config = UserAuthConfig()
+
+# Get optional RCV3 values.  These might not be present in the config
+# file.
+try:
+    _rcv3_load_balancer_pool = json.loads(
+        autoscale_config.rcv3_load_balancer_pool)
+except Exception:
+    _rcv3_load_balancer_pool = None
+
+_rcv3_cloud_network = autoscale_config.rcv3_cloud_network
+
+autoscale_client, server_client, lbaas_client, rcv3_client = _set_up_clients()
 
 
 class AutoscaleFixture(BaseTestFixture):
@@ -41,66 +147,10 @@ class AutoscaleFixture(BaseTestFixture):
         super(AutoscaleFixture, cls).setUpClass()
         cls.resources = ResourcePool()
         cls.autoscale_config = autoscale_config
-        cls.endpoint_config = UserAuthConfig()
-        user_config = UserConfig()
-        access_data = AuthProvider.get_access_data(cls.endpoint_config,
-                                                   user_config)
-        server_service = access_data.get_service(
-            cls.autoscale_config.server_endpoint_name)
-        load_balancer_service = access_data.get_service(
-            cls.autoscale_config.load_balancer_endpoint_name)
-        server_url = server_service.get_endpoint(
-            cls.autoscale_config.server_region_override or
-            cls.autoscale_config.region).public_url
-        lbaas_url = load_balancer_service.get_endpoint(
-            cls.autoscale_config.lbaas_region_override or
-            cls.autoscale_config.region).public_url
-        # Get the name of the RCV3 service catalog entry from the config file
-        rcv3_service = access_data.get_service(
-            cls.autoscale_config.rcv3_endpoint_name)
-        # Use the region of the config to get the url
-        try:
-            rcv3_url = rcv3_service.get_endpoint(
-                cls.autoscale_config.rcv3_region_override or
-                cls.autoscale_config.region).public_url
-            # Instantiate an RCV3 client using the url from the catalog
-            cls.rcv3_client = RackConnectV3APIClient(
-                rcv3_url, access_data.token.id_,
-                'json', 'json')
-        except Exception:
-            cls.rcv3_client = None
-            print("This account does not support rackconnect")
-            # Skip rackconnect test? TO_DO
+        cls.endpoint_config = endpoint_config
 
         cls.tenant_id = cls.autoscale_config.tenant_id
 
-        if autoscale_config.environment in ('production', 'staging'):
-            autoscale_service = access_data.get_service(
-                cls.autoscale_config.autoscale_endpoint_name)
-            cls.url = autoscale_service.get_endpoint(
-                cls.autoscale_config.region).public_url
-
-        # If not production or staging, always use the configured server
-        # endpoint instead of what's in the service catalog.
-        else:
-            cls.url = "{0}/{1}".format(
-                autoscale_config.server_endpoint, cls.tenant_id)
-            print(" ------ Using non-production, non-staging otter --------")
-
-        cls.autoscale_client = AutoscalingAPIClient(
-            cls.url, access_data.token.id_,
-            'json', 'json')
-        cls.server_client = ServersClient(
-            server_url, access_data.token.id_,
-            'json', 'json')
-        cls.lbaas_client = LbaasAPIClient(
-            lbaas_url, access_data.token.id_,
-            'json', 'json')
-
-        cls.autoscale_behaviors = AutoscaleBehaviors(
-            cls.autoscale_config, cls.autoscale_client,
-            rcv3_client=cls.rcv3_client
-        )
         cls.gc_name = cls.autoscale_config.gc_name
         cls.gc_cooldown = int(cls.autoscale_config.gc_cooldown)
         cls.gc_min_entities = int(cls.autoscale_config.gc_min_entities)
@@ -143,19 +193,20 @@ class AutoscaleFixture(BaseTestFixture):
             cls.autoscale_config.non_autoscale_password)
         cls.non_autoscale_tenant = cls.autoscale_config.non_autoscale_tenant
 
-        # Initialize optional values to None
-        cls.rcv3_load_balancer_pool = None
-        cls.rcv3_cloud_network = None
+        cls.autoscale_client = autoscale_client
+        cls.server_client = server_client
+        cls.lbaas_client = lbaas_client
+        cls.rcv3_client = rcv3_client
 
-        # Get optional RCV3 values.  These might not be present in the config
-        # file.
-        try:
-            cls.rcv3_load_balancer_pool = json.loads(
-                cls.autoscale_config.rcv3_load_balancer_pool)
-            cls.rcv3_cloud_network = cls.autoscale_config.rcv3_cloud_network
-        except Exception:
-            # Skip all RCV3 testing
-            pass
+        cls.rcv3_load_balancer_pool = _rcv3_load_balancer_pool
+        cls.rcv3_cloud_network = _rcv3_cloud_network
+
+        cls.url = autoscale_client.url
+
+        cls.autoscale_behaviors = AutoscaleBehaviors(
+            autoscale_config, autoscale_client,
+            rcv3_client=rcv3_client
+        )
 
     def validate_headers(self, headers):
         """

@@ -3,7 +3,6 @@ System Integration tests for autoscaling with RackConnect V3 load balancers
 """
 from __future__ import print_function
 
-
 import random
 import time
 import unittest
@@ -12,11 +11,11 @@ from cafe.drivers.unittest.decorators import tags
 
 from cloudcafe.common.tools.datagen import rand_name
 
-import common
-
 from autoscale.behaviors import safe_hasattr
 
-from test_repo.autoscale.fixtures import AutoscaleFixture, autoscale_config
+from test_repo.autoscale.fixtures import (
+    AutoscaleFixture, autoscale_config, rcv3_client)
+from test_repo.autoscale.system.integration import common
 
 
 class DummyAsserter(object):
@@ -35,6 +34,7 @@ class DummyAsserter(object):
         self.err = msg
 
 
+@unittest.skipUnless(rcv3_client, "RCv3 is not supported by this account.")
 class AutoscaleRackConnectFixture(AutoscaleFixture):
     """
     System tests to verify lbaas integration with autoscale
@@ -56,7 +56,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         across all tests which can benefit from it.
         """
         super(AutoscaleRackConnectFixture, cls).setUpClass()
-
         cls.common = common.CommonTestUtilities(cls.server_client,
                                                 cls.autoscale_client,
                                                 cls.lbaas_client)
