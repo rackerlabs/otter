@@ -96,14 +96,15 @@ def _set_up_clients():
 
     rcv3_client = None
     if _rcv3_cloud_network and _rcv3_load_balancer_pool:
-        print("Not enough test configuration for RCv3 provided. "
-              "Will not run RCv3 tests.")
         rcv3_client = _make_client(
             access_data,
             autoscale_config.rcv3_endpoint_name,
             autoscale_config.rcv3_region_override or autoscale_config.region,
             RackConnectV3APIClient,
             "RackConnect v3")
+    else:
+        print("Not enough test configuration for RCv3 provided. "
+              "Will not run RCv3 tests.")
 
     if not all([x is not None for x in (autoscale_client, server_client,
                                         lbaas_client)]):
