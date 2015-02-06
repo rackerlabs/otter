@@ -107,8 +107,8 @@ def _set_up_clients():
         print("Not enough test configuration for RCv3 provided. "
               "Will not run RCv3 tests.")
 
-    if not all([x is not None for x in (autoscale_client, server_client,
-                                        lbaas_client)]):
+    if not all([x is not None for x in (_autoscale_client, _server_client,
+                                        _lbaas_client)]):
         raise Exception(
             "Unable to instantiate all necessary clients.")
 
