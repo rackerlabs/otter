@@ -163,7 +163,8 @@ class OtterGroups(object):
             } for state in group_states]
             return {
                 "groups": groups,
-                "groups_links": get_groups_links(groups, self.tenant_id, None, **paginate)
+                "groups_links": get_groups_links(
+                    groups, self.tenant_id, None, **paginate)
             }
 
         deferred = self.store.list_scaling_group_states(
