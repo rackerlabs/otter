@@ -3,41 +3,40 @@ Tests for :mod:`otter.rest.groups`, which include the endpoints for listing
 all scaling groups, and creating/viewing/deleting a scaling group.
 """
 import json
-from jsonschema import ValidationError
 from copy import deepcopy
 
 import mock
-
+from jsonschema import ValidationError
+from otter.bobby import BobbyClient
+from otter.json_schema import rest_schemas, validate
+from otter.json_schema.group_examples import (
+    config as config_examples,
+    launch_server_config as launch_examples,
+    policy as policy_examples,
+)
+from otter.json_schema.group_schemas import MAX_ENTITIES
+from otter.models.interface import (
+    GroupNotEmptyError,
+    GroupState,
+    NoSuchScalingGroupError,
+)
+from otter.rest import groups
+from otter.rest.bobby import set_bobby
+from otter.rest.decorators import InvalidJsonError, InvalidQueryArgument
+from otter.rest.groups import extract_bool_arg, format_state_dict
+from otter.supervisor import (
+    CannotDeleteServerBelowMinError,
+    ServerNotFoundError,
+    set_supervisor,
+)
+from otter.test.rest.request import DummyException, RestAPITestMixin
+from otter.test.utils import IsBoundWith, matches, patch
+from otter.util.config import set_config_data
+from otter.worker.validate_config import InvalidLaunchConfiguration
 from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.web.http import Request
 from twisted.web.test.requesthelper import DummyChannel
-
-from otter.json_schema.group_examples import (
-    launch_server_config as launch_examples,
-    config as config_examples,
-    policy as policy_examples)
-
-from otter.json_schema import rest_schemas, validate
-from otter.json_schema.group_schemas import MAX_ENTITIES
-
-from otter.models.interface import (
-    GroupState, GroupNotEmptyError, NoSuchScalingGroupError)
-from otter.rest.decorators import InvalidJsonError, InvalidQueryArgument
-
-from otter.rest import groups
-from otter.rest.groups import format_state_dict, extract_bool_arg
-
-from otter.test.rest.request import DummyException, RestAPITestMixin
-from otter.test.utils import patch, matches, IsBoundWith
-
-from otter.rest.bobby import set_bobby
-from otter.bobby import BobbyClient
-
-from otter.supervisor import set_supervisor, ServerNotFoundError, CannotDeleteServerBelowMinError
-from otter.worker.validate_config import InvalidLaunchConfiguration
-
-from otter.util.config import set_config_data
 
 
 class FormatterHelpers(SynchronousTestCase):
