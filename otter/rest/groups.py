@@ -616,8 +616,10 @@ class OtterGroup(object):
         executed (execution will be rejected).  This is an idempotent operation -
         pausing an already paused group does nothing.
         """
-        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
-        return controller.pause_scaling_group(self.log, transaction_id(request), group)
+        group = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
+        return controller.pause_scaling_group(
+            self.log, transaction_id(request), group)
 
     @app.route('/resume/', methods=['POST'])
     @with_transaction_id()
