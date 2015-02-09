@@ -2,30 +2,39 @@
 Autoscale REST endpoints having to do with a group or collection of groups
 (/tenantId/groups and /tenantId/groups/groupId)
 """
-from functools import partial
 import json
-
-from twisted.internet import defer
+from functools import partial
 
 from otter import controller
-from otter.supervisor import get_supervisor, remove_server_from_group
-
-from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import (
-    MAX_ENTITIES, validate_launch_config_servicenet)
+    MAX_ENTITIES,
+    validate_launch_config_servicenet,
+)
+from otter.json_schema.rest_schemas import create_group_request
 from otter.log import log
+from otter.rest.bobby import get_bobby
 from otter.rest.configs import OtterConfig, OtterLaunch, normalize_launch_config
-from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   with_transaction_id, paginatable,
-                                   InvalidQueryArgument)
-from otter.rest.errors import exception_codes
+from otter.rest.decorators import (
+    InvalidQueryArgument,
+    fails_with,
+    paginatable,
+    succeeds_with,
+    validate_body,
+    with_transaction_id,
+)
+from otter.rest.errors import InvalidMinEntities, exception_codes
+from otter.rest.otterapp import OtterApp
 from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.webhooks import _format_webhook
-from otter.rest.errors import InvalidMinEntities
-from otter.rest.otterapp import OtterApp
-from otter.util.http import (get_autoscale_links, transaction_id, get_groups_links,
-                             get_policies_links, get_webhooks_links)
-from otter.rest.bobby import get_bobby
+from otter.supervisor import get_supervisor, remove_server_from_group
+from otter.util.http import (
+    get_autoscale_links,
+    get_groups_links,
+    get_policies_links,
+    get_webhooks_links,
+    transaction_id,
+)
+from twisted.internet import defer
 
 
 def format_state_dict(state):
