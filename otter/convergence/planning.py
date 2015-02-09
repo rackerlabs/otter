@@ -8,7 +8,7 @@ from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
 
 from otter.convergence.model import (
-    ServerState, IDrainable, CLBDescription, CLBNode, CLBNodeCondition)
+    CLBDescription, CLBNode, CLBNodeCondition, IDrainable, ServerState)
 from otter.convergence.steps import (
     AddNodesToCLB,
     ChangeCLBNode,
