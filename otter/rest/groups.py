@@ -105,7 +105,8 @@ class OtterGroups(object):
     @paginatable
     def list_all_scaling_groups(self, request, paginate):
         """
-        Lists all the autoscaling groups and their states per for a given tenant ID.
+        Lists all the autoscaling groups and their states per for a given
+        tenant ID.
 
         Example response::
 
