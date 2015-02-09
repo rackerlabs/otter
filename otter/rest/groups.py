@@ -345,11 +345,14 @@ class OtterGroups(object):
             }
 
         """
-        data['groupConfiguration'].setdefault('maxEntities', MAX_ENTITIES)
-        data['groupConfiguration'].setdefault('metadata', {})
+        group_cfg = data['groupConfiguration']
 
-        if data['groupConfiguration']['minEntities'] > data['groupConfiguration']['maxEntities']:
-            raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
+        group_cfg.setdefault('maxEntities', MAX_ENTITIES)
+        group_cfg.setdefault('metadata', {})
+
+        if group_cfg['minEntities'] > group_cfg['maxEntities']:
+            raise InvalidMinEntities(
+                "minEntities must be less than or equal to maxEntities")
 
         validate_launch_config_servicenet(data['launchConfiguration'])
 
