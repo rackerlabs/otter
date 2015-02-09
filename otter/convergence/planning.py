@@ -58,6 +58,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
             [node for node in nodes
              if IDrainable.providedBy(node) and node.is_active()])
 
+        # Nothing should be done to these, because the timeout has not expired
+        # and the nodes are still active
         in_drain = [node for node in draining
                     if not node.is_done_draining(now, timeout)]
 
