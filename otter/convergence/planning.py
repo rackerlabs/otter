@@ -92,7 +92,7 @@ def _converge_lb_state(server, current_lb_nodes):
 
     :rtype: `list` of :class:`IStep`
     """
-    # list of desired configurations that match up with existing nodes - e.g.
+    # list of desired configurations that match up with existing nodes
     desired_lbs = set(concat(server.desired_lbs.values()))
     desired_matching_existing = [
         (desired, node) for desired in desired_lbs
@@ -355,12 +355,6 @@ def add_server_to_lb(server, description):
     :ivar description: The description of the load balancer and how to add
         the server to it.
     :type description: :class:`ILBDescription` provider
-
-    In the cases where no steps are produced (because it is an unsupported
-    description type, or if there is no ServiceNet address), a reporting
-    step could be produced instead.  However, there is currently too much of a
-    yet-to-be-merged backlog touching convergence and steps, so this should be
-    done in the future.
     """
     if isinstance(description, CLBDescription):
         if server.servicenet_address:
@@ -376,11 +370,6 @@ def remove_node_from_lb(node):
 
     :ivar node: The node to be removed.
     :type node: :class:`ILBNode` provider
-
-    In the cases where no steps are produced (because it is an unsupported
-    description type, etc.), a reporting step could be produced instead.
-    However, there is currently too much of a yet-to-be-merged backlog touching
-    convergence and steps, so this should be done in the future.
     """
     if isinstance(node, CLBNode):
         return RemoveNodesFromCLB(lb_id=node.description.lb_id,
@@ -397,11 +386,6 @@ def change_lb_node(node, description):
     :ivar description: The description of the load balancer and how to add
         the server to it.
     :type description: :class:`ILBDescription` provider
-
-    In the cases where no steps are produced (because it is an unsupported
-    description type), a reporting step could be produced instead.  However,
-    there is currently too much of a yet-to-be-merged backlog touching
-    convergence and steps, so this should be done in the future.
     """
     if type(node.description) == type(description):
         if isinstance(description, CLBDescription):
@@ -418,11 +402,6 @@ def drain_lb_node(node):
 
     :ivar node: The node to be changed.
     :type node: :class:`ILBNode` provider
-
-    In the cases where no steps are produced (because it is an unsupported
-    description type), a reporting step could be produced instead.  However,
-    there is currently too much of a yet-to-be-merged backlog touching
-    convergence and steps, so this should be done in the future.
     """
     if isinstance(node, CLBNode):
         return ChangeCLBNode(lb_id=node.description.lb_id,
