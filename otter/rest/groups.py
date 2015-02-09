@@ -639,7 +639,8 @@ class OtterGroup(object):
         """
         servers/ route handling
         """
-        return OtterServers(self.store, self.tenant_id, self.group_id).app.resource()
+        servers = OtterServers(self.store, self.tenant_id, self.group_id)
+        return servers.app.resource()
 
     @app.route('/config/')
     def config(self, request):
