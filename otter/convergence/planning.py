@@ -91,7 +91,7 @@ def _converge_lb_state(server, current_lb_nodes):
     :rtype: `list` of :class:`IStep`
     """
     # list of desired configurations that match up with existing nodes - e.g.
-    desired_lbs = concat(server.desired_lbs.values())
+    desired_lbs = set(concat(server.desired_lbs.values()))
     desired_matching_existing = [
         (desired, node) for desired in desired_lbs
         for node in current_lb_nodes
@@ -104,7 +104,7 @@ def _converge_lb_state(server, current_lb_nodes):
 
     adds = [
         add_server_to_lb(server=server, description=desired)
-        for desired in set(desired_lbs) - set(met_desireds)
+        for desired in desired_lbs - set(met_desireds)
     ]
 
     # Removes could be replaced with _remove_from_lb_with_draining if
