@@ -521,8 +521,8 @@ class OtterGroup(object):
         deferred.addCallback(json.dumps)
         return deferred
 
-    # Feature: Force delete, which stops scaling, deletes all servers for you, then
-    #       deletes the scaling group.
+    # Feature: Force delete, which stops scaling, deletes all servers for
+    #       you, then deletes the scaling group.
     @app.route('/', methods=['DELETE'])
     @with_transaction_id()
     @fails_with(exception_codes)
