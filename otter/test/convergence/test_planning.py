@@ -258,7 +258,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
     def test_add_to_lb(self):
         """
         If a desired LB config is not in the set of current configs,
-        `converge_lb_state` returns a :class:`AddToLoadBalancer` object
+        `converge_lb_state` returns the relevant adding-to-load-balancer
+        steps (:class:`AddNodesToCLB` in the case of CLB).
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
         self.assertEqual(
