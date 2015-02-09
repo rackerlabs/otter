@@ -529,8 +529,8 @@ class OtterGroup(object):
     @succeeds_with(204)
     def delete_scaling_group(self, request):
         """
-        Delete a scaling group if there are no entities belonging to the scaling
-        group.  If successful, no response body will be returned.
+        Delete a scaling group if there are no entities belonging to the
+        scaling group.  If successful, no response body will be returned.
         """
         group = self.store.get_scaling_group(self.log, self.tenant_id,
                                              self.group_id)
