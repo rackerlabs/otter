@@ -391,7 +391,8 @@ class OtterGroups(object):
             uuid = result['id']
             result["state"] = format_state_dict(result["state"])
             request.setHeader(
-                "Location", get_autoscale_links(self.tenant_id, uuid, format=None))
+                "Location",
+                get_autoscale_links(self.tenant_id, uuid, format=None))
             result["links"] = get_autoscale_links(self.tenant_id, uuid)
             linkify_policy_list(result['scalingPolicies'], self.tenant_id, uuid)
             result['scalingPolicies_links'] = get_policies_links(
