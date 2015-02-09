@@ -195,6 +195,13 @@ class ILBNode(Interface):
         :rtype: `bool`
         """
 
+    def is_active():  # pragma: no cover
+        """
+        :return: Whether this node is currently active or enabled on the load
+            balancer
+        :rtype: `bool`
+        """
+
 
 class IDrainable(Interface):
     """
@@ -299,3 +306,9 @@ class CLBNode(object):
         See :func:`IDrainable.is_done_draining`.
         """
         return now - self.drained_at >= timeout or self.connections == 0
+
+    def is_active(self):
+        """
+        See :func:`ILBNode.is_active`.
+        """
+        return self.description.condition != CLBNodeCondition.DISABLED

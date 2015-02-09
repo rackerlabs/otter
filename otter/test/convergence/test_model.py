@@ -193,3 +193,30 @@ class CLBNodeTests(SynchronousTestCase):
         node = CLBNode(node_id='1234', description=self.drain_desc,
                        address='10.1.1.1', drained_at=0.0)
         self.assertFalse(node.is_done_draining(now=15, timeout=30))
+
+    def test_active_if_node_is_enabled(self):
+        """
+        If the node is ENABLED, :func:`CLBNode.is_active` returns `True`.
+        """
+        node = CLBNode(node_id='1234', description=self.desc,
+                       address='10.1.1.1', drained_at=0.0, connections=1)
+        self.assertTrue(node.is_active())
+
+    def test_active_if_node_is_draining(self):
+        """
+        If the node is DRAINING, :func:`CLBNode.is_active` returns `True`.
+        """
+        node = CLBNode(node_id='1234', description=self.drain_desc,
+                       address='10.1.1.1', drained_at=0.0, connections=1)
+        self.assertTrue(node.is_active())
+
+    def test_inactive_if_node_is_disabled(self):
+        """
+        If the node is DRAINING, :func:`CLBNode.is_active` returns `True`.
+        """
+        node = CLBNode(node_id='1234',
+                       description=CLBDescription(
+                           lb_id='12345', port=80,
+                           condition=CLBNodeCondition.DISABLED),
+                       address='10.1.1.1', drained_at=0.0, connections=1)
+        self.assertFalse(node.is_active())
