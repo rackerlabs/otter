@@ -173,14 +173,15 @@ class OtterGroups(object):
         deferred.addCallback(json.dumps)
         return deferred
 
-    # --------------------------- CRD a scaling group -----------------------------
+    # -------------------------- CRD a scaling group -------------------------
     # (CRD = CRUD - U, because updating happens at suburls - so you can update
     # different parts)
 
-    # TODO: Currently, the response does not include scaling policy ids, because
-    # we are just repeating whatever the request body was, with an ID and links
-    # attached.  If we are going to create the scaling policies here too, we should
-    # probably also return their ids and links, just like the manifest.
+    # TODO: Currently, the response does not include scaling policy ids,
+    # because we are just repeating whatever the request body was, with an ID
+    # and links attached.  If we are going to create the scaling policies here
+    # too, we should probably also return their ids and links, just like the
+    # manifest.
     @app.route('/', methods=['POST'])
     @with_transaction_id()
     @fails_with(exception_codes)
