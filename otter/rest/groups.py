@@ -362,7 +362,7 @@ class OtterGroups(object):
         deferred.addCallback(
             lambda _: self.store.create_scaling_group(
                 self.log, self.tenant_id,
-                data['groupConfiguration'],
+                group_cfg,
                 normalize_launch_config(data['launchConfiguration']),
                 data.get('scalingPolicies', None)))
 
