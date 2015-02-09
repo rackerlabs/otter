@@ -514,7 +514,8 @@ class OtterGroup(object):
                 add_webhooks_links(data["scalingPolicies"], uuid)
             return {"group": data}
 
-        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        group = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
         deferred = group.view_manifest(with_webhooks(request))
         deferred.addCallback(openstack_formatting, group.uuid)
         deferred.addCallback(json.dumps)
