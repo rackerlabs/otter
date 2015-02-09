@@ -189,10 +189,11 @@ class OtterGroups(object):
     @validate_body(create_group_request)
     def create_new_scaling_group(self, request, data):
         """
-        Create a new scaling group, given the general scaling group configuration,
-        launch configuration, and optional scaling policies.  This data provided
-        in the request body in JSON format. If successful, the created group in JSON
-        format containing id and links is returned.
+        Create a new scaling group, given the general scaling group
+        configuration, launch configuration, and optional scaling policies.
+        This data provided in the request body in JSON format. If
+        successful, the created group in JSON format containing id and links
+        is returned.
 
         Example request body containing some scaling policies::
 
