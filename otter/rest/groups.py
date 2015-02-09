@@ -78,8 +78,10 @@ def extract_bool_arg(request, key, default=False):
             return False
         else:
             raise InvalidQueryArgument(
-                'Invalid "{}" query argument: "{}". Must be "true" or "false". '
-                'Defaults to "{}" if not provided'.format(key, value, str(default).lower()))
+                'Invalid "{}" query argument: "{}". '
+                'Must be "true" or "false". '
+                'Defaults to "{}" if not provided'
+                .format(key, value, str(default).lower()))
     else:
         return default
 
