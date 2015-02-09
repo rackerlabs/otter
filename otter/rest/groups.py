@@ -599,7 +599,8 @@ class OtterGroup(object):
         def _format_and_stackify(state):
             return {"group": format_state_dict(state)}
 
-        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        group = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
         deferred = group.view_state()
         deferred.addCallback(_format_and_stackify)
         deferred.addCallback(json.dumps)
