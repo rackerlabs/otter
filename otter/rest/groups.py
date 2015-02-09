@@ -647,7 +647,8 @@ class OtterGroup(object):
         """
         config route handled by OtterConfig
         """
-        return OtterConfig(self.store, self.tenant_id, self.group_id).app.resource()
+        config = OtterConfig(self.store, self.tenant_id, self.group_id)
+        return config.app.resource()
 
     @app.route('/launch/')
     def launch(self, request):
