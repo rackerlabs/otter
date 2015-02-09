@@ -1024,7 +1024,7 @@ class PlanTests(SynchronousTestCase):
             result,
             pbag([
                 AddNodesToCLB(
-                    lb_id=5,
+                    lb_id='5',
                     address_configs=s(
                         ('1.1.1.1', CLBDescription(lb_id='5', port=80)),
                         ('1.2.3.4', CLBDescription(lb_id='5', port=80)))
