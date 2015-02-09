@@ -709,7 +709,8 @@ class OtterServers(object):
         """
         Delete a server from the group.
         """
-        group = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
+        group = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.scaling_group_id)
         d = group.modify_state(
             partial(remove_server_from_group, self.log.bind(server_id=server_id),
                     transaction_id(request), server_id,
