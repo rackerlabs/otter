@@ -397,7 +397,8 @@ class OtterGroups(object):
             linkify_policy_list(
                 result['scalingPolicies'], self.tenant_id, uuid)
             result['scalingPolicies_links'] = get_policies_links(
-                result['scalingPolicies'], self.tenant_id, uuid, rel='policies')
+                result['scalingPolicies'],
+                self.tenant_id, uuid, rel='policies')
             return {"group": result}
 
         deferred.addCallback(_format_output)
