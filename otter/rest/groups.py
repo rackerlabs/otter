@@ -394,7 +394,8 @@ class OtterGroups(object):
                 "Location",
                 get_autoscale_links(self.tenant_id, uuid, format=None))
             result["links"] = get_autoscale_links(self.tenant_id, uuid)
-            linkify_policy_list(result['scalingPolicies'], self.tenant_id, uuid)
+            linkify_policy_list(
+                result['scalingPolicies'], self.tenant_id, uuid)
             result['scalingPolicies_links'] = get_policies_links(
                 result['scalingPolicies'], self.tenant_id, uuid, rel='policies')
             return {"group": result}
