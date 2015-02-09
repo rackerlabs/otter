@@ -631,7 +631,8 @@ class OtterGroup(object):
         executed as usual.  This is an idempotent operation - resuming an already
         running group does nothing.
         """
-        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        group = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
         return controller.resume_scaling_group(self.log, transaction_id(request), group)
 
     @app.route('/servers/', branch=True)
