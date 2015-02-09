@@ -613,8 +613,8 @@ class OtterGroup(object):
     def pause_scaling_group(self, request):
         """
         Pause a scaling group.  This means that no scaling policies will get
-        executed (execution will be rejected).  This is an idempotent operation -
-        pausing an already paused group does nothing.
+        executed (execution will be rejected).  This is an idempotent
+        operation - pausing an already paused group does nothing.
         """
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.group_id)
