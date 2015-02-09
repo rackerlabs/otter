@@ -362,8 +362,10 @@ def add_server_to_lb(server, description):
     """
     if isinstance(description, CLBDescription):
         if server.servicenet_address:
-            return AddNodesToCLB(lb_id=description.lb_id,
-                                 address_configs=(server.servicenet_address))
+            return AddNodesToCLB(
+                lb_id=description.lb_id,
+                address_configs=pset(
+                    [(server.servicenet_address, description)]))
 
 
 def remove_node_from_lb(node):
