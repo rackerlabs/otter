@@ -435,8 +435,8 @@ class OtterGroup(object):
     def view_manifest_config_for_scaling_group(self, request):
         """
         View manifested view of the scaling group configuration, including the
-        launch configuration, and the scaling policies.  This data is returned in
-        the body of the response in JSON format.
+        launch configuration, and the scaling policies.  This data is
+        returned in the body of the response in JSON format.
 
         Example response::
 
