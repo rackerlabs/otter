@@ -55,7 +55,8 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     if timeout > 0:
         draining, to_drain = partition_bool(
             lambda node: node.currently_draining(),
-            [node for node in nodes if IDrainable.providedBy(node)])
+            [node for node in nodes
+             if IDrainable.providedBy(node) and node.is_active()])
 
         in_drain = [node for node in draining
                     if not node.is_done_draining(now, timeout)]
