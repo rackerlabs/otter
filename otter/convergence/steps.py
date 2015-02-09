@@ -310,7 +310,7 @@ class BulkAddToRCv3(object):
 
     See http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
 
-    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
+    :param list lb_node_pairs: A list of ``lb_id, server_id`` tuples of
         connections to be made.
     """
 
@@ -333,7 +333,7 @@ class BulkRemoveFromRCv3(object):
 
     See http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
 
-    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
+    :param list lb_node_pairs: A list of ``lb_id, server_id`` tuples of
         connections to be removed.
     """
 
