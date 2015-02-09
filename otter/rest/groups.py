@@ -575,11 +575,13 @@ class OtterGroup(object):
     @succeeds_with(200)
     def get_scaling_group_state(self, request):
         """
-        Get the current state of the scaling group, including the current set of
-        active entities, number of pending entities, and the desired number
-        of entities.  This data is returned in the body of the response in JSON format.
+        Get the current state of the scaling group, including the current set
+        of active entities, number of pending entities, and the desired
+        number of entities.  This data is returned in the body of the
+        response in JSON format.
 
-        There is no guarantee about the sort order of the list of active entities.
+        There is no guarantee about the sort order of the list of active
+        entities.
 
         Example response::
 
