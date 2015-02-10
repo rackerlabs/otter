@@ -865,26 +865,33 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
                 }
             ]
         ]
-        webhooks_internal_links = [
-            [[{"href": '/v1.0/11111/groups/one/policies/5/webhooks/3/', "rel": "self"},
+        webhooks_links = [
+            [[{"href": '/v1.0/11111/groups/one/policies/5/webhooks/3/',
+               "rel": "self"},
               {"href": '/v1.0/execute/1/xxx/', "rel": "capability"}],
-             [{"href": '/v1.0/11111/groups/one/policies/5/webhooks/4/', "rel": "self"},
+             [{"href": '/v1.0/11111/groups/one/policies/5/webhooks/4/',
+               "rel": "self"},
               {"href": '/v1.0/execute/1/yyy/', "rel": "capability"}]],
-            [[{"href": '/v1.0/11111/groups/one/policies/6/webhooks/5/', "rel": "self"},
+            [[{"href": '/v1.0/11111/groups/one/policies/6/webhooks/5/',
+               "rel": "self"},
               {"href": '/v1.0/execute/1/xxx/', "rel": "capability"}],
-             [{"href": '/v1.0/11111/groups/one/policies/6/webhooks/6/', "rel": "self"},
+             [{"href": '/v1.0/11111/groups/one/policies/6/webhooks/6/',
+               "rel": "self"},
               {"href": '/v1.0/execute/1/yyy/', "rel": "capability"}]]
         ]
         webhooks_links = [
-            [{'href': '/v1.0/11111/groups/one/policies/5/webhooks/', 'rel': 'webhooks'}],
-            [{'href': '/v1.0/11111/groups/one/policies/6/webhooks/', 'rel': 'webhooks'}]
+            [{'href': '/v1.0/11111/groups/one/policies/5/webhooks/',
+              'rel': 'webhooks'}],
+            [{'href': '/v1.0/11111/groups/one/policies/6/webhooks/',
+              'rel': 'webhooks'}]
         ]
         manifest['scalingPolicies'][0]['webhooks'] = webhooks[0]
         manifest['scalingPolicies'][1]['webhooks'] = webhooks[1]
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)
 
         response_body = self.assert_status_code(
-            200, endpoint="{0}?webhooks=true".format(self.endpoint), method="GET")
+            200, endpoint="{0}?webhooks=true".format(self.endpoint),
+            method="GET")
         resp = json.loads(response_body)
         validate(resp, rest_schemas.create_and_manifest_response)
 
