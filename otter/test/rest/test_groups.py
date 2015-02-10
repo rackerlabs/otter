@@ -880,8 +880,9 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
               {"href": '/v1.0/execute/1/yyy/', "rel": "capability"}]]
         ]
         webhooks_links = [
-            [{'href': '/v1.0/11111/groups/one/policies/5/webhooks/', 'rel': 'webhooks'}],
             [{'href': '/v1.0/11111/groups/one/policies/6/webhooks/', 'rel': 'webhooks'}]
+            [{'href': '/v1.0/11111/groups/one/policies/5/webhooks/',
+              'rel': 'webhooks'}],
         ]
         manifest['scalingPolicies'][0]['webhooks'] = webhooks[0]
         manifest['scalingPolicies'][1]['webhooks'] = webhooks[1]
