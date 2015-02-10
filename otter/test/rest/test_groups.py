@@ -1249,4 +1249,5 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         """
         GET /servers/id is not implemented
         """
-        self.assert_status_code(501, method="GET", endpoint=self.endpoint + 's1')
+        self.assert_status_code(501, method="GET",
+                                endpoint=self.endpoint + 's1')
