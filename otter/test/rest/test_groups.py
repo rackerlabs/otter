@@ -810,7 +810,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
                     {"href": "/v1.0/11111/groups/one/", "rel": "self"}
                 ],
                 'scalingPolicies_links': [
-                    {"href": "/v1.0/11111/groups/one/policies/", "rel": "policies"}
+                    {"href": "/v1.0/11111/groups/one/policies/",
+                     "rel": "policies"}
                 ],
                 'state': manifest['state']
             }
