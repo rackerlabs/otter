@@ -310,9 +310,9 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         The "next" link should be formatted as link json with the rel 'next'
         """
-        self.mock_store.list_scaling_group_states.return_value = defer.succeed([
-            GroupState('11111', 'one', 'test', {}, {}, None, {}, True)
-        ])
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed(
+            [GroupState('11111', 'one', 'test', {}, {}, None, {}, True)]
+        )
         response_body = self.assert_status_code(
             200, endpoint="{0}?limit=1".format(self.endpoint))
         resp = json.loads(response_body)
