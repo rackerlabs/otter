@@ -6,6 +6,8 @@ import json
 
 from functools import partial
 
+from twisted.internet import defer
+
 from otter import controller
 from otter.json_schema.group_schemas import (
     MAX_ENTITIES,
@@ -39,8 +41,6 @@ from otter.util.http import (
     get_webhooks_links,
     transaction_id,
 )
-
-from twisted.internet import defer
 
 
 def format_state_dict(state):
