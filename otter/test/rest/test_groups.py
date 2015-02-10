@@ -890,7 +890,9 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)
 
         response_body = self.assert_status_code(
-            200, endpoint="{0}?webhooks=true".format(self.endpoint), method="GET")
+            200,
+            endpoint="{0}?webhooks=true".format(self.endpoint),
+            method="GET")
         resp = json.loads(response_body)
         validate(resp, rest_schemas.create_and_manifest_response)
 
