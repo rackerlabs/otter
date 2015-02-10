@@ -901,10 +901,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                                                        asserter=self)
 
         # Wait for RackConnect to reflect Otter's preferred configuration.
-        # To comply with line_limits
         nodes_after = self.asb.wait_for_expected_number_of_active_servers(
             pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
-            expected_rcv3_server_count, timeout=30, api="RackConnect",
+            expected_rcv3_server_count, timeout=300, api="RackConnect",
             asserter=self)
 
 
