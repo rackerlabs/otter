@@ -195,6 +195,13 @@ class ILBNode(Interface):
         :rtype: `bool`
         """
 
+    def is_active():  # pragma: no cover
+        """
+        :return: Whether this node is currently active or enabled on the load
+            balancer
+        :rtype: `bool`
+        """
+
 
 class IDrainable(Interface):
     """
@@ -266,12 +273,12 @@ class CLBNode(object):
     """
     A Rackspace Cloud Load Balancer node.
 
-    :ivar int node_id: The ID of the node, which is represents a unique
+    :ivar str node_id: The ID of the node, which is represents a unique
         combination of IP and port number, on the CLB.  Also, see
         :obj:`ILBNode.node_id`.
     :ivar description: The description of how the node should be set up. See
         :obj:`ILBNode.description`.
-    :type: :class:`ILBDescription` provider
+    :type description: :class:`CLBescription`
 
     :ivar str address: The IP address of the node.  The IP and port form a
         unique mapping on the CLB, which is assigned a node ID.  Two
@@ -299,3 +306,9 @@ class CLBNode(object):
         See :func:`IDrainable.is_done_draining`.
         """
         return now - self.drained_at >= timeout or self.connections == 0
+
+    def is_active(self):
+        """
+        See :func:`ILBNode.is_active`.
+        """
+        return self.description.condition != CLBNodeCondition.DISABLED
