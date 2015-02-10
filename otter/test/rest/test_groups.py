@@ -754,7 +754,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
-    @mock.patch('otter.rest.groups.get_policies_links', return_value='pol links')
+    @mock.patch('otter.rest.groups.get_policies_links',
+                return_value='pol links')
     def test_get_policies_links_called(self, mock_get_policies_links):
         """
         'scalingPolicies_links' is added in response by calling `get_policies_links`
