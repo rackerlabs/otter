@@ -10,6 +10,11 @@ from jsonschema import ValidationError
 
 import mock
 
+from twisted.internet import defer
+from twisted.trial.unittest import SynchronousTestCase
+from twisted.web.http import Request
+from twisted.web.test.requesthelper import DummyChannel
+
 from otter.bobby import BobbyClient
 from otter.json_schema import rest_schemas, validate
 from otter.json_schema.group_examples import (
@@ -36,11 +41,6 @@ from otter.test.rest.request import DummyException, RestAPITestMixin
 from otter.test.utils import IsBoundWith, matches, patch
 from otter.util.config import set_config_data
 from otter.worker.validate_config import InvalidLaunchConfiguration
-
-from twisted.internet import defer
-from twisted.trial.unittest import SynchronousTestCase
-from twisted.web.http import Request
-from twisted.web.test.requesthelper import DummyChannel
 
 
 class FormatterHelpers(SynchronousTestCase):
