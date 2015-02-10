@@ -420,7 +420,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'launchConfiguration': launch_examples()[0],
             'scalingPolicies': [],
         }
-        resp_body = self.assert_status_code(400, self.endpoint, 'POST', json.dumps(invalid))
+        resp_body = self.assert_status_code(
+            400, self.endpoint, 'POST', json.dumps(invalid))
         resp = json.loads(resp_body)
         self.assertEqual(resp['error']['type'], 'InvalidMinEntities', resp['error']['message'])
 
