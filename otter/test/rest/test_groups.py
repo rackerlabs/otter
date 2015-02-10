@@ -714,7 +714,8 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
 
         self.assert_status_code(
-            201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1/')
+            201, None, 'POST', json.dumps(request_body),
+            '/v1.0/11111/groups/1/')
 
         self.mock_store.create_scaling_group.assert_called_once_with(
             mock.ANY, '11111', expected_config, launch, policies or None)
