@@ -155,7 +155,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
 
         # Patch supervisor
         self.supervisor = mock.Mock(spec=['validate_launch_config'])
-        self.supervisor.validate_launch_config.return_value = defer.succeed(None)
+        self.supervisor.validate_launch_config.return_value = defer.succeed(
+            None)
         set_supervisor(self.supervisor)
 
         set_config_data({'limits': {'pagination': 100}, 'url_root': ''})
