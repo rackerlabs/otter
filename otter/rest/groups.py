@@ -678,7 +678,8 @@ class OtterGroup(object):
         """
         policies routes handled by OtterPolicies
         """
-        return OtterPolicies(self.store, self.tenant_id, self.group_id).app.resource()
+        policies = OtterPolicies(self.store, self.tenant_id, self.group_id)
+        return policies.app.resource()
 
 
 class OtterServers(object):
