@@ -824,8 +824,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
 
     def test_view_manifest_with_webhooks(self):
         """
-        `view_manifest` gives webhooks information in policies if query args contains
-        ?webhooks=true
+        `view_manifest` gives webhooks information in policies if query args
+        contains ?webhooks=true.
         """
         manifest = {
             'groupConfiguration': config_examples()[0],
