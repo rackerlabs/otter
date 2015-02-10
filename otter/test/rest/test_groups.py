@@ -135,8 +135,8 @@ class ExtractBoolArgTests(SynchronousTestCase):
                               self.request, 'key', False)
         self.assertEqual(
             e.message,
-            ('Invalid "key" query argument: "junk". Must be "true" or "false". '
-             'Defaults to "false" if not provided'))
+            ('Invalid "key" query argument: "junk". Must be '
+             '"true" or "false". Defaults to "false" if not provided'))
 
 
 class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
