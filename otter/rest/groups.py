@@ -259,8 +259,8 @@ class OtterGroups(object):
             }
 
 
-        The ``scalingPolicies`` attribute can also be an empty list, or just left
-        out entirely.
+        The ``scalingPolicies`` attribute can also be an empty list, or just
+        left out entirely.
 
         Example response body to the above request::
 
