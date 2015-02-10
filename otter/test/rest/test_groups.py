@@ -581,7 +581,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'groupConfiguration': expected_config,
             'launchConfiguration': launch
         }
-        self.mock_store.create_scaling_group.return_value = defer.succeed(manifest)
+        self.mock_store.create_scaling_group.return_value = defer.succeed(
+            manifest)
         self._test_successful_create(manifest)
 
         self.mock_group.modify_state.assert_called_once_with(mock.ANY)
