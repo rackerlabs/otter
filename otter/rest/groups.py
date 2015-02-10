@@ -484,9 +484,12 @@ class OtterGroup(object):
                             "id": "eb0fe1bf-3428-4f34-afd9-a5ac36f60511",
                             "links": [
                                 {
-                                    "href": "https://dfw.autoscale.api.rackspacecloud.com/
-                                    v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/
-                                    policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/",
+                                    "href": "https://dfw.autoscale.api.
+                                    rackspacecloud.com/
+                                    v1.0/676873/groups/
+                                    605e13f6-1452-4588-b5da-ac6bb468c5bf/
+                                    policies/
+                                    eb0fe1bf-3428-4f34-afd9-a5ac36f60511/",
                                     "rel": "self"
                                 }
                             ],
