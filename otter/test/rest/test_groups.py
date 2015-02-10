@@ -173,7 +173,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         If an unexpected exception is raised, endpoint returns a 500.
         """
         error = DummyException('what')
-        self.mock_store.list_scaling_group_states.return_value = defer.fail(error)
+        self.mock_store.list_scaling_group_states.return_value = defer.fail(
+            error)
         self.assert_status_code(500)
         self.flushLoggedErrors()
 
