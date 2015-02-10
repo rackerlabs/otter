@@ -423,7 +423,9 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         resp_body = self.assert_status_code(
             400, self.endpoint, 'POST', json.dumps(invalid))
         resp = json.loads(resp_body)
-        self.assertEqual(resp['error']['type'], 'InvalidMinEntities', resp['error']['message'])
+        self.assertEqual(resp['error']['type'],
+                         'InvalidMinEntities',
+                         resp['error']['message'])
 
     @mock.patch('otter.util.http.get_url_root', return_value="")
     def _test_successful_create(self, request_body, mock_url):
