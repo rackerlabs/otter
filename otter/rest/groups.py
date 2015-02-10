@@ -116,8 +116,10 @@ class OtterGroups(object):
                         "id": "e41380ae-173c-4b40-848a-25c16d7fa83d",
                         "links": [
                             {
-                                "href": "https://dfw.autoscale.api.rackspacecloud.com/
-                                v1.0/676873/groups/e41380ae-173c-4b40-848a-25c16d7fa83d/",
+                                "href": "https://dfw.autoscale.api
+                                .rackspacecloud.com/
+                                v1.0/676873/
+                                groups/e41380ae-173c-4b40-848a-25c16d7fa83d/",
                                 "rel": "self"
                             }
                         ],
@@ -142,8 +144,10 @@ class OtterGroups(object):
                         },
                         "links": [
                             {
-                                "href": "https://dfw.autoscale.api.rackspacecloud.com/
-                                v1.0/676873/groups/f82bb000-f451-40c8-9dc3-6919097d2f7e/",
+                                "href": "https://dfw.autoscale.api
+                                .rackspacecloud.com/
+                                v1.0/676873/
+                                groups/f82bb000-f451-40c8-9dc3-6919097d2f7e/",
                                 "rel": "self"
                             }
                         ]
