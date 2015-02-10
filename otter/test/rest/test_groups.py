@@ -961,7 +961,9 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             204, endpoint="{0}?force=true".format(self.endpoint),
             method="DELETE")
 
-        expected_config = {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'}
+        expected_config = {'maxEntities': 0,
+                           'minEntities': 0,
+                           'name': 'group1'}
         self.mock_group.update_config.assert_called_once_with(expected_config)
         self.mock_controller.obey_config_change.assert_called_once_with(
             mock.ANY, "transaction-id", expected_config, self.mock_group,
