@@ -3,6 +3,7 @@ Autoscale REST endpoints having to do with a group or collection of groups
 (/tenantId/groups and /tenantId/groups/groupId)
 """
 import json
+
 from functools import partial
 
 from otter import controller
@@ -13,7 +14,11 @@ from otter.json_schema.group_schemas import (
 from otter.json_schema.rest_schemas import create_group_request
 from otter.log import log
 from otter.rest.bobby import get_bobby
-from otter.rest.configs import OtterConfig, OtterLaunch, normalize_launch_config
+from otter.rest.configs import (
+    OtterConfig,
+    OtterLaunch,
+    normalize_launch_config
+)
 from otter.rest.decorators import (
     InvalidQueryArgument,
     fails_with,
@@ -34,6 +39,7 @@ from otter.util.http import (
     get_webhooks_links,
     transaction_id,
 )
+
 from twisted.internet import defer
 
 
