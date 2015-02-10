@@ -928,7 +928,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             {'name': 'group1', 'minEntities': '10', 'maxEntities': '1000'})
         self.mock_group.delete_group.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
-        self.mock_controller.obey_config_change.return_value = defer.succeed(None)
+        self.mock_controller.obey_config_change.return_value = defer.succeed(
+            None)
 
         self.assert_status_code(
             204, endpoint="{0}?force=true".format(self.endpoint),
