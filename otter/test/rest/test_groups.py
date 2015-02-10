@@ -489,7 +489,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         resp_policies.sort(key=lambda dictionary: dictionary['id'])
         for pol in resp_policies:
             self.assertEqual(pol.pop('links'), [{
-                "href": "/v1.0/11111/groups/1/policies/{0}/".format(pol.pop('id')),
+                "href": "/v1.0/11111/groups/1/policies/{0}/"
+                .format(pol.pop('id')),
                 "rel": "self"
             }])
         self.assertEqual(resp_policies, policies)
