@@ -485,7 +485,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                  "load_balancer_pool": {"id": lb_id}}
                 for (lb_id, node_id) in pairs]
         res = _rcv3_check_bulk_delete(pairs, (resp, body))
-        self.assertIdentical(res, None)
+        self.assertEqual(res, (StepResult.SUCCESS, []))
 
     def test_try_again(self):
         """
