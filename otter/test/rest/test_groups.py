@@ -209,7 +209,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         If there are no groups for that account, a JSON blob consisting of an
         empty list is returned with a 200 (OK) status
         """
-        self.mock_store.list_scaling_group_states.return_value = defer.succeed([])
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed(
+            [])
         body = self.assert_status_code(200)
         self.mock_store.list_scaling_group_states.assert_called_once_with(
             mock.ANY, '11111', limit=100)
