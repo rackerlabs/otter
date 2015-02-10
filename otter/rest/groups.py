@@ -641,8 +641,8 @@ class OtterGroup(object):
     def resume_scaling_group(self, request):
         """
         Resume a scaling group.  This means that scaling policies will now get
-        executed as usual.  This is an idempotent operation - resuming an already
-        running group does nothing.
+        executed as usual.  This is an idempotent operation - resuming an
+        already running group does nothing.
         """
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.group_id)
