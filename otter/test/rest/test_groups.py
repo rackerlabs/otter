@@ -866,7 +866,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             ]
         ]
         webhooks_internal_links = [
-            [[{"href": '/v1.0/11111/groups/one/policies/5/webhooks/3/', "rel": "self"},
+            [[{"href": '/v1.0/11111/groups/one/policies/5/webhooks/3/',
+               "rel": "self"},
               {"href": '/v1.0/execute/1/xxx/', "rel": "capability"}],
              [{"href": '/v1.0/11111/groups/one/policies/5/webhooks/4/', "rel": "self"},
               {"href": '/v1.0/execute/1/yyy/', "rel": "capability"}]],
