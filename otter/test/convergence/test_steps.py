@@ -131,7 +131,8 @@ class StepAsEffectTests(SynchronousTestCase):
                 'PUT',
                 'loadbalancers/abc123/nodes/node1',
                 data={'condition': 'DRAINING',
-                      'weight': 50}))
+                      'weight': 50},
+                success_pred=has_code(202)))
 
     def test_add_nodes_to_clb(self):
         """
