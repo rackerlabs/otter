@@ -8,8 +8,9 @@ import json
 import time
 import uuid
 import weakref
-
 from datetime import datetime
+
+from characteristic import attributes
 
 from jsonschema import ValidationError
 
@@ -45,6 +46,13 @@ from otter.util.hashkey import generate_capability, generate_key_str
 
 
 LOCK_PATH = '/locks'
+
+
+@attributes(['query', 'params', 'consistency_level'])
+class CQLQueryExecute(object):
+    """
+    An intent to execute CQL query
+    """
 
 
 def serialize_json_data(data, ver):

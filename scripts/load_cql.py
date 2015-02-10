@@ -5,13 +5,35 @@ Loads cql into Cassandra
 """
 
 import argparse
+from functools import partial
 import sys
 import re
 
 from cql.apivalues import ProgrammingError
 from cql.connection import connect
 
+# from cassandra.cluster import Cluster
+
+from effect import (
+    ComposedDispatcher,
+    Effect,
+    ParallelEffects,
+    TypeDispatcher,
+    base_dispatcher,
+    parallel,
+    perform,
+    sync_performer
+)
+
+from pyrsistent import freeze
+
+from silverberg.client import ConsistencyLevel
+
+from toolz.dicttoolz import keymap
+
+from otter.models.cass import CQLQueryExecute
 from otter.test.resources import CQLGenerator
+from otter.util.cqlbatch import batch
 
 
 the_parser = argparse.ArgumentParser(description="Load data into Cassandra.")
@@ -20,6 +42,10 @@ the_parser = argparse.ArgumentParser(description="Load data into Cassandra.")
 the_parser.add_argument(
     'cql_dir', type=str, metavar='cql_dir',
     help='Directory containing *.cql files to merge and replace.')
+
+the_parser.add_argument(
+    '--webhook-migrate', action='store_false',
+    help='Migrate webhook indexes to table')
 
 the_parser.add_argument(
     '--keyspace', type=str, default='otter',
@@ -55,7 +81,7 @@ the_parser.add_argument(
     '--verbose', '-v', action='count', default=0, help="How verbose to be")
 
 
-def run(args):
+def generate(args):
     """
     Generate CQL and/or load it into a cassandra instance/cluster.
     """
@@ -127,6 +153,84 @@ def run(args):
     cursor.close()
     connection.close()
 
+
+@sync_performer
+def perform_query_sync(session, dispatcher, intent):
+    query = re.sub(r':(\w+)', r'%(\1)s', intent.query)
+    if intent.consistency_level == ConsistencyLevel.ONE:
+        return session.execute(query, intent.params)
+    else:
+        return session.execute(
+            SimpleStatement(query, consistency_level=intent.consistency_level),
+            intent.params)
+
+
+@sync_performer
+def perform_serial(disp, intent):
+    return map(partial(perform, disp), intent.effects)
+
+
+def get_dispatcher(session):
+    return ComposedDispatcher([
+        base_dispatcher,
+        TypeDispatcher({
+            CQLQueryExecute: partial(perform_query_sync, session),
+            ParallelEffects: perform_serial
+        })
+    ])
+
+
+def get_webhook_index_only():
+    """
+    Get webhook info that is there in webhook index but is not there in
+    webhook_keys table
+    """
+    query = 'SELECT "tenantId", "groupId", "policyId", "webhookKey" FROM {cf}'
+    eff = parallel(
+        [CQLQueryExecute(query=query.format(cf='policy_webhooks'), params={},
+                         consistency_level=ConsistencyLevel.ONE),
+         CQLQueryExecute(query=query.format(cf='webhook_keys'), params={},
+                         consistency_level=ConsistencyLevel.ONE)])
+    return eff.on(
+        lambda (webhooks, wkeys): set(freeze(webhooks)) - set(freeze(wkeys)))
+
+
+def add_webhook_keys(webhook_keys):
+    """
+    Add webhook keys to webhook_keys table
+    """
+    query = (
+        'INSERT INTO {cf} "tenantId", "groupId", "policyId", "webhookKey"'
+        'VALUES (:tenantId{i}, :groupId{i}, :policyId{i}, :webhookKey{i})')
+    stmts = []
+    data = {}
+    for i, wkey in enumerate(webhook_keys):
+        data.update(keymap(lambda k: k + str(i), wkey))
+        stmts.append(query.format(cf='webhook_keys', i=i))
+    return Effect(
+        CQLQueryExecute(query=batch(stmts), params=data,
+                        consistency_level=ConsistencyLevel.ONE))
+
+
+def webhook_migrate():
+    """
+    Migrate webhook indexes to table
+    """
+    return get_webhook_index_only().on(add_webhook_keys)
+
+
+def setup_session(args):
+#     cluster = Cluster([args.host], port=args.port)
+#     return cluster.connect(args.keyspace)
+    pass
+
+
+def run(args):
+    if args.webhook_migrate:
+        eff = webhook_migrate()
+        perform(get_dispatcher(setup_session(args)), eff)
+    else:
+        generate(args)
 
 args = the_parser.parse_args()
 run(args)
