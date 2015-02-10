@@ -1232,7 +1232,8 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         """
         403 error is returned if deleting server will break min/max boundary
         """
-        self.mock_rsfg.return_value = defer.fail(CannotDeleteServerBelowMinError('t', 'g', 's', 3))
+        self.mock_rsfg.return_value = defer.fail(
+            CannotDeleteServerBelowMinError('t', 'g', 's', 3))
         body = self.assert_status_code(403, self.endpoint + 's1', "DELETE")
         self.assertIn('CannotDeleteServerBelowMinError', body)
         self.assertEqual(self._request.uri, self.endpoint + 's1')
