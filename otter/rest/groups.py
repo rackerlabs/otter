@@ -646,7 +646,8 @@ class OtterGroup(object):
         """
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.group_id)
-        return controller.resume_scaling_group(self.log, transaction_id(request), group)
+        return controller.resume_scaling_group(
+            self.log, transaction_id(request), group)
 
     @app.route('/servers/', branch=True)
     def servers(self, request):
