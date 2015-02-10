@@ -7,11 +7,16 @@ from collections import namedtuple
 from copy import deepcopy
 from datetime import datetime
 
+from effect import ParallelEffects
+from effect.testing import resolve_effect
+
 from jsonschema import ValidationError
 
 from kazoo.protocol.states import KazooState
 
 import mock
+
+from pyrsistent import freeze
 
 from silverberg.client import CQLClient, ConsistencyLevel
 
@@ -26,6 +31,7 @@ from otter.models.cass import (
     CassAdmin,
     CassScalingGroup,
     CassScalingGroupCollection,
+    CQLQueryExecute,
     WeakLocks,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
@@ -2525,6 +2531,68 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
 
         pol['id'] = self.mock_key.return_value
         self.assertEqual(result, [pol])
+
+
+class ScalingGroupWebhookMigrateTests(SynchronousTestCase):
+    """
+    Tests for webhook migration functions in :obj:`CassScalingGroup`
+    """
+
+    def setUp(self):
+        """
+        Sample CassScalingGroup object
+        """
+        self.store = CassScalingGroup(
+            mock_log(), 'tid', 'gid', object(), [], object(), object(),
+            object())
+
+    def test_webhook_index_only(self):
+        """
+        Test `get_webhook_index_only`
+        """
+        eff = self.store.get_webhook_index_only()
+        self.assertEqual(
+            eff.intent,
+            ParallelEffects(
+                [CQLQueryExecute(
+                    query=('SELECT "tenantId", "groupId", "policyId", '
+                           '"webhookKey" FROM policy_webhooks'),
+                    params={}, consistency_level=ConsistencyLevel.ONE),
+                 CQLQueryExecute(
+                    query=('SELECT "tenantId", "groupId", "policyId", '
+                           '"webhookKey" FROM webhook_keys'),
+                    params={}, consistency_level=ConsistencyLevel.ONE)]))
+        r = resolve_effect(
+            eff, [[{'w1': '1'}, {'w2': '2'}], [{'w1': '1'}]])
+        self.assertEqual(r, set(freeze([{'w2': '2'}])))
+
+    def test_add_webhook_keys(self):
+        """
+        `add_webhook_keys` inserts webhook keys as a batch
+        """
+        eff = self.store.add_webhook_keys(
+            [{'tenantId': 't1', 'groupId': 'g1', 'policyId': 'p1',
+              'webhookKey': 'w1'},
+             {'tenantId': 't2', 'groupId': 'g2', 'policyId': 'p2',
+              'webhookKey': 'w2'}])
+
+        query = (
+            'BEGIN BATCH '
+            'INSERT INTO webhook_keys "tenantId", "groupId", "policyId", '
+            '"webhookKey"'
+            'VALUES (:tenantId0, :groupId0, :policyId0, :webhookKey0) '
+            'INSERT INTO webhook_keys "tenantId", "groupId", "policyId", '
+            '"webhookKey"'
+            'VALUES (:tenantId1, :groupId1, :policyId1, :webhookKey1) '
+            'APPLY BATCH;')
+        params = {
+            'tenantId0': 't1', 'groupId0': 'g1', 'policyId0': 'p1',
+            'webhookKey0': 'w1', 'tenantId1': 't2', 'groupId1': 'g2',
+            'policyId1': 'p2', 'webhookKey1': 'w2'}
+        self.assertEqual(
+            eff.intent,
+            CQLQueryExecute(query=query, params=params,
+                            consistency_level=ConsistencyLevel.ONE))
 
 
 class CassScalingScheduleCollectionTestCase(
