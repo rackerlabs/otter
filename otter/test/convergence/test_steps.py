@@ -90,13 +90,24 @@ class StepAsEffectTests(SynchronousTestCase):
         :obj:`DeleteServer.as_effect` produces a request for deleting a server.
         """
         delete = DeleteServer(server_id='abc123')
+        eff = delete.as_effect()
         self.assertEqual(
-            delete.as_effect(),
+            eff.intent,
             service_request(
                 ServiceType.CLOUD_SERVERS,
                 'DELETE',
                 'servers/abc123',
-                success_pred=has_code(204)))
+                success_pred=has_code(204)).intent)
+
+        self.assertEqual(
+            resolve_effect(eff, (None, {})),
+            (StepResult.SUCCESS, []))
+
+        self.assertEqual(
+            resolve_effect(eff,
+                           (APIError, APIError(500, None, None), None),
+                           is_error=True),
+            (StepResult.RETRY, []))
 
     def test_set_metadata_item(self):
         """
