@@ -758,7 +758,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
                 return_value='pol links')
     def test_get_policies_links_called(self, mock_get_policies_links):
         """
-        'scalingPolicies_links' is added in response by calling `get_policies_links`
+        'scalingPolicies_links' is added in response by calling
+        `get_policies_links`
         """
         policies = [dict(id="5", **policy_examples()[0])]
         manifest = {
