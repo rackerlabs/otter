@@ -1221,7 +1221,8 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         """
         404 error is returned when server is not found
         """
-        self.mock_rsfg.return_value = defer.fail(ServerNotFoundError('t', 'g', 's'))
+        self.mock_rsfg.return_value = defer.fail(
+            ServerNotFoundError('t', 'g', 's'))
         body = self.assert_status_code(404, self.endpoint + 's1', "DELETE")
         self.assertIn('ServerNotFoundError', body)
         self.assertEqual(self._request.uri, self.endpoint + 's1')
