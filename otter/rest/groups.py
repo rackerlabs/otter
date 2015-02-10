@@ -511,7 +511,11 @@ class OtterGroup(object):
                                 for webhook_model in policy['webhooks']]
                 policy['webhooks'] = webhook_list
                 policy['webhooks_links'] = get_webhooks_links(
-                    webhook_list, self.tenant_id, gid, policy['id'], rel='webhooks')
+                    webhook_list,
+                    self.tenant_id,
+                    gid,
+                    policy['id'],
+                    rel='webhooks')
 
         def openstack_formatting(data, uuid):
             data["links"] = get_autoscale_links(self.tenant_id, uuid)
