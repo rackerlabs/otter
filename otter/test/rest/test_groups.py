@@ -299,7 +299,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         ``list_all_scaling_groups`` passes on the 'marker' query argument to
         the model
         """
-        self.mock_store.list_scaling_group_states.return_value = defer.succeed([])
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed(
+            [])
         self.assert_status_code(
             200, endpoint="{0}?marker=123456".format(self.endpoint))
         self.mock_store.list_scaling_group_states.assert_called_once_with(
