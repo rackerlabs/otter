@@ -171,8 +171,6 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     :rtype: :obj:`pbag` of `IStep`
 
     """
-    lbs_by_address = groupby(lambda n: n.address, load_balancer_contents)
-
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
 
     servers_in_error, servers_in_active, servers_in_build, draining_servers = (
@@ -205,8 +203,10 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
 
     def drain_and_delete_a_server(server):
         return _drain_and_delete(
-            server, desired_state.draining_timeout,
-            lbs_by_address.get(server.servicenet_address, []), now)
+            server,
+            desired_state.draining_timeout,
+            [node for node in load_balancer_contents if node.matches(server)],
+            now)
 
     scale_down_steps = list(mapcat(drain_and_delete_a_server,
                                    servers_to_delete + draining_servers))
@@ -219,7 +219,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         [RemoveNodesFromCLB(lb_id=lb_node.description.lb_id,
                             node_ids=(lb_node.node_id,))
          for server in servers_in_error
-         for lb_node in lbs_by_address.get(server.servicenet_address, [])])
+         for lb_node in load_balancer_contents if lb_node.matches(server)])
 
     # converge all the servers that remain to their desired load balancer state
     still_active_servers = filter(lambda s: s not in servers_to_delete,
@@ -229,8 +229,8 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
         for server in still_active_servers
         for step in _converge_lb_state(
             server,
-            lbs_by_address.get(server.servicenet_address, []))
-        if server.servicenet_address]
+            [node for node in load_balancer_contents if node.matches(server)])
+        ]
 
     return pbag(create_steps
                 + scale_down_steps
