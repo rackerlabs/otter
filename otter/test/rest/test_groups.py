@@ -68,7 +68,16 @@ class FormatterHelpers(SynchronousTestCase):
             'j2': {'created': 't'},
             'j3': {'created': 't'}}
         translated = format_state_dict(
-            GroupState('11111', 'one', 'test', active, pending, None, {}, True))
+            GroupState(
+                '11111',
+                'one',
+                'test',
+                active,
+                pending,
+                None,
+                {},
+                True)
+        )
 
         # sort so it can be compared
         translated['active'].sort(key=lambda x: x['id'])
