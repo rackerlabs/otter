@@ -10,6 +10,7 @@ from toolz.itertoolz import concat, concatv, mapcat
 from otter.convergence.model import CLBNodeCondition, ServerState
 from otter.convergence.steps import (
     AddNodesToCLB,
+    BulkAddToRCv3,
     ChangeCLBNode,
     CreateServer,
     DeleteServer,
@@ -248,6 +249,30 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                 + lb_converge_steps)
 
 
+def calculate_active_and_pending(servers, steps):
+    """
+    Given the current NovaServers and the planned (unthrottled) steps,
+    determine which servers are active and which servers are pending.
+
+    :return: Two-tuple of (active, num_pending) where `active` is a list of
+    NovaServer objects which are considered active, and `num_pending` is the
+    number of servers which haven't been completely built and configured.
+    """
+    all_rcv3_server_adds = set(concat([
+        [pair[1] for pair in s.lb_node_pairs]
+        for s in steps if type(s) is BulkAddToRCv3]))
+    all_clb_ips = set(concat([
+        [c[0] for c in s.address_configs]
+        for s in steps if type(s) is AddNodesToCLB]))
+    num_pending = (len(all_rcv3_server_adds)
+                   + len(all_clb_ips)
+                   + len(s for s in steps if type(s) is CreateServer))
+    active = [server for server in servers
+              if server.id not in all_rcv3_server_adds
+              and server.servicenet_address not in all_clb_ips]
+    return active, num_pending
+
+
 _optimizers = {}
 
 
@@ -348,7 +373,10 @@ def plan(desired_group_state, servers, lb_nodes, now):
     Get an optimized convergence plan.
 
     Takes the same arguments as :func:`converge`.
+
+    :return: A three-tuple of steps, active servers, and pending jobs.
     """
     steps = converge(desired_group_state, servers, lb_nodes, now)
+    active, pending = calculate_active_and_pending(servers, steps)
     steps = _default_limit_step_count(steps)
-    return optimize_steps(steps)
+    return optimize_steps(steps), active, pending

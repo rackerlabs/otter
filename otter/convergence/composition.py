@@ -11,31 +11,7 @@ from pyrsistent import freeze
 from toolz.dicttoolz import keyfilter
 from toolz.itertoolz import groupby
 
-from otter.convergence.effecting import steps_to_effect
-from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import CLBDescription, DesiredGroupState
-from otter.convergence.planning import plan
-
-
-def execute_convergence(servers, lb_nodes, desired_group_state,
-                        get_all_convergence_data=get_all_convergence_data):
-    """
-    Execute convergence. This function will do following:
-    1. Get state of the nova, CLB and RCv3.
-    2. Get a plan for convergence
-    3. Return an Effect representing the execution of the steps in the plan.
-
-    This is in effect single cycle execution. A layer above this is expected
-    to keep calling this until this function returns False
-
-    :param bytes group_id: Tenant's group
-    :param DesiredGroupState desired_group_state: the desired state
-
-    :return: Effect of bool specifying if the effect should be performed again
-    :rtype: :class:`effect.Effect`
-    """
-    conv_eff = plan(desired_group_state, servers, lb_nodes, time.time())
-    return conv_eff.on(steps_to_effect).on(bool)
 
 
 def tenant_is_enabled(tenant_id, get_config_value):

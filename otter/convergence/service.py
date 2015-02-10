@@ -1,20 +1,21 @@
 """Converger service"""
 
+import time
+
 from functools import partial
 
 from effect import Effect
 from effect.do import do, do_return
 from effect.twisted import perform
 
-from toolz.itertoolz import concat
-
 from twisted.application.service import Service
 
 from otter.constants import CONVERGENCE_LOCK_PATH
 from otter.convergence.composition import (
     execute_convergence, get_desired_group_state)
+from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
-from otter.convergence.steps import AddNodesToCLB, BulkAddToRCv3, CreateServer
+from otter.convergence.planning import plan
 from otter.http import TenantScope
 from otter.models.intents import ModifyGroupState
 from otter.util.deferredutils import with_lock
@@ -23,37 +24,6 @@ from otter.util.fp import obj_assoc
 
 def server_to_json(server):
     return {'id': server.id}
-
-
-def calculate_active_and_pending(servers, steps):
-    """
-    Given the current NovaServers and the planned (unthrottled) steps,
-    determine which servers are active and which servers are pending.
-
-    :return: Two-tuple of (active, pending) where `active` is a dict of server
-    IDs to server info, and `pending` is a dict of arbitrary integers to
-    pending server info.
-    """
-    all_rcv3_server_adds = set(concat([
-        [pair[1] for pair in s.lb_node_pairs]
-        for s in steps if type(s) is BulkAddToRCv3]))
-
-    all_clb_ips = set(concat([
-        [c[0] for c in s.address_configs]
-        for s in steps if type(s) is AddNodesToCLB]))
-
-    num_pending = (len(all_rcv3_server_adds)
-                   + len(all_clb_ips)
-                   + len(s for s in steps if type(s) is CreateServer))
-
-    pending = {job_id: {'convergence-job': True}
-               for job_id in range(num_pending)}
-
-    complete = [server for server in servers
-                if server.id not in all_rcv3_server_adds
-                and server.servicenet_address not in all_clb_ips]
-    active = {server.id: server_to_json(server) for server in complete}
-    return active, pending
 
 
 class Converger(Service, object):
@@ -73,19 +43,22 @@ class Converger(Service, object):
 
     @do
     def _converge_eff(self, scaling_group, group_state, launch_config,
-                      execute_convergence):
+                      execute_convergence, now):
         servers, lb_nodes = yield get_all_convergence_data(
             group_state.group_id)
-        actives, pendings = calculate_active_and_pending(servers)
-        new_state = obj_assoc(group_state, active=actives, pending=pendings)
-        yield Effect(ModifyGroupState(scaling_group=scaling_group,
-                                      group_state=new_state))
         desired_group_state = get_desired_group_state(
             group_state.group_id, launch_config, group_state.desired)
-        eff = execute_convergence(servers, lb_nodes, group_state.group_id,
-                                  desired_group_state)
-        result = yield Effect(TenantScope(eff, group_state.tenant_id))
-        yield do_return(result)
+        steps, active, num_pending = plan(desired_group_state, servers,
+                                          lb_nodes, now)
+        active = map(server_to_json, active)
+        pending = {job_id: {'convergence-job': True}
+                   for job_id in range(num_pending)}
+        new_state = obj_assoc(group_state, active=active, pending=pending)
+        yield Effect(ModifyGroupState(scaling_group=scaling_group,
+                                      group_state=new_state))
+        steps_eff = steps_to_effect(steps)
+        yield Effect(TenantScope(steps_eff, group_state.tenant_id))
+        yield do_return(True)
 
     def start_convergence(self, log, scaling_group, group_state,
                           launch_config,
@@ -94,7 +67,7 @@ class Converger(Service, object):
         """Converge a group to a capacity with a launch config."""
         def exec_convergence():
             eff = self._converge_eff(scaling_group, group_state, launch_config,
-                                     execute_convergence)
+                                     execute_convergence, time.time())
             d = perform(self._dispatcher, eff)
             return d.addErrback(log.err, "Error when performing convergence",
                                 otter_event_type='convergence-perform-error')
