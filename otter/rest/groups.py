@@ -669,7 +669,8 @@ class OtterGroup(object):
         """
         launch route handled by OtterLaunch
         """
-        return OtterLaunch(self.store, self.tenant_id, self.group_id).app.resource()
+        launch = OtterLaunch(self.store, self.tenant_id, self.group_id)
+        return launch.app.resource()
 
     @app.route('/policies/', branch=True)
     def policies(self, request):
