@@ -680,7 +680,8 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         set_supervisor(None)
 
     @mock.patch('otter.util.http.get_url_root', return_value="")
-    @mock.patch('otter.bobby.BobbyClient.create_group', return_value=defer.succeed(''))
+    @mock.patch('otter.bobby.BobbyClient.create_group',
+                return_value=defer.succeed(''))
     def test_group_create_bobby(self, create_group, get_url_root):
         """
         A scaling group is created and calls over to Bobby
