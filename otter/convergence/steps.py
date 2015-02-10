@@ -393,7 +393,7 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
     response, body = result
 
     if response.code == 204:  # All done!
-        return
+        return StepResult.SUCCESS, []
 
     to_retry = pset(attempted_pairs)
     for error in body["errors"]:
