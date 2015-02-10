@@ -221,7 +221,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(resp, {"groups": [], "groups_links": []})
         validate(resp, rest_schemas.list_groups_response)
 
-    @mock.patch('otter.rest.groups.format_state_dict', return_value={'id': 'formatted'})
+    @mock.patch('otter.rest.groups.format_state_dict',
+                return_value={'id': 'formatted'})
     def test_list_group_formats_gets_and_formats_all_states(self, mock_format):
         """
         ``list_all_scaling_groups`` translates a list of IScalingGroup to a
