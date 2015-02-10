@@ -470,8 +470,10 @@ class OtterGroup(object):
                     },
                     "links": [
                         {
-                            "href": "https://dfw.autoscale.api.rackspacecloud.com/
-                            v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/",
+                            "href": "https://dfw.autoscale.api.
+                            rackspacecloud.com/
+                            v1.0/676873
+                            /groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/",
                             "rel": "self"
                         }
                     ],
