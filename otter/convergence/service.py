@@ -2,11 +2,9 @@
 
 from functools import partial
 
-from characteristic import attributes
-
 from effect import Effect
 from effect.do import do, do_return
-from effect.twisted import deferred_performer, perform
+from effect.twisted import perform
 
 from toolz.itertoolz import concat
 
@@ -18,21 +16,9 @@ from otter.convergence.composition import (
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.steps import AddNodesToCLB, BulkAddToRCv3, CreateServer
 from otter.http import TenantScope
+from otter.models.intents import ModifyGroupState
 from otter.util.deferredutils import with_lock
 from otter.util.fp import obj_assoc
-
-
-@attributes(['scaling_group', 'group_state'])
-class ModifyGroupState(object):
-    """
-    An Effect intent which indicates that a group state should be updated.
-    """
-
-
-@deferred_performer
-def perform_modify_group_state(mgs):
-    """Perform an :obj:`UpdateGroupState`."""
-    return mgs.scaling_group.modify_state(lambda: mgs.state)
 
 
 def server_to_json(server):
@@ -88,7 +74,8 @@ class Converger(Service, object):
     @do
     def _converge_eff(self, scaling_group, group_state, launch_config,
                       execute_convergence):
-        servers, lb_nodes = yield get_all_convergence_data(group_state.group_id)
+        servers, lb_nodes = yield get_all_convergence_data(
+            group_state.group_id)
         actives, pendings = calculate_active_and_pending(servers)
         new_state = obj_assoc(group_state, active=actives, pending=pendings)
         yield Effect(ModifyGroupState(scaling_group=scaling_group,
@@ -106,13 +93,17 @@ class Converger(Service, object):
                           execute_convergence=execute_convergence):
         """Converge a group to a capacity with a launch config."""
         def exec_convergence():
-            eff = self._converge_eff(scaling_group, group_state, launch_config, execute_convergence)
+            eff = self._converge_eff(scaling_group, group_state, launch_config,
+                                     execute_convergence)
             d = perform(self._dispatcher, eff)
             return d.addErrback(log.err, "Error when performing convergence",
                                 otter_event_type='convergence-perform-error')
         return with_lock(
-            self._reactor, self._get_lock(group_state.group_id), exec_convergence,
-            acquire_timeout=150, release_timeout=150)
+            self._reactor,
+            self._get_lock(group_state.group_id),
+            exec_convergence,
+            acquire_timeout=150,
+            release_timeout=150)
 
 
 # We're using a global for now because it's difficult to thread a new parameter
