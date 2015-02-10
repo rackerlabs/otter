@@ -950,7 +950,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
 
-        self.mock_group.view_config.return_value = defer.succeed({'name': 'group1'})
+        self.mock_group.view_config.return_value = defer.succeed(
+            {'name': 'group1'})
         self.mock_group.delete_group.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
         self.mock_controller.obey_config_change.return_value = defer.succeed(None)
