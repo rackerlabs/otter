@@ -44,10 +44,12 @@ lint: listoutdated flake8diff
 listoutdated:
 	pip list --outdated --allow-external=cafe,cloudcafe
 
-ifneq ($(JENKINS_URL), )
-# On Jenkins, HEAD will be a Github-created merge commit. Hence, diffing
-# against HEAD^1 gives you the diff introduced by the PR, which is what we're
-# trying to test.
+# concatenate both environment variables together - if both are unset, the
+# concatenation will be empty
+ifneq ($(JENKINS_URL)$(TRAVIS_PULL_REQUEST), )
+# On Jenkins or Travis, HEAD will be a Github-created merge commit. Hence,
+# diffing against HEAD^1 gives you the diff introduced by the PR, which is what
+# we're trying to test.
 DIFF_TARGET = HEAD^1
 else
 # On not-Jenkins, we find the current branch's branch-off point from master,

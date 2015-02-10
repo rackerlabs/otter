@@ -9,4 +9,5 @@ install:
 
 script:
     - make lint
+    - make docbook
     - make unit
