@@ -892,7 +892,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         for i in [0, 1]:
             exp_policies[i]['webhooks'] = deepcopy(webhooks[i])
             for j, webhook in enumerate(exp_policies[i]['webhooks']):
-                exp_policies[i]['webhooks'][j]['links'] = webhooks_links[i][j]
+                exp_policies[i]['webhooks'][j]['links'] = webhooks_internal_links[i][j]
             exp_policies[i]['webhooks_links'] = webhooks_links[i]
 
         self.assertEqual(resp['group']['scalingPolicies'], exp_policies)
