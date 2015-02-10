@@ -93,11 +93,19 @@ class DeleteServer(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to delete a server."""
-        return service_request(
+        eff = service_request(
             ServiceType.CLOUD_SERVERS,
             'DELETE',
             append_segments('servers', self.server_id),
             success_pred=has_code(204))
+
+        def report_success(result):
+            return StepResult.SUCCESS, []
+
+        def report_failure(result):
+            return StepResult.RETRY, []
+
+        return eff.on(success=report_success, error=report_failure)
 
 
 @implementer(IStep)
