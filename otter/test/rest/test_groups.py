@@ -1174,7 +1174,8 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
                                 scaling_group_id='one',
                                 server_id='s1',
                                 transaction_id='transaction-id')),
-            'transaction-id', 's1', replace, purge, self.mock_group, self.mock_state)
+            'transaction-id', 's1', replace, purge, self.mock_group,
+            self.mock_state)
 
     def _test_server_delete(self, replace, purge):
         """
