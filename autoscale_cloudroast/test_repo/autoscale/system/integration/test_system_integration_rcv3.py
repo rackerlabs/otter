@@ -95,6 +95,22 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
         lb_pools = [{'loadBalancerId': cls.pool.id, 'type': 'RackConnectV3'}]
 
+        #####################
+
+        init_rc_node_ids = []
+        initial_node_list = cls.rcv3_client.get_nodes_on_pool(
+            cls.pool.id).entity.nodes
+        for each_node in initial_node_list:
+            init_rc_node_ids.append(each_node.id)
+            print(each_node)
+
+        print('Setup: init_rc_node_ids')
+        print(init_rc_node_ids)
+        count_pre_nodes = cls.rcv3_client.get_pool_info(cls.pool.id)\
+                             .entity.node_counts['cloud_servers']
+        print(count_pre_nodes)
+        #####################
+
         # Many tests require us to have some servers sitting in an account
         # ahead of time.  We don't actually use these servers for anything,
         # except to verify that Autoscale doesn't affect them in any way.  We
@@ -138,6 +154,22 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         # testing.
         if dummy_asserter.err:
             print("SetUpClass failed: background servers")
+
+        # Wait for initial nodes to be added to the load balancer
+        cls.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            cls.pool.id,
+            count_pre_nodes + 2,
+            timeout=300,
+            api="RackConnect",
+            asserter=dummy_asserter)
+        # If there was an error waiting for servers to build, abort the
+        # testing.
+        pool_info = cls.rcv3_client.get_pool_info(cls.pool.id).entity.node_counts
+        print(pool_info)
+        if dummy_asserter.err:
+            print("SetUpClass failed: background LB nodes")
+
+
 
     @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
     def test_create_scaling_group_with_pool_on_cloud_network(self):
@@ -653,7 +685,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           'count of {1}'.format(num_clb_nodes_after_scale,
                                                 self.min_servers))
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='pass', working='true')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='unknown', working='true')
     def test_scale_down_after_manual_remove_node(self):
         """
         Verify that the RCV3 group can successfully scale down after a server
@@ -662,14 +694,43 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
         # Create a group with an RCVe loadbalancer pool and a minimum number
         # of servers
+        initial_cloud_server_count = self._get_node_counts_on_pool(
+            self.pool.id)['cloud_servers']
         lb_pools = [{'loadBalancerId': self.pool.id, 'type': 'RackConnectV3'}]
         pool_group_resp = self._create_rcv3_group(
             lb_list=lb_pools, group_min=self.min_servers,
             network_list=[self.rackconnect_network])
         pool_group = pool_group_resp.entity
-        server_count_before_autoscaling = self._get_node_counts_on_pool(
-            self.pool.id)['cloud_servers']
 
+
+        # # Capture a list of the node_ids of all nodes on the pool before doing
+        # # anything.
+        # init_rc_node_ids = []
+        # initial_node_list = self.rcv3_client.get_nodes_on_pool(
+        #     self.pool.id).entity.nodes
+        # for each_node in initial_node_list:
+        #     init_rc_node_ids.append(each_node.id)
+        #     print(each_node.id)
+
+        # initial_cloud_server_count = self._get_node_counts_on_pool(
+        #     self.pool.id)['cloud_servers']
+
+        # second_node_list = self.rcv3_client.get_nodes_on_pool(
+        #     self.pool.id).entity.nodes
+        # for each_node in initial_node_list:
+        #     init_rc_node_ids.append(each_node.id)
+        #     print(each_node.id)
+
+
+        # print('server_count')
+        # print(initial_cloud_server_count)
+
+        # initial_cloud_server_count = self._get_node_counts_on_pool(
+        #     self.pool.id)['cloud_servers']
+        # print(initial_cloud_server_count)
+
+        # print(init_rc_node_ids)
+        # initial_cloud_server_count = len(initial_node_list)
 
         print('\n Create initial group')
         # Wait for the servers and capture the oldest server ids
@@ -683,10 +744,137 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         print('We now have one server')
         # Wait for RackConnect to reflect Otter's preferred configuration.
         # Capture the initial node ids
+        # print(self._get_node_counts_on_pool(self.pool.id))
+
+        # list_min_nodes = self._get_cloud_servers_on_pool(self.pool.id)
+
+        # print(list_min_nodes)
+
+        # list2 = self.rcv3_client.get_nodes_on_pool(
+        #     self.pool.id).entity.nodes
+        # print(list2)
+
+
         self.asb.wait_for_expected_number_of_active_servers(
             pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
-            self.min_servers, timeout=300, api="RackConnect",
+            initial_cloud_server_count + self.min_servers, timeout=5,
+            api="RackConnect",
             asserter=self)
+
+        # Create and execute a policy to scale up  servers
+        server_count_before_autoscaling = self._get_node_counts_on_pool(
+            self.pool.id)['cloud_servers']
+        # Capture the list of nodes before scaling
+        pool_node_list_pre = self._get_cloud_servers_on_pool(self.pool.id)
+        pool_node_set_pre = set([n['node_id'] for n in pool_node_list_pre])
+
+        scale_amt = 2
+        policy_up_data = {'change': scale_amt, 'cooldown': 0}
+        expected_rcv3_server_count = (server_count_before_autoscaling
+                                      + scale_amt)
+        as_server_count = self.min_servers + scale_amt
+
+        print('\n create and execute policy')
+        # Create the policy and execute it immediately
+        self.asb.create_policy_webhook(pool_group.id,
+                                       policy_up_data,
+                                       execute_policy=True)
+        server_list_after_scale_up = self.asb.\
+            wait_for_expected_number_of_active_servers(pool_group.id,
+                                                       as_server_count,
+                                                       timeout=600,
+                                                       asserter=self)
+
+        # Wait for RackConnect to reflect Otter's preferred configuration.
+        # To comply with line_limits
+        nodes_after = self.asb.wait_for_expected_number_of_active_servers(
+            pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
+            expected_rcv3_server_count, timeout=30, api="RackConnect",
+            asserter=self)
+
+
+        print('nodes_after: {}'.format(nodes_after))
+        print('server_list: {}'.format(server_list_after_scale_up))
+
+
+        # Get a list of new nodes after scaling
+        pool_node_set_post = set(nodes_after)
+        new_nodes = pool_node_set_post.difference(pool_node_set_pre)
+        print('new_nodes: {}'.format(new_nodes))
+        # Remove one of the servers from the LB pool
+        self.rcv3_client.remove_node_from_pool(self.pool.id,
+                                               list(new_nodes)[0])
+
+        # Ensure that the deletion was completed by rackconnect
+        self.asb.wait_for_expected_number_of_active_servers(
+            pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
+            expected_rcv3_server_count - 1, timeout=300, api="RackConnect",
+            asserter=self)
+
+        # Vefity that Autoscale still has the correct number of servers
+        self.verify_server_count_using_server_metadata(pool_group.id,
+                                                       as_server_count)
+
+        # Create and execute policy to scale back to min
+        policy_down_data = {'change': -scale_amt, 'cooldown': 0}
+        expected_rcv3_server_count = server_count_before_autoscaling
+        as_server_count = as_server_count - scale_amt
+
+        # Create the policy and execute it immediately
+        self.asb.create_policy_webhook(pool_group.id,
+                                       policy_down_data,
+                                       execute_policy=True)
+
+        #
+        server_list_after_scale_down = self.asb.\
+            wait_for_expected_number_of_active_servers(pool_group.id,
+                                                       as_server_count,
+                                                       timeout=200,
+                                                       asserter=self)
+
+        # Wait for RackConnect to reflect Otter's preferred configuration.
+        nodes_down = self.asb.wait_for_expected_number_of_active_servers(
+            pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
+            expected_rcv3_server_count, timeout=150, api="RackConnect",
+            asserter=self)
+
+        print('nodes_down: {}'.format(nodes_down))
+        print('server_list: {}'.format(server_list_after_scale_down))
+
+        # Confirm that the pre and post scale node_lists are the same
+        pool_node_set_post = (self._get_cloud_servers_on_pool(
+                              self.pool.id))
+        self.assertEquals(pool_node_list_pre, pool_node_set_post,
+                          msg='The set of nodes on the pool is incorrect'
+                          'after scaling')
+
+
+
+
+
+
+
+
+    @tags(speed='slow', type='rcv3', rcv3_mimic='work', working='true')
+    def test_scale_down_after_manual_remove_node(self):
+        """
+        Verify that the RCV3 group can successfully scale down after a server
+        has been removed from the loadbalancer pool outside of autoscale.
+        """
+
+        # Create a group with an RCVe loadbalancer pool and a minimum number
+        # of servers
+        initial_cloud_server_count = self._get_node_counts_on_pool(
+            self.pool.id)['cloud_servers']
+        lb_pools = [{'loadBalancerId': self.pool.id, 'type': 'RackConnectV3'}]
+        pool_group_resp = self._create_rcv3_group(
+            lb_list=lb_pools, group_min=0,
+            network_list=[self.rackconnect_network])
+        pool_group = pool_group_resp.entity
+        print(pool_group.launchConfiguration.server.name)
+
+
+        print('\n Create initial group')
 
         # Create and execute a policy to scale up  servers
         server_count_before_autoscaling = self._get_node_counts_on_pool(
@@ -716,7 +904,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         # To comply with line_limits
         nodes_after = self.asb.wait_for_expected_number_of_active_servers(
             pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
-            expected_rcv3_server_count, timeout=300, api="RackConnect",
+            expected_rcv3_server_count, timeout=30, api="RackConnect",
             asserter=self)
 
 
@@ -725,12 +913,15 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
 
         # Get a list of new nodes after scaling
-        pool_node_set_post = set([n['node_id'] for n in nodes_after])
+        pool_node_set_post = set(nodes_after)
         new_nodes = pool_node_set_post.difference(pool_node_set_pre)
-
+        print('new_nodes: {}'.format(new_nodes))
         # Remove one of the servers from the LB pool
         self.rcv3_client.remove_node_from_pool(self.pool.id,
-                                               new_nodes[0])
+                                               list(new_nodes)[0])
+        pool_node_list_post = self._get_cloud_servers_on_pool(self.pool.id)
+        pool_node_set_post = set([n['node_id'] for n in pool_node_list_post])
+        print(pool_node_list_post)
 
         # Ensure that the deletion was completed by rackconnect
         self.asb.wait_for_expected_number_of_active_servers(
@@ -742,7 +933,11 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.verify_server_count_using_server_metadata(pool_group.id,
                                                        as_server_count)
 
-        # Create and execute policy to scale back to zero
+        # Confirm that the expected server count also exists according to Nova
+        self.verify_server_count_using_server_metadata(pool_group.id,
+                                                       as_server_count)
+
+        # Create and execute policy to scale back to min
         policy_down_data = {'change': -scale_amt, 'cooldown': 0}
         expected_rcv3_server_count = server_count_before_autoscaling
         as_server_count = as_server_count - scale_amt
@@ -752,17 +947,26 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                                        policy_down_data,
                                        execute_policy=True)
 
-        #
-        server_list_after_scale_down = self.asb.\
-            wait_for_expected_number_of_active_servers(pool_group.id,
-                                                       as_server_count,
-                                                       timeout=600,
-                                                       asserter=self)
+        # #
+        # server_list_after_scale_down = self.asb.\
+        #     wait_for_expected_number_of_active_servers(pool_group.id,
+        #                                                as_server_count,
+        #                                                timeout=200,
+        #                                                asserter=self)
+
+        # Since we expect 0 servers after scale down, use wait for state
+        # instead of wait for active servers
+        self.wait_for_expected_group_state(pool_group.id, as_server_count)
+
+        self.assert_servers_deleted_successfully(
+            pool_group.launchConfiguration.server.name)
 
         # Wait for RackConnect to reflect Otter's preferred configuration.
+        # (this should still work with the empty group under test since
+        # there were background nodes added at setUp)
         nodes_down = self.asb.wait_for_expected_number_of_active_servers(
             pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
-            expected_rcv3_server_count, timeout=300, api="RackConnect",
+            expected_rcv3_server_count, timeout=150, api="RackConnect",
             asserter=self)
 
         print('nodes_down: {}'.format(nodes_down))
@@ -774,6 +978,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.assertEquals(pool_node_list_pre, pool_node_set_post,
                           msg='The set of nodes on the pool is incorrect'
                           'after scaling')
+
+
 
     def _get_node_counts_on_pool(self, pool_id):
         """
