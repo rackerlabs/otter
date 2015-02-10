@@ -495,7 +495,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(resp_policies, policies)
 
         self.assertEqual(resp_policies_links,
-                         [{'href': '/v1.0/11111/groups/1/policies/', 'rel': 'policies'}])
+                         [{'href': '/v1.0/11111/groups/1/policies/',
+                           'rel': 'policies'}])
 
     def test_group_create_maxEntities_eq_minEntities_valid(self):
         """
