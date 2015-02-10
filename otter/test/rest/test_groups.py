@@ -455,7 +455,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         expected_config.setdefault('maxEntities', MAX_ENTITIES)
         expected_config.setdefault('metadata', {})
 
-        return_policies = [dict(id=str(i), **p) for i, p in enumerate(policies)]
+        return_policies = [dict(id=str(i), **p)
+                           for i, p in enumerate(policies)]
 
         rval = {
             'groupConfiguration': expected_config,
