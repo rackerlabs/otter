@@ -233,7 +233,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             GroupState('11111', '2', '', {}, {}, None, {}, False)
         ]
 
-        self.mock_store.list_scaling_group_states.return_value = defer.succeed(states)
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed(
+            states)
 
         self.assert_status_code(200)
         self.mock_store.list_scaling_group_states.assert_called_once_with(
