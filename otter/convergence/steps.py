@@ -281,7 +281,8 @@ class ChangeCLBNode(object):
             append_segments('loadbalancers', self.lb_id,
                             'nodes', self.node_id),
             data={'condition': self.condition,
-                  'weight': self.weight})
+                  'weight': self.weight},
+            success_pred=has_code(202))
 
 
 def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
