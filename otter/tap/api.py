@@ -1,43 +1,42 @@
 """
 Twisted Application plugin for otter API nodes.
 """
-import jsonfig
+
 from functools import partial
 
-from twisted.python import usage
+import jsonfig
 
+from silverberg.cluster import RoundRobinCassandraCluster
+from silverberg.logger import LoggingCQLClient
+
+from twisted.application.service import MultiService, Service
+from twisted.application.strports import service
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, maybeDeferred
-from twisted.internet.task import coiterate
-
 from twisted.internet.endpoints import clientFromString
-
-from twisted.application.strports import service
-from twisted.application.service import Service, MultiService
-
+from twisted.internet.task import coiterate
+from twisted.python import usage
+from twisted.python.log import addObserver
 from twisted.web.server import Site
 
 from txkazoo import TxKazooClient
 
+from otter.auth import generate_authenticator
+from otter.bobby import BobbyClient
+from otter.constants import get_service_configs
 from otter.convergence.service import Converger, set_converger
 from otter.effect_dispatcher import get_full_dispatcher
+from otter.log import log
+from otter.log.cloudfeeds import CloudFeedsObserver
+from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.rest.admin import OtterAdmin
 from otter.rest.application import Otter
 from otter.rest.bobby import set_bobby
-from otter.util.config import set_config_data, config_value
-from otter.util.deferredutils import timeout_deferred
-from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.scheduler import SchedulerService
-
 from otter.supervisor import SupervisorService, set_supervisor
-from otter.auth import generate_authenticator
-from otter.constants import get_service_configs
-
-from otter.log import log
-from silverberg.cluster import RoundRobinCassandraCluster
-from silverberg.logger import LoggingCQLClient
+from otter.util.config import config_value, set_config_data
 from otter.util.cqlbatch import TimingOutCQLClient
-from otter.bobby import BobbyClient
+from otter.util.deferredutils import timeout_deferred
 
 
 class Options(usage.Options):
@@ -190,11 +189,13 @@ def makeService(config):
     if bobby_url is not None:
         set_bobby(BobbyClient(bobby_url))
 
+    service_configs = get_service_configs(config)
+
     authenticator = generate_authenticator(reactor, config['identity'])
     dispatcher = get_full_dispatcher(reactor, authenticator, log,
                                      get_service_configs(config))
     supervisor = SupervisorService(authenticator, region, coiterate,
-                                   get_service_configs(config))
+                                   service_configs)
     supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
@@ -226,6 +227,15 @@ def makeService(config):
         admin_site.displayTracebacks = False
         admin_service = service(str(admin_port), admin_site)
         admin_service.setServiceParent(s)
+
+    # setup cloud feed
+    cf_conf = config.get('cloudfeeds', None)
+    if cf_conf is not None:
+        addObserver(
+            CloudFeedsObserver(
+                reactor=reactor, authenticator=authenticator,
+                region=region, tenant_id=cf_conf['tenant_id'],
+                service_configs=service_configs))
 
     # Setup Kazoo client
     if config_value('zookeeper'):

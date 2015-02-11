@@ -10,7 +10,7 @@ from cafe.drivers.unittest.decorators import tags
 
 from test_repo.autoscale.fixtures import AutoscaleFixture
 
-from . import common
+from test_repo.autoscale.system.integration import common
 
 
 class AutoscaleLbaasFixture(AutoscaleFixture):

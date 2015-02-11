@@ -11,11 +11,12 @@ from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
+from otter.test.utils import StubResponse
 from otter.util.pure_http import has_code
 from otter.worker import _rcv3
 
 
-def _rcv3_add_response(lb_id, server_id):
+def _rcv3_add_response_body(lb_id, server_id):
     """
     Return a single, successful RCv3 response from adding a server to a load
     balancer.
@@ -52,6 +53,9 @@ class RCv3Tests(SynchronousTestCase):
         self.dispatcher = object()
         self.request_bag = _RequestBag(dispatcher=self.dispatcher,
                                        tenant_id='thetenantid')
+        self.post_response = (StubResponse(201, {}),
+                              _rcv3_add_response_body("lb_id", "server_id"))
+        self.del_response = None
 
     def _fake_perform(self, dispatcher, effect):
         """
@@ -81,13 +85,11 @@ class RCv3Tests(SynchronousTestCase):
         if req.method == "POST":
             self.assertEqual(req.success_pred, has_code(201))
             # http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes
-            response = _rcv3_add_response("lb_id", "server_id")
+            return succeed([self.post_response])
         elif req.method == "DELETE":
             self.assertEqual(req.success_pred, has_code(204, 409))
-            # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes
-            response = None
-
-        return succeed([response])
+            # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnode
+            return succeed([self.del_response])
 
     def test_add_to_rcv3(self):
         """
@@ -97,6 +99,14 @@ class RCv3Tests(SynchronousTestCase):
         (add_result,) = self.successResultOf(d)
         self.assertEqual(add_result["cloud_server"], {"id": "server_id"})
         self.assertEqual(add_result["load_balancer_pool"], {"id": "lb_id"})
+
+    def test_add_to_rcv3_fail_when_body_none(self):
+        """
+        :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
+        """
+        self.post_response = None
+        d = _rcv3.add_to_rcv3(self.request_bag, "lb_id", "server_id")
+        self.failureResultOf(d)
 
     def test_remove_from_rcv3(self):
         """

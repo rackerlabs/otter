@@ -1,7 +1,6 @@
 """Tests for convergence steps."""
 
 from effect import Func
-from effect.testing import resolve_effect
 
 from mock import ANY
 
@@ -10,7 +9,7 @@ from pyrsistent import freeze, pset
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
-from otter.convergence.model import CLBDescription
+from otter.convergence.model import CLBDescription, StepResult
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -24,8 +23,9 @@ from otter.convergence.steps import (
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
     _rcv3_check_bulk_delete)
 from otter.http import has_code, service_request
-from otter.test.utils import StubResponse
+from otter.test.utils import StubResponse, resolve_effect
 from otter.util.hashkey import generate_server_name
+from otter.util.http import APIError
 
 
 class StepAsEffectTests(SynchronousTestCase):
@@ -44,19 +44,32 @@ class StepAsEffectTests(SynchronousTestCase):
         self.assertEqual(eff.intent, Func(generate_server_name))
         eff = resolve_effect(eff, 'random-name')
         self.assertEqual(
-            eff,
+            eff.intent,
             service_request(
                 ServiceType.CLOUD_SERVERS,
                 'POST',
                 'servers',
                 data={'server': {'name': 'myserver-random-name',
                                  'flavorRef': '1'}},
-                success_pred=has_code(202)))
+                success_pred=has_code(202)).intent)
+
+        self.assertEqual(
+            resolve_effect(eff, (None, {})),
+            (StepResult.SUCCESS, []))
+
+        self.assertEqual(
+            resolve_effect(eff,
+                           (APIError, APIError(500, None, None), None),
+                           is_error=True),
+            (StepResult.RETRY, []))
 
     def test_create_server_noname(self):
         """
         :obj:`CreateServer.as_effect`, when no name is provided in the launch
         config, will generate the name will from scratch.
+
+        This only verifies intent; result reporting is tested in
+        :meth:`test_create_server`.
         """
         create = CreateServer(
             server_config=freeze({'server': {'flavorRef': '1'}}))
@@ -64,13 +77,13 @@ class StepAsEffectTests(SynchronousTestCase):
         self.assertEqual(eff.intent, Func(generate_server_name))
         eff = resolve_effect(eff, 'random-name')
         self.assertEqual(
-            eff,
+            eff.intent,
             service_request(
                 ServiceType.CLOUD_SERVERS,
                 'POST',
                 'servers',
                 data={'server': {'name': 'random-name', 'flavorRef': '1'}},
-                success_pred=has_code(202)))
+                success_pred=has_code(202)).intent)
 
     def test_delete_server(self):
         """
@@ -118,7 +131,8 @@ class StepAsEffectTests(SynchronousTestCase):
                 'PUT',
                 'loadbalancers/abc123/nodes/node1',
                 data={'condition': 'DRAINING',
-                      'weight': 50}))
+                      'weight': 50},
+                success_pred=has_code(202)))
 
     def test_add_nodes_to_clb(self):
         """
@@ -472,7 +486,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                  "load_balancer_pool": {"id": lb_id}}
                 for (lb_id, node_id) in pairs]
         res = _rcv3_check_bulk_delete(pairs, (resp, body))
-        self.assertIdentical(res, None)
+        self.assertEqual(res, (StepResult.SUCCESS, []))
 
     def test_try_again(self):
         """

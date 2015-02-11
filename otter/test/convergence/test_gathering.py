@@ -4,7 +4,7 @@ import calendar
 from functools import partial
 
 from effect import Constant, Effect
-from effect.testing import Stub, resolve_effect
+from effect.testing import Stub
 
 from pyrsistent import pmap
 
@@ -28,7 +28,12 @@ from otter.convergence.model import (
     NovaServer,
     ServerState)
 from otter.http import service_request
-from otter.test.utils import patch, resolve_retry_stubs, resolve_stubs
+from otter.test.utils import (
+    patch,
+    resolve_effect,
+    resolve_retry_stubs,
+    resolve_stubs
+)
 from otter.util.retry import (
     ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import from_timestamp
@@ -69,10 +74,11 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         `get_all_server_details` will not fetch again if first get returns
         results with size < batch_size
         """
-        response = {'servers': self.servers}
+        fake_response = object()
+        body = {'servers': self.servers}
         eff = get_all_server_details(batch_size=10)
         svcreq = resolve_retry_stubs(eff)
-        result = resolve_svcreq(svcreq, response, *self.req)
+        result = resolve_svcreq(svcreq, (fake_response, body), *self.req)
         self.assertEqual(result, self.servers)
 
     def test_get_all_above_batch_size(self):
@@ -84,10 +90,14 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         req2 = (ServiceType.CLOUD_SERVERS, 'GET',
                 'servers/detail?limit=10&marker=9')
         svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
-        next_retry = resolve_svcreq(svcreq, {'servers': servers[:10]},
+        fake_response = object()
+        body = {'servers': servers[:10]}
+
+        next_retry = resolve_svcreq(svcreq, (fake_response, body),
                                     *self.req)
         next_req = resolve_retry_stubs(next_retry)
-        result = resolve_svcreq(next_req, {'servers': servers[10:]}, *req2)
+        body = {'servers': servers[10:]}
+        result = resolve_svcreq(next_req, (fake_response, body), *req2)
         self.assertEqual(result, servers)
 
     def test_retry(self):
@@ -115,7 +125,9 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         """
         servers = [{'id': i} for i in range(10)]
         eff = resolve_retry_stubs(get_scaling_group_servers())
-        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
+        fake_response = object()
+        body = {'servers': servers}
+        result = resolve_svcreq(eff, (fake_response, body), *self.req)
         self.assertEqual(result, {})
 
     def test_filters_no_as_metadata(self):
@@ -125,7 +137,9 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         """
         servers = [{'id': i, 'metadata': {}} for i in range(10)]
         eff = resolve_retry_stubs(get_scaling_group_servers())
-        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
+        fake_response = object()
+        body = {'servers': servers}
+        result = resolve_svcreq(eff, (fake_response, body), *self.req)
         self.assertEqual(result, {})
 
     def test_returns_as_servers(self):
@@ -140,7 +154,9 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
         servers = as_servers + [{'metadata': 'junk'}] * 3
         eff = resolve_retry_stubs(get_scaling_group_servers())
-        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
+        fake_response = object()
+        body = {'servers': servers}
+        result = resolve_svcreq(eff, (fake_response, body), *self.req)
         self.assertEqual(
             result,
             {'a': as_servers[:5] + [as_servers[-1]], 'b': as_servers[5:8]})
@@ -158,7 +174,9 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         eff = resolve_retry_stubs(
             get_scaling_group_servers(
                 server_predicate=lambda s: s['id'] % 3 == 0))
-        result = resolve_svcreq(eff, {'servers': servers}, *self.req)
+        fake_response = object()
+        body = {'servers': servers}
+        result = resolve_svcreq(eff, (fake_response, body), *self.req)
         self.assertEqual(
             result,
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
@@ -232,8 +250,9 @@ class GetLBContentsTests(SynchronousTestCase):
             ShouldDelayAndRetry(can_retry=retry_times(5),
                                 next_interval=exponential_backoff_interval(2)))
         req = eff.intent.effect.intent
-        response = self.reqs[(req.method, req.url, req.json_response)]
-        return resolve_effect(eff, response)
+        body = self.reqs[(req.method, req.url, req.json_response)]
+        fake_response = object()
+        return resolve_effect(eff, (fake_response, body))
 
     def _resolve_lb(self, eff):
         """Resolve the tree of effects used to fetch LB information."""

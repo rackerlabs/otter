@@ -3,7 +3,6 @@ System Integration tests for autoscaling with RackConnect V3 load balancers
 """
 from __future__ import print_function
 
-
 import random
 import time
 import unittest
@@ -12,11 +11,11 @@ from cafe.drivers.unittest.decorators import tags
 
 from cloudcafe.common.tools.datagen import rand_name
 
-import common
-
 from autoscale.behaviors import safe_hasattr
 
-from test_repo.autoscale.fixtures import AutoscaleFixture
+from test_repo.autoscale.fixtures import (
+    AutoscaleFixture, autoscale_config, rcv3_client)
+from test_repo.autoscale.system.integration import common
 
 
 class DummyAsserter(object):
@@ -35,6 +34,7 @@ class DummyAsserter(object):
         self.err = msg
 
 
+@unittest.skipUnless(rcv3_client, "RCv3 is not supported by this account.")
 class AutoscaleRackConnectFixture(AutoscaleFixture):
     """
     System tests to verify lbaas integration with autoscale
@@ -56,7 +56,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         across all tests which can benefit from it.
         """
         super(AutoscaleRackConnectFixture, cls).setUpClass()
-
         cls.common = common.CommonTestUtilities(cls.server_client,
                                                 cls.autoscale_client,
                                                 cls.lbaas_client)
@@ -200,6 +199,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.verify_group_state(pool_group_resp.entity.id, self.min_servers)
 
     @tags(speed='slow', type='rcv3', rcv3_mimic='fail')
+    @unittest.skipIf(autoscale_config.mimic,
+                     "This test fails on mimic because it does not implement "
+                     "cloud networks yet.")
     def test_create_nonzero_scaling_group_with_pool_on_private(self):
         """
         Test that it is possible to create a scaling group with
@@ -229,6 +231,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                  asserter=self))
 
     @tags(speed='slow', type='rcv3', rcv3_mimic='fail')
+    @unittest.skipIf(autoscale_config.mimic,
+                     "This test fails on mimic because it does not implement "
+                     "cloud networks yet.")
     def test_create_nonzero_scaling_group_with_pool_on_public(self):
         """
         Test that it is possible to create a scaling group with
@@ -304,6 +309,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                      self.min_servers))
 
     @tags(speed='slow', type='rcv3', rcv3_mimic='fail')
+    @unittest.skipIf(autoscale_config.mimic,
+                     "This test fails on mimic because it does not implement "
+                     "cloud networks yet.")
     def test_create_scaling_group_with_pool_and_nonzero_min(self):
         """
         Create group with min_entities servers, a single RCv3 LB, ServiceNet
@@ -422,6 +430,10 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             expected_rcv3_server_count, timeout=300, api="RackConnect",
             asserter=self)
 
+        # Confirm that the expected server count also exists according to Nova
+        self.verify_server_count_using_server_metadata(pool_group.id,
+                                                       as_server_count)
+
         # Get node count after scaling and confirm that the expected number of
         # nodes are present on the load_balancer_pool.
         scale_up_node_count = (self._get_node_counts_on_pool(self.pool.id)
@@ -460,6 +472,10 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             msg='The actual '
             'cloud_server count of [{0}] does not match the expected count '
             'of [{1}]'.format(scale_up_node_count, expected_rcv3_server_count))
+
+        # Confirm that the expected server count also exists according to Nova
+        self.verify_server_count_using_server_metadata(pool_group.id,
+                                                       as_server_count)
 
         # Capture a list of the node_ids of all nodes on the pool after scaling
         final_node_ids = []
@@ -547,6 +563,10 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             expected_rcv3_server_count, timeout=300, api="RackConnect",
             asserter=self)
 
+        # Confirm that the expected server count also exists according to Nova
+        self.verify_server_count_using_server_metadata(pool_group.id,
+                                                       as_server_count)
+
         # Get node count after scaling and confirm that the expected number of
         # nodes are present on the load_balancer_pool.
         scale_up_node_count = (self._get_node_counts_on_pool(self.pool.id)
@@ -591,6 +611,10 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
             expected_rcv3_server_count, timeout=300, api="RackConnect",
             asserter=self)
+
+        # Confirm that the expected server count also exists according to Nova
+        self.verify_server_count_using_server_metadata(pool_group.id,
+                                                       as_server_count)
 
         # Get node count after scaling and confirm that the expected number of
         # nodes are present on the load_balancer_pool

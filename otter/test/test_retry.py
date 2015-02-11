@@ -6,7 +6,7 @@ import sys
 from effect import (
     ComposedDispatcher, Constant, Delay, Effect, Func, TypeDispatcher,
     base_dispatcher, sync_perform)
-from effect.testing import Stub, resolve_effect
+from effect.testing import Stub
 
 import mock
 
@@ -16,7 +16,7 @@ from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.utils import (
-    CheckFailure, CheckFailureValue, DummyException)
+    CheckFailure, CheckFailureValue, DummyException, resolve_effect)
 from otter.util.retry import (
     Retry,
     ShouldDelayAndRetry,

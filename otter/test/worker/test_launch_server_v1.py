@@ -1,60 +1,69 @@
 """
 Unittests for the launch_server_v1 launch config.
 """
-import mock
 import json
-from toolz.dicttoolz import merge
+
 from urllib import urlencode
 from urlparse import urlunsplit
 
-from twisted.trial.unittest import SynchronousTestCase
+import mock
+
+from testtools.matchers import IsInstance, MatchesRegex, StartsWith
+
+from toolz.dicttoolz import merge
+
 from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
 from twisted.python.failure import Failure
+from twisted.trial.unittest import SynchronousTestCase
 
+from otter.auth import headers
+from otter.test.utils import (
+    CheckFailure,
+    DummyException,
+    IsBoundWith,
+    StubResponse,
+    StubTreq,
+    StubTreq2,
+    defaults_by_name,
+    iMock,
+    matches,
+    mock_log,
+    mock_treq,
+    patch)
+from otter.test.worker.test_rcv3 import _rcv3_add_response_body
+from otter.undo import IUndoStack
+from otter.util.config import set_config_data
+from otter.util.deferredutils import TimedOutError, unwrap_first_error
+from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.worker import launch_server_v1
 from otter.worker.launch_server_v1 import (
+    CLBOrNodeDeleted,
+    LB_MAX_RETRIES,
+    LB_RETRY_INTERVAL_RANGE,
+    ServerCreationRetryError,
+    ServerDeleted,
+    UnexpectedServerStatus,
+    _as_new_style_instance_details,
+    _definitely_lb_config,
+    _remove_from_clb,
+    _without_otter_metadata,
     add_to_clb,
     add_to_load_balancer,
     add_to_load_balancers,
-    server_details,
-    wait_for_active,
     create_server,
+    delete_and_verify,
+    delete_server,
+    find_server,
+    generate_server_metadata,
     launch_server,
     prepare_launch_config,
-    delete_server,
     remove_from_load_balancer,
-    UnexpectedServerStatus,
-    ServerDeleted,
-    delete_and_verify,
-    verified_delete,
-    LB_MAX_RETRIES,
-    LB_RETRY_INTERVAL_RANGE,
-    find_server,
-    ServerCreationRetryError,
-    CLBOrNodeDeleted,
-    generate_server_metadata,
-    _without_otter_metadata,
     scrub_otter_metadata,
-    _definitely_lb_config,
-    _as_new_style_instance_details,
-    _remove_from_clb
+    server_details,
+    verified_delete,
+    wait_for_active
 )
-
-
-from otter.test.utils import (mock_log, patch, CheckFailure, mock_treq, matches,
-                              DummyException, IsBoundWith, StubTreq, StubTreq2,
-                              StubResponse, defaults_by_name)
-from otter.test.worker.test_rcv3 import _rcv3_add_response
-from testtools.matchers import IsInstance, StartsWith, MatchesRegex
-
-from otter.auth import headers
-from otter.util.http import APIError, RequestError, wrap_request_error
-from otter.util.config import set_config_data
-from otter.util.deferredutils import unwrap_first_error, TimedOutError
-
-from otter.test.utils import iMock
-from otter.undo import IUndoStack
 
 
 fake_config = {
@@ -377,7 +386,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.assertIdentical(request_func, self.request_func)
         self.assertEqual(lb_id, self.lb_config["loadBalancerId"])
         self.assertEqual(server_id, self.server_details["server"]["id"])
-        rcv3_add_response = _rcv3_add_response(lb_id, server_id)
+        rcv3_add_response = _rcv3_add_response_body(lb_id, server_id)
         return succeed(rcv3_add_response)
 
     def _fake_add_to_clb(self, log, endpoint, auth_token, lb_config,
@@ -817,7 +826,7 @@ class RemoveFromRCv3Tests(LoadBalancersTestsMixin, SynchronousTestCase):
         """
         lb_id = "my-rcv3-lb-id"
         rcv3_config = {"type": "RackConnectV3", "loadBalancerId": lb_id}
-        rcv3_response = _rcv3_add_response(lb_id, "my-server-id")
+        rcv3_response = _rcv3_add_response_body(lb_id, "my-server-id")
         d = remove_from_load_balancer(self.log, self.request_func,
                                       rcv3_config, rcv3_response)
         self.assertIdentical(self.successResultOf(d), None)

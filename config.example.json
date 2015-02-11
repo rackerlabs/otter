@@ -57,5 +57,6 @@
         "password": "REPLACE_WITH_REAL_PASSWORD",
         "ttl": 432000,
         "interval": 60
-    }
+    },
+    "cloudfeeds": {"service": "cloudFeeds", "tenant_id": "tenant"}
 }

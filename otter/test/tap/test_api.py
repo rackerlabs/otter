@@ -3,25 +3,33 @@ Tests for the otter-api tap plugin.
 """
 
 import json
+from copy import deepcopy
+
 import mock
 
-from testtools.matchers import Contains
-
-from twisted.internet import defer
-from twisted.internet.task import Clock
+from testtools.matchers import Contains, IsInstance
 
 from twisted.application.service import MultiService
+from twisted.internet import defer
+from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.models.cass import CassScalingGroupCollection as original_store
-from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
+from otter.auth import CachingAuthenticator
+from otter.constants import ServiceType, get_service_configs
+from otter.log.cloudfeeds import CloudFeedsObserver
+from otter.models.cass import CassScalingGroupCollection as OriginalStore
+from otter.supervisor import SupervisorService, get_supervisor, set_supervisor
 from otter.tap.api import (
-    Options, HealthChecker, makeService, setup_scheduler, call_after_supervisor)
-from otter.test.utils import matches, patch, CheckFailure
+    HealthChecker,
+    Options,
+    call_after_supervisor,
+    makeService,
+    setup_scheduler
+)
+from otter.test.test_auth import identity_config
+from otter.test.utils import CheckFailure, matches, patch
 from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
-
-from otter.test.test_auth import identity_config
 
 
 test_config = {
@@ -266,7 +274,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.reactor = patch(self, 'otter.tap.api.reactor')
 
         def scaling_group_collection(*args, **kwargs):
-            self.store = original_store(*args, **kwargs)
+            self.store = OriginalStore(*args, **kwargs)
             return self.store
 
         patch(self, 'otter.tap.api.CassScalingGroupCollection',
@@ -435,6 +443,32 @@ class APIMakeServiceTests(SynchronousTestCase):
         supervisor_service = parent.getServiceNamed('supervisor')
 
         self.assertEqual(get_supervisor(), supervisor_service)
+
+    @mock.patch('otter.tap.api.addObserver')
+    def test_cloudfeeds_setup(self, mock_addobserver):
+        """
+        Cloud feeds observer is setup if it is there in config
+        """
+        conf = deepcopy(test_config)
+        conf['cloudfeeds'] = {'service': 'cloudFeeds', 'tenant_id': 'tid'}
+        makeService(conf)
+        serv_confs = get_service_configs(conf)
+        serv_confs[ServiceType.CLOUD_FEEDS] = {
+            'name': 'cloudFeeds', 'region': 'ord'}
+        cf = CloudFeedsObserver(
+            reactor=self.reactor,
+            authenticator=matches(IsInstance(CachingAuthenticator)),
+            region='ord', tenant_id='tid',
+            service_configs=serv_confs)
+        mock_addobserver.assert_called_once_with(cf)
+
+    @mock.patch('otter.tap.api.addObserver')
+    def test_cloudfeeds_no_setup(self, mock_addobserver):
+        """
+        Cloud feeds observer is not setup if it is not there in config
+        """
+        makeService(test_config)
+        self.assertFalse(mock_addobserver.called)
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
