@@ -14,7 +14,7 @@ from .auth import (
     perform_invalidate_token,
 )
 from .http import TenantScope, perform_tenant_scope
-from .models.cass import CQLQueryExecute
+from .models.cass import CQLQueryExecute, perform_query_sync
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
 
@@ -66,6 +66,7 @@ def get_sync_cql_dispatcher(cursor):
             ParallelEffects: perform_serial
         })
     ])
+
 
 @sync_performer
 def perform_serial(disp, intent):
