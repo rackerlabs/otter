@@ -53,9 +53,9 @@ class RCv3Tests(SynchronousTestCase):
         self.dispatcher = object()
         self.request_bag = _RequestBag(dispatcher=self.dispatcher,
                                        tenant_id='thetenantid')
-        self.post_response = (StubResponse(201, {}),
+        self.post_result = (StubResponse(201, {}),
                               _rcv3_add_response_body("lb_id", "server_id"))
-        self.del_response = None
+        self.del_result = None
 
     def _fake_perform(self, dispatcher, effect):
         """
@@ -84,12 +84,12 @@ class RCv3Tests(SynchronousTestCase):
             self.assertEqual(req.success_pred, has_code(201))
             # http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}
             # %2Fload_balancer_pools%2Fnodes
-            return succeed(self.post_response)
+            return succeed(self.post_result)
         elif req.method == "DELETE":
             self.assertEqual(req.success_pred, has_code(204, 409))
             # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}
             # %2Fload_balancer_pools%2Fnode
-            return succeed(self.del_response)
+            return succeed(self.del_result)
 
     def test_add_to_rcv3(self):
         """
@@ -104,7 +104,7 @@ class RCv3Tests(SynchronousTestCase):
         """
         :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
         """
-        self.post_response = None
+        self.post_result = None
         d = _rcv3.add_to_rcv3(self.request_bag, "lb_id", "server_id")
         self.failureResultOf(d)
 
