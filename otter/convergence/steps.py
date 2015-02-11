@@ -348,17 +348,20 @@ class BulkAddToRCv3(object):
     :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
         connections to be made.
     """
+    def _bare_effect(self):
+        """
+        Just the RCv3 bulk request effect, with no callbacks.
+        """
+        return _rackconnect_bulk_request(self.lb_node_pairs, "POST",
+                                         success_pred=has_code(201))
 
     def as_effect(self):
         """
         Produce a :obj:`Effect` to add some nodes to some RCv3 load
         balancers.
         """
-        return _rackconnect_bulk_request(
-            self.lb_node_pairs, "POST",
-            success_pred=has_code(201))
+        return self._bare_effect()
 
-    _bare_effect = as_effect
 
 
 @implementer(IStep)
