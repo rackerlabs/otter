@@ -1515,7 +1515,7 @@ class CassScalingGroupCollection:
         Get webhook info that is there in webhook index but is not there in
         webhook_keys table
 
-        :return: Effect of CQLQueryExecute
+        :return: Effect of list of dict
         """
         query = ('SELECT "tenantId", "groupId", "policyId", "webhookKey" '
                  'FROM {cf}')
@@ -1535,7 +1535,7 @@ class CassScalingGroupCollection:
         """
         Add webhook keys to webhook_keys table
 
-        :return: Effect of CQLQueryExecute
+        :return: Effect of None
         """
         query = (
             'INSERT INTO {cf} ("tenantId", "groupId", "policyId", '
