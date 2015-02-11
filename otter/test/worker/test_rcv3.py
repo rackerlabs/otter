@@ -53,9 +53,9 @@ class RCv3Tests(SynchronousTestCase):
         self.dispatcher = object()
         self.request_bag = _RequestBag(dispatcher=self.dispatcher,
                                        tenant_id='thetenantid')
-        self.post_response = (StubResponse(201, {}),
-                              _rcv3_add_response_body("lb_id", "server_id"))
-        self.del_response = None
+        self.post_result = (StubResponse(201, {}),
+                            _rcv3_add_response_body("lb_id", "server_id"))
+        self.del_result = StubResponse(204, {}), None
 
     def _fake_perform(self, dispatcher, effect):
         """
@@ -69,10 +69,8 @@ class RCv3Tests(SynchronousTestCase):
         self.assertIs(type(effect), Effect)
         tenant_scope = effect.intent
         self.assertEqual(tenant_scope.tenant_id, 'thetenantid')
-        parallel = effect.intent.effect.intent
-        (sub_effect,) = parallel.effects
-        req = sub_effect.intent
 
+        req = tenant_scope.effect.intent
         self.assertEqual(req.service_type, ServiceType.RACKCONNECT_V3)
         self.assertEqual(req.data,
                          [{'load_balancer_pool': {'id': 'lb_id'},
@@ -84,12 +82,14 @@ class RCv3Tests(SynchronousTestCase):
 
         if req.method == "POST":
             self.assertEqual(req.success_pred, has_code(201))
-            # http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes
-            return succeed([self.post_response])
+            # http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}
+            # %2Fload_balancer_pools%2Fnodes
+            return succeed(self.post_result)
         elif req.method == "DELETE":
             self.assertEqual(req.success_pred, has_code(204, 409))
-            # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnode
-            return succeed([self.del_response])
+            # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}
+            # %2Fload_balancer_pools%2Fnode
+            return succeed(self.del_result)
 
     def test_add_to_rcv3(self):
         """
@@ -99,14 +99,6 @@ class RCv3Tests(SynchronousTestCase):
         (add_result,) = self.successResultOf(d)
         self.assertEqual(add_result["cloud_server"], {"id": "server_id"})
         self.assertEqual(add_result["load_balancer_pool"], {"id": "lb_id"})
-
-    def test_add_to_rcv3_fail_when_body_none(self):
-        """
-        :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
-        """
-        self.post_response = None
-        d = _rcv3.add_to_rcv3(self.request_bag, "lb_id", "server_id")
-        self.failureResultOf(d)
 
     def test_remove_from_rcv3(self):
         """

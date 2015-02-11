@@ -326,7 +326,8 @@ class BulkAddToRCv3(object):
 
     Each connection is independently specified.
 
-    See http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
+    See http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}
+    %2Fload_balancer_pools%2Fnodes.
 
     :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
         connections to be made.
@@ -341,6 +342,8 @@ class BulkAddToRCv3(object):
             self.lb_node_pairs, "POST",
             success_pred=has_code(201))
 
+    _bare_effect = as_effect
+
 
 @implementer(IStep)
 @attributes(['lb_node_pairs'])
@@ -349,21 +352,27 @@ class BulkRemoveFromRCv3(object):
     Some connections must be removed between some combination of nodes
     and RackConnect v3.0 load balancers.
 
-    See http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
+    See http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}
+    %2Fload_balancer_pools%2Fnodes.
 
     :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
         connections to be removed.
     """
+    def _bare_effect(self):
+        """
+        Just the RCv3 bulk request effect, with no callbacks.
+        """
+        # While 409 isn't success, that has to be introspected by
+        # _rcv3_check_bulk_delete in order to recover from it.
+        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE",
+                                         success_pred=has_code(204, 409))
 
     def as_effect(self):
         """
         Produce a :obj:`Effect` to remove some nodes from some RCv3 load
         balancers.
         """
-        eff = _rackconnect_bulk_request(self.lb_node_pairs, "DELETE",
-                                        success_pred=has_code(204, 409))
-        # While 409 isn't success, that has to be introspected by
-        # _rcv3_check_bulk_delete in order to recover from it.
+        eff = self._bare_effect()
         return eff.on(partial(_rcv3_check_bulk_delete, self.lb_node_pairs))
 
 
