@@ -423,7 +423,8 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         response_body = self.assert_status_code(
             204, method='PUT', body=json.dumps(launch_examples()[0]))
         self.assertEqual(response_body, "")
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.update_launch_config.assert_called_once_with(
             launch_examples()[0])
 
