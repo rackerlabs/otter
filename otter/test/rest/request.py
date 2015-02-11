@@ -120,7 +120,9 @@ def request(root_resource, method, endpoint, headers=None, body=None):
             content = "".join(
                 [call[1][0] for call in mock_request.write.mock_calls])
 
-        return ResponseWrapper(response=response, content=content, request=mock_request)
+        return ResponseWrapper(response=response,
+                               content=mock_request.getWrittenData(),
+                               request=mock_request)
 
     return _render(
         getChildForRequest(root_resource, mock_request),
