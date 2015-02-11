@@ -171,7 +171,7 @@ class OtterLaunch(object):
                             "personality": [
                                 {
                                     "path": '/root/.ssh/authorized_keys',
-                                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                                    "contents": "ssh-rsa A... user@example.net"
                                 }
                             ],
                             "networks": [
