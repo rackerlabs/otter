@@ -114,7 +114,9 @@ class OtterConfig(object):
         def _get_launch_and_obey_config_change(scaling_group, state):
             d = scaling_group.view_launch_config()
             d.addCallback(partial(
-                controller.obey_config_change, self.log, transaction_id(request),
+                controller.obey_config_change,
+                self.log,
+                transaction_id(request),
                 data, scaling_group, state))
             return d
 
