@@ -4,6 +4,7 @@
 At some point, this should just be moved into that module.
 """
 from functools import partial
+from operator import itemgetter
 
 from effect import Effect
 from effect.twisted import perform
@@ -26,29 +27,12 @@ def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
         firing with the parsed result of the request, or :data:`None` if the
         request has no body.
     """
-    step = step_class(lb_node_pairs=[(lb_id, server_id)])
-    effect = steps_to_effect([step])
+    effect = step_class(lb_node_pairs=[(lb_id, server_id)])._bare_effect()
     # Unfortunate that we have to TenantScope here, but here's where we're
     # performing.
     scoped = Effect(TenantScope(effect, request_bag.tenant_id))
-
     d = perform(request_bag.dispatcher, scoped)
-
-    def get_response_body(result):
-        # The body must be provided for adding, because that is stored in
-        # the DB so that the worker can delete the server and remove it
-        # from all the load balancers later.  The body is unimportant for
-        # deletes.
-
-        # TODO: when/before #956 lands, this needs refactoring
-        if result[0] is None:
-            assert step_class == BulkRemoveFromRCv3
-            return None
-        else:
-            _response, body = result[0]
-            return body
-
-    return d.addCallback(get_response_body)
+    return d.addCallback(itemgetter(1))
 
 
 add_to_rcv3 = partial(_generic_rcv3_request, BulkAddToRCv3)
