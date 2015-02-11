@@ -352,7 +352,8 @@ class BulkRemoveFromRCv3(object):
     Some connections must be removed between some combination of nodes
     and RackConnect v3.0 load balancers.
 
-    See http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
+    See http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}
+    %2Fload_balancer_pools%2Fnodes.
 
     :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
         connections to be removed.
