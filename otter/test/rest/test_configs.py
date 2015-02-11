@@ -309,7 +309,8 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
 
         # Patch supervisor
         self.supervisor = mock.Mock(spec=['validate_launch_config'])
-        self.supervisor.validate_launch_config.return_value = defer.succeed(None)
+        self.supervisor.validate_launch_config.return_value = defer.succeed(
+            None)
         set_supervisor(self.supervisor)
 
     def tearDown(self):
