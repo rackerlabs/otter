@@ -317,6 +317,22 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
         success_pred=success_pred)
 
 
+_UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
+                "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
+_RCV3_NODE_NOT_A_MEMBER_PATTERN = re.compile(
+    "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
+    "(?P<lb_id>{uuid})".format(uuid=_UUID4_REGEX),
+    re.IGNORECASE)
+_RCV3_LB_INACTIVE_PATTERN = re.compile(
+    "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state"
+    .format(uuid=_UUID4_REGEX),
+    re.IGNORECASE)
+_RCV3_LB_DOESNT_EXIST_PATTERN = re.compile(
+    "Load Balancer Pool (?P<lb_id>{uuid}) does not exist"
+    .format(uuid=_UUID4_REGEX),
+    re.IGNORECASE)
+
+
 @implementer(IStep)
 @attributes(['lb_node_pairs'])
 class BulkAddToRCv3(object):
@@ -374,22 +390,6 @@ class BulkRemoveFromRCv3(object):
         """
         eff = self._bare_effect()
         return eff.on(partial(_rcv3_check_bulk_delete, self.lb_node_pairs))
-
-
-_UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
-                "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
-_RCV3_NODE_NOT_A_MEMBER_PATTERN = re.compile(
-    "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
-    "(?P<lb_id>{uuid})".format(uuid=_UUID4_REGEX),
-    re.IGNORECASE)
-_RCV3_LB_INACTIVE_PATTERN = re.compile(
-    "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state"
-    .format(uuid=_UUID4_REGEX),
-    re.IGNORECASE)
-_RCV3_LB_DOESNT_EXIST_PATTERN = re.compile(
-    "Load Balancer Pool (?P<lb_id>{uuid}) does not exist"
-    .format(uuid=_UUID4_REGEX),
-    re.IGNORECASE)
 
 
 def _rcv3_check_bulk_delete(attempted_pairs, result):
