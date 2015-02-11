@@ -2,15 +2,10 @@
 
 from functools import partial
 
-from cql.connection import connect
-
 from effect import (
     ComposedDispatcher,
-    ParallelEffects,
     TypeDispatcher,
-    base_dispatcher,
-    sync_perform,
-    sync_performer)
+    base_dispatcher)
 from effect.twisted import make_twisted_dispatcher
 
 from .auth import (
