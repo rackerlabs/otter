@@ -36,7 +36,7 @@ from otter.models.cass import (
     WeakLocks,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
-    perform_query_sync,
+    perform_cql_query,
     serialize_json_data,
     verified_view
 )
@@ -116,24 +116,24 @@ def _cassandrify_data(list_of_dicts):
 
 class PerformTests(SynchronousTestCase):
     """
-    Tests for :func:`perform_query_sync` function
+    Tests for :func:`perform_cql_query` function
     """
 
     def test_perform_query_sync(self):
         """
-        Test for :func:`perform_query_sync`
+        Calls given connection's execute
         """
-        cursor = mock.Mock(spec=['execute'])
-        cursor.execute.return_value = 'ret'
+        conn = mock.Mock(spec=CQLClient)
+        conn.execute.return_value = 'ret'
         intent = CQLQueryExecute(query='query', params={'w': 2},
                                  consistency_level=ConsistencyLevel.ONE)
         r = sync_perform(
-            TypeDispatcher({CQLQueryExecute: partial(perform_query_sync,
-                                                     cursor)}),
+            TypeDispatcher({CQLQueryExecute: partial(perform_cql_query,
+                                                     conn)}),
             Effect(intent))
         self.assertEqual(r, 'ret')
-        cursor.execute.assert_called_once_with(
-            'query', {'w': 2}, consistency_level=ConsistencyLevel.ONE)
+        conn.execute.assert_called_once_with(
+            'query', {'w': 2}, ConsistencyLevel.ONE)
 
 
 class SerialJsonDataTestCase(SynchronousTestCase):

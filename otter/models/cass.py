@@ -12,7 +12,8 @@ from datetime import datetime
 
 from characteristic import attributes
 
-from effect import Effect, parallel, sync_performer
+from effect import Effect, parallel
+from effect.twisted import deferred_performer
 
 from jsonschema import ValidationError
 
@@ -61,15 +62,13 @@ class CQLQueryExecute(object):
     """
 
 
-@sync_performer
-def perform_query_sync(cursor, disp, intent):
+@deferred_performer
+def perform_cql_query(conn, disp, intent):
     """
-    Perform CQLQueryExecute synchronously using cursor
+    Perform CQLQueryExecute intent using given silverberg connection
     """
-    cursor.execute(
-        intent.query, intent.params)
-        #consistency_level=intent.consistency_level)
-    return cursor.fetchall()
+    return conn.execute(
+        intent.query, intent.params, intent.consistency_level)
 
 
 def serialize_json_data(data, ver):
