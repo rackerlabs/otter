@@ -80,17 +80,16 @@ class RCv3Tests(SynchronousTestCase):
         # The method is either POST (add) or DELETE (remove).
         self.assertIn(req.method, ["POST", "DELETE"])
 
-        fake_response_object = object()
         if req.method == "POST":
             self.assertEqual(req.success_pred, has_code(201))
             # http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}
             # %2Fload_balancer_pools%2Fnodes
-            return succeed((fake_response_object, self.post_response))
+            return succeed(self.post_response)
         elif req.method == "DELETE":
             self.assertEqual(req.success_pred, has_code(204, 409))
             # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}
             # %2Fload_balancer_pools%2Fnode
-            return succeed((fake_response_object, self.del_response))
+            return succeed(self.del_response)
 
     def test_add_to_rcv3(self):
         """
