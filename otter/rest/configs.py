@@ -4,20 +4,23 @@ or launch configuration for a scaling group.
 
 (/tenantId/groups/groupId/config and /tenantId/groups/groupId/launch)
 """
-from functools import partial
 import json
 
-from otter.json_schema import group_schemas
-from otter.log import log
-from otter.rest.decorators import (validate_body, fails_with,
-                                   succeeds_with, with_transaction_id)
-from otter.rest.errors import exception_codes
-from otter.rest.otterapp import OtterApp
-from otter.util.http import transaction_id
+from functools import partial
 
 from otter import controller
+from otter.json_schema import group_schemas
+from otter.log import log
+from otter.rest.decorators import (
+    fails_with,
+    succeeds_with,
+    validate_body,
+    with_transaction_id
+)
+from otter.rest.errors import InvalidMinEntities, exception_codes
+from otter.rest.otterapp import OtterApp
 from otter.supervisor import get_supervisor
-from otter.rest.errors import InvalidMinEntities
+from otter.util.http import transaction_id
 
 
 def normalize_launch_config(config):
