@@ -132,15 +132,15 @@ class LaunchConfigTest(AutoscaleFixture):
     @tags(speed='quick', convergence='p1')
     def test_system_server_details_name_and_metadata(self):
         """
-        Server name is appended by random characters and metadata of servers includes the group id,
-        for servers created by autoscale.
+        Server name is appended by random characters and metadata of servers
+        includes the group id, for servers created by autoscale.
         """
         group = self._create_group(minentities=self.gc_min_entities_alt)
-        active_servers_list = self.check_for_expected_number_of_building_servers(
+        active_servers = self.check_for_expected_number_of_building_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
         expected_metadata = {'rax:auto_scaling_group_id': group.id}
-        for each in list(active_servers_list):
+        for each in list(active_servers):
             get_server_resp = self.server_client.get_server(each)
             server = get_server_resp.entity
             metadata = self.autoscale_behaviors.to_data(server.metadata)
