@@ -12,9 +12,15 @@ import re
 from cql.apivalues import ProgrammingError
 from cql.connection import connect
 
-from effect import perform
+from effect.twisted import perform
 
-from otter.effect_dispatcher import get_sync_cql_dispatcher
+from silverberg.client import CQLClient
+
+from twisted.internet import task
+from twisted.internet.endpoints import clientFromString
+
+from otter.effect_dispatcher import get_cql_dispatcher
+from otter.models.cass import CassScalingGroupCollection
 from otter.test.resources import CQLGenerator
 
 
@@ -22,7 +28,7 @@ the_parser = argparse.ArgumentParser(description="Load data into Cassandra.")
 
 
 the_parser.add_argument(
-    'cql_dir', type=str, metavar='cql_dir',
+    'cql_dir', type=str, metavar='cql_dir', nargs='?',
     help='Directory containing *.cql files to merge and replace.')
 
 the_parser.add_argument(
@@ -136,24 +142,29 @@ def generate(args):
     connection.close()
 
 
-def setup_cursor(args):
-    return connect(args.host, args.port).Cursor()
+def setup_connection(reactor, args):
+    """
+    Return Cassandra connection
+    """
+    return CQLClient(
+        clientFromString(reactor, 'tcp:{}:{}'.format(args.host, args.port)),
+        args.keyspace)
 
 
-def webhook_migrate():
+def webhook_migrate(reactor, args):
     """
     Migrate webhook indexes to table
     """
     store = CassScalingGroupCollection(None, None)
-    return store.get_webhook_index_only().on(store.add_webhook_keys)
+    eff = store.get_webhook_index_only().on(store.add_webhook_keys)
+    conn = setup_connection(reactor, args)
+    return perform(get_cql_dispatcher(reactor, conn), eff).addCallback(
+        lambda _: conn.disconnect())
 
 
 def run(args):
     if args.webhook_migrate:
-        eff = webhook_migrate()
-        cursor = setup_cursor(args)
-        perform(get_sync_cql_dispatcher(cursor), eff)
-        cursor.close()
+        task.react(webhook_migrate, (args,))
     else:
         generate(args)
 
