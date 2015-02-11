@@ -190,7 +190,8 @@ class OtterLaunch(object):
                 }
             }
         """
-        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
         deferred = rec.view_launch_config()
         deferred.addCallback(lambda conf: json.dumps({"launchConfiguration": conf}))
         return deferred
