@@ -12,7 +12,7 @@ from datetime import datetime
 
 from characteristic import attributes
 
-from effect import Effect, parallel
+from effect import Effect, parallel, sync_performer
 
 from jsonschema import ValidationError
 
@@ -59,6 +59,16 @@ class CQLQueryExecute(object):
     """
     An intent to execute CQL query
     """
+
+
+@sync_performer
+def perform_query_sync(cursor, disp, intent):
+    """
+    Perform CQLQueryExecute synchronously using cursor
+    """
+    return cursor.execute(
+        intent.query, intent.params,
+        consistency_level=intent.consistency_level)
 
 
 def serialize_json_data(data, ver):

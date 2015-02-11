@@ -57,25 +57,3 @@ class FullDispatcherTests(SynchronousTestCase):
         eff = Effect(scope)
         self.assertEqual(sync_perform(dispatcher, eff), 'foo')
 
-
-class PerformTests(SynchronousTestCase):
-    """
-    Tests for perform_* functions
-    """
-
-    def test_perform_query_sync(self):
-        """
-        Test for :func:`perform_query_sync`
-        """
-        cursor = mock.Mock(spec=['execute'])
-        cursor.execute.return_value = 'ret'
-        intent = CQLQueryExecute(query='query', params={'w': 2},
-                                 consistency_level=ConsistencyLevel.ONE)
-        r = sync_perform(
-            TypeDispatcher({CQLQueryExecute: partial(perform_query_sync,
-                                                     conn)}),
-            Effect(intent))
-        self.assertEqual(r, 'ret')
-        cursor.execute.assert_called_once_with(
-            'query', {'w': 2}, consistency_level=ConsistencyLevel.ONE)
-

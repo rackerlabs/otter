@@ -6,8 +6,9 @@ import json
 from collections import namedtuple
 from copy import deepcopy
 from datetime import datetime
+from functools import partial
 
-from effect import ParallelEffects
+from effect import Effect, ParallelEffects, TypeDispatcher, sync_perform
 from effect.testing import resolve_effect
 
 from jsonschema import ValidationError
@@ -35,6 +36,7 @@ from otter.models.cass import (
     WeakLocks,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
+    perform_query_sync,
     serialize_json_data,
     verified_view
 )
@@ -110,6 +112,28 @@ def _cassandrify_data(list_of_dicts):
     This function also de-identifies the data for you.
     """
     return _de_identify(list_of_dicts)
+
+
+class PerformTests(SynchronousTestCase):
+    """
+    Tests for :func:`perform_query_sync` function
+    """
+
+    def test_perform_query_sync(self):
+        """
+        Test for :func:`perform_query_sync`
+        """
+        cursor = mock.Mock(spec=['execute'])
+        cursor.execute.return_value = 'ret'
+        intent = CQLQueryExecute(query='query', params={'w': 2},
+                                 consistency_level=ConsistencyLevel.ONE)
+        r = sync_perform(
+            TypeDispatcher({CQLQueryExecute: partial(perform_query_sync,
+                                                     cursor)}),
+            Effect(intent))
+        self.assertEqual(r, 'ret')
+        cursor.execute.assert_called_once_with(
+            'query', {'w': 2}, consistency_level=ConsistencyLevel.ONE)
 
 
 class SerialJsonDataTestCase(SynchronousTestCase):

@@ -73,13 +73,3 @@ def perform_serial(disp, intent):
     Performs parallel effects serially. Useful when testing or simple cases
     """
     return map(partial(perform, disp), intent.effects)
-
-
-@sync_performer
-def perform_query_sync(cursor, disp, intent):
-    """
-    Perform CQLQueryExecute synchronously using cursor
-    """
-    return cursor.execute(
-        intent.query, intent.params,
-        consistency_level=intent.consistency_level)
