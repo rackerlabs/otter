@@ -203,10 +203,10 @@ class OtterLaunch(object):
     def edit_launch_config(self, request, data):
         """
         Edit the launch configuration for a scaling group, which includes the
-        details of how to create a server, from what image, which load balancers to
-        join it to, and what networks to add it to, and other metadata.
-        This data provided in the request body in JSON format.
-        If successful, no response body will be returned.
+        details of how to create a server, from what image, which load
+        balancers to join it to, and what networks to add it to, and other
+        metadata.  This data provided in the request body in JSON format.  If
+        successful, no response body will be returned.
 
         Example request::
 
