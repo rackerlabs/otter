@@ -603,6 +603,22 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         result = _rcv3_check_bulk_delete(pairs, (resp, body))
         self.assertIdentical(result, None)
 
+    def test_lb_does_not_exist(self):
+        """
+        If the load balancer doesn't even exist, the delete was successful.
+        """
+        node_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
+        nonexistent_lb_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+
+        pairs = [(nonexistent_lb_id, node_id)]
+
+        resp = StubResponse(409, {})
+        body = {"errors": ["Load Balancer Pool {} does not exist"
+                           .format(nonexistent_lb_id)]}
+        result = _rcv3_check_bulk_delete(pairs, (resp, body))
+        self.assertIdentical(result, None)
+
+
     def test_node_not_a_member(self):
         """
         If the node is not a member of the load balancer pool it's being
