@@ -69,10 +69,8 @@ class RCv3Tests(SynchronousTestCase):
         self.assertIs(type(effect), Effect)
         tenant_scope = effect.intent
         self.assertEqual(tenant_scope.tenant_id, 'thetenantid')
-        parallel = effect.intent.effect.intent
-        (sub_effect,) = parallel.effects
-        req = sub_effect.intent
 
+        req = tenant_scope.effect.intent
         self.assertEqual(req.service_type, ServiceType.RACKCONNECT_V3)
         self.assertEqual(req.data,
                          [{'load_balancer_pool': {'id': 'lb_id'},
