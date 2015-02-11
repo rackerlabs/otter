@@ -19,6 +19,7 @@ from otter.convergence.steps import (
     DeleteServer,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
+    _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
     _rcv3_check_bulk_delete)
@@ -481,6 +482,40 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                 "not exist",
                 "Load Balancer Pool D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 does "
                 "not exist"]:
+            self.assertIdentical(match(message), None)
+
+    def test_no_such_lb_message(self):
+        """
+        The regex for parsing messages saying the load balancer doesn't
+        exist, parses those messages. It rejects other messages.
+        """
+        match = _RCV3_LB_DOESNT_EXIST_PATTERN.match
+
+        test_data = [
+            ("Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 does "
+             "not exist",
+             ("d95ae0c4-6ab8-4873-b82f-f8433840cff2",)),
+            ("Load Balancer Pool D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 does "
+             "not exist",
+             ("D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2",))
+        ]
+
+        for message, expected_groups in test_data:
+            res = match(message)
+            self.assertNotIdentical(res, None)
+            self.assertEqual(res.groups(), expected_groups)
+
+        for message in ["Load Balancer Pool {lb_id} is not in an ACTIVE state"
+                        .format(lb_id=lb_id) for lb_id in
+                        ['d95ae0c4-6ab8-4873-b82f-f8433840cff2',
+                         'D95AE0C4-6AB8-4873-B82F-F8433840CFF2']]:
+            self.assertIdentical(match(message), None)
+
+        for message in [
+                'Node d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is not a member '
+                'of Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2',
+                'Node D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is not a member '
+                'of Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2']:
             self.assertIdentical(match(message), None)
 
     def test_good_response(self):
