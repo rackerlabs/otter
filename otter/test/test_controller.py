@@ -12,6 +12,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter import controller
 
+from otter.convergence.service import get_converger, set_converger
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError)
 from otter.util.timestamp import MIN
@@ -640,7 +641,8 @@ class ObeyConfigChangeTestCase(SynchronousTestCase):
                                           'launch')
         self.assertIs(self.successResultOf(d), self.state)
         self.execute_launch_config.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state, 'launch',
+            self.log.bind.return_value.bind.return_value,
+            'transaction-id', self.state, 'launch',
             self.group, 5)
 
     def test_nonzero_delta_execute_errors_propagated(self):
@@ -656,7 +658,8 @@ class ObeyConfigChangeTestCase(SynchronousTestCase):
         f = self.failureResultOf(d)
         self.assertTrue(f.check(Exception))
         self.execute_launch_config.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state, 'launch',
+            self.log.bind.return_value.bind.return_value,
+            'transaction-id', self.state, 'launch',
             self.group, 5)
 
     def test_negative_delta_state_is_returned_if_execute_successful(self):
@@ -669,7 +672,8 @@ class ObeyConfigChangeTestCase(SynchronousTestCase):
                                           'config', self.group, self.state, 'launch')
         self.assertIs(self.successResultOf(d), self.state)
         self.exec_scale_down.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state,
+            self.log.bind.return_value.bind.return_value,
+            'transaction-id', self.state,
             self.group, 5)
 
     def test_negative_delta_execute_errors_propagated(self):
@@ -683,7 +687,8 @@ class ObeyConfigChangeTestCase(SynchronousTestCase):
         f = self.failureResultOf(d)
         self.assertTrue(f.check(Exception))
         self.exec_scale_down.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state,
+            self.log.bind.return_value.bind.return_value,
+            'transaction-id', self.state,
             self.group, 5)
 
     def test_audit_log_events_logged_on_positive_delta(self):
@@ -696,7 +701,7 @@ class ObeyConfigChangeTestCase(SynchronousTestCase):
                                           'config', self.group, self.state,
                                           'launch')
         self.assertIs(self.successResultOf(d), self.state)
-        log.msg.assert_called_once_with(
+        log.msg.assert_called_with(
             'Starting {convergence_delta} new servers to satisfy desired capacity',
             scaling_group_id=self.group.uuid, event_type="convergence.scale_up",
             convergence_delta=5, desired_capacity=5, pending_capacity=2,
@@ -712,12 +717,61 @@ class ObeyConfigChangeTestCase(SynchronousTestCase):
         d = controller.obey_config_change(log, 'transaction-id',
                                           'config', self.group, self.state, 'launch')
         self.assertIs(self.successResultOf(d), self.state)
-        log.msg.assert_called_once_with(
+        log.msg.assert_called_with(
             'Deleting 5 servers to satisfy desired capacity',
             scaling_group_id=self.group.uuid, event_type="convergence.scale_down",
             convergence_delta=-5, desired_capacity=5, pending_capacity=2,
             active_capacity=3, audit_log=True, policy_id=None,
             webhook_id=None)
+
+
+def mock_controller_utilities(test_case):
+    """
+    Mock out the following functions in the controller module, in order to simplify
+    testing of scaling up and down.
+
+        - check_cooldowns (returns True)
+        - calculate_delta (return 1)
+        - exec_scale_down (return a dummy success)
+        - execute_launch_config (return a dummy success)
+    """
+    mocks = {}
+    things_and_return_vals = {
+        'check_cooldowns': True,
+        'calculate_delta': 1,
+        'exec_scale_down': defer.succeed("scaled down"),
+        'execute_launch_config': defer.succeed("scaled up")
+    }
+
+    for thing, return_val in things_and_return_vals.iteritems():
+        mocks[thing] = patch(test_case, 'otter.controller.{0}'.format(thing),
+                             return_value=return_val)
+
+    return mocks
+
+
+def mock_group_state():
+    """
+    Create a mocked GroupState.
+    """
+    mock_state = mock.MagicMock(GroupState)
+    mock_state.get_capacity.return_value = {
+        'desired_capacity': 5,
+        'pending_capacity': 2,
+        'active_capacity': 3
+    }
+    return mock_state
+
+
+def mock_group():
+    """
+    Create a mocked ScalingGroup.
+    """
+    group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
+    group.view_config.return_value = defer.succeed("config")
+    group.get_policy.return_value = defer.succeed("policy")
+    group.view_launch_config.return_value = defer.succeed("launch")
+    return group
 
 
 class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
@@ -727,34 +781,12 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
 
     def setUp(self):
         """
-        Mock relevant controller methods. Also build a mock model that can be
-        used for testing.
+        Mock relevant controller methods.
         """
-        self.mocks = {}
-        things_and_return_vals = {
-            'check_cooldowns': True,
-            'calculate_delta': 1,
-            'exec_scale_down': defer.succeed(None),
-            'execute_launch_config': defer.succeed(None)
-        }
-
-        for thing, return_val in things_and_return_vals.iteritems():
-            self.mocks[thing] = patch(self,
-                                      'otter.controller.{0}'.format(thing),
-                                      return_value=return_val)
-
+        self.mocks = mock_controller_utilities(self)
         self.mock_log = mock.MagicMock()
-        self.mock_state = mock.MagicMock(GroupState)
-        self.mock_state.get_capacity.return_value = {
-            'desired_capacity': 5,
-            'pending_capacity': 2,
-            'active_capacity': 3
-        }
-
-        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
-        self.group.view_config.return_value = defer.succeed("config")
-        self.group.get_policy.return_value = defer.succeed("policy")
-        self.group.view_launch_config.return_value = defer.succeed("launch")
+        self.mock_state = mock_group_state()
+        self.group = mock_group()
 
     def test_maybe_execute_scaling_policy_no_such_policy(self):
         """
@@ -952,3 +984,129 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
             convergence_delta=-5, desired_capacity=5, pending_capacity=2,
             active_capacity=3, audit_log=True, policy_id=None,
             webhook_id=None)
+
+
+class ConvergeTestCase(SynchronousTestCase):
+    """
+    Tests for :func:`otter.controller.converge`, currently using the Otter
+    launch_server backend.
+    """
+
+    def setUp(self):
+        """
+        Mock relevant controller methods. Also build a mock model that can be
+        used for testing.
+        """
+        self.mocks = mock_controller_utilities(self)
+        self.mock_log = mock.MagicMock()
+        self.mock_state = mock_group_state()
+        self.group = mock_group()
+        self.converger_mock = mock.Mock()
+        self.addCleanup(set_converger, get_converger())
+        set_converger(self.converger_mock)
+
+    def test_no_change_returns_none(self):
+        """
+        converge returns None when there are no changes to make.
+        """
+        log = mock_log()
+        self.mocks['calculate_delta'].return_value = 0
+        result = controller.converge(
+            log, 'transaction', 'config', self.group,
+            self.mock_state, 'launch', 'policy')
+        self.assertIs(result, None)
+        log.msg.assert_called_once_with('no change in servers', server_delta=0)
+
+    def test_scale_up_execute_launch_config(self):
+        """
+        Converge will invoke execute_launch_config when the delta is positive.
+        """
+        self.mocks['calculate_delta'].return_value = 5
+        result = controller.converge(
+            self.mock_log, 'transaction', 'config', self.group,
+            self.mock_state, 'launch', 'policy')
+
+        self.mock_log.bind.assert_any_call(server_delta=5)
+        bound_log = self.mock_log.bind.return_value
+        self.assertIs(self.successResultOf(result), self.mock_state)
+        self.mocks['execute_launch_config'].assert_called_once_with(
+            bound_log, 'transaction', self.mock_state, 'launch', self.group, 5)
+        bound_log.msg.assert_any_call('executing launch configs')
+
+        # And converger service is _not_ called
+        self.assertFalse(self.converger_mock.start_convergence.called)
+
+    def test_scale_down_exec_scale_down(self):
+        """
+        Converge will invoke exec_scale_down when the delta is negative.
+        """
+        self.mocks['calculate_delta'].return_value = -5
+        result = controller.converge(
+            self.mock_log, 'transaction', 'config', self.group,
+            self.mock_state, 'launch', 'policy')
+
+        self.mock_log.bind.assert_any_call(server_delta=-5)
+        bound_log = self.mock_log.bind.return_value
+        self.assertIs(self.successResultOf(result), self.mock_state)
+        self.mocks['exec_scale_down'].assert_called_once_with(
+            bound_log, 'transaction', self.mock_state, self.group, 5)
+        bound_log.msg.assert_any_call('scaling down')
+        # And converger service is _not_ called
+        self.assertFalse(self.converger_mock.start_convergence.called)
+
+    def test_audit_log_scale_up(self):
+        """
+        When converge scales up, an audit log is emitted.
+        """
+        log = mock_log()
+        self.mocks['calculate_delta'].return_value = 1
+        controller.converge(
+            log, 'transaction', 'config', self.group,
+            self.mock_state, 'launch', 'policy')
+
+        log.msg.assert_any_call(
+            "Starting {convergence_delta} new servers to satisfy desired "
+            "capacity", event_type="convergence.scale_up", convergence_delta=1,
+            policy_id=None, webhook_id=None,
+            active_capacity=3, desired_capacity=5, pending_capacity=2,
+            audit_log=True)
+
+    def test_audit_log_scale_down(self):
+        """
+        When converge scales down, an audit log is emitted.
+        """
+        log = mock_log()
+        self.mocks['calculate_delta'].return_value = -1
+        controller.converge(
+            log, 'transaction', 'config', self.group,
+            self.mock_state, 'launch', 'policy')
+
+        log.msg.assert_any_call(
+            "Deleting 1 servers to satisfy desired capacity",
+            event_type="convergence.scale_down",
+            convergence_delta=-1,
+            policy_id=None, webhook_id=None,
+            active_capacity=3, desired_capacity=5, pending_capacity=2,
+            audit_log=True)
+
+    def test_real_convergence(self):
+        """
+        When a tenant is configured to for convergence, the Convergence
+        service's ``converge`` method is invoked, and None is returned.
+        """
+        log = mock_log()
+        state = GroupState('tenant', 'group-id', "test", [], [], None, {},
+                           False)
+        group_config = {'maxEntities': 100, 'minEntities': 0}
+        policy = {'change': 5}
+        config_data = {'convergence-tenants': ['tenant']}
+
+        result = controller.converge(log, 'txn-id', group_config, self.group,
+                                     state, 'launch', policy,
+                                     config_value=config_data.get)
+        self.assertIs(result, None)
+        self.converger_mock.start_convergence.assert_called_once_with(
+            log, 'tenant', 'group-id', 5, 'launch')
+
+        # And execute_launch_config is _not_ called
+        self.assertFalse(self.mocks['execute_launch_config'].called)

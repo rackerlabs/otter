@@ -1,6 +1,8 @@
 """
 System tests for launch config
 """
+import unittest
+
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 from cloudcafe.common.tools.datagen import rand_name
@@ -127,18 +129,18 @@ class LaunchConfigTest(AutoscaleFixture):
             group.launchConfiguration.server.name,
             - scale_down_change)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_server_details_name_and_metadata(self):
         """
-        Server name is appended by random characters and metadata of servers includes the group id,
-        for servers created by autoscale.
+        Server name is appended by random characters and metadata of servers
+        includes the group id, for servers created by autoscale.
         """
         group = self._create_group(minentities=self.gc_min_entities_alt)
-        active_servers_list = self.check_for_expected_number_of_building_servers(
+        active_servers = self.check_for_expected_number_of_building_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
         expected_metadata = {'rax:auto_scaling_group_id': group.id}
-        for each in list(active_servers_list):
+        for each in list(active_servers):
             get_server_resp = self.server_client.get_server(each)
             server = get_server_resp.entity
             metadata = self.autoscale_behaviors.to_data(server.metadata)
@@ -167,6 +169,41 @@ class LaunchConfigTest(AutoscaleFixture):
         self.resources.add(group, self.empty_scaling_group)
         self.verify_group_state(group.id, self.gc_min_entities_alt)
         self.verify_server_count_using_server_metadata(group.id, self.gc_min_entities_alt)
+
+    @unittest.skip('Requires an upgrade of cloudcafe to handle empty images')
+    @tags(requires='mimic')
+    def test_system_launchconfig_with_boot_from_volume(self):
+        """
+        Create a scaling group with a launch config that has an empty image ID,
+        and minEntities=1.  Ensure a server with an empty image ID was created
+        on the group.
+
+        TODO: once cloudcafe is upgraded to a version that supports
+        block_device_mapping, the hacks to keep it out of the cloudcafe models
+        should be removed and "requires='mimic'" should no longer be necessary.
+        (This should work on Nova)
+        """
+        group_response = self.autoscale_client.create_scaling_group(
+            gc_name='test',
+            gc_cooldown=self.gc_cooldown,
+            gc_min_entities=self.gc_min_entities_alt,
+            lc_image_ref="",
+            lc_flavor_ref=self.lc_flavor_ref,
+            lc_block_device_mapping=[{
+                "boot_index": "0",
+                "uuid": self.lc_image_ref,
+                "volume_size": "100",
+                "source_type": "image",
+                "destination_type": "volume",
+                "delete_on_termination": True
+            }])
+        group = group_response.entity
+        self.resources.add(group, self.empty_scaling_group)
+        self.verify_group_state(group.id, self.gc_min_entities_alt)
+
+        servers = self.get_group_servers_based_on_metadata(group.id)
+        self.assertEquals(1, len(servers))
+        self.assertEquals("", servers[0].image.id)
 
     @tags(speed='quick')
     def test_system_update_launchconfig_while_group_building(self):

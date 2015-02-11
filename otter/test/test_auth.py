@@ -1,36 +1,60 @@
 """
 Test authentication functions.
 """
+from copy import deepcopy
+
+from effect import Effect, sync_perform
+
 import mock
 
-from twisted.trial.unittest import SynchronousTestCase
-from twisted.internet.defer import succeed, fail, Deferred
+from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
-
-from testtools.matchers import IsInstance
+from twisted.python.failure import Failure
+from twisted.trial.unittest import SynchronousTestCase
 
 from zope.interface.verify import verifyObject
 
-from otter.test.utils import patch, SameJSON, iMock, matches
+from otter.auth import (
+    Authenticate,
+    CachingAuthenticator,
+    IAuthenticator,
+    ICachingAuthenticator,
+    ImpersonatingAuthenticator,
+    InvalidateToken,
+    RetryingAuthenticator,
+    WaitingAuthenticator,
+    authenticate_user,
+    endpoints,
+    endpoints_for_token,
+    extract_token,
+    generate_authenticator,
+    impersonate_user,
+    public_endpoint_url,
+    user_for_tenant,
+)
+from otter.effect_dispatcher import get_simple_dispatcher
+from otter.test.utils import SameJSON, iMock, mock_log, patch
+from otter.util.http import APIError, UpstreamError
 
-from otter.util.http import APIError, RequestError
-
-from otter.log import log as default_log
-
-from otter.auth import authenticate_user
-from otter.auth import extract_token
-from otter.auth import impersonate_user
-from otter.auth import endpoints_for_token
-from otter.auth import user_for_tenant
-from otter.auth import ImpersonatingAuthenticator
-from otter.auth import CachingAuthenticator
-from otter.auth import RetryingAuthenticator
-from otter.auth import IAuthenticator
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],
                     'x-auth-token': ['auth-token'],
                     'User-Agent': ['OtterScale/0.0']}
+
+fake_service_catalog = [
+    {'type': 'compute',
+     'name': 'cloudServersOpenStack',
+     'endpoints': [
+         {'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
+         {'region': 'ORD', 'publicURL': 'http://ord.openstack/'}
+     ]},
+    {'type': 'lb',
+     'name': 'cloudLoadBalancers',
+     'endpoints': [
+         {'region': 'DFW', 'publicURL': 'http://dfw.lbaas/'},
+     ]}
+]
 
 
 class HelperTests(SynchronousTestCase):
@@ -53,11 +77,8 @@ class HelperTests(SynchronousTestCase):
         resp = {'access': {'token': {'id': u'11111-111111-1111111-1111111'}}}
         self.assertEqual(extract_token(resp), '11111-111111-1111111-1111111')
 
-    def test_authenticate_user(self):
-        """
-        authenticate_user sends the username and password to the tokens
-        endpoint.
-        """
+    def _verify_request_invoked_with_pool(self, **kwargs):
+        pool = kwargs.get("pool", None)
         response = mock.Mock(code=200)
         response_body = {
             'access': {
@@ -68,7 +89,7 @@ class HelperTests(SynchronousTestCase):
         self.treq.post.return_value = succeed(response)
 
         d = authenticate_user('http://identity/v2.0', 'user', 'pass',
-                              log=self.log)
+                              log=self.log, **kwargs)
 
         self.assertEqual(self.successResultOf(d), response_body)
 
@@ -83,7 +104,24 @@ class HelperTests(SynchronousTestCase):
             headers={'accept': ['application/json'],
                      'content-type': ['application/json'],
                      'User-Agent': ['OtterScale/0.0']},
-            log=self.log)
+            log=self.log,
+            pool=pool)
+
+    def test_authenticate_user_with_pool(self):
+        """
+        authenticate_user sends the username and password to the tokens
+        endpoint.  This variant issues the call with a specified
+        HTTPConnectionPool.
+        """
+        self._verify_request_invoked_with_pool(pool='gene')
+
+    def test_authenticate_user_without_pool(self):
+        """
+        authenticate_user sends the username and password to the tokens
+        endpoint.  This variant issues the call without a specified
+        HTTPConnectionPool.
+        """
+        self._verify_request_invoked_with_pool()
 
     def test_authenticate_user_propagates_error(self):
         """
@@ -96,7 +134,7 @@ class HelperTests(SynchronousTestCase):
         d = authenticate_user('http://identity/v2.0', 'user', 'pass')
         failure = self.failureResultOf(d)
 
-        self.assertTrue(failure.check(RequestError))
+        self.assertTrue(failure.check(UpstreamError))
         real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
@@ -175,7 +213,7 @@ class HelperTests(SynchronousTestCase):
                              expire_in=60)
         failure = self.failureResultOf(d)
 
-        self.assertTrue(failure.check(RequestError))
+        self.assertTrue(failure.check(UpstreamError))
         real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
@@ -213,7 +251,7 @@ class HelperTests(SynchronousTestCase):
                                 'user-token')
         failure = self.failureResultOf(d)
 
-        self.assertTrue(failure.check(RequestError))
+        self.assertTrue(failure.check(UpstreamError))
         real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
@@ -252,12 +290,32 @@ class HelperTests(SynchronousTestCase):
                             111111)
         failure = self.failureResultOf(d)
 
-        self.assertTrue(failure.check(RequestError))
+        self.assertTrue(failure.check(UpstreamError))
         real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
         self.assertEqual(real_failure.value.body, 'error_body')
+
+    def test_endpoints(self):
+        """
+        endpoints will return only the named endpoint in a specific region.
+        """
+        self.assertEqual(
+            sorted(endpoints(fake_service_catalog,
+                             'cloudServersOpenStack',
+                             'DFW')),
+            [{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'}])
+
+    def test_public_endpoint_url(self):
+        """
+        public_endpoint_url returns the first publicURL for the named service
+        in a specific region.
+        """
+        self.assertEqual(
+            public_endpoint_url(fake_service_catalog, 'cloudServersOpenStack',
+                                'DFW'),
+            'http://dfw.openstack/')
 
 
 class ImpersonatingAuthenticatorTests(SynchronousTestCase):
@@ -296,21 +354,44 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         """
         verifyObject(IAuthenticator, self.ia)
 
-    def test_authenticate_tenant_auth_as_service_user(self):
+    def test_auth_me_auth_as_service_user(self):
         """
-        authenticate_tenant authenticates as the service user.
+        _auth_me authenticates as the service user.
         """
-        self.successResultOf(self.ia.authenticate_tenant(111111))
+        self.successResultOf(self.ia._auth_me(None))
         self.authenticate_user.assert_called_once_with(self.url, self.user,
                                                        self.password,
                                                        log=None)
+        self.assertEqual(self.ia._token, 'auth-token')
+        self.assertFalse(self.log.msg.called)
 
         self.authenticate_user.reset_mock()
 
-        self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
+        self.successResultOf(self.ia._auth_me(self.log))
         self.authenticate_user.assert_called_once_with(self.url, self.user,
                                                        self.password,
                                                        log=self.log)
+        self.log.msg.assert_called_once_with('Getting new identity admin token')
+        self.assertEqual(self.ia._token, 'auth-token')
+
+    def test_auth_me_waits(self):
+        """
+        _auth_me is called only once if it is called again while its previous call
+        has not returned
+        """
+        aud = Deferred()
+        self.authenticate_user.side_effect = lambda *a, **k: aud
+
+        log = mock_log()
+
+        self.ia._auth_me(log=log)
+        self.ia._auth_me(log=log)
+        self.assertEqual(len(self.authenticate_user.mock_calls), 1)
+        log.msg.assert_called_once_with('Getting new identity admin token')
+
+        aud.callback({'access': {'token': {'id': 'auth-token'}}})
+        self.assertEqual(len(self.authenticate_user.mock_calls), 1)
+        self.assertEqual(self.ia._token, 'auth-token')
 
     def test_authenticate_tenant_gets_user_for_specified_tenant(self):
         """
@@ -335,6 +416,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         authenticate_tenant impersonates the first user from the list of
         users for the tenant using the admin endpoint.
         """
+        self.ia._token = 'auth-token'
         self.successResultOf(self.ia.authenticate_tenant(111111))
         self.impersonate_user.assert_called_once_with(self.admin_url,
                                                       'auth-token',
@@ -347,20 +429,49 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
                                                       'auth-token',
                                                       'test_user', log=self.log)
 
+    def test_authenticate_tenant_retries_impersonates_first_user(self):
+        """
+        authenticate_tenant impersonates again with new auth if initial impersonation
+        fails with 401
+        """
+        self.impersonate_user.side_effect = [
+            fail(UpstreamError(Failure(APIError(401, '')), 'identity', 'o')),
+            succeed({'access': {'token': {'id': 'impersonation_token'}}})]
+        self.successResultOf(self.ia.authenticate_tenant(111111, self.log))
+        self.impersonate_user.assert_has_calls(
+            [mock.call(self.admin_url, None, 'test_user', log=self.log),
+             mock.call(self.admin_url, 'auth-token', 'test_user', log=self.log)])
+        self.authenticate_user.assert_called_once_with(self.url, self.user,
+                                                       self.password,
+                                                       log=self.log)
+        self.log.msg.assert_called_once_with('Getting new identity admin token')
+
     def test_authenticate_tenant_gets_endpoints_for_the_impersonation_token(self):
         """
-        authenticate_tenant fetches all the endpoints for the impersonation
-        token.
+        authenticate_tenant fetches all the endpoints for the impersonation with
+        cached token.
         """
-        self.successResultOf(self.ia.authenticate_tenant(111111))
-        self.endpoints_for_token.assert_called_once_with(
-            self.admin_url, 'auth-token', 'impersonation_token', log=None)
-
-        self.endpoints_for_token.reset_mock()
-
+        self.ia._token = 'auth-token'
         self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
         self.endpoints_for_token.assert_called_once_with(
             self.admin_url, 'auth-token', 'impersonation_token', log=self.log)
+
+    def test_authenticate_tenant_retries_getting_endpoints_for_the_impersonation_token(self):
+        """
+        authenticate_tenant fetches all the endpoints for the impersonation and
+        retries with new authentication token if it gets 401
+        """
+        self.endpoints_for_token.side_effect = [
+            fail(UpstreamError(Failure(APIError(401, '')), 'identity', 'o')),
+            succeed({'endpoints': [{'name': 'anEndpoint', 'type': 'anType'}]})]
+        self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
+        self.endpoints_for_token.assert_has_calls(
+            [mock.call(self.admin_url, None, 'impersonation_token', log=self.log),
+             mock.call(self.admin_url, 'auth-token', 'impersonation_token', log=self.log)])
+        self.authenticate_user.assert_called_once_with(self.url, self.user,
+                                                       self.password,
+                                                       log=self.log)
+        self.log.msg.assert_called_once_with('Getting new identity admin token')
 
     def test_authenticate_tenant_returns_impersonation_token_and_endpoint_list(self):
         """
@@ -380,37 +491,43 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         """
         authenticate_tenant propagates errors from authenticate_user.
         """
-        self.authenticate_user.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
+        self.impersonate_user.side_effect = lambda *a, **k: fail(
+            UpstreamError(Failure(APIError(401, '4')), 'identity', 'o'))
+        self.authenticate_user.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
+        f = self.failureResultOf(self.ia.authenticate_tenant(111111), UpstreamError)
+        self.assertEqual(f.value.reason.value.code, 500)
 
     def test_authenticate_tenant_propagates_user_list_errors(self):
         """
         authenticate_tenant propagates errors from user_for_tenant
         """
-        self.user_for_tenant.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
+        self.user_for_tenant.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
+        f = self.failureResultOf(self.ia.authenticate_tenant(111111), UpstreamError)
+        self.assertEqual(f.value.reason.value.code, 500)
 
     def test_authenticate_tenant_propagates_impersonation_errors(self):
         """
         authenticate_tenant propagates errors from impersonate_user
         """
-        self.impersonate_user.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
+        self.impersonate_user.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
+        f = self.failureResultOf(self.ia.authenticate_tenant(111111))
+        self.assertEqual(f.value.reason.value.code, 500)
 
     def test_authenticate_tenant_propagates_endpoint_list_errors(self):
         """
         authenticate_tenant propagates errors from endpoints_for_token
         """
-        self.endpoints_for_token.side_effect = lambda *a, **kw: fail(APIError(500, '500'))
+        self.endpoints_for_token.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
+        f = self.failureResultOf(self.ia.authenticate_tenant(111111), UpstreamError)
+        self.assertEqual(f.value.reason.value.code, 500)
 
 
 class CachingAuthenticatorTests(SynchronousTestCase):
@@ -421,16 +538,18 @@ class CachingAuthenticatorTests(SynchronousTestCase):
         """
         Configure a clock and a fake auth function.
         """
-        self.authenticator = iMock(IAuthenticator)
+        self.result = ('auth-token', 'catalog')
+        self.resps = {1: self.result}
 
-        def authenticate_tenant(tenant_id, log=None):
-            return succeed(('auth-token', 'catalog'))
-
-        self.authenticator.authenticate_tenant.side_effect = authenticate_tenant
-        self.auth_function = self.authenticator.authenticate_tenant
+        class FakeAuthenticator(object):
+            def authenticate_tenant(fself, tenant_id, log=None):
+                r = self.resps[tenant_id]
+                if isinstance(r, Deferred):
+                    return r
+                return fail(r) if isinstance(r, Exception) else succeed(r)
 
         self.clock = Clock()
-        self.ca = CachingAuthenticator(self.clock, self.authenticator, 10)
+        self.ca = CachingAuthenticator(self.clock, FakeAuthenticator(), 10)
 
     def test_verifyObject(self):
         """
@@ -444,9 +563,7 @@ class CachingAuthenticatorTests(SynchronousTestCase):
         of the auth_function passed to the authenticator.
         """
         result = self.successResultOf(self.ca.authenticate_tenant(1, mock.Mock()))
-        self.assertEqual(result, ('auth-token', 'catalog'))
-        self.auth_function.assert_called_once_with(
-            1, log=matches(IsInstance(mock.Mock)))
+        self.assertEqual(result, self.result)
 
     def test_returns_token_from_cache(self):
         """
@@ -454,13 +571,12 @@ class CachingAuthenticatorTests(SynchronousTestCase):
         auth_function again for subsequent calls.
         """
         result = self.successResultOf(self.ca.authenticate_tenant(1))
-        self.assertEqual(result, ('auth-token', 'catalog'))
+        self.assertEqual(result, self.result)
 
+        # Remove result and it still succeeds since it is from cache
+        del self.resps[1]
         result = self.successResultOf(self.ca.authenticate_tenant(1))
-        self.assertEqual(result, ('auth-token', 'catalog'))
-
-        self.auth_function.assert_called_once_with(
-            1, log=matches(IsInstance(default_log.__class__)))
+        self.assertEqual(result, self.result)
 
     def test_cache_expires(self):
         """
@@ -468,21 +584,14 @@ class CachingAuthenticatorTests(SynchronousTestCase):
         lapsed.
         """
         result = self.successResultOf(self.ca.authenticate_tenant(1))
-        self.assertEqual(result, ('auth-token', 'catalog'))
-
-        self.auth_function.assert_called_once_with(
-            1, log=matches(IsInstance(default_log.__class__)))
+        self.assertEqual(result, self.result)
 
         self.clock.advance(20)
 
-        self.auth_function.side_effect = lambda _, log: succeed(('auth-token2', 'catalog2'))
+        self.resps[1] = ('auth-token2', 'catalog2')
 
         result = self.successResultOf(self.ca.authenticate_tenant(1))
         self.assertEqual(result, ('auth-token2', 'catalog2'))
-
-        self.auth_function.assert_has_calls([
-            mock.call(1, log=matches(IsInstance(default_log.__class__))),
-            mock.call(1, log=matches(IsInstance(default_log.__class__)))])
 
     def test_serialize_auth_requests(self):
         """
@@ -491,16 +600,15 @@ class CachingAuthenticatorTests(SynchronousTestCase):
         value is cached.
         """
         auth_d = Deferred()
-        self.auth_function.side_effect = lambda _, log: auth_d
+        self.resps[1] = auth_d
 
         d1 = self.ca.authenticate_tenant(1)
         d2 = self.ca.authenticate_tenant(1)
 
+        self.assertIs(auth_d, d1)
         self.assertNotIdentical(d1, d2)
 
-        self.auth_function.assert_called_once_with(
-            1, log=matches(IsInstance(default_log.__class__)))
-
+        del self.resps[1]
         auth_d.callback(('auth-token2', 'catalog2'))
 
         r1 = self.successResultOf(d1)
@@ -515,10 +623,10 @@ class CachingAuthenticatorTests(SynchronousTestCase):
         not found in the cache.
         """
         r1 = self.successResultOf(self.ca.authenticate_tenant(1))
-        self.assertEqual(r1, ('auth-token', 'catalog'))
+        self.assertEqual(r1, self.result)
 
-        self.auth_function.side_effect = (
-            lambda _, log: succeed(('auth-token2', 'catalog2')))
+        del self.resps[1]
+        self.resps[2] = ('auth-token2', 'catalog2')
 
         r2 = self.successResultOf(self.ca.authenticate_tenant(2))
 
@@ -529,29 +637,40 @@ class CachingAuthenticatorTests(SynchronousTestCase):
         authenticate_tenant propagates auth failures to all waiters
         """
         auth_d = Deferred()
-        self.auth_function.side_effect = lambda _, log: auth_d
+        self.resps[1] = auth_d
 
         d1 = self.ca.authenticate_tenant(1)
+        del self.resps[1]
         d2 = self.ca.authenticate_tenant(1)
 
         self.assertNotIdentical(d1, d2)
 
         auth_d.errback(APIError(500, '500'))
 
-        self.failureResultOf(d1)
+        self.failureResultOf(d1, APIError)
 
-        f2 = self.failureResultOf(d2)
-        self.assertTrue(f2.check(APIError))
+        self.failureResultOf(d2, APIError)
 
     def test_auth_failure_propagated_to_caller(self):
         """
         authenticate_tenant propagates auth failures to the caller.
         """
-        self.auth_function.side_effect = lambda _, log: fail(APIError(500, '500'))
+        self.resps[1] = APIError(500, '500')
 
         d = self.ca.authenticate_tenant(1)
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(APIError))
+        self.failureResultOf(d, APIError)
+
+    def test_invalidate(self):
+        """
+        The invalidate method causes the next authenticate_tenant call to
+        re-authenticate.
+        """
+        d = self.ca.authenticate_tenant(1)
+        self.assertEqual(self.successResultOf(d), self.result)
+        self.ca.invalidate(1)
+        self.resps[1] = 'r2'
+        d = self.ca.authenticate_tenant(1)
+        self.assertEqual(self.successResultOf(d), 'r2')
 
 
 class RetryingAuthenticatorTests(SynchronousTestCase):
@@ -606,3 +725,129 @@ class RetryingAuthenticatorTests(SynchronousTestCase):
         self.clock.pump([4] * 4)
         f = self.failureResultOf(d, APIError)
         self.assertEqual(f.value.code, 500)
+
+
+class WaitingAuthenticatorTests(SynchronousTestCase):
+    """
+    Tests for `WaitingAuthenticator`
+    """
+
+    def setUp(self):
+        """
+        Create WaitingAuthenticator
+        """
+        self.clock = Clock()
+        self.mock_auth = iMock(IAuthenticator)
+        self.authenticator = WaitingAuthenticator(self.clock, self.mock_auth, 5)
+
+    def test_waits(self):
+        """
+        Waits before returning token
+        """
+        self.mock_auth.authenticate_tenant.return_value = succeed('token')
+        d = self.authenticator.authenticate_tenant('t1', 'log')
+        self.assertNoResult(d)
+        self.clock.advance(5)
+        self.assertEqual(self.successResultOf(d), 'token')
+        self.mock_auth.authenticate_tenant.assert_called_once_with('t1', log='log')
+
+    def test_no_wait_on_error(self):
+        """
+        Does not wait if internal auth errors
+        """
+        self.mock_auth.authenticate_tenant.return_value = fail(ValueError('e'))
+        d = self.authenticator.authenticate_tenant('t1', 'log')
+        self.failureResultOf(d, ValueError)
+
+
+class AuthenticateTests(SynchronousTestCase):
+    """Tests for :obj:`Authenticate`."""
+
+    def test_authenticate(self):
+        """Performing causes a call to authenticator.authenticate_tenant."""
+        result = ('token', {'catalog': 'foo'})
+        mock_auth = iMock(IAuthenticator)
+        mock_auth.authenticate_tenant.return_value = succeed(result)
+        log = object()
+        eff = Effect(Authenticate(mock_auth, 'tenant_id1', log))
+        self.assertEqual(sync_perform(get_simple_dispatcher(None), eff),
+                         result)
+        mock_auth.authenticate_tenant.assert_called_once_with('tenant_id1',
+                                                              log=log)
+
+
+class InvalidateTokenTests(SynchronousTestCase):
+    """Tests for :obj:`InvalidateToken`."""
+
+    def test_invalidate_token(self):
+        """Performig causes a call to authenticator.invalidate."""
+        mock_auth = iMock(ICachingAuthenticator)
+        mock_auth.invalidate.return_value = None
+        eff = Effect(InvalidateToken(mock_auth, 'tenant_id1'))
+        self.assertEqual(sync_perform(get_simple_dispatcher(None), eff), None)
+        mock_auth.invalidate.assert_called_once_with('tenant_id1')
+
+
+identity_config = {
+    'username': 'uname', 'password': 'pwd', 'url': 'htp',
+    'admin_url': 'ad', 'max_retries': 3, 'retry_interval': 5,
+    'wait': 4, 'cache_ttl': 50
+}
+
+
+class AuthenticatorTests(SynchronousTestCase):
+    """
+    Check if authenticators are instantiated in right composition
+    """
+
+    def setUp(self):
+        """
+        Config with identity settings
+        """
+        self.config = deepcopy(identity_config)
+
+    def test_composition(self):
+        """
+        authenticator is composed correctly with values from config
+        """
+        r = mock.Mock()
+        a = generate_authenticator(r, self.config)
+        self.assertIsInstance(a, CachingAuthenticator)
+        self.assertIdentical(a._reactor, r)
+        self.assertEqual(a._ttl, 50)
+
+        wa = a._authenticator
+        self.assertIsInstance(wa, WaitingAuthenticator)
+        self.assertIdentical(wa._reactor, r)
+        self.assertEqual(wa._wait, 4)
+
+        ra = wa._authenticator
+        self.assertIsInstance(ra, RetryingAuthenticator)
+        self.assertIdentical(ra._reactor, r)
+        self.assertEqual(ra._max_retries, 3)
+        self.assertEqual(ra._retry_interval, 5)
+
+        ia = ra._authenticator
+        self.assertIsInstance(ia, ImpersonatingAuthenticator)
+        self.assertEqual(ia._identity_admin_user, 'uname')
+        self.assertEqual(ia._identity_admin_password, 'pwd')
+        self.assertEqual(ia._url, 'htp')
+        self.assertEqual(ia._admin_url, 'ad')
+
+    def test_wait_defaults(self):
+        """
+        WaitingAuthenticator is created with default of 5 if not given
+        """
+        del self.config['wait']
+        r = mock.Mock()
+        a = generate_authenticator(r, self.config)
+        self.assertEqual(a._authenticator._wait, 5)
+
+    def test_cache_ttl_defaults(self):
+        """
+        CachingAuthenticator is created with default of 300 if not given
+        """
+        del self.config['cache_ttl']
+        r = mock.Mock()
+        a = generate_authenticator(r, self.config)
+        self.assertEqual(a._ttl, 300)

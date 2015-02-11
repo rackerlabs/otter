@@ -1,41 +1,42 @@
 """
 Twisted Application plugin for otter API nodes.
 """
-import jsonfig
+
 from functools import partial
 
-from twisted.python import usage
+import jsonfig
 
+from silverberg.cluster import RoundRobinCassandraCluster
+from silverberg.logger import LoggingCQLClient
+
+from twisted.application.service import MultiService, Service
+from twisted.application.strports import service
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, maybeDeferred
-from twisted.internet.task import coiterate
-
 from twisted.internet.endpoints import clientFromString
-
-from twisted.application.strports import service
-from twisted.application.service import Service, MultiService
-
+from twisted.internet.task import coiterate
+from twisted.python import usage
+from twisted.python.log import addObserver
 from twisted.web.server import Site
 
 from txkazoo import TxKazooClient
 
+from otter.auth import generate_authenticator
+from otter.bobby import BobbyClient
+from otter.constants import get_service_configs
+from otter.convergence.service import Converger, set_converger
+from otter.effect_dispatcher import get_full_dispatcher
+from otter.log import log
+from otter.log.cloudfeeds import CloudFeedsObserver
+from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.rest.admin import OtterAdmin
 from otter.rest.application import Otter
 from otter.rest.bobby import set_bobby
-from otter.util.config import set_config_data, config_value
-from otter.util.deferredutils import timeout_deferred
-from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.scheduler import SchedulerService
-
 from otter.supervisor import SupervisorService, set_supervisor
-from otter.auth import ImpersonatingAuthenticator
-from otter.auth import RetryingAuthenticator
-from otter.auth import CachingAuthenticator
-
-from otter.log import log
-from silverberg.cluster import RoundRobinCassandraCluster
-from silverberg.logger import LoggingCQLClient
-from otter.bobby import BobbyClient
+from otter.util.config import config_value, set_config_data
+from otter.util.cqlbatch import TimingOutCQLClient
+from otter.util.deferredutils import timeout_deferred
 
 
 class Options(usage.Options):
@@ -61,22 +62,7 @@ class Options(usage.Options):
         """
         Merge our commandline arguments with our config file.
         """
-        # Inject some default values into the config.  Right now this is
-        # only used to support distinguishing between staging and production.
-        self.update({
-            'regionOverrides': {},
-            'cloudServersOpenStack': 'cloudServersOpenStack',
-            'cloudLoadBalancers': 'cloudLoadBalancers'
-        })
-
         self.update(jsonfig.from_path(self['config']))
-
-        # The staging service catalog has some unfortunate differences
-        # from the production one, so these are here to hint at the
-        # correct ocnfiguration for staging.
-        if self.get('environment') == 'staging':
-            self['cloudServersOpenStack'] = 'cloudServersPreprod'
-            self['regionOverrides']['cloudLoadBalancers'] = 'STAGING'
 
 
 class FunctionalService(Service, object):
@@ -175,17 +161,26 @@ def makeService(config):
     """
     Set up the otter-api service.
     """
-    set_config_data(dict(config))
+    config = dict(config)
+    set_config_data(config)
 
     s = MultiService()
+
+    region = config_value('region')
 
     seed_endpoints = [
         clientFromString(reactor, str(host))
         for host in config_value('cassandra.seed_hosts')]
 
-    cassandra_cluster = LoggingCQLClient(RoundRobinCassandraCluster(
-        seed_endpoints,
-        config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
+    cassandra_cluster = LoggingCQLClient(
+        TimingOutCQLClient(
+            reactor,
+            RoundRobinCassandraCluster(
+                seed_endpoints,
+                config_value('cassandra.keyspace'),
+                disconnect_on_cancel=True),
+            config_value('cassandra.timeout') or 30),
+        log.bind(system='otter.silverberg'))
 
     store = CassScalingGroupCollection(cassandra_cluster, reactor)
     admin_store = CassAdmin(cassandra_cluster)
@@ -194,27 +189,13 @@ def makeService(config):
     if bobby_url is not None:
         set_bobby(BobbyClient(bobby_url))
 
-    cache_ttl = config_value('identity.cache_ttl')
+    service_configs = get_service_configs(config)
 
-    if cache_ttl is None:
-        # FIXME: Pick an arbitrary cache ttl value based on absolutely no
-        # science.
-        cache_ttl = 300
-
-    authenticator = CachingAuthenticator(
-        reactor,
-        RetryingAuthenticator(
-            reactor,
-            ImpersonatingAuthenticator(
-                config_value('identity.username'),
-                config_value('identity.password'),
-                config_value('identity.url'),
-                config_value('identity.admin_url')),
-            max_retries=config_value('identity.max_retries'),
-            retry_interval=config_value('identity.retry_interval')),
-        cache_ttl)
-
-    supervisor = SupervisorService(authenticator.authenticate_tenant, coiterate)
+    authenticator = generate_authenticator(reactor, config['identity'])
+    dispatcher = get_full_dispatcher(reactor, authenticator, log,
+                                     get_service_configs(config))
+    supervisor = SupervisorService(authenticator, region, coiterate,
+                                   service_configs)
     supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
@@ -230,7 +211,8 @@ def makeService(config):
         s.addService(FunctionalService(stop=partial(call_after_supervisor,
                                                     cassandra_cluster.disconnect, supervisor)))
 
-    otter = Otter(store, health_checker.health_check)
+    otter = Otter(store, region, health_checker.health_check,
+                  es_host=config_value('elasticsearch.host'))
     site = Site(otter.app.resource())
     site.displayTracebacks = False
 
@@ -246,12 +228,25 @@ def makeService(config):
         admin_service = service(str(admin_port), admin_site)
         admin_service.setServiceParent(s)
 
+    # setup cloud feed
+    cf_conf = config.get('cloudfeeds', None)
+    if cf_conf is not None:
+        addObserver(
+            CloudFeedsObserver(
+                reactor=reactor, authenticator=authenticator,
+                region=region, tenant_id=cf_conf['tenant_id'],
+                service_configs=service_configs))
+
     # Setup Kazoo client
     if config_value('zookeeper'):
         threads = config_value('zookeeper.threads') or 10
         kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'),
+                                  # Keep trying to connect until the end of time with
+                                  # max interval of 10 minutes
+                                  connection_retry=dict(max_tries=-1, max_delay=600),
                                   threads=threads, txlog=log.bind(system='kazoo'))
-        d = kz_client.start()
+        # Don't timeout. Keep trying to connect forever
+        d = kz_client.start(timeout=None)
 
         def on_client_ready(_):
             # Setup scheduler service after starting
@@ -264,8 +259,14 @@ def makeService(config):
             # delete will fail
             store.kz_client = kz_client
             # Setup kazoo to stop when shutting down
-            s.addService(FunctionalService(stop=partial(call_after_supervisor,
-                                                        kz_client.stop, supervisor)))
+            s.addService(FunctionalService(
+                stop=partial(call_after_supervisor,
+                             kz_client.stop, supervisor)))
+
+            # setup converger service
+            converger_service = Converger(reactor, kz_client, dispatcher)
+            s.addService(converger_service)
+            set_converger(converger_service)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')

@@ -1,6 +1,13 @@
 """
 Tests for :mod:`otter.utils.retry`
 """
+import sys
+
+from effect import (
+    ComposedDispatcher, Constant, Delay, Effect, Func, TypeDispatcher,
+    base_dispatcher, sync_perform)
+from effect.testing import Stub
+
 import mock
 
 from twisted.internet.task import Clock
@@ -8,9 +15,22 @@ from twisted.internet.defer import CancelledError, Deferred, succeed
 from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.util.retry import (retry, repeating_interval, random_interval,
-                              transient_errors_except, retry_times, compose_retries)
-from otter.test.utils import CheckFailure, DummyException
+from otter.test.utils import (
+    CheckFailure, CheckFailureValue, DummyException, resolve_effect)
+from otter.util.retry import (
+    Retry,
+    ShouldDelayAndRetry,
+    compose_retries,
+    exponential_backoff_interval,
+    perform_retry,
+    random_interval,
+    repeating_interval,
+    retry,
+    retry_effect,
+    retry_times,
+    terminal_errors_except,
+    transient_errors_except,
+)
 
 
 class RetryTests(SynchronousTestCase):
@@ -329,6 +349,24 @@ class CanRetryHelperTests(SynchronousTestCase):
         self.assertFalse(can_retry(8))
         self.assertFalse(can_retry(3))
 
+    def test_terminal_errors_except_defaults_to_all_errors_bad(self):
+        """
+        If no args are provided to :func:`fail_unless`, the
+        function it returns treats all errors as terminal (returns False)
+        """
+        can_retry = terminal_errors_except()
+
+        for exception in (DummyException(), NotImplementedError()):
+            self.assertFalse(can_retry(Failure(exception)))
+
+    def test_terminal_errors_except_continues_on_provided_exceptions(self):
+        """
+        If the failure is of a type provided to :func:`transient_errors_except`,
+        the function it returns will treat it as transient (returns True)
+        """
+        can_retry = terminal_errors_except(DummyException)
+        self.assertTrue(can_retry(Failure(DummyException())))
+
 
 class NextIntervalHelperTests(SynchronousTestCase):
     """
@@ -357,3 +395,166 @@ class NextIntervalHelperTests(SynchronousTestCase):
             self.assertTrue(5 <= interval <= 10)
             self.assertNotIn(interval, intervals)
             intervals.add(interval)
+
+    def test_exp_backoff_interval(self):
+        """
+        ``exponential_backoff_interval`` returns previous interval * 2 every
+        time it is called
+        """
+        err = DummyException()
+        next_interval = exponential_backoff_interval(3)
+        self.assertEqual(next_interval(err), 3)
+        self.assertEqual(next_interval(err), 6)
+        self.assertEqual(next_interval(err), 12)
+
+
+STUB = Effect(Stub(Constant("foo")))
+
+
+class RetryEffectTests(SynchronousTestCase):
+    """Tests for :func:`retry_effect`."""
+
+    def test_retry_effect(self):
+        """
+        :func:`retry_effect` takes an effect and returns an :obj:`Effect` of
+        :obj:`Retry`, with a :obj:`ShouldDelayAndRetry` as the should_retry
+        callable.
+        """
+        can_retry = lambda f: True
+        next_interval = lambda f: 1
+        eff = retry_effect(STUB, can_retry, next_interval)
+        self.assertEqual(
+            eff,
+            Effect(Retry(
+                effect=STUB,
+                should_retry=ShouldDelayAndRetry(can_retry=can_retry,
+                                                 next_interval=next_interval))))
+
+
+def _raise(exc):
+    raise exc
+
+
+def _repeated_effect_func(*funcs):
+    """
+    Return an (impure) function which does different things based on the
+    number of times it's been called.
+    """
+    counter = [0]
+
+    def func():
+        count = counter[0]
+        counter[0] += 1
+        return funcs[count]()
+
+    return func
+
+
+class EffectfulRetryTests(SynchronousTestCase):
+    """Tests for :obj:`Retry`."""
+
+    # Sadly, these are basically a less thorough version of effect.retry's
+    # tests. How could this be improved? by generalizing the concept of
+    # an object which calls a function with arguments specified as public
+    # attributes, I guess...
+
+    def setUp(self):
+        """Save common objects."""
+        self.dispatcher = ComposedDispatcher([
+            base_dispatcher,
+            TypeDispatcher({Retry: perform_retry})])
+
+    def test_perform_retry(self):
+        """
+        When the specified effect is successful, its result is propagated.
+        """
+        retry = Retry(effect=Effect(Constant('foo')),
+                      should_retry=lambda e: 1 / 0)
+        result = sync_perform(self.dispatcher, Effect(retry))
+        self.assertEqual(result, 'foo')
+
+    def test_perform_retry_retries_on_error(self):
+        """
+        When the specified effect raises, it is retried when should_retry
+        returns an Effect of True.
+        """
+        func = _repeated_effect_func(
+            lambda: _raise(RuntimeError("foo")),
+            lambda: "final")
+
+        def should_retry(exc_info):
+            if (exc_info[0] is RuntimeError
+                    and exc_info[1].message == "foo"):
+                return Effect(Constant(True))
+            else:
+                return Effect(Constant(False))
+
+        retry = Retry(effect=Effect(Func(func)),
+                      should_retry=should_retry)
+        result = sync_perform(self.dispatcher, Effect(retry))
+        self.assertEqual(result, "final")
+
+
+def get_exc_info():
+    """Get the exc_info tuple representing a ZeroDivisionError('foo')"""
+    try:
+        raise ZeroDivisionError("foo")
+    except Exception:
+        return sys.exc_info()
+
+
+def _perform_func_intent(eff):
+    """Perform a func intent without recursing on effects."""
+    assert type(eff.intent) is Func
+    return eff.intent.func()
+
+
+class ShouldDelayAndRetryTests(SynchronousTestCase):
+    """Tests for :obj:`ShouldDelayAndRetry`."""
+
+    def test_should_not_retry(self):
+        """
+        When an instance is called, an Effect of False is returned if the
+        can_retry function returns False.
+        """
+        sdar = ShouldDelayAndRetry(can_retry=lambda f: False,
+                                   next_interval=lambda f: 1 / 0)
+        eff = sdar(get_exc_info())
+        self.assertEqual(_perform_func_intent(eff), False)
+
+    def test_should_retry(self):
+        """
+        When called and can_retry returns True, a Delay based on next_interval
+        is executed and the ultimate result is True.
+        """
+        sdar = ShouldDelayAndRetry(can_retry=lambda f: True,
+                                   next_interval=lambda f: 1.5)
+        eff = sdar(get_exc_info())
+        next_eff = _perform_func_intent(eff)
+        self.assertEqual(next_eff.intent, Delay(delay=1.5))
+        self.assertEqual(resolve_effect(next_eff, None),
+                         True)
+
+    def test_failure_passed_correctly(self):
+        """
+        The failure argument to can_retry and next_interval represents the
+        error that occurred.
+        """
+        can_retry_failures = []
+        next_interval_failures = []
+
+        def can_retry(failure):
+            can_retry_failures.append(failure)
+            return True
+
+        def next_interval(failure):
+            next_interval_failures.append(failure)
+            return 0.5
+
+        sdar = ShouldDelayAndRetry(can_retry=can_retry,
+                                   next_interval=next_interval)
+        eff = sdar(get_exc_info())
+        _perform_func_intent(eff)
+        self.assertEqual(can_retry_failures, next_interval_failures)
+        self.assertEqual(can_retry_failures[0],
+                         CheckFailureValue(ZeroDivisionError("foo")))

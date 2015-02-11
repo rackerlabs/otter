@@ -1,0 +1,62 @@
+{
+    "environment": "staging",
+    "region": "ORD",
+    "url_root": "http://127.0.0.1:9000",
+    "cassandra": {
+        "seed_hosts": ["tcp:127.0.0.1:9160"],
+        "keyspace": "otter",
+        "timeout": 30
+    },
+    "identity": {
+        "username": "REPLACE_WITH_REAL_USERNAME",
+        "password": "REPLACE_WITH_REAL_PASSWORD",
+        "url": "https://keystone_identity_endpoint.com/v2.0",
+        "admin_url": "https://keystone_identity_endpoint.com/v2.0",
+        "max_retries": 10,
+        "retry_interval": 10,
+        "wait": 3
+    },
+    "zookeeper": {
+        "hosts": "127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183",
+        "threads": 100
+    },
+    "scheduler": {
+        "interval": 10,
+        "batchsize": 100,
+        "buckets": 10,
+        "partition": {
+            "path": "/scheduler_partition",
+            "time_boundary": 15
+        }
+    },
+    "worker": {
+        "lb_max_retries": 10,
+        "lb_retry_interval_range": [10, 15],
+        "lb_delete_timeout": 600
+    },
+    "limits": {
+        "pagination": 100,
+        "absolute": {
+          "maxGroups": 1000,
+          "maxPoliciesPerGroup": 100,
+          "maxWebhooksPerPolicy": 25
+        }
+    },
+    "root": {
+      "code": 301,
+      "headers": ["http://redirected_to_api.com"],
+      "body": "Moved to http://redirected_to_api.com"
+    },
+    "elasticsearch": {
+      "host": "http://127.0.0.1:9200"
+    },
+    "metrics": {
+        "service": "cloudMetricsIngest",
+        "region": "IAD",
+        "username": "REPLACE_WITH_REAL_USERNAME",
+        "password": "REPLACE_WITH_REAL_PASSWORD",
+        "ttl": 432000,
+        "interval": 60
+    },
+    "cloudfeeds": {"service": "cloudFeeds", "tenant_id": "tenant"}
+}

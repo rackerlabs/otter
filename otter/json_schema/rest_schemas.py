@@ -16,7 +16,7 @@ from otter.util.config import config_value
 _max_batch_creates = config_value('limits.pagination') or 100
 
 
-#------------- subschemas and other utilities -----------------
+# ------------- subschemas and other utilities -----------------
 
 _links = {
     'type': 'array',

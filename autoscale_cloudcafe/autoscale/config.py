@@ -137,62 +137,6 @@ class AutoscaleConfig(ConfigSectionInterface):
         return self.get('sp_desired_capacity')
 
     @property
-    def check_type(self):
-        """
-        maas scaling policy's check type
-        """
-        return self.get('check_type')
-
-    @property
-    def check_url(self):
-        """
-        maas scaling policy's check url
-        """
-        return self.get('check_url')
-
-    @property
-    def check_method(self):
-        """
-        maas scaling policy's check method
-        """
-        return self.get('check_method')
-
-    @property
-    def monitoring_zones(self):
-        """
-        maas scaling policy's monitoring zones
-        """
-        return self.get('monitoring_zones')
-
-    @property
-    def check_timeout(self):
-        """
-        maas scaling policy's check timeout
-        """
-        return self.get('check_timeout')
-
-    @property
-    def check_period(self):
-        """
-        maas scaling policy's check period
-        """
-        return self.get('check_period')
-
-    @property
-    def target_alias(self):
-        """
-        maas scaling policy's target alias
-        """
-        return self.get('target_alias')
-
-    @property
-    def alarm_criteria(self):
-        """
-        maas scaling policy's alarm criteria
-        """
-        return self.get('alarm_criteria')
-
-    @property
     def lc_load_balancers(self):
         """
         launch configuration for load balancers
@@ -369,3 +313,47 @@ class AutoscaleConfig(ConfigSectionInterface):
         no access for autoscale.
         """
         return self.get('autoscale_nno_lno_aa')
+
+    @property
+    def rcv3_endpoint_name(self):
+        """
+        Get the catalog name of the RCV3 endpoint
+        """
+        return self.get('rcv3_endpoint_name')
+
+    @property
+    def rcv3_load_balancer_pool(self):
+        """
+        Name and id of the shared RCV3 LB
+        """
+        temp = self.get('rcv3_load_balancer_pool')
+        return temp
+
+    @property
+    def rcv3_region_override(self):
+        """
+        Allow override of the rcv3 region from the config file
+        """
+        return self.get('rcv3_region_override')
+
+    @property
+    def rcv3_cloud_network(self):
+        """
+        Specify the cloud network to use with RackConnect
+        """
+        return self.get('rcv3_cloud_network')
+
+    @property
+    def environment(self):
+        """
+        Read the environment for the config.  For example, dev, ci, etc.
+        Default is production.
+        """
+        return self.get('environment', 'production')
+
+    @property
+    def mimic(self):
+        """
+        Specify whether this configuration is against a mimic instance.
+        """
+        return bool(self.get('mimic'))

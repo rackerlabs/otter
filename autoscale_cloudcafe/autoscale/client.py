@@ -1,19 +1,28 @@
 """
 Client objects for all the autoscale api calls
 """
-from autoscale.models.response.autoscale_response import (Group, Config,
-                                                          Policy, Webhook,
-                                                          ScalingGroup, Groups,
-                                                          Policies, Webhooks,
-                                                          Audit)
-from autoscale.models.response.limits_response import Limits
-from autoscale.models.request.autoscale_requests import (
-    Group_Request, Policy_Request, Webhook_Request, Config_Request,
-    ScalingGroup_Request, Update_Policy_Request, Update_Webhook_Request,
-    Maas_Policy_Request, Update_Maas_Policy_Request)
-from autoscale.models.lbaas import NodeList, LoadBalancer
-from cafe.engine.clients.rest import AutoMarshallingRestClient
+from __future__ import print_function
+
+
 from urlparse import urlparse
+
+from cafe.engine.clients.rest import AutoMarshallingRestClient
+
+from autoscale.models.lbaas import LoadBalancer, NodeList
+from autoscale.models.request.autoscale_requests import (
+    Config_Request, Group_Request, Policy_Batch_Request,
+    Policy_Request, ScalingGroup_Request,
+    Update_Policy_Request, Update_Webhook_Request, Webhook_Multi_Request,
+    Webhook_Request
+)
+from autoscale.models.response.autoscale_response import (
+    Audit, Config,
+    Group, Groups, Policies, Policy, RackConnectLBNodeDetail,
+    RackConnectLBNodes, RackConnectLBPool, RackConnectLBPools,
+    RackConnectNetworkInfo, ScalingGroup, Webhook, Webhooks
+)
+
+from autoscale.models.response.limits_response import Limits
 
 
 class AutoscalingAPIClient(AutoMarshallingRestClient):
@@ -55,6 +64,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                              gc_max_entities=None, gc_metadata=None,
                              lc_personality=None, lc_metadata=None,
                              lc_disk_config=None, lc_networks=None,
+                             lc_block_device_mapping=None,
                              lc_load_balancers=None, sp_list=None,
                              network_type=None, requestslib_kwargs=None):
         """
@@ -75,6 +85,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type lc_name: String
         :param lc_image_ref: The reference to the image used to build the server
         :type lc_image_ref: String
+        :param dict lc_block_device_mapping: Block device mapping data to be
+            passed to the server for mounting volumes
         :param lc_flavor_ref: The flavor used to build the server.
         :type lc_flavor_ref: String
         :param lc_metadata: A dictionary of values to be used as metadata.
@@ -106,24 +118,33 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
             lc_metadata['build_config'] = 'core'
         else:
             lc_metadata = dict(build_config='core')
-        # Setting netowrk type for servers to be private by default.
-        lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'}]
-        if network_type is 'public':
-            lc_networks.append({'uuid': '00000000-0000-0000-0000-000000000000'})
-        scaling_group = ScalingGroup_Request(gc_name=gc_name,
-                                             gc_cooldown=gc_cooldown,
-                                             gc_min_entities=gc_min_entities,
-                                             gc_max_entities=gc_max_entities,
-                                             gc_metadata=gc_metadata,
-                                             lc_name=lc_name,
-                                             lc_image_ref=lc_image_ref,
-                                             lc_flavor_ref=lc_flavor_ref,
-                                             lc_personality=lc_personality,
-                                             lc_metadata=lc_metadata,
-                                             lc_disk_config=lc_disk_config,
-                                             lc_networks=lc_networks,
-                                             lc_load_balancers=lc_load_balancers,
-                                             sp_list=sp_list)
+
+        # Setting network type for servers to be private by default so that
+        # when testing against production, by default public IPs are not
+        # used up.
+        if lc_networks is None:
+            lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'}]
+            if network_type is 'public':
+                lc_networks.append(
+                    {'uuid': '00000000-0000-0000-0000-000000000000'})
+
+        scaling_group = ScalingGroup_Request(
+            gc_name=gc_name,
+            gc_cooldown=gc_cooldown,
+            gc_min_entities=gc_min_entities,
+            gc_max_entities=gc_max_entities,
+            gc_metadata=gc_metadata,
+            lc_name=lc_name,
+            lc_image_ref=lc_image_ref,
+            lc_flavor_ref=lc_flavor_ref,
+            lc_personality=lc_personality,
+            lc_metadata=lc_metadata,
+            lc_disk_config=lc_disk_config,
+            lc_networks=lc_networks,
+            lc_block_device_mapping=lc_block_device_mapping,
+            lc_load_balancers=lc_load_balancers,
+            sp_list=sp_list)
+
         return self.request('POST', url,
                             request_entity=scaling_group,
                             requestslib_kwargs=requestslib_kwargs,
@@ -225,6 +246,29 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         return self.request('DELETE', url, params=params,
                             requestslib_kwargs=requestslib_kwargs)
 
+    def delete_scaling_group_with_force(self, group_id,
+                                        requestslib_kwargs=None):
+        """
+        :summary: Deletes the scaling group even when there are servers on the
+                  group
+
+        :param group_id: The id of an existing scaling group.
+
+        :type group_id: String
+
+        :return: Response Object containing response code 204 on success and
+                 empty body
+        :rtype: Response Object
+
+            DELETE '/{tenantId}/groups/{groupId}?force=true'
+        """
+
+        self.group_id = group_id
+        params = {'force': True}
+        url = '%s/groups/%s/' % (self.url, self.group_id)
+        return self.request('DELETE', url, params=params,
+                            requestslib_kwargs=requestslib_kwargs)
+
     def list_status_entities_sgroups(self, group_id, requestslib_kwargs=None):
         """
         :summary: List status of entities in autoscaling group
@@ -314,6 +358,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def update_launch_config(self, group_id, name, image_ref, flavor_ref,
                              personality=None, metadata=None,
                              disk_config=None, networks=None,
+                             block_device_mapping=None,
                              load_balancers=None,
                              requestslib_kwargs=None):
         """
@@ -330,6 +375,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                                 flavor_ref=flavor_ref,
                                 personality=personality, metadata=metadata,
                                 disk_config=disk_config, networks=networks,
+                                block_device_mapping=block_device_mapping,
                                 load_balancers=load_balancers)
         return self.request('PUT', url,
                             request_entity=config,
@@ -338,12 +384,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def create_policy(self, group_id, name, cooldown,
                       change=None, change_percent=None,
                       desired_capacity=None, policy_type=None,
-                      args=None, check_label=None,
-                      check_type=None, check_url=None, check_method=None,
-                      monitoring_zones=None, check_timeout=None, check_period=None,
-                      alarm_criteria=None, check_disabled=None, check_metadata=None,
-                      target_alias=None, target_hostname=None,
-                      target_resolver=None, requestslib_kwargs=None):
+                      args=None, requestslib_kwargs=None):
         """
         :summary: Create scaling policy
         :param name: A unique name for the scaling policy
@@ -356,40 +397,72 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :param change_percent: The changepercent to make in the number of
                               servers in the scaling group
         :type change_percent: Number
-        :param desired_capacity: The desired capacity is the no of servers to be
+        :param desired_capacity: The desired capacity is the number of servers to be
                             in the scaling group
         :type desired_capacity: Integer
         :param policy_type: What type of policy this is
         :type policy_type: String
-        :return: Response Object containing response code 201
+        :return: Policy Response Object containing response code 201
          on success and empty body
-        :rtype: Response Object
+        :rtype: :class:`Policy`
 
         POST
         '/{tenantId}/groups/{groupId}/policy'
         """
         url = '%s/groups/%s/policies/' % (self.url, group_id)
-        if policy_type is 'cloud_monitoring':
-            policy = Maas_Policy_Request(
-                name=name, cooldown=cooldown, change=change,
-                change_percent=change_percent,
-                desired_capacity=desired_capacity,
-                policy_type=policy_type, check_label=check_label,
-                check_type=check_type, check_url=check_url, check_method=check_method,
-                monitoring_zones=monitoring_zones, check_timeout=check_timeout,
-                check_period=check_period, target_alias=target_alias,
-                alarm_criteria=alarm_criteria, check_disabled=check_disabled,
-                check_metadata=check_metadata, target_hostname=target_hostname,
-                target_resolver=target_resolver)
-        else:
-            policy = Policy_Request(
-                name=name, cooldown=cooldown, change=change,
-                change_percent=change_percent,
-                desired_capacity=desired_capacity,
-                policy_type=policy_type, args=args)
+        policy = Policy_Request(
+            name=name, cooldown=cooldown, change=change,
+            change_percent=change_percent,
+            desired_capacity=desired_capacity,
+            policy_type=policy_type, args=args)
         return self.request('POST', url,
                             response_entity_type=Policy,
                             request_entity=policy,
+                            requestslib_kwargs=requestslib_kwargs)
+
+    def create_policy_batch(self, group_id, name, cooldown,
+                            change=None, change_percent=None,
+                            desired_capacity=None, policy_type=None,
+                            args=None, requestslib_kwargs=None, batch_size=1):
+        """
+        Create multiple scaling policies with the same configuration in a
+            single API call
+
+        :param name: Name root - Names take the form "name_#" with numbers from
+            0 to batch_size
+        :type name: str
+        :param cooldown: The cooldown time for the policy
+        :type cooldown: int|float
+        :param change: The change to make in the number of servers in the
+                      scaling group (non-zero)
+        :type change: int
+        :param change_percent: The changepercent to make in the number of
+                              servers in the scaling group
+        :type change_percent: int|float
+        :param desired_capacity: The desired capacity is the number of servers to be
+                            in the scaling group
+        :type desired_capacity: int
+        :param policy_type: What type of policy this is ("webhook", "schedule")
+        :type policy_type: str
+        :return: Response Object containing response code 201 on success
+         and a list of policy objects
+        :rtype: :class:`Policy`
+
+        POST
+        '/{tenantId}/groups/{groupId}/policy'
+        """
+        url = '{0}/groups/{1}/policies/'.format(self.url, group_id)
+        policy_list = []
+        for p in range(batch_size):
+            name_num = name + '_{0}'.format(p)
+            policy_list.append(Policy_Request(
+                name=name_num, cooldown=cooldown, change=change,
+                change_percent=change_percent,
+                desired_capacity=desired_capacity,
+                policy_type=policy_type, args=args))
+        return self.request('POST', url,
+                            response_entity_type=Policy,
+                            request_entity=Policy_Batch_Request(policy_list),
                             requestslib_kwargs=requestslib_kwargs)
 
     def list_policies(self, group_id, marker=None, limit=None,
@@ -400,7 +473,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type group_id: String
         :return: Response Object containing response code 200 and body with
                  the list of the policy configs
-        :rtype: Response Object
+        :rtype: :class:`Policies`
 
         GET
         '/<string:tenantId>/groups/<string:groupId>/policy'
@@ -413,11 +486,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def update_policy(self, group_id, policy_id, name, cooldown, change=None,
                       change_percent=None, desired_capacity=None,
-                      policy_type=None, args=None, check_label=None,
-                      check_type=None, check_url=None, check_method=None,
-                      monitoring_zones=None, check_timeout=None, check_period=None,
-                      target_alias=None, alarm_criteria=None,
-                      requestslib_kwargs=None):
+                      policy_type=None, args=None, requestslib_kwargs=None):
         """
         :summary: Update/Create details of a specific scaling policy
         :param name: The name of the policy
@@ -434,24 +503,12 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
             '/<string:tenantId>/groups/<groupId>/policy/<policyId>'
         """
         url = '%s/groups/%s/policies/%s/' % (self.url, group_id, policy_id)
-        if policy_type is 'cloud_monitoring':
-            policy = Update_Maas_Policy_Request(
-                name=name, cooldown=cooldown, change=change,
-                change_percent=change_percent,
-                desired_capacity=desired_capacity,
-                policy_type=policy_type, check_label=check_label,
-                check_type=check_type, check_url=check_url, check_method=check_method,
-                monitoring_zones=monitoring_zones, check_timeout=check_timeout,
-                check_period=check_period, target_alias=target_alias,
-                alarm_criteria=alarm_criteria
-            )
-        else:
-            policy = Update_Policy_Request(
-                name=name, cooldown=cooldown, change=change,
-                change_percent=change_percent,
-                desired_capacity=desired_capacity,
-                policy_type=policy_type,
-                args=args)
+        policy = Update_Policy_Request(
+            name=name, cooldown=cooldown, change=change,
+            change_percent=change_percent,
+            desired_capacity=desired_capacity,
+            policy_type=policy_type,
+            args=args)
         return self.request('PUT', url,
                             request_entity=policy,
                             requestslib_kwargs=requestslib_kwargs)
@@ -528,7 +585,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         :type cooldown: dict
         :return: Response Object containing response code 201
          on success and empty body
-        :rtype: Response Object
+        :rtype: :class:`Webhook`
 
             POST
             '/{tenantId}/groups/{groupId}/policy/{policyId}/webhooks/'
@@ -536,6 +593,30 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         url = '%s/groups/%s/policies/%s/webhooks/' % (self.url, group_id,
                                                       policy_id)
         webhooks = Webhook_Request(name=name, metadata=metadata)
+        return self.request('POST', url,
+                            response_entity_type=Webhook,
+                            request_entity=webhooks,
+                            requestslib_kwargs=requestslib_kwargs)
+
+    def create_webhooks_multiple(self, group_id, policy_id, webhook_list,
+                                 requestslib_kwargs=None):
+        """
+        :summary: Use a single API call to create multiple webhooks on a policy based
+         on a list of request dictionaries
+        :param webhook_list: A list of dictionaries representing the desired webhooks
+         (i.e. {"name": str, "metadata": {key: str, ...}})
+        :type webhook_list: list of dict
+        :return: Response Object containing response code 201
+         on success and a list of webhook objects
+        :rtype: :class:`Webhook`
+
+            POST
+            '/{tenantId}/groups/{groupId}/policy/{policyId}/webhooks/'
+        """
+        url = '{0}/groups/{1}/policies/{2}/webhooks/'.format(self.url, group_id,
+                                                             policy_id)
+        request_list = [Webhook_Request(w['name'], w['metadata']) for w in webhook_list]
+        webhooks = Webhook_Multi_Request(request_list=request_list)
         return self.request('POST', url,
                             response_entity_type=Webhook,
                             request_entity=webhooks,
@@ -672,6 +753,17 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Audit)
 
+    def delete_server(self, group_id, server_id, replace=None):
+        """
+        Delete server from the group
+
+        :param str group_id: Scaling group ID
+        :param str server_id: ID of server in the group
+        :param str replace: replace query argument. "?replace" is not passed if this is None
+        """
+        url = '{}/groups/{}/servers/{}'.format(self.url, group_id, server_id)
+        return self.request('DELETE', url, params={'replace': replace})
+
 
 class LbaasAPIClient(AutoMarshallingRestClient):
 
@@ -711,7 +803,7 @@ class LbaasAPIClient(AutoMarshallingRestClient):
         :param virtualIps: The virtualIps of the load balancer
         :type virtualIps: string
         :return: Response Object containing response code 202
-        on success and returns created load balancer json
+         on success and returns created load balancer json
         :rtype: Response Object
         """
         lb = LoadBalancer(name=name, nodes=nodes, protocol=protocol,
@@ -773,4 +865,87 @@ class LbaasAPIClient(AutoMarshallingRestClient):
         full_url = '/'.join([self.url, str(load_balancer_id), 'nodes',
                              str(node_id)])
         return self.request('DELETE', full_url,
+                            requestslib_kwargs=requestslib_kwargs)
+
+
+class RackConnectV3APIClient(AutoMarshallingRestClient):
+    """
+    Client objects for all Rackconnect V3 API calls.
+    """
+
+    def __init__(self, url, auth_token, serialize_format=None,
+                 deserialize_format=None):
+        super(RackConnectV3APIClient, self).__init__(serialize_format,
+                                                     deserialize_format)
+        self.url = url
+        self.auth_token = auth_token
+        self.default_headers['X-Auth-Token'] = auth_token
+        self.default_headers['Content-Type'] = (
+            'application/%s' % (self.serialize_format,))
+        self.default_headers['Accept'] = 'application/%s' % (
+            (self.deserialize_format,))
+
+    def list_pools(self):
+        """
+        :summary: Get the list of pools for the tenant's RCV3 account
+        :return: Response Object containing response code 202
+        on success and list of pools
+        :rtype: Response Object
+        """
+        url = self.url + "/load_balancer_pools"
+        return self.request('GET', url,
+                            response_entity_type=RackConnectLBPools)
+
+    def get_cloud_network_info(self, cloud_network_id):
+        """
+        :summary: Get information on a given cloud_network
+        :return: Response Object
+        :rtype: Response Object
+        """
+        url = self.url + '/cloud_networks/{0}'.format(cloud_network_id)
+        print("### GETTING NETWORK INFO FROM: " + url)
+        return self.request('GET', url,
+                            response_entity_type=RackConnectNetworkInfo)
+
+    def get_pool_info(self, pool_id):
+        """
+        :summary: Get information on a given load_balancer_pool
+        :return: Response Object
+        :rtype: Response Object
+        """
+        url = self.url + '/load_balancer_pools/{0}'.format(pool_id)
+        print("... RCV3 request ... ", url)
+        return self.request('GET', url, response_entity_type=RackConnectLBPool)
+
+    def get_nodes_on_pool(self, pool_id):
+        """
+        :summary: Get the list of nodes on a given load balancer pool
+        :return: List of RC Node objects
+        :rtype: Response Object
+        """
+        url = self.url + '/load_balancer_pools/{0}/nodes'.format(pool_id)
+        print("... RCV3 request ... ", url)
+        return self.request('GET', url,
+                            response_entity_type=RackConnectLBNodes)
+
+    def get_node_info_detail(self, pool_id, node_id):
+        """
+        :summary: Get the detailed information on a specific node on a pool
+        :return: List of RC Node objects
+        :rtype: Response Object
+        """
+        url = self.url + ('/load_balancer_pools/{0}/nodes/{1}/details'
+                          .format(pool_id, node_id))
+        print("... RCV3 request ... ", url)
+        return self.request('GET', url,
+                            response_entity_type=RackConnectLBNodeDetail)
+
+    def remove_node_from_pool(self, pool_id, node_id, requestslib_kwargs=None):
+        """
+        :summary: Remove a node from a lb pool
+        """
+        url = self.url + '/load_balancer_pools/{0}/nodes/{1}'.format(pool_id,
+                                                                     node_id)
+        print("... RCV3 request ... ", url)
+        return self.request('DELETE', url,
                             requestslib_kwargs=requestslib_kwargs)

@@ -142,7 +142,6 @@ class DummyException(Exception):
 
     This way we are certain to throw a completely unhandled exception
     """
-    pass
 
 
 class RequestTestMixin(object):
@@ -294,11 +293,10 @@ class RestAPITestMixin(RequestTestMixin):
         self.mock_state = mock.MagicMock(spec=[])  # so nothing can call it
 
         def _mock_modify_state(modifier, *args, **kwargs):
-            modifier(self.mock_group, self.mock_state, *args, **kwargs)
-            return defer.succeed(None)
+            return defer.maybeDeferred(modifier, self.mock_group, self.mock_state, *args, **kwargs)
 
         self.mock_group.modify_state.side_effect = _mock_modify_state
-        self.root = Otter(self.mock_store).app.resource()
+        self.root = Otter(self.mock_store, 'ord').app.resource()
 
         # set pagination limits as it'll be used by all rest interfaces
         set_config_data({'limits': {'pagination': 100}, 'url_root': ''})

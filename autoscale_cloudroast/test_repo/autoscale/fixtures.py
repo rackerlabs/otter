@@ -1,23 +1,140 @@
 """
 :summary: Base Classes for Autoscale Test Suites (Collections of Test Cases)
 """
+from __future__ import print_function
+
+
+import json
+import time
+from functools import partial
+
 from cafe.drivers.unittest.fixtures import BaseTestFixture
-from autoscale.behaviors import AutoscaleBehaviors
+
+from cloudcafe.auth.config import UserAuthConfig, UserConfig
+from cloudcafe.auth.provider import AuthProvider
+
 from cloudcafe.common.resources import ResourcePool
 from cloudcafe.common.tools.datagen import rand_name
-from autoscale.config import AutoscaleConfig
-from cloudcafe.auth.config import UserAuthConfig, UserConfig
-from autoscale.client import AutoscalingAPIClient, LbaasAPIClient
-from cloudcafe.auth.provider import AuthProvider
 from cloudcafe.compute.servers_api.client import ServersClient
+
+from autoscale.behaviors import AutoscaleBehaviors
+from autoscale.client import (
+    AutoscalingAPIClient, LbaasAPIClient, RackConnectV3APIClient
+)
+from autoscale.config import AutoscaleConfig
 from autoscale.otter_constants import OtterConstants
 
-import os
-import time
+
+def _make_client(access_data, service_name, region, client_cls, debug_name):
+    """
+    Create a client using the `client_cls`, assuming it takes a url, an
+    auth token, serialize format, and deserialize format.
+
+    Extacts the URL and token from the access_data.
+
+    The autoscale client is special in that it extracts the URL from the
+    config, in some cases.
+    """
+    url = None
+
+    # If not production or staging, always use the configured server
+    # endpoint for autoscale instead of what's in the service catalog.
+    if (service_name == "autoscale" and
+            autoscale_config.environment not in ('production', 'staging')):
+        url = "{0}/{1}".format(
+            autoscale_config.server_endpoint, autoscale_config.tenant_id)
+        print(" ------ Using non-production, non-staging otter --------")
+
+    else:
+        service = access_data.get_service(service_name)
+        if service is not None:
+            url = service.get_endpoint(region).public_url
+
+    if url is not None:
+        return client_cls(url, access_data.token.id_, 'json', 'json')
+    else:
+        print("This account does not support {0}.".format(debug_name))
+        return None
+
+
+def _set_up_clients():
+    """
+    Read the user creds from the configuration file in and constructs all the
+    service clients.  If it can't authenticate, or it cannot construct the
+    autoscale/server/lbaas clients, then it fails.
+
+    The RCv3 client is not created if the account does not have access to RCv3
+    or if RCv3 configuration parameters are not present or invalid.
+    """
+    user_config = UserConfig()
+    access_data = AuthProvider.get_access_data(endpoint_config, user_config)
+
+    if access_data is None:
+        raise Exception(
+            "Unable to authenticate against identity to get auth token and "
+            "service catalog.")
+
+    _autoscale_client = _make_client(
+        access_data,
+        autoscale_config.autoscale_endpoint_name,
+        autoscale_config.region,
+        AutoscalingAPIClient,
+        "Autoscale")
+
+    _server_client = _make_client(
+        access_data,
+        autoscale_config.server_endpoint_name,
+        autoscale_config.server_region_override or autoscale_config.region,
+        ServersClient,
+        "Nova Compute")
+
+    _lbaas_client = _make_client(
+        access_data,
+        autoscale_config.load_balancer_endpoint_name,
+        autoscale_config.lbaas_region_override or autoscale_config.region,
+        LbaasAPIClient,
+        "Cloud Load Balancers")
+
+    _rcv3_client = None
+    if _rcv3_cloud_network and _rcv3_load_balancer_pool:
+        _rcv3_client = _make_client(
+            access_data,
+            autoscale_config.rcv3_endpoint_name,
+            autoscale_config.rcv3_region_override or autoscale_config.region,
+            RackConnectV3APIClient,
+            "RackConnect v3")
+    else:
+        print("Not enough test configuration for RCv3 provided. "
+              "Will not run RCv3 tests.")
+
+    if not all([x is not None for x in (_autoscale_client, _server_client,
+                                        _lbaas_client)]):
+        raise Exception(
+            "Unable to instantiate all necessary clients.")
+
+    return (_autoscale_client, _server_client, _lbaas_client, _rcv3_client)
+
+
+# Global testing state - unfortunate, but only needs to be done once and also
+# makes it easier to skip tests based on configs and clients.
+
+autoscale_config = AutoscaleConfig()
+endpoint_config = UserAuthConfig()
+
+# Get optional RCV3 values.  These might not be present in the config
+# file.
+try:
+    _rcv3_load_balancer_pool = json.loads(
+        autoscale_config.rcv3_load_balancer_pool)
+except Exception:
+    _rcv3_load_balancer_pool = None
+
+_rcv3_cloud_network = autoscale_config.rcv3_cloud_network
+
+autoscale_client, server_client, lbaas_client, rcv3_client = _set_up_clients()
 
 
 class AutoscaleFixture(BaseTestFixture):
-
     """
     :summary: Fixture for an Autoscale test.
     """
@@ -29,45 +146,11 @@ class AutoscaleFixture(BaseTestFixture):
         """
         super(AutoscaleFixture, cls).setUpClass()
         cls.resources = ResourcePool()
-        cls.autoscale_config = AutoscaleConfig()
-        cls.endpoint_config = UserAuthConfig()
-        user_config = UserConfig()
-        access_data = AuthProvider.get_access_data(cls.endpoint_config,
-                                                   user_config)
-        server_service = access_data.get_service(
-            cls.autoscale_config.server_endpoint_name)
-        load_balancer_service = access_data.get_service(
-            cls.autoscale_config.load_balancer_endpoint_name)
-        server_url = server_service.get_endpoint(
-            cls.autoscale_config.server_region_override or
-            cls.autoscale_config.region).public_url
-        lbaas_url = load_balancer_service.get_endpoint(
-            cls.autoscale_config.lbaas_region_override or
-            cls.autoscale_config.region).public_url
+        cls.autoscale_config = autoscale_config
+        cls.endpoint_config = endpoint_config
 
         cls.tenant_id = cls.autoscale_config.tenant_id
 
-        env = os.environ['OSTNG_CONFIG_FILE']
-        if ('preprod' in env.lower()) or ('dev' in env.lower()):
-            cls.url = str(cls.autoscale_config.server_endpoint) + \
-                '/' + str(cls.tenant_id)
-        else:
-            autoscale_service = access_data.get_service(
-                cls.autoscale_config.autoscale_endpoint_name)
-            cls.url = autoscale_service.get_endpoint(
-                cls.autoscale_config.region).public_url
-
-        cls.autoscale_client = AutoscalingAPIClient(
-            cls.url, access_data.token.id_,
-            'json', 'json')
-        cls.server_client = ServersClient(
-            server_url, access_data.token.id_,
-            'json', 'json')
-        cls.lbaas_client = LbaasAPIClient(
-            lbaas_url, access_data.token.id_,
-            'json', 'json')
-        cls.autoscale_behaviors = AutoscaleBehaviors(cls.autoscale_config,
-                                                     cls.autoscale_client)
         cls.gc_name = cls.autoscale_config.gc_name
         cls.gc_cooldown = int(cls.autoscale_config.gc_cooldown)
         cls.gc_min_entities = int(cls.autoscale_config.gc_min_entities)
@@ -83,14 +166,6 @@ class AutoscaleFixture(BaseTestFixture):
         cls.sp_change_percent = int(cls.autoscale_config.sp_change_percent)
         cls.sp_desired_capacity = int(cls.autoscale_config.sp_desired_capacity)
         cls.sp_policy_type = cls.autoscale_config.sp_policy_type
-        cls.check_type = cls.autoscale_config.check_type
-        cls.check_url = cls.autoscale_config.check_url
-        cls.check_method = cls.autoscale_config.check_method
-        cls.check_timeout = cls.autoscale_config.check_timeout
-        cls.check_period = cls.autoscale_config.check_period
-        cls.monitoring_zones = ['mzord', 'mzdfw', 'mziad']
-        cls.target_alias = cls.autoscale_config.target_alias
-        cls.alarm_criteria = cls.autoscale_config.alarm_criteria
         cls.upd_sp_change = int(cls.autoscale_config.upd_sp_change)
         cls.lc_load_balancers = cls.autoscale_config.lc_load_balancers
         cls.sp_list = cls.autoscale_config.sp_list
@@ -112,9 +187,26 @@ class AutoscaleFixture(BaseTestFixture):
         cls.personality_maxlength = OtterConstants.PERSONALITY_MAXLENGTH
         cls.max_personalities = OtterConstants.PERSONALITIES_PER_SERVER
         cls.personality_max_file_size = OtterConstants.PERSONAITY_FILE_SIZE
-        cls.non_autoscale_username = cls.autoscale_config.non_autoscale_username
-        cls.non_autoscale_password = cls.autoscale_config.non_autoscale_password
+        cls.non_autoscale_username = (
+            cls.autoscale_config.non_autoscale_username)
+        cls.non_autoscale_password = (
+            cls.autoscale_config.non_autoscale_password)
         cls.non_autoscale_tenant = cls.autoscale_config.non_autoscale_tenant
+
+        cls.autoscale_client = autoscale_client
+        cls.server_client = server_client
+        cls.lbaas_client = lbaas_client
+        cls.rcv3_client = rcv3_client
+
+        cls.rcv3_load_balancer_pool = _rcv3_load_balancer_pool
+        cls.rcv3_cloud_network = _rcv3_cloud_network
+
+        cls.url = autoscale_client.url
+
+        cls.autoscale_behaviors = AutoscaleBehaviors(
+            autoscale_config, autoscale_client,
+            rcv3_client=rcv3_client
+        )
 
     def validate_headers(self, headers):
         """
@@ -159,25 +251,29 @@ class AutoscaleFixture(BaseTestFixture):
         asserts if the desired capacity is being met by the scaling group
         through the list group status call
         """
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            group_id)
+        group_state_response = (
+            self.autoscale_client.list_status_entities_sgroups(group_id)
+        )
         self.assertEquals(group_state_response.status_code, 200)
         group_state = group_state_response.entity
         self.assertEquals(
             group_state.pendingCapacity + group_state.activeCapacity,
             desired_capacity,
-            msg='Active + Pending servers ({0}) != ({1}) minentities on the group {2}'
+            msg=('Active + Pending servers ({0}) != ({1}) '
+                 'minentities on the group {2}')
             .format((group_state.pendingCapacity + group_state.activeCapacity),
-                desired_capacity, group_id))
+                    desired_capacity, group_id))
         self.assertEquals(group_state.desiredCapacity, desired_capacity,
-                          msg='Desired capacity ({0}) != ({1}) minentities on the group {2}'
-                          .format(group_state.desiredCapacity, desired_capacity, group_id))
+                          msg='Desired capacity ({0}) != ({1}) '
+                          'minentities on the group {2}'
+                          .format(group_state.desiredCapacity,
+                                  desired_capacity, group_id))
 
     def assert_get_policy(self, created_policy, get_policy, args=False):
         """
-        Given the newly created policy dict and the response object from the get
-        policy call, asserts all the attributes are equal. args can be at_style,
-        cron_style or maas
+        Given the newly created policy dict and the response object from the
+        get policy call, asserts all the attributes are equal. args can be
+        at_style or  cron_style
         """
         self.assertEquals(
             get_policy.id, created_policy['id'],
@@ -243,14 +339,20 @@ class AutoscaleFixture(BaseTestFixture):
             schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
         time.sleep(self.scheduler_interval + delay)
 
+    def get_non_deleting_servers(self, name=None):
+        """
+        Get servers that are not in the process of getting deleted
+
+        :param name: if given, return servers with this name
+        """
+        return filter(lambda s: s.task_state != 'deleting' and s.status != 'DELETED',
+                      self.server_client.list_servers_with_detail(name=name).entity)
+
     def get_servers_containing_given_name_on_tenant(self, group_id=None, server_name=None):
         """
-        The group_id or the server_name should be provided.
-        Given the group id, the server name is got from the group's launch
-        config and returns server ID list of servers containing that server name
-        on the tenant, from nova.
-        list_servers(name=params) returns list of servers that contain the
-        specified name within the server name.
+        Get a list of server IDs not marked pending deletion from Nova based on the
+        given server_name. If the group_id is given, use the server_name extracted
+        from the launch config instead
         """
         if group_id:
             launch_config = self.autoscale_client.view_launch_config(
@@ -258,75 +360,54 @@ class AutoscaleFixture(BaseTestFixture):
             params = launch_config.server.name
         elif server_name:
             params = server_name
-        list_server_resp = self.server_client.list_servers(name=params)
-        filtered_servers = list_server_resp.entity
-        return [server.id for server in filtered_servers]
+        return [server.id for server in self.get_non_deleting_servers(params)]
 
-    def verify_server_count_using_server_metadata(self, group_id, expected_count):
+    def get_group_servers_based_on_metadata(self, group_id):
+        """
+        Returns a list of servers that belong to a group, from looking at the
+        server metadata
+        """
+        def is_in_group(server):
+            metadata = self.autoscale_behaviors.to_data(server.metadata)
+            return metadata.get('rax:auto_scaling_group_id') == group_id
+
+        return [s for s in self.get_non_deleting_servers() if is_in_group(s)]
+
+    def verify_server_count_using_server_metadata(self, group_id,
+                                                  expected_count):
         """
         Asserts the expected count is the number of servers with the groupid
         in the metadata. Fails if the count is not met in 60 seconds.
         """
         end_time = time.time() + 60
         while time.time() < end_time:
-            list_servers_on_tenant = self.server_client.list_servers_with_detail().entity
-            metadata_list = [self.autoscale_behaviors.to_data(each_server.metadata) for each_server
-                             in list_servers_on_tenant]
-            group_ids_list_from_metadata = [each.get('rax:auto_scaling_group_id') for each
-                                            in metadata_list]
-            actual_count = group_ids_list_from_metadata.count(group_id)
+            actual_count = len(
+                self.get_group_servers_based_on_metadata(group_id)
+            )
             if actual_count is expected_count:
                 break
             time.sleep(5)
         else:
-            self.fail('Waited 60 seconds, expecting {0} servers with group id : {1} in the '
-                      'metadata but has {2} servers'.format(expected_count, group_id,
-                                                            actual_count))
+            self.fail('Waited 60 seconds, expecting {0} servers with group id '
+                      ': {1} in the '
+                      'metadata but has {2} servers'.format(
+                          expected_count, group_id, actual_count))
 
-    def wait_for_expected_number_of_active_servers(self, group_id, expected_servers,
-                                                   interval_time=None, timeout=None):
+    def wait_for_expected_number_of_active_servers(self, group_id,
+                                                   expected_servers,
+                                                   interval_time=None,
+                                                   timeout=None,
+                                                   api="Autoscale"):
+        """This thunks to its replacement in Behaviors.
+        Please refer to Autoscale's behaviors.py for more details.
         """
-        :summary: verify the desired capacity in group state is equal to expected servers
-         and waits for the specified number of servers to be active on a group
-        :param group_id: Group id
-        :param expected_servers: Total active servers expected on the group
-        :param interval_time: Time to wait during polling group state
-        :param timeout: Time to wait before exiting this function
-        :return: returns the list of active servers in the group
-        """
-        interval_time = interval_time or int(
-            self.autoscale_config.interval_time)
-        timeout = timeout or int(self.autoscale_config.timeout)
-        end_time = time.time() + timeout
+        return (self.autoscale_behaviors
+                .wait_for_expected_number_of_active_servers(
+                    group_id, expected_servers, interval_time, timeout,
+                    api=api, asserter=self))
 
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            group_id)
-        group_state = group_state_response.entity
-        self.assertEquals(group_state.desiredCapacity, expected_servers,
-                          msg='Group {0} should have {1} servers, but is trying to '
-                          'build {2} servers'.format(group_id, expected_servers,
-                                                     group_state.desiredCapacity))
-        while time.time() < end_time:
-            resp = self.autoscale_client.list_status_entities_sgroups(group_id)
-            group_state = resp.entity
-            active_list = group_state.active
-            self.assertNotEquals(
-                (group_state.activeCapacity + group_state.pendingCapacity), 0,
-                msg='Group Id {0} failed to attempt server creation. Group has no'
-                ' servers'.format(group_id))
-            self.assertEquals(group_state.desiredCapacity, expected_servers,
-                              msg='Group {0} should have {1} servers, but has reduced the build {2}'
-                              'servers'.format(group_id, expected_servers, group_state.desiredCapacity))
-            if len(active_list) == expected_servers:
-                return [server.id for server in active_list]
-            time.sleep(interval_time)
-        else:
-            self.fail(
-                "wait_for_active_list_in_group_state ran for {0} seconds for group {1} and did not "
-                "observe the active server list achieving the expected servers count: {2}.".format(
-                    timeout, group_id, expected_servers))
-
-    def wait_for_expected_group_state(self, group_id, expected_servers, wait_time=180):
+    def wait_for_expected_group_state(self, group_id, expected_servers,
+                                      wait_time=180):
         """
         :summary: verify the group state reached the expected servers count.
         :param group_id: Group id
@@ -413,8 +494,8 @@ class AutoscaleFixture(BaseTestFixture):
                 else:
                     break
             else:
-                print 'Tried deleting node for 2 mins but lb {0} remained in PENDING_UPDATE'
-                ' state'.format(load_balancer)
+                print('Tried deleting node for 2 mins but lb {0} remained '
+                      'in PENDING_UPDATE state'.format(load_balancer))
 
     def get_total_num_groups(self):
         """
@@ -490,6 +571,7 @@ class ScalingGroupFixture(AutoscaleFixture):
                    lc_image_ref=None, lc_flavor_ref=None,
                    lc_personality=None, lc_metadata=None,
                    lc_disk_config=None, lc_networks=None,
+                   lc_block_device_mapping=None,
                    lc_load_balancers=None):
         """
         Creates a scaling group with config values
@@ -521,10 +603,11 @@ class ScalingGroupFixture(AutoscaleFixture):
                 lc_metadata=lc_metadata,
                 lc_disk_config=lc_disk_config,
                 lc_networks=lc_networks,
+                lc_block_device_mapping=lc_block_device_mapping,
                 lc_load_balancers=lc_load_balancers)
         cls.group = cls.create_group_response.entity
         cls.resources.add(cls.group.id,
-                          cls.autoscale_client.delete_scaling_group)
+                          partial(cls.autoscale_client.delete_scaling_group, force='true'))
 
     @classmethod
     def tearDownClass(cls):
@@ -544,12 +627,12 @@ class ScalingGroupPolicyFixture(ScalingGroupFixture):
     @classmethod
     def setUpClass(cls, name=None, cooldown=None, change=None,
                    change_percent=None, desired_capacity=None,
-                   policy_type=None):
+                   policy_type=None, **kwargs):
         """
         Creates a scaliing policy
         """
 
-        super(ScalingGroupPolicyFixture, cls).setUpClass()
+        super(ScalingGroupPolicyFixture, cls).setUpClass(**kwargs)
         if name is None:
             name = cls.sp_name
         if cooldown is None:

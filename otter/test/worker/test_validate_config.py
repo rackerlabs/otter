@@ -78,6 +78,42 @@ class ValidateLaunchServerConfigTests(SynchronousTestCase):
         self.assertEqual(f.value.message, ('Following problems with launch configuration:\n' +
                                            'Inactive imageRef "meh" in launchConfiguration'))
 
+    def test_empty_image(self):
+        """
+        An empty string in the image param means that Nova will use
+        boot-from-volume.  The empty string still validates.
+        """
+        self.launch_config['server']['imageRef'] = ""
+
+        d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
+        self.successResultOf(d)
+
+        self.assertFalse(self.validate_image.called)
+
+    def test_null_image(self):
+        """
+        None in the image param means that Nova will use boot-from-volume.
+        The ``None`` ``imageRef`` still validates.
+        """
+        self.launch_config['server']['imageRef'] = None
+
+        d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
+        self.successResultOf(d)
+
+        self.assertFalse(self.validate_image.called)
+
+    def test_no_image(self):
+        """
+        Not providing an ``imageRef`` param means that Nova will use
+        boot-from-volume.  The server args still validate.
+        """
+        self.launch_config['server'].pop('imageRef')
+
+        d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
+        self.successResultOf(d)
+
+        self.assertFalse(self.validate_image.called)
+
     def test_invalid_flavor(self):
         """
         Invalid flavor causes InvalidLaunchConfiguration
@@ -202,7 +238,7 @@ class ValidateImageTests(SynchronousTestCase):
         """
         `InactiveImage` is raised if given image is inactive
         """
-        self.treq.json_content.return_value = defer.succeed({'image': {'status': 'INACTIVE'}})
+        self.treq.json_content.side_effect = lambda r: defer.succeed({'image': {'status': 'INACTIVE'}})
         d = validate_image(self.log, 'token', 'endpoint', 'image_ref')
         self.failureResultOf(d, InactiveImage)
 

@@ -6,6 +6,11 @@ from twisted.internet import defer
 
 from otter.util.retry import retry
 
+from pyrsistent import freeze
+
+from functools import wraps
+from collections import defaultdict
+
 
 def unwrap_first_error(possible_first_error):
     """
@@ -181,6 +186,12 @@ class DeferredPool(object):
         """
         return len(self._pool)
 
+    def __contains__(self, deferred):
+        """
+        Return True if given deferred is in the pool. False if not
+        """
+        return deferred in self._pool
+
 
 def log_with_time(result, reactor, log, start, msg, time_kwarg=None):
     """
@@ -202,25 +213,34 @@ def log_with_time(result, reactor, log, start, msg, time_kwarg=None):
     return result
 
 
-def with_lock(reactor, lock, log, func, *args, **kwargs):
+def with_lock(reactor, lock, func, log=None, acquire_timeout=None, release_timeout=None):
     """
     Context manager for any lock object that contains acquire() and release() methods
     """
-
+    if log:
+        log.msg('Starting lock acquisition')
     d = defer.maybeDeferred(lock.acquire)
-    d.addCallback(log_with_time, reactor, log, reactor.seconds(),
-                  'Lock acquisition', 'acquire_time')
-    d.addErrback(log_with_time, reactor, log, reactor.seconds(),
-                 'Lock acquisition failed')
+    if acquire_timeout is not None:
+        timeout_deferred(d, acquire_timeout, reactor, 'Lock acquisition')
+    if log:
+        d.addCallback(log_with_time, reactor, log, reactor.seconds(),
+                      'Lock acquisition', 'acquire_time')
+        d.addErrback(log_with_time, reactor, log, reactor.seconds(),
+                     'Lock acquisition failed')
 
     def release_lock(result):
+        if log:
+            log.msg('Starting lock release')
         d = defer.maybeDeferred(lock.release)
-        d.addCallback(
-            log_with_time, reactor, log, reactor.seconds(), 'Lock release', 'release_time')
+        if release_timeout is not None:
+            timeout_deferred(d, release_timeout, reactor, 'Lock release')
+        if log:
+            d.addCallback(
+                log_with_time, reactor, log, reactor.seconds(), 'Lock release', 'release_time')
         return d.addCallback(lambda _: result)
 
     def lock_acquired(_):
-        d = defer.maybeDeferred(func, *args, **kwargs).addBoth(release_lock)
+        d = defer.maybeDeferred(func).addBoth(release_lock)
         return d
 
     d.addCallback(lock_acquired)
@@ -240,3 +260,43 @@ def delay(result, reactor, seconds):
     d = defer.Deferred()
     reactor.callLater(seconds, d.callback, result)
     return d
+
+
+def wait(ignore_kwargs=()):
+    """
+    Return decorator that wraps a function by waiting for its result when its called
+    multiple times and its result from first call with same arguments is not yet ready.
+    Basically disallows re-entrancy for Deferred returning functions
+
+    :param list ignore_kwargs: Keyword arguments to ignore when matching results with args
+    :return: A decorator that can wrap function to wait
+    """
+    waiters = defaultdict(list)
+    waiting = {}
+
+    def release_waiters(r, method, k):
+        for waiter in waiters[k]:
+            method(waiter, r)
+        del waiters[k], waiting[k]
+        return r
+
+    def decorator(func):
+
+        @wraps(func)
+        def wrapped_f(*args, **kwargs):
+            kwcopy = kwargs.copy()
+            [kwcopy.pop(kwa, None) for kwa in ignore_kwargs]
+            k = freeze((args, kwcopy))
+            if k in waiting:
+                d = defer.Deferred()
+                waiters[k].append(d)
+            else:
+                d = defer.maybeDeferred(func, *args, **kwargs)
+                waiting[k] = d
+                d.addCallback(release_waiters, defer.Deferred.callback, k)
+                d.addErrback(release_waiters, defer.Deferred.errback, k)
+            return d
+
+        return wrapped_f
+
+    return decorator

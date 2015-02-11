@@ -9,7 +9,7 @@ import itertools
 
 from otter.util import logging_treq as treq
 
-from otter.worker.launch_server_v1 import public_endpoint_url
+from otter.auth import public_endpoint_url
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
                              raise_error_on_code, wrap_request_error)
@@ -22,7 +22,6 @@ class InvalidLaunchConfiguration(Exception):
     """
     Represents an invalid launch configuration
     """
-    pass
 
 
 class UnknownImage(InvalidLaunchConfiguration):

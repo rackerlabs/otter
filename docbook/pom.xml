@@ -28,6 +28,15 @@
         <artifactId>rackspace-docs-maven-plugin</artifactId>
         <executions>
           <execution>
+	    <phase>initialize</phase>
+	    <goals>
+	      <goal>olink</goal>
+	    </goals>
+          </execution>
+        </executions>
+      </plugin>
+        <executions>
+          <execution>
             <id>autoscale</id>
             <goals>
               <goal>generate-webhelp</goal>
@@ -59,7 +68,6 @@
 	  <showXslMessages>true</showXslMessages>
 	  <highlightSource>false</highlightSource>
         </configuration>
-      </plugin>
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
 	<artifactId>maven-assembly-plugin</artifactId>

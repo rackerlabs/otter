@@ -545,13 +545,16 @@ class HealthCheckTestCase(RestAPITestMixin, TestCase):
         """
         And returns the stringified json blob
         """
-        def health_check():
-            return succeed({'blargh': 'boo'})
+        jsonobj = {'blargh': 'boo', 'inside': {'key': 'boom'}}
 
-        self.root = Otter(self.mock_store, health_check).app.resource()
+        def health_check():
+            return succeed(jsonobj)
+
+        otter = Otter(self.mock_store, 'region', health_check)
+        self.root = otter.app.resource()
 
         resp = self.assert_status_code(200)
-        self.assertEqual(resp, json.dumps({'blargh': 'boo'}))
+        self.assertEqual(resp, json.dumps(jsonobj, indent=4, sort_keys=True))
 
 
 class RootRouteTestCase(RestAPITestMixin, TestCase):
@@ -645,7 +648,7 @@ class SchedulerResetTests(RestAPITestMixin, TestCase):
         Sample scheduler
         """
         super(SchedulerResetTests, self).setUp()
-        otter = Otter(self.mock_store)
+        otter = Otter(self.mock_store, 'region')
         self.sch = otter.scheduler = mock.Mock(spec=['reset'])
         self.root = otter.app.resource()
 
@@ -681,7 +684,7 @@ class SchedulerStopTests(RestAPITestMixin, TestCase):
         Sample scheduler
         """
         super(SchedulerStopTests, self).setUp()
-        otter = Otter(self.mock_store)
+        otter = Otter(self.mock_store, 'region')
         self.sch = otter.scheduler = mock.Mock(spec=['stopService'])
         self.root = otter.app.resource()
 

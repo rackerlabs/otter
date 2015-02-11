@@ -39,7 +39,7 @@ def JSONObserverWrapper(observer, **kwargs):
 
     :param ILogObserver observer: The observer to delegate message delivery to.
 
-    :rtype: ILogObserver
+    :rtype: :class:`ILogObserver`
     """
     def JSONObserver(eventDict):
         observer({'message': (json.dumps(eventDict, cls=LoggingEncoder, **kwargs),)})
@@ -50,11 +50,12 @@ def JSONObserverWrapper(observer, **kwargs):
 def StreamObserverWrapper(stream, delimiter='\n', buffered=False):
     """
     Create a log observer that will write bytes to the specified stream.
+
     :param str or None delimter: A delimiter for each message.
     :param bool buffered: True if output should be buffered, if False we will
         call `flush` on the `stream` after writing every message.
 
-    :rtype: ILogObserver
+    :rtype: :class:`ILogObserver`
     """
     def StreamObserver(eventDict):
         stream.write(''.join(eventDict['message']))
@@ -76,7 +77,7 @@ def SystemFilterWrapper(observer):
     :param ILogObserver observer: The log observer to delegate to after
         fixing system.
 
-    :rtype: ILogObserver
+    :rtype: :class:`ILogObserver`
     """
     def SystemFilterObserver(eventDict):
         system = eventDict['system']
@@ -96,10 +97,11 @@ def SystemFilterWrapper(observer):
 def PEP3101FormattingWrapper(observer):
     """
     Format messages using PEP3101 format strings.
+
     :param ILogObserver observer: The log observer to delegate to after
         formatting message.
 
-    :rtype: ILogObserver
+    :rtype: :class:`ILogObserver`
     """
     def PEP3101FormattingObserver(eventDict):
         if eventDict.get('why'):
@@ -223,7 +225,7 @@ def ObserverWrapper(observer, hostname, seconds=None):
         formatted data.
     :param seconds: A 0-argument callable that returns a datetime.
 
-    :rtype: ILogObserver
+    :rtype: :class:`ILogObserver`
     """
 
     if seconds is None:  # pragma: no cover

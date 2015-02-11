@@ -22,12 +22,13 @@ class IUndoStack(Interface):
 
     def rewind():
         """
-        Rewind the undo stack.  Rewinding will stop if an operation on the
-        stack raises an exception or returns a Failure.  The caller of
-        :py:function:`IUndoStack.push` is expected to decide if an undo
-        operation should raise an exception and stop rewinding.
+        Rewind the undo stack. Rewinding will stop if an operation on the stack
+        raises an exception or returns a Failure. The caller of
+        :func:`IUndoStack.push` is expected to decide if an undo operation
+        should raise an exception and stop rewinding.
 
         :rtype: ``Deferred``
+
         """
 
 
@@ -42,13 +43,13 @@ class InMemoryUndoStack(object):
 
     def push(self, f, *args, **kwargs):
         """
-        See :py:function:`IUndoStack.push`
+        See :func:`IUndoStack.push`
         """
         self._ops.append((f, args, kwargs))
 
     def rewind(self):
         """
-        See :py:function:`IUndoStack.rewind`
+        See :func:`IUndoStack.rewind`
         """
         ops, self._ops = reversed(self._ops), []
 

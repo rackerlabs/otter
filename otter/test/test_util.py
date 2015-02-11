@@ -3,6 +3,7 @@ Tests for ``otter.util``
 """
 from datetime import datetime
 import mock
+import json
 
 from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed, fail, Deferred
@@ -11,13 +12,16 @@ from twisted.python.failure import Failure
 from twisted.web.http_headers import Headers
 
 from otter.util.http import (
-    append_segments, APIError, check_success, RequestError, headers,
-    raise_error_on_code, wrap_request_error)
+    append_segments, APIError, check_success, headers,
+    raise_error_on_code, wrap_request_error, RequestError, UpstreamError,
+    retry_on_unauth)
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
-from otter.util.deferredutils import with_lock, delay
+from otter.util.deferredutils import with_lock, delay, TimedOutError
 
-from otter.test.utils import patch, LockMixin, mock_log, DummyException
+from otter.test.utils import (
+    patch, LockMixin, mock_log, DummyException, IsBoundWith, matches)
+from otter.log.bound import BoundLog
 
 
 class HTTPUtilityTests(SynchronousTestCase):
@@ -217,6 +221,70 @@ class HTTPUtilityTests(SynchronousTestCase):
                           failure, 'url')
 
 
+class UpstreamErrorTests(SynchronousTestCase):
+    """
+    Tests for `UpstreamError`
+    """
+
+    def test_apierror_nova(self):
+        """
+        Wraps APIError from nova and parses error body accordingly
+        """
+        body = json.dumps({"computeFault": {"message": "b"}})
+        apie = APIError(404, body, {})
+        err = UpstreamError(Failure(apie), 'nova', 'add', 'xkcd.com')
+        self.assertEqual(str(err), 'nova error: 404 - b')
+        self.assertEqual(err.details, {
+            'system': 'nova', 'operation': 'add', 'url': 'xkcd.com',
+            'message': 'b', 'code': 404, 'body': body, 'headers': {}})
+
+    def test_apierror_clb(self):
+        """
+        Wraps APIError from clb and parses error body accordingly
+        """
+        body = json.dumps({"message": "b"})
+        apie = APIError(403, body, {'h1': 2})
+        err = UpstreamError(Failure(apie), 'clb', 'remove', 'xkcd.com')
+        self.assertEqual(str(err), 'clb error: 403 - b')
+        self.assertEqual(err.details, {
+            'system': 'clb', 'operation': 'remove', 'url': 'xkcd.com',
+            'message': 'b', 'code': 403, 'body': body, 'headers': {'h1': 2}})
+
+    def test_apierror_identity(self):
+        """
+        Wraps APIError from identity and parses error body accordingly
+        """
+        body = json.dumps({"identityFault": {"message": "ba"}})
+        apie = APIError(410, body, {})
+        err = UpstreamError(Failure(apie), 'identity', 'stuff', 'xkcd.com')
+        self.assertEqual(str(err), 'identity error: 410 - ba')
+        self.assertEqual(err.details, {
+            'system': 'identity', 'operation': 'stuff', 'url': 'xkcd.com',
+            'message': 'ba', 'code': 410, 'body': body, 'headers': {}})
+
+    def test_apierror_unparsed(self):
+        """
+        Wraps APIError from identity and uses default string if unable to parses
+        error body
+        """
+        body = json.dumps({"identityFault": {"m": "ba"}})
+        apie = APIError(410, body, {})
+        err = UpstreamError(Failure(apie), 'identity', 'stuff', 'xkcd.com')
+        self.assertEqual(str(err), 'identity error: 410 - Could not parse API error body')
+        self.assertEqual(err.details, {
+            'system': 'identity', 'operation': 'stuff', 'url': 'xkcd.com',
+            'message': 'Could not parse API error body', 'code': 410, 'body': body, 'headers': {}})
+
+    def test_non_apierror(self):
+        """
+        Wraps any other error and has message and details accordingly
+        """
+        err = UpstreamError(Failure(ValueError('heh')), 'identity', 'stuff', 'xkcd.com')
+        self.assertEqual(str(err), 'identity error: heh')
+        self.assertEqual(err.details, {
+            'system': 'identity', 'operation': 'stuff', 'url': 'xkcd.com'})
+
+
 class CapabilityTests(SynchronousTestCase):
     """
     Test capability generation.
@@ -318,25 +386,37 @@ class ConfigTest(SynchronousTestCase):
             'foo': 'bar',
             'baz': {'bax': 'quux'}
         })
+        self.addCleanup(config.set_config_data, {})
 
     def test_top_level_value(self):
         """
-        config_value returns the value stored at the top level key.
+        :func:`~config.config_value` returns the value stored at the top level key.
         """
         self.assertEqual(config.config_value('foo'), 'bar')
 
     def test_nested_value(self):
         """
-        config_value returns the value stored at a . separated path.
+        :func:`~config.config_value` returns the value stored at a . separated
+        path.
         """
         self.assertEqual(config.config_value('baz.bax'), 'quux')
 
     def test_non_existent_value(self):
         """
-        config_value will return None if the path does not exist in the
-        nested dictionaries.
+        :func:`~config.config_value` will return :data`None` if the path does
+        not exist in the nested dictionaries.
         """
         self.assertIdentical(config.config_value('baz.blah'), None)
+
+    def test_nonexistent_value_with_shared_key_part_at_toplevel(self):
+        """
+        :func:`~config.config_value` will return :data`None` if the path does
+        not exist in the nested dictionaries, even if some part of the path
+        does. I.e. config_value is not allowed to ignore arbitrary path
+        prefixes.
+        """
+        value = config.config_value('prefix.shouldnt.be.ignored.foo')
+        self.assertIdentical(value, None)
 
 
 class WithLockTests(SynchronousTestCase):
@@ -349,7 +429,13 @@ class WithLockTests(SynchronousTestCase):
         Mock reactor, log and method
         """
         self.lock = LockMixin().mock_lock()
-        self.method = mock.Mock(return_value=succeed('result'))
+        self.acquire_d, self.release_d = Deferred(), Deferred()
+        self.lock.acquire.side_effect = lambda: self.acquire_d
+        self.lock.release.side_effect = lambda: self.release_d
+
+        self.method_d = Deferred()
+        self.method = mock.Mock(return_value=self.method_d)
+
         self.reactor = Clock()
         self.log = mock_log()
 
@@ -357,24 +443,39 @@ class WithLockTests(SynchronousTestCase):
         """
         Acquires, calls method, releases and returns method's result. Logs time taken
         """
-        acquire_d, release_d = Deferred(), Deferred()
-        self.lock.acquire.side_effect = lambda: acquire_d
-        self.lock.release.side_effect = lambda: release_d
+        d = with_lock(self.reactor, self.lock, self.method, self.log)
+        self.assertNoResult(d)
+        self.log.msg.assert_called_once_with('Starting lock acquisition')
 
-        d = with_lock(self.reactor, self.lock, self.log, self.method, 2, a=3)
+        self.reactor.advance(10)
+        self.acquire_d.callback(None)
+        self.log.msg.assert_called_with('Lock acquisition in 10.0 seconds',
+                                        acquire_time=10.0)
+        self.method.assert_called_once_with()
+        self.method_d.callback('result')
+
+        self.log.msg.assert_called_with('Starting lock release')
+        self.reactor.advance(3)
+        self.release_d.callback(None)
+        self.log.msg.assert_called_with('Lock release in 3.0 seconds',
+                                        release_time=3.0)
+
+        self.assertEqual(self.successResultOf(d), 'result')
+
+    def test_acquire_release_no_log(self):
+        """
+        Acquires, calls method and releases even if log is None
+        """
+        d = with_lock(self.reactor, self.lock, self.method)
         self.assertNoResult(d)
 
         self.reactor.advance(10)
-        acquire_d.callback(None)
-        self.log.msg.assert_called_once_with('Lock acquisition in 10.0 seconds',
-                                             acquire_time=10.0)
-        self.method.assert_called_once_with(2, a=3)
+        self.acquire_d.callback(None)
+        self.method.assert_called_once_with()
+        self.method_d.callback('result')
 
         self.reactor.advance(3)
-        release_d.callback(None)
-        self.log.msg.assert_called_with('Lock release in 3.0 seconds',
-                                        release_time=3.0)
-        self.assertEqual(self.log.msg.call_count, 2)
+        self.release_d.callback(None)
 
         self.assertEqual(self.successResultOf(d), 'result')
 
@@ -382,44 +483,74 @@ class WithLockTests(SynchronousTestCase):
         """
         If acquire fails, method and release is not called. Acquisition failed is logged
         """
-        acquire_d = Deferred()
-        self.lock.acquire.side_effect = lambda: acquire_d
-
-        d = with_lock(self.reactor, self.lock, self.log, self.method, 2, a=3)
+        d = with_lock(self.reactor, self.lock, self.method, self.log)
         self.assertNoResult(d)
+        self.log.msg.assert_called_once_with('Starting lock acquisition')
 
         self.reactor.advance(10)
-        acquire_d.errback(ValueError(None))
-        self.log.msg.assert_called_once_with('Lock acquisition failed in 10.0 seconds')
+        self.acquire_d.errback(ValueError(None))
+        self.log.msg.assert_called_with('Lock acquisition failed in 10.0 seconds')
         self.assertFalse(self.method.called)
         self.failureResultOf(d, ValueError)
 
-    def test_methods_failure(self):
+    def test_method_failure(self):
         """
         If method fails, lock is released and failure is propogated
         Acquisition and release is logged with time taken
         """
-        acquire_d, release_d = Deferred(), Deferred()
-        self.lock.acquire.side_effect = lambda: acquire_d
-        self.lock.release.side_effect = lambda: release_d
         self.method.return_value = fail(ValueError('a'))
 
-        d = with_lock(self.reactor, self.lock, self.log, self.method, 2, a=3)
+        d = with_lock(self.reactor, self.lock, self.method, self.log)
         self.assertNoResult(d)
+        self.log.msg.assert_called_once_with('Starting lock acquisition')
 
         self.reactor.advance(10)
-        acquire_d.callback(None)
-        self.log.msg.assert_called_once_with('Lock acquisition in 10.0 seconds',
-                                             acquire_time=10.0)
-        self.method.assert_called_once_with(2, a=3)
+        self.acquire_d.callback(None)
+        self.assertEqual(
+            self.log.msg.mock_calls[-2:],
+            [mock.call('Lock acquisition in 10.0 seconds', acquire_time=10.0),
+             mock.call('Starting lock release')])
+        self.method.assert_called_once_with()
 
         self.reactor.advance(3)
-        release_d.callback(None)
+        self.release_d.callback(None)
         self.log.msg.assert_called_with('Lock release in 3.0 seconds',
                                         release_time=3.0)
-        self.assertEqual(self.log.msg.call_count, 2)
 
         self.failureResultOf(d, ValueError)
+
+    def test_acquire_timeout(self):
+        """
+        acquire is timed out if it does not succeed in a given time
+        """
+        d = with_lock(self.reactor, self.lock, self.method, self.log,
+                      acquire_timeout=9)
+        self.assertNoResult(d)
+        self.log.msg.assert_called_once_with('Starting lock acquisition')
+
+        self.reactor.advance(10)
+        f = self.failureResultOf(d, TimedOutError)
+        self.assertEqual(f.value.message, 'Lock acquisition timed out after 9 seconds.')
+        self.log.msg.assert_called_with('Lock acquisition failed in 10.0 seconds')
+
+        self.assertFalse(self.method.called)
+        self.assertFalse(self.lock.release.called)
+
+    def test_release_timeout(self):
+        """
+        release is timed out if it does not succeed in a given time
+        """
+        d = with_lock(self.reactor, self.lock, self.method, self.log,
+                      release_timeout=9)
+        self.acquire_d.callback(None)
+
+        self.method.assert_called_once_with()
+        self.method_d.callback('result')
+        self.lock.release.assert_called_once_with()
+
+        self.reactor.advance(10)
+        f = self.failureResultOf(d, TimedOutError)
+        self.assertEqual(f.value.message, 'Lock release timed out after 9 seconds.')
 
 
 class DelayTests(SynchronousTestCase):
@@ -441,3 +572,179 @@ class DelayTests(SynchronousTestCase):
         self.assertNoResult(d)
         self.clock.advance(5)
         self.assertEqual(self.successResultOf(d), 2)
+
+
+class IsBoundWithTests(SynchronousTestCase):
+    """
+    Tests for :class:`otter.test.utils.IsBoundWith` class
+    """
+
+    def setUp(self):
+        """
+        Sample object
+        """
+        self.bound = IsBoundWith(a=10, b=20)
+
+    def test_match_not_boundlog(self):
+        """
+        Does not match non `BoundLog`
+        """
+        m = self.bound.match('junk')
+        self.assertEqual(m.describe(), 'log is not a BoundLog')
+
+    def test_match_kwargs(self):
+        """
+        Returns None on matching kwargs
+        """
+        log = BoundLog(lambda: None, lambda: None).bind(a=10, b=20)
+        self.assertIsNone(self.bound.match(log))
+
+    def test_not_match_kwargs(self):
+        """
+        Returns mismatch on non-matching kwargs
+        """
+        log = BoundLog(lambda: None, lambda: None).bind(a=10, b=2)
+        self.assertEqual(
+            self.bound.match(log).describe(),
+            'Expected kwargs {} but got {} instead'.format(dict(a=10, b=20), dict(a=10, b=2)))
+
+    def test_nested_match(self):
+        """
+        works with Nested BoundLog
+        """
+        log = BoundLog(lambda: None, lambda: None).bind(a=10, b=20).bind(c=3)
+        self.assertIsNone(IsBoundWith(a=10, b=20, c=3).match(log))
+
+    def test_kwargs_order(self):
+        """
+        kwargs bound in order, i.e. next bound overriding previous bound should
+        retain the value
+        """
+        log = BoundLog(lambda: None, lambda: None).bind(a=10, b=20).bind(a=3)
+        self.assertIsNone(IsBoundWith(a=3, b=20).match(log))
+
+    def test_str(self):
+        """
+        str(matcher) returns something useful
+        """
+        self.assertEqual(str(self.bound), 'IsBoundWith {}'.format(dict(a=10, b=20)))
+
+
+class MatchesTests(SynchronousTestCase):
+    """
+    Tests for :class:`otter.test.utils.matches` class
+    """
+
+    def setUp(self):
+        """
+        Sample matches object
+        """
+        self.matcher = mock.MagicMock(spec=['match', '__str__'])
+        self.matches = matches(self.matcher)
+
+    def test_eq(self):
+        """
+        matches == another if matcher.match returns None
+        """
+        self.matcher.match.return_value = None
+        self.assertEqual(self.matches, 2)
+        self.matcher.match.assert_called_with(2)
+
+    def test_not_eq(self):
+        """
+        matches != another if matcher.match does not return None
+        """
+        self.matcher.match.return_value = 'not none'
+        self.assertNotEqual(self.matches, 2)
+        self.matcher.match.assert_called_with(2)
+
+    def test_repr(self):
+        """
+        repr(matches) returns matcher's representation
+        """
+        self.matcher.__str__.return_value = 'mystr'
+        self.assertEqual(repr(self.matches), 'matches(mystr)')
+
+    def test_repr_mismatch(self):
+        """
+        repr(matches) returns mismatch description also if match fails
+        """
+        self.matcher.__str__.return_value = 'ms'
+        self.matcher.match.return_value = mock.Mock(describe=lambda: 'not none')
+        self.matches == 'else'
+        self.assertEqual(repr(self.matches), 'matches(ms): <mismatch: not none>')
+
+
+class RetryOnUnauthTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.util.http.retry_on_unauth`
+    """
+
+    def setUp(self):
+        """
+        Sample auth function
+        """
+
+        def _auth():
+            raise KeyError('e')
+
+        self.auth = _auth
+
+    def test_success(self):
+        """
+        `func` value is returned if it succeeds
+        """
+        d = retry_on_unauth(lambda: succeed('a'), self.auth)
+        self.assertEqual(self.successResultOf(d), 'a')
+
+    def test_non_upstream(self):
+        """
+        Any error other than UpstreamError is returned
+        """
+        d = retry_on_unauth(lambda: fail(ValueError('a')), self.auth)
+        self.failureResultOf(d, ValueError)
+
+    def test_non_apierror(self):
+        """
+        Any error other than APIError in UpstreamError is propogated
+        """
+        d = retry_on_unauth(
+            lambda: fail(UpstreamError(Failure(ValueError('a')), 'identity', 'o')),
+            self.auth)
+        f = self.failureResultOf(d, UpstreamError)
+        f.value.reason.trap(ValueError)
+
+    def test_auth_error(self):
+        """
+        Calls auth() followed by func() again if initial func() returns 401
+        """
+        auth = mock.Mock(spec=[], return_value=succeed('a'))
+        func = mock.Mock(side_effect=[
+            fail(UpstreamError(Failure(APIError(401, '401')), 'identity', 'o')),
+            succeed('r')])
+        d = retry_on_unauth(func, auth)
+        self.assertEqual(self.successResultOf(d), 'r')
+        auth.assert_called_once_with()
+
+    def test_500_error(self):
+        """
+        Any error other than 401 is propogated
+        """
+        d = retry_on_unauth(
+            lambda: fail(UpstreamError(Failure(APIError(500, 'a')), 'identity', 'o')),
+            self.auth)
+        f = self.failureResultOf(d, UpstreamError)
+        f.value.reason.trap(APIError)
+        self.assertEqual(f.value.reason.value.code, 500)
+
+    def test_auth_error_propogates(self):
+        """
+        `auth()` errors are propogated
+        """
+        auth = mock.Mock(spec=[], return_value=fail(ValueError('a')))
+        func = mock.Mock(side_effect=[
+            fail(UpstreamError(Failure(APIError(401, '401')), 'identity', 'o')),
+            succeed('r')])
+        d = retry_on_unauth(func, auth)
+        self.failureResultOf(d, ValueError)
+        auth.assert_called_once_with()

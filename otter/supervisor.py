@@ -4,19 +4,23 @@ The Otter Supervisor manages a number of workers to execute a launch config.
 This code is specific to the launch_server_v1 worker.
 """
 
+from characteristic import attributes
+
 from twisted.application.service import Service
-from twisted.internet.defer import Deferred, succeed, gatherResults
+from twisted.internet import reactor
+from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
-from otter.models.interface import NoSuchScalingGroupError
+from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import audit
-from otter.util.deferredutils import DeferredPool, unwrap_first_error
-from otter.util.hashkey import generate_job_id
+from otter.models.interface import NoSuchScalingGroupError
+from otter.undo import InMemoryUndoStack
 from otter.util.config import config_value
+from otter.util.deferredutils import DeferredPool
+from otter.util.hashkey import generate_job_id
 from otter.util.timestamp import from_timestamp
 from otter.worker import launch_server_v1, validate_config
-from otter.undo import InMemoryUndoStack
 
 
 class ISupervisor(Interface):
@@ -31,9 +35,6 @@ class ISupervisor(Interface):
 
         :param log: Bound logger.
         :param str transaction_id: Transaction ID.
-        :param callable auth_function: A 1-argument callable that takes a tenant_id,
-            and returns a Deferred that fires with a 2-tuple of auth_token and
-            service_catalog.
         :param IScalingGroup scaling_group: Scaling Group.
         :param dict launch_config: The launch config for the scaling group.
 
@@ -58,71 +59,98 @@ class ISupervisor(Interface):
             before callback(ing).
         """
 
+    def scrub_otter_metadata(log, transaction_id, tenant_id, server_id):
+        """
+        Remove otter-specific metadata off of a single server.
+
+        :param log: Bound logger.
+        :param str transaction_id: The transaction id.
+        :param str tenant_id: The tenant_id.
+        :param str server_id: The server id.
+        """
+
+
+@attributes(['lb_region', 'region', 'dispatcher', 'tenant_id',
+             'auth_token', 'service_catalog'])
+class RequestBag(object):
+    """A bag of data useful for making HTTP requests."""
+
 
 @implementer(ISupervisor)
 class SupervisorService(object, Service):
     """
     A service which manages execution of launch configurations.
 
-    :ivar callable auth_function: authentication function to use to obtain an
-        auth token and service catalog.  Should accept a tenant ID.
-
+    :ivar IAuthenticator authenticator: Authenticator to use to obtain an
+        auth token and service catalog.
     :ivar callable coiterate: coiterate function that will be passed to
         InMemoryUndoStack.
-
+    :ivar str region: The region in which this supervisor is operating.
     :ivar DeferredPool deferred_pool: a pool in which to store deferreds that
         should be waited on
     """
     name = "supervisor"
 
-    def __init__(self, auth_function, coiterate):
-        self.auth_function = auth_function
+    def __init__(self, authenticator, region, coiterate, service_configs):
+        self.authenticator = authenticator
+        self.region = region
         self.coiterate = coiterate
         self.deferred_pool = DeferredPool()
+        self.service_configs = service_configs
+
+    def _get_request_bag(self, log, scaling_group):
+        """
+        Builds :obj:`RequestBag` containing a bunch of useful stuff for making
+        HTTP requests.
+        """
+        tenant_id = scaling_group.tenant_id
+        dispatcher = get_full_dispatcher(reactor, self.authenticator, log,
+                                         self.service_configs)
+        lb_region = config_value('regionOverrides.cloudLoadBalancers')
+
+        log.msg("Authenticating for tenant")
+        d = self.authenticator.authenticate_tenant(tenant_id, log=log)
+
+        def when_authenticated((auth_token, service_catalog)):
+            bag = RequestBag(
+                lb_region=lb_region or self.region,
+                region=self.region,
+                dispatcher=dispatcher,
+                tenant_id=tenant_id,
+                auth_token=auth_token,
+                service_catalog=service_catalog
+            )
+            return bag
+
+        return d.addCallback(when_authenticated)
 
     def execute_config(self, log, transaction_id, scaling_group, launch_config):
         """
         see :meth:`ISupervisor.execute_config`
         """
-        job_id = generate_job_id(scaling_group.uuid)
-        completion_d = Deferred()
-
-        log = log.bind(job_id=job_id,
-                       worker=launch_config['type'],
+        log = log.bind(worker=launch_config['type'],
                        tenant_id=scaling_group.tenant_id)
 
         assert launch_config['type'] == 'launch_server'
 
         undo = InMemoryUndoStack(self.coiterate)
 
-        def when_fails(result):
-            log.msg("Encountered an error, rewinding {worker!r} job undo stack.",
-                    exc=result.value)
-            ud = undo.rewind()
-            ud.addCallback(lambda _: result)
-            return ud
+        d = self._get_request_bag(log, scaling_group)
 
-        completion_d.addErrback(when_fails)
-
-        log.msg("Authenticating for tenant")
-
-        d = self.auth_function(scaling_group.tenant_id, log=log)
-
-        def when_authenticated((auth_token, service_catalog)):
+        def got_request_bag(request_bag):
             log.msg("Executing launch config.")
-            return launch_server_v1.launch_server(
-                log,
-                config_value('region'),
-                scaling_group,
-                service_catalog,
-                auth_token,
-                launch_config['args'], undo)
+            return launch_server_v1.launch_server(log,
+                                                  request_bag,
+                                                  scaling_group,
+                                                  launch_config['args'],
+                                                  undo)
 
-        d.addCallback(when_authenticated)
+        d.addCallback(got_request_bag)
 
         def when_launch_server_completed(result):
-            # XXX: Something should be done with this data. Currently only enough
-            # to pass to the controller to store in the active state is returned
+            # XXX: Something should be done with this data. Currently only
+            # enough to pass to the controller to store in the active state is
+            # returned
             server_details, lb_info = result
             log.msg("Done executing launch config.",
                     server_id=server_details['server']['id'])
@@ -135,31 +163,50 @@ class SupervisorService(object, Service):
 
         d.addCallback(when_launch_server_completed)
 
-        self.deferred_pool.add(d)
+        def when_fails(result):
+            log.msg("Encountered an error, rewinding {worker!r} job undo stack.",
+                    exc=result.value)
+            ud = undo.rewind()
+            ud.addCallback(lambda _: result)
+            return ud
 
-        d.chainDeferred(completion_d)
-
-        return succeed((job_id, completion_d))
+        d.addErrback(when_fails)
+        return d
 
     def execute_delete_server(self, log, transaction_id, scaling_group, server):
         """
-        see :meth:`ISupervisor.execute_delete_server`
+        See :meth:`ISupervisor.execute_delete_server`
         """
-        log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
+        log = log.bind(server_id=server['id'],
+                       tenant_id=scaling_group.tenant_id)
 
-        # authenticate for tenant
-        def when_authenticated((auth_token, service_catalog)):
-            return launch_server_v1.delete_server(
-                log,
-                config_value('region'),
-                service_catalog,
-                auth_token,
-                (server['id'], server['lb_info']))
+        d = self._get_request_bag(log, scaling_group)
 
-        d = self.auth_function(scaling_group.tenant_id, log=log)
+        def got_request_bag(request_bag):
+            log.msg("Executing delete server.")
+            instance_details = server['id'], server['lb_info']
+            return launch_server_v1.delete_server(log, request_bag,
+                                                  instance_details)
+
+        return d.addCallback(got_request_bag)
+
+    def scrub_otter_metadata(self, log, transaction_id, tenant_id, server_id):
+        """
+        See :meth:`ISupervisor.scrub_otter_metadata`.
+        """
+        log = log.bind(server_id=server_id, tenant_id=tenant_id)
+
+        d = self.authenticator.authenticate_tenant(tenant_id, log=log)
         log.msg("Authenticating for tenant")
+
+        def when_authenticated((auth_token, service_catalog)):
+            d = launch_server_v1.scrub_otter_metadata(log,
+                                                      auth_token,
+                                                      service_catalog,
+                                                      self.region,
+                                                      server_id)
+            return d
         d.addCallback(when_authenticated)
-        self.deferred_pool.add(d)
 
         return d
 
@@ -171,7 +218,7 @@ class SupervisorService(object, Service):
             log.msg('Validating launch server config')
             return validate_config.validate_launch_server_config(
                 log,
-                config_value('region'),
+                self.region,
                 service_catalog,
                 auth_token,
                 launch_config['args'])
@@ -181,7 +228,7 @@ class SupervisorService(object, Service):
 
         log = log.bind(system='otter.supervisor.validate_launch_config',
                        tenant_id=tenant_id)
-        d = self.auth_function(tenant_id, log=log)
+        d = self.authenticator.authenticate_tenant(tenant_id, log=log)
         log.msg('Authenticating for tenant')
         return d.addCallback(when_authenticated)
 
@@ -262,7 +309,7 @@ def delete_active_servers(log, transaction_id, scaling_group,
     supervisor = get_supervisor()
     for i, server_info in enumerate(servers_to_evict):
         job = _DeleteJob(log, transaction_id, scaling_group, server_info, supervisor)
-        job.start()
+        supervisor.deferred_pool.add(job.start())
 
 
 def exec_scale_down(log, transaction_id, state, scaling_group, delta):
@@ -277,12 +324,32 @@ def exec_scale_down(log, transaction_id, state, scaling_group, delta):
         state.remove_job(job_id)
 
     # delete active servers if pending jobs are not enough
-    remaining = delta - len(jobs_to_cancel)
-    if remaining > 0:
+    remaining_to_delete = delta - len(jobs_to_cancel)
+    if remaining_to_delete > 0:
         delete_active_servers(log, transaction_id,
-                              scaling_group, remaining, state)
+                              scaling_group, remaining_to_delete, state)
+
+    log.msg("Deleting {delta} servers.", delta=delta, **_log_capacity(state))
 
     return succeed(None)
+
+
+def _log_capacity(state):
+    """
+    Produces a dictionary containing the active capacity, pending capacity, and
+    desired capacity (which is what the user requested, not active + pending),
+    to be used for logging.
+
+    This exists because the current_desired presented to users is active +
+    pending, and we want these keywords to be filtered out of the audit logs
+    for now until desired capacity is consistent between the state API
+    response and the audit log/this.
+    """
+    return {
+        'current_active': len(state.active),
+        'current_pending': len(state.pending),
+        'current_desired': state.desired
+    }
 
 
 class _DeleteJob(object):
@@ -310,9 +377,9 @@ class _DeleteJob(object):
         """
         d = self.supervisor.execute_delete_server(
             self.log, self.trans_id, self.scaling_group, self.server_info)
-        d.addCallback(self._job_completed)
-        d.addErrback(self._job_failed)
+        d.addCallbacks(self._job_completed, self._job_failed)
         self.log.msg('Started server deletion job')
+        return d
 
     def _job_completed(self, _):
         audit(self.log).msg('Server deleted.', event_type="server.delete")
@@ -323,18 +390,57 @@ class _DeleteJob(object):
         self.log.err(failure, 'Server deletion job failed')
 
 
+class _ScrubJob(object):
+    """
+    Otter-specific metadata scrubbing job.
+    """
+
+    def __init__(self, log, transaction_id, tenant_id, server_id, supervisor):
+        """
+        :param log: A bound logger instance.
+        :param str transaction_id: A transaction id.
+        :param str server_id: The id of the server to scrub the metadata of.
+        :param ISupervisor supervisor: The supervisor responsible for keeping
+            track of this job.
+        """
+        self.log = log.bind(system="otter.job.scrub_otter_metadata")
+        self.transaction_id = transaction_id
+        self.tenant_id = tenant_id
+        self.server_id = server_id
+        self.supervisor = supervisor
+
+    def start(self):
+        """
+        Start the metadata scrubbing job.
+        """
+        d = self.supervisor.scrub_otter_metadata(
+            self.log, self.transaction_id, self.tenant_id, self.server_id)
+
+        def _scrub_succeeded(_):
+            audit(self.log).msg("Otter-specific metadata scrubbed.",
+                                event_type="server.scrub_otter_metadata")
+
+        def _scrub_failed(f):
+            self.log.err(f, "Server metadata scrubbing failed.")
+
+        return d.addCallbacks(_scrub_succeeded, _scrub_failed)
+
+
 class _Job(object):
     """
-    Private class representing a server creation job.  This calls the supervisor
-    to create one server, and also handles job completion.
+    Server creation job.
+
+    Calls the supervisor to create one server, and handles job completion.
     """
+
     def __init__(self, log, transaction_id, scaling_group, supervisor):
         """
-        :param log: a bound logger instance that can be used for logging
-        :param str transaction_id: a transaction id
-        :param IScalingGroup scaling_group: the scaling group for which a job
-            should be created
-        :param dict launch_config: the launch config to scale up a server
+        :param log: A bound logger instance.
+        :param str transaction_id: A transaction id.
+        :param IScalingGroup scaling_group: The scaling group for which a job
+            should be created.
+        :param ISupervisor supervisor: The supervisor responsible for keeping
+            track of this job.
         """
         self.log = log.bind(system='otter.job.launch')
         self.transaction_id = transaction_id
@@ -345,6 +451,8 @@ class _Job(object):
     def start(self, launch_config):
         """
         Kick off a job by calling the supervisor with a launch config.
+
+        :param dict launch_config: The launch config to scale up a server.
         """
         try:
             image = launch_config['args']['server']['imageRef']
@@ -356,24 +464,26 @@ class _Job(object):
         except:
             flavor = 'Unable to pull flavor ref.'
 
-        self.log = self.log.bind(image_ref=image, flavor_ref=flavor)
+        self.job_id = generate_job_id(self.scaling_group.uuid)
+        self.log = self.log.bind(image_ref=image, flavor_ref=flavor, job_id=self.job_id)
 
-        deferred = self.supervisor.execute_config(
+        d = self.supervisor.execute_config(
             self.log, self.transaction_id, self.scaling_group, launch_config)
-        deferred.addCallback(self.job_started)
-        return deferred
+        d.addCallbacks(self._job_succeeded, self._job_failed)
+        d.addErrback(self.log.err)
+
+        return d
 
     def _job_failed(self, f):
         """
         Job has failed. Remove the job, if it exists, and log the error.
         """
-        self.log.err(f, 'Launching server failed')
-
         def handle_failure(group, state):
             # if it is not in pending, then the job was probably deleted before
             # it got a chance to fail.
             if self.job_id in state.pending:
                 state.remove_job(self.job_id)
+            self.log.err(f, 'Launching server failed', **_log_capacity(state))
             return state
 
         d = self.scaling_group.modify_state(handle_failure)
@@ -401,15 +511,17 @@ class _Job(object):
                 audit(log).msg(
                     "A pending server that is no longer needed is now active, "
                     "and hence deletable.  Deleting said server.",
-                    event_type="server.deletable")
+                    event_type="server.deletable", **_log_capacity(state))
 
                 job = _DeleteJob(self.log, self.transaction_id,
                                  self.scaling_group, result, self.supervisor)
-                job.start()
+                d = job.start()
+                self.supervisor.deferred_pool.add(d)
             else:
                 state.remove_job(self.job_id)
                 state.add_active(result['id'], result)
-                audit(log).msg("Server is active.", event_type="server.active")
+                audit(log).msg("Server is active.", event_type="server.active",
+                               **_log_capacity(state))
             return state
 
         d = self.scaling_group.modify_state(handle_success)
@@ -424,53 +536,145 @@ class _Job(object):
 
             job = _DeleteJob(self.log, self.transaction_id,
                              self.scaling_group, result, self.supervisor)
-            job.start()
+            d = job.start()
+            self.supervisor.deferred_pool.add(d)
 
         d.addErrback(delete_if_group_deleted)
         return d
-
-    def job_started(self, result):
-        """
-        Takes a tuple of (job_id, completion deferred), which will fire when a
-        job has been completed, and marks said job as completed by removing it
-        from pending.
-        """
-        self.job_id, completion_deferred = result
-        self.log = self.log.bind(job_id=self.job_id)
-
-        completion_deferred.addCallbacks(
-            self._job_succeeded, self._job_failed)
-        completion_deferred.addErrback(self.log.err)
-
-        return self.job_id
 
 
 def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
     """
     Execute a launch config some number of times.
+    """
+    log.msg("Launching {delta} servers.", delta=delta)
+    supervisor = get_supervisor()
+    for i in range(delta):
+        job = _Job(log, transaction_id, scaling_group, supervisor)
+        d = job.start(launch)
+        state.add_job(job.job_id)
+        # Add the job to the pool to ensure otter does not shut down until job is completed
+        supervisor.deferred_pool.add(d)
 
-    :return: Deferred
+    #TODO: Doing this to not cause change in controller but would be nice to remove it
+    return succeed(None)
+
+
+class ServerNotFoundError(Exception):
+    """
+    Exception to be raised when the given server is not found
+    """
+    def __init__(self, tenant_id, group_id, server_id):
+        self.tenant_id = tenant_id
+        self.group_id = group_id
+        self.server_id = server_id
+        super(ServerNotFoundError, self).__init__(
+            "Active server {} not found in tenant {}'s group {}".format(
+                server_id, tenant_id, group_id))
+
+
+class CannotDeleteServerBelowMinError(Exception):
+    """
+    Exception to be raised when server cannot be removed from the group
+    if it will be below minimum servers in the group
+    """
+    def __init__(self, tenant_id, group_id, server_id, min_servers):
+        self.tenant_id = tenant_id
+        self.group_id = group_id
+        self.server_id = server_id
+        self.min_servers = min_servers
+        super(CannotDeleteServerBelowMinError, self).__init__(
+            ("Cannot remove server {server_id} from tenant {tenant_id}'s group {group_id}. "
+             "It will reduce number of servers below required minimum {min_servers}.").format(
+                 server_id=server_id, min_servers=min_servers,
+                 tenant_id=tenant_id, group_id=group_id))
+
+
+def remove_server_from_group(log, trans_id, server_id, replace, purge, group, state):
+    """
+    Remove a specific server from the group, optionally replacing it
+    with a new one, and optionally deleting the old one from Nova.
+
+    If the old server is not deleted from Nova, otter-specific metdata
+    is removed: otherwise, a different part of otter may later mistake
+    the server as one that *should* still be in the group.
+
+    :param log: A bound logger
+    :param bytes trans_id: The transaction id for this operation.
+    :param bytes server_id: The id of the server to be removed.
+    :param bool replace: Should the server be replaced?
+    :param bool purge: Should the server be deleted from Nova?
+    :param group: The scaling group to remove a server from.
+    :type group: :class:`~otter.models.interface.IScalingGroup`
+    :param state: The current state of the group.
+    :type state: :class:`~otter.models.interface.GroupState`
+
+    :return: The updated state.
+    :rtype: deferred :class:`~otter.models.interface.GroupState`
     """
 
-    def _update_state(pending_results):
+    def maybe_reduce_desired(config):
         """
-        :param pending_results: ``list`` of tuples of
-        ``(job_id, {'created': <job creation time>, 'jobType': [create/delete]})``
+        If the desired capacity is still above the minimum, decrement it.
+        Otherwise, raise an exception.
+
+        :param config: The group configuration.
+        :raises CannotDeleteServerBelowMinError: If the group is already at
+            minimum capacity, and therefore the group can not be scaled down
+            further.
+        :return: :data:`None`
         """
-        log.msg('updating state')
+        if len(state.active) + len(state.pending) == config['minEntities']:
+            raise CannotDeleteServerBelowMinError(
+                group.tenant_id, group.uuid, server_id, config['minEntities'])
+        else:
+            state.desired -= 1
 
-        for job_id in pending_results:
-            state.add_job(job_id)
+    def remove_server_from_state(_):
+        """
+        Remove the server from the group state, then return the modified
+        group state.
+        """
+        state.remove_active(server_id)
+        return state
 
-    if delta > 0:
-        log.msg("Launching some servers.")
+    def remove_server_from_nova(_):
+        """
+        Remove the server from Nova.
+
+        Please note that this does *not* return a deferred, because its return
+        value is in the deferred chain in :func:`remove_server_from_group`,
+        which shouldn't wait until the server has been removed.
+        """
         supervisor = get_supervisor()
-        deferreds = [
-            _Job(log, transaction_id, scaling_group, supervisor).start(launch)
-            for i in range(delta)
-        ]
+        job = _DeleteJob(log, trans_id, group, server_info, supervisor)
+        d = job.start()
+        supervisor.deferred_pool.add(d)
 
-    pendings_deferred = gatherResults(deferreds, consumeErrors=True)
-    pendings_deferred.addCallback(_update_state)
-    pendings_deferred.addErrback(unwrap_first_error)
-    return pendings_deferred
+    def scrub_otter_metadata(_):
+        """
+        Scrub otter-specific metadata from the server.
+        """
+        supervisor = get_supervisor()
+        job = _ScrubJob(log, trans_id, group.tenant_id, server_id, supervisor)
+        d = job.start()
+        supervisor.deferred_pool.add(d)
+        return d
+
+    if server_id not in state.active:
+        raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
+    elif replace:
+        d = group.view_launch_config()
+        d.addCallback(lambda lc: execute_launch_config(log, trans_id, state, lc, group, 1))
+    else:
+        d = group.view_config()
+        d.addCallback(maybe_reduce_desired)
+
+    if purge:
+        server_info = state.active[server_id]
+        d.addCallback(remove_server_from_nova)
+    else:
+        d.addCallback(scrub_otter_metadata)
+
+    d.addCallback(remove_server_from_state)
+    return d

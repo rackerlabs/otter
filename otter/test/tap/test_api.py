@@ -3,20 +3,31 @@ Tests for the otter-api tap plugin.
 """
 
 import json
+from copy import deepcopy
+
 import mock
 
-from testtools.matchers import Contains
-
-from twisted.internet import defer
-from twisted.internet.task import Clock
+from testtools.matchers import Contains, IsInstance
 
 from twisted.application.service import MultiService
+from twisted.internet import defer
+from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
+from otter.auth import CachingAuthenticator
+from otter.constants import ServiceType, get_service_configs
+from otter.log.cloudfeeds import CloudFeedsObserver
+from otter.models.cass import CassScalingGroupCollection as OriginalStore
+from otter.supervisor import SupervisorService, get_supervisor, set_supervisor
 from otter.tap.api import (
-    Options, HealthChecker, makeService, setup_scheduler, call_after_supervisor)
-from otter.test.utils import matches, patch, CheckFailure
+    HealthChecker,
+    Options,
+    call_after_supervisor,
+    makeService,
+    setup_scheduler
+)
+from otter.test.test_auth import identity_config
+from otter.test.utils import CheckFailure, matches, patch
 from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
 
@@ -26,9 +37,17 @@ test_config = {
     'admin': 'tcp:9789',
     'cassandra': {
         'seed_hosts': ['tcp:127.0.0.1:9160'],
-        'keyspace': 'otter_test'
+        'keyspace': 'otter_test',
+        'timeout': 10
     },
-    'environment': 'prod'
+    'environment': 'prod',
+    'region': 'ord',
+    'identity': identity_config,
+    'cloudServersOpenStack': 'cloudServersOpenStack',
+    'cloudLoadBalancers': 'cloudLoadBalancers',
+    'rackconnect': 'rackconnect',
+    'metrics': {'service': 'cloudMetricsIngest',
+                'region': 'IAD'}
 }
 
 
@@ -245,6 +264,7 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.RoundRobinCassandraCluster = patch(self, 'otter.tap.api.RoundRobinCassandraCluster')
         self.LoggingCQLClient = patch(self, 'otter.tap.api.LoggingCQLClient')
+        self.TimingOutCQLClient = patch(self, 'otter.tap.api.TimingOutCQLClient')
         self.log = patch(self, 'otter.tap.api.log')
 
         Otter_patcher = mock.patch('otter.tap.api.Otter')
@@ -253,8 +273,12 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.reactor = patch(self, 'otter.tap.api.reactor')
 
-        self.CassScalingGroupCollection = patch(self, 'otter.tap.api.CassScalingGroupCollection')
-        self.store = self.CassScalingGroupCollection.return_value
+        def scaling_group_collection(*args, **kwargs):
+            self.store = OriginalStore(*args, **kwargs)
+            return self.store
+
+        patch(self, 'otter.tap.api.CassScalingGroupCollection',
+              wraps=scaling_group_collection)
 
         self.health_checker = None
 
@@ -341,7 +365,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         makeService(test_config)
         self.RoundRobinCassandraCluster.assert_called_once_with(
             [self.clientFromString.return_value],
-            'otter_test')
+            'otter_test', disconnect_on_cancel=True)
 
     def test_cassandra_scaling_group_collection_with_cluster(self):
         """
@@ -350,10 +374,15 @@ class APIMakeServiceTests(SynchronousTestCase):
         """
         makeService(test_config)
         self.log.bind.assert_called_once_with(system='otter.silverberg')
-        self.LoggingCQLClient.assert_called_once_with(self.RoundRobinCassandraCluster.return_value,
+        self.TimingOutCQLClient.assert_called_once_with(
+            self.reactor,
+            self.RoundRobinCassandraCluster.return_value,
+            10)
+        self.LoggingCQLClient.assert_called_once_with(self.TimingOutCQLClient.return_value,
                                                       self.log.bind.return_value)
-        self.CassScalingGroupCollection.assert_called_once_with(
-            self.LoggingCQLClient.return_value, self.reactor)
+
+        self.assertEqual(self.store.connection, self.LoggingCQLClient.return_value)
+        self.assertEqual(self.store.reactor, self.reactor)
 
     def test_cassandra_cluster_disconnects_on_stop(self):
         """
@@ -370,8 +399,22 @@ class APIMakeServiceTests(SynchronousTestCase):
         api store
         """
         makeService(test_config)
-        self.Otter.assert_called_once_with(self.store,
-                                           self.health_checker.health_check)
+        self.Otter.assert_called_once_with(self.store, 'ord',
+                                           self.health_checker.health_check,
+                                           es_host=None)
+
+    @mock.patch('otter.tap.api.reactor')
+    @mock.patch('otter.tap.api.generate_authenticator')
+    @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
+    def test_authenticator(self, mock_ss, mock_ga, mock_reactor):
+        """
+        Authenticator is generated and passed to SupervisorService
+        """
+        self.addCleanup(lambda: set_supervisor(None))
+        makeService(test_config)
+        mock_ga.assert_called_once_with(mock_reactor, test_config['identity'])
+        self.assertIdentical(get_supervisor().authenticator,
+                             mock_ga.return_value)
 
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_health_checker_no_zookeeper(self, supervisor):
@@ -401,6 +444,32 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.assertEqual(get_supervisor(), supervisor_service)
 
+    @mock.patch('otter.tap.api.addObserver')
+    def test_cloudfeeds_setup(self, mock_addobserver):
+        """
+        Cloud feeds observer is setup if it is there in config
+        """
+        conf = deepcopy(test_config)
+        conf['cloudfeeds'] = {'service': 'cloudFeeds', 'tenant_id': 'tid'}
+        makeService(conf)
+        serv_confs = get_service_configs(conf)
+        serv_confs[ServiceType.CLOUD_FEEDS] = {
+            'name': 'cloudFeeds', 'region': 'ord'}
+        cf = CloudFeedsObserver(
+            reactor=self.reactor,
+            authenticator=matches(IsInstance(CachingAuthenticator)),
+            region='ord', tenant_id='tid',
+            service_configs=serv_confs)
+        mock_addobserver.assert_called_once_with(cf)
+
+    @mock.patch('otter.tap.api.addObserver')
+    def test_cloudfeeds_no_setup(self, mock_addobserver):
+        """
+        Cloud feeds observer is not setup if it is not there in config
+        """
+        makeService(test_config)
+        self.assertFalse(mock_addobserver.called)
+
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     def test_kazoo_client_success(self, mock_txkz, mock_setup_scheduler):
@@ -416,14 +485,15 @@ class APIMakeServiceTests(SynchronousTestCase):
         start_d = defer.Deferred()
         kz_client.start.return_value = start_d
         mock_txkz.return_value = kz_client
-        self.store.kz_client = None
 
         parent = makeService(config)
 
         self.log.bind.assert_called_with(system='kazoo')
         mock_txkz.assert_called_once_with(
-            hosts='zk_hosts', threads=20, txlog=self.log.bind.return_value)
-        kz_client.start.assert_called_once_with()
+            hosts='zk_hosts', threads=20,
+            connection_retry=dict(max_tries=-1, max_delay=600),
+            txlog=self.log.bind.return_value)
+        kz_client.start.assert_called_once_with(timeout=None)
 
         # setup_scheduler and store.kz_client is not called yet, and nothing
         # added to the health checker
@@ -454,8 +524,9 @@ class APIMakeServiceTests(SynchronousTestCase):
         makeService(config)
 
         mock_txkz.assert_called_once_with(
-            hosts='zk_hosts', threads=20, txlog=mock.ANY)
-        kz_client.start.assert_called_once_with()
+            hosts='zk_hosts', threads=20,
+            connection_retry=dict(max_tries=-1, max_delay=600), txlog=mock.ANY)
+        kz_client.start.assert_called_once_with(timeout=None)
         self.assertFalse(mock_setup_scheduler.called)
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
                                              'Could not start TxKazooClient')
@@ -471,7 +542,6 @@ class APIMakeServiceTests(SynchronousTestCase):
         kz_client = mock.Mock(spec=['start', 'stop'])
         kz_client.start.return_value = defer.succeed(None)
         mock_txkz.return_value = kz_client
-        self.store.kz_client = None
 
         parent = makeService(config)
 
@@ -495,7 +565,6 @@ class APIMakeServiceTests(SynchronousTestCase):
         kz_client.start.return_value = defer.succeed(None)
         kz_client.stop.return_value = defer.succeed(None)
         mock_txkz.return_value = kz_client
-        self.store.kz_client = None
 
         parent = makeService(config)
 

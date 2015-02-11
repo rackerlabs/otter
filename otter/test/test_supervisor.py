@@ -1,24 +1,44 @@
 """
 Tests for the worker supervisor.
 """
+
+from effect import Constant, Effect
+
 import mock
 
 from testtools.matchers import ContainsDict, Equals, IsInstance
 
-from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
-from twisted.internet.defer import succeed, fail, Deferred, maybeDeferred
+from twisted.internet.defer import succeed, fail, Deferred
 from twisted.internet.task import Cooperator
 
 from zope.interface.verify import verifyObject
 
 from otter import supervisor
+from otter.constants import ServiceType
+from otter.http import TenantScope
 from otter.models.interface import (
-    IScalingGroup, GroupState, NoSuchScalingGroupError)
-from otter.supervisor import ISupervisor, SupervisorService
-from otter.test.utils import iMock, patch, mock_log, CheckFailure, matches
-from otter.util.config import set_config_data
+    GroupState, IScalingGroup, NoSuchScalingGroupError)
+from otter.supervisor import (
+    CannotDeleteServerBelowMinError, ISupervisor, ServerNotFoundError,
+    SupervisorService, execute_launch_config, remove_server_from_group,
+    set_supervisor)
+from otter.test.utils import (
+    CheckFailure, DummyException, FakeSupervisor, IsBoundWith, iMock, matches,
+    mock_group, mock_log, patch)
 from otter.util.deferredutils import DeferredPool
+
+
+class FakeSupervisorTests(SynchronousTestCase):
+    """
+    Tests for the supervisor test double.
+    """
+    def test_interface(self):
+        """
+        The supervisor test double implements the supervisor interface.
+        """
+        fake_supervisor = FakeSupervisor()
+        verifyObject(ISupervisor, fake_supervisor)
 
 
 class SupervisorTests(SynchronousTestCase):
@@ -30,28 +50,34 @@ class SupervisorTests(SynchronousTestCase):
         """
         Configure test resources.
         """
-        self.log = mock.Mock()
+        self.log = mock_log()
         self.group = iMock(IScalingGroup)
         self.group.tenant_id = 11111
         self.group.uuid = 'group-id'
+        self.region = "ORD"
 
         self.auth_token = 'auth-token'
         self.service_catalog = {}
-        self.auth_function = mock.Mock(
-            return_value=succeed((self.auth_token, self.service_catalog)))
+        self.authenticator = mock.Mock()
+        self.auth_function = self.authenticator.authenticate_tenant
+        self.auth_function.return_value = succeed((self.auth_token,
+                                                   self.service_catalog))
 
         self.fake_server_details = {
             'server': {'id': 'server_id', 'links': ['links'], 'name': 'meh',
                        'metadata': {}}
         }
 
-        set_config_data({'region': 'ORD'})
-        self.addCleanup(set_config_data, {})
-
         self.cooperator = mock.Mock(spec=Cooperator)
+        self.service_mapping = {
+            ServiceType.CLOUD_SERVERS: 'SUPERVISOR_CS',
+            ServiceType.CLOUD_LOAD_BALANCERS: 'SUPERVISOR_CLB',
+            ServiceType.RACKCONNECT_V3: 'SUPERVISOR_RCV3'
+        }
 
         self.supervisor = SupervisorService(
-            self.auth_function, self.cooperator.coiterate)
+            self.authenticator, self.region, self.cooperator.coiterate,
+            self.service_mapping)
 
         self.InMemoryUndoStack = patch(self, 'otter.supervisor.InMemoryUndoStack')
         self.undo = self.InMemoryUndoStack.return_value
@@ -62,6 +88,22 @@ class SupervisorTests(SynchronousTestCase):
         SupervisorService provides ISupervisor
         """
         verifyObject(ISupervisor, self.supervisor)
+
+    def assertCorrectRequestFunc(self, request_bag):
+        """
+        Asserts that the given request bag has all necessary data.
+
+        :param request_bag: The :obj:`otter.supervisor.RequestBag` to check.
+        """
+        self.assertEqual(request_bag.auth_token, self.auth_token)
+        self.assertEqual(request_bag.service_catalog, self.service_catalog)
+        self.assertEqual(request_bag.region, "ORD")
+        self.assertEqual(request_bag.lb_region, "ORD")
+        self.assertEqual(request_bag.tenant_id, self.group.tenant_id)
+        # make sure the dispatcher supports some interesting intent that is
+        # only provided by the full dispatcher
+        tscope = TenantScope(Effect(Constant(1)), 'tenant_id')
+        self.assertIsNot(request_bag.dispatcher(tscope), None)
 
 
 class HealthCheckTests(SupervisorTests):
@@ -105,7 +147,7 @@ class LaunchConfigTests(SupervisorTests):
         super(LaunchConfigTests, self).setUp()
 
         self.launch_server = patch(
-            self, 'otter.supervisor.launch_server_v1.launch_server',
+            self, 'otter.worker.launch_server_v1.launch_server',
             return_value=succeed((self.fake_server_details, {})))
         self.generate_job_id = patch(self, 'otter.supervisor.generate_job_id')
         self.generate_job_id.return_value = 'job-id'
@@ -130,7 +172,8 @@ class LaunchConfigTests(SupervisorTests):
                                        self.group, self.launch_config)
 
         self.auth_function.assert_called_once_with(
-            11111, log=self.log.bind.return_value)
+            11111, log=matches(IsBoundWith(tenant_id=11111,
+                                           worker='launch_server')))
 
     def test_execute_config_propagates_auth_error(self):
         """
@@ -143,9 +186,7 @@ class LaunchConfigTests(SupervisorTests):
         d = self.supervisor.execute_config(self.log, 'transaction-id',
                                            self.group, self.launch_config)
 
-        (job_id, completed_d) = self.successResultOf(d)
-
-        failure = self.failureResultOf(completed_d)
+        failure = self.failureResultOf(d)
         failure.trap(ValueError)
         self.assertEquals(failure.value, expected)
 
@@ -157,20 +198,18 @@ class LaunchConfigTests(SupervisorTests):
         d = self.supervisor.execute_config(self.log, 'transaction-id',
                                            self.group, self.launch_config)
 
-        (job_id, completed_d) = self.successResultOf(d)
-
-        result = self.successResultOf(completed_d)
+        result = self.successResultOf(d)
         self.assertEqual(result, {'id': 'server_id', 'links': ['links'],
                                   'name': 'meh', 'lb_info': {}})
 
-        self.launch_server.assert_called_once_with(
-            mock.ANY,
-            'ORD',
-            self.group,
-            self.service_catalog,
-            self.auth_token,
-            {'server': {}},
-            self.undo)
+        (args, _kwargs), = self.launch_server.call_args_list
+        log, request_bag, scaling_group, launch_config, undo = args
+        self.assertEqual(log, matches(IsBoundWith(tenant_id=11111,
+                                                  worker='launch_server')))
+        self.assertCorrectRequestFunc(request_bag)
+        self.assertEqual(scaling_group, self.group)
+        self.assertEqual(launch_config, {'server': {}})
+        self.assertEqual(undo, self.undo)
 
     def test_execute_config_rewinds_undo_stack_on_failure(self):
         """
@@ -183,9 +222,7 @@ class LaunchConfigTests(SupervisorTests):
         d = self.supervisor.execute_config(self.log, 'transaction-id',
                                            self.group, self.launch_config)
 
-        (job_id, completed_d) = self.successResultOf(d)
-
-        self.failureResultOf(completed_d)
+        self.failureResultOf(d, ValueError)
         self.undo.rewind.assert_called_once_with()
 
     def test_coiterate_passed_to_undo_stack(self):
@@ -198,46 +235,23 @@ class LaunchConfigTests(SupervisorTests):
 
         self.InMemoryUndoStack.assert_called_once_with(self.cooperator.coiterate)
 
-    def test_job_deferred_added_to_deferred_pool(self):
-        """
-        The launch config job deferred is added to a deferred pool, if it is
-        provided to the constructor
-        """
-        self.launch_server.return_value = Deferred()  # block forward progress
-
-        # the pool starts off empty
-        self.successResultOf(self.supervisor.deferred_pool.notify_when_empty())
-
-        self.supervisor.execute_config(self.log, 'transaction-id',
-                                       self.group, self.launch_config)
-
-        # the pool is now not empty, since the job has been added
-        empty = self.supervisor.deferred_pool.notify_when_empty()
-        self.assertNoResult(empty)  # the pool is not empty now
-
-        # after launch server returns, the pool empties
-        self.launch_server.return_value.callback((self.fake_server_details, {}))
-        self.successResultOf(empty)
-
     def test_will_not_stop_until_pool_empty(self):
         """
         The deferred returned by stopService will not fire until the deferred
         pool is empty.
         """
-        self.launch_server.return_value = Deferred()  # block forward progress
-
         # the pool starts off empty
         self.successResultOf(self.supervisor.deferred_pool.notify_when_empty())
 
-        self.supervisor.execute_config(self.log, 'transaction-id',
-                                       self.group, self.launch_config)
+        d = Deferred()
+        self.supervisor.deferred_pool.add(d)   # block forward progress
 
         sd = self.supervisor.stopService()
 
         self.assertFalse(self.supervisor.running)
         self.assertNoResult(sd)
 
-        self.launch_server.return_value.callback((self.fake_server_details, {}))
+        d.callback(None)
 
         self.successResultOf(sd)
 
@@ -253,11 +267,16 @@ class DeleteServerTests(SupervisorTests):
         """
         super(DeleteServerTests, self).setUp()
         self.delete_server = patch(
-            self, 'otter.supervisor.launch_server_v1.delete_server',
+            self, 'otter.worker.launch_server_v1.delete_server',
             return_value=succeed(None))
 
         self.fake_server = self.fake_server_details['server']
-        self.fake_server['lb_info'] = {}
+        self.fake_server['lb_info'] = [({"loadBalancerId": '12345'},
+                                        {'nodes': [{'id': 'a',
+                                                    'address': "1.1.1.1"}]}),
+                                       ({"loadBalancerId": '54321'},
+                                        {'nodes': [{'id': 'b',
+                                                    'address': "1.1.1.2"}]})]
 
     def test_execute_delete_calls_delete_worker(self):
         """
@@ -266,21 +285,13 @@ class DeleteServerTests(SupervisorTests):
         """
         self.supervisor.execute_delete_server(self.log, 'transaction-id',
                                               self.group, self.fake_server)
-        self.delete_server.assert_called_once_with(
-            self.log.bind.return_value,
-            'ORD',
-            self.service_catalog,
-            self.auth_token,
-            (self.fake_server['id'], self.fake_server['lb_info']))
-
-    def test_execute_delete_added_to_pool(self):
-        """
-        `execute_delete_server` returned deferred is added to the pool
-        """
-        self.delete_server.return_value = Deferred()
-        d = self.supervisor.execute_delete_server(
-            self.log, 'transaction-id', self.group, self.fake_server)
-        self.assertIn(d, self.supervisor.deferred_pool._pool)
+        (args, _kwargs), = self.delete_server.call_args_list
+        log, request_bag, instance_details = args
+        self.assertEqual(log, matches(IsBoundWith(tenant_id=11111,
+                                                  server_id='server_id')))
+        self.assertCorrectRequestFunc(request_bag)
+        expected_details = self.fake_server['id'], self.fake_server['lb_info']
+        self.assertEqual(instance_details, expected_details)
 
     def test_execute_delete_auths(self):
         """
@@ -289,9 +300,9 @@ class DeleteServerTests(SupervisorTests):
         """
         self.supervisor.execute_delete_server(self.log, 'transaction-id',
                                               self.group, self.fake_server)
-
         self.auth_function.assert_called_once_with(
-            11111, log=self.log.bind.return_value)
+            11111, log=matches(IsBoundWith(tenant_id=11111,
+                                           server_id='server_id')))
 
     def test_execute_delete_propagates_auth_error(self):
         """
@@ -306,6 +317,39 @@ class DeleteServerTests(SupervisorTests):
 
         f = self.failureResultOf(d, ValueError)
         self.assertEqual(f.value, expected)
+
+
+class ScrubMetadataTests(SupervisorTests):
+    """
+    Tests for func:``otter.supervisor.scrub_otter_metadata``.
+    """
+    def setUp(self):
+        """
+        Set up the test.
+        """
+        super(ScrubMetadataTests, self).setUp()
+        self.scrub_otter_metadata = patch(
+            self,
+            'otter.worker.launch_server_v1.scrub_otter_metadata',
+            return_value=succeed(None))
+
+    def test_scrub_metadata(self):
+        """
+        Tests metadata scrubbing.
+        """
+        d = self.supervisor.scrub_otter_metadata(
+            self.log, "txn-id", "tenant-id", "server-id")
+        self.successResultOf(d)
+        smells_like_log = matches(IsBoundWith(tenant_id='tenant-id',
+                                              server_id='server-id'))
+        self.auth_function.assert_called_once_with(
+            "tenant-id", log=smells_like_log)
+        self.scrub_otter_metadata.assert_called_once_with(
+            smells_like_log,
+            self.auth_token,
+            self.service_catalog,
+            self.supervisor.region,
+            "server-id")
 
 
 class ValidateLaunchConfigTests(SupervisorTests):
@@ -378,11 +422,11 @@ class FindPendingJobsToCancelTests(SynchronousTestCase):
         sorting.
         """
         self.data = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001'},
-            '2': {'created': '0001-01-04T00:02:02Z'},
-            '3': {'created': '0001-01-04T00:00:10Z'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513'},
-            '5': {'created': '0001-01-05T00:00:00Z'}
+            '1': {'created': '2014-01-01T00:00:05Z.1234'},
+            '2': {'created': '2014-01-04T00:02:02Z'},
+            '3': {'created': '2014-01-04T00:00:10Z'},
+            '4': {'created': '2014-01-01T01:00:00Z.3513'},
+            '5': {'created': '2014-01-05T00:00:00Z'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
 
         self.cancellable_state = GroupState('t', 'g', 'n', {}, self.data, None, {},
@@ -419,13 +463,13 @@ class FindServersToEvictTests(SynchronousTestCase):
         sorting.
         """
         self.data = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1',
+            '1': {'created': '2014-01-01T00:00:05Z.1234', 'id': '1',
                   'lb': 'lb'},
-            '2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
-            '3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4',
+            '2': {'created': '2014-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
+            '3': {'created': '2014-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
+            '4': {'created': '2014-01-01T01:00:00Z.3513', 'id': '4',
                   'lb': 'lb'},
-            '5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
+            '5': {'created': '2014-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
 
         self.deletable_state = GroupState('t', 'g', 'n', self.data, {}, None, {},
@@ -463,13 +507,13 @@ class DeleteActiveServersTests(SynchronousTestCase):
         """
         self.log = mock.Mock()
         self.data = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1',
+            '1': {'created': '2014-01-01T00:00:05Z.1234', 'id': '1',
                   'lb': 'lb'},
-            '2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
-            '3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4',
+            '2': {'created': '2014-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
+            '3': {'created': '2014-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
+            '4': {'created': '2014-01-01T01:00:00Z.3513', 'id': '4',
                   'lb': 'lb'},
-            '5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
+            '5': {'created': '2014-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
         self.fake_state = GroupState('t', 'g', 'n', self.data, {}, False, False,
                                      False)
@@ -540,8 +584,8 @@ class DeleteJobTests(SynchronousTestCase):
         self.supervisor.execute_delete_server.assert_called_once_with(
             self.log, 'trans_id', 'group', {'id': 2, 'b': 'lah'})
         d = self.supervisor.execute_delete_server.return_value
-        d.addCallback.assert_called_once_with(self.job._job_completed)
-        d.addErrback.assert_called_once_with(self.job._job_failed)
+        d.addCallbacks.assert_called_once_with(self.job._job_completed,
+                                               self.job._job_failed)
         self.log.msg.assert_called_once_with('Started server deletion job')
 
     def test_job_completed(self):
@@ -563,9 +607,65 @@ class DeleteJobTests(SynchronousTestCase):
                                              'Server deletion job failed')
 
 
+class ScrubJobTests(SynchronousTestCase):
+    """
+    Tests for :class:`supervisor._ScrubJob`.
+    """
+
+    def setUp(self):
+        """
+        Set up an environment for testing :class:`supervisor._ScrubJob`.
+        """
+        self.supervisor = iMock(ISupervisor)
+        self.log = mock_log()
+
+    def _create_job(self):
+        """
+        Creates a job with associated bound logger.
+
+        Checks that the logger was appropriately bound.
+        """
+        job = supervisor._ScrubJob(self.log,
+                                   "txn-id",
+                                   "tenant-id",
+                                   "server-id",
+                                   self.supervisor)
+        return job
+
+    def test_scrub_job(self):
+        """
+        Starting a scrub job works correctly.
+        """
+        d = succeed(None)
+        self.supervisor.scrub_otter_metadata.return_value = d
+
+        job = self._create_job()
+        self.successResultOf(job.start())
+
+        self.log.msg.assert_called_with(
+            "Otter-specific metadata scrubbed.",
+            audit_log=True,
+            event_type="server.scrub_otter_metadata",
+            system="otter.job.scrub_otter_metadata")
+
+    def test_failed_job(self):
+        """
+        When a scrubbing job fails, the failure is logged.
+        """
+        e = RuntimeError("o noes")
+        self.supervisor.scrub_otter_metadata.return_value = fail(e)
+
+        job = self._create_job()
+        self.successResultOf(job.start())
+
+        (f, msg), _ = self.log.err.call_args
+        self.assertEqual(f.value, e)
+        self.assertEqual(msg, "Server metadata scrubbing failed.")
+
+
 class ExecScaleDownTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.supervisor.exec_scale_down`
+    Tests for :func:`otter.supervisor.exec_scale_down`.
     """
 
     def setUp(self):
@@ -574,20 +674,20 @@ class ExecScaleDownTests(SynchronousTestCase):
         """
         self.log = mock.Mock()
         self.pending = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001'},
-            '2': {'created': '0001-01-04T00:02:02Z'},
-            '3': {'created': '0001-01-04T00:00:10Z'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513'},
-            '5': {'created': '0001-01-05T00:00:00Z'}
+            '1': {'created': '2014-01-01T00:00:05Z.1234'},
+            '2': {'created': '2014-01-04T00:02:02Z'},
+            '3': {'created': '2014-01-04T00:00:10Z'},
+            '4': {'created': '2014-01-01T01:00:00Z.3513'},
+            '5': {'created': '2014-01-05T00:00:00Z'}
         }  # descending order by time would be: 5, 2, 3, 4, 1
         self.active = {
-            'a1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1',
+            'a1': {'created': '2014-01-01T00:00:05Z.1234', 'id': '1',
                    'lb': 'lb'},
-            'a2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
-            'a3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
-            'a4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4',
+            'a2': {'created': '2014-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
+            'a3': {'created': '2014-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
+            'a4': {'created': '2014-01-01T01:00:00Z.3513', 'id': '4',
                    'lb': 'lb'},
-            'a5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
+            'a5': {'created': '2014-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: a1, a4, a3, a2, a5
         self.fake_state = GroupState('t', 'g', '', self.active, self.pending,
                                      False, False, False)
@@ -632,197 +732,58 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
 
     def setUp(self):
         """
-        Mock relevant supervisor methods.
-        Also build a mock model that can be used for testing.
+        Setup fake supervisor and fake job
         """
-        self.execute_config_deferreds = []
-
-        def fake_execute(*args, **kwargs):
-            d = Deferred()
-            self.execute_config_deferreds.append(d)
-            return succeed((str(len(self.execute_config_deferreds)), d))
-
-        self.supervisor = iMock(ISupervisor)
-        self.supervisor.execute_config.side_effect = fake_execute
-
-        patch(self, 'otter.supervisor.get_supervisor', return_value=self.supervisor)
-        self.del_job = patch(self, 'otter.supervisor._DeleteJob')
+        self.supervisor = FakeSupervisor()
+        set_supervisor(self.supervisor)
+        self.addCleanup(set_supervisor, None)
 
         self.log = mock_log()
 
-        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
-        self.fake_state = mock.MagicMock(GroupState)
+        self.jobs = []
 
-    def test_positive_delta_execute_config_called_delta_times(self):
+        class FakeJob(object):
+
+            def __init__(jself, *args):
+                jself.args = args
+                jself.job_id = len(self.jobs) + 10
+                self.jobs.append(jself)
+
+            def start(jself, launch):
+                jself.launch = launch
+                jself.d = Deferred()
+                return jself.d
+
+        patch(self, 'otter.supervisor._Job', new=FakeJob)
+        self.state = GroupState('t', 'g', 'n', {}, {}, *range(3))
+
+    def test_no_jobs_started(self):
         """
-        If delta > 0, ``execute_launch_config`` calls
-        ``supervisor.execute_config`` delta times.
+        If delta == 0, ``execute_launch_config`` does not create any job. It also logs
         """
-        supervisor.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 5)
-        self.assertEqual(self.supervisor.execute_config.mock_calls,
-                         [mock.call(matches(IsInstance(self.log.__class__)), '1',
-                                    self.group, 'launch')] * 5)
+        d = execute_launch_config(self.log, 'tid', self.state, 'launch', 'group', 0)
+        self.assertIsNone(self.successResultOf(d))
 
-    def test_positive_delta_execute_config_failures_propagated(self):
+        self.log.msg.assert_called_once_with('Launching {delta} servers.', delta=0)
+        self.assertEqual(len(self.jobs), 0)
+
+    def test_delta_jobs_started(self):
         """
-        ``execute_launch_config`` fails if ``execute_config`` fails for any one
-        case, and propagates the first ``execute_config`` error.
+        If delta > 0, ``execute_launch_config`` creates and starts delta jobs.
+        It adds the jobs to the state and its completion deferreds to supervisor's pool.
+        It also logs
         """
-        class ExecuteException(Exception):
-            pass
+        d = execute_launch_config(self.log, 'tid', self.state, 'launch', 'group', 3)
+        self.assertIsNone(self.successResultOf(d))
 
-        def fake_execute(*args, **kwargs):
-            if len(self.execute_config_deferreds) > 1:
-                return fail(ExecuteException('no more!'))
-            d = Deferred()
-            self.execute_config_deferreds.append(d)
-            return succeed((
-                str(len(self.execute_config_deferreds)), d))
+        self.log.msg.assert_called_once_with('Launching {delta} servers.', delta=3)
 
-        self.supervisor.execute_config.side_effect = fake_execute
-        d = supervisor.execute_launch_config(self.log, '1', self.fake_state,
-                                             'launch', self.group, 3)
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(ExecuteException))
-
-    def test_add_job_called_with_new_jobs(self):
-        """
-        ``execute_launch_config`` calls ``add_job`` on the state for every job
-        that has been started
-        """
-        supervisor.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 3)
-        self.fake_state.add_job.assert_has_calls(
-            [mock.call(str(i)) for i in (1, 2, 3)])
-        self.assertEqual(self.fake_state.add_job.call_count, 3)
-
-    def test_propagates_add_job_failures(self):
-        """
-        ``execute_launch_config`` fails if ``add_job`` raises an error
-        """
-        self.fake_state.add_job.side_effect = AssertionError
-        d = supervisor.execute_launch_config(self.log, '1', self.fake_state,
-                                             'launch', self.group, 1)
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(AssertionError))
-
-    def test_on_job_completion_modify_state_called(self):
-        """
-        ``execute_launch_config`` sets it up so that the group's
-        ``modify_state``state is called with the result as an arg whenever a
-        job finishes, whether successfully or not
-        """
-        supervisor.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 3)
-
-        self.execute_config_deferreds[0].callback({'id': '1'})       # job id 1
-        self.execute_config_deferreds[1].errback(Exception('meh'))   # job id 2
-        self.execute_config_deferreds[2].callback({'id': '3'})       # job id 3
-
-        self.assertEqual(self.group.modify_state.call_count, 3)
-
-    def test_job_success(self):
-        """
-        ``execute_launch_config`` sets it up so that when a job succeeds, it is
-        removed from pending and the server is added to active.  It is also
-        logged.
-        """
-        s = GroupState('tenant', 'group', 'name', {}, {'1': {}}, None, {}, False)
-
-        def fake_modify_state(callback, *args, **kwargs):
-            callback(self.group, s, *args, **kwargs)
-
-        self.group.modify_state.side_effect = fake_modify_state
-        supervisor.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 1)
-
-        self.execute_config_deferreds[0].callback({'id': 's1'})
-        self.assertEqual(s.pending, {})  # job removed
-        self.assertIn('s1', s.active)    # active server added
-
-    def test_pending_server_delete(self):
-        """
-        When a pending job is cancelled, it is deleted from the job list. When
-        the server finishes building, then ``execute_launch_config`` is called
-        to remove the job from pending job list. It then notices that pending
-        job_id is not there in job list and calls ``execute_delete_server``
-        to delete the server.
-        """
-        self.supervisor.execute_delete_server.return_value = succeed(None)
-
-        s = GroupState('tenant', 'group', 'name', {}, {'1': {}}, None, {}, False)
-
-        def fake_modify_state(callback, *args, **kwargs):
-            callback(self.group, s, *args, **kwargs)
-
-        self.group.modify_state.side_effect = fake_modify_state
-        supervisor.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 1)
-
-        s.remove_job('1')
-        self.execute_config_deferreds[0].callback({'id': 's1'})
-
-        # first bind is system='otter.job.launch', second is job_id='1'
-        self.del_job.assert_called_once_with(
-            matches(IsInstance(self.log.__class__)), '1', self.group,
-            {'id': 's1'}, self.supervisor)
-        self.del_job.return_value.start.assert_called_once_with()
-
-    def test_job_failure(self):
-        """
-        ``execute_launch_config`` sets it up so that when a job fails, it is
-        removed from pending.  It is also lgoged.
-        """
-        s = GroupState('tenant', 'group', 'name', {}, {'1': {}}, None, {}, False)
-        written = []
-
-        # modify state writes on callback, doesn't write on error
-        def fake_modify_state(callback, *args, **kwargs):
-            d = maybeDeferred(callback, self.group, s, *args, **kwargs)
-            d.addCallback(written.append)
-            return d
-
-        self.group.modify_state.side_effect = fake_modify_state
-        supervisor.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 1)
-
-        f = Failure(Exception('meh'))
-        self.execute_config_deferreds[0].errback(f)
-
-        # job is removed and no active servers added
-        self.assertEqual(s, GroupState('tenant', 'group', 'name', {}, {}, None, {},
-                                       False))
-        # state is written
-        self.assertEqual(len(written), 1)
-        self.assertEqual(written[0], s)
-
-        self.log.err.assert_called_with(f, 'Launching server failed',
-                                        system="otter.job.launch",
-                                        image_ref="Unable to pull image ref.",
-                                        flavor_ref="Unable to pull flavor ref.",
-                                        job_id='1')
-
-    def test_modify_state_failure_logged(self):
-        """
-        If the job succeeded but modifying the state fails, that error is
-        logged.
-        """
-        self.group.modify_state.side_effect = AssertionError
-        supervisor.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 1)
-        self.execute_config_deferreds[0].callback({'id': 's1'})
-
-        self.log.err.assert_called_once_with(
-            CheckFailure(AssertionError), system="otter.job.launch",
-            image_ref="Unable to pull image ref.",
-            flavor_ref="Unable to pull flavor ref.", job_id='1')
-
-
-class DummyException(Exception):
-    """
-    Dummy exception used in tests
-    """
+        self.assertEqual(len(self.jobs), 3)
+        for job in self.jobs:
+            self.assertEqual(job.args, (self.log, 'tid', 'group', self.supervisor))
+            self.assertEqual(job.launch, 'launch')
+            self.assertIn(job.job_id, self.state.pending)
+            self.assertIn(job.d, self.supervisor.deferred_pool)
 
 
 class PrivateJobHelperTestCase(SynchronousTestCase):
@@ -835,20 +796,14 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         """
         self.transaction_id = 'transaction_id'
         self.job_id = 'job_id'
-        self.log = mock.MagicMock()
-        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
-        self.state = None
+        patch(self, 'otter.supervisor.generate_job_id', return_value=self.job_id)
+        self.state = GroupState('tenant', 'group', 'name', {}, {}, None, {}, False)
+        self.group = mock_group(self.state, 'tenant', 'group')
+
         self.supervisor = iMock(ISupervisor)
+        self.supervisor.deferred_pool = DeferredPool()
         self.completion_deferred = Deferred()
-
-        self.supervisor.execute_config.return_value = succeed(
-            (self.job_id, self.completion_deferred))
-
-        def fake_modify_state(f, *args, **kwargs):
-            return maybeDeferred(
-                f, self.group, self.state, *args, **kwargs)
-
-        self.group.modify_state.side_effect = fake_modify_state
+        self.supervisor.execute_config.return_value = self.completion_deferred
 
         self.log = mock_log()
         self.job = supervisor._Job(self.log, self.transaction_id, self.group,
@@ -859,85 +814,43 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
                             'args': {'server': {'imageRef': 'imageID',
                                                 'flavorRef': '1'}}}
 
-    def test_start_binds_image_and_flavor_refs_to_log(self):
-        """
-        `start` binds the image ID and flavor, if provided, to the logs
-        """
-        self.job.job_started = mock.MagicMock()
-
-        self.job.start(self.mock_launch)
-
-        self.job.log.msg('')
-        self.log.msg.assert_called_once_with('', system='otter.job.launch',
-                                             image_ref="imageID", flavor_ref='1')
-
     def test_start_binds_invalid_image_ref_to_log(self):
         """
         `start` binds the image ID to a string that says that we were unable
         to find the image id in the logs, if the image ref could not be found
         """
-        self.job.job_started = mock.MagicMock()
-
         del self.mock_launch['args']['server']['imageRef']
         self.job.start(self.mock_launch)
-
-        self.job.log.msg('')
-        self.log.msg.assert_called_once_with('', system='otter.job.launch',
-                                             image_ref="Unable to pull image ref.",
-                                             flavor_ref='1')
+        self.assertEqual(
+            self.job.log,
+            matches(IsBoundWith(system='otter.job.launch',
+                                image_ref="Unable to pull image ref.",
+                                flavor_ref='1', job_id='job_id')))
 
     def test_start_binds_invalid_flavor_ref_to_log(self):
         """
         `start` binds the flavor ID to a string that says that we were unable
         to find the flavor id in the logs, if the flavor ref could not be found
         """
-        self.job.job_started = mock.MagicMock()
-
         del self.mock_launch['args']['server']['flavorRef']
         self.job.start(self.mock_launch)
-
-        self.job.log.msg('')
-        self.log.msg.assert_called_once_with('', system='otter.job.launch',
-                                             image_ref="imageID",
-                                             flavor_ref="Unable to pull flavor ref.")
+        self.assertEqual(
+            self.job.log,
+            matches(IsBoundWith(system='otter.job.launch', image_ref="imageID",
+                                flavor_ref="Unable to pull flavor ref.",
+                                job_id='job_id')))
 
     def test_start_calls_supervisor(self):
         """
-        `start` calls the supervisor's `execute_config` method, and adds
-        `job_started` as a callback to that deferred
+        `start` calls the supervisor's `execute_config` method with
+        log bound with imageRef and flavorRef from launch config
         """
-        self.job.job_started = mock.MagicMock()
-
-        self.job.start('launch')
+        self.job.start(self.mock_launch)
         self.supervisor.execute_config.assert_called_once_with(
-            matches(IsInstance(self.log.__class__)), self.transaction_id,
-            self.group, 'launch')
-        self.job.job_started.assert_called_once_with(
-            (self.job_id, self.completion_deferred))
-
-    def test_job_started_not_called_if_supervisor_error(self):
-        """
-        `job_started` is not called if the supervisor's `execute_config`
-        errbacks, and the failure propagates up.
-        """
-        self.job.job_started = mock.MagicMock()
-        self.supervisor.execute_config.return_value = fail(
-            DummyException('e'))
-
-        d = self.job.start('launch')
-        self.assertEqual(self.job.job_started.call_count, 0)
-        f = self.failureResultOf(d)
-        self.assertTrue(f.check(DummyException))
-
-    def test_start_callbacks_with_job_id(self):
-        """
-        The deferred returned by start callbacks immediately with just the job
-        ID, without waiting for the `completion_deferred` to fire, and the log
-        is bound
-        """
-        d = self.job.start('launch')
-        self.assertEqual(self.successResultOf(d), self.job_id)
-        self.assertEqual(self.job.log, matches(IsInstance(self.log.__class__)))
+            matches(IsBoundWith(system='otter.job.launch', image_ref="imageID",
+                                flavor_ref='1', job_id='job_id')),
+            self.transaction_id,
+            self.group, self.mock_launch)
 
     def test_modify_state_called_on_job_completion_success(self):
         """
@@ -962,8 +875,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         If the job succeeded, and the job ID is still in pending, it is removed
         and added to active.
         """
-        self.state = GroupState('tenant', 'group', 'name', {}, {self.job_id: {}}, None,
-                                {}, False)
+        self.state.add_job(self.job_id)
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
 
@@ -978,10 +890,11 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
     def test_job_completion_success_audit_logged(self):
         """
         If the job succeeded, and the job ID is still in pending, it is audit
-        logged as a "server.active" event.
+        logged as a "server.active" event, and the new state after the server
+        has been moved to active is logged.
         """
-        self.state = GroupState('tenant', 'group', 'name', {},
-                                {self.job_id: {}}, None, {}, False)
+        self.state.add_job(self.job_id)
+        self.state.desired = 1
         self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'yay'})
 
@@ -990,15 +903,17 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.log.msg.assert_called_once_with(
             "Server is active.", event_type="server.active", server_id='yay',
             job_id=self.job_id, audit_log=True, system="otter.job.launch",
-            image_ref="imageID", flavor_ref="1")
+            image_ref="imageID", flavor_ref="1", current_active=1,
+            current_pending=0, current_desired=1)
 
     def test_job_completion_success_job_deleted_pending(self):
         """
         If the job succeeded, but the job ID is no longer in pending, the
         server is deleted and the state not changed.  No error is logged.
         """
-        self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
-                                {}, False)
+        d = Deferred()
+        self.del_job.return_value.start.return_value = d
+
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
 
@@ -1011,7 +926,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.del_job.assert_called_once_with(
             matches(IsInstance(self.log.__class__)), self.transaction_id,
             self.group, {'id': 'active'}, self.supervisor)
-        self.del_job.return_value.start.assert_called_once_with()
+        self.assertIn(d, self.supervisor.deferred_pool)
 
         self.assertEqual(self.log.err.call_count, 0)
 
@@ -1021,7 +936,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         audit logged as a "server.deletable" event.
         """
         self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
-                                {}, False)
+                                {}, False, desired=0)
         self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'yay'})
 
@@ -1032,15 +947,15 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
              "and hence deletable.  Deleting said server."),
             event_type="server.deletable", server_id='yay', job_id=self.job_id,
             audit_log=True, system="otter.job.launch", image_ref="imageID",
-            flavor_ref="1")
+            flavor_ref="1", current_active=0, current_pending=0,
+            current_desired=0)
 
     def test_job_completion_failure_job_removed(self):
         """
         If the job failed, the job ID is removed from the pending state.  The
         failure is logged.
         """
-        self.state = GroupState('tenant', 'group', 'name', {}, {self.job_id: {}}, None,
-                                {}, False)
+        self.state.add_job(self.job_id)
         self.job.start(self.mock_launch)
         self.completion_deferred.errback(DummyException('e'))
 
@@ -1053,7 +968,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.log.err.assert_called_once_with(
             CheckFailure(DummyException), 'Launching server failed',
             system="otter.job.launch", image_ref="imageID", job_id=self.job_id,
-            flavor_ref="1")
+            flavor_ref="1", current_active=0, current_pending=0,
+            current_desired=0)
 
     def test_job_completion_failure_job_deleted_pending(self):
         """
@@ -1061,8 +977,6 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         is not removed (and hence no error occurs).  The only error logged is
         the failure. Nothing else in the state changes.
         """
-        self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
-                                {}, False)
         self.job.start(self.mock_launch)
         self.completion_deferred.errback(DummyException('e'))
 
@@ -1075,7 +989,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.log.err.assert_called_with(
             CheckFailure(DummyException), 'Launching server failed',
             system="otter.job.launch", image_ref="imageID", job_id=self.job_id,
-            flavor_ref="1")
+            flavor_ref="1", current_active=0, current_pending=0,
+            current_desired=0)
 
     def test_job_completion_success_NoSuchScalingGroupError(self):
         """
@@ -1085,6 +1000,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         """
         self.group.modify_state.side_effect = (
             lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
+        d = Deferred()
+        self.del_job.return_value.start.return_value = d
 
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
@@ -1093,6 +1010,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
             matches(IsInstance(self.log.__class__)), self.transaction_id,
             self.group, {'id': 'active'}, self.supervisor)
         self.del_job.return_value.start.assert_called_once_with()
+        self.assertIn(d, self.supervisor.deferred_pool)
 
     def test_job_completion_success_NoSuchScalingGroupError_audit_logged(self):
         """
@@ -1143,3 +1061,180 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
                                              system="otter.job.launch",
                                              image_ref="imageID", flavor_ref="1",
                                              job_id=self.job_id)
+
+
+class RemoveServerTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.supervisor.remove_server_from_group`
+    """
+
+    def setUp(self):
+        """
+        Fake supervisor, group and state
+        """
+        self.tid = 'trans_id'
+        self.log = mock_log()
+        self.state = GroupState('tid', 'gid', 'g', {'s0': {'id': 's0'}}, {},
+                                None, None, None, desired=1)
+        self.group = mock_group(self.state)
+        self.gen_jobid = patch(self, 'otter.supervisor.generate_job_id', return_value='jid')
+        self.supervisor = FakeSupervisor()
+        set_supervisor(self.supervisor)
+        self.addCleanup(set_supervisor, None)
+
+        self.group.view_config.return_value = succeed({'minEntities': 0})
+        self.group.view_launch_config.return_value = succeed('launch')
+
+    def _remove_server(self, replace=True, purge=True, server_id="s0"):
+        """
+        Try to remove a server from the group.
+        """
+        d = remove_server_from_group(self.log, self.tid, server_id,
+                                     replace, purge, self.group, self.state)
+        return d
+
+    def _assert_server_in_group_state(self, state):
+        """
+        Assert that the server is still in the group state.
+        """
+        self.assertEqual(state.active, {'s0': {'id': 's0'}})
+
+    def _assert_server_not_in_group_state(self, state):
+        """
+        Assert that the server is not in the group state.
+        """
+        self.assertNotIn('s0', state.active)
+
+    def _assert_delete_scheduled(self):
+        """
+        Assert that the server was scheduled for deletion.
+        """
+        self.assertEqual(self.supervisor.del_calls[-1],
+                         (matches(IsBoundWith(server_id='s0', system='otter.job.delete')),
+                          self.tid, self.group, {'id': 's0'}))
+
+    def _assert_delete_not_scheduled(self):
+        """
+        Assert that the server was scheduled for deletion.
+        """
+        self.assertEqual(self.supervisor.del_calls, [])
+
+    def _assert_create_scheduled(self, state):
+        """
+        Assert that a new server is being created. Specifically, checks
+        that the id is now pending, and that the supervisor has a
+        create server call.
+        """
+        self.assertIn('jid', state.pending)
+        self.assertEqual(self.supervisor.exec_calls[-1],
+                         (matches(IsBoundWith(image_ref=mock.ANY,
+                                              flavor_ref=mock.ANY,
+                                              system='otter.job.launch',
+                                              job_id='jid')),
+                          self.tid, self.group, 'launch'))
+
+    def _assert_create_not_scheduled(self, state):
+        """
+        Assert that a new server is not being created. Specifically,
+        checks that the id does not exist in pending, and no creation
+        calls were issued.
+        """
+        self.assertNotIn('jid', state.pending)
+        self.assertEqual(self.supervisor.exec_calls, [])
+
+    def _assert_metadata_scrubbing_scheduled(self, expected_server_id="s0"):
+        """
+        Assert that otter-specific metadata scrubbing was scheduled.
+        """
+        _, txn_id, tenant_id, server_id = self.supervisor.scrub_calls[-1]
+        self.assertEqual(txn_id, self.tid)
+        self.assertEqual(tenant_id, "tenant")
+        self.assertEqual(server_id, expected_server_id)
+
+    def _assert_metadata_scrubbing_not_scheduled(self):
+        """
+        Asserts that no metadata scrubbing was scheduled.
+        """
+        self.assertEqual(len(self.supervisor.scrub_calls), 0)
+
+    def test_server_not_found(self):
+        """
+        If specific server is not in the group, :class:`ServerNotFoundError`
+        is raised.
+        """
+        self.assertRaises(ServerNotFoundError,
+                          self._remove_server, server_id="BOGUS")
+
+        self._assert_server_in_group_state(self.state)
+        self._assert_create_not_scheduled(self.state)
+        self._assert_delete_not_scheduled()
+        self._assert_metadata_scrubbing_not_scheduled()
+        self.assertEqual(self.state.desired, 1)
+
+    def test_not_deleted_below_min(self):
+        """
+        :class:`CannotDeleteServerBelowMinError` is raised if the current
+        (active + pending) number of servers is already the minimum.
+        """
+        self.state.add_job('j1')
+        self.group.view_config.return_value = succeed({'minEntities': 2})
+        d = self._remove_server(replace=False, purge=True)
+        self.failureResultOf(d, CannotDeleteServerBelowMinError)
+
+        self._assert_server_in_group_state(self.state)
+        self._assert_delete_not_scheduled()
+        self._assert_create_not_scheduled(self.state)
+        self._assert_metadata_scrubbing_not_scheduled()
+        self.assertEqual(self.state.desired, 1)
+
+    def test_replaced_and_removed(self):
+        """
+        Server is removed, purged and replaced.
+        """
+        d = self._remove_server(replace=True, purge=True)
+        state = self.successResultOf(d)
+
+        self._assert_server_not_in_group_state(state)
+        self._assert_delete_scheduled()
+        self._assert_create_scheduled(state)
+        self.assertEqual(self.state.desired, 1)
+
+    def test_not_replaced(self):
+        """
+        Server is removed and purged from Nova, but not replaced. The
+        desired is reduced by 1.
+        """
+        d = self._remove_server(replace=False, purge=True)
+        state = self.successResultOf(d)
+
+        self._assert_server_not_in_group_state(state)
+        self._assert_delete_scheduled()
+        self._assert_create_not_scheduled(state)
+        self._assert_metadata_scrubbing_not_scheduled()
+        self.assertEqual(state.desired, 0)
+
+    def test_not_replaced_and_not_purged(self):
+        """
+        The server is removed, but not replaced and not purged.
+        """
+        d = self._remove_server(replace=False, purge=False)
+        state = self.successResultOf(d)
+
+        self._assert_server_not_in_group_state(state)
+        self._assert_delete_not_scheduled()
+        self._assert_create_not_scheduled(state)
+        self._assert_metadata_scrubbing_scheduled()
+        self.assertEqual(state.desired, 0)
+
+    def test_replaced_but_not_purged(self):
+        """
+        The server is removed, replaced, but not purged.
+        """
+        d = self._remove_server(replace=True, purge=False)
+        state = self.successResultOf(d)
+
+        self._assert_server_not_in_group_state(state)
+        self._assert_delete_not_scheduled()
+        self._assert_create_scheduled(state)
+        self._assert_metadata_scrubbing_scheduled()
+        self.assertEqual(state.desired, 1)

@@ -245,7 +245,7 @@ class AllPoliciesTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Policy creation is audit-logged
         """
-        self.root = Otter(self.mock_store).app.resource()
+        self.root = Otter(self.mock_store, 'region').app.resource()
         self.assertFalse(logger.msg.called)
         resp = policy_examples()[0]
         resp['id'] = '5'
@@ -551,7 +551,7 @@ class OnePolicyTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Policy deletion is audit-logged
         """
-        self.root = Otter(self.mock_store).app.resource()
+        self.root = Otter(self.mock_store, 'region').app.resource()
         self.assertFalse(logger.msg.called)
 
         self.mock_group.delete_policy.return_value = defer.succeed(None)

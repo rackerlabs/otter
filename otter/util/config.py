@@ -1,6 +1,8 @@
 """
 Implement a global configuration API.
 """
+from toolz.dicttoolz import get_in
+
 _config_data = {}
 
 
@@ -21,16 +23,4 @@ def config_value(name):
 
     :returns: The value specificed in the configuration file, or None.
     """
-    config = _config_data
-    value = None
-    parts = name.split('.')
-
-    while parts:
-        part = parts.pop(0)
-        value = config.get(part)
-
-        if isinstance(value, dict) and parts:
-            config = value
-            value = None
-
-    return value
+    return get_in(name.split('.'), _config_data)

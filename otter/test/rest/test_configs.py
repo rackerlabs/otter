@@ -5,6 +5,7 @@ for a scaling group.
 """
 
 import json
+
 from jsonschema import ValidationError
 
 import mock
@@ -12,16 +13,15 @@ import mock
 from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.json_schema import rest_schemas, validate
 from otter.json_schema.group_examples import (
     config as config_examples,
     launch_server_config as launch_examples)
-from otter.json_schema import rest_schemas, validate
 from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 from otter.supervisor import set_supervisor
-from otter.worker.validate_config import InvalidLaunchConfiguration
-
 from otter.test.rest.request import DummyException, RestAPITestMixin
+from otter.worker.validate_config import InvalidLaunchConfiguration
 
 
 class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
@@ -43,7 +43,8 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         response_body = self.assert_status_code(404)
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.view_config.assert_called_once_with()
         self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
@@ -56,7 +57,8 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         response_body = self.assert_status_code(500)
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.view_config.assert_called_once_with()
         self.assertEqual(resp['error']['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
@@ -79,7 +81,8 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         validate(response_body, rest_schemas.view_config)
         self.assertEqual(response_body, {'groupConfiguration': config})
 
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.view_config.assert_called_once_with()
 
     def test_update_group_config_404(self):
@@ -137,7 +140,8 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
                                                 body=json.dumps(request_body))
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.update_config.assert_called_once_with(expected_config)
         self.assertEqual(resp['error']['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
@@ -145,7 +149,8 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
     @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
     def test_update_group_config_success(self, *args):
         """
-        If the update succeeds, the complete data is updated and a 204 is returned.
+        If the update succeeds, the complete data is updated and a 204 is
+        returned.
         """
         self.mock_group.modify_state.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
@@ -173,14 +178,16 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_group.update_config.assert_called_once_with(expected_config)
 
     @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
-    def test_update_group_config_calls_obey_config_change(self, mock_controller):
+    def test_update_group_config_calls_obey_config_change(
+            self, mock_controller):
         """
         If the update succeeds, the data is updated and a 204 is returned.
         Obey config change is called with the updated log, transaction id,
         the complete config (including non-required, group, and state
         """
         self.mock_group.update_config.return_value = defer.succeed(None)
-        self.mock_group.view_launch_config.return_value = defer.succeed('launch')
+        self.mock_group.view_launch_config.return_value = defer.succeed(
+            'launch')
 
         self.assert_status_code(204, method='PUT', body=json.dumps({
             'name': 'blah',
@@ -268,7 +275,9 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
             400, method='PUT', body=json.dumps(invalid))
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['error']['type'], 'InvalidMinEntities', resp['error']['message'])
+        self.assertEqual(resp['error']['type'],
+                         'InvalidMinEntities',
+                         resp['error']['message'])
 
     def test_group_modify_minEntities_eq_maxEntities_204(self):
         """
@@ -305,7 +314,8 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
 
         # Patch supervisor
         self.supervisor = mock.Mock(spec=['validate_launch_config'])
-        self.supervisor.validate_launch_config.return_value = defer.succeed(None)
+        self.supervisor.validate_launch_config.return_value = defer.succeed(
+            None)
         set_supervisor(self.supervisor)
 
     def tearDown(self):
@@ -324,7 +334,8 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         response_body = self.assert_status_code(404)
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.view_launch_config.assert_called_once_with()
         self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
@@ -338,7 +349,8 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         response_body = self.assert_status_code(500)
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.view_launch_config.assert_called_once_with()
         self.assertEqual(resp['error']['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
@@ -356,7 +368,8 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         validate(resp, rest_schemas.view_launch_config)
         self.assertEqual(resp, {'launchConfiguration': launch_examples()[0]})
 
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.view_launch_config.assert_called_once_with()
 
     def test_update_group_config_404(self):
@@ -386,7 +399,8 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
             500, method="PUT", body=json.dumps(launch_examples()[0]))
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.update_launch_config.assert_called_once_with(
             launch_examples()[0])
         self.assertEqual(resp['error']['type'], 'InternalError')
@@ -414,9 +428,63 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         response_body = self.assert_status_code(
             204, method='PUT', body=json.dumps(launch_examples()[0]))
         self.assertEqual(response_body, "")
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.update_launch_config.assert_called_once_with(
             launch_examples()[0])
+
+    def test_update_launch_config_null_server_metadata(self):
+        """
+        Updating a launch config with null as the server metadata causes the
+        update to happen with effectively no metadata.
+        """
+        launch = launch_examples()[0]
+        launch['args']['server']['metadata'] = None
+
+        expected_launch = launch_examples()[0]
+        expected_launch['args']['server'].pop('metadata', None)
+
+        self.mock_group.update_launch_config.return_value = defer.succeed(None)
+        self.assert_status_code(
+            204, method='PUT', body=json.dumps(launch))
+        self.mock_group.update_launch_config.assert_called_once_with(
+            expected_launch)
+
+    def test_update_launch_config_invalid_server_metadata(self):
+        """
+        If invalid server metadata is provided, updating the launch config will
+        fail with a 400
+        """
+        launch = launch_examples()[0]
+        launch['args']['server']['metadata'] = "invalid"
+
+        self.mock_group.update_launch_config.return_value = defer.succeed(None)
+        self.assert_status_code(
+            400, method='PUT', body=json.dumps(launch))
+
+        self.assertFalse(self.mock_store.get_scaling_group.called)
+        self.assertFalse(self.mock_group.update_launch_config.called)
+
+    def test_update_with_clb_and_no_servicenet_returns_400(self):
+        """
+        If the launch config has one or more cloud load balancers attached, but
+        disabled ServiceNet on the server, the launch config fails to validate
+        when editing a launch config.
+        """
+        no_servicenet = launch_examples()[0]
+        no_servicenet['args']['server']['networks'] = [
+            {'uuid': "00000000-0000-0000-0000-000000000000"}]
+        no_servicenet['args']["loadBalancers"] = [
+            {'loadBalancerId': 1, 'port': 80}]
+
+        response_body = self.assert_status_code(
+            400, method='PUT', body=json.dumps(no_servicenet))
+        resp = json.loads(response_body)
+        self.assertEquals(resp['error']['type'], 'ValidationError')
+        self.assertEquals(
+            resp['error']['message'],
+            "ServiceNet network must be present if one or more Cloud Load "
+            "Balancers are configured.")
 
     def test_launch_config_modify_bad_or_missing_input_400(self):
         """
@@ -437,7 +505,8 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         Checks that an update with PUT data with the wrong schema fails with a
         400
         """
-        invalids = (config_examples()[0], {"type": "launch_server", "args": {}})
+        invalids = (config_examples()[0],
+                    {"type": "launch_server", "args": {}})
         for request_body in invalids:
             self.mock_group.update_launch_config.return_value = None
             response_body = self.assert_status_code(

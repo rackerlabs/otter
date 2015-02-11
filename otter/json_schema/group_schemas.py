@@ -8,6 +8,7 @@ from datetime import datetime
 import calendar
 
 from croniter import croniter
+from toolz import get_in
 
 from otter.util.timestamp import from_timestamp
 from otter.json_schema import format_checker
@@ -51,9 +52,111 @@ metadata = {
     "additionalProperties": False
 }
 
-# nova server payload
-server = {
+server_metadata = {
+    # TODO: Taken from Nova's validation code at
+    # https://github.com/openstack/nova/blob/master/nova/api/validation/parameter_types.py#L83.
+    # It will be ideal to import nova package and use their schema but their
+    # schema is not fully complete and there are lots of dependencies when trying to
+    # install nova package
     "type": "object",
+    "patternProperties": {
+        "^[a-zA-Z0-9-_:. ]{1,255}$": {
+            "type": "string", "maxLength": 255
+        }
+    },
+    "additionalProperties": False,
+}
+
+# nova server payload
+
+_bfv_server = {
+    "type": "object",
+    "properties": {
+        "imageRef": {
+            "type": ["string", "null"],
+            "maxLength": 0
+        },
+        "block_device_mapping": {
+            "type": "array",
+            "items": {"type": "object"},
+            "required": True
+        }
+    }
+}
+
+_non_bfv_server = {
+    "type": "object",
+    "properties": {
+        "imageRef": {
+            "type": "string",
+            "pattern": "^\S+$",  # must contain non-whitespace
+            "required": True
+        }
+    }
+}
+
+_rcv3_lb = {
+    "type": "object",
+    "description": (
+        "One load balancer all new servers should be "
+        "added to."),
+    "properties": {
+        "loadBalancerId": {
+            "type": "string",
+            "pattern": "^\S+$",  # must contain non-whitespace
+            "required": True,
+            "description": (
+                "The ID of the load balancer to which new "
+                "servers will be added."),
+        },
+        "type": {
+            "type": "string",
+            "description": (
+                "What type of a load balancer is in use"),
+            "required": True,
+            "oneOf": ["RackConnectV3"]
+        }
+    },
+    "additionalProperties": False
+}
+
+_clb_lb = {
+    "type": "object",
+    "description": (
+        "One load balancer all new servers should be "
+        "added to."),
+    "properties": {
+        # Cloud load balancer id's are NOT uuid's, just ints.  But accept
+        # strings also for backwards compatibility reasons.
+        "loadBalancerId": {
+            "type": ["integer", "string"],
+            "description": (
+                "The ID of the load balancer to which new "
+                "servers will be added."),
+            "required": True
+        },
+        "port": {
+            "type": "integer",
+            "description": (
+                "The port number of the service (on the "
+                "new servers) to load balance on for this "
+                "particular Cloud Load Balancer."),
+            "required": True
+        },
+        "type": {
+            "type": "string",
+            "description": (
+                "What type of a load balancer is in use"),
+            "required": False,
+            "oneOf": ["CloudLoadBalancer"]
+        }
+    },
+    "additionalProperties": False
+}
+
+
+server = {
+    "type": [_bfv_server, _non_bfv_server],
     # The schema for the create server attributes should come
     # from Nova, or Nova should provide some no-op method to
     # validate creating a server. Autoscale should not
@@ -67,16 +170,16 @@ server = {
                     "all new servers (including the name attribute)."),
     "properties": {
         "imageRef": {
-            "type": "string",
-            "required": True,
-            "minLength": 1,
-            "pattern": "\S+"  # must contain non-whitespace
         },
         "flavorRef": {
             "type": "string",
             "required": True,
             "minLength": 1,
-            "pattern": "\S+"  # must contain non-whitespace
+            "pattern": "^\S+$"  # must contain non-whitespace
+        },
+        "block_device_mapping": {
+            "type": "array",
+            "items": {"type": "object"}
         },
         "personality": {
             "type": "array",
@@ -92,6 +195,10 @@ server = {
                     "contents": {"type": "string", "required": True}
                 }
             },
+            "required": False
+        },
+        "metadata": {
+            "type": [server_metadata, "null"],
             "required": False
         }
     },
@@ -127,31 +234,10 @@ launch_server = {
                     # doesn't seem like a good idea.
                     "required": False,
                     "minItems": 0,
+                    "maxItems": 5,
                     "uniqueItems": True,
                     "items": {
-                        "type": "object",
-                        "description": (
-                            "One load balancer all new servers should be "
-                            "added to."),
-                        "properties": {
-                            # load balancer id's are NOT uuid's.  just an int.
-                            "loadBalancerId": {
-                                "type": "integer",
-                                "description": (
-                                    "The ID of the load balancer to which new "
-                                    "servers will be added."),
-                                "required": True
-                            },
-                            "port": {
-                                "type": "integer",
-                                "description": (
-                                    "The port number of the service (on the "
-                                    "new servers) to load balance on for this "
-                                    "particular load balancer."),
-                                "required": True
-                            }
-                        },
-                        "additionalProperties": False
+                        "type": [_clb_lb, _rcv3_lb]
                     }
                 },
 
@@ -235,6 +321,21 @@ zero = {
     "minimum": 0,
     "maximum": 0
 }
+
+
+def validate_launch_config_servicenet(lc):
+    """
+    Validate that if CLBs are provided, ServiceNet is also provided.
+    """
+    clb = any([lb.get('type', 'CloudLoadBalancer') == 'CloudLoadBalancer'
+               for lb in get_in(('args', 'loadBalancers'), lc, default=())])
+    networks = get_in(('args', 'server', 'networks'), lc, default=None)
+
+    if (clb and
+            networks is not None and
+            {'uuid': '11111111-1111-1111-1111-111111111111'} not in networks):
+        raise ValidationError("ServiceNet network must be present if one or "
+                              "more Cloud Load Balancers are configured.")
 
 
 # Datetime validator. Allow only zulu-based UTC timestamp
@@ -379,7 +480,7 @@ policy = {
                 {
                     "type": "object",
                     "properties": {"alarm_criteria": {"required": True},
-                                   "check": {"required":True}},
+                                   "check": {"required": True}},
                     "additionalProperties": False
                 }
             ],

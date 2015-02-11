@@ -1,9 +1,7 @@
 CODEDIR=otter
 TESTDIR1=autoscale_cloudroast/test_repo
 TESTDIR2=autoscale_cloudcafe/autoscale
-TESTDIR3=autoscale_cloudcafe/bobby
 SCRIPTSDIR=scripts
-PYTHONLINT=${SCRIPTSDIR}/python-lint.py
 PYDIRS=${CODEDIR} ${SCRIPTSDIR} autoscale_cloudcafe autoscale_cloudroast
 CQLSH ?= $(shell which cqlsh)
 DOCDIR=doc
@@ -16,6 +14,22 @@ CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
 CLOUDCAFE ?= $(shell which cafe-runner)
 
+mkfile_dir := $(shell dirname "$(MAKEFILE_LIST)")
+
+.PHONY: targets env-precheck docbook
+
+targets:
+	@cat README.md
+
+hooks:
+	cp ${mkfile_dir}/scripts/config_check.py ${mkfile_dir}/.git/hooks
+	echo "#!/bin/bash" > ${mkfile_dir}/.git/hooks/pre-commit
+	echo "python .git/hooks/config_check.py" >> ${mkfile_dir}/.git/hooks/pre-commit
+	chmod a+x ${mkfile_dir}/.git/hooks/pre-commit
+
+env-precheck:
+	./scripts/env-precheck.py
+
 test: unit integration
 
 run:
@@ -24,15 +38,38 @@ run:
 env:
 	./scripts/bootstrap-virtualenv.sh
 
-lint:
-	${PYTHONLINT} ${PYDIRS}
+lint: listoutdated flake8diff
+	pyflakes ${PYDIRS}
+
+listoutdated:
+	pip list --outdated --allow-external=cafe,cloudcafe
+
+# concatenate both environment variables together - if both are unset, the
+# concatenation will be empty
+ifneq ($(JENKINS_URL)$(TRAVIS_PULL_REQUEST), )
+# On Jenkins or Travis, HEAD will be a Github-created merge commit. Hence,
+# diffing against HEAD^1 gives you the diff introduced by the PR, which is what
+# we're trying to test.
+DIFF_TARGET = HEAD^1
+else
+# On not-Jenkins, we find the current branch's branch-off point from master,
+# and diff against that.
+DIFF_TARGET = $(shell git merge-base master HEAD)
+endif
+
+flake8diff:
+	git diff --patch --no-prefix ${DIFF_TARGET} | flake8 --diff
+
+flake8full:
+	flake8 ${PYDIRS}
 
 unit:
 ifneq ($(JENKINS_URL), )
-	trial --random 0 --reporter=subunit ${UNITTESTS} | tee subunit-output.txt
-	tail -n +3 subunit-output.txt | subunit2junitxml > test-report.xml
+	trial --jobs=4 --random 0 --reporter=subunit ${UNITTESTS} \
+		| tee subunit-output.txt
+	tail -n +4 subunit-output.txt | subunit2junitxml > test-report.xml
 else
-	trial --random 0 ${UNITTESTS}
+	trial --jobs=4 --random 0 ${UNITTESTS}
 endif
 
 integration:
@@ -40,47 +77,92 @@ ifneq ($(JENKINS_URL), )
 ifneq ($(CLOUDCAFE), )
 	cafe-runner autoscale dev -p functional --parallel
 else
-	@echo "Waiting on preprod node before running tests here."
+	@echo "Environment variable CLOUDCAFE appears to not be set; is it installed"
+	@echo "correctly and are you on the correct environment?"
+	@echo "Invoke `make envcheck' to double-check your environment compatibility."
 endif
 else
-	@echo "Cloudcafe is not set up as desired, so can't run those tests."
+	@echo "Cloudcafe is not set up as desired, so can't run integration tests:"
+	@echo "- Missing JENKINS_URL environment setting."
 endif
 
 coverage:
-	coverage run --source=${CODEDIR} --branch `which trial` ${UNITTESTS} && coverage html -d _trial_coverage --omit="*/test/*"
+	coverage run --source=${CODEDIR} --branch `which trial` ${UNITTESTS}
+	coverage html -d _trial_coverage --omit="*/test/*"
 
 cleandocs:
 	rm -rf _builddoc
 	rm -rf htmldoc
 	rm -rf docbook/target
 
-docs: cleandocs
+docs: sphinxdocs docbook
+
+sphinxdocs:
 	cp -r ${DOCDIR} _builddoc
 	sphinx-apidoc -F -T -o _builddoc ${CODEDIR}
 	sphinx-apidoc -F -T -o _builddoc ${TESTDIR2}
 	sphinx-apidoc -F -T -o _builddoc ${TESTDIR1}
-	sphinx-apidoc -F -T -o _builddoc ${TESTDIR3}
 	sphinx-build -b html _builddoc htmldoc
-	rm -rf _builddoc
+
+docbook:
+ifneq ($(shell git diff --name-only ${DIFF_TARGET} -- docbook), )
+	cd docbook; mvn -q compile
+else
+	echo "Skipping, nothing changed between working tree and diff target"
+endif
 
 schema: FORCE schema-setup schema-teardown
 
 schema-setup:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE}  --dry-run
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-prod.cql --replication ${REPLICATION_FACTOR} --keyspace ${CONTROL_KEYSPACE}  --dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup \
+		--ban-unsafe \
+		--outfile schema/setup-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup \
+		--ban-unsafe \
+		--outfile schema/setup-prod.cql \
+		--replication ${REPLICATION_FACTOR} \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--dry-run
 
 schema-teardown:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE}  --dry-run
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-prod.cql --replication ${REPLICATION_FACTOR} --keyspace ${CONTROL_KEYSPACE}  --dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown \
+		--outfile schema/teardown-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE}  \
+		--dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown \
+		--outfile schema/teardown-prod.cql \
+		--replication ${REPLICATION_FACTOR} \
+		--keyspace ${CONTROL_KEYSPACE}  \
+		--dry-run
 
 load-dev-schema:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup \
+		--ban-unsafe \
+		--outfile schema/setup-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--host ${CASSANDRA_HOST} \
+		--port ${CASSANDRA_PORT}
 
 migrate-dev-schema:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/migrations --outfile schema/migrations-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/migrations \
+		--outfile schema/migrations-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--host ${CASSANDRA_HOST} \
+		--port ${CASSANDRA_PORT}
 
 teardown-dev-schema:
-	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown \
+		--outfile schema/teardown-dev.cql \
+		--replication 1 \
+		--keyspace ${CONTROL_KEYSPACE} \
+		--host ${CASSANDRA_HOST} \
+		--port ${CASSANDRA_PORT}
 
 clear-dev-schema: FORCE teardown-dev-schema load-dev-schema
 
@@ -96,6 +178,3 @@ clean: cleandocs
 	rm -rf schema/setup-*.cql
 	rm -rf schema/migrations-*.cql
 	rm -rf schema/teardown-*.cql
-
-bundle:
-	./scripts/bundle.sh

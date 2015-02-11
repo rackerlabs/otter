@@ -40,16 +40,40 @@ import json
 from itertools import groupby
 from functools import partial
 
-from twisted.internet.defer import succeed, Deferred
+from characteristic import attributes
+
+from effect.twisted import deferred_performer
+
+from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
+from otter.log import BoundLog, log as default_log
 from otter.util import logging_treq as treq
-from otter.util.retry import retry, retry_times, repeating_interval
-
-from otter.log import log as default_log
+from otter.util.deferredutils import delay, wait
 from otter.util.http import (
-    headers, check_success, append_segments, wrap_request_error)
+    append_segments,
+    check_success,
+    headers,
+    retry_on_unauth,
+    wrap_upstream_error,
+)
+from otter.util.retry import repeating_interval, retry, retry_times
+
+
+class _DoNothingLogger(BoundLog):
+    """This class implements a do-nothing logger for the benefit of
+    those wishing to call authenticate_user without a logger.
+    """
+
+    def _discard(self, *args, **kwArgs):
+        """Consumes the attempt at logging, but takes no action."""
+
+    def __init__(self, unused1, unused2):
+        """Requires two arguments, even if unused, because the :py:meth:`bind`
+        method invokes this constructor with two arguments.
+        """
+        super(_DoNothingLogger, self).__init__(self._discard, self._discard)
 
 
 class IAuthenticator(Interface):
@@ -60,7 +84,25 @@ class IAuthenticator(Interface):
         """
         :param tenant_id: A keystone tenant ID to authenticate as.
 
-        :returns: 2-tuple of auth token and service catalog.
+        :returns: Deferred of a 2-tuple of auth token and service catalog.
+        """
+
+
+class ICachingAuthenticator(IAuthenticator):
+    """
+    Caching authenticators can authenticate tenants and can have their cache
+    invalidated on a tenant-by-tenant basis.
+    """
+    def invalidate(tenant_id):
+        """
+        Invalidate the cache for a particular tenant.
+
+        After this is called, a call to authenticate_tenant must return a fresh
+        token.
+
+        :param tenant_id: A keystone tenant ID
+
+        :returns: :data:`None`
         """
 
 
@@ -90,6 +132,29 @@ class RetryingAuthenticator(object):
 
 
 @implementer(IAuthenticator)
+class WaitingAuthenticator(object):
+    """
+    An authenticator that waits after getting the token and before returning it
+
+    :param IReactorTime reactor: An IReactorTime provider used for waiting
+    :param IAuthenticator authenticator: authenticate using this
+    :param float wait: Number of seconds to wait before returning
+    """
+    def __init__(self, reactor, authenticator, wait):
+        self._reactor = reactor
+        self._authenticator = authenticator
+        self._wait = wait
+
+    def authenticate_tenant(self, tenant_id, log=None):
+        """
+        see :meth:`IAuthenticator.authenticate_tenant`
+        """
+        d = self._authenticator.authenticate_tenant(tenant_id, log=log)
+        d.addCallback(delay, self._reactor, self._wait)
+        return d
+
+
+@implementer(ICachingAuthenticator)
 class CachingAuthenticator(object):
     """
     An authenticator which cases the result of the provided auth_function
@@ -108,6 +173,7 @@ class CachingAuthenticator(object):
         self._waiters = {}
         self._cache = {}
         self._log = self._bind_log(default_log)
+        self._auth_func = wait(ignore_kwargs=['log'])(self._authenticator.authenticate_tenant)
 
     def _bind_log(self, log, **kwargs):
         """
@@ -137,37 +203,20 @@ class CachingAuthenticator(object):
 
             log.msg('otter.auth.cache.expired', age=now - created)
 
-        if tenant_id in self._waiters:
-            d = Deferred()
-            self._waiters[tenant_id].append(d)
-            log.msg('otter.auth.cache.waiting',
-                    waiters=len(self._waiters[tenant_id]))
-            return d
-
         def when_authenticated(result):
             log.msg('otter.auth.cache.populate')
             self._cache[tenant_id] = (self._reactor.seconds(), result)
-
-            waiters = self._waiters.pop(tenant_id, [])
-            for waiter in waiters:
-                waiter.callback(result)
-
             return result
 
-        def when_auth_fails(failure):
-            waiters = self._waiters.pop(tenant_id, [])
-            for waiter in waiters:
-                waiter.errback(failure)
-
-            return failure
-
         log.msg('otter.auth.cache.miss')
-        self._waiters[tenant_id] = []
-        d = self._authenticator.authenticate_tenant(tenant_id, log=log)
+        d = self._auth_func(tenant_id, log=log)
         d.addCallback(when_authenticated)
-        d.addErrback(when_auth_fails)
 
         return d
+
+    def invalidate(self, tenant_id):
+        """Remove a tenant's token from the cache."""
+        self._cache.pop(tenant_id, None)
 
 
 @implementer(IAuthenticator)
@@ -181,46 +230,58 @@ class ImpersonatingAuthenticator(object):
         self._identity_admin_password = identity_admin_password
         self._url = url
         self._admin_url = admin_url
+        # cached token to admin identity
+        self._token = None
 
-    def authenticate_tenant(self, tenant_id, log=None):
-        """
-        see :meth:`IAuthenticator.authenticate_tenant`
-        """
+    @wait(ignore_kwargs=['log'])
+    def _auth_me(self, log=None):
+        if log:
+            log.msg('Getting new identity admin token')
         d = authenticate_user(self._url,
                               self._identity_admin_user,
                               self._identity_admin_password,
                               log=log)
         d.addCallback(extract_token)
+        d.addCallback(partial(setattr, self, "_token"))
+        return d
 
-        def find_user(identity_admin_token):
-            d = user_for_tenant(self._admin_url,
-                                self._identity_admin_user,
-                                self._identity_admin_password,
-                                tenant_id, log=log)
-            d.addCallback(lambda username: (identity_admin_token, username))
-            return d
+    def authenticate_tenant(self, tenant_id, log=None):
+        """
+        see :meth:`IAuthenticator.authenticate_tenant`
+        """
+        auth = partial(self._auth_me, log=log)
 
-        d.addCallback(find_user)
+        d = user_for_tenant(self._admin_url,
+                            self._identity_admin_user,
+                            self._identity_admin_password,
+                            tenant_id, log=log)
 
-        def impersonate((identity_admin_token, user)):
+        def impersonate(user):
             iud = impersonate_user(self._admin_url,
-                                   identity_admin_token,
+                                   self._token,
                                    user, log=log)
             iud.addCallback(extract_token)
-            iud.addCallback(lambda token: (identity_admin_token, token))
             return iud
 
-        d.addCallback(impersonate)
+        d.addCallback(lambda user: retry_on_unauth(partial(impersonate, user), auth))
 
-        def endpoints((identity_admin_token, token)):
-            scd = endpoints_for_token(self._admin_url, identity_admin_token,
+        def endpoints(token):
+            scd = endpoints_for_token(self._admin_url, self._token,
                                       token, log=log)
             scd.addCallback(lambda endpoints: (token, _endpoints_to_service_catalog(endpoints)))
             return scd
 
-        d.addCallback(endpoints)
+        d.addCallback(lambda token: retry_on_unauth(partial(endpoints, token), auth))
 
         return d
+
+    def __hash__(self):
+        """
+        Return hash of the object. Required for this to be stored in dict to
+        make wait() decorator work
+        """
+        return hash((self._identity_admin_user, self._identity_admin_password,
+                     self._url, self._admin_url))
 
 
 def extract_token(auth_response):
@@ -249,7 +310,7 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token,
     d = treq.get(append_segments(auth_endpoint, 'tokens', user_token, 'endpoints'),
                  headers=headers(identity_admin_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, auth_endpoint, data='token_endpoints')
+    d.addErrback(wrap_upstream_error, 'identity', 'token_endpoints', auth_endpoint)
     d.addCallback(treq.json_content)
     return d
 
@@ -271,22 +332,29 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
         allow_redirects=False,
         log=log)
     d.addCallback(check_success, [301])
-    d.addErrback(wrap_request_error, auth_endpoint, data='mosso')
+    d.addErrback(wrap_upstream_error, 'identity', 'mosso', auth_endpoint)
     d.addCallback(treq.json_content)
     d.addCallback(lambda user: user['user']['id'])
     return d
 
 
-def authenticate_user(auth_endpoint, username, password, log=None):
+def authenticate_user(auth_endpoint, username, password, log=None, pool=None):
     """
     Authenticate to a Identity auth endpoint with a username and password.
 
     :param str auth_endpoint: Identity API endpoint URL.
     :param str username: Username to authenticate as.
     :param str password: Password for the specified user.
+    :param log: If provided, a BoundLog object.
+    :param twisted.web.client.HTTPConnectionPool pool: If provided,
+        a connection pool which an integration test can manually clean up
+        to avoid a race condition between Trial and Twisted.
 
     :return: Decoded JSON response as dict.
     """
+    if not log:
+        log = _DoNothingLogger(None, None)
+
     d = treq.post(
         append_segments(auth_endpoint, 'tokens'),
         json.dumps(
@@ -299,10 +367,13 @@ def authenticate_user(auth_endpoint, username, password, log=None):
                 }
             }),
         headers=headers(),
-        log=log)
+        log=log,
+        pool=pool)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, auth_endpoint,
-                 data=('authenticating', username))
+    d.addErrback(
+        wrap_upstream_error, 'identity',
+        ('authenticating', username), auth_endpoint
+    )
     d.addCallback(treq.json_content)
     return d
 
@@ -331,7 +402,7 @@ def impersonate_user(auth_endpoint, identity_admin_token, username,
         headers=headers(identity_admin_token),
         log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, auth_endpoint, data='impersonation')
+    d.addErrback(wrap_upstream_error, 'identity', 'impersonation', auth_endpoint)
     d.addCallback(treq.json_content)
     return d
 
@@ -343,3 +414,114 @@ def _endpoints_to_service_catalog(endpoints):
     """
     return [{'endpoints': list(e), 'name': n, 'type': t}
             for (n, t), e in groupby(endpoints['endpoints'], lambda i: (i['name'], i['type']))]
+
+
+def endpoints(service_catalog, service_name, region):
+    """
+    Search a service catalog for matching endpoints.
+
+    :param list service_catalog: List of services.
+    :param str service_name: Name of service.  Example: 'cloudServersOpenStack'
+    :param str region: Region of service.  Example: 'ORD'
+
+    :return: Iterable of endpoints.
+    """
+    for service in service_catalog:
+        if service_name != service['name']:
+            continue
+
+        for endpoint in service['endpoints']:
+            if region != endpoint['region']:
+                continue
+
+            yield endpoint
+
+
+def public_endpoint_url(service_catalog, service_name, region):
+    """
+    Return the first publicURL for a given service in a given region.
+
+    :param list service_catalog: List of services.
+    :param str service_name: Name of service.  Example: 'cloudServersOpenStack'
+    :param str region: Region of service.  Example: 'ORD'
+
+    :return: URL as a string.
+    """
+    first_endpoint = next(endpoints(service_catalog, service_name, region))
+    return first_endpoint['publicURL']
+
+
+@attributes(['authenticator', 'tenant_id', 'log'], apply_with_init=False)
+class Authenticate(object):
+    """
+    An Effect intent that represents authentication.
+
+    The result type is (auth_token, service_catalog).
+    """
+    def __init__(self, authenticator, tenant_id, log):
+        self.authenticator = authenticator
+        self.tenant_id = tenant_id
+        self.log = log
+
+    def intent_result_pred(self, result):
+        """Check that the result looks like (auth_token, service_catalog)."""
+        return (isinstance(result, tuple)
+                and len(result) == 2
+                and isinstance(result[1], list))
+
+
+@deferred_performer
+def perform_authenticate(dispatcher, intent):
+    """Authenticate."""
+    return intent.authenticator.authenticate_tenant(intent.tenant_id,
+                                                    log=intent.log)
+
+
+@attributes(['authenticator', 'tenant_id'], apply_with_init=False)
+class InvalidateToken(object):
+    """
+    An Effect intent that represents the invalidation of a token from a local
+    cache.
+
+    The result type is None.
+    """
+    def __init__(self, authenticator, tenant_id):
+        self.authenticator = authenticator
+        self.tenant_id = tenant_id
+
+    def intent_result_pred(self, result):
+        """Check that the result is None."""
+        return result is None
+
+
+@deferred_performer
+def perform_invalidate_token(dispatcher, intent):
+    """Invalidate the credential cache."""
+    return intent.authenticator.invalidate(intent.tenant_id)
+
+
+def generate_authenticator(reactor, config):
+    """
+    Generate authenticator based on settings in config
+
+    :param reactor: Twisted reactor
+    :param dict config: Identity specific config
+    """
+    # FIXME: Pick an arbitrary cache ttl value based on absolutely no science.
+    cache_ttl = config.get('cache_ttl', 300)
+
+    return CachingAuthenticator(
+        reactor,
+        WaitingAuthenticator(
+            reactor,
+            RetryingAuthenticator(
+                reactor,
+                ImpersonatingAuthenticator(
+                    config['username'],
+                    config['password'],
+                    config['url'],
+                    config['admin_url']),
+                max_retries=config['max_retries'],
+                retry_interval=config['retry_interval']),
+            config.get('wait', 5)),
+        cache_ttl)

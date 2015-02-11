@@ -1,6 +1,7 @@
 """
 Test to update launch config.
 """
+from autoscale.models.request.autoscale_requests import null
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cloudcafe.common.tools.datagen import rand_name
 
@@ -28,7 +29,8 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
         lc_name = rand_name('upd_server_name')
         lc_image_ref = self.lc_image_ref_alt
         lc_flavor_ref = '4'
-        lc_load_balancers = [{'loadBalancerId': 1234, 'port': 8181}]
+        lc_load_balancers = [{'loadBalancerId': 1234, 'port': 8181},
+                             {'loadBalancerId': '3245', 'port': 8181}]
         lc_disk_config = 'AUTO'
         lc_personality = [{'path': '/root/.ssh/authorized_keys',
                            'contents': ('DQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp')}]
@@ -130,3 +132,69 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
         self.assertEquals(update_launchconfig_response.status_code, 204,
                           msg='Update launch config does not allow partial requests'
                           ' for group {0}'.format(self.group.id))
+
+    def _test_boot_from_volume(self, lc_image_ref):
+        """
+        Helper to assert that updating boot from volume works
+        """
+        lc_name = rand_name('boot_from_volume')
+        lc_flavor_ref = self.lc_flavor_ref
+        update_lc_response = self.autoscale_client.update_launch_config(
+            group_id=self.group.id,
+            name=lc_name,
+            image_ref=lc_image_ref,
+            flavor_ref=lc_flavor_ref,
+            block_device_mapping=[{
+                "boot_index": "0",
+                "uuid": self.lc_image_ref,
+                "volume_size": "100",
+                "source_type": "image",
+                "destination_type": "volume",
+                "delete_on_termination": False
+            }])
+
+        self.assertEquals(update_lc_response.status_code, 204,
+                          msg='Update launch config failed with {0} as against a 204, success for'
+                          ' group {1}'.format(update_lc_response.status_code, self.group.id))
+        self.validate_headers(update_lc_response.headers)
+
+        launchconfig_response = self.autoscale_client.view_launch_config(
+            self.group.id)
+        updated_launchconfig = launchconfig_response.entity
+
+        # None is no argument, null is null.  Yes this is terrible.
+        # Cloudcafe removes arguments from the json if the value is None.
+        # So a null value was hacked in to be 'null'
+        if lc_image_ref is None:
+            self.assertFalse(hasattr(updated_launchconfig.server, 'imageRef'))
+        elif lc_image_ref is null:
+            self.assertEquals(
+                updated_launchconfig.server.imageRef, None,
+                msg='Server ImageRef in the launch config did not update '
+                'for group {0}'.format(self.group.id))
+        else:
+            self.assertEquals(
+                updated_launchconfig.server.imageRef, lc_image_ref,
+                msg='Server ImageRef in the launch config did not update '
+                'for group {0}'.format(self.group.id))
+
+    def test_update_launch_config_with_boot_from_volume_empty_image(self):
+        """
+        Update a scaling group's launch config with an empty image ID.  Request
+        succeeds, overwriting previous launch config.
+        """
+        self._test_boot_from_volume("")
+
+    def test_update_launch_config_with_boot_from_volume_null_image(self):
+        """
+        Update a scaling group's launch config with a null image ID.  Request
+        succeeds, overwriting previous launch config.
+        """
+        self._test_boot_from_volume(null)
+
+    def test_update_launch_config_with_boot_from_volume_no_image(self):
+        """
+        Update a scaling group's launch config without an image ID.  Request
+        succeeds, overwriting previous launch config.
+        """
+        self._test_boot_from_volume(None)

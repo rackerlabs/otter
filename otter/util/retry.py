@@ -4,7 +4,13 @@ Module that provides retrying-at-a-particular-interval functionality.
 
 import random
 
+from characteristic import Attribute, attributes
+
+from effect import Delay, Effect, Func, sync_performer
+from effect.retry import retry as effect_retry
+
 from twisted.internet import defer
+from twisted.python.failure import Failure
 
 
 class _Retrier(object):
@@ -123,10 +129,26 @@ def transient_errors_except(*args):
 
     :return: a function that accepts a :class:`Failure` and returns ``True``
         only if the :class:`Failure` does not wrap an Exception passed in the
-        args.  If no args are passed, all Exceptions are treated as transient.
+        args.  If no args are passed, all :class:`Exception`s are treated as
+        transient.
     """
     def can_retry(f):
         return not f.check(*args)
+
+    return can_retry
+
+
+def terminal_errors_except(*args):
+    """
+    Returns a ``can_retry`` function for :py:func:retry` that only retries if
+    errors the ``Exception`` types specified.
+
+    :return: a function that accepts a :class:`Failure` and returns ``True``
+        only if the :class:`Failure` wraps an Exception passed in the args.
+        If no args are passed, no :class:`Exception` is treated as transient.
+    """
+    def can_retry(f):
+        return f.check(*args)
 
     return can_retry
 
@@ -139,13 +161,7 @@ def retry_times(max_tries):
     :return: a function that accepts a :class:`Failure` and returns ``True``
         until it has been called ``max_tries`` times. Otherwise, returns ``False``
     """
-    tries = [0]
-
-    def can_retry(f):
-        tries[0] += 1
-        return tries[0] <= max_tries
-
-    return can_retry
+    return RetryTimes(max_retries=max_tries)
 
 
 def compose_retries(*can_retry_funcs):
@@ -185,6 +201,17 @@ def random_interval(minimum, maximum):
     :return: a function that accepts a :class:`Failure` and returns ``interval``
     """
     return lambda f: random.uniform(minimum, maximum)
+
+
+def exponential_backoff_interval(start=2):
+    """
+    Returns a ``next_interval`` function for `:py:func:retry` that returns previous
+    interval * 2 as new interval each time it is called
+
+    :param start: number of seconds > 0 to start with
+    :return: a function that accepts a :class:`Failure` and returns ``interval``
+    """
+    return ExponentialBackoffInterval(start=start)
 
 
 def retry(do_work, can_retry=None, next_interval=None, clock=None):
@@ -235,3 +262,102 @@ class TransientRetryError(Exception):
     Exception that can be used to represent retry-able status in a
     retry-function.
     """
+
+
+# TODO: The following code should be moved to effect.retry if it proves out.
+
+@attributes(['start', Attribute('last_interval', default_value=0)])
+class ExponentialBackoffInterval(object):
+    """
+    A callable that returns the previous interval * 2 (starting at
+    ``start``) every time it's called.
+
+    :param start: number of seconds > 0 to start with
+    :return: a function that accepts a :class:`Failure` and returns ``interval``
+    """
+
+    def __call__(self, failure):
+        """Return an increasingly larger number."""
+        if self.last_interval != 0:
+            self.last_interval *= 2
+        else:
+            self.last_interval = self.start
+        return self.last_interval
+
+
+@attributes(['max_retries', Attribute('tries', default_value=0)])
+class RetryTimes(object):
+    """
+    A callable that returns True until it's been called ``max_retries``.
+    :param max_retries: Number of times to return True.
+    """
+    def __call__(self, failure):
+        """Return True if this has been called <= ``max_retries``."""
+        self.tries += 1
+        return self.tries <= self.max_retries
+
+
+@attributes(['can_retry', 'next_interval'])
+class ShouldDelayAndRetry(object):
+    """
+    A callable which can be passed as the should_retry argument to
+    :func:`effect.retry.retry`. Determines whether to retry and also causes
+    a delay before retrying.
+
+    :param can_retry: A callable of Failure -> Bool, indicating whether retry
+        should occur
+    :param next_interval: A callable of Failure -> interval to wait
+    """
+
+    def __call__(self, exc_info):
+        """
+        Determine whether retry should occur, based on the exception info.
+        """
+        exc_type, exc_value, exc_traceback = exc_info
+        failure = Failure(exc_value, exc_type, exc_traceback)
+
+        def doit():
+            if self.can_retry(failure):
+                interval = self.next_interval(failure)
+                return Effect(Delay(interval)).on(lambda r: True)
+            else:
+                return False
+        return Effect(Func(doit))
+
+
+@attributes(['effect', 'should_retry'])
+class Retry(object):
+    """
+    An effect intent that, when performed, executes another effect and
+    potentially retries it.
+
+    The main reason this class exists is to transparently represent the
+    retryable effect and its retry policy as public attributes, making it
+    easy to test that some effect should be retried, without actually running
+    a bunch of imperative code to test it's retried correctly.
+
+    :param effect: The effect to perform.
+    :param should_retry: The function to call to determine whether retry
+    should occur (usually an instance of :obj:`ShouldDelayAndRetry`).
+    """
+
+
+@sync_performer
+def perform_retry(dispatcher, intent):
+    """
+    Invoke :func:`effect.retry.retry` with the effect and the
+    should_retry function.
+    """
+    return effect_retry(intent.effect, intent.should_retry)
+
+
+def retry_effect(effect, can_retry, next_interval):
+    """
+    Convenience function for wrapping an effect in a :obj:`Retry`.
+
+    :return: :obj:`Effect` of :obj:`Retry`.
+    """
+    return Effect(Retry(
+        effect=effect,
+        should_retry=ShouldDelayAndRetry(can_retry=can_retry,
+                                         next_interval=next_interval)))

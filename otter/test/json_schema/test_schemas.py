@@ -192,7 +192,9 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
 
     def test_invalid_load_balancer_does_not_validate(self):
         """
-        Load balancers need to have 2 values: loadBalancerId and port.
+        Cloud Load Balancers need a load balancer ID and a port, plus
+        optionally a type.  RCv3 needs the type but not the port.
+        The type needs to be valid.
         """
         base = {
             "type": "launch_server",
@@ -202,7 +204,15 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
         }
         invalids = [
             {'loadBalancerId': '', 'port': 80},
-            {'loadBalancerId': 3, 'port': '80'}
+            {'loadBalancerId': 3, 'port': '80'},
+            {'loadBalancerId': 3, 'type': 'CloudLoadBalancer'},
+            {'loadBalancerId': 3, 'port': '80', 'type': 'blah blah'},
+            {'loadBalancerId': 3, 'type': 'RackConnectV3'},
+            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2', 'type': 'CloudLoadBalancer'},
+            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2', 'type': 'RackConnectV3',
+             'port': 80},
+            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'},
+            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2', 'type': ''},
         ]
         for invalid in invalids:
             base["args"]["loadBalancers"] = [invalid]
@@ -213,6 +223,28 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
             # fails to validate because it is not the given type
             self.assertRaisesRegexp(ValidationError, 'not of type', validate,
                                     base, group_schemas.launch_config)
+
+    def test_too_many_load_balancers_do_not_validate(self):
+        """
+        If more than 5 load balancers are provided, the launch config fails to
+        validate.
+        """
+        invalid = {
+            "type": "launch_server",
+            "args": {
+                "server": {},
+                "loadBalancers": [{'loadBalancerId': i, 'port': 80}
+                                  for i in range(6)]
+            }
+        }
+
+        # the type fails ot valdiate because the load balancer list is too long
+        self.assertRaisesRegexp(ValidationError, 'is too long',
+                                validate, invalid, group_schemas.launch_server)
+        # because the type schema fails to validate, the config schema
+        # fails to validate because it is not the given type
+        self.assertRaisesRegexp(ValidationError, 'not of type',
+                                validate, invalid, group_schemas.launch_config)
 
     def test_duplicate_load_balancers_do_not_validate(self):
         """
@@ -272,6 +304,46 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
         self.assertRaisesRegexp(ValidationError, 'not of type',
                                 validate, invalid, group_schemas.launch_config)
 
+    def test_array_metadata_invalid(self):
+        """
+        metadata with array in it is not allowed
+        """
+        config = deepcopy(group_examples.launch_server_config()[0])
+        config['args']['server']['metadata'] = []
+        self.assertRaisesRegexp(
+            ValidationError, "\[\] is not of type ",
+            validate, config, group_schemas.launch_server)
+
+    def test_no_metadata_valid(self):
+        """
+        No metadata in launch config is valid
+        """
+        config = deepcopy(group_examples.launch_server_config()[0])
+        del config['args']['server']['metadata']
+        validate(config, group_schemas.launch_server)
+
+    def test_special_char_metadata_invalid(self):
+        """
+        metadata with special character in launch config is valid
+        """
+        invalid = deepcopy(group_examples.launch_server_config()[0])
+        invalid['args']['server']['metadata'] = {'anc%': 'ag'}
+        self.assertRaises(ValidationError, validate, invalid,
+                          group_schemas.launch_server)
+
+    def test_more255_metadata_invalid(self):
+        """
+        metadata with key or value > 255 in launch config is valid
+        """
+        invalid = deepcopy(group_examples.launch_server_config()[0])
+        invalid['args']['server']['metadata'] = {'ab' * 150: 'ag'}
+        self.assertRaises(ValidationError, validate, invalid,
+                          group_schemas.launch_server)
+
+        invalid['args']['server']['metadata'] = {'ab': 'ag' * 150}
+        self.assertRaises(ValidationError, validate, invalid,
+                          group_schemas.launch_server)
+
 
 class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
     """
@@ -289,23 +361,53 @@ class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
         invalidates if imageRef is not a string
         """
         self.server['imageRef'] = 3
-        self.assertRaisesRegexp(ValidationError, "3 is not of type 'string'",
+        self.assertRaisesRegexp(ValidationError, "is not of type",
                                 validate, self.server, group_schemas.server)
 
-    def test_empty_image(self):
+    def test_empty_image_no_bfv(self):
         """
-        invalidates if imageRef is an empty string
+        Empty string or null for ``imageRef`` is not valid, if no
+        ``block_device_mapping`` is provided.
         """
-        self.server['imageRef'] = ''
-        self.assertRaisesRegexp(ValidationError, "'' is too short",
+        for ref in ('', None):
+            self.server['imageRef'] = ref
+            self.assertRaisesRegexp(ValidationError, "is not of type",
+                                    validate, self.server, group_schemas.server)
+
+    def test_null_image_no_bfv(self):
+        """
+        Not providing ``imageRef`` is not valid, if no
+        ``block_device_mapping`` is provided.
+        """
+        self.server.pop('imageRef')
+        self.assertRaisesRegexp(ValidationError, "is not of type",
                                 validate, self.server, group_schemas.server)
+
+    def test_empty_image_bfv(self):
+        """
+        Empty string or null for ``imageRef`` is valid, if
+        ``block_device_mapping`` is provided.
+        """
+        for ref in ('', None):
+            self.server['imageRef'] = ref
+            self.server['block_device_mapping'] = [{'volume_id': '235'}]
+            validate(self.server, group_schemas.server)
+
+    def test_no_image_bfv(self):
+        """
+        Not providing ``imageRef`` is valid, if ``block_device_mapping`` is
+        provided.
+        """
+        self.server.pop('imageRef')
+        self.server['block_device_mapping'] = [{'volume_id': '235'}]
+        validate(self.server, group_schemas.server)
 
     def test_blank_image(self):
         """
         invalidates if imageRef is just whitespace
         """
         self.server['imageRef'] = ' '
-        self.assertRaisesRegexp(ValidationError, "does not match",
+        self.assertRaisesRegexp(ValidationError, "is not of type",
                                 validate, self.server, group_schemas.server)
 
     def test_invalid_flavor(self):
@@ -1002,3 +1104,80 @@ class UpdateWebhookTestCase(SynchronousTestCase):
         """
         invalid = {'name': 'foo'}
         self.assertRaises(ValidationError, validate, invalid, group_schemas.update_webhook)
+
+
+class HelperValidationFunctionsTestCase(SynchronousTestCase):
+    """
+    Tests for helper validation functions such as
+    :func:`group_schemas.validate_launch_config_servicenet`.
+    """
+    def test_servicenet_validation_fails_if_no_servicenet_but_has_clbs_old_style(self):
+        """
+        If CLBs are confgured on the launch configuration (old style load
+        balancer configuration), but no ServiceNet is supplied, raise
+        validation error.
+        """
+        bad_schema = {
+            "server": {"networks": [{'uuid': "00000000-0000-0000-0000-000000000000"}]},
+            "loadBalancers": [{'loadBalancerId': 1, "port": 80}]
+        }
+        self.assertRaises(ValidationError,
+                          group_schemas.validate_launch_config_servicenet,
+                          {'type': 'launch_server', 'args': bad_schema})
+
+    def test_servicenet_validation_fails_if_no_servicenet_but_has_clbs_new_style(self):
+        """
+        If CLBs are confgured on the launch configuration (new style load
+        balancer configuration), but no ServiceNet is supplied, raise
+        validation error.
+        """
+        bad_schema = {
+            "server": {"networks": [{'uuid': "00000000-0000-0000-0000-000000000000"}]},
+            "loadBalancers": [{'loadBalancerId': 1, "port": 80, 'type': 'CloudLoadBalancer'}]
+        }
+        self.assertRaises(ValidationError,
+                          group_schemas.validate_launch_config_servicenet,
+                          {'type': 'launch_server', 'args': bad_schema})
+
+    def test_servicenet_validation_succeeds_if_clbs_but_no_network_info(self):
+        """
+        If CLBs are confgured on the launch configuration, but no network
+        configuration is supplied, Nova sets up both ServiceNet and public
+        network, so validation succeeds.
+        """
+        good_schema = {
+            "server": {},
+            "loadBalancers": [{'loadBalancerId': 1, "port": 80}]
+        }
+        self.assertIsNone(
+            group_schemas.validate_launch_config_servicenet(
+                {'type': 'launch_server', 'args': good_schema}))
+
+    def test_servicenet_validation_succeeds_if_rackconnect_but_no_network_info(self):
+        """
+        If only RackConnect LBs are confgured on the launch configuration, and
+        no ServiceNet is supplied, that's still ok because RackConnect does not
+        need ServiceNet so validation succeeds.
+        """
+        good_schema = {
+            "server": {"networks": [{'uuid': "00000000-0000-0000-0000-000000000000"}]},
+            "loadBalancers": [{'loadBalancerId': '1234', 'type': 'RackConnectV3'}]
+        }
+        self.assertIsNone(
+            group_schemas.validate_launch_config_servicenet(
+                {'type': 'launch_server', 'args': good_schema}))
+
+    def test_servicenet_validation_succeeds_if_clbs_and_servicenet(self):
+        """
+        If CLBs are confgured on the launch configuration, but and ServiceNet
+        is specifically provided, validation succeeds
+        """
+        good_schema = {
+            "server": {"networks": [
+                {'uuid': "00000000-0000-0000-0000-000000000000"},
+                {'uuid': "11111111-1111-1111-1111-111111111111"}]},
+            "loadBalancers": [{'loadBalancerId': 1, "port": 80}]
+        }
+        self.assertIsNone(
+            group_schemas.validate_launch_config_servicenet(
+                {'type': 'launch_server', 'args': good_schema}))

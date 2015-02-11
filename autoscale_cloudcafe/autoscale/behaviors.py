@@ -1,13 +1,59 @@
 """
 Behaviors for Autoscale
 """
-from decimal import Decimal, ROUND_HALF_UP
-from datetime import datetime, timedelta
+import inspect
+import logging
+import time
+import unittest
 
+from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 
 from cafe.engine.behaviors import BaseBehavior
+
 from cloudcafe.common.tools.datagen import rand_name
+
 from autoscale.models.servers import Metadata
+
+
+log = logging.getLogger('RunnerLog')
+
+
+def _line():
+    """Returns the line number of the caller."""
+    # Taken shamelessly from
+    # http://code.activestate.com/recipes/145297-grabbing-the-current-line-number-easily/
+    return inspect.currentframe().f_back.f_lineno
+
+
+class DefaultAsserter(object):
+    """DefaultAsserter objects are used when invoking AutoscaleBehaviors
+    methods that take an asserter, but you don't feel like or care about the
+    assertion results.  If an assertion failure happens, it raises
+    unittest.AssertionError.
+
+    However, this isn't generally recommended.  If you're verifying results,
+    you REALLY want to know if something failed.  Thus, you should subclass
+    DefaultAsserter (or write a new class entirely which implements an
+    asserter-like interface) and implement your own functionality.  For
+    example, you could call various TestCase.assertX() functions.  Or, you
+    could just flag when things aren't correct in an error attribute for later
+    inspection independent of any test framework.
+
+    If you choose to subclass instead of compose an asserter-like interface,
+    all you need to override is the fail() method.
+    """
+
+    def assertEquals(self, a, b, msg=""):  # nopep8 - ignore N802
+        if a != b:
+            self.fail(msg)
+
+    def assertNotEquals(self, a, b, msg=""):  # nopep8 - ignore N802
+        if a == b:
+            self.fail(msg)
+
+    def fail(self, msg):
+        raise unittest.AssertionError(msg)
 
 
 class AutoscaleBehaviors(BaseBehavior):
@@ -15,15 +61,20 @@ class AutoscaleBehaviors(BaseBehavior):
     """
     :summary: Behavior Module for the Autoscale REST API
     :note: Should be the primary interface to a test case or external tool
+    :note: Instantiate this behaviors class without an rcv3_client keyword
+           option implies you cannot meaningfully call
+           wait_for_expected_number_of_active_servers() with the api set to
+           "RackConnect".  Doing so will throw an exception.
     """
 
-    def __init__(self, autoscale_config, autoscale_client):
+    def __init__(self, autoscale_config, autoscale_client, rcv3_client=None):
         """
         Instantiate config and client
         """
         super(AutoscaleBehaviors, self).__init__()
         self.autoscale_config = autoscale_config
         self.autoscale_client = autoscale_client
+        self.rcv3_client = rcv3_client
 
     def create_scaling_group_min(self, gc_name=None,
                                  gc_cooldown=None,
@@ -107,7 +158,7 @@ class AutoscaleBehaviors(BaseBehavior):
             sp_cooldown = int(self.autoscale_config.sp_cooldown)
         if sp_policy_type is None:
             sp_policy_type = self.autoscale_config.sp_policy_type
-        sp_change = int(self.autoscale_config.sp_change)
+        sp_change = int(self.autoscale_config.sp_change) if sp_change is None else sp_change
         create_response = self.autoscale_client.create_policy(
             group_id=group_id,
             name=sp_name, cooldown=sp_cooldown,
@@ -115,6 +166,30 @@ class AutoscaleBehaviors(BaseBehavior):
         policy = AutoscaleBehaviors.get_policy_properties(
             self, create_response.entity, create_response.status_code)
         return policy
+
+    def create_policy_min_batch(self, group_id, sp_name=None, sp_cooldown=None,
+                                sp_change=None, sp_change_percent=None,
+                                sp_desired_capacity=None, sp_policy_type=None, batch_size=1):
+        """
+        :summary: Use a single API call to create the requested number of scaling policies.
+        :param: group_id
+        :param: name - Names take the form "name_#" with numbers from 0 to batch_size (done in client.py)
+        :return: returns information on the created policies in the form of a list of dicts
+        :rtype: returns a list of policy dicts
+        """
+        sp_name = sp_name and str(sp_name) or rand_name('test_sp')
+        if sp_cooldown is None:
+            sp_cooldown = int(self.autoscale_config.sp_cooldown)
+        if sp_policy_type is None:
+            sp_policy_type = self.autoscale_config.sp_policy_type
+        sp_change = int(self.autoscale_config.sp_change)
+        create_response = self.autoscale_client.create_policy_batch(
+            group_id=group_id,
+            name=sp_name, cooldown=sp_cooldown,
+            change=sp_change, policy_type=sp_policy_type, batch_size=batch_size)
+        policy_list = [AutoscaleBehaviors.get_policy_properties(
+            self, [each_policy], create_response.status_code) for each_policy in create_response.entity]
+        return policy_list
 
     def create_policy_given(self, group_id, sp_name=None, sp_cooldown=None,
                             sp_change=None, sp_change_percent=None,
@@ -186,75 +261,6 @@ class AutoscaleBehaviors(BaseBehavior):
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
                 change=sp_change, policy_type=sp_policy_type, args=args)
-        if create_response.status_code != 201:
-            return dict(status_code=create_response.status_code)
-        else:
-            policy = AutoscaleBehaviors.get_policy_properties(
-                self, policy_list=create_response.entity, status_code=create_response.status_code,
-                headers=create_response.headers)
-            return policy
-
-    def create_monitoring_policy_given(self, group_id, sp_name=None, sp_cooldown=None,
-                                       sp_change=None, sp_change_percent=None,
-                                       sp_desired_capacity=None, sp_policy_type='cloud_monitoring',
-                                       check_label=None, check_type=None, check_url=None,
-                                       check_method=None, monitoring_zones=None,
-                                       check_timeout=None, check_period=None,
-                                       alarm_criteria=None, check_disabled=None,
-                                       check_metadata=None, target_alias=None,
-                                       target_hostname=None, target_resolver=None):
-        """
-        :summary: creates a monitoring policy for the given check type, target.
-        :return: returns the newly created policy object
-        :rtype: returns the policy object
-        """
-        sp_name = sp_name and str(sp_name) or rand_name('test_maas_policy_')
-        sp_cooldown = sp_cooldown or int(self.autoscale_config.sp_cooldown)
-        check_type = check_type or self.autoscale_config.check_type
-        check_label = check_label or rand_name('scaling_group_check')
-        check_timeout = check_timeout or int(self.autoscale_config.check_timeout)
-        check_period = check_period or int(self.autoscale_config.check_period)
-        alarm_criteria = alarm_criteria or self.autoscale_config.alarm_criteria
-        monitoring_zones = monitoring_zones or ['mzord', 'mzdfw', 'mziad']
-        if check_type == 'remote.http':
-            check_url = self.autoscale_config.check_url
-            check_method = self.autoscale_config.check_method
-        if not target_hostname or target_resolver or target_alias:
-            target_alias = self.autoscale_config.target_alias
-        if sp_change_percent is not None:
-            create_response = self.autoscale_client.create_policy(
-                group_id=group_id,
-                name=sp_name, cooldown=sp_cooldown,
-                change_percent=sp_change_percent, policy_type=sp_policy_type,
-                check_label=check_label, check_type=check_type, check_url=check_url,
-                check_method=check_method, monitoring_zones=monitoring_zones,
-                check_timeout=check_timeout, check_period=check_period,
-                alarm_criteria=alarm_criteria, check_disabled=check_disabled,
-                check_metadata=check_metadata, target_alias=target_alias,
-                target_hostname=target_hostname, target_resolver=target_resolver)
-        elif sp_desired_capacity is not None:
-            create_response = self.autoscale_client.create_policy(
-                group_id=group_id,
-                name=sp_name, cooldown=sp_cooldown,
-                desired_capacity=sp_desired_capacity, policy_type=sp_policy_type,
-                check_label=check_label, check_type=check_type, check_url=check_url,
-                check_method=check_method, monitoring_zones=monitoring_zones,
-                check_timeout=check_timeout, check_period=check_period,
-                alarm_criteria=alarm_criteria, check_disabled=check_disabled,
-                check_metadata=check_metadata, target_alias=target_alias,
-                target_hostname=target_hostname, target_resolver=target_resolver)
-        else:
-            sp_change = sp_change or int(self.autoscale_config.sp_change)
-            create_response = self.autoscale_client.create_policy(
-                group_id=group_id,
-                name=sp_name, cooldown=sp_cooldown,
-                change=sp_change, policy_type=sp_policy_type,
-                check_label=check_label, check_type=check_type, check_url=check_url,
-                check_method=check_method, monitoring_zones=monitoring_zones,
-                check_timeout=check_timeout, check_period=check_period,
-                alarm_criteria=alarm_criteria, check_disabled=check_disabled,
-                check_metadata=check_metadata, target_alias=target_alias,
-                target_hostname=target_hostname, target_resolver=target_resolver)
         if create_response.status_code != 201:
             return dict(status_code=create_response.status_code)
         else:
@@ -390,7 +396,10 @@ class AutoscaleBehaviors(BaseBehavior):
 
     def get_policy_properties(self, policy_list, status_code=None,
                               headers=None):
-        """converts policy list object to a dict"""
+        """
+        This function converts a policy list containing a single policy object to a dict.
+        If there are multiple policies in the list, the properties of the first are returned.
+        """
         # :todo : find the change type
         policy = {}
         for policy_type in policy_list:
@@ -423,67 +432,6 @@ class AutoscaleBehaviors(BaseBehavior):
                             policy['schedule_value'] = policy_type.args.cron
                     except AttributeError:
                         pass
-                    try:
-                        if policy_type.args.check.url:
-                            policy['check_url'] = policy_type.args.check.url
-                            policy['check_method'] = policy_type.args.check.method
-                    except AttributeError:
-                        pass
-                    try:
-                        if policy_type.args.check.type:
-                            policy['check_type'] = policy_type.args.check.type
-                    except AttributeError:
-                        pass
-                    try:
-                        if policy_type.args.check.label:
-                            policy['check_label'] = policy_type.args.check.label
-                    except AttributeError:
-                        pass
-                    try:
-                        if policy_type.args.check.disabled:
-                            policy['check_disabled'] = policy_type.args.check.disabled
-                    except AttributeError:
-                        pass
-                    try:
-                        if policy_type.args.check.metadata:
-                            policy['check_metadata'] = policy_type.args.check.metadata
-                    except AttributeError:
-                        pass
-                    try:
-                        if policy_type.args.check.period:
-                            policy['check_period'] = policy_type.args.check.period
-                    except AttributeError:
-                        pass
-                    try:
-                        if policy_type.args.check.timeout:
-                            policy['check_timeout'] = policy_type.args.check.timeout
-                    except AttributeError:
-                        pass
-                    try:
-                        if policy_type.args.check.monitoring_zones_poll:
-                            policy['monitoring_zones'] = policy_type.args.check.monitoring_zones_poll
-                    except AttributeError:
-                        pass
-                    try:
-                        if policy_type.args.check.target_alias:
-                            policy['target_alias'] = policy_type.args.check.target_alias
-                    except AttributeError:
-                        pass
-                    try:
-                        if policy_type.args.check.target_hostname:
-                            policy['target_hostname'] = policy_type.args.check.target_hostname
-                    except AttributeError:
-                        pass
-                    try:
-                        if policy_type.args.check.target_resolver:
-                            policy['target_resolver'] = policy_type.args.check.target_resolver
-                    except AttributeError:
-                        pass
-                    try:
-                        if policy_type.args.alarm_criteria:
-                            policy['alarm_criteria'] = policy_type.args.alarm_criteria.criteria
-                    except AttributeError:
-                        pass
             except AttributeError:
                 pass
 
@@ -498,7 +446,7 @@ class AutoscaleBehaviors(BaseBehavior):
             return policy
 
     def get_webhooks_properties(self, webhook_list):
-        """converts webhook list object to a dict"""
+        """converts the first item in a webhook list object to a dict"""
         webhook = {}
         for i in webhook_list:
             webhook['id'] = i.id
@@ -511,3 +459,87 @@ class AutoscaleBehaviors(BaseBehavior):
                 pass
             webhook['count'] = len(webhook_list)
             return webhook
+
+    def wait_for_expected_number_of_active_servers(
+            self, group_id, expected_servers, interval_time=None, timeout=None,
+            api="Autoscale", asserter=None
+    ):
+        """
+        Wait for the expected_servers to arrive in either Autoscale or
+        RackConnectV3 API.
+
+        :summary: verify the desired capacity in group state is equal to
+                  expected servers and waits for the specified number of
+                  servers to be active on a group
+
+        :param group_id: Group id (AutoScale API), or pool ID (RackConnect API)
+        :param expected_servers: Total active servers expected on the group
+        :param interval_time: Time to wait during polling group state
+        :param timeout: Time to wait before exiting this function
+        :param api: Either "Autoscale" or "RackConnect".  Defaults to
+            "Autoscale"
+        :param asserter: Object responsible for enforcing invariants through
+            assertions.  If none provided, a default do-nothing asserter will
+            be assumed.  You won't be able to tell if things pass or fail,
+            though.  It's best if you pass in your own asserter.
+
+        :return: returns the list of active servers in the group
+        """
+
+        interval_time = interval_time or int(
+            self.autoscale_config.interval_time)
+        timeout = timeout or int(self.autoscale_config.timeout)
+        start_time = time.time()
+        end_time = start_time + timeout
+
+        # If we didn't receive an asserter, let's assume a do-nothing asserter.
+        if asserter is None:
+            asserter = DefaultAsserter()
+
+        while time.time() < end_time:
+            if api == 'Autoscale':
+                resp = (self.autoscale_client
+                        .list_status_entities_sgroups(group_id))
+                group_state = resp.entity
+                active_list = group_state.active
+                asserter.assertNotEquals(
+                    (group_state.activeCapacity +
+                     group_state.pendingCapacity),
+                    0,
+                    msg='Group Id {0} failed to attempt server creation. '
+                    'Group has no servers'.format(group_id)
+                )
+
+                asserter.assertEquals(
+                    group_state.desiredCapacity, expected_servers,
+                    msg='Group {0} should have {1} servers,'
+                    ' but has reduced the build {2}'
+                    'servers'.format(group_id, expected_servers,
+                                     group_state.desiredCapacity))
+
+                if len(active_list) == expected_servers:
+                    return [server.id for server in active_list]
+            else:
+                # We're looking at the RackConnect API for our server list
+                # here.
+                nodes = self.rcv3_client.get_nodes_on_pool(group_id).entity
+                server_list = [n for n in nodes.nodes
+                               if (safe_hasattr(n, "cloud_server"))
+                               and (n.status == "ACTIVE")]
+                if len(server_list) == expected_servers:
+                    return [n.id for n in server_list]
+
+            time.sleep(interval_time)
+        else:
+            asserter.fail(
+                "wait_for_active_list_in_group_state ran for {0} seconds "
+                "for group/pool ID {1} and did not observe the active "
+                "server list achieving the expected servers count: {2}."
+                .format(timeout, group_id, expected_servers)
+            )
+
+
+def safe_hasattr(obj, key):
+    """This function provides a safe alternative to the hasattr() function."""
+    sentinel = object()
+    return getattr(obj, key, sentinel) is not sentinel
