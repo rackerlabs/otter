@@ -54,7 +54,7 @@ class RCv3Tests(SynchronousTestCase):
         self.request_bag = _RequestBag(dispatcher=self.dispatcher,
                                        tenant_id='thetenantid')
         self.post_result = (StubResponse(201, {}),
-                              _rcv3_add_response_body("lb_id", "server_id"))
+                            _rcv3_add_response_body("lb_id", "server_id"))
         self.del_result = (StubResponse(204, {}), None)
 
     def _fake_perform(self, dispatcher, effect):
