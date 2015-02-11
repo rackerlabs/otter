@@ -129,7 +129,7 @@ class LaunchConfigTest(AutoscaleFixture):
             group.launchConfiguration.server.name,
             - scale_down_change)
 
-    @tags(speed='quick', convergence='p1')
+    @tags(speed='quick', convergence='yes')
     def test_system_server_details_name_and_metadata(self):
         """
         Server name is appended by random characters and metadata of servers
