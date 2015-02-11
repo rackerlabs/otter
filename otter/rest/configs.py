@@ -108,7 +108,8 @@ class OtterConfig(object):
         The entire schema body must be provided.
         """
         if data['minEntities'] > data['maxEntities']:
-            raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
+            raise InvalidMinEntities(
+                "minEntities must be less than or equal to maxEntities")
 
         def _get_launch_and_obey_config_change(scaling_group, state):
             d = scaling_group.view_launch_config()
