@@ -363,7 +363,8 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         validate(resp, rest_schemas.view_launch_config)
         self.assertEqual(resp, {'launchConfiguration': launch_examples()[0]})
 
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.view_launch_config.assert_called_once_with()
 
     def test_update_group_config_404(self):
