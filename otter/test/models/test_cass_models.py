@@ -2602,11 +2602,11 @@ class ScalingGroupWebhookMigrateTests(SynchronousTestCase):
 
         query = (
             'BEGIN BATCH '
-            'INSERT INTO webhook_keys "tenantId", "groupId", "policyId", '
-            '"webhookKey"'
+            'INSERT INTO webhook_keys ("tenantId", "groupId", "policyId", '
+            '"webhookKey")'
             'VALUES (:tenantId0, :groupId0, :policyId0, :webhookKey0) '
-            'INSERT INTO webhook_keys "tenantId", "groupId", "policyId", '
-            '"webhookKey"'
+            'INSERT INTO webhook_keys ("tenantId", "groupId", "policyId", '
+            '"webhookKey")'
             'VALUES (:tenantId1, :groupId1, :policyId1, :webhookKey1) '
             'APPLY BATCH;')
         params = {

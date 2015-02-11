@@ -66,9 +66,10 @@ def perform_query_sync(cursor, disp, intent):
     """
     Perform CQLQueryExecute synchronously using cursor
     """
-    return cursor.execute(
-        intent.query, intent.params,
-        consistency_level=intent.consistency_level)
+    cursor.execute(
+        intent.query, intent.params)
+        #consistency_level=intent.consistency_level)
+    return cursor.fetchall()
 
 
 def serialize_json_data(data, ver):
@@ -1538,7 +1539,8 @@ class CassScalingGroupCollection:
         :return: Effect of CQLQueryExecute
         """
         query = (
-            'INSERT INTO {cf} "tenantId", "groupId", "policyId", "webhookKey"'
+            'INSERT INTO {cf} ("tenantId", "groupId", "policyId", '
+            '"webhookKey")'
             'VALUES (:tenantId{i}, :groupId{i}, :policyId{i}, :webhookKey{i})')
         stmts = []
         data = {}
