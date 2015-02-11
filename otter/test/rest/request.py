@@ -104,6 +104,16 @@ def request(root_resource, method, endpoint, headers=None, body=None):
             mock_request.responseHeaders.setRawHeaders(
                 'Content-Type', [Request.defaultContentType])
 
+        # Annoying implementation detail: if the status code is one of the
+        # status codes that should not have a body, twisted replaces the
+        # write method of the request with a function that does nothing, so
+        # no response body can every be written.  This messes up the mock
+        # request's write function (which just returns another mock).  So
+        # in this case, just return the empty string.
+        content = ''
+        if status_code not in http.NO_BODY_CODES:
+            content = mock_request.getWrittenData()
+
         response = mock.MagicMock(spec=['code', 'headers'],
                                   code=status_code,
                                   headers=mock_request.responseHeaders)
