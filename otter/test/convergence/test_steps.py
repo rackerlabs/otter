@@ -618,7 +618,6 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         result = _rcv3_check_bulk_delete(pairs, (resp, body))
         self.assertIdentical(result, None)
 
-
     def test_node_not_a_member(self):
         """
         If the node is not a member of the load balancer pool it's being
