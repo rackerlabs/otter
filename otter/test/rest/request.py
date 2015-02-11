@@ -118,7 +118,7 @@ def request(root_resource, method, endpoint, headers=None, body=None):
                                   code=status_code,
                                   headers=mock_request.responseHeaders)
         return ResponseWrapper(response=response,
-                               content=mock_request.getWrittenData(),
+                               content=content,
                                request=mock_request)
 
     return _render(
