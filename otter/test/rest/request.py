@@ -105,8 +105,9 @@ def request(root_resource, method, endpoint, headers=None, body=None):
                 'Content-Type', [Request.defaultContentType])
 
         response = mock.MagicMock(spec=['code', 'headers'], code=status_code,
+        response = mock.MagicMock(spec=['code', 'headers'],
+                                  code=status_code,
                                   headers=mock_request.responseHeaders)
-
         # Annoying implementation detail: if the status code is one of the
         # status codes that should not have a body, twisted replaces the
         # write method of the request with a function that does nothing, so
