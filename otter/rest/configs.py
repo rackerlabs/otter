@@ -120,7 +120,8 @@ class OtterConfig(object):
                 data, scaling_group, state))
             return d
 
-        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
         deferred = rec.update_config(data)
         deferred.addCallback(
             lambda _: rec.modify_state(_get_launch_and_obey_config_change))
