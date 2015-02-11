@@ -149,9 +149,10 @@ class OtterLaunch(object):
     def view_launch_config(self, request):
         """
         Get the launch configuration for a scaling group, which includes the
-        details of how to create a server, from what image, which load balancers to
-        join it to, and what networks to add it to, and other metadata.
-        This data is returned in the body of the response in JSON format.
+        details of how to create a server, from what image, which load
+        balancers to join it to, and what networks to add it to, and other
+        metadata.  This data is returned in the body of the response in JSON
+        format.
 
         Example response::
 
