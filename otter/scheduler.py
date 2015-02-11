@@ -6,16 +6,17 @@ in the first place.
 
 from datetime import datetime
 from functools import partial
-from croniter import croniter
 
-from twisted.internet import defer
 from twisted.application.internet import TimerService
+from twisted.internet import defer
 
-from otter.util.hashkey import generate_transaction_id
-from otter.controller import maybe_execute_scaling_policy, CannotExecutePolicyError
+from otter.controller import (
+    CannotExecutePolicyError, maybe_execute_scaling_policy)
 from otter.log import log as otter_log
-from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
+from otter.models.interface import (
+    NoSuchPolicyError, NoSuchScalingGroupError, next_cron_occurrence)
 from otter.util.deferredutils import ignore_and_log
+from otter.util.hashkey import generate_transaction_id
 
 
 class SchedulerService(TimerService):
@@ -200,13 +201,6 @@ def process_events(events, store, log):
     d = defer.gatherResults(deferreds, consumeErrors=True)
     d.addCallback(lambda _: add_cron_events(store, log, events, deleted_policy_ids))
     return d.addCallback(lambda _: len(events))
-
-
-def next_cron_occurrence(cron):
-    """
-    Return next occurence of given cron entry
-    """
-    return croniter(cron, start_time=datetime.utcnow()).get_next(ret_type=datetime)
 
 
 def add_cron_events(store, log, events, deleted_policy_ids):

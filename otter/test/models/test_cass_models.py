@@ -3336,7 +3336,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         r = self.successResultOf(d)
         self.assertEqual(r, ('123', 'group1', 'pol1'))
         self.connection.execute.assert_called_once_with(
-            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+            expectedCql, expectedData, ConsistencyLevel.ONE)
 
     def test_webhook_hash_table(self):
         """
@@ -3354,7 +3354,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         r = self.successResultOf(d)
         self.assertEqual(r, ('123', 'group1', 'pol1'))
         self.connection.execute.assert_called_once_with(
-            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+            expectedCql, expectedData, ConsistencyLevel.ONE)
 
     def test_webhook_bad(self):
         """
@@ -3371,8 +3371,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
         self.failureResultOf(d, UnrecognizedCapabilityError)
         self.connection.execute.assert_has_calls(
-            [mock.call(expectedCql[0], expectedData, ConsistencyLevel.QUORUM),
-             mock.call(expectedCql[1], expectedData, ConsistencyLevel.QUORUM)])
+            [mock.call(expectedCql[0], expectedData, ConsistencyLevel.ONE),
+             mock.call(expectedCql[1], expectedData, ConsistencyLevel.ONE)])
 
     def test_get_counts(self):
         """

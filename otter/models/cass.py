@@ -42,8 +42,8 @@ from otter.models.interface import (
     PoliciesOverLimitError,
     ScalingGroupOverLimitError,
     UnrecognizedCapabilityError,
-    WebhooksOverLimitError)
-from otter.scheduler import next_cron_occurrence
+    WebhooksOverLimitError,
+    next_cron_occurrence)
 from otter.util import timestamp
 from otter.util.config import config_value
 from otter.util.cqlbatch import Batch, batch
@@ -1508,7 +1508,7 @@ class CassScalingGroupCollection:
         """
         d = self.connection.execute(
             _cql_find_webhook_token.format(cf=self.webhook_keys_table),
-            {"webhookKey": capability_hash}, DEFAULT_CONSISTENCY)
+            {"webhookKey": capability_hash}, ConsistencyLevel.ONE)
 
         def extract_info(rows):
             if len(rows) == 0:
@@ -1533,7 +1533,7 @@ class CassScalingGroupCollection:
         query = _cql_find_webhook_token.format(cf=self.webhooks_table)
         d = self.connection.execute(query,
                                     {"webhookKey": capability_hash},
-                                    DEFAULT_CONSISTENCY)
+                                    ConsistencyLevel.ONE)
         d.addCallback(_do_webhook_lookup)
         return d
 

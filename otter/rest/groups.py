@@ -2,30 +2,45 @@
 Autoscale REST endpoints having to do with a group or collection of groups
 (/tenantId/groups and /tenantId/groups/groupId)
 """
-from functools import partial
 import json
+
+from functools import partial
 
 from twisted.internet import defer
 
 from otter import controller
-from otter.supervisor import get_supervisor, remove_server_from_group
-
-from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import (
-    MAX_ENTITIES, validate_launch_config_servicenet)
+    MAX_ENTITIES,
+    validate_launch_config_servicenet,
+)
+from otter.json_schema.rest_schemas import create_group_request
 from otter.log import log
-from otter.rest.configs import OtterConfig, OtterLaunch, normalize_launch_config
-from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   with_transaction_id, paginatable,
-                                   InvalidQueryArgument)
-from otter.rest.errors import exception_codes
+from otter.rest.bobby import get_bobby
+from otter.rest.configs import (
+    OtterConfig,
+    OtterLaunch,
+    normalize_launch_config
+)
+from otter.rest.decorators import (
+    InvalidQueryArgument,
+    fails_with,
+    paginatable,
+    succeeds_with,
+    validate_body,
+    with_transaction_id,
+)
+from otter.rest.errors import InvalidMinEntities, exception_codes
+from otter.rest.otterapp import OtterApp
 from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.webhooks import _format_webhook
-from otter.rest.errors import InvalidMinEntities
-from otter.rest.otterapp import OtterApp
-from otter.util.http import (get_autoscale_links, transaction_id, get_groups_links,
-                             get_policies_links, get_webhooks_links)
-from otter.rest.bobby import get_bobby
+from otter.supervisor import get_supervisor, remove_server_from_group
+from otter.util.http import (
+    get_autoscale_links,
+    get_groups_links,
+    get_policies_links,
+    get_webhooks_links,
+    transaction_id,
+)
 
 
 def format_state_dict(state):
@@ -69,8 +84,10 @@ def extract_bool_arg(request, key, default=False):
             return False
         else:
             raise InvalidQueryArgument(
-                'Invalid "{}" query argument: "{}". Must be "true" or "false". '
-                'Defaults to "{}" if not provided'.format(key, value, str(default).lower()))
+                'Invalid "{}" query argument: "{}". '
+                'Must be "true" or "false". '
+                'Defaults to "{}" if not provided'
+                .format(key, value, str(default).lower()))
     else:
         return default
 
@@ -94,7 +111,8 @@ class OtterGroups(object):
     @paginatable
     def list_all_scaling_groups(self, request, paginate):
         """
-        Lists all the autoscaling groups and their states per for a given tenant ID.
+        Lists all the autoscaling groups and their states per for a given
+        tenant ID.
 
         Example response::
 
@@ -104,8 +122,10 @@ class OtterGroups(object):
                         "id": "e41380ae-173c-4b40-848a-25c16d7fa83d",
                         "links": [
                             {
-                                "href": "https://dfw.autoscale.api.rackspacecloud.com/
-                                v1.0/676873/groups/e41380ae-173c-4b40-848a-25c16d7fa83d/",
+                                "href": "https://dfw.autoscale.api
+                                .rackspacecloud.com/
+                                v1.0/676873/
+                                groups/e41380ae-173c-4b40-848a-25c16d7fa83d/",
                                 "rel": "self"
                             }
                         ],
@@ -130,8 +150,10 @@ class OtterGroups(object):
                         },
                         "links": [
                             {
-                                "href": "https://dfw.autoscale.api.rackspacecloud.com/
-                                v1.0/676873/groups/f82bb000-f451-40c8-9dc3-6919097d2f7e/",
+                                "href": "https://dfw.autoscale.api
+                                .rackspacecloud.com/
+                                v1.0/676873/
+                                groups/f82bb000-f451-40c8-9dc3-6919097d2f7e/",
                                 "rel": "self"
                             }
                         ]
@@ -151,7 +173,8 @@ class OtterGroups(object):
             } for state in group_states]
             return {
                 "groups": groups,
-                "groups_links": get_groups_links(groups, self.tenant_id, None, **paginate)
+                "groups_links": get_groups_links(
+                    groups, self.tenant_id, None, **paginate)
             }
 
         deferred = self.store.list_scaling_group_states(
@@ -160,14 +183,10 @@ class OtterGroups(object):
         deferred.addCallback(json.dumps)
         return deferred
 
-    # --------------------------- CRD a scaling group -----------------------------
+    # -------------------------- CRD a scaling group -------------------------
     # (CRD = CRUD - U, because updating happens at suburls - so you can update
     # different parts)
 
-    # TODO: Currently, the response does not include scaling policy ids, because
-    # we are just repeating whatever the request body was, with an ID and links
-    # attached.  If we are going to create the scaling policies here too, we should
-    # probably also return their ids and links, just like the manifest.
     @app.route('/', methods=['POST'])
     @with_transaction_id()
     @fails_with(exception_codes)
@@ -175,10 +194,11 @@ class OtterGroups(object):
     @validate_body(create_group_request)
     def create_new_scaling_group(self, request, data):
         """
-        Create a new scaling group, given the general scaling group configuration,
-        launch configuration, and optional scaling policies.  This data provided
-        in the request body in JSON format. If successful, the created group in JSON
-        format containing id and links is returned.
+        Create a new scaling group, given the general scaling group
+        configuration, launch configuration, and optional scaling policies.
+        This data provided in the request body in JSON format. If
+        successful, the created group in JSON format containing id and links
+        is returned.
 
         Example request body containing some scaling policies::
 
@@ -240,8 +260,8 @@ class OtterGroups(object):
             }
 
 
-        The ``scalingPolicies`` attribute can also be an empty list, or just left
-        out entirely.
+        The ``scalingPolicies`` attribute can also be an empty list, or just
+        left out entirely.
 
         Example response body to the above request::
 
@@ -330,11 +350,14 @@ class OtterGroups(object):
             }
 
         """
-        data['groupConfiguration'].setdefault('maxEntities', MAX_ENTITIES)
-        data['groupConfiguration'].setdefault('metadata', {})
+        group_cfg = data['groupConfiguration']
 
-        if data['groupConfiguration']['minEntities'] > data['groupConfiguration']['maxEntities']:
-            raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
+        group_cfg.setdefault('maxEntities', MAX_ENTITIES)
+        group_cfg.setdefault('metadata', {})
+
+        if group_cfg['minEntities'] > group_cfg['maxEntities']:
+            raise InvalidMinEntities(
+                "minEntities must be less than or equal to maxEntities")
 
         validate_launch_config_servicenet(data['launchConfiguration'])
 
@@ -344,7 +367,7 @@ class OtterGroups(object):
         deferred.addCallback(
             lambda _: self.store.create_scaling_group(
                 self.log, self.tenant_id,
-                data['groupConfiguration'],
+                group_cfg,
                 normalize_launch_config(data['launchConfiguration']),
                 data.get('scalingPolicies', None)))
 
@@ -352,7 +375,8 @@ class OtterGroups(object):
             group_id = result['id']
             config = result['groupConfiguration']
             launch = result['launchConfiguration']
-            group = self.store.get_scaling_group(self.log, self.tenant_id, group_id)
+            group = self.store.get_scaling_group(
+                self.log, self.tenant_id, group_id)
             d = group.modify_state(partial(
                 controller.obey_config_change, self.log,
                 transaction_id(request), config, launch_config=launch))
@@ -372,11 +396,14 @@ class OtterGroups(object):
             uuid = result['id']
             result["state"] = format_state_dict(result["state"])
             request.setHeader(
-                "Location", get_autoscale_links(self.tenant_id, uuid, format=None))
+                "Location",
+                get_autoscale_links(self.tenant_id, uuid, format=None))
             result["links"] = get_autoscale_links(self.tenant_id, uuid)
-            linkify_policy_list(result['scalingPolicies'], self.tenant_id, uuid)
+            linkify_policy_list(
+                result['scalingPolicies'], self.tenant_id, uuid)
             result['scalingPolicies_links'] = get_policies_links(
-                result['scalingPolicies'], self.tenant_id, uuid, rel='policies')
+                result['scalingPolicies'],
+                self.tenant_id, uuid, rel='policies')
             return {"group": result}
 
         deferred.addCallback(_format_output)
@@ -413,8 +440,8 @@ class OtterGroup(object):
     def view_manifest_config_for_scaling_group(self, request):
         """
         View manifested view of the scaling group configuration, including the
-        launch configuration, and the scaling policies.  This data is returned in
-        the body of the response in JSON format.
+        launch configuration, and the scaling policies.  This data is
+        returned in the body of the response in JSON format.
 
         Example response::
 
@@ -444,8 +471,10 @@ class OtterGroup(object):
                     },
                     "links": [
                         {
-                            "href": "https://dfw.autoscale.api.rackspacecloud.com/
-                            v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/",
+                            "href": "https://dfw.autoscale.api.
+                            rackspacecloud.com/
+                            v1.0/676873
+                            /groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/",
                             "rel": "self"
                         }
                     ],
@@ -456,9 +485,12 @@ class OtterGroup(object):
                             "id": "eb0fe1bf-3428-4f34-afd9-a5ac36f60511",
                             "links": [
                                 {
-                                    "href": "https://dfw.autoscale.api.rackspacecloud.com/
-                                    v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/
-                                    policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/",
+                                    "href": "https://dfw.autoscale.api.
+                                    rackspacecloud.com/
+                                    v1.0/676873/groups/
+                                    605e13f6-1452-4588-b5da-ac6bb468c5bf/
+                                    policies/
+                                    eb0fe1bf-3428-4f34-afd9-a5ac36f60511/",
                                     "rel": "self"
                                 }
                             ],
@@ -480,7 +512,11 @@ class OtterGroup(object):
                                 for webhook_model in policy['webhooks']]
                 policy['webhooks'] = webhook_list
                 policy['webhooks_links'] = get_webhooks_links(
-                    webhook_list, self.tenant_id, gid, policy['id'], rel='webhooks')
+                    webhook_list,
+                    self.tenant_id,
+                    gid,
+                    policy['id'],
+                    rel='webhooks')
 
         def openstack_formatting(data, uuid):
             data["links"] = get_autoscale_links(self.tenant_id, uuid)
@@ -492,22 +528,23 @@ class OtterGroup(object):
                 add_webhooks_links(data["scalingPolicies"], uuid)
             return {"group": data}
 
-        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        group = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
         deferred = group.view_manifest(with_webhooks(request))
         deferred.addCallback(openstack_formatting, group.uuid)
         deferred.addCallback(json.dumps)
         return deferred
 
-    # Feature: Force delete, which stops scaling, deletes all servers for you, then
-    #       deletes the scaling group.
+    # Feature: Force delete, which stops scaling, deletes all servers for
+    #       you, then deletes the scaling group.
     @app.route('/', methods=['DELETE'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     def delete_scaling_group(self, request):
         """
-        Delete a scaling group if there are no entities belonging to the scaling
-        group.  If successful, no response body will be returned.
+        Delete a scaling group if there are no entities belonging to the
+        scaling group.  If successful, no response body will be returned.
         """
         group = self.store.get_scaling_group(self.log, self.tenant_id,
                                              self.group_id)
@@ -552,11 +589,13 @@ class OtterGroup(object):
     @succeeds_with(200)
     def get_scaling_group_state(self, request):
         """
-        Get the current state of the scaling group, including the current set of
-        active entities, number of pending entities, and the desired number
-        of entities.  This data is returned in the body of the response in JSON format.
+        Get the current state of the scaling group, including the current set
+        of active entities, number of pending entities, and the desired
+        number of entities.  This data is returned in the body of the
+        response in JSON format.
 
-        There is no guarantee about the sort order of the list of active entities.
+        There is no guarantee about the sort order of the list of active
+        entities.
 
         Example response::
 
@@ -574,7 +613,8 @@ class OtterGroup(object):
         def _format_and_stackify(state):
             return {"group": format_state_dict(state)}
 
-        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        group = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
         deferred = group.view_state()
         deferred.addCallback(_format_and_stackify)
         deferred.addCallback(json.dumps)
@@ -587,11 +627,13 @@ class OtterGroup(object):
     def pause_scaling_group(self, request):
         """
         Pause a scaling group.  This means that no scaling policies will get
-        executed (execution will be rejected).  This is an idempotent operation -
-        pausing an already paused group does nothing.
+        executed (execution will be rejected).  This is an idempotent
+        operation - pausing an already paused group does nothing.
         """
-        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
-        return controller.pause_scaling_group(self.log, transaction_id(request), group)
+        group = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
+        return controller.pause_scaling_group(
+            self.log, transaction_id(request), group)
 
     @app.route('/resume/', methods=['POST'])
     @with_transaction_id()
@@ -600,39 +642,45 @@ class OtterGroup(object):
     def resume_scaling_group(self, request):
         """
         Resume a scaling group.  This means that scaling policies will now get
-        executed as usual.  This is an idempotent operation - resuming an already
-        running group does nothing.
+        executed as usual.  This is an idempotent operation - resuming an
+        already running group does nothing.
         """
-        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
-        return controller.resume_scaling_group(self.log, transaction_id(request), group)
+        group = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
+        return controller.resume_scaling_group(
+            self.log, transaction_id(request), group)
 
     @app.route('/servers/', branch=True)
     def servers(self, request):
         """
         servers/ route handling
         """
-        return OtterServers(self.store, self.tenant_id, self.group_id).app.resource()
+        servers = OtterServers(self.store, self.tenant_id, self.group_id)
+        return servers.app.resource()
 
     @app.route('/config/')
     def config(self, request):
         """
         config route handled by OtterConfig
         """
-        return OtterConfig(self.store, self.tenant_id, self.group_id).app.resource()
+        config = OtterConfig(self.store, self.tenant_id, self.group_id)
+        return config.app.resource()
 
     @app.route('/launch/')
     def launch(self, request):
         """
         launch route handled by OtterLaunch
         """
-        return OtterLaunch(self.store, self.tenant_id, self.group_id).app.resource()
+        launch = OtterLaunch(self.store, self.tenant_id, self.group_id)
+        return launch.app.resource()
 
     @app.route('/policies/', branch=True)
     def policies(self, request):
         """
         policies routes handled by OtterPolicies
         """
-        return OtterPolicies(self.store, self.tenant_id, self.group_id).app.resource()
+        policies = OtterPolicies(self.store, self.tenant_id, self.group_id)
+        return policies.app.resource()
 
 
 class OtterServers(object):
@@ -678,9 +726,11 @@ class OtterServers(object):
         """
         Delete a server from the group.
         """
-        group = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
+        group = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.scaling_group_id)
         d = group.modify_state(
-            partial(remove_server_from_group, self.log.bind(server_id=server_id),
+            partial(remove_server_from_group,
+                    self.log.bind(server_id=server_id),
                     transaction_id(request), server_id,
                     extract_bool_arg(request, 'replace', True),
                     extract_bool_arg(request, 'purge', True)))
