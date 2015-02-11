@@ -1520,12 +1520,14 @@ class CassScalingGroupCollection:
         query = ('SELECT "tenantId", "groupId", "policyId", "webhookKey" '
                  'FROM {cf}')
         eff = parallel(
-            [CQLQueryExecute(query=query.format(cf=self.webhooks_table),
-                             params={},
-                             consistency_level=ConsistencyLevel.ONE),
-             CQLQueryExecute(query=query.format(cf=self.webhook_keys_table),
-                             params={},
-                             consistency_level=ConsistencyLevel.ONE)])
+            [Effect(
+                CQLQueryExecute(query=query.format(cf=self.webhooks_table),
+                                params={},
+                                consistency_level=ConsistencyLevel.ONE)),
+             Effect(
+                CQLQueryExecute(query=query.format(cf=self.webhook_keys_table),
+                                params={},
+                                consistency_level=ConsistencyLevel.ONE))])
         return eff.on(
             lambda (whooks, wkeys): set(freeze(whooks)) - set(freeze(wkeys)))
 
