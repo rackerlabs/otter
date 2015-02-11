@@ -441,6 +441,13 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                          'D95AE0C4-6AB8-4873-B82F-F8433840CFF2']]:
             self.assertIdentical(match(message), None)
 
+        for message in [
+                "Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 does "
+                "not exist",
+                "Load Balancer Pool D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 does "
+                "not exist"]:
+            self.assertIdentical(match(message), None)
+
     def test_lb_inactive_regex(self):
         """
         The regex for parsing messages saying the load balancer is
@@ -475,6 +482,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                 "Load Balancer Pool D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 does "
                 "not exist"]:
             self.assertIdentical(match(message), None)
+
     def test_good_response(self):
         """
         If the response code indicates success, the response was successful.
