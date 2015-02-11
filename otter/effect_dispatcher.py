@@ -4,7 +4,13 @@ from functools import partial
 
 from cql.connection import connect
 
-from effect import ComposedDispatcher, TypeDispatcher, base_dispatcher, sync_performer
+from effect import (
+    ComposedDispatcher,
+    ParallelEffects,
+    TypeDispatcher,
+    base_dispatcher,
+    sync_perform,
+    sync_performer)
 from effect.twisted import make_twisted_dispatcher
 
 from .auth import (
@@ -14,7 +20,7 @@ from .auth import (
     perform_invalidate_token,
 )
 from .http import TenantScope, perform_tenant_scope
-from .models.cass import CQLQueryExecute, perform_query_sync
+from .models.cass import CQLQueryExecute, perform_cql_query
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
 
@@ -35,7 +41,7 @@ def get_simple_dispatcher(reactor):
             Authenticate: perform_authenticate,
             InvalidateToken: perform_invalidate_token,
             Request: perform_request,
-            Retry: perform_retry,
+            Retry: perform_retry
         }),
         make_twisted_dispatcher(reactor),
     ])
@@ -53,24 +59,16 @@ def get_full_dispatcher(reactor, authenticator, log, service_config):
     ])
 
 
-def get_sync_cql_dispatcher(cursor):
+def get_cql_dispatcher(reactor, connection):
     """
-    Get dispatcher with `CQLQueryExecute`'s synchronous performer in it
+    Get dispatcher with `CQLQueryExecute`'s performer in it
 
-    :param cql: CQL cursor
+    :param reactor: Twisted reactor
+    :param connection: Silverberg connection
     """
     return ComposedDispatcher([
-        base_dispatcher,
+        get_simple_dispatcher(reactor),
         TypeDispatcher({
-            CQLQueryExecute: partial(perform_query_sync, cursor),
-            ParallelEffects: perform_serial
+            CQLQueryExecute: partial(perform_cql_query, connection)
         })
     ])
-
-
-@sync_performer
-def perform_serial(disp, intent):
-    """
-    Performs parallel effects serially. Useful when testing or simple cases
-    """
-    return map(partial(perform, disp), intent.effects)
