@@ -107,18 +107,6 @@ def request(root_resource, method, endpoint, headers=None, body=None):
         response = mock.MagicMock(spec=['code', 'headers'],
                                   code=status_code,
                                   headers=mock_request.responseHeaders)
-        # Annoying implementation detail: if the status code is one of the
-        # status codes that should not have a body, twisted replaces the
-        # write method of the request with a function that does nothing, so
-        # no response body can every be written.  This messes up the mock
-        # request's write function (which just returns another mock.  So
-        # in this case, just return "".
-        content = ''
-        if status_code not in http.NO_BODY_CODES:
-            # get the body by joining all calls to request.write
-            content = "".join(
-                [call[1][0] for call in mock_request.write.mock_calls])
-
         return ResponseWrapper(response=response,
                                content=mock_request.getWrittenData(),
                                request=mock_request)
