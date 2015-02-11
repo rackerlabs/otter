@@ -2579,12 +2579,12 @@ class ScalingGroupWebhookMigrateTests(SynchronousTestCase):
                 Effect(
                     CQLQueryExecute(
                         query=('SELECT "tenantId", "groupId", "policyId", '
-                            '"webhookKey" FROM policy_webhooks'),
+                               '"webhookKey" FROM policy_webhooks'),
                         params={}, consistency_level=ConsistencyLevel.ONE)),
                  Effect(
                     CQLQueryExecute(
                         query=('SELECT "tenantId", "groupId", "policyId", '
-                            '"webhookKey" FROM webhook_keys'),
+                               '"webhookKey" FROM webhook_keys'),
                         params={}, consistency_level=ConsistencyLevel.ONE))]))
         r = resolve_effect(
             eff, [[{'w1': '1'}, {'w2': '2'}], [{'w1': '1'}]])
