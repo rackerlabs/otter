@@ -5,7 +5,6 @@ Loads cql into Cassandra
 """
 
 import argparse
-from functools import partial
 import sys
 import re
 
@@ -28,7 +27,7 @@ the_parser = argparse.ArgumentParser(description="Load data into Cassandra.")
 
 
 the_parser.add_argument(
-    'cql_dir', type=str, metavar='cql_dir', nargs='?',
+    'cql_dir', type=str, metavar='cql_dir',
     help='Directory containing *.cql files to merge and replace.')
 
 the_parser.add_argument(
