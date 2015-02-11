@@ -41,12 +41,12 @@ class Converger(Service, object):
         return lock
 
     @do
-    def _converge_eff(self, scaling_group, group_state, launch_config,
+    def _converge_eff(self, scaling_group, desired, launch_config,
                       now, log):
         servers, lb_nodes = yield get_all_convergence_data(
-            group_state.group_id)
+            scaling_group.uuid)
         desired_group_state = get_desired_group_state(
-            group_state.group_id, launch_config, group_state.desired)
+            scaling_group.uuid, launch_config, desired)
         steps, active, num_pending = plan(desired_group_state, servers,
                                           lb_nodes, now)
         active = {server.id: server_to_json(server) for server in active}
@@ -55,11 +55,11 @@ class Converger(Service, object):
         log.msg(otter_event_type='convergence-active-pending',
                 active=active,
                 pending=pending)
-        new_state = obj_assoc(group_state, active=active, pending=pending)
+        def update_group_state(group, old_state):
+            return obj_assoc(old_state, active=active, pending=pending)
         yield Effect(ModifyGroupState(scaling_group=scaling_group,
-                                      group_state=new_state))
-        steps_eff = steps_to_effect(steps)
-        yield steps_eff
+                                      modifier=update_group_state))
+        yield steps_to_effect(steps)
 
     def start_convergence(self, log, scaling_group, group_state,
                           launch_config,
@@ -67,8 +67,8 @@ class Converger(Service, object):
         """Converge a group to a capacity with a launch config."""
         def exec_convergence():
             log.msg(otter_event_type='convergence-rocks')
-            eff = self._converge_eff(scaling_group, group_state, launch_config,
-                                     time.time(), log)
+            eff = self._converge_eff(scaling_group, group_state.desired,
+                                     launch_config, time.time(), log)
             eff = Effect(TenantScope(eff, group_state.tenant_id))
             d = perform(self._dispatcher, eff)
             return d.addErrback(log.err, "Error when performing convergence",

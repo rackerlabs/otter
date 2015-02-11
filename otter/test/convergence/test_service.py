@@ -39,8 +39,7 @@ class ConvergerTests(SynchronousTestCase):
             mock_log(),
             'tenant-id',
             'group-id', 5, self.lc,
-            perform=perform,
-            execute_convergence=lambda gid, dgs: exec_calls.get((gid, dgs)))
+            perform=perform)
         self.kz_client.Lock.assert_called_once_with(
             '/groups/group-id/converge_lock')
         # acquire is a monkey-patched partial function. :-(
