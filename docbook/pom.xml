@@ -7,6 +7,11 @@
   <version>1.0.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Autoscale Docs</name>
+  <parent>
+    <groupId>com.rackspace.cloud.api</groupId>
+    <artifactId>rackspace-docs-parent</artifactId>
+    <version>1.0.0</version>
+  </parent>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <src.wadl>src/wadl</src.wadl>
@@ -17,20 +22,10 @@
       <plugin>
         <groupId>com.rackspace.cloud.api</groupId>
         <artifactId>olink-maven-plugin</artifactId>
-        <version>1.1.0</version>
-        <executions>
-          <execution>
-	    <phase>initialize</phase>
-	    <goals>
-	      <goal>olink</goal>
-	    </goals>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>com.rackspace.cloud.api</groupId>
-        <artifactId>clouddocs-maven-plugin</artifactId>
-        <version>2.0.2</version>
+        <artifactId>rackspace-docs-maven-plugin</artifactId>
         <executions>
           <execution>
             <id>autoscale</id>
