@@ -275,7 +275,9 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
             400, method='PUT', body=json.dumps(invalid))
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['error']['type'], 'InvalidMinEntities', resp['error']['message'])
+        self.assertEqual(resp['error']['type'],
+                         'InvalidMinEntities',
+                         resp['error']['message'])
 
     def test_group_modify_minEntities_eq_maxEntities_204(self):
         """
