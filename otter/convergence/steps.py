@@ -345,9 +345,6 @@ class BulkAddToRCv3(object):
     _bare_effect = as_effect
 
 
-# TODO: add ticket for removing _bare_effect hacks
-
-
 @implementer(IStep)
 @attributes(['lb_node_pairs'])
 class BulkRemoveFromRCv3(object):
