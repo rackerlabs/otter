@@ -88,9 +88,9 @@ class OtterConfig(object):
     def edit_config_for_scaling_group(self, request, data):
         """
         Edit the configuration for a scaling group, which includes the minimum
-        number of entities, the maximum number of entities, global cooldown, and
-        other metadata.  This data provided in the request body in JSON format.
-        If successful, no response body will be returned.
+        number of entities, the maximum number of entities, global cooldown,
+        and other metadata.  This data provided in the request body in JSON
+        format.  If successful, no response body will be returned.
 
         Example request::
 
