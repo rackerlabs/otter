@@ -54,9 +54,9 @@ class OtterConfig(object):
     def view_config_for_scaling_group(self, request):
         """
         Get the configuration for a scaling group, which includes the minimum
-        number of entities, the maximum number of entities, global cooldown, and
-        other metadata.  This data is returned in the body of the response in JSON
-        format.
+        number of entities, the maximum number of entities, global cooldown,
+        and other metadata.  This data is returned in the body of the response
+        in JSON format.
 
         Example response::
 
