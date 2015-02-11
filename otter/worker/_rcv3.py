@@ -9,7 +9,6 @@ from operator import itemgetter
 from effect import Effect
 from effect.twisted import perform
 
-from otter.convergence.effecting import steps_to_effect
 from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3
 from otter.http import TenantScope
 
