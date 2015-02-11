@@ -56,4 +56,3 @@ class FullDispatcherTests(SynchronousTestCase):
         scope = TenantScope(Effect(Constant('foo')), 1)
         eff = Effect(scope)
         self.assertEqual(sync_perform(dispatcher, eff), 'foo')
-
