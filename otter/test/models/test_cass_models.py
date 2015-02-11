@@ -2581,7 +2581,7 @@ class ScalingGroupWebhookMigrateTests(SynchronousTestCase):
                         query=('SELECT "tenantId", "groupId", "policyId", '
                                '"webhookKey" FROM policy_webhooks'),
                         params={}, consistency_level=ConsistencyLevel.ONE)),
-                 Effect(
+                Effect(
                     CQLQueryExecute(
                         query=('SELECT "tenantId", "groupId", "policyId", '
                                '"webhookKey" FROM webhook_keys'),
