@@ -174,11 +174,9 @@ class OtterLaunch(object):
                                     "contents": "ssh-rsa A... user@example.net"
                                 }
                             ],
-                            "networks": [
-                                {
-                                    "uuid": "11111111-1111-1111-1111-111111111111"
-                                }
-                            ],
+                            "networks": [{
+                                "uuid": "11111111-1111-1111-1111-111111111111"
+                            }],
                         },
                         "loadBalancers": [
                             {
