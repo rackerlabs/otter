@@ -57,7 +57,8 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         response_body = self.assert_status_code(500)
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.view_config.assert_called_once_with()
         self.assertEqual(resp['error']['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
