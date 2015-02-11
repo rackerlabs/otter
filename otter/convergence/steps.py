@@ -341,6 +341,7 @@ class BulkAddToRCv3(object):
             self.lb_node_pairs, "POST",
             success_pred=has_code(201))
 
+    _bare_effect = as_effect
 
 # TODO: add ticket for removing _bare_effect hacks
 
