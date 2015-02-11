@@ -81,7 +81,8 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         validate(response_body, rest_schemas.view_config)
         self.assertEqual(response_body, {'groupConfiguration': config})
 
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.view_config.assert_called_once_with()
 
     def test_update_group_config_404(self):
