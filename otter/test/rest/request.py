@@ -104,7 +104,6 @@ def request(root_resource, method, endpoint, headers=None, body=None):
             mock_request.responseHeaders.setRawHeaders(
                 'Content-Type', [Request.defaultContentType])
 
-        response = mock.MagicMock(spec=['code', 'headers'], code=status_code,
         response = mock.MagicMock(spec=['code', 'headers'],
                                   code=status_code,
                                   headers=mock_request.responseHeaders)
