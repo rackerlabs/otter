@@ -149,7 +149,8 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
     @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
     def test_update_group_config_success(self, *args):
         """
-        If the update succeeds, the complete data is updated and a 204 is returned.
+        If the update succeeds, the complete data is updated and a 204 is
+        returned.
         """
         self.mock_group.modify_state.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
