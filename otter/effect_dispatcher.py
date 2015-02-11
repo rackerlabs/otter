@@ -2,7 +2,9 @@
 
 from functools import partial
 
-from effect import ComposedDispatcher, TypeDispatcher, base_dispatcher
+from cql.connection import connect
+
+from effect import ComposedDispatcher, TypeDispatcher, base_dispatcher, sync_performer
 from effect.twisted import make_twisted_dispatcher
 
 from .auth import (
@@ -12,6 +14,7 @@ from .auth import (
     perform_invalidate_token,
 )
 from .http import TenantScope, perform_tenant_scope
+from .models.cass import CQLQueryExecute
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
 
@@ -48,3 +51,35 @@ def get_full_dispatcher(reactor, authenticator, log, service_config):
                                  service_config)}),
         get_simple_dispatcher(reactor),
     ])
+
+
+def get_sync_cql_dispatcher(cursor):
+    """
+    Get dispatcher with `CQLQueryExecute`'s synchronous performer in it
+
+    :param cql: CQL cursor
+    """
+    return ComposedDispatcher([
+        base_dispatcher,
+        TypeDispatcher({
+            CQLQueryExecute: partial(perform_query_sync, cursor),
+            ParallelEffects: perform_serial
+        })
+    ])
+
+@sync_performer
+def perform_serial(disp, intent):
+    """
+    Performs parallel effects serially. Useful when testing or simple cases
+    """
+    return map(partial(perform, disp), intent.effects)
+
+
+@sync_performer
+def perform_query_sync(cursor, disp, intent):
+    """
+    Perform CQLQueryExecute synchronously using cursor
+    """
+    return cursor.execute(
+        intent.query, intent.params,
+        consistency_level=intent.consistency_level)
