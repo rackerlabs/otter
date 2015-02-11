@@ -394,7 +394,8 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
             500, method="PUT", body=json.dumps(launch_examples()[0]))
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.update_launch_config.assert_called_once_with(
             launch_examples()[0])
         self.assertEqual(resp['error']['type'], 'InternalError')
