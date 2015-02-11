@@ -186,7 +186,8 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         the complete config (including non-required, group, and state
         """
         self.mock_group.update_config.return_value = defer.succeed(None)
-        self.mock_group.view_launch_config.return_value = defer.succeed('launch')
+        self.mock_group.view_launch_config.return_value = defer.succeed(
+            'launch')
 
         self.assert_status_code(204, method='PUT', body=json.dumps({
             'name': 'blah',
