@@ -3,6 +3,7 @@
 """
 Loads cql into Cassandra
 """
+from __future__ import print_function
 
 import argparse
 import sys
@@ -75,7 +76,7 @@ def generate(args):
     try:
         generator = CQLGenerator(args.cql_dir, safe_only=args.ban_unsafe)
     except Exception as e:
-        print e.message
+        print(e.message)
         sys.exit(1)
 
     cql = generator.generate_cql(
@@ -96,20 +97,34 @@ def generate(args):
 
     # connect
     if args.verbose > 0:
-        print "Attempting to connect to {0}:{1}".format(args.host, args.port)
+        print("Attempting to connect to {0}:{1}".format(args.host, args.port))
     try:
         connection = connect(args.host, args.port, cql_version='3.0.4')
     except Exception as e:
-        print "CONNECTION ERROR: {0}".format(e.message)
+        print("CONNECTION ERROR: {0}".format(e.message))
         sys.exit(1)
-
     cursor = connection.cursor()
 
+    # execute commands
+    execute_commands(cursor, commands, args.verbose)
+
+    if args.verbose > 0:
+        print('\n----\n')
+        print("Done.  Disconnecting.")
+
+    cursor.close()
+    connection.close()
+
+
+def execute_commands(cursor, commands, verbose):
+    """
+    Execute commands
+    """
     for command in commands:
         try:
             cursor.execute(command, {})
         except ProgrammingError as pe:
-            # if somewhat verbose, then print out all errors.
+            # if somewhat verbose, then print(out all errors.)
             # if less verbose, print out only non-already-existing errors
             message = pe.message.lower()
             significant_error = (
@@ -118,10 +133,10 @@ def generate(args):
                 "existing column" not in message and
                 not re.search("index '.*' could not be found", message))
 
-            if args.verbose > 1 or significant_error:
-                print '\n----\n'
-                print command
-                print "{0}".format(pe.message.strip())
+            if verbose > 1 or significant_error:
+                print('\n----\n')
+                print(command)
+                print("{0}".format(pe.message.strip()))
 
             if significant_error:
                 sys.exit(1)
@@ -129,16 +144,9 @@ def generate(args):
         else:
             # extremely verbose - notify that command executed correctly.
             if args.verbose > 2:
-                print '\n----\n'
-                print command
-                print "Ok."
-
-    if args.verbose > 0:
-        print '\n----\n'
-        print "Done.  Disconnecting."
-
-    cursor.close()
-    connection.close()
+                print('\n----\n')
+                print(command)
+                print("Ok.")
 
 
 def setup_connection(reactor, args):
