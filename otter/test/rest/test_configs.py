@@ -500,7 +500,8 @@ class LaunchConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         Checks that an update with PUT data with the wrong schema fails with a
         400
         """
-        invalids = (config_examples()[0], {"type": "launch_server", "args": {}})
+        invalids = (config_examples()[0],
+                    {"type": "launch_server", "args": {}})
         for request_body in invalids:
             self.mock_group.update_launch_config.return_value = None
             response_body = self.assert_status_code(
