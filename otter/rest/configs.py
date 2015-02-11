@@ -254,6 +254,7 @@ class OtterLaunch(object):
             self.log, self.tenant_id, self.group_id)
         data = normalize_launch_config(data)
         group_schemas.validate_launch_config_servicenet(data)
-        deferred = get_supervisor().validate_launch_config(self.log, self.tenant_id, data)
+        deferred = get_supervisor().validate_launch_config(
+            self.log, self.tenant_id, data)
         deferred.addCallback(lambda _: rec.update_launch_config(data))
         return deferred
