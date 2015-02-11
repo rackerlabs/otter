@@ -178,7 +178,8 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_group.update_config.assert_called_once_with(expected_config)
 
     @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
-    def test_update_group_config_calls_obey_config_change(self, mock_controller):
+    def test_update_group_config_calls_obey_config_change(
+            self, mock_controller):
         """
         If the update succeeds, the data is updated and a 204 is returned.
         Obey config change is called with the updated log, transaction id,
