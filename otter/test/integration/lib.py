@@ -118,7 +118,9 @@ class ScalingGroup(object):
         """
 
         return (treq.delete(
-            "%s/groups/%s" % (str(rcs.endpoints["otter"]), self.group_id),
+            "%s/groups/%s?force=true" % (
+                str(rcs.endpoints["otter"]), self.group_id
+            ),
             headers=headers(str(rcs.token)),
             pool=self.pool
         ).addCallback(check_success, [204, 404]))
@@ -175,6 +177,69 @@ class ScalingGroup(object):
             .addCallback(treq.json_content)
             .addCallback(record_results)
         )
+
+
+@attributes([
+    Attribute('scale_by', instance_of=int),
+    Attribute('scaling_group', instance_of=ScalingGroup),
+])
+class ScalingPolicy(object):
+    def __init__(self):
+        self.policy = [{
+            "name": "integration-test-policy",
+            "cooldown": 0,
+            "type": "webhook",
+            "change": self.scale_by
+        }]
+
+    def stop(self, rcs):
+        return self.delete(rcs)
+
+    def start(self, rcs, test):
+        test.addCleanup(self.stop, rcs)
+
+        def record_results(resp):
+            self.policy_id = resp["policies"][0]["id"]
+            self.link = str(resp["policies"][0]["links"][0]["href"])
+            return rcs
+
+        return (
+            treq.post(
+                "%s/groups/%s/policies" % (
+                    str(rcs.endpoints["otter"]), self.scaling_group.group_id
+                ),
+                json.dumps(self.policy),
+                headers=headers(str(rcs.token)),
+                pool=self.scaling_group.pool,
+            )
+            .addCallback(check_success, [201])
+            .addCallback(treq.json_content)
+            .addCallback(record_results)
+        )
+
+    def delete(self, rcs):
+        return (
+            treq.delete(
+                "%s?force=true" % self.link,
+                headers=headers(str(rcs.token)),
+                pool=self.scaling_group.pool,
+            )
+            .addCallback(check_success, [204, 404])
+        ).addCallback(lambda _: rcs)
+
+    def execute(self, rcs):
+        return (
+            treq.post(
+                "%sexecute" % self.link,
+                headers=headers(str(rcs.token)),
+                pool=self.scaling_group.pool,
+            ).addCallback(check_success, [202])
+            # Policy execution does not return anything meaningful,
+            # per http://tinyurl.com/ndds6ap (link to docs.rackspace).
+            # So, we forcefully return our resources here.
+            .addCallback(lambda _, x: x, rcs)
+        )
+        return rcs
 
 
 def find_endpoint(catalog, service_type, region):
