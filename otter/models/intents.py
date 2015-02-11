@@ -11,6 +11,7 @@ class ModifyGroupState(object):
 
 
 @deferred_performer
-def perform_modify_group_state(mgs):
+def perform_modify_group_state(dispatcher, mgs):
     """Perform an :obj:`UpdateGroupState`."""
-    return mgs.scaling_group.modify_state(lambda: mgs.state)
+    return mgs.scaling_group.modify_state(
+        lambda group, old_state: mgs.group_state)

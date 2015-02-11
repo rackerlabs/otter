@@ -84,5 +84,5 @@ def predicate_any(*preds):
 def obj_assoc(o, **k):
     """Update attributes on an object, returning a new one."""
     new_o = deepcopy(o)
-    new_o.update(k)
+    new_o.__dict__.update(k)
     return new_o

@@ -11,8 +11,7 @@ from effect.twisted import perform
 from twisted.application.service import Service
 
 from otter.constants import CONVERGENCE_LOCK_PATH
-from otter.convergence.composition import (
-    execute_convergence, get_desired_group_state)
+from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.planning import plan
@@ -43,31 +42,34 @@ class Converger(Service, object):
 
     @do
     def _converge_eff(self, scaling_group, group_state, launch_config,
-                      execute_convergence, now):
+                      now, log):
         servers, lb_nodes = yield get_all_convergence_data(
             group_state.group_id)
         desired_group_state = get_desired_group_state(
             group_state.group_id, launch_config, group_state.desired)
         steps, active, num_pending = plan(desired_group_state, servers,
                                           lb_nodes, now)
-        active = map(server_to_json, active)
+        active = {server.id: server_to_json(server) for server in active}
         pending = {job_id: {'convergence-job': True}
                    for job_id in range(num_pending)}
+        log.msg(otter_event_type='convergence-active-pending',
+                active=active,
+                pending=pending)
         new_state = obj_assoc(group_state, active=active, pending=pending)
         yield Effect(ModifyGroupState(scaling_group=scaling_group,
                                       group_state=new_state))
         steps_eff = steps_to_effect(steps)
-        yield Effect(TenantScope(steps_eff, group_state.tenant_id))
-        yield do_return(True)
+        yield steps_eff
 
     def start_convergence(self, log, scaling_group, group_state,
                           launch_config,
-                          perform=perform,
-                          execute_convergence=execute_convergence):
+                          perform=perform):
         """Converge a group to a capacity with a launch config."""
         def exec_convergence():
+            log.msg(otter_event_type='convergence-rocks')
             eff = self._converge_eff(scaling_group, group_state, launch_config,
-                                     execute_convergence, time.time())
+                                     time.time(), log)
+            eff = Effect(TenantScope(eff, group_state.tenant_id))
             d = perform(self._dispatcher, eff)
             return d.addErrback(log.err, "Error when performing convergence",
                                 otter_event_type='convergence-perform-error')
