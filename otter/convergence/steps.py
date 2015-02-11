@@ -319,18 +319,19 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
 
 _UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
                 "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
-_RCV3_NODE_NOT_A_MEMBER_PATTERN = re.compile(
+
+
+def _rcv3_re(pattern):
+    return re.compile(pattern.format(uuid=_UUID4_REGEX), re.IGNORECASE)
+
+
+_RCV3_NODE_NOT_A_MEMBER_PATTERN = _rcv3_re(
     "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
-    "(?P<lb_id>{uuid})".format(uuid=_UUID4_REGEX),
-    re.IGNORECASE)
-_RCV3_LB_INACTIVE_PATTERN = re.compile(
-    "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state"
-    .format(uuid=_UUID4_REGEX),
-    re.IGNORECASE)
-_RCV3_LB_DOESNT_EXIST_PATTERN = re.compile(
-    "Load Balancer Pool (?P<lb_id>{uuid}) does not exist"
-    .format(uuid=_UUID4_REGEX),
-    re.IGNORECASE)
+    "(?P<lb_id>{uuid})")
+_RCV3_LB_INACTIVE_PATTERN = _rcv3_re(
+    "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state")
+_RCV3_LB_DOESNT_EXIST_PATTERN = _rcv3_re(
+    "Load Balancer Pool (?P<lb_id>{uuid}) does not exist")
 
 
 @implementer(IStep)
