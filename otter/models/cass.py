@@ -35,8 +35,8 @@ from otter.models.interface import (
     PoliciesOverLimitError,
     ScalingGroupOverLimitError,
     UnrecognizedCapabilityError,
-    WebhooksOverLimitError)
-from otter.scheduler import next_cron_occurrence
+    WebhooksOverLimitError,
+    next_cron_occurrence)
 from otter.util import timestamp
 from otter.util.config import config_value
 from otter.util.cqlbatch import Batch, batch
