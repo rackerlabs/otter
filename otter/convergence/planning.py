@@ -245,22 +245,32 @@ def calculate_active_and_pending(servers, steps):
     Given the current NovaServers and the planned (unthrottled) steps,
     determine which servers are active and which servers are pending.
 
+    Sadly this function currently has a pretty intimate knowledge of the rest
+    of the convergence workflow -- like which steps indicate that something is
+    still to be done on a server. If server building is extended with new types
+    of steps or if those steps change, this function will need to be updated. A
+    better design would be welcome.
+
     :return: Two-tuple of (active, num_pending) where `active` is a list of
     NovaServer objects which are considered active, and `num_pending` is the
     number of servers which haven't been completely built and configured.
     """
+    # assumption: only ACTIVE servers will have steps about them.
+    servers_by_servicenet = {s.servicenet_address: s.id for s in servers}
+    get_server = servers_by_servicenet.get
     all_rcv3_server_adds = set(concat([
         [pair[1] for pair in s.lb_node_pairs]
         for s in steps if type(s) is BulkAddToRCv3]))
-    all_clb_ips = set(concat([
-        [c[0] for c in s.address_configs]
+    all_clb_adds = set(concat([
+        [get_server(c[0]) for c in s.address_configs]
         for s in steps if type(s) is AddNodesToCLB]))
-    num_pending = (len(all_rcv3_server_adds)
-                   + len(all_clb_ips)
-                   + len([s for s in steps if type(s) is CreateServer]))
+    num_pending = (len(all_rcv3_server_adds.union(all_clb_adds))
+                   + len([s for s in steps if type(s) is CreateServer])
+                   + len([s for s in servers if s.state == 'BUILDING']))
     active = [server for server in servers
-              if server.id not in all_rcv3_server_adds
-              and server.servicenet_address not in all_clb_ips]
+              if server.state == 'ACTIVE'
+              and server.id not in all_rcv3_server_adds
+              and server.id not in all_clb_adds]
     return active, num_pending
 
 
