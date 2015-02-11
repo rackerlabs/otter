@@ -25,6 +25,33 @@ def server_to_json(server):
     return {'id': server.id}
 
 
+@do
+def _converge_eff(scaling_group, desired, launch_config, now, log):
+    """
+    Gather data, plan a convergence, save active and pending servers to the
+    group state, and then execute the convergence.
+
+    :return: An Effect of List of Step Effect Results. (???)
+    """
+    servers, lb_nodes = yield get_all_convergence_data(
+        scaling_group.uuid)
+    desired_group_state = get_desired_group_state(
+        scaling_group.uuid, launch_config, desired)
+    steps, active, num_pending = plan(desired_group_state, servers,
+                                      lb_nodes, now)
+    active = {server.id: server_to_json(server) for server in active}
+    pending = {job_id: {'convergence-job': True}
+               for job_id in range(num_pending)}
+    log.msg(otter_msg_type='convergence-active-pending', # RADIX delete thiss
+            active=active,
+            pending=pending)
+    def update_group_state(group, old_state):
+        return obj_assoc(old_state, active=active, pending=pending)
+    yield Effect(ModifyGroupState(scaling_group=scaling_group,
+                                  modifier=update_group_state))
+    yield steps_to_effect(steps)
+
+
 class Converger(Service, object):
     """Converger service"""
 
@@ -40,34 +67,14 @@ class Converger(Service, object):
         lock.acquire = partial(lock.acquire, timeout=120)
         return lock
 
-    @do
-    def _converge_eff(self, scaling_group, desired, launch_config,
-                      now, log):
-        servers, lb_nodes = yield get_all_convergence_data(
-            scaling_group.uuid)
-        desired_group_state = get_desired_group_state(
-            scaling_group.uuid, launch_config, desired)
-        steps, active, num_pending = plan(desired_group_state, servers,
-                                          lb_nodes, now)
-        active = {server.id: server_to_json(server) for server in active}
-        pending = {job_id: {'convergence-job': True}
-                   for job_id in range(num_pending)}
-        log.msg(otter_msg_type='convergence-active-pending', # RADIX delete thiss
-                active=active,
-                pending=pending)
-        def update_group_state(group, old_state):
-            return obj_assoc(old_state, active=active, pending=pending)
-        yield Effect(ModifyGroupState(scaling_group=scaling_group,
-                                      modifier=update_group_state))
-        yield steps_to_effect(steps)
-
     def start_convergence(self, log, scaling_group, group_state,
                           launch_config,
-                          perform=perform):
+                          perform=perform,
+                          converge_eff=_converge_eff):
         """Converge a group to a capacity with a launch config."""
         def exec_convergence():
             log.msg(otter_msg_type='convergence-rocks') # RADIX delete thissssss
-            eff = self._converge_eff(scaling_group, group_state.desired,
+            eff = converge_eff(scaling_group, group_state.desired,
                                      launch_config, time.time(), log)
             eff = Effect(TenantScope(eff, group_state.tenant_id))
             d = perform(self._dispatcher, eff)
@@ -79,6 +86,7 @@ class Converger(Service, object):
             exec_convergence,
             acquire_timeout=150,
             release_timeout=150)
+
 
 
 # We're using a global for now because it's difficult to thread a new parameter

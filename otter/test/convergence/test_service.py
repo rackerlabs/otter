@@ -1,4 +1,4 @@
-from effect import Effect
+from effect import Constant, Effect
 
 import mock
 
@@ -9,7 +9,7 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence.composition import get_desired_group_state
-from otter.convergence.service import Converger
+from otter.convergence.service import _converge_eff, Converger
 from otter.http import TenantScope
 from otter.models.interface import GroupState
 from otter.test.utils import CheckFailure, LockMixin, mock_group, mock_log
@@ -27,32 +27,35 @@ class ConvergerTests(SynchronousTestCase):
         self.group = mock_group(self.state, 'tenant-id', 'group-id')
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
 
-    def test_converge(self):
+    @mock.patch('time.time')
+    def test_converge(self, time):
         """
         The ``converge`` method acquires a lock and performs the result of
-        :func:`execute_convergence` within that lock.
+        :func:`_converge_eff` within that lock.
         """
         perform = mock.Mock()
-        exec_convergence_result = object()
-        expected_desired_group_state = get_desired_group_state('group-id',
-                                                               self.lc, 5)
-        exec_calls = pmap().set(
-            ('group-id', expected_desired_group_state), exec_convergence_result
-        )
+
+        def converge_eff(group, desired, lc, now, log):
+            return Effect(Constant((group, desired, lc, now, log)))
+
+        log = mock_log()
         self.converger.start_convergence(
-            mock_log(),
+            log,
             self.group,
             self.state,
             self.lc,
+            converge_eff=converge_eff,
             perform=perform)
         self.kz_client.Lock.assert_called_once_with(
             '/groups/group-id/converge_lock')
         # acquire is a monkey-patched partial function. :-(
         self.kz_client.Lock().acquire.func.assert_called_once_with(timeout=120)
         self.kz_client.Lock().release.assert_called_once_with()
+        expected_converge_args = (self.group, 0, self.lc, time(), log)
         perform.assert_called_once_with(
             self.dispatcher,
-            Effect(TenantScope(exec_convergence_result, 'tenant-id')))
+            Effect(TenantScope(Effect(Constant(expected_converge_args)),
+                               'tenant-id')))
 
     def test_converge_error_log(self):
         """If performance fails, the error is logged."""
@@ -61,11 +64,14 @@ class ConvergerTests(SynchronousTestCase):
         log = mock_log()
         self.converger.start_convergence(
             log,
-            'tenant-id',
-            'group-id', 5, self.lc,
+            self.group, self.state, self.lc,
+            converge_eff=lambda *args: None,
             perform=perform)
 
         log.err.assert_called_once_with(
             CheckFailure(ZeroDivisionError),
             "Error when performing convergence",
             otter_msg_type='convergence-perform-error')
+
+
+# TODO: _converge_eff tests!
