@@ -89,7 +89,8 @@ class RCv3Tests(SynchronousTestCase):
             return succeed((None, self.post_response))
         elif req.method == "DELETE":
             self.assertEqual(req.success_pred, has_code(204, 409))
-            # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnode
+            # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}
+            # %2Fload_balancer_pools%2Fnode
             return succeed([self.del_response])
 
     def test_add_to_rcv3(self):
