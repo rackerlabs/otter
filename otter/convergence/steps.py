@@ -342,6 +342,8 @@ class BulkAddToRCv3(object):
             success_pred=has_code(201))
 
 
+# TODO: add ticket for removing _bare_effect hacks
+
 @implementer(IStep)
 @attributes(['lb_node_pairs'])
 class BulkRemoveFromRCv3(object):
