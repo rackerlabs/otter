@@ -5,6 +5,7 @@ for a scaling group.
 """
 
 import json
+
 from jsonschema import ValidationError
 
 import mock
@@ -12,16 +13,15 @@ import mock
 from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.json_schema import rest_schemas, validate
 from otter.json_schema.group_examples import (
     config as config_examples,
     launch_server_config as launch_examples)
-from otter.json_schema import rest_schemas, validate
 from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 from otter.supervisor import set_supervisor
-from otter.worker.validate_config import InvalidLaunchConfiguration
-
 from otter.test.rest.request import DummyException, RestAPITestMixin
+from otter.worker.validate_config import InvalidLaunchConfiguration
 
 
 class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
