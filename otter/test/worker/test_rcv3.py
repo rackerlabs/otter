@@ -100,14 +100,6 @@ class RCv3Tests(SynchronousTestCase):
         self.assertEqual(add_result["cloud_server"], {"id": "server_id"})
         self.assertEqual(add_result["load_balancer_pool"], {"id": "lb_id"})
 
-    def test_add_to_rcv3_fail_when_body_none(self):
-        """
-        :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
-        """
-        self.post_result = None
-        d = _rcv3.add_to_rcv3(self.request_bag, "lb_id", "server_id")
-        self.failureResultOf(d)
-
     def test_remove_from_rcv3(self):
         """
         :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
