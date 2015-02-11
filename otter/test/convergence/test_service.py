@@ -11,7 +11,8 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.service import Converger
 from otter.http import TenantScope
-from otter.test.utils import CheckFailure, LockMixin, mock_log
+from otter.models.interface import GroupState
+from otter.test.utils import CheckFailure, LockMixin, mock_group, mock_log
 
 
 class ConvergerTests(SynchronousTestCase):
@@ -21,6 +22,9 @@ class ConvergerTests(SynchronousTestCase):
         self.kz_client = mock.Mock(Lock=LockMixin().mock_lock())
         self.dispatcher = object()
         self.converger = Converger(clock, self.kz_client, self.dispatcher)
+        self.state = GroupState('tenant-id', 'group-id', 'group-name',
+                                {}, {}, None, {}, False)
+        self.group = mock_group(self.state, 'tenant-id', 'group-id')
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
 
     def test_converge(self):
@@ -37,8 +41,9 @@ class ConvergerTests(SynchronousTestCase):
         )
         self.converger.start_convergence(
             mock_log(),
-            'tenant-id',
-            'group-id', 5, self.lc,
+            self.group,
+            self.state,
+            self.lc,
             perform=perform)
         self.kz_client.Lock.assert_called_once_with(
             '/groups/group-id/converge_lock')

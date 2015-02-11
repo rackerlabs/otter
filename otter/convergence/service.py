@@ -52,7 +52,7 @@ class Converger(Service, object):
         active = {server.id: server_to_json(server) for server in active}
         pending = {job_id: {'convergence-job': True}
                    for job_id in range(num_pending)}
-        log.msg(otter_event_type='convergence-active-pending',
+        log.msg(otter_msg_type='convergence-active-pending', # RADIX delete thiss
                 active=active,
                 pending=pending)
         def update_group_state(group, old_state):
@@ -66,7 +66,7 @@ class Converger(Service, object):
                           perform=perform):
         """Converge a group to a capacity with a launch config."""
         def exec_convergence():
-            log.msg(otter_event_type='convergence-rocks')
+            log.msg(otter_msg_type='convergence-rocks') # RADIX delete thissssss
             eff = self._converge_eff(scaling_group, group_state.desired,
                                      launch_config, time.time(), log)
             eff = Effect(TenantScope(eff, group_state.tenant_id))
