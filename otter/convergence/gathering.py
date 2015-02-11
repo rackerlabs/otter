@@ -231,7 +231,7 @@ def to_nova_server(server_json):
     Convert from JSON format to :obj:`NovaServer` instance.
     """
     return NovaServer(id=server_json['id'],
-                      state=ServerState.lookupByName(server_json['state']),
+                      state=ServerState.lookupByName(server_json['status']),
                       created=timestamp_to_epoch(server_json['created']),
                       image_id=server_json.get('image', {}).get('id'),
                       flavor_id=server_json['flavor']['id'],
