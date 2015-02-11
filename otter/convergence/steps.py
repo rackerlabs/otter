@@ -369,6 +369,10 @@ _RCV3_LB_INACTIVE_PATTERN = re.compile(
     "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state"
     .format(uuid=_UUID4_REGEX),
     re.IGNORECASE)
+_RCV3_LB_DOESNT_EXIST_PATTERN = re.compile(
+    "Load Balancer Pool (?P<lb_id>{uuid}) does not exist"
+    .format(uuid=_UUID4_REGEX),
+    re.IGNORECASE)
 
 
 def _rcv3_check_bulk_delete(attempted_pairs, result):
