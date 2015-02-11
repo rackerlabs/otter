@@ -119,12 +119,12 @@ class PerformTests(SynchronousTestCase):
     Tests for :func:`perform_cql_query` function
     """
 
-    def test_perform_query_sync(self):
+    def test_perform_cql_query(self):
         """
         Calls given connection's execute
         """
         conn = mock.Mock(spec=CQLClient)
-        conn.execute.return_value = 'ret'
+        conn.execute.return_value = defer.succeed('ret')
         intent = CQLQueryExecute(query='query', params={'w': 2},
                                  consistency_level=ConsistencyLevel.ONE)
         r = sync_perform(
