@@ -555,16 +555,23 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         node_c_id = '08944038-80ba-4ae1-a188-c827444e02e2'
         lb_c_id = '150895a5-1aa7-45b7-b7a4-98b9c282f800'
 
+        # This isn't even a little piggy!
+        node_d_id = 'bc1e94c3-0c88-4828-9e93-d42259280987'
+        lb_d_id = 'de52879e-1f84-4ecd-8988-91dfdc99570d'
+
         resp = StubResponse(409, {})
         body = {"errors":
                 ["Node {node_id} is not a member of Load Balancer "
                  "Pool {lb_id}".format(node_id=node_a_id, lb_id=lb_a_id),
                  "Load Balancer Pool {lb_id} is not in an ACTIVE state"
-                 .format(lb_id=lb_c_id)]}
+                 .format(lb_id=lb_c_id),
+                 "Load Balancer Pool {lb_id} does not exist"
+                 .format(lb_id=lb_d_id)]}
         eff = _rcv3_check_bulk_delete(
             [(lb_a_id, node_a_id),
              (lb_b_id, node_b_id),
-             (lb_c_id, node_c_id)],
+             (lb_c_id, node_c_id),
+             (lb_d_id, node_d_id)],
             (resp, body))
         expected_intent = service_request(
             service_type=ServiceType.RACKCONNECT_V3,
