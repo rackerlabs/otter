@@ -2566,9 +2566,7 @@ class ScalingGroupWebhookMigrateTests(SynchronousTestCase):
         """
         Sample CassScalingGroup object
         """
-        self.store = CassScalingGroup(
-            mock_log(), 'tid', 'gid', object(), [], object(), object(),
-            object())
+        self.store = CassScalingGroupCollection(None, None)
 
     def test_webhook_index_only(self):
         """
