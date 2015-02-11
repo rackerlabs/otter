@@ -11,7 +11,6 @@ from pyrsistent import freeze, pmap
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.constants import ServiceType
 from otter.convergence.composition import (
     get_desired_group_state,
     json_to_LBConfigs,

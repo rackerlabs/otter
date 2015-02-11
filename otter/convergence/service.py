@@ -5,7 +5,7 @@ import time
 from functools import partial
 
 from effect import Effect
-from effect.do import do, do_return
+from effect.do import do
 from effect.twisted import perform
 
 from twisted.application.service import Service
