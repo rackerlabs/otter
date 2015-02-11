@@ -405,12 +405,13 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
         if match is not None:
             to_retry -= pset([match.groups()[::-1]])
 
-        match = _RCV3_LB_INACTIVE_PATTERN.match(error)
+        match = (_RCV3_LB_INACTIVE_PATTERN.match(error)
+                 or _RCV3_LB_DOESNT_EXIST_PATTERN.match(error))
         if match is not None:
-            inactive_lb_id, = match.groups()
+            bad_lb_id, = match.groups()
             to_retry = pset([(lb_id, node_id)
                              for (lb_id, node_id) in to_retry
-                             if lb_id != inactive_lb_id])
+                             if lb_id != bad_lb_id])
 
     if to_retry:
         next_step = BulkRemoveFromRCv3(lb_node_pairs=to_retry)
