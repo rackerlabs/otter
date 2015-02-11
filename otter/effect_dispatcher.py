@@ -36,7 +36,7 @@ def get_simple_dispatcher(reactor):
             Authenticate: perform_authenticate,
             InvalidateToken: perform_invalidate_token,
             Request: perform_request,
-            Retry: perform_retry
+            Retry: perform_retry,
         }),
         make_twisted_dispatcher(reactor),
     ])
