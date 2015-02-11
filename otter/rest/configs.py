@@ -73,7 +73,8 @@ class OtterConfig(object):
                 }
             }
         """
-        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
         deferred = rec.view_config()
         deferred.addCallback(lambda conf: json.dumps({"groupConfiguration": conf}))
         return deferred
