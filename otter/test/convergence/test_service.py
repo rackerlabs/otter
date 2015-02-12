@@ -11,12 +11,13 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
 from otter.convergence.model import (
-    CLBDescription, NovaServer, ServerState)
+    CLBDescription, CLBNode, NovaServer, ServerState)
 from otter.convergence.service import (
-    Converger, execute_convergence, server_to_json)
+    Converger, determine_active, execute_convergence, server_to_json)
 from otter.http import TenantScope, service_request
 from otter.models.intents import ModifyGroupState
 from otter.models.interface import GroupState
+from otter.test.convergence.test_planning import server
 from otter.test.utils import (
     CheckFailure, LockMixin, mock_group, mock_log, resolve_effect,
     resolve_stubs)
@@ -126,8 +127,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
-        for server in self.servers:
-            server.desired_lbs = pmap()
+        for s in self.servers:
+            s.desired_lbs = pmap()
 
         eff = execute_convergence(self.group, 2, self.lc, 0, log,
                                   get_all_convergence_data=gacd)
@@ -175,3 +176,66 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         # The result of the parallel is returned directly
         # TODO: This must change with issue #844.
         self.assertEqual(r, ['stuff'])
+
+
+class DetermineActiveTests(SynchronousTestCase):
+    """Tests for :func:`determine_active`."""
+
+    def test_nothing(self):
+        """No input means no active servers."""
+        self.assertEqual(determine_active([], []), [])
+
+    def test_active(self):
+        """Built servers with no desired LBs are active."""
+        servers = [server('id1', ServerState.ACTIVE),
+                   server('id2', ServerState.BUILD)]
+        self.assertEqual(determine_active(servers, []), servers[:1])
+
+    def test_lb_pending(self):
+        """
+        When a server should be in a LB but it's not, it's not active.
+        """
+        desired_lbs = pmap({'foo': [CLBDescription(lb_id='foo', port=80)]})
+        lb_nodes = [
+            CLBNode(node_id='x',
+                    description=CLBDescription(lb_id='foo', port=80),
+                    address='1.1.1.3')]
+        servers = [
+            server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1',
+                   desired_lbs=desired_lbs),
+            server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2',
+                   desired_lbs=desired_lbs),
+            server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3',
+                   desired_lbs=desired_lbs)]
+        self.assertEqual(determine_active(servers, lb_nodes), servers[2:])
+
+    def test_multiple_lb_pending(self):
+        """
+        When a server needs to be added to multiple LBs, it's only counted
+        once.
+        """
+        lb_nodes = [
+            CLBNode(node_id='1',
+                    description=CLBDescription(lb_id='foo', port=1),
+                    address='1.1.1.1'),
+            CLBNode(node_id='2',
+                    description=CLBDescription(lb_id='foo', port=2),
+                    address='1.1.1.1'),
+            CLBNode(node_id='3',
+                    description=CLBDescription(lb_id='bar', port=3),
+                    address='1.1.1.1'),
+            CLBNode(node_id='4',
+                    description=CLBDescription(lb_id='bar', port=4),
+                    address='1.1.1.1'),
+        ]
+        desired_lbs = pmap({'foo': [CLBDescription(lb_id='foo', port=1),
+                                    CLBDescription(lb_id='foo', port=2)],
+                            'bar': [CLBDescription(lb_id='bar', port=3),
+                                    CLBDescription(lb_id='bar', port=4)]})
+        servers = [
+            server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1',
+                   desired_lbs=desired_lbs),
+            server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2',
+                   desired_lbs=desired_lbs)
+        ]
+        self.assertEqual(determine_active(servers, lb_nodes), servers[:1])

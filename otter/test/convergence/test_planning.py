@@ -1,6 +1,6 @@
 """Tests for convergence planning."""
 
-from pyrsistent import freeze, m, pbag, pmap, pset, s, v
+from pyrsistent import freeze, pbag, pmap, pset, s
 
 from toolz import groupby
 
@@ -18,7 +18,6 @@ from otter.convergence.planning import (
     _default_limit_step_count,
     _limit_step_count,
     converge,
-    determine_active,
     optimize_steps,
     plan)
 from otter.convergence.steps import (
@@ -1047,7 +1046,7 @@ class PlanTests(SynchronousTestCase):
         desired_group_state = DesiredGroupState(
             server_config={}, capacity=8, desired_lbs=freeze(desired_lbs))
 
-        result, active = plan(
+        result = plan(
             desired_group_state,
             set([server('server1', state=ServerState.ACTIVE,
                         servicenet_address='1.1.1.1',
@@ -1058,8 +1057,6 @@ class PlanTests(SynchronousTestCase):
             set(),
             0)
 
-        self.assertEqual(active, [])
-
         self.assertEqual(
             result,
             pbag([
@@ -1069,101 +1066,3 @@ class PlanTests(SynchronousTestCase):
                         ('1.1.1.1', CLBDescription(lb_id='5', port=80)),
                         ('1.2.3.4', CLBDescription(lb_id='5', port=80)))
                 )] + [CreateServer(server_config=pmap({}))] * 3))
-
-
-class DetermineActiveTests(SynchronousTestCase):
-    """Tests for :func:`determine_active`."""
-
-    def test_pending(self):
-        """Servers yet to be built are pending."""
-        steps = pbag([CreateServer(server_config=m())] * 3)
-
-        self.assertEqual(determine_active([], steps), [])
-
-    def test_active(self):
-        """Built servers with no further work are active."""
-        steps = pbag([])
-        servers = [server('id1', ServerState.ACTIVE),
-                   server('id2', ServerState.BUILD)]
-        self.assertEqual(determine_active(servers, steps), servers[:1])
-
-    def test_clb_pending(self):
-        """
-        When a server is being added to a load balancer, it is considered
-        pending.
-        """
-        steps = pbag([
-            AddNodesToCLB(
-                lb_id='foo',
-                address_configs=s(
-                    ('1.1.1.1', CLBDescription(lb_id='foo', port=80)),
-                    ('1.1.1.2', CLBDescription(lb_id='foo', port=90))))])
-        servers = [
-            server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
-            server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
-            server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
-        self.assertEqual(determine_active(servers, steps), servers[2:])
-
-    def test_multiple_clb_pending(self):
-        """
-        When a server is being added to multiple CLBs, it's only counted
-        once.
-        """
-        steps = pbag([
-            AddNodesToCLB(
-                lb_id='foo',
-                address_configs=s(
-                    ('1.1.1.1', CLBDescription(lb_id='foo', port=80)),
-                    ('1.1.1.1', CLBDescription(lb_id='foo', port=90))))])
-        servers = [
-            server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
-            server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
-            server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
-        self.assertEqual(determine_active(servers, steps), servers[1:])
-
-    def test_rcv3_pending(self):
-        """
-        When a server is being added to a RCv3 load balancer, it is considered
-        pending.
-        """
-        steps = pbag([
-            BulkAddToRCv3(
-                lb_node_pairs=v(('lb-id1', 'id1'), ('lb-id2', 'id2')))])
-        servers = [
-            server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
-            server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
-            server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
-        self.assertEqual(determine_active(servers, steps), servers[2:])
-
-    def test_multiple_rcv3_pending(self):
-        """
-        When a server is being added to multiple RCv3 load balancers, it's only
-        counted once.
-        """
-        steps = pbag([
-            BulkAddToRCv3(
-                lb_node_pairs=v(('lb-id1', 'id1'), ('lb-id2', 'id1')))])
-        servers = [
-            server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
-            server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
-            server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
-        self.assertEqual(determine_active(servers, steps), servers[1:])
-
-    def test_clb_and_rcv3_pending(self):
-        """
-        When a server is being added to both a CLB and a RCv3 load balancer,
-        it's only counted once.
-        """
-        steps = pbag([
-            BulkAddToRCv3(
-                lb_node_pairs=v(('lb-id1', 'id1'))),
-            AddNodesToCLB(
-                lb_id='foo',
-                address_configs=s(
-                    ('1.1.1.1', CLBDescription(lb_id='foo', port=80)))),
-        ])
-        servers = [
-            server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
-            server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
-            server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
-        self.assertEqual(determine_active(servers, steps), servers[1:])

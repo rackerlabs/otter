@@ -11,7 +11,6 @@ from otter.convergence.model import (
     CLBDescription, CLBNode, CLBNodeCondition, IDrainable, ServerState)
 from otter.convergence.steps import (
     AddNodesToCLB,
-    BulkAddToRCv3,
     ChangeCLBNode,
     CreateServer,
     DeleteServer,
@@ -240,35 +239,6 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                 + lb_converge_steps)
 
 
-def determine_active(servers, steps):
-    """
-    Given the current NovaServers and the planned (unthrottled) steps,
-    determine which servers are completely built.
-
-    Sadly this function currently has a pretty intimate knowledge of the rest
-    of the convergence workflow -- like which steps indicate that something is
-    still to be done on a server. If server building is extended with new types
-    of steps or if those steps change, this function will need to be updated. A
-    better design would be welcome.
-
-    :return: list of servers that are active.
-    """
-    # assumption: only ACTIVE servers will have steps about them.
-    servers_by_servicenet = {s.servicenet_address: s.id for s in servers}
-    get_server = servers_by_servicenet.get
-    all_rcv3_server_adds = set(concat([
-        [pair[1] for pair in s.lb_node_pairs]
-        for s in steps if type(s) is BulkAddToRCv3]))
-    all_clb_adds = set(concat([
-        [get_server(c[0]) for c in s.address_configs]
-        for s in steps if type(s) is AddNodesToCLB]))
-    active = [server for server in servers
-              if server.state == ServerState.ACTIVE
-              and server.id not in all_rcv3_server_adds
-              and server.id not in all_clb_adds]
-    return active
-
-
 _optimizers = {}
 
 
@@ -370,12 +340,11 @@ def plan(desired_group_state, servers, lb_nodes, now):
 
     Takes the same arguments as :func:`converge`.
 
-    :return: A two-tuple of steps and active servers.
+    :return: steps
     """
     steps = converge(desired_group_state, servers, lb_nodes, now)
-    active = determine_active(servers, steps)
     steps = _default_limit_step_count(steps)
-    return optimize_steps(steps), active
+    return optimize_steps(steps)
 
 
 def add_server_to_lb(server, description):

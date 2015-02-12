@@ -7,12 +7,15 @@ from functools import partial
 from effect import Effect
 from effect.twisted import perform
 
+from toolz.itertoolz import concat
+
 from twisted.application.service import Service
 
 from otter.constants import CONVERGENCE_LOCK_PATH
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
+from otter.convergence.model import ServerState
 from otter.convergence.planning import plan
 from otter.http import TenantScope
 from otter.models.intents import ModifyGroupState
@@ -28,6 +31,32 @@ def server_to_json(server):
     return {'id': server.id}
 
 
+def determine_active(servers, lb_nodes):
+    """
+    Given the current NovaServers and CLB nodes, determine which servers are
+    completely built.
+
+    :param desired_lbs: As per DesiredGroupState.desired_lbs.
+    :param servers: sequence of :obj:`NovaServer`.
+    :param lb_nodes: sequence of :obj:`ILBNode`.
+
+    :return: list of servers that are active.
+    """
+
+    def all_met(server, current_lb_nodes):
+        """Determine if a server is in all the LBs it wants to be in."""
+        desired_lbs = set(concat(server.desired_lbs.values()))
+        met_desireds = set([
+            desired for desired in desired_lbs
+            for node in current_lb_nodes
+            if desired.equivalent_definition(node.description)])
+        return desired_lbs == met_desireds
+
+    return [s for s in servers
+            if s.state == ServerState.ACTIVE
+            and all_met(s, [node for node in lb_nodes if node.matches(s)])]
+
+
 def execute_convergence(
         scaling_group, desired, launch_config, now, log,
         get_all_convergence_data=get_all_convergence_data):
@@ -40,9 +69,11 @@ def execute_convergence(
     all_data_eff = get_all_convergence_data(scaling_group.uuid)
 
     def got_all_data((servers, lb_nodes)):
+
+        active = determine_active(servers, lb_nodes)
         desired_group_state = get_desired_group_state(
             scaling_group.uuid, launch_config, desired)
-        steps, active = plan(desired_group_state, servers, lb_nodes, now)
+        steps = plan(desired_group_state, servers, lb_nodes, now)
         active = {server.id: server_to_json(server) for server in active}
 
         def update_group_state(group, old_state):
