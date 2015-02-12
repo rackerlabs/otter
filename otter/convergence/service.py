@@ -57,7 +57,7 @@ def determine_active(servers, lb_nodes):
 
 
 def execute_convergence(
-        scaling_group, desired, launch_config, now, log,
+        scaling_group, desired_capacity, launch_config, now, log,
         get_all_convergence_data=get_all_convergence_data):
     """
     Gather data, plan a convergence, save active and pending servers to the
@@ -78,7 +78,7 @@ def execute_convergence(
     def got_all_data((servers, lb_nodes)):
         active = determine_active(servers, lb_nodes)
         desired_group_state = get_desired_group_state(
-            scaling_group.uuid, launch_config, desired)
+            scaling_group.uuid, launch_config, desired_capacity)
         steps = plan(desired_group_state, servers, lb_nodes, now)
         active = {server.id: server_to_json(server) for server in active}
 
