@@ -373,7 +373,7 @@ class StepAsEffectTests(SynchronousTestCase):
 
         success_pred = request.intent.success_pred
         if request.intent.method == "POST":
-            self.assertEqual(success_pred, has_code(201))
+            self.assertEqual(success_pred, has_code(201, 409))
         else:
             self.assertEqual(success_pred, has_code(204, 409))
 
