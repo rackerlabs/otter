@@ -433,10 +433,10 @@ _RCV3_TEST_DATA = {
     _RCV3_LB_INACTIVE_PATTERN: [
         ('Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 is '
          'not in an ACTIVE state',
-         ("d95ae0c4-6ab8-4873-b82f-f8433840cff2",)),
+         {"lb_id": "d95ae0c4-6ab8-4873-b82f-f8433840cff2"}),
         ('Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2 is '
          'not in an ACTIVE state',
-         ("D95AE0C4-6AB8-4873-B82F-F8433840CFF2",))
+         {"lb_id": "D95AE0C4-6AB8-4873-B82F-F8433840CFF2"})
     ],
     _RCV3_LB_DOESNT_EXIST_PATTERN: [
         ("Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 does "
