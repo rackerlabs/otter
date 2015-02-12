@@ -9,6 +9,7 @@ from functools import partial
 from twisted.internet import defer
 
 from otter import controller
+from otter.convergence.composition import tenant_is_enabled
 from otter.json_schema.group_schemas import (
     MAX_ENTITIES,
     validate_launch_config_servicenet,
@@ -34,6 +35,7 @@ from otter.rest.otterapp import OtterApp
 from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.webhooks import _format_webhook
 from otter.supervisor import get_supervisor, remove_server_from_group
+from otter.util.config import config_value
 from otter.util.http import (
     get_autoscale_links,
     get_groups_links,
@@ -53,10 +55,16 @@ def format_state_dict(state):
     :return: a ``dict`` that looks like what should be respond by the API
         response when getting state
     """
+    if tenant_is_enabled(state.tenant_id, config_value):
+        desired = state.desired
+        pending = state.desired - len(state.active)
+    else:
+        pending = len(state.pending)
+        desired = len(state.active) + pending
     return {
         'activeCapacity': len(state.active),
-        'pendingCapacity': len(state.pending),
-        'desiredCapacity': len(state.active) + len(state.pending),
+        'pendingCapacity': pending,
+        'desiredCapacity': desired,
         'name': state.group_name,
         'paused': state.paused,
         'active': [
