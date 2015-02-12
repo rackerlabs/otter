@@ -21,6 +21,10 @@ from otter.util.fp import obj_assoc
 
 
 def server_to_json(server):
+    """
+    Convert a NovaServer to a dict representation suitable for returning to the
+    end-user as a part of group state.
+    """
     return {'id': server.id}
 
 
