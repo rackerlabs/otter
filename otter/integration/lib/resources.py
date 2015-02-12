@@ -2,7 +2,7 @@
 integration tests.
 """
 
-from characteristic import attributes, Attribute
+from characteristic import Attribute, attributes
 
 
 @attributes([

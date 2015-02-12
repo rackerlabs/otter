@@ -5,16 +5,17 @@ from pyrsistent import pmap, pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.convergence.model import (
-    DesiredGroupState,
-    NovaServer,
-    ServerState
-)
 from utils import (
     GroupState,
     OvershootError,
     UndershootError,
     measure_progress
+)
+
+from otter.convergence.model import (
+    DesiredGroupState,
+    NovaServer,
+    ServerState
 )
 
 

@@ -8,6 +8,8 @@
 # this after refactoring is done.
 
 
+from __future__ import print_function
+
 import json
 import os
 
@@ -18,8 +20,8 @@ from twisted.trial import unittest
 from twisted.web.client import HTTPConnectionPool
 
 from otter import auth
-from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib import autoscale
+from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
 
 
@@ -32,7 +34,7 @@ region = os.environ['AS_REGION']
 
 
 def dump_js(js):
-    print json.dumps(js, indent=4)
+    print(json.dumps(js, indent=4))
 
 
 def dump_groups(rcs):
@@ -49,7 +51,7 @@ def find_end_point(rcs):
 
 
 def print_token_and_ep(rcs):
-    print "TOKEN(%s) EP(%s)" % (rcs.token, rcs.endpoints["otter"])
+    print("TOKEN(%s) EP(%s)" % (rcs.token, rcs.endpoints["otter"]))
     return rcs
 
 
