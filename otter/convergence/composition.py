@@ -2,7 +2,6 @@
 Code for composing all of the convergence functionality together.
 """
 import json
-import time
 
 from collections import defaultdict
 

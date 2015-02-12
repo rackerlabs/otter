@@ -2,11 +2,6 @@
 
 import json
 
-from effect import Constant, Effect, ParallelEffects
-from effect.testing import Stub
-
-import mock
-
 from pyrsistent import freeze, pmap
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -15,10 +10,7 @@ from otter.convergence.composition import (
     get_desired_group_state,
     json_to_LBConfigs,
     tenant_is_enabled)
-from otter.convergence.model import (
-    CLBDescription, DesiredGroupState, NovaServer, ServerState)
-from otter.http import service_request
-from otter.test.utils import resolve_effect, resolve_stubs
+from otter.convergence.model import CLBDescription, DesiredGroupState
 
 
 class JsonToLBConfigTests(SynchronousTestCase):
