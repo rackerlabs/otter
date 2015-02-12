@@ -572,7 +572,7 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
         self.assertEqual(eff.intent, expected_intent)
         (partial_check_bulk_add, _), = eff.callbacks
         self.assertEqual(partial_check_bulk_add.func,
-                         _rcv3_check_bulk_delete)
+                         _rcv3_check_bulk_add)
         expected_pairs = pset([(lb_b_id, node_b_id)])
         self.assertEqual(partial_check_bulk_add.args, (expected_pairs,))
         self.assertEqual(partial_check_bulk_add.keywords, None)
