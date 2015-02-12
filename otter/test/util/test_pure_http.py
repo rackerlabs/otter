@@ -143,6 +143,12 @@ class HasCodeTests(SynchronousTestCase):
         self.assertNotEqual(b, d)
         self.assertNotEqual(c, d)
 
+    def test_introspection(self):
+        """
+        The codes are introspectable.
+        """
+        self.assertEqual(has_code(200, 300, 400).codes, (200, 300, 400))
+
 
 class AddEffectfulHeadersTest(TestCase):
     """
