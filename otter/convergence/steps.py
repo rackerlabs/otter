@@ -372,7 +372,10 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
     """
     Checks if the RCv3 bulk add command was successful.
     """
-    return StepResult.SUCCESS, []
+    response, body = result
+
+    if response.code == 201:  # All done!
+        return StepResult.SUCCESS, []
 
 
 @implementer(IStep)
