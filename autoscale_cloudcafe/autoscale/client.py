@@ -3,6 +3,7 @@ Client objects for all the autoscale api calls
 """
 from __future__ import print_function
 
+import json
 
 from urlparse import urlparse
 
@@ -23,6 +24,7 @@ from autoscale.models.response.autoscale_response import (
 )
 
 from autoscale.models.response.limits_response import Limits
+
 
 
 class AutoscalingAPIClient(AutoMarshallingRestClient):
@@ -940,18 +942,18 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         return self.request('GET', url,
                             response_entity_type=RackConnectLBNodeDetail)
 
-    def remove_node_from_pool(self, pool_id, server_id,
-                              requestslib_kwargs=None):
+    def remove_server_from_pool(self, pool_id, server_id,
+                                requestslib_kwargs=None):
         """
         :summary: Remove a node from a lb pool using the bulk delete API
         """
         url = self.url + '/load_balancer_pools/nodes'
         print("... RCV3 request ... ", url)
-        requestslib_kwargs = [
+        data = [
             {
                 "cloud_server": {"id": server_id},
                 "load_balancer_pool": {"id": pool_id}
             }]
-        return self.request('DELETE', url,
+        return self.request('DELETE', url, data=json.dumps(data),
                             requestslib_kwargs=requestslib_kwargs)
 
