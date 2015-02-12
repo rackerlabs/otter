@@ -462,13 +462,14 @@ class RCv3RegexTests(SynchronousTestCase):
         """
         self.assertIn(test_pattern, _RCV3_TEST_DATA)
         for pattern, test_data in _RCV3_TEST_DATA.iteritems():
-            message, expected_group_dict = test_data
             if pattern is not test_pattern:
-                self.assertIdentical(test_pattern.match(message), None)
+                for message, _ in test_data:
+                    self.assertIdentical(test_pattern.match(message), None)
             else:
-                res = pattern.match(message)
-                self.assertNotIdentical(res, None)
-                self.assertEqual(res.groupdict(), expected_group_dict)
+                for message, expected_group_dict in test_data:
+                    res = pattern.match(message)
+                    self.assertNotIdentical(res, None)
+                    self.assertEqual(res.groupdict(), expected_group_dict)
 
     def test_node_not_a_member_error_message_regex(self):
         """
