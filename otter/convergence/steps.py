@@ -364,7 +364,6 @@ class BulkAddToRCv3(object):
         return self._bare_effect()
 
 
-
 @implementer(IStep)
 @attributes(['lb_node_pairs'])
 class BulkRemoveFromRCv3(object):
