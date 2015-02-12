@@ -419,6 +419,36 @@ class StepAsEffectTests(SynchronousTestCase):
             BulkRemoveFromRCv3, "DELETE")
 
 
+_RCV3_TEST_DATA = freeze({
+    _RCV3_NODE_NOT_A_MEMBER_PATTERN: [
+        ('Node d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is not a member of '
+         'Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2',
+         {'lb_id': 'd95ae0c4-6ab8-4873-b82f-f8433840cff2',
+          'node_id': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'}),
+        ('Node D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is not a member of '
+         'Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+         {'lb_id': 'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+          'node_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'})
+    ],
+    _RCV3_LB_INACTIVE_PATTERN: [
+            ('Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 is '
+             'not in an ACTIVE state',
+             ("d95ae0c4-6ab8-4873-b82f-f8433840cff2",)),
+            ('Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2 is '
+             'not in an ACTIVE state',
+             ("D95AE0C4-6AB8-4873-B82F-F8433840CFF2",))
+        ],
+    _RCV3_LB_DOESNT_EXIST_PATTERN: [
+            ("Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 does "
+             "not exist",
+             ("d95ae0c4-6ab8-4873-b82f-f8433840cff2",)),
+            ("Load Balancer Pool D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 does "
+             "not exist",
+             ("D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2",))
+        ]
+})
+
+
 class RCv3CheckBulkDeleteTests(SynchronousTestCase):
     """
     Tests for :func:`_rcv3_check_bulk_delete`.
