@@ -71,7 +71,7 @@ def execute_convergence(
     :param get_all_convergence_data: The :func`get_all_convergence_data` to use
         for testing.
 
-    :return: An Effect of List of Step Effect Results. (???)
+    :return: An Effect of a list containing the individual step results.
     """
     all_data_eff = get_all_convergence_data(scaling_group.uuid)
 
