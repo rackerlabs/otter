@@ -556,6 +556,22 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
         self.assertEqual(partial_check_bulk_add.args, (expected_pairs,))
         self.assertEqual(partial_check_bulk_add.keywords, None)
 
+    def test_node_already_a_member(self):
+        """
+        If the node was already a member, the request is successful.
+        """
+        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+        pairs = [(node_id, lb_id)]
+
+        resp = StubResponse(409, {})
+        body = {"errors": [
+            "Cloud Server {node_id} is already a member of Load "
+            "Balancer Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
+        result = _rcv3_check_bulk_add(pairs, (resp, body))
+        self.assertEqual(result, (StepResult.SUCCESS, []))
+
+
 class RCv3CheckBulkDeleteTests(SynchronousTestCase):
     """
     Tests for :func:`_rcv3_check_bulk_delete`.
