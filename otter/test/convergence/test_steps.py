@@ -583,7 +583,7 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
         """
         node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
         lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
-        pairs = [(node_id, lb_id)]
+        pairs = [(lb_id, node_id)]
 
         resp = StubResponse(409, {})
         body = {"errors": [
