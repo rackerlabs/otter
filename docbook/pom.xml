@@ -12,25 +12,20 @@
     <src.wadl>src/wadl</src.wadl>
     <wadl.file>autoscale.wadl</wadl.file>
   </properties>
+  <parent>
+    <groupId>com.rackspace.cloud.api</groupId>
+    <artifactId>rackspace-docs-parent</artifactId>
+    <version>1.0.0</version>
+  </parent>
   <build>
     <plugins>
       <plugin>
         <groupId>com.rackspace.cloud.api</groupId>
         <artifactId>olink-maven-plugin</artifactId>
-        <version>1.2.6</version>
-        <executions>
-          <execution>
-	    <phase>initialize</phase>
-	    <goals>
-	      <goal>olink</goal>
-	    </goals>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>com.rackspace.cloud.api</groupId>
-        <artifactId>clouddocs-maven-plugin</artifactId>
-        <version>2.1.2</version>
+        <artifactId>rackspace-docs-maven-plugin</artifactId>
         <executions>
           <execution>
             <id>autoscale</id>
