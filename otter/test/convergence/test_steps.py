@@ -545,8 +545,9 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
     def test_try_again(self):
         """
         If a node was already removed (or maybe was never part of the load
-        balancer pool to begin with), returns an effect that removes
-        the remaining load balancer pairs.
+        balancer pool to begin with), or some load balancer was
+        inactive, or one of the load balancers doesn't exist, returns
+        an effect that removes the remaining load balancer pairs.
         """
         # This little piggy isn't even on this load balancer.
         node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
