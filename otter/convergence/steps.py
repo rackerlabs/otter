@@ -357,7 +357,7 @@ class BulkAddToRCv3(object):
         Just the RCv3 bulk request effect, with no callbacks.
         """
         return _rackconnect_bulk_request(self.lb_node_pairs, "POST",
-                                         success_pred=has_code(201))
+                                         success_pred=has_code(201, 409))
 
     def as_effect(self):
         """
