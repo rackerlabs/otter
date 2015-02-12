@@ -472,7 +472,7 @@ class RCv3RegexTests(SynchronousTestCase):
                     self.assertNotIdentical(res, None)
                     self.assertEqual(res.groupdict(), expected_group_dict)
 
-    def test_node_not_a_member_error_message_regex(self):
+    def test_node_not_a_member_regex(self):
         """
         The regex for parsing messages saying the node isn't part of the
         load balancer parses those messages. It rejects other
