@@ -266,9 +266,9 @@ def calculate_active_and_pending(servers, steps):
         for s in steps if type(s) is AddNodesToCLB]))
     num_pending = (len(all_rcv3_server_adds.union(all_clb_adds))
                    + len([s for s in steps if type(s) is CreateServer])
-                   + len([s for s in servers if s.state == 'BUILDING']))
+                   + len([s for s in servers if s.state == ServerState.BUILD]))
     active = [server for server in servers
-              if server.state == 'ACTIVE'
+              if server.state == ServerState.ACTIVE
               and server.id not in all_rcv3_server_adds
               and server.id not in all_clb_adds]
     return active, num_pending

@@ -1048,7 +1048,8 @@ class CalculateActiveAndPendingTests(SynchronousTestCase):
     def test_active(self):
         """Built servers with no further work are active."""
         steps = pbag([])
-        servers = [server('id1', 'ACTIVE'), server('id2', 'BUILDING')]
+        servers = [server('id1', ServerState.ACTIVE),
+                   server('id2', ServerState.BUILD)]
         self.assertEqual(
             calculate_active_and_pending(servers, steps),
             (servers[:1], 1))
@@ -1064,9 +1065,9 @@ class CalculateActiveAndPendingTests(SynchronousTestCase):
                 address_configs=s(
                     ('1.1.1.1', CLBDescription(lb_id='foo', port=80)),
                     ('1.1.1.2', CLBDescription(lb_id='foo', port=90))))])
-        servers = [server('id1', 'ACTIVE', servicenet_address='1.1.1.1'),
-                   server('id2', 'ACTIVE', servicenet_address='1.1.1.2'),
-                   server('id3', 'ACTIVE', servicenet_address='1.1.1.3')]
+        servers = [server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
+                   server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
+                   server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
         self.assertEqual(
             calculate_active_and_pending(servers, steps),
             (servers[2:], 2))
@@ -1082,9 +1083,9 @@ class CalculateActiveAndPendingTests(SynchronousTestCase):
                 address_configs=s(
                     ('1.1.1.1', CLBDescription(lb_id='foo', port=80)),
                     ('1.1.1.1', CLBDescription(lb_id='foo', port=90))))])
-        servers = [server('id1', 'ACTIVE', servicenet_address='1.1.1.1'),
-                   server('id2', 'ACTIVE', servicenet_address='1.1.1.2'),
-                   server('id3', 'ACTIVE', servicenet_address='1.1.1.3')]
+        servers = [server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
+                   server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
+                   server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
         self.assertEqual(
             calculate_active_and_pending(servers, steps),
             (servers[1:], 1))
@@ -1097,9 +1098,9 @@ class CalculateActiveAndPendingTests(SynchronousTestCase):
         steps = pbag([
             BulkAddToRCv3(
                 lb_node_pairs=v(('lb-id1', 'id1'), ('lb-id2', 'id2')))])
-        servers = [server('id1', 'ACTIVE', servicenet_address='1.1.1.1'),
-                   server('id2', 'ACTIVE', servicenet_address='1.1.1.2'),
-                   server('id3', 'ACTIVE', servicenet_address='1.1.1.3')]
+        servers = [server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
+                   server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
+                   server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
         self.assertEqual(
             calculate_active_and_pending(servers, steps),
             (servers[2:], 2))
@@ -1112,9 +1113,9 @@ class CalculateActiveAndPendingTests(SynchronousTestCase):
         steps = pbag([
             BulkAddToRCv3(
                 lb_node_pairs=v(('lb-id1', 'id1'), ('lb-id2', 'id1')))])
-        servers = [server('id1', 'ACTIVE', servicenet_address='1.1.1.1'),
-                   server('id2', 'ACTIVE', servicenet_address='1.1.1.2'),
-                   server('id3', 'ACTIVE', servicenet_address='1.1.1.3')]
+        servers = [server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
+                   server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
+                   server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
         self.assertEqual(
             calculate_active_and_pending(servers, steps),
             (servers[1:], 1))
@@ -1132,9 +1133,9 @@ class CalculateActiveAndPendingTests(SynchronousTestCase):
                 address_configs=s(
                     ('1.1.1.1', CLBDescription(lb_id='foo', port=80)))),
         ])
-        servers = [server('id1', 'ACTIVE', servicenet_address='1.1.1.1'),
-                   server('id2', 'ACTIVE', servicenet_address='1.1.1.2'),
-                   server('id3', 'ACTIVE', servicenet_address='1.1.1.3')]
+        servers = [server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
+                   server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
+                   server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
         self.assertEqual(
             calculate_active_and_pending(servers, steps),
             (servers[1:], 1))
