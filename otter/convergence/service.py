@@ -63,6 +63,14 @@ def execute_convergence(
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
 
+    :param IScalingGroup scaling_group: The scaling group object.
+    :param GroupState group_state: The group state.
+    :param launch_config: An otter launch config.
+    :param now: The current time in seconds.
+    :param log: A bound logger.
+    :param get_all_convergence_data: The :func`get_all_convergence_data` to use
+        for testing.
+
     :return: An Effect of List of Step Effect Results. (???)
     """
     all_data_eff = get_all_convergence_data(scaling_group.uuid)
@@ -103,7 +111,17 @@ class Converger(Service, object):
                           launch_config,
                           perform=perform,
                           execute_convergence=execute_convergence):
-        """Converge a group to a capacity with a launch config."""
+        """
+        Converge a group to a capacity with a launch config.
+
+        :param log: a bound logger.
+        :param IScalingGroup scaling_group: The scaling group object.
+        :param GroupState group_state: The group state.
+        :param launch_config: An otter launch config.
+        :param perform: :func:`perform` function to use for testing.
+        :param execute_convergence: :func:`execute_convergence` function to use
+            for testing.
+        """
         def exec_convergence():
             eff = execute_convergence(scaling_group, group_state.desired,
                                       launch_config, time.time(), log)
