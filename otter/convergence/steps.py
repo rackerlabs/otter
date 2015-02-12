@@ -364,7 +364,8 @@ class BulkAddToRCv3(object):
         Produce a :obj:`Effect` to add some nodes to some RCv3 load
         balancers.
         """
-        return self._bare_effect()
+        eff = self._bare_effect()
+        return eff.on(partial(_rcv3_check_bulk_add, self.lb_node_pairs))
 
 
 def _rcv3_check_bulk_add(attempted_pairs, result):
