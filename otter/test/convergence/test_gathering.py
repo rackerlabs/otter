@@ -366,16 +366,16 @@ class ToNovaServerTests(SynchronousTestCase):
         self.createds = [('2020-10-10T10:00:00Z', 1602324000),
                          ('2020-10-20T11:30:00Z', 1603193400)]
         self.servers = [{'id': 'a',
-                         'state': 'ACTIVE',
+                         'status': 'ACTIVE',
                          'created': self.createds[0][0],
                          'image': {'id': 'valid_image'},
                          'flavor': {'id': 'valid_flavor'}},
                         {'id': 'b',
-                         'state': 'BUILD',
+                         'status': 'BUILD',
                          'image': {'id': 'valid_image'},
                          'flavor': {'id': 'valid_flavor'},
                          'created': self.createds[1][0],
-                         'addresses': {'private': [{'addr': '10.0.0.1',
+                         'addresses': {'private': [{'addr': u'10.0.0.1',
                                                     'version': 4}]}}]
 
     def test_without_address(self):
@@ -538,18 +538,18 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         """Save some stuff."""
         self.servers = [
             {'id': 'a',
-             'state': 'ACTIVE',
+             'status': 'ACTIVE',
              'image': {'id': 'image'},
              'flavor': {'id': 'flavor'},
              'created': '1970-01-01T00:00:00Z',
-             'addresses': {'private': [{'addr': '10.0.0.1',
+             'addresses': {'private': [{'addr': u'10.0.0.1',
                                         'version': 4}]}},
             {'id': 'b',
-             'state': 'ACTIVE',
+             'status': 'ACTIVE',
              'image': {'id': 'image'},
              'flavor': {'id': 'flavor'},
              'created': '1970-01-01T00:00:01Z',
-             'addresses': {'private': [{'addr': '10.0.0.2',
+             'addresses': {'private': [{'addr': u'10.0.0.2',
                                         'version': 4}]}}
         ]
 
