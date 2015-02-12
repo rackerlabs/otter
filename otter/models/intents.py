@@ -11,6 +11,6 @@ class ModifyGroupState(object):
 
 
 @deferred_performer
-def perform_modify_group_state(dispatcher, mgs):
+def perform_modify_group_state(dispatcher, mgs_intent):
     """Perform a :obj:`ModifyGroupState`."""
-    return mgs.scaling_group.modify_state(mgs.modifier)
+    return mgs_intent.scaling_group.modify_state(mgs_intent.modifier)
