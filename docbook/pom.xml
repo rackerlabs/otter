@@ -7,6 +7,11 @@
   <version>1.0.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Autoscale Docs</name>
+  <parent>
+    <groupId>com.rackspace.cloud.api</groupId>
+    <artifactId>rackspace-docs-parent</artifactId>
+    <version>1.0.0</version>
+  </parent>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <src.wadl>src/wadl</src.wadl>
@@ -17,7 +22,10 @@
       <plugin>
         <groupId>com.rackspace.cloud.api</groupId>
         <artifactId>olink-maven-plugin</artifactId>
-        <version>1.2.6</version>
+      </plugin>
+      <plugin>
+        <groupId>com.rackspace.cloud.api</groupId>
+        <artifactId>rackspace-docs-maven-plugin</artifactId>
         <executions>
           <execution>
 	    <phase>initialize</phase>
@@ -28,11 +36,11 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>com.rackspace.cloud.api</groupId>
-        <artifactId>clouddocs-maven-plugin</artifactId>
-        <version>2.1.2</version>
-        <executions>
-          <execution>
+      <groupId>com.rackspace.cloud.api</groupId>
+      <artifactId>clouddocs-maven-plugin-docbook</artifactId>
+      <version>2.1.5-SNAPSHOT</version>
+      <executions>
+      <execution>
             <id>autoscale</id>
             <goals>
               <goal>generate-webhelp</goal>
@@ -51,8 +59,8 @@
                 <security>internal</security>
               -->
             </configuration>
-          </execution>
-        </executions>
+          </execution>     
+      </executions>
         <configuration>
 	  <enableDisqus>internet</enableDisqus>
 	  <socialIcons>0</socialIcons>
