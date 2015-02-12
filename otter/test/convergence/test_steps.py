@@ -22,6 +22,7 @@ from otter.convergence.steps import (
     _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
+    _rcv3_check_bulk_add,
     _rcv3_check_bulk_delete)
 from otter.http import has_code, service_request
 from otter.test.utils import StubResponse, resolve_effect
