@@ -701,8 +701,8 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
 
     def test_node_not_a_member(self):
         """
-        If the node is not a member of the load balancer pool it's being
-        removed from, the response was successful.
+        If the nodes are already not member of the load balancer pools
+        they're being removed from, the response was successful.
         """
         node_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
         lb_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
