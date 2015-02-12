@@ -453,6 +453,23 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
     """
     Tests for :func:`_rcv3_check_bulk_delete`.
     """
+    def _regex_test(self, test_pattern):
+        """A generic regex test.
+
+        Asserts that the given test pattern has test data, matches all
+        of its test data, and that it does not match all of the test
+        data for all of the other patterns.
+        """
+        self.assertIn(test_pattern, _RCV3_TEST_DATA)
+        for pattern, test_data in _RCV3_TEST_DATA.iteritems():
+            message, expected_group_dict = test_data
+            if pattern is not test_pattern:
+                self.assertIdentical(test_pattern.match(message), None)
+            else:
+                res = pattern.match(message)
+                self.assertNotIdentical(res, None)
+                self.assertEqual(res.groupdict(), expected_group_dict)
+
     def test_node_not_a_member_error_message_regex(self):
         """
         The regex for parsing messages saying the node isn't part of the
