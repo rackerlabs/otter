@@ -328,6 +328,9 @@ def _rcv3_re(pattern):
 _RCV3_NODE_NOT_A_MEMBER_PATTERN = _rcv3_re(
     "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
     "(?P<lb_id>{uuid})")
+_RCV3_NODE_ALREADY_A_MEMBER_PATTERN = _rcv3_re(
+    "Cloud Server (?P<node_id>{uuid}) is already a member of Load Balancer "
+    "Pool (?P<lb_id>{uuid})")
 _RCV3_LB_INACTIVE_PATTERN = _rcv3_re(
     "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state")
 _RCV3_LB_DOESNT_EXIST_PATTERN = _rcv3_re(
