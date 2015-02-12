@@ -36,7 +36,6 @@ def determine_active(servers, lb_nodes):
     Given the current NovaServers and LB nodes, determine which servers are
     completely built.
 
-    :param desired_lbs: As per DesiredGroupState.desired_lbs.
     :param servers: sequence of :obj:`NovaServer`.
     :param lb_nodes: sequence of :obj:`ILBNode`.
 
