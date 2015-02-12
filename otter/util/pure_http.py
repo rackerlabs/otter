@@ -121,6 +121,7 @@ def has_code(*codes):
         :rtype: bool
         """
         return response.code in codes
+    check_response_code.codes = codes
     return check_response_code
 
 
