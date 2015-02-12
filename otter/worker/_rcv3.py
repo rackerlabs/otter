@@ -31,7 +31,7 @@ def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
 
     svc_req = effect.intent
     codes = set(svc_req.success_pred.codes) - set([409])
-    svc_req.succes_pred = has_code(*codes)
+    svc_req.success_pred = has_code(*codes)
 
     # Unfortunate that we have to TenantScope here, but here's where we're
     # performing.
