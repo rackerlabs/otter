@@ -579,7 +579,8 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
 
     def test_node_already_a_member(self):
         """
-        If the node was already a member, the request is successful.
+        If all nodes were already member of the load balancers we were
+        trying to add them to, the request is successful.
         """
         node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
         lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
