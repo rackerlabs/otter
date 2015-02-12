@@ -38,17 +38,10 @@ def execute_convergence(
     def got_all_data((servers, lb_nodes)):
         desired_group_state = get_desired_group_state(
             scaling_group.uuid, launch_config, desired)
-        steps, active, num_pending = plan(desired_group_state, servers,
-                                          lb_nodes, now)
+        steps, active = plan(desired_group_state, servers, lb_nodes, now)
         active = {server.id: server_to_json(server) for server in active}
-        pending = {job_id: {'convergence-job': True}
-                   for job_id in range(num_pending)}
-        log.msg(otter_msg_type='convergence-active-pending', # RADIX delete thiss
-                active=active,
-                pending=pending)
-
         def update_group_state(group, old_state):
-            return obj_assoc(old_state, active=active, pending=pending)
+            return obj_assoc(old_state, active=active)
 
         eff = Effect(ModifyGroupState(scaling_group=scaling_group,
                                       modifier=update_group_state))
@@ -78,7 +71,6 @@ class Converger(Service, object):
                           execute_convergence=execute_convergence):
         """Converge a group to a capacity with a launch config."""
         def exec_convergence():
-            log.msg(otter_msg_type='convergence-rocks') # RADIX delete thissssss
             eff = execute_convergence(scaling_group, group_state.desired,
                                       launch_config, time.time(), log)
             eff = Effect(TenantScope(eff, group_state.tenant_id))

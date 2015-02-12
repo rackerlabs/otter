@@ -114,11 +114,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             return Effect(Stub(Constant((self.servers, []))))
         return get_all_convergence_data
 
-    def _assert_active_pending(self, effect, active, pending):
+    def _assert_active(self, effect, active):
         self.assertIsInstance(effect.intent, ModifyGroupState)
         self.assertEqual(effect.intent.scaling_group, self.group)
         self.assertEqual(effect.intent.modifier(self.group, self.state),
-                         obj_assoc(self.state, active=active, pending=pending))
+                         obj_assoc(self.state, active=active))
 
     def test_no_steps(self):
         """
@@ -134,7 +134,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         mgs_eff = resolve_stubs(eff)
         expected_active = {'a': server_to_json(self.servers[0]),
                            'b': server_to_json(self.servers[1])}
-        self._assert_active_pending(mgs_eff, expected_active, {})
+        self._assert_active(mgs_eff, expected_active)
         p_effs = resolve_effect(mgs_eff, None)
         self.assertEqual(p_effs, parallel([]))
 
@@ -150,10 +150,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         eff = execute_convergence(self.group, 2, self.lc, 0, log,
                                   get_all_convergence_data=gacd)
         mgs_eff = resolve_stubs(eff)
-        expected_active = {}
-        expected_pending = {0: {'convergence-job': True},
-                            1: {'convergence-job': True}}
-        self._assert_active_pending(mgs_eff, expected_active, expected_pending)
+        self._assert_active(mgs_eff, {})
 
         eff = resolve_effect(mgs_eff, None)
         # The steps are optimized

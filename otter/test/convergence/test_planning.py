@@ -17,7 +17,7 @@ from otter.convergence.model import (
 from otter.convergence.planning import (
     _default_limit_step_count,
     _limit_step_count,
-    calculate_active_and_pending,
+    determine_active,
     converge,
     optimize_steps,
     plan)
@@ -1047,7 +1047,7 @@ class PlanTests(SynchronousTestCase):
         desired_group_state = DesiredGroupState(
             server_config={}, capacity=8, desired_lbs=freeze(desired_lbs))
 
-        result, active, num_pending = plan(
+        result, active = plan(
             desired_group_state,
             set([server('server1', state=ServerState.ACTIVE,
                         servicenet_address='1.1.1.1',
@@ -1059,7 +1059,6 @@ class PlanTests(SynchronousTestCase):
             0)
 
         self.assertEqual(active, [])
-        self.assertEqual(num_pending, 8)
 
         self.assertEqual(
             result,
@@ -1072,25 +1071,21 @@ class PlanTests(SynchronousTestCase):
                 )] + [CreateServer(server_config=pmap({}))] * 3))
 
 
-class CalculateActiveAndPendingTests(SynchronousTestCase):
-    """Tests for :func:`calculate_active_and_pending`."""
+class DetermineActiveTests(SynchronousTestCase):
+    """Tests for :func:`determine_active`."""
 
     def test_pending(self):
         """Servers yet to be built are pending."""
         steps = pbag([CreateServer(server_config=m())] * 3)
 
-        self.assertEqual(
-            calculate_active_and_pending([], steps),
-            ([], 3))
+        self.assertEqual(determine_active([], steps), [])
 
     def test_active(self):
         """Built servers with no further work are active."""
         steps = pbag([])
         servers = [server('id1', ServerState.ACTIVE),
                    server('id2', ServerState.BUILD)]
-        self.assertEqual(
-            calculate_active_and_pending(servers, steps),
-            (servers[:1], 1))
+        self.assertEqual(determine_active(servers, steps), servers[:1])
 
     def test_clb_pending(self):
         """
@@ -1107,9 +1102,7 @@ class CalculateActiveAndPendingTests(SynchronousTestCase):
             server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
             server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
             server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
-        self.assertEqual(
-            calculate_active_and_pending(servers, steps),
-            (servers[2:], 2))
+        self.assertEqual(determine_active(servers, steps), servers[2:])
 
     def test_multiple_clb_pending(self):
         """
@@ -1126,9 +1119,7 @@ class CalculateActiveAndPendingTests(SynchronousTestCase):
             server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
             server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
             server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
-        self.assertEqual(
-            calculate_active_and_pending(servers, steps),
-            (servers[1:], 1))
+        self.assertEqual(determine_active(servers, steps), servers[1:])
 
     def test_rcv3_pending(self):
         """
@@ -1142,9 +1133,7 @@ class CalculateActiveAndPendingTests(SynchronousTestCase):
             server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
             server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
             server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
-        self.assertEqual(
-            calculate_active_and_pending(servers, steps),
-            (servers[2:], 2))
+        self.assertEqual(determine_active(servers, steps), servers[2:])
 
     def test_multiple_rcv3_pending(self):
         """
@@ -1158,9 +1147,7 @@ class CalculateActiveAndPendingTests(SynchronousTestCase):
             server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
             server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
             server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
-        self.assertEqual(
-            calculate_active_and_pending(servers, steps),
-            (servers[1:], 1))
+        self.assertEqual(determine_active(servers, steps), servers[1:])
 
     def test_clb_and_rcv3_pending(self):
         """
@@ -1179,6 +1166,4 @@ class CalculateActiveAndPendingTests(SynchronousTestCase):
             server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1'),
             server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2'),
             server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3')]
-        self.assertEqual(
-            calculate_active_and_pending(servers, steps),
-            (servers[1:], 1))
+        self.assertEqual(determine_active(servers, steps), servers[1:])
