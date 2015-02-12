@@ -35,8 +35,12 @@
           </execution>
         </executions>
       </plugin>
-        <executions>
-          <execution>
+      <plugin>
+      <groupId>com.rackspace.cloud.api</groupId>
+      <artifactId>clouddocs-maven-plugin-docbook</artifactId>
+      <version>2.1.5-SNAPSHOT</version>
+      <executions>
+      <execution>
             <id>autoscale</id>
             <goals>
               <goal>generate-webhelp</goal>
@@ -55,8 +59,8 @@
                 <security>internal</security>
               -->
             </configuration>
-          </execution>
-        </executions>
+          </execution>     
+      </executions>
         <configuration>
 	  <enableDisqus>internet</enableDisqus>
 	  <socialIcons>0</socialIcons>
@@ -68,6 +72,7 @@
 	  <showXslMessages>true</showXslMessages>
 	  <highlightSource>false</highlightSource>
         </configuration>
+      </plugin>
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
 	<artifactId>maven-assembly-plugin</artifactId>
