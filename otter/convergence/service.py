@@ -5,7 +5,6 @@ import time
 from functools import partial
 
 from effect import Effect
-from effect.do import do
 from effect.twisted import perform
 
 from twisted.application.service import Service
@@ -47,8 +46,10 @@ def execute_convergence(
         log.msg(otter_msg_type='convergence-active-pending', # RADIX delete thiss
                 active=active,
                 pending=pending)
+
         def update_group_state(group, old_state):
             return obj_assoc(old_state, active=active, pending=pending)
+
         eff = Effect(ModifyGroupState(scaling_group=scaling_group,
                                       modifier=update_group_state))
         return eff.on(lambda _: steps_to_effect(steps))
@@ -90,7 +91,6 @@ class Converger(Service, object):
             exec_convergence,
             acquire_timeout=150,
             release_timeout=150)
-
 
 
 # We're using a global for now because it's difficult to thread a new parameter

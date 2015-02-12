@@ -3,21 +3,23 @@ from effect.testing import Stub
 
 import mock
 
-from pyrsistent import pmap, freeze
+from pyrsistent import freeze, pmap
 
 from twisted.internet.defer import fail
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
-from otter.convergence.composition import get_desired_group_state
-from otter.convergence.model import CLBDescription, DesiredGroupState, NovaServer, ServerState
+from otter.convergence.model import (
+    CLBDescription, NovaServer, ServerState)
 from otter.convergence.service import (
     Converger, execute_convergence, server_to_json)
 from otter.http import TenantScope, service_request
 from otter.models.intents import ModifyGroupState
 from otter.models.interface import GroupState
-from otter.test.utils import CheckFailure, LockMixin, mock_group, mock_log, resolve_effect, resolve_stubs
+from otter.test.utils import (
+    CheckFailure, LockMixin, mock_group, mock_log, resolve_effect,
+    resolve_stubs)
 from otter.util.fp import obj_assoc
 
 
@@ -127,7 +129,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         for server in self.servers:
             server.desired_lbs = pmap()
 
-        get_all_convergence_data = self._get_gacd_func('group-id')
         eff = execute_convergence(self.group, 2, self.lc, 0, log,
                                   get_all_convergence_data=gacd)
         mgs_eff = resolve_stubs(eff)
@@ -145,7 +146,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         # The scenario: We have two servers but they're not in the LBs
         # yet. convergence should add them to the LBs.
         log = mock_log()
-        gacd = self._get_gacd_func('group-id')
+        gacd = self._get_gacd_func(self.group.uuid)
         eff = execute_convergence(self.group, 2, self.lc, 0, log,
                                   get_all_convergence_data=gacd)
         mgs_eff = resolve_stubs(eff)
