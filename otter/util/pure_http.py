@@ -106,6 +106,9 @@ def has_code(*codes):
     If this function is called multiple times with the same argument,
     the results will compare equal.
 
+    The codes can be introspected using the ``codes`` attribute of the
+    returned object.
+
     :param codes: Status codes to be considered successful.
     :type codes: ints
     :return: Response success predicate that checks for these codes.
