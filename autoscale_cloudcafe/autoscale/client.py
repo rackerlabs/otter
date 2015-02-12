@@ -940,12 +940,18 @@ class RackConnectV3APIClient(AutoMarshallingRestClient):
         return self.request('GET', url,
                             response_entity_type=RackConnectLBNodeDetail)
 
-    def remove_node_from_pool(self, pool_id, node_id, requestslib_kwargs=None):
+    def remove_node_from_pool(self, pool_id, server_id,
+                              requestslib_kwargs=None):
         """
-        :summary: Remove a node from a lb pool
+        :summary: Remove a node from a lb pool using the bulk delete API
         """
-        url = self.url + '/load_balancer_pools/{0}/nodes/{1}'.format(pool_id,
-                                                                     node_id)
+        url = self.url + '/load_balancer_pools/nodes'
         print("... RCV3 request ... ", url)
+        requestslib_kwargs = [
+            {
+                "cloud_server": {"id": server_id},
+                "load_balancer_pool": {"id": pool_id}
+            }]
         return self.request('DELETE', url,
                             requestslib_kwargs=requestslib_kwargs)
+

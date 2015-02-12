@@ -16,6 +16,7 @@ from toolz.itertoolz import concat
 from zope.interface import Interface, implementer
 
 from otter.constants import ServiceType
+from otter.convergence.model import StepResult
 from otter.http import has_code, service_request
 from otter.util.fp import predicate_any
 from otter.util.hashkey import generate_server_name
@@ -70,7 +71,15 @@ class CreateServer(object):
                 'servers',
                 data=thaw(server_config),
                 success_pred=has_code(202))
-        return eff.on(got_name)
+
+        def report_success(result):
+            return StepResult.SUCCESS, []
+
+        def report_failure(result):
+            return StepResult.RETRY, []
+
+        return eff.on(got_name).on(success=report_success,
+                                   error=report_failure)
 
 
 @implementer(IStep)
