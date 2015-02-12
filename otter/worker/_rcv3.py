@@ -11,6 +11,7 @@ from effect.twisted import perform
 
 from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3
 from otter.http import TenantScope
+from otter.util.pure_http import has_code
 
 
 def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
@@ -27,6 +28,11 @@ def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
         request has no body.
     """
     effect = step_class(lb_node_pairs=[(lb_id, server_id)])._bare_effect()
+
+    svc_req = effect.intent
+    codes = set(svc_req.success_pred.codes) - set([409])
+    svc_req.succes_pred = has_code(*codes)
+
     # Unfortunate that we have to TenantScope here, but here's where we're
     # performing.
     scoped = Effect(TenantScope(effect, request_bag.tenant_id))

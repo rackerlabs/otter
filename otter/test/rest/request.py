@@ -6,7 +6,7 @@ response from the rest resource.
 from collections import namedtuple
 from urlparse import urlsplit
 
-from klein.test_resource import requestMock
+from klein.test.test_resource import requestMock
 
 import mock
 
@@ -104,22 +104,22 @@ def request(root_resource, method, endpoint, headers=None, body=None):
             mock_request.responseHeaders.setRawHeaders(
                 'Content-Type', [Request.defaultContentType])
 
-        response = mock.MagicMock(spec=['code', 'headers'], code=status_code,
-                                  headers=mock_request.responseHeaders)
-
         # Annoying implementation detail: if the status code is one of the
         # status codes that should not have a body, twisted replaces the
         # write method of the request with a function that does nothing, so
         # no response body can every be written.  This messes up the mock
-        # request's write function (which just returns another mock.  So
-        # in this case, just return "".
+        # request's write function (which just returns another mock).  So
+        # in this case, just return the empty string.
         content = ''
         if status_code not in http.NO_BODY_CODES:
-            # get the body by joining all calls to request.write
-            content = "".join(
-                [call[1][0] for call in mock_request.write.mock_calls])
+            content = mock_request.getWrittenData()
 
-        return ResponseWrapper(response=response, content=content, request=mock_request)
+        response = mock.MagicMock(spec=['code', 'headers'],
+                                  code=status_code,
+                                  headers=mock_request.responseHeaders)
+        return ResponseWrapper(response=response,
+                               content=content,
+                               request=mock_request)
 
     return _render(
         getChildForRequest(root_resource, mock_request),
