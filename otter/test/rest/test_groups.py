@@ -99,6 +99,34 @@ class FormatterHelpers(SynchronousTestCase):
             'paused': True
         })
 
+    @mock.patch('otter.rest.groups.config_value')
+    def test_format_state_dict_with_convergence(self, config_value):
+        """
+        When convergence is enabled for a tenant, the returned desiredCapacity
+        is based on the stored `desired` in the group state, and the pending
+        capacity is desired from the desired and active servers.
+        """
+        config_value.side_effect = {'convergence-tenants': ['11111']}.get
+        active = {
+            '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
+            '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
+            '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
+        result = format_state_dict(
+            GroupState(
+                '11111',
+                'one',
+                'test',
+                active,
+                {},  # Ignored!
+                None,
+                {},
+                True,
+                desired=10)
+        )
+
+        self.assertEqual(result['desiredCapacity'], 10)
+        self.assertEqual(result['pendingCapacity'], 7)
+
 
 class ExtractBoolArgTests(SynchronousTestCase):
     """
