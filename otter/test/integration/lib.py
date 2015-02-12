@@ -118,7 +118,9 @@ class ScalingGroup(object):
         """
 
         return (treq.delete(
-            "%s/groups/%s" % (str(rcs.endpoints["otter"]), self.group_id),
+            "%s/groups/%s?force=true" % (
+                str(rcs.endpoints["otter"]), self.group_id
+            ),
             headers=headers(str(rcs.token)),
             pool=self.pool
         ).addCallback(check_success, [204, 404]))
@@ -175,6 +177,127 @@ class ScalingGroup(object):
             .addCallback(treq.json_content)
             .addCallback(record_results)
         )
+
+
+@attributes([
+    Attribute('scale_by', instance_of=int),
+    Attribute('scaling_group', instance_of=ScalingGroup),
+])
+class ScalingPolicy(object):
+    """ScalingPolicy class instances represent individual policies which your
+    integration tests can execute at their convenience.
+
+    :param int scale_by: The number of servers to scale up (positive) or down
+        (negative) by.  Cannot be zero, lest an API-generated error occur.
+    :param ScalingGroup scaling_group: The scaling group to which this policy
+        applies.
+    """
+
+    def __init__(self):
+        self.policy = [{
+            "name": "integration-test-policy",
+            "cooldown": 0,
+            "type": "webhook",
+            "change": self.scale_by
+        }]
+
+    def stop(self, rcs):
+        """Disposes of the policy.
+
+        :param TestResources rcs: The integration test resources instance.
+            This provides useful information to complete the request, like
+            which endpoint to use to make the API request.
+
+        :return: A :class:`Deferred` which, when triggered, removes the scaling
+            policy.  It returns the test resources supplied, easing continuity
+            of integration test code.
+        """
+        return self.delete(rcs)
+
+    def start(self, rcs, test):
+        """Creates and registers, but does not execute, the policy.
+
+        :param TestResources rcs: The integration test resources instance.
+            This provides useful information to complete the request, like
+            which endpoint to use to make the API request.
+
+        :param twisted.trial.unittest.TestCase test: The test case running the
+            integration test.
+
+        :return: A :class:`Deferred` which, when triggered, creates the scaling
+            policy and registers it with AutoScale API.  It does not execute
+            the policy, however.  The policy, when created, will also appear in
+            the test resources `groups` list.  The full JSON will be available
+            for inspection.  In addition, this object's :attribute:`policy_id`
+            member will contain the ID of the policy.
+
+            The deferred will itself return the TestResources instance
+            provided.
+        """
+        test.addCleanup(self.stop, rcs)
+
+        def record_results(resp):
+            self.policy_id = resp["policies"][0]["id"]
+            self.link = str(resp["policies"][0]["links"][0]["href"])
+            return rcs
+
+        return (
+            treq.post(
+                "%s/groups/%s/policies" % (
+                    str(rcs.endpoints["otter"]), self.scaling_group.group_id
+                ),
+                json.dumps(self.policy),
+                headers=headers(str(rcs.token)),
+                pool=self.scaling_group.pool,
+            )
+            .addCallback(check_success, [201])
+            .addCallback(treq.json_content)
+            .addCallback(record_results)
+        )
+
+    def delete(self, rcs):
+        """Removes the scaling policy.
+
+        :param TestResources rcs: The integration test resources instance.
+            This provides useful information to complete the request, like
+            which endpoint to use to make the API request.
+
+        :return: A :class:`Deferred` which, when triggered, removes the scaling
+            policy.  It returns the test resources supplied, easing continuity
+            of integration test code.
+        """
+        return (
+            treq.delete(
+                "%s?force=true" % self.link,
+                headers=headers(str(rcs.token)),
+                pool=self.scaling_group.pool,
+            )
+            .addCallback(check_success, [204, 404])
+        ).addCallback(lambda _: rcs)
+
+    def execute(self, rcs):
+        """Executes the scaling policy.
+
+        :param TestResources rcs: The integration test resources instance.
+            This provides useful information to complete the request, like
+            which endpoint to use to make the API request.
+
+        :return: A :class:`Deferred` which, when triggered, removes the scaling
+            policy.  It returns the test resources supplied, easing continuity
+            of integration test code.
+        """
+        return (
+            treq.post(
+                "%sexecute" % self.link,
+                headers=headers(str(rcs.token)),
+                pool=self.scaling_group.pool,
+            ).addCallback(check_success, [202])
+            # Policy execution does not return anything meaningful,
+            # per http://tinyurl.com/ndds6ap (link to docs.rackspace).
+            # So, we forcefully return our resources here.
+            .addCallback(lambda _, x: x, rcs)
+        )
+        return rcs
 
 
 def find_endpoint(catalog, service_type, region):
