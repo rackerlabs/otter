@@ -52,14 +52,16 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         """
         If the timeout is zero, all nodes are just removed.
         """
+        desc = CLBDescription(lb_id='5', port=80)
         self.assertEqual(
             self._filter_only_lb_steps(converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=0.0),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=freeze({'5': desc}))]),
                 set([CLBNode(node_id='123', address='1.1.1.1',
-                     description=CLBDescription(lb_id='5', port=80))]),
+                     description=desc)]),
                 now=0)),
             pbag([RemoveNodesFromCLB(lb_id='5', node_ids=('123',))]))
 
@@ -68,6 +70,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         Nodes in disabled state are just removed from the load balancer even
         if the timeout is positive.
         """
+        desired = freeze({'5': CLBDescription(lb_id='5', port=80)})
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(
                                lb_id='5', port=80,
@@ -77,7 +80,8 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set(current),
                 now=0)),
             pbag([RemoveNodesFromCLB(lb_id='5', node_ids=('123',))]))
@@ -86,14 +90,15 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         """
         Nodes in enabled state are put into draining.
         """
-        current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(lb_id='5', port=80))]
+        desc = CLBDescription(lb_id='5', port=80)
+        current = [CLBNode(node_id='123', address='1.1.1.1', description=desc)]
         self.assertEqual(
             self._filter_only_lb_steps(converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=freeze({'5': desc}))]),
                 set(current),
                 now=0)),
             pbag([ChangeCLBNode(lb_id='5', node_id='123', weight=1,
@@ -105,6 +110,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         Nodes in draining state will be ignored if they still have connections
         and the timeout is not yet expired.
         """
+        desired = freeze({'5': CLBDescription(lb_id='5', port=80)})
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(
                                lb_id='5', port=80,
@@ -115,7 +121,8 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set(current),
                 now=5)),
             pbag([]))
@@ -125,6 +132,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         Nodes in draining state will be removed if they have no more
         connections, even if the timeout is not yet expired
         """
+        desired = freeze({'5': CLBDescription(lb_id='5', port=80)})
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(
                                lb_id='5', port=80,
@@ -135,7 +143,8 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set(current),
                 now=5)),
             pbag([RemoveNodesFromCLB(lb_id='5', node_ids=('123',))]))
@@ -145,6 +154,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         Nodes in draining state will be ignored if timeout has not yet expired
         and the number of active connections are not provided
         """
+        desired = freeze({'5': CLBDescription(lb_id='5', port=80)})
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(
                                lb_id='5', port=80,
@@ -155,7 +165,8 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set(current),
                 now=5)),
             pbag([]))
@@ -165,6 +176,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         Nodes in draining state will be removed when the timeout expires if
         the number of active connections are not provided
         """
+        desired = freeze({'5': CLBDescription(lb_id='5', port=80)})
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(
                                lb_id='5', port=80,
@@ -175,7 +187,8 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set(current),
                 now=15)),
             pbag([RemoveNodesFromCLB(lb_id='5', node_ids=('123',))]))
@@ -185,6 +198,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         Nodes in draining state will be removed when the timeout expires even
         if they still have active connections
         """
+        desired = freeze({'5': CLBDescription(lb_id='5', port=80)})
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(
                                lb_id='5', port=80,
@@ -195,16 +209,23 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set(current),
                 now=15)),
             pbag([RemoveNodesFromCLB(lb_id='5', node_ids=('123',))]))
 
-    def test_all_changes_together(self):
+    def test_all_clb_changes_together(self):
         """
-        Given all possible combination of load balancer states and timeouts,
-        ensure function produces the right set of step for all of them.
+        Given all possible combination of clb load balancer states and
+        timeouts, ensure function produces the right set of step for all of
+        them.
         """
+        desired = freeze({'1': CLBDescription(lb_id='1', port=80),
+                          '2': CLBDescription(lb_id='2', port=80),
+                          '3': CLBDescription(lb_id='3', port=80),
+                          '4': CLBDescription(lb_id='4', port=80),
+                          '5': CLBDescription(lb_id='5', port=80)})
         current = [
             # enabled, should be drained
             CLBNode(node_id='1', address='1.1.1.1',
@@ -238,7 +259,8 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set(current),
                 now=10)),
             pbag([
@@ -414,13 +436,16 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
     def test_active_server_without_load_balancers_can_be_deleted(self):
         """
         If an active server to be scaled down is not attached to any load
-        balancers, it can be deleted. It is not first put into draining state.
+        balancers, even if it should be, it can be deleted.
+        It is not first put into draining state.
         """
+        desired = freeze({'1': CLBDescription(lb_id='1', port=80)})
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
-                set([server('abc', state=ServerState.ACTIVE)]),
+                set([server('abc', state=ServerState.ACTIVE,
+                            desired_lbs=desired)]),
                 set(),
                 0),
             pbag([DeleteServer(server_id='abc')]))
@@ -431,13 +456,16 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         balancers, the server can be deleted.  It is not first put into
         draining state.
         """
+        desc = CLBDescription(lb_id='1', port=80)
+        desired = freeze({'1': desc})
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0),
                 set([server('abc', state=ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
-                             description=CLBDescription(lb_id='1', port=80))]),
+                             description=desc)]),
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
@@ -449,11 +477,13 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         If draining server can be removed from all the load balancers, the
         server can be deleted.
         """
+        desired = freeze({'1': CLBDescription(lb_id='1', port=80)})
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0),
                 set([server('abc', state=ServerState.DRAINING,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
                              description=CLBDescription(
                                  lb_id='1', port=80,
@@ -469,12 +499,14 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         If the server already in draining state is waiting for the draining
         timeout on some load balancers, nothing is done to it.
         """
+        desired = freeze({'1': CLBDescription(lb_id='1', port=80)})
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.DRAINING,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
                              description=CLBDescription(
                                  lb_id='1', port=80,
@@ -489,12 +521,14 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         balancers, it is set to draining state and all the nodes are set to
         draining condition.
         """
+        desired = freeze({'1': CLBDescription(lb_id='1', port=80)})
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
                              description=CLBDescription(lb_id='1', port=80))]),
                 0),
@@ -517,12 +551,14 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         in a previous convergence run, and the load balancers were set to
         draining but setting the server metadata failed.
         """
+        desired = freeze({'1': CLBDescription(lb_id='1', port=80)})
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
                              description=CLBDescription(
                                  lb_id='1', port=80,
@@ -545,12 +581,14 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         in a previous convergence run, and the server metadata was set but
         the load balancers update failed.
         """
+        desired = freeze({'1': CLBDescription(lb_id='1', port=80)})
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.DRAINING,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=desired)]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
                              description=CLBDescription(lb_id='1', port=80))]),
                 1),

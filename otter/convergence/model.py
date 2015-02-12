@@ -102,7 +102,7 @@ class StepResult(Names):
              Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
              Attribute('servicenet_address',
                        default_value='',
-                       instance_of=str)])
+                       instance_of=basestring)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.

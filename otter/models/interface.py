@@ -1,8 +1,13 @@
 """
 Interface to be used by the scaling groups engine
 """
-from zope.interface import Interface, Attribute
-from twisted.python.constants import Names, NamedConstant
+from datetime import datetime
+
+from croniter import croniter
+
+from twisted.python.constants import NamedConstant, Names
+
+from zope.interface import Attribute, Interface
 
 from otter.util import timestamp
 
@@ -708,6 +713,14 @@ class IScalingScheduleCollection(Interface):
         :return: Deferred that fires with dict of oldest event
         :rtype: :class:`dict`
         """
+
+
+def next_cron_occurrence(cron):
+    """
+    Return next occurence of given cron entry
+    """
+    return croniter(
+        cron, start_time=datetime.utcnow()).get_next(ret_type=datetime)
 
 
 class IScalingGroupCollection(Interface):
