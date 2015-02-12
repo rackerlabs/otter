@@ -17,8 +17,8 @@ from otter.convergence.model import (
 from otter.convergence.planning import (
     _default_limit_step_count,
     _limit_step_count,
-    determine_active,
     converge,
+    determine_active,
     optimize_steps,
     plan)
 from otter.convergence.steps import (

@@ -40,6 +40,7 @@ def execute_convergence(
             scaling_group.uuid, launch_config, desired)
         steps, active = plan(desired_group_state, servers, lb_nodes, now)
         active = {server.id: server_to_json(server) for server in active}
+
         def update_group_state(group, old_state):
             return obj_assoc(old_state, active=active)
 
