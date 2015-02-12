@@ -153,7 +153,7 @@ class LaunchConfigTest(AutoscaleFixture):
             self.assertTrue(
                 group.launchConfiguration.server.name in server.name)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_launchconfig_without_server_name(self):
         """
         Create a scaling group with a scaling policy, without server name in the launch config.
