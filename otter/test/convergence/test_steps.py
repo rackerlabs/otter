@@ -449,9 +449,9 @@ _RCV3_TEST_DATA = freeze({
 })
 
 
-class RCv3CheckBulkDeleteTests(SynchronousTestCase):
+class RCv3RegexTests(SynchronousTestCase):
     """
-    Tests for :func:`_rcv3_check_bulk_delete`.
+    Tests for the RCv3 error parsing regexes.
     """
     def _regex_test(self, test_pattern):
         """A generic regex test.
@@ -492,6 +492,11 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         """
         self._regex_test(_RCV3_LB_DOESNT_EXIST_PATTERN)
 
+
+class RCv3CheckBulkDeleteTests(SynchronousTestCase):
+    """
+    Tests for :func:`_rcv3_check_bulk_delete`.
+    """
     def test_good_response(self):
         """
         If the response code indicates success, the response was successful.
