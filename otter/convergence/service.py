@@ -20,7 +20,7 @@ from otter.convergence.planning import plan
 from otter.http import TenantScope
 from otter.models.intents import ModifyGroupState
 from otter.util.deferredutils import with_lock
-from otter.util.fp import obj_assoc
+from otter.util.fp import assoc_obj
 
 
 def server_to_json(server):
@@ -75,7 +75,7 @@ def execute_convergence(
         active = {server.id: server_to_json(server) for server in active}
 
         def update_group_state(group, old_state):
-            return obj_assoc(old_state, active=active)
+            return assoc_obj(old_state, active=active)
 
         eff = Effect(ModifyGroupState(scaling_group=scaling_group,
                                       modifier=update_group_state))

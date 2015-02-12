@@ -81,7 +81,7 @@ def predicate_any(*preds):
     return lambda *a, **kw: any(p(*a, **kw) for p in preds)
 
 
-def obj_assoc(o, **k):
+def assoc_obj(o, **k):
     """Update attributes on an object, returning a new one."""
     new_o = deepcopy(o)
     new_o.__dict__.update(k)

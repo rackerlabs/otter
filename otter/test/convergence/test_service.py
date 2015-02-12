@@ -21,7 +21,7 @@ from otter.test.convergence.test_planning import server
 from otter.test.utils import (
     CheckFailure, LockMixin, mock_group, mock_log, resolve_effect,
     resolve_stubs)
-from otter.util.fp import obj_assoc
+from otter.util.fp import assoc_obj
 
 
 class ConvergerTests(SynchronousTestCase):
@@ -119,7 +119,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.assertIsInstance(effect.intent, ModifyGroupState)
         self.assertEqual(effect.intent.scaling_group, self.group)
         self.assertEqual(effect.intent.modifier(self.group, self.state),
-                         obj_assoc(self.state, active=active))
+                         assoc_obj(self.state, active=active))
 
     def test_no_steps(self):
         """
