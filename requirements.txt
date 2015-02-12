@@ -1,4 +1,4 @@
-klein==0.2.1
+klein==15.0.0
 twisted==15.0.0
 service_identity==14.0.0
 jsonschema==2.4.0
