@@ -483,35 +483,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         The regex for parsing messages saying the load balancer is
         inactive parses those messages. It rejects other messages.
         """
-        match = _RCV3_LB_INACTIVE_PATTERN.match
-
-        test_data = [
-            ('Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 is '
-             'not in an ACTIVE state',
-             ("d95ae0c4-6ab8-4873-b82f-f8433840cff2",)),
-            ('Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2 is '
-             'not in an ACTIVE state',
-             ("D95AE0C4-6AB8-4873-B82F-F8433840CFF2",))
-        ]
-
-        for message, expected_groups in test_data:
-            res = match(message)
-            self.assertNotIdentical(res, None)
-            self.assertEqual(res.groups(), expected_groups)
-
-        for message in [
-                'Node d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is not a member '
-                'of Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2',
-                'Node D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is not a member '
-                'of Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2']:
-            self.assertIdentical(match(message), None)
-
-        for message in [
-                "Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 does "
-                "not exist",
-                "Load Balancer Pool D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 does "
-                "not exist"]:
-            self.assertIdentical(match(message), None)
+        self._regex_test(_RCV3_LB_INACTIVE_PATTERN)
 
     def test_no_such_lb_message(self):
         """
