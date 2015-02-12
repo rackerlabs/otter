@@ -441,10 +441,10 @@ _RCV3_TEST_DATA = {
     _RCV3_LB_DOESNT_EXIST_PATTERN: [
         ("Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 does "
          "not exist",
-         ("d95ae0c4-6ab8-4873-b82f-f8433840cff2",)),
+         {"lb_id": "d95ae0c4-6ab8-4873-b82f-f8433840cff2"}),
         ("Load Balancer Pool D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 does "
          "not exist",
-         ("D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2",))
+         {"lb_id": "D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2"})
     ]
 }
 
