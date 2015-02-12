@@ -111,21 +111,25 @@ class FormatterHelpers(SynchronousTestCase):
             '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
             '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
             '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
-        result = format_state_dict(
-            GroupState(
-                '11111',
-                'one',
-                'test',
-                active,
-                {},  # Ignored!
-                None,
-                {},
-                True,
-                desired=10)
-        )
-
+        state = GroupState(
+            '11111',
+            'one',
+            'test',
+            active,
+            {},  # Ignored!
+            None,
+            {},
+            True,
+            desired=10)
+        result = format_state_dict(state)
         self.assertEqual(result['desiredCapacity'], 10)
         self.assertEqual(result['pendingCapacity'], 7)
+
+        # And a non-convergence tenant still gets old-style data
+        state.tenant_id = '11112'
+        result = format_state_dict(state)
+        self.assertEqual(result['desiredCapacity'], 3)
+        self.assertEqual(result['pendingCapacity'], 0)
 
 
 class ExtractBoolArgTests(SynchronousTestCase):
