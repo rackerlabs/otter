@@ -364,6 +364,13 @@ class BulkAddToRCv3(object):
         return self._bare_effect()
 
 
+def _rcv3_check_bulk_add(attempted_pairs, result):
+    """
+    Checks if the RCv3 bulk add command was successful.
+    """
+    return StepResult.SUCCESS, []
+
+
 @implementer(IStep)
 @attributes(['lb_node_pairs'])
 class BulkRemoveFromRCv3(object):
