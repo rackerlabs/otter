@@ -1042,6 +1042,7 @@ class PlanTests(SynchronousTestCase):
 
     def test_plan(self):
         """An optimized plan is returned. Steps are limited."""
+
         desired_lbs = {5: [CLBDescription(lb_id='5', port=80)]}
         desired_group_state = DesiredGroupState(
             server_config={}, capacity=8, desired_lbs=freeze(desired_lbs))

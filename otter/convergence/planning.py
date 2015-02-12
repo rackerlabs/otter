@@ -339,8 +339,6 @@ def plan(desired_group_state, servers, lb_nodes, now):
     Get an optimized convergence plan.
 
     Takes the same arguments as :func:`converge`.
-
-    :return: steps
     """
     steps = converge(desired_group_state, servers, lb_nodes, now)
     steps = _default_limit_step_count(steps)
