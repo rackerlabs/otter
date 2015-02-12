@@ -377,6 +377,18 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
     if response.code == 201:  # All done!
         return StepResult.SUCCESS, []
 
+    to_retry = pset(attempted_pairs)
+    for error in body["errors"]:
+        match = _RCV3_NODE_ALREADY_A_MEMBER_PATTERN.match(error)
+        if match is not None:
+            to_retry -= pset([match.groups()[::-1]])
+
+    if to_retry:
+        next_step = BulkAddToRCv3(lb_node_pairs=to_retry)
+        return next_step.as_effect()
+    else:
+        return StepResult.SUCCESS, []
+
 
 @implementer(IStep)
 @attributes(['lb_node_pairs'])
