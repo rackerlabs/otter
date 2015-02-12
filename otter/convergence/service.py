@@ -33,7 +33,7 @@ def server_to_json(server):
 
 def determine_active(servers, lb_nodes):
     """
-    Given the current NovaServers and CLB nodes, determine which servers are
+    Given the current NovaServers and LB nodes, determine which servers are
     completely built.
 
     :param desired_lbs: As per DesiredGroupState.desired_lbs.
@@ -69,7 +69,6 @@ def execute_convergence(
     all_data_eff = get_all_convergence_data(scaling_group.uuid)
 
     def got_all_data((servers, lb_nodes)):
-
         active = determine_active(servers, lb_nodes)
         desired_group_state = get_desired_group_state(
             scaling_group.uuid, launch_config, desired)
