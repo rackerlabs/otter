@@ -518,6 +518,43 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
         res = _rcv3_check_bulk_add(pairs, (resp, body))
         self.assertEqual(res, (StepResult.SUCCESS, []))
 
+    def test_try_again(self):
+        """
+        If a node is already on the load balancer, returns an effect that
+        removes the remaining load balancer pairs.
+        """
+        # This little piggy is already on the load balancer
+        node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
+        lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+
+        # This little piggy is going to be added to this load balancer
+        node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+
+        resp = StubResponse(409, {})
+        body = {"errors":
+                ["Cloud Server {node_id} is already a member of Load "
+                 "Balancer Pool {lb_id}"
+                 .format(node_id=node_a_id, lb_id=lb_a_id)]}
+        eff = _rcv3_check_bulk_add(
+            [(lb_a_id, node_a_id),
+             (lb_b_id, node_b_id)],
+            (resp, body))
+        expected_intent = service_request(
+            service_type=ServiceType.RACKCONNECT_V3,
+            method="POST",
+            url='load_balancer_pools/nodes',
+            data=[
+                {'load_balancer_pool': {'id': lb_b_id},
+                 'cloud_server': {'id': node_b_id}}],
+            success_pred=has_code(201, 409)).intent
+        self.assertEqual(eff.intent, expected_intent)
+        (partial_check_bulk_add, _), = eff.callbacks
+        self.assertEqual(partial_check_bulk_add.func,
+                         _rcv3_check_bulk_delete)
+        expected_pairs = pset([(lb_b_id, node_b_id)])
+        self.assertEqual(partial_check_bulk_add.args, (expected_pairs,))
+        self.assertEqual(partial_check_bulk_add.keywords, None)
 
 class RCv3CheckBulkDeleteTests(SynchronousTestCase):
     """
