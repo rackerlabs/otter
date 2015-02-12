@@ -494,6 +494,30 @@ class RCv3RegexTests(SynchronousTestCase):
         self._regex_test(_RCV3_LB_DOESNT_EXIST_PATTERN)
 
 
+class RCv3CheckBulkAddTests(SynchronousTestCase):
+    """
+    Tests for :func:`_rcv3_check_bulk_add`.
+    """
+    def test_good_response(self):
+        """
+        If the response code indicates success, the response was successful.
+        """
+        node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
+        lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+
+        node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+
+        pairs = [(lb_a_id, node_a_id), (lb_b_id, node_b_id)]
+
+        resp = StubResponse(201, {})
+        body = [{"cloud_server": {"id": node_id},
+                 "load_balancer_pool": {"id": lb_id}}
+                for (lb_id, node_id) in pairs]
+        res = _rcv3_check_bulk_add(pairs, (resp, body))
+        self.assertEqual(res, (StepResult.SUCCESS, []))
+
+
 class RCv3CheckBulkDeleteTests(SynchronousTestCase):
     """
     Tests for :func:`_rcv3_check_bulk_delete`.
