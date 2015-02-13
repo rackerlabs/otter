@@ -1441,20 +1441,6 @@ class CassScalingGroupCollection:
         """
         see :meth:`IScalingGroupCollection.webhook_info_by_hash`
         """
-        d = self._webhook_info_from_table(log, capability_hash)
-
-        def not_found(f):
-            if not f.check(UnrecognizedCapabilityError):
-                log.err(f, 'Error getting webhook info from table')
-            return self._webhook_info_by_index(log, capability_hash)
-
-        d.addErrback(not_found)
-        return d
-
-    def _webhook_info_from_table(self, log, capability_hash):
-        """
-        Get webhook info based on hash by using the new webhook_keys table
-        """
         d = self.connection.execute(
             _cql_find_webhook_token.format(cf=self.webhook_keys_table),
             {"webhookKey": capability_hash}, ConsistencyLevel.ONE)
@@ -1466,24 +1452,6 @@ class CassScalingGroupCollection:
             return (r['tenantId'], r['groupId'], r['policyId'])
 
         d.addCallback(extract_info)
-        return d
-
-    def _webhook_info_by_index(self, log, capability_hash):
-        """
-        Get webhook info based on hash by using the INDEX
-        """
-        def _do_webhook_lookup(webhook_rec):
-            res = webhook_rec
-            if len(res) == 0:
-                raise UnrecognizedCapabilityError(capability_hash, 1)
-            res = res[0]
-            return (res['tenantId'], res['groupId'], res['policyId'])
-
-        query = _cql_find_webhook_token.format(cf=self.webhooks_table)
-        d = self.connection.execute(query,
-                                    {"webhookKey": capability_hash},
-                                    ConsistencyLevel.ONE)
-        d.addCallback(_do_webhook_lookup)
         return d
 
     def get_counts(self, log, tenant_id):
