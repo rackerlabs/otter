@@ -26,7 +26,6 @@ from autoscale.models.response.autoscale_response import (
 from autoscale.models.response.limits_response import Limits
 
 
-
 class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     """
