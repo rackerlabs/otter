@@ -149,8 +149,8 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
     """
     if tenant_is_enabled(scaling_group.tenant_id, config_value):
         apply_delta(log, state.desired, state, config, policy)
-        get_converger().start_convergence(
-            log, state.tenant_id, state.group_id, state.desired, launch_config)
+        get_converger().start_convergence(log, scaling_group, state,
+                                          launch_config)
         return None
 
     delta = calculate_delta(log, state, config, policy)
