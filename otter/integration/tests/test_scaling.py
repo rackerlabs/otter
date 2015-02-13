@@ -46,7 +46,7 @@ def dump_groups(rcs):
 def find_end_point(rcs):
     rcs.token = rcs.access["access"]["token"]["id"]
     sc = rcs.access["access"]["serviceCatalog"]
-    rcs.endpoints["otter"] = auth.public_endpoint_url(sc, "autoscale", "IAD")
+    rcs.endpoints["otter"] = auth.public_endpoint_url(sc, "autoscale", region)
     return rcs
 
 

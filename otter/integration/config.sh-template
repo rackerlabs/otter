@@ -18,5 +18,5 @@ export AS_FLAVOR_REF=2
 # When creating servers, use this image.
 export AS_IMAGE_REF=cca73d10-8953-4949-a2f2-1e5444a4130d
 
-# When creating servers, use this region.
-export AS_REGION=iad
+# When creating servers, use this region.  Beware; this is case sensitive.
+export AS_REGION=IAD
