@@ -93,11 +93,19 @@ class DeleteServer(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to delete a server."""
-        return service_request(
+        eff = service_request(
             ServiceType.CLOUD_SERVERS,
             'DELETE',
             append_segments('servers', self.server_id),
             success_pred=has_code(204))
+
+        def report_success(result):
+            return StepResult.SUCCESS, []
+
+        def report_failure(result):
+            return StepResult.RETRY, []
+
+        return eff.on(success=report_success, error=report_failure)
 
 
 @implementer(IStep)
@@ -309,6 +317,23 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
         success_pred=success_pred)
 
 
+_UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
+                "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
+
+
+def _rcv3_re(pattern):
+    return re.compile(pattern.format(uuid=_UUID4_REGEX), re.IGNORECASE)
+
+
+_RCV3_NODE_NOT_A_MEMBER_PATTERN = _rcv3_re(
+    "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
+    "(?P<lb_id>{uuid})")
+_RCV3_LB_INACTIVE_PATTERN = _rcv3_re(
+    "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state")
+_RCV3_LB_DOESNT_EXIST_PATTERN = _rcv3_re(
+    "Load Balancer Pool (?P<lb_id>{uuid}) does not exist")
+
+
 @implementer(IStep)
 @attributes(['lb_node_pairs'])
 class BulkAddToRCv3(object):
@@ -318,20 +343,25 @@ class BulkAddToRCv3(object):
 
     Each connection is independently specified.
 
-    See http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
+    See http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}
+    %2Fload_balancer_pools%2Fnodes.
 
     :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
         connections to be made.
     """
+    def _bare_effect(self):
+        """
+        Just the RCv3 bulk request effect, with no callbacks.
+        """
+        return _rackconnect_bulk_request(self.lb_node_pairs, "POST",
+                                         success_pred=has_code(201))
 
     def as_effect(self):
         """
         Produce a :obj:`Effect` to add some nodes to some RCv3 load
         balancers.
         """
-        return _rackconnect_bulk_request(
-            self.lb_node_pairs, "POST",
-            success_pred=has_code(201))
+        return self._bare_effect()
 
 
 @implementer(IStep)
@@ -341,34 +371,28 @@ class BulkRemoveFromRCv3(object):
     Some connections must be removed between some combination of nodes
     and RackConnect v3.0 load balancers.
 
-    See http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}%2Fload_balancer_pools%2Fnodes.
+    See http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}
+    %2Fload_balancer_pools%2Fnodes.
 
     :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
         connections to be removed.
     """
+    def _bare_effect(self):
+        """
+        Just the RCv3 bulk request effect, with no callbacks.
+        """
+        # While 409 isn't success, that has to be introspected by
+        # _rcv3_check_bulk_delete in order to recover from it.
+        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE",
+                                         success_pred=has_code(204, 409))
 
     def as_effect(self):
         """
         Produce a :obj:`Effect` to remove some nodes from some RCv3 load
         balancers.
         """
-        eff = _rackconnect_bulk_request(self.lb_node_pairs, "DELETE",
-                                        success_pred=has_code(204, 409))
-        # While 409 isn't success, that has to be introspected by
-        # _rcv3_check_bulk_delete in order to recover from it.
+        eff = self._bare_effect()
         return eff.on(partial(_rcv3_check_bulk_delete, self.lb_node_pairs))
-
-
-_UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
-                "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
-_RCV3_NODE_NOT_A_MEMBER_PATTERN = re.compile(
-    "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
-    "(?P<lb_id>{uuid})".format(uuid=_UUID4_REGEX),
-    re.IGNORECASE)
-_RCV3_LB_INACTIVE_PATTERN = re.compile(
-    "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state"
-    .format(uuid=_UUID4_REGEX),
-    re.IGNORECASE)
 
 
 def _rcv3_check_bulk_delete(attempted_pairs, result):
@@ -401,12 +425,13 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
         if match is not None:
             to_retry -= pset([match.groups()[::-1]])
 
-        match = _RCV3_LB_INACTIVE_PATTERN.match(error)
+        match = (_RCV3_LB_INACTIVE_PATTERN.match(error)
+                 or _RCV3_LB_DOESNT_EXIST_PATTERN.match(error))
         if match is not None:
-            inactive_lb_id, = match.groups()
+            bad_lb_id, = match.groups()
             to_retry = pset([(lb_id, node_id)
                              for (lb_id, node_id) in to_retry
-                             if lb_id != inactive_lb_id])
+                             if lb_id != bad_lb_id])
 
     if to_retry:
         next_step = BulkRemoveFromRCv3(lb_node_pairs=to_retry)

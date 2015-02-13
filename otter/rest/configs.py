@@ -4,20 +4,23 @@ or launch configuration for a scaling group.
 
 (/tenantId/groups/groupId/config and /tenantId/groups/groupId/launch)
 """
-from functools import partial
 import json
 
-from otter.json_schema import group_schemas
-from otter.log import log
-from otter.rest.decorators import (validate_body, fails_with,
-                                   succeeds_with, with_transaction_id)
-from otter.rest.errors import exception_codes
-from otter.rest.otterapp import OtterApp
-from otter.util.http import transaction_id
+from functools import partial
 
 from otter import controller
+from otter.json_schema import group_schemas
+from otter.log import log
+from otter.rest.decorators import (
+    fails_with,
+    succeeds_with,
+    validate_body,
+    with_transaction_id
+)
+from otter.rest.errors import InvalidMinEntities, exception_codes
+from otter.rest.otterapp import OtterApp
 from otter.supervisor import get_supervisor
-from otter.rest.errors import InvalidMinEntities
+from otter.util.http import transaction_id
 
 
 def normalize_launch_config(config):
@@ -54,9 +57,9 @@ class OtterConfig(object):
     def view_config_for_scaling_group(self, request):
         """
         Get the configuration for a scaling group, which includes the minimum
-        number of entities, the maximum number of entities, global cooldown, and
-        other metadata.  This data is returned in the body of the response in JSON
-        format.
+        number of entities, the maximum number of entities, global cooldown,
+        and other metadata.  This data is returned in the body of the response
+        in JSON format.
 
         Example response::
 
@@ -73,9 +76,11 @@ class OtterConfig(object):
                 }
             }
         """
-        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
         deferred = rec.view_config()
-        deferred.addCallback(lambda conf: json.dumps({"groupConfiguration": conf}))
+        deferred.addCallback(
+            lambda conf: json.dumps({"groupConfiguration": conf}))
         return deferred
 
     @app.route('/', methods=['PUT'])
@@ -86,9 +91,9 @@ class OtterConfig(object):
     def edit_config_for_scaling_group(self, request, data):
         """
         Edit the configuration for a scaling group, which includes the minimum
-        number of entities, the maximum number of entities, global cooldown, and
-        other metadata.  This data provided in the request body in JSON format.
-        If successful, no response body will be returned.
+        number of entities, the maximum number of entities, global cooldown,
+        and other metadata.  This data provided in the request body in JSON
+        format.  If successful, no response body will be returned.
 
         Example request::
 
@@ -106,16 +111,20 @@ class OtterConfig(object):
         The entire schema body must be provided.
         """
         if data['minEntities'] > data['maxEntities']:
-            raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
+            raise InvalidMinEntities(
+                "minEntities must be less than or equal to maxEntities")
 
         def _get_launch_and_obey_config_change(scaling_group, state):
             d = scaling_group.view_launch_config()
             d.addCallback(partial(
-                controller.obey_config_change, self.log, transaction_id(request),
+                controller.obey_config_change,
+                self.log,
+                transaction_id(request),
                 data, scaling_group, state))
             return d
 
-        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
         deferred = rec.update_config(data)
         deferred.addCallback(
             lambda _: rec.modify_state(_get_launch_and_obey_config_change))
@@ -143,9 +152,10 @@ class OtterLaunch(object):
     def view_launch_config(self, request):
         """
         Get the launch configuration for a scaling group, which includes the
-        details of how to create a server, from what image, which load balancers to
-        join it to, and what networks to add it to, and other metadata.
-        This data is returned in the body of the response in JSON format.
+        details of how to create a server, from what image, which load
+        balancers to join it to, and what networks to add it to, and other
+        metadata.  This data is returned in the body of the response in JSON
+        format.
 
         Example response::
 
@@ -164,14 +174,12 @@ class OtterLaunch(object):
                             "personality": [
                                 {
                                     "path": '/root/.ssh/authorized_keys',
-                                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                                    "contents": "ssh-rsa A... user@example.net"
                                 }
                             ],
-                            "networks": [
-                                {
-                                    "uuid": "11111111-1111-1111-1111-111111111111"
-                                }
-                            ],
+                            "networks": [{
+                                "uuid": "11111111-1111-1111-1111-111111111111"
+                            }],
                         },
                         "loadBalancers": [
                             {
@@ -183,9 +191,11 @@ class OtterLaunch(object):
                 }
             }
         """
-        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
         deferred = rec.view_launch_config()
-        deferred.addCallback(lambda conf: json.dumps({"launchConfiguration": conf}))
+        deferred.addCallback(
+            lambda conf: json.dumps({"launchConfiguration": conf}))
         return deferred
 
     @app.route('/', methods=['PUT'])
@@ -196,10 +206,10 @@ class OtterLaunch(object):
     def edit_launch_config(self, request, data):
         """
         Edit the launch configuration for a scaling group, which includes the
-        details of how to create a server, from what image, which load balancers to
-        join it to, and what networks to add it to, and other metadata.
-        This data provided in the request body in JSON format.
-        If successful, no response body will be returned.
+        details of how to create a server, from what image, which load
+        balancers to join it to, and what networks to add it to, and other
+        metadata.  This data provided in the request body in JSON format.  If
+        successful, no response body will be returned.
 
         Example request::
 
@@ -217,7 +227,7 @@ class OtterLaunch(object):
                         "personality": [
                             {
                                 "path": '/root/.ssh/authorized_keys',
-                                "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                                "contents": "ssh-rsa A... user@example.net"
                             }
                         ],
                         "networks": [
@@ -241,9 +251,11 @@ class OtterLaunch(object):
         Nova should validate the image before saving the new config.
         Users may have an invalid configuration based on dependencies.
         """
-        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(
+            self.log, self.tenant_id, self.group_id)
         data = normalize_launch_config(data)
         group_schemas.validate_launch_config_servicenet(data)
-        deferred = get_supervisor().validate_launch_config(self.log, self.tenant_id, data)
+        deferred = get_supervisor().validate_launch_config(
+            self.log, self.tenant_id, data)
         deferred.addCallback(lambda _: rec.update_launch_config(data))
         return deferred

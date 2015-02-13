@@ -19,6 +19,7 @@ from otter.convergence.steps import (
     DeleteServer,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
+    _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
     _rcv3_check_bulk_delete)
@@ -90,13 +91,24 @@ class StepAsEffectTests(SynchronousTestCase):
         :obj:`DeleteServer.as_effect` produces a request for deleting a server.
         """
         delete = DeleteServer(server_id='abc123')
+        eff = delete.as_effect()
         self.assertEqual(
-            delete.as_effect(),
+            eff.intent,
             service_request(
                 ServiceType.CLOUD_SERVERS,
                 'DELETE',
                 'servers/abc123',
-                success_pred=has_code(204)))
+                success_pred=has_code(204)).intent)
+
+        self.assertEqual(
+            resolve_effect(eff, (None, {})),
+            (StepResult.SUCCESS, []))
+
+        self.assertEqual(
+            resolve_effect(eff,
+                           (APIError, APIError(500, None, None), None),
+                           is_error=True),
+            (StepResult.RETRY, []))
 
     def test_set_metadata_item(self):
         """
@@ -407,68 +419,85 @@ class StepAsEffectTests(SynchronousTestCase):
             BulkRemoveFromRCv3, "DELETE")
 
 
-class RCv3CheckBulkDeleteTests(SynchronousTestCase):
+_RCV3_TEST_DATA = {
+    _RCV3_NODE_NOT_A_MEMBER_PATTERN: [
+        ('Node d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is not a member of '
+         'Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2',
+         {'lb_id': 'd95ae0c4-6ab8-4873-b82f-f8433840cff2',
+          'node_id': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'}),
+        ('Node D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is not a member of '
+         'Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+         {'lb_id': 'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+          'node_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'})
+    ],
+    _RCV3_LB_INACTIVE_PATTERN: [
+        ('Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 is '
+         'not in an ACTIVE state',
+         {"lb_id": "d95ae0c4-6ab8-4873-b82f-f8433840cff2"}),
+        ('Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2 is '
+         'not in an ACTIVE state',
+         {"lb_id": "D95AE0C4-6AB8-4873-B82F-F8433840CFF2"})
+    ],
+    _RCV3_LB_DOESNT_EXIST_PATTERN: [
+        ("Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 does "
+         "not exist",
+         {"lb_id": "d95ae0c4-6ab8-4873-b82f-f8433840cff2"}),
+        ("Load Balancer Pool D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 does "
+         "not exist",
+         {"lb_id": "D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2"})
+    ]
+}
+
+
+class RCv3RegexTests(SynchronousTestCase):
     """
-    Tests for :func:`_rcv3_check_bulk_delete`.
+    Tests for the RCv3 error parsing regexes.
     """
+    def _regex_test(self, test_pattern):
+        """A generic regex test.
+
+        Asserts that the given test pattern has test data, matches all
+        of its test data, and that it does not match all of the test
+        data for all of the other patterns.
+        """
+        self.assertIn(test_pattern, _RCV3_TEST_DATA)
+        for pattern, test_data in _RCV3_TEST_DATA.iteritems():
+            if pattern is not test_pattern:
+                for message, _ in test_data:
+                    self.assertIdentical(test_pattern.match(message), None)
+            else:
+                for message, expected_group_dict in test_data:
+                    res = pattern.match(message)
+                    self.assertNotIdentical(res, None)
+                    self.assertEqual(res.groupdict(), expected_group_dict)
+
     def test_node_not_a_member_error_message_regex(self):
         """
         The regex for parsing messages saying the node isn't part of the
         load balancer parses those messages. It rejects other
         messages.
         """
-        match = _RCV3_NODE_NOT_A_MEMBER_PATTERN.match
-
-        test_data = [
-            ('Node d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is not a member of '
-             'Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2',
-             {'lb_id': 'd95ae0c4-6ab8-4873-b82f-f8433840cff2',
-              'node_id': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'}),
-            ('Node D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is not a member of '
-             'Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
-             {'lb_id': 'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
-              'node_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'})
-        ]
-
-        for message, expected_group_dict in test_data:
-            res = match(message)
-            self.assertNotIdentical(res, None)
-            self.assertEqual(res.groupdict(), expected_group_dict)
-
-        for message in ["Load Balancer Pool {lb_id} is not in an ACTIVE state"
-                        .format(lb_id=lb_id) for lb_id in
-                        ['d95ae0c4-6ab8-4873-b82f-f8433840cff2',
-                         'D95AE0C4-6AB8-4873-B82F-F8433840CFF2']]:
-            self.assertIdentical(match(message), None)
+        self._regex_test(_RCV3_NODE_NOT_A_MEMBER_PATTERN)
 
     def test_lb_inactive_regex(self):
         """
         The regex for parsing messages saying the load balancer is
         inactive parses those messages. It rejects other messages.
         """
-        match = _RCV3_LB_INACTIVE_PATTERN.match
+        self._regex_test(_RCV3_LB_INACTIVE_PATTERN)
 
-        test_data = [
-            ('Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 is '
-             'not in an ACTIVE state',
-             ("d95ae0c4-6ab8-4873-b82f-f8433840cff2",)),
-            ('Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2 is '
-             'not in an ACTIVE state',
-             ("D95AE0C4-6AB8-4873-B82F-F8433840CFF2",))
-        ]
+    def test_no_such_lb_message(self):
+        """
+        The regex for parsing messages saying the load balancer doesn't
+        exist, parses those messages. It rejects other messages.
+        """
+        self._regex_test(_RCV3_LB_DOESNT_EXIST_PATTERN)
 
-        for message, expected_groups in test_data:
-            res = match(message)
-            self.assertNotIdentical(res, None)
-            self.assertEqual(res.groups(), expected_groups)
 
-        for message in [
-                'Node d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is not a member '
-                'of Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2',
-                'Node D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is not a member '
-                'of Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2']:
-            self.assertIdentical(match(message), None)
-
+class RCv3CheckBulkDeleteTests(SynchronousTestCase):
+    """
+    Tests for :func:`_rcv3_check_bulk_delete`.
+    """
     def test_good_response(self):
         """
         If the response code indicates success, the response was successful.
@@ -506,16 +535,23 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         node_c_id = '08944038-80ba-4ae1-a188-c827444e02e2'
         lb_c_id = '150895a5-1aa7-45b7-b7a4-98b9c282f800'
 
+        # This isn't even a little piggy!
+        node_d_id = 'bc1e94c3-0c88-4828-9e93-d42259280987'
+        lb_d_id = 'de52879e-1f84-4ecd-8988-91dfdc99570d'
+
         resp = StubResponse(409, {})
         body = {"errors":
                 ["Node {node_id} is not a member of Load Balancer "
                  "Pool {lb_id}".format(node_id=node_a_id, lb_id=lb_a_id),
                  "Load Balancer Pool {lb_id} is not in an ACTIVE state"
-                 .format(lb_id=lb_c_id)]}
+                 .format(lb_id=lb_c_id),
+                 "Load Balancer Pool {lb_id} does not exist"
+                 .format(lb_id=lb_d_id)]}
         eff = _rcv3_check_bulk_delete(
             [(lb_a_id, node_a_id),
              (lb_b_id, node_b_id),
-             (lb_c_id, node_c_id)],
+             (lb_c_id, node_c_id),
+             (lb_d_id, node_d_id)],
             (resp, body))
         expected_intent = service_request(
             service_type=ServiceType.RACKCONNECT_V3,
@@ -544,6 +580,21 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         resp = StubResponse(409, {})
         body = {"errors": ["Load Balancer Pool {} is not in an ACTIVE state"
                            .format(inactive_lb_id)]}
+        result = _rcv3_check_bulk_delete(pairs, (resp, body))
+        self.assertIdentical(result, None)
+
+    def test_lb_does_not_exist(self):
+        """
+        If the load balancer doesn't even exist, the delete was successful.
+        """
+        node_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
+        nonexistent_lb_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+
+        pairs = [(nonexistent_lb_id, node_id)]
+
+        resp = StubResponse(409, {})
+        body = {"errors": ["Load Balancer Pool {} does not exist"
+                           .format(nonexistent_lb_id)]}
         result = _rcv3_check_bulk_delete(pairs, (resp, body))
         self.assertIdentical(result, None)
 

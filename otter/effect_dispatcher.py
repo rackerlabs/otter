@@ -16,6 +16,7 @@ from .auth import (
 )
 from .http import TenantScope, perform_tenant_scope
 from .models.cass import CQLQueryExecute, perform_cql_query
+from .models.intents import ModifyGroupState, perform_modify_group_state
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
 
@@ -37,6 +38,7 @@ def get_simple_dispatcher(reactor):
             InvalidateToken: perform_invalidate_token,
             Request: perform_request,
             Retry: perform_retry,
+            ModifyGroupState: perform_modify_group_state,
         }),
         make_twisted_dispatcher(reactor),
     ])
