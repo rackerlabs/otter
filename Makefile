@@ -64,14 +64,15 @@ flake8full:
 	flake8 ${PYDIRS}
 
 TRIAL_OPTIONS=--random 0
+TRIAL_OPTIONS_UNIT=${TRIAL_OPTIONS} --jobs 4
 
 unit:
 ifneq ($(JENKINS_URL), )
-	trial ${TRIAL_OPTIONS} --reporter=subunit ${UNITTESTS} \
+	trial ${TRIAL_OPTIONS_UNIT} --reporter=subunit ${UNITTESTS} \
 		| tee subunit-output.txt
 	tail -n +4 subunit-output.txt | subunit2junitxml > test-report.xml
 else
-	trial ${TRIAL_OPTIONS} ${UNITTESTS}
+	trial ${TRIAL_OPTIONS_UNIT} ${UNITTESTS}
 endif
 
 integration:
@@ -89,7 +90,8 @@ else
 endif
 
 coverage:
-	coverage run --source=${CODEDIR} --branch `which trial` ${TRIAL_OPTIONS} ${UNITTESTS}
+	coverage run --source=${CODEDIR} --branch `which trial` \
+	    ${TRIAL_OPTIONS} ${UNITTESTS}
 
 coverage-html: coverage
 	coverage html -d _trial_coverage --omit="*/test/*"
