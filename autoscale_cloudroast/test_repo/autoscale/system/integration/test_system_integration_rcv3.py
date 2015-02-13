@@ -665,7 +665,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           'count of {1}'.format(num_clb_nodes_after_scale,
                                                 self.min_servers))
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='pass', working='true')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
     def test_scale_down_after_manual_remove_node(self):
         """
         Verify that the RCV3 group can successfully scale down after a server
