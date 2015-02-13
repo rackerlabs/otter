@@ -870,6 +870,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                             'meta_key_2': 'meta_value_2'}
         self.lc_disk_config = 'AUTO'
         self.lc_networks = network_list
+        server_name = rand_name('rc_server')
 
         self.create_resp = self.autoscale_client.create_scaling_group(
             gc_name=self.gc_name,
@@ -877,7 +878,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             gc_min_entities=group_min,
             gc_max_entities=self.gc_max_entities,
             gc_metadata=self.gc_metadata,
-            lc_name=self.lc_name,
+            lc_name=server_name,
             lc_image_ref=self.lc_image_ref,
             lc_flavor_ref=self.lc_flavor_ref,
             lc_metadata=self.lc_metadata,
