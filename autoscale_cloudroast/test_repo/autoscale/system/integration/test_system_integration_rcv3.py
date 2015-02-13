@@ -95,12 +95,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
         lb_pools = [{'loadBalancerId': cls.pool.id, 'type': 'RackConnectV3'}]
 
-        init_rc_node_ids = []
-        initial_node_list = cls.rcv3_client.get_nodes_on_pool(
-            cls.pool.id).entity.nodes
-        for each_node in initial_node_list:
-            init_rc_node_ids.append(each_node.id)
-
         count_pre_nodes = cls.rcv3_client.get_pool_info(cls.pool.id)\
                              .entity.node_counts['cloud_servers']
 
