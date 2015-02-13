@@ -122,6 +122,10 @@ class NovaServer(object):
         of :class:`CLBDescription` instances.
     """
 
+    def __init__(self):
+        assert self.state in ServerState.iterconstants(), \
+            "%r is not a ServerState" % (self.state,)
+
 
 @attributes(['server_config', 'capacity',
              Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
