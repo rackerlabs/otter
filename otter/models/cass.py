@@ -1515,7 +1515,8 @@ class CassScalingGroupCollection:
         Get webhook info that is there in webhook index but is not there in
         webhook_keys table
 
-        :return: Effect of list of dict
+        :return: Effect of list of pmap. The pmap contains tenantId, groupId,
+            policyId and webhookKey
         """
         query = ('SELECT "tenantId", "groupId", "policyId", "webhookKey" '
                  'FROM {cf}')
@@ -1533,7 +1534,10 @@ class CassScalingGroupCollection:
 
     def add_webhook_keys(self, webhook_keys):
         """
-        Add webhook keys to webhook_keys table
+        Add webhook keys to webhook_keys table.
+
+        :param dict webhook_keys: It must have tenantId, groupId, policyId
+            and webhookKey
 
         :return: Effect of None
         """
