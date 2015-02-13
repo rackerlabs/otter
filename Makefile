@@ -63,7 +63,7 @@ flake8diff:
 flake8full:
 	flake8 ${PYDIRS}
 
-TRIAL_OPTIONS=--jobs=4 --random 0
+TRIAL_OPTIONS=--random 0
 
 unit:
 ifneq ($(JENKINS_URL), )
