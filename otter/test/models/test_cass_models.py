@@ -2570,7 +2570,9 @@ class ScalingGroupWebhookMigrateTests(SynchronousTestCase):
 
     def test_webhook_index_only(self):
         """
-        Test `get_webhook_index_only`
+        `get_webhook_index_only` gets webhook info from policy_webhooks table
+        and webhook_keys in parallel and returns those webhook info that is
+        there in policy_webhooks table but NOT in webhook_keys table
         """
         eff = self.store.get_webhook_index_only()
         self.assertEqual(
