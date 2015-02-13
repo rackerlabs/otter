@@ -687,7 +687,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             network_list=[self.rackconnect_network])
         pool_group = pool_group_resp.entity
 
-        # Create and execute a policy to scale up  servers
+        # Construct a policy to scale up servers
         server_count_before_autoscaling = self._get_node_counts_on_pool(
             self.pool.id)['cloud_servers']
 
@@ -713,10 +713,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         self.rcv3_client.remove_server_from_pool(self.pool.id,
                                                  server_list_after_up[0])
 
-        # pool_node_list_post = self._get_cloud_servers_on_pool(self.pool.id)
-        # pool_node_set_post = set([n['node_id'] for n in pool_node_list_post])
-        # print(pool_node_list_post)
-
         post_del_servers, post_del_nodes = self._verify_rcv3_group_state(
             pool_group,
             pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
@@ -724,12 +720,11 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             expected_rcv3_server_count - 1,
             as_server_count)
 
-        # Create and execute policy to scale back to min
+        # Construct, create, and execute a policy to scale back to min.
         policy_down_data = {'change': -scale_amt, 'cooldown': 0}
         expected_rcv3_server_count = server_count_before_autoscaling
         as_server_count = as_server_count - scale_amt
 
-        # Create the policy and execute it immediately
         self.asb.create_policy_webhook(pool_group.id,
                                        policy_down_data,
                                        execute_policy=True)
