@@ -157,8 +157,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             asserter=dummy_asserter)
         # If there was an error waiting for servers to build, abort the
         # testing.
-        cls.rcv3_client.get_pool_info(
-            cls.pool.id).entity.node_counts
         if dummy_asserter.err:
             print("SetUpClass failed: background LB nodes")
 
@@ -533,11 +531,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
         # Capture a list of the node_ids of all nodes on the pool before doing
         # anything.
-        init_rc_node_ids = []
-        initial_node_list = self.rcv3_client.get_nodes_on_pool(
-            self.pool.id).entity.nodes
-        for each_node in initial_node_list:
-            init_rc_node_ids.append(each_node.id)
+        init_rc_node_ids = [n.id for n in self.rcv3_client.get_nodes_on_pool(
+            self.pool.id).entity.nodes]
 
         initial_cloud_server_count = self._get_node_counts_on_pool(
             self.pool.id)['cloud_servers']
