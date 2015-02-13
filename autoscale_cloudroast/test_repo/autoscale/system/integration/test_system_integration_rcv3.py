@@ -95,21 +95,14 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
         lb_pools = [{'loadBalancerId': cls.pool.id, 'type': 'RackConnectV3'}]
 
-        #####################
-
         init_rc_node_ids = []
         initial_node_list = cls.rcv3_client.get_nodes_on_pool(
             cls.pool.id).entity.nodes
         for each_node in initial_node_list:
             init_rc_node_ids.append(each_node.id)
-            print(each_node)
 
-        print('Setup: init_rc_node_ids')
-        print(init_rc_node_ids)
         count_pre_nodes = cls.rcv3_client.get_pool_info(cls.pool.id)\
                              .entity.node_counts['cloud_servers']
-        print(count_pre_nodes)
-        #####################
 
         # Many tests require us to have some servers sitting in an account
         # ahead of time.  We don't actually use these servers for anything,
@@ -164,9 +157,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             asserter=dummy_asserter)
         # If there was an error waiting for servers to build, abort the
         # testing.
-        pool_info = cls.rcv3_client.get_pool_info(
+        cls.rcv3_client.get_pool_info(
             cls.pool.id).entity.node_counts
-        print(pool_info)
         if dummy_asserter.err:
             print("SetUpClass failed: background LB nodes")
 
@@ -716,7 +708,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                                       + scale_amt)
         as_server_count = scale_amt
 
-        print('\n create and execute scale up policy')
         # Create the policy and execute it immediately
         self.asb.create_policy_webhook(pool_group.id,
                                        policy_up_data,
@@ -743,8 +734,6 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             as_server_count,
             expected_rcv3_server_count - 1,
             as_server_count)
-
-        print('\n create and execute scale down policy')
 
         # Create and execute policy to scale back to min
         policy_down_data = {'change': -scale_amt, 'cooldown': 0}
