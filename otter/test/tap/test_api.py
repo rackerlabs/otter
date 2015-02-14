@@ -366,7 +366,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         """
         unicode_config = json.loads(json.dumps(test_config, encoding="utf-8"))
         makeService(unicode_config)
-        self.clientFromString.assert_called_once_with(self.reactor, 'tcp:127.0.0.1:9160')
+        self.clientFromString.assert_called_once_with(
+            self.reactor, 'tcp:127.0.0.1:9160')
         self.assertTrue(isinstance(self.clientFromString.call_args[0][1], str))
 
     def test_cassandra_cluster_with_endpoints_and_keyspace(self):
