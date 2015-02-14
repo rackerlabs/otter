@@ -67,7 +67,8 @@ class Options(usage.Options):
 
 class FunctionalService(Service, object):
     """
-    A simple service that has functions to call when starting and stopping service
+    A simple service that has functions to call when starting and
+    stopping service.
     """
 
     def __init__(self, start=None, stop=None):
