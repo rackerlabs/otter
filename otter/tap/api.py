@@ -257,9 +257,9 @@ def makeService(config):
             health_checker.checks['scheduler'] = scheduler.health_check
             otter.scheduler = scheduler
             # Set the client after starting
-            # NOTE: There is small amount of time when the start is not finished
-            # and the kz_client is not set in which case policy execution and group
-            # delete will fail
+            # NOTE: There is small amount of time when the start is
+            # not finished and the kz_client is not set in which case
+            # policy execution and group delete will fail
             store.kz_client = kz_client
             # Setup kazoo to stop when shutting down
             s.addService(FunctionalService(
