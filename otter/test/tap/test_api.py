@@ -518,7 +518,8 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         # they are called after start completes
         start_d.callback(None)
-        mock_setup_scheduler.assert_called_once_with(parent, self.store, kz_client)
+        mock_setup_scheduler.assert_called_once_with(
+            parent, self.store, kz_client)
         self.assertEqual(self.store.kz_client, kz_client)
         sch = mock_setup_scheduler.return_value
         self.assertEqual(self.health_checker.checks['scheduler'], sch.health_check)
