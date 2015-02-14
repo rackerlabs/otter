@@ -211,8 +211,8 @@ def makeService(config):
 
     # Setup cassandra cluster to disconnect when otter shuts down
     if 'cassandra_cluster' in locals():
-        s.addService(FunctionalService(stop=partial(call_after_supervisor,
-                                                    cassandra_cluster.disconnect, supervisor)))
+        s.addService(FunctionalService(stop=partial(
+            call_after_supervisor, cassandra_cluster.disconnect, supervisor)))
 
     otter = Otter(store, region, health_checker.health_check,
                   es_host=config_value('elasticsearch.host'))
