@@ -213,8 +213,9 @@ class HealthCheckerTests(SynchronousTestCase):
         Each health check is timed out after 15 seconds
         """
         checker = HealthChecker(
-            self.clock, {'a': mock.Mock(return_value=defer.Deferred()),
-                         'b': mock.Mock(return_value=defer.succeed((True, {})))})
+            self.clock,
+            {'a': mock.Mock(return_value=defer.Deferred()),
+             'b': mock.Mock(return_value=defer.succeed((True, {})))})
         d = checker.health_check()
         self.assertNoResult(d)
         self.clock.advance(16)
