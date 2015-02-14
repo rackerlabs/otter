@@ -347,7 +347,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         returned MultiService.
         """
         expected_parent = makeService(test_config)
-        self.service.return_value.setServiceParent.assert_called_with(expected_parent)
+        self.service.return_value.setServiceParent.assert_called_with(
+            expected_parent)
 
     def test_cassandra_seed_hosts_endpoints(self):
         """
