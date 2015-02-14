@@ -322,7 +322,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         config = test_config.copy()
         del config['admin']
         makeService(config)
-        self.assertTrue('tcp:9789' not in [args[0] for args, _ in self.service.call_args_list])
+        self.assertTrue('tcp:9789' not in
+                        [args[0] for args, _ in self.service.call_args_list])
 
     def test_unicode_service_site_on_port(self):
         """
