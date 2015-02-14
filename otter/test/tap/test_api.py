@@ -295,7 +295,8 @@ class APIMakeServiceTests(SynchronousTestCase):
             self.health_checker = HealthChecker(*args, **kwargs)
             return self.health_checker
 
-        patch(self, 'otter.tap.api.HealthChecker', side_effect=make_health_checker)
+        patch(self, 'otter.tap.api.HealthChecker',
+              side_effect=make_health_checker)
 
     def test_service_site_on_port(self):
         """
