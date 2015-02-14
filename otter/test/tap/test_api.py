@@ -239,7 +239,8 @@ class CallAfterSupervisorTests(SynchronousTestCase):
         """
         supervisor = mock.Mock(spec=['deferred_pool'])
         supervisor.deferred_pool = mock.Mock(spec=DeferredPool)
-        supervisor.deferred_pool.notify_when_empty.return_value = defer.Deferred()
+        supervisor.deferred_pool.notify_when_empty.return_value = \
+            defer.Deferred()
         func = mock.Mock(return_value=defer.succeed(2))
 
         d = call_after_supervisor(func, supervisor)
