@@ -73,8 +73,10 @@ class FunctionalService(Service, object):
 
     def __init__(self, start=None, stop=None):
         """
-        :param start: A single argument callable to be called when service is started
-        :param stop: A single argument callable to be called when service is stopped
+        :param start: A single argument callable to be called when service
+            is started
+        :param stop: A single argument callable to be called when service
+            is stopped
         """
         self._start = start
         self._stop = stop
