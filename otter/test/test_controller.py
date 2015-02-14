@@ -1106,7 +1106,7 @@ class ConvergeTestCase(SynchronousTestCase):
                                      config_value=config_data.get)
         self.assertIs(result, None)
         self.converger_mock.start_convergence.assert_called_once_with(
-            log, 'tenant', 'group-id', 5, 'launch')
+            log, self.group, state, 'launch')
 
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)

@@ -21,7 +21,9 @@ from otter.convergence.steps import (
     SetMetadataItemOnServer,
     _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
+    _RCV3_NODE_ALREADY_A_MEMBER_PATTERN,
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
+    _rcv3_check_bulk_add,
     _rcv3_check_bulk_delete)
 from otter.http import has_code, service_request
 from otter.test.utils import StubResponse, resolve_effect
@@ -371,7 +373,7 @@ class StepAsEffectTests(SynchronousTestCase):
 
         success_pred = request.intent.success_pred
         if request.intent.method == "POST":
-            self.assertEqual(success_pred, has_code(201))
+            self.assertEqual(success_pred, has_code(201, 409))
         else:
             self.assertEqual(success_pred, has_code(204, 409))
 
@@ -430,6 +432,18 @@ _RCV3_TEST_DATA = {
          {'lb_id': 'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
           'node_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'})
     ],
+    _RCV3_NODE_ALREADY_A_MEMBER_PATTERN: [
+        ('Cloud Server d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is already '
+         'a member of Load Balancer Pool '
+         'd95ae0c4-6ab8-4873-b82f-f8433840cff2',
+         {'lb_id': 'd95ae0c4-6ab8-4873-b82f-f8433840cff2',
+          'node_id': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'}),
+        ('Cloud Server D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is already '
+         'a member of Load Balancer Pool '
+         'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+         {'lb_id': 'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+          'node_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'})
+    ],
     _RCV3_LB_INACTIVE_PATTERN: [
         ('Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 is '
          'not in an ACTIVE state',
@@ -471,13 +485,21 @@ class RCv3RegexTests(SynchronousTestCase):
                     self.assertNotIdentical(res, None)
                     self.assertEqual(res.groupdict(), expected_group_dict)
 
-    def test_node_not_a_member_error_message_regex(self):
+    def test_node_not_a_member_regex(self):
         """
         The regex for parsing messages saying the node isn't part of the
         load balancer parses those messages. It rejects other
         messages.
         """
         self._regex_test(_RCV3_NODE_NOT_A_MEMBER_PATTERN)
+
+    def test_node_already_a_member_regex(self):
+        """
+        The regex for parsing messages saying the node is already part of
+        the load balancer parses those messages. It rejects other
+        messages.
+        """
+        self._regex_test(_RCV3_NODE_ALREADY_A_MEMBER_PATTERN)
 
     def test_lb_inactive_regex(self):
         """
@@ -492,6 +514,84 @@ class RCv3RegexTests(SynchronousTestCase):
         exist, parses those messages. It rejects other messages.
         """
         self._regex_test(_RCV3_LB_DOESNT_EXIST_PATTERN)
+
+
+class RCv3CheckBulkAddTests(SynchronousTestCase):
+    """
+    Tests for :func:`_rcv3_check_bulk_add`.
+    """
+    def test_good_response(self):
+        """
+        If the response code indicates success, the response was successful.
+        """
+        node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
+        lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+
+        node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+
+        pairs = [(lb_a_id, node_a_id), (lb_b_id, node_b_id)]
+
+        resp = StubResponse(201, {})
+        body = [{"cloud_server": {"id": node_id},
+                 "load_balancer_pool": {"id": lb_id}}
+                for (lb_id, node_id) in pairs]
+        res = _rcv3_check_bulk_add(pairs, (resp, body))
+        self.assertEqual(res, (StepResult.SUCCESS, []))
+
+    def test_try_again(self):
+        """
+        If a node is already on the load balancer, returns an effect that
+        removes the remaining load balancer pairs.
+        """
+        # This little piggy is already on the load balancer
+        node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
+        lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+
+        # This little piggy is going to be added to this load balancer
+        node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+
+        resp = StubResponse(409, {})
+        body = {"errors":
+                ["Cloud Server {node_id} is already a member of Load "
+                 "Balancer Pool {lb_id}"
+                 .format(node_id=node_a_id, lb_id=lb_a_id)]}
+        eff = _rcv3_check_bulk_add(
+            [(lb_a_id, node_a_id),
+             (lb_b_id, node_b_id)],
+            (resp, body))
+        expected_intent = service_request(
+            service_type=ServiceType.RACKCONNECT_V3,
+            method="POST",
+            url='load_balancer_pools/nodes',
+            data=[
+                {'load_balancer_pool': {'id': lb_b_id},
+                 'cloud_server': {'id': node_b_id}}],
+            success_pred=has_code(201, 409)).intent
+        self.assertEqual(eff.intent, expected_intent)
+        (partial_check_bulk_add, _), = eff.callbacks
+        self.assertEqual(partial_check_bulk_add.func,
+                         _rcv3_check_bulk_add)
+        expected_pairs = pset([(lb_b_id, node_b_id)])
+        self.assertEqual(partial_check_bulk_add.args, (expected_pairs,))
+        self.assertEqual(partial_check_bulk_add.keywords, None)
+
+    def test_node_already_a_member(self):
+        """
+        If all nodes were already member of the load balancers we were
+        trying to add them to, the request is successful.
+        """
+        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+        pairs = [(lb_id, node_id)]
+
+        resp = StubResponse(409, {})
+        body = {"errors": [
+            "Cloud Server {node_id} is already a member of Load "
+            "Balancer Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
+        result = _rcv3_check_bulk_add(pairs, (resp, body))
+        self.assertEqual(result, (StepResult.SUCCESS, []))
 
 
 class RCv3CheckBulkDeleteTests(SynchronousTestCase):
@@ -520,8 +620,9 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
     def test_try_again(self):
         """
         If a node was already removed (or maybe was never part of the load
-        balancer pool to begin with), returns an effect that removes
-        the remaining load balancer pairs.
+        balancer pool to begin with), or some load balancer was
+        inactive, or one of the load balancers doesn't exist, returns
+        an effect that removes the remaining load balancer pairs.
         """
         # This little piggy isn't even on this load balancer.
         node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
@@ -600,8 +701,8 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
 
     def test_node_not_a_member(self):
         """
-        If the node is not a member of the load balancer pool it's being
-        removed from, the response was successful.
+        If the nodes are already not member of the load balancer pools
+        they're being removed from, the response was successful.
         """
         node_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
         lb_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'

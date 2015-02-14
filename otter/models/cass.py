@@ -8,14 +8,22 @@ import json
 import time
 import uuid
 import weakref
-
 from datetime import datetime
+
+from characteristic import attributes
+
+from effect import Effect, parallel
+from effect.twisted import deferred_performer
 
 from jsonschema import ValidationError
 
 from kazoo.protocol.states import KazooState
 
+from pyrsistent import freeze
+
 from silverberg.client import ConsistencyLevel
+
+from toolz.dicttoolz import keymap
 
 from twisted.internet import defer
 
@@ -45,6 +53,22 @@ from otter.util.hashkey import generate_capability, generate_key_str
 
 
 LOCK_PATH = '/locks'
+
+
+@attributes(['query', 'params', 'consistency_level'])
+class CQLQueryExecute(object):
+    """
+    An intent to execute CQL query
+    """
+
+
+@deferred_performer
+def perform_cql_query(conn, disp, intent):
+    """
+    Perform CQLQueryExecute intent using given silverberg connection
+    """
+    return conn.execute(
+        intent.query, intent.params, intent.consistency_level)
 
 
 def serialize_json_data(data, ver):
@@ -1453,6 +1477,50 @@ class CassScalingGroupCollection:
 
         d.addCallback(extract_info)
         return d
+
+    def get_webhook_index_only(self):
+        """
+        Get webhook info that is there in webhook index but is not there in
+        webhook_keys table
+
+        :return: Effect of list of pmap. The pmap contains tenantId, groupId,
+            policyId and webhookKey
+        """
+        query = ('SELECT "tenantId", "groupId", "policyId", "webhookKey" '
+                 'FROM {cf}')
+        eff = parallel(
+            [Effect(
+                CQLQueryExecute(query=query.format(cf=self.webhooks_table),
+                                params={},
+                                consistency_level=ConsistencyLevel.ONE)),
+             Effect(
+                CQLQueryExecute(query=query.format(cf=self.webhook_keys_table),
+                                params={},
+                                consistency_level=ConsistencyLevel.ONE))])
+        return eff.on(
+            lambda (whooks, wkeys): set(freeze(whooks)) - set(freeze(wkeys)))
+
+    def add_webhook_keys(self, webhook_keys):
+        """
+        Add webhook keys to webhook_keys table.
+
+        :param dict webhook_keys: It must have tenantId, groupId, policyId
+            and webhookKey
+
+        :return: Effect of None
+        """
+        query = (
+            'INSERT INTO {cf} ("tenantId", "groupId", "policyId", '
+            '"webhookKey")'
+            'VALUES (:tenantId{i}, :groupId{i}, :policyId{i}, :webhookKey{i})')
+        stmts = []
+        data = {}
+        for i, wkey in enumerate(webhook_keys):
+            data.update(keymap(lambda k: k + str(i), wkey))
+            stmts.append(query.format(cf=self.webhook_keys_table, i=i))
+        return Effect(
+            CQLQueryExecute(query=batch(stmts), params=data,
+                            consistency_level=ConsistencyLevel.ONE))
 
     def get_counts(self, log, tenant_id):
         """

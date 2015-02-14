@@ -3,6 +3,7 @@
 """
 Loads cql into Cassandra
 """
+from __future__ import print_function
 
 import argparse
 import sys
@@ -11,6 +12,15 @@ import re
 from cql.apivalues import ProgrammingError
 from cql.connection import connect
 
+from effect.twisted import perform
+
+from silverberg.client import CQLClient
+
+from twisted.internet import task
+from twisted.internet.endpoints import clientFromString
+
+from otter.effect_dispatcher import get_cql_dispatcher
+from otter.models.cass import CassScalingGroupCollection
 from otter.test.resources import CQLGenerator
 
 
@@ -20,6 +30,10 @@ the_parser = argparse.ArgumentParser(description="Load data into Cassandra.")
 the_parser.add_argument(
     'cql_dir', type=str, metavar='cql_dir',
     help='Directory containing *.cql files to merge and replace.')
+
+the_parser.add_argument(
+    '--webhook-migrate', action='store_true',
+    help='Migrate webhook indexes to table')
 
 the_parser.add_argument(
     '--keyspace', type=str, default='otter',
@@ -55,14 +69,14 @@ the_parser.add_argument(
     '--verbose', '-v', action='count', default=0, help="How verbose to be")
 
 
-def run(args):
+def generate(args):
     """
     Generate CQL and/or load it into a cassandra instance/cluster.
     """
     try:
         generator = CQLGenerator(args.cql_dir, safe_only=args.ban_unsafe)
     except Exception as e:
-        print e.message
+        print(e.message)
         sys.exit(1)
 
     cql = generator.generate_cql(
@@ -83,20 +97,34 @@ def run(args):
 
     # connect
     if args.verbose > 0:
-        print "Attempting to connect to {0}:{1}".format(args.host, args.port)
+        print("Attempting to connect to {0}:{1}".format(args.host, args.port))
     try:
         connection = connect(args.host, args.port, cql_version='3.0.4')
     except Exception as e:
-        print "CONNECTION ERROR: {0}".format(e.message)
+        print("CONNECTION ERROR: {0}".format(e.message))
         sys.exit(1)
-
     cursor = connection.cursor()
 
+    # execute commands
+    execute_commands(cursor, commands, args.verbose)
+
+    if args.verbose > 0:
+        print('\n----\n')
+        print("Done.  Disconnecting.")
+
+    cursor.close()
+    connection.close()
+
+
+def execute_commands(cursor, commands, verbose):
+    """
+    Execute commands
+    """
     for command in commands:
         try:
             cursor.execute(command, {})
         except ProgrammingError as pe:
-            # if somewhat verbose, then print out all errors.
+            # if somewhat verbose, then print(out all errors.)
             # if less verbose, print out only non-already-existing errors
             message = pe.message.lower()
             significant_error = (
@@ -105,10 +133,10 @@ def run(args):
                 "existing column" not in message and
                 not re.search("index '.*' could not be found", message))
 
-            if args.verbose > 1 or significant_error:
-                print '\n----\n'
-                print command
-                print "{0}".format(pe.message.strip())
+            if verbose > 1 or significant_error:
+                print('\n----\n')
+                print(command)
+                print("{0}".format(pe.message.strip()))
 
             if significant_error:
                 sys.exit(1)
@@ -116,16 +144,36 @@ def run(args):
         else:
             # extremely verbose - notify that command executed correctly.
             if args.verbose > 2:
-                print '\n----\n'
-                print command
-                print "Ok."
+                print('\n----\n')
+                print(command)
+                print("Ok.")
 
-    if args.verbose > 0:
-        print '\n----\n'
-        print "Done.  Disconnecting."
 
-    cursor.close()
-    connection.close()
+def setup_connection(reactor, args):
+    """
+    Return Cassandra connection
+    """
+    return CQLClient(
+        clientFromString(reactor, 'tcp:{}:{}'.format(args.host, args.port)),
+        args.keyspace)
+
+
+def webhook_migrate(reactor, args):
+    """
+    Migrate webhook indexes to table
+    """
+    store = CassScalingGroupCollection(None, None)
+    eff = store.get_webhook_index_only().on(store.add_webhook_keys)
+    conn = setup_connection(reactor, args)
+    return perform(get_cql_dispatcher(reactor, conn), eff).addCallback(
+        lambda _: conn.disconnect())
+
+
+def run(args):
+    if args.webhook_migrate:
+        task.react(webhook_migrate, (args,))
+    else:
+        generate(args)
 
 
 args = the_parser.parse_args()

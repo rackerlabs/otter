@@ -2,7 +2,10 @@
 
 from functools import partial
 
-from effect import ComposedDispatcher, TypeDispatcher, base_dispatcher
+from effect import (
+    ComposedDispatcher,
+    TypeDispatcher,
+    base_dispatcher)
 from effect.twisted import make_twisted_dispatcher
 
 from .auth import (
@@ -12,6 +15,7 @@ from .auth import (
     perform_invalidate_token,
 )
 from .http import TenantScope, perform_tenant_scope
+from .models.cass import CQLQueryExecute, perform_cql_query
 from .models.intents import ModifyGroupState, perform_modify_group_state
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
@@ -49,4 +53,19 @@ def get_full_dispatcher(reactor, authenticator, log, service_config):
             TenantScope: partial(perform_tenant_scope, authenticator, log,
                                  service_config)}),
         get_simple_dispatcher(reactor),
+    ])
+
+
+def get_cql_dispatcher(reactor, connection):
+    """
+    Get dispatcher with `CQLQueryExecute`'s performer in it
+
+    :param reactor: Twisted reactor
+    :param connection: Silverberg connection
+    """
+    return ComposedDispatcher([
+        get_simple_dispatcher(reactor),
+        TypeDispatcher({
+            CQLQueryExecute: partial(perform_cql_query, connection)
+        })
     ])

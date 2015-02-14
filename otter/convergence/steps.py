@@ -328,6 +328,9 @@ def _rcv3_re(pattern):
 _RCV3_NODE_NOT_A_MEMBER_PATTERN = _rcv3_re(
     "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
     "(?P<lb_id>{uuid})")
+_RCV3_NODE_ALREADY_A_MEMBER_PATTERN = _rcv3_re(
+    "Cloud Server (?P<node_id>{uuid}) is already a member of Load Balancer "
+    "Pool (?P<lb_id>{uuid})")
 _RCV3_LB_INACTIVE_PATTERN = _rcv3_re(
     "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state")
 _RCV3_LB_DOESNT_EXIST_PATTERN = _rcv3_re(
@@ -354,14 +357,37 @@ class BulkAddToRCv3(object):
         Just the RCv3 bulk request effect, with no callbacks.
         """
         return _rackconnect_bulk_request(self.lb_node_pairs, "POST",
-                                         success_pred=has_code(201))
+                                         success_pred=has_code(201, 409))
 
     def as_effect(self):
         """
         Produce a :obj:`Effect` to add some nodes to some RCv3 load
         balancers.
         """
-        return self._bare_effect()
+        eff = self._bare_effect()
+        return eff.on(partial(_rcv3_check_bulk_add, self.lb_node_pairs))
+
+
+def _rcv3_check_bulk_add(attempted_pairs, result):
+    """
+    Checks if the RCv3 bulk add command was successful.
+    """
+    response, body = result
+
+    if response.code == 201:  # All done!
+        return StepResult.SUCCESS, []
+
+    to_retry = pset(attempted_pairs)
+    for error in body["errors"]:
+        match = _RCV3_NODE_ALREADY_A_MEMBER_PATTERN.match(error)
+        if match is not None:
+            to_retry -= pset([match.groups()[::-1]])
+
+    if to_retry:
+        next_step = BulkAddToRCv3(lb_node_pairs=to_retry)
+        return next_step.as_effect()
+    else:
+        return StepResult.SUCCESS, []
 
 
 @implementer(IStep)
