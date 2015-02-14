@@ -394,7 +394,8 @@ class APIMakeServiceTests(SynchronousTestCase):
             self.TimingOutCQLClient.return_value,
             self.log.bind.return_value)
 
-        self.assertEqual(self.store.connection, self.LoggingCQLClient.return_value)
+        self.assertEqual(self.store.connection,
+                         self.LoggingCQLClient.return_value)
         self.assertEqual(self.store.reactor, self.reactor)
 
     def test_cassandra_cluster_disconnects_on_stop(self):
