@@ -268,10 +268,11 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.Site = patch(self, 'otter.tap.api.Site')
         self.clientFromString = patch(self, 'otter.tap.api.clientFromString')
 
-        self.LoggingCQLClient = patch(self, 'otter.tap.api.LoggingCQLClient')
         self.TimingOutCQLClient = patch(self, 'otter.tap.api.TimingOutCQLClient')
         self.RoundRobinCassandraCluster = patch(
             self, 'otter.tap.api.RoundRobinCassandraCluster')
+        self.LoggingCQLClient = patch(
+            self, 'otter.tap.api.LoggingCQLClient')
         self.log = patch(self, 'otter.tap.api.log')
 
         Otter_patcher = mock.patch('otter.tap.api.Otter')
