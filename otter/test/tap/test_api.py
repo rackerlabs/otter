@@ -573,7 +573,8 @@ class APIMakeServiceTests(SynchronousTestCase):
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
-    def test_kazoo_client_stops_after_supervisor(self, mock_txkz, mock_setup_scheduler):
+    def test_kazoo_client_stops_after_supervisor(self, mock_txkz,
+                                                 mock_setup_scheduler):
         """
         Kazoo is stopped after supervisor stops
         """
