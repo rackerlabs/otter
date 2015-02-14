@@ -356,7 +356,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         cassandra seed_hosts.
         """
         makeService(test_config)
-        self.clientFromString.assert_called_once_with(self.reactor, 'tcp:127.0.0.1:9160')
+        self.clientFromString.assert_called_once_with(
+            self.reactor, 'tcp:127.0.0.1:9160')
 
     def test_unicode_cassandra_seed_hosts_endpoints(self):
         """
