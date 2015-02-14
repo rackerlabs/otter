@@ -402,7 +402,8 @@ class APIMakeServiceTests(SynchronousTestCase):
 
     def test_cassandra_cluster_disconnects_on_stop(self):
         """
-        Cassandra cluster connection is disconnected when main service is stopped
+        Cassandra cluster connection is disconnected when main service is
+        stopped
         """
         service = makeService(test_config)
         service.stopService()
@@ -435,7 +436,8 @@ class APIMakeServiceTests(SynchronousTestCase):
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_health_checker_no_zookeeper(self, supervisor):
         """
-        A health checker is constructed by default with the store and kazoo health check
+        A health checker is constructed by default with the store and kazoo
+        health check
         """
         self.addCleanup(lambda: set_supervisor(None))
         self.assertIsNone(self.health_checker)
