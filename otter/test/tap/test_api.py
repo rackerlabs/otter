@@ -118,7 +118,9 @@ class HealthCheckerTests(SynchronousTestCase):
         """
         If a check raises an exception, its health is unhealthy
         """
-        checker = HealthChecker(self.clock, {'fail': mock.Mock(side_effect=Exception)})
+        checker = HealthChecker(
+            self.clock,
+            {'fail': mock.Mock(side_effect=Exception)})
         d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {
             'healthy': False,
