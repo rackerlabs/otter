@@ -134,7 +134,9 @@ class HealthCheckerTests(SynchronousTestCase):
         """
         Synchronous health checks are supported
         """
-        checker = HealthChecker(self.clock, {'sync': mock.Mock(return_value=(True, {}))})
+        checker = HealthChecker(
+            self.clock,
+            {'sync': mock.Mock(return_value=(True, {}))})
         d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {
             'healthy': True,
