@@ -637,7 +637,8 @@ class SchedulerSetupTests(SynchronousTestCase):
         self.store.set_scheduler_buckets.assert_called_once_with(buckets)
         self.scheduler_service.assert_called_once_with(
             100, 10, self.store, self.kz_client, '/part_path', 15, buckets)
-        self.scheduler_service.return_value.setServiceParent.assert_called_once_with(self.parent)
+        self.scheduler_service.return_value.setServiceParent\
+            .assert_called_once_with(self.parent)
 
     def test_mock_store_with_scheduler(self):
         """
