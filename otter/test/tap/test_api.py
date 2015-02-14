@@ -390,8 +390,9 @@ class APIMakeServiceTests(SynchronousTestCase):
             self.reactor,
             self.RoundRobinCassandraCluster.return_value,
             10)
-        self.LoggingCQLClient.assert_called_once_with(self.TimingOutCQLClient.return_value,
-                                                      self.log.bind.return_value)
+        self.LoggingCQLClient.assert_called_once_with(
+            self.TimingOutCQLClient.return_value,
+            self.log.bind.return_value)
 
         self.assertEqual(self.store.connection, self.LoggingCQLClient.return_value)
         self.assertEqual(self.store.reactor, self.reactor)
