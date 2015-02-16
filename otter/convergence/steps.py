@@ -462,3 +462,5 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
     if to_retry:
         next_step = BulkRemoveFromRCv3(lb_node_pairs=to_retry)
         return next_step.as_effect()
+    else:
+        return StepResult.SUCCESS, []
