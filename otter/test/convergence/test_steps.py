@@ -679,13 +679,13 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         combination of all of them, even if there are several (load
         balancer, node) pairs for each reason.
         """
-        node_1_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
-        lb_1_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+        node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
+        lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
 
-        node_2_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
-        lb_2_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+        node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
 
-        pairs = [(lb_1_id, node_1_id), (lb_2_id, node_2_id)]
+        pairs = [(lb_a_id, node_a_id), (lb_b_id, node_b_id)]
 
         resp = StubResponse(409, {})
         body = {"errors":
