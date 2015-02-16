@@ -608,10 +608,11 @@ def generate_authenticator(reactor, config):
             reactor,
             RetryingAuthenticator(
                 reactor,
-                SingleTenantAuthenticator(
+                ImpersonatingAuthenticator(
                     config['username'],
                     config['password'],
-                    config['url']),
+                    config['url'],
+                    config['admin_url']),
                 max_retries=config['max_retries'],
                 retry_interval=config['retry_interval']),
             config.get('wait', 5)),

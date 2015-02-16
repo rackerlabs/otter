@@ -909,11 +909,12 @@ class AuthenticatorTests(SynchronousTestCase):
         self.assertEqual(ra._max_retries, 3)
         self.assertEqual(ra._retry_interval, 5)
 
-        st = ra._authenticator
-        self.assertIsInstance(st, SingleTenantAuthenticator)
-        self.assertEqual(st._identity_user, 'uname')
-        self.assertEqual(st._identity_password, 'pwd')
-        self.assertEqual(st._url, 'htp')
+        ia = ra._authenticator
+        self.assertIsInstance(ia, ImpersonatingAuthenticator)
+        self.assertEqual(ia._identity_admin_user, 'uname')
+        self.assertEqual(ia._identity_admin_password, 'pwd')
+        self.assertEqual(ia._url, 'htp')
+        self.assertEqual(ia._admin_url, 'ad')
 
     def test_wait_defaults(self):
         """
