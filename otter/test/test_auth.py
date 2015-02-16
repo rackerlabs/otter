@@ -20,6 +20,7 @@ from otter.auth import (
     IAuthenticator,
     ICachingAuthenticator,
     ImpersonatingAuthenticator,
+    SingleTenantAuthenticator,
     InvalidateToken,
     RetryingAuthenticator,
     WaitingAuthenticator,
@@ -31,6 +32,7 @@ from otter.auth import (
     impersonate_user,
     public_endpoint_url,
     user_for_tenant,
+    authenticate_single_tenant
 )
 from otter.effect_dispatcher import get_simple_dispatcher
 from otter.test.utils import SameJSON, iMock, mock_log, patch
@@ -316,6 +318,33 @@ class HelperTests(SynchronousTestCase):
             public_endpoint_url(fake_service_catalog, 'cloudServersOpenStack',
                                 'DFW'),
             'http://dfw.openstack/')
+
+
+class SingleTenantAuthenticatorTests(SynchronousTestCase):
+    """
+    Tests for the end-to-end single tenant workflow.
+    """
+    def setUp(self):
+        """
+        Shortcut by mocking all the helper functions that do IO.
+        """
+        self.authenticate_single_tenant = patch(
+            self, 'otter.auth.authenticate_single_tenant')
+
+        self.authenticate_single_tenant.side_effect = lambda *a, **kw: succeed(
+            {'access': {'token': {'id': 'auth-token'}}})
+
+        self.url = 'http://identity/v2.0'
+        self.user = 'service_user'
+        self.password = 'service_password'
+        self.st = SingleTenantAuthenticator(self.user, self.password, self.url)
+        self.log = mock.Mock()
+
+    def test_verifyObject(self):
+        """
+        ImpersonatingAuthenticator provides the IAuthenticator interface.
+        """
+        verifyObject(IAuthenticator, self.st)
 
 
 class ImpersonatingAuthenticatorTests(SynchronousTestCase):
@@ -827,12 +856,11 @@ class AuthenticatorTests(SynchronousTestCase):
         self.assertEqual(ra._max_retries, 3)
         self.assertEqual(ra._retry_interval, 5)
 
-        ia = ra._authenticator
-        self.assertIsInstance(ia, ImpersonatingAuthenticator)
-        self.assertEqual(ia._identity_admin_user, 'uname')
-        self.assertEqual(ia._identity_admin_password, 'pwd')
-        self.assertEqual(ia._url, 'htp')
-        self.assertEqual(ia._admin_url, 'ad')
+        st = ra._authenticator
+        self.assertIsInstance(st, SingleTenantAuthenticator)
+        self.assertEqual(st._identity_user, 'uname')
+        self.assertEqual(st._identity_password, 'pwd')
+        self.assertEqual(st._url, 'htp')
 
     def test_wait_defaults(self):
         """

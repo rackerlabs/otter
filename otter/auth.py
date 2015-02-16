@@ -284,6 +284,44 @@ class ImpersonatingAuthenticator(object):
                      self._url, self._admin_url))
 
 
+@implementer(IAuthenticator)
+class SingleTenantAuthenticator(object):
+    """
+    An authentication handler that first uses a identity admin account to authenticate
+    and then impersonates the desired tenant_id.
+    """
+    def __init__(self, _identity_user, _identity_password, url):
+        self._identity_user = _identity_user
+        self._identity_password = _identity_password
+        self._url = url
+
+
+    @wait(ignore_kwargs=['log'])
+    def _auth_me(self, tenant_id, log=None):
+        if log:
+            log.msg('Authenticating as new tenant')
+        d = partial(authenticate_single_tenant(self._url,
+                                               self._identity_user,
+                                               self._identity_password,
+                                               tenant_id,
+                                               log=log))
+        d.addCallback(_endpoints_to_service_catalog)
+        return d
+
+    def authenticate_tenant(self, tenant_id, log=None):
+        """
+        see :meth:`IAuthenticator.authenticate_tenant`
+        """
+        return partial(self._auth_me, tenant_id, log=log)
+
+    def __hash__(self):
+        """
+        Return hash of the object. Required for this to be stored in dict to
+        make wait() decorator work
+        """
+        return hash((self._identity_user, self.identity_password, self._url))
+
+
 def extract_token(auth_response):
     """
     Extract an auth token from an authentication response.
@@ -364,6 +402,51 @@ def authenticate_user(auth_endpoint, username, password, log=None, pool=None):
                         "username": username,
                         "password": password
                     }
+                }
+            }),
+        headers=headers(),
+        log=log,
+        pool=pool)
+    d.addCallback(check_success, [200, 203])
+    d.addErrback(
+        wrap_upstream_error, 'identity',
+        ('authenticating', username), auth_endpoint
+    )
+    d.addCallback(treq.json_content)
+    return d
+
+
+def authenticate_single_tenant(auth_endpoint, username, password, tenant_id,
+                               expire_in=10800, log=None, pool=None):
+    """
+    Authenticate to a Identity auth endpoint with a username and password to
+    retrieve a token for the specified tenant_id.
+
+    :param str auth_endpoint: Identity API endpoint URL.
+    :param str username: Username to authenticate as.
+    :param str password: Password for the specified user.
+    :param tenant_id: The tenant ID we wish to authenticate as.
+    :param log: If provided, a BoundLog object.
+    :param twisted.web.client.HTTPConnectionPool pool: If provided,
+        a connection pool which an integration test can manually clean up
+        to avoid a race condition between Trial and Twisted.
+
+    :return: Decoded JSON response as dict.
+    """
+    if not log:
+        log = _DoNothingLogger(None, None)
+
+    d = treq.post(
+        append_segments(auth_endpoint, 'tokens'),
+        json.dumps(
+            {
+                "auth": {
+                    "passwordCredentials": {
+                        "username": username,
+                        "password": password
+                    },
+                    "tenantId": tenant_id,
+                    "expire-in-seconds": expire_in
                 }
             }),
         headers=headers(),
@@ -516,11 +599,10 @@ def generate_authenticator(reactor, config):
             reactor,
             RetryingAuthenticator(
                 reactor,
-                ImpersonatingAuthenticator(
+                SingleTenantAuthenticator(
                     config['username'],
                     config['password'],
-                    config['url'],
-                    config['admin_url']),
+                    config['url']),
                 max_retries=config['max_retries'],
                 retry_interval=config['retry_interval']),
             config.get('wait', 5)),
