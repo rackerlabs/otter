@@ -388,6 +388,12 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
         if match is not None:
             failure_reasons.append(
                 "RCv3 LB {lb_id} was inactive".format(**match.groupdict()))
+
+        match = _RCV3_LB_DOESNT_EXIST_PATTERN.match(error)
+        if match is not None:
+            failure_reasons.append(
+                "RCv3 LB {lb_id} does not exist".format(**match.groupdict()))
+
     if failure_reasons:
         return StepResult.FAILURE, failure_reasons
     elif to_retry:
