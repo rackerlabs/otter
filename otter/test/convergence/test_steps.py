@@ -672,9 +672,12 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
 
     def test_nothing_to_retry(self):
         """
-        If all of the load balancer, node pairs we tried to remove were
-        already removed, there is nothing to retry, and the request
-        was successful.
+        If there are no further pairs to try and remove, the request was
+        successful.
+
+        This is similar to other tests, except that it tests the
+        combination of all of them, even if there are several (load
+        balancer, node) pairs for each reason.
         """
         node_1_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
         lb_1_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
