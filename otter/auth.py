@@ -287,24 +287,22 @@ class ImpersonatingAuthenticator(object):
 @implementer(IAuthenticator)
 class SingleTenantAuthenticator(object):
     """
-    An authentication handler that first uses a identity admin account to authenticate
-    and then impersonates the desired tenant_id.
+    An authentication handler that authenticates using a single tenant id.
     """
     def __init__(self, _identity_user, _identity_password, url):
         self._identity_user = _identity_user
         self._identity_password = _identity_password
         self._url = url
 
-
     @wait(ignore_kwargs=['log'])
     def _auth_me(self, tenant_id, log=None):
         if log:
             log.msg('Authenticating as new tenant')
-        d = partial(authenticate_single_tenant(self._url,
-                                               self._identity_user,
-                                               self._identity_password,
-                                               tenant_id,
-                                               log=log))
+        d = authenticate_single_tenant(self._url,
+                                       self._identity_user,
+                                       self._identity_password,
+                                       tenant_id,
+                                       log=log)
         d.addCallback(_endpoints_to_service_catalog)
         return d
 
