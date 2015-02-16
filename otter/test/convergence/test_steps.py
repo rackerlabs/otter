@@ -686,13 +686,13 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
 
         pairs = [(lb_a_id, node_a_id), (lb_b_id, node_b_id)]
+        not_a_member_pairs = [(lb_a_id, node_a_id), (lb_b_id, node_b_id)]
 
         resp = StubResponse(409, {})
         body = {"errors":
                 ["Node {node_id} is not a member of Load Balancer "
                  "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)
-                 for (lb_id, node_id) in pairs]}
-        result = _rcv3_check_bulk_delete(pairs, (resp, body))
+                 for (lb_id, node_id) in not_a_member_pairs]
         self.assertEqual(result, (StepResult.SUCCESS, []))
 
     def test_inactive_lb(self):
