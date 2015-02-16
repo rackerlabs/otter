@@ -303,21 +303,21 @@ class SingleTenantAuthenticator(object):
                                        self._identity_password,
                                        tenant_id,
                                        log=log)
-        d.addCallback(_endpoints_to_service_catalog)
+        d.addCallback(extract_service_catalog)
         return d
 
     def authenticate_tenant(self, tenant_id, log=None):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
-        return partial(self._auth_me, tenant_id, log=log)
+        return self._auth_me(tenant_id, log=log)
 
     def __hash__(self):
         """
         Return hash of the object. Required for this to be stored in dict to
         make wait() decorator work
         """
-        return hash((self._identity_user, self.identity_password, self._url))
+        return hash((self._identity_user, self._identity_password, self._url))
 
 
 def extract_token(auth_response):
@@ -329,6 +329,17 @@ def extract_token(auth_response):
     :rtype: str
     """
     return auth_response['access']['token']['id'].encode('ascii')
+
+
+def extract_service_catalog(auth_response):
+    """
+    Extract the service catalog from an authentication response.
+
+    :param dict auth_response: A dictionary containing the decoded response
+        from the authentication API.
+    :rtype: str
+    """
+    return auth_response['service_catalog']
 
 
 def endpoints_for_token(auth_endpoint, identity_admin_token, user_token,

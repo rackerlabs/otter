@@ -31,8 +31,7 @@ from otter.auth import (
     generate_authenticator,
     impersonate_user,
     public_endpoint_url,
-    user_for_tenant,
-    authenticate_single_tenant
+    user_for_tenant
 )
 from otter.effect_dispatcher import get_simple_dispatcher
 from otter.test.utils import SameJSON, iMock, mock_log, patch
@@ -332,7 +331,8 @@ class SingleTenantAuthenticatorTests(SynchronousTestCase):
             self, 'otter.auth.authenticate_single_tenant')
 
         self.authenticate_single_tenant.side_effect = lambda *a, **kw: succeed(
-            {'access': {'token': {'id': 'auth-token'}}})
+            {'access': {'token': {'id': 'auth-token'}},
+             'service_catalog': fake_service_catalog})
 
         self.url = 'http://identity/v2.0'
         self.user = 'service_user'
@@ -345,6 +345,59 @@ class SingleTenantAuthenticatorTests(SynchronousTestCase):
         ImpersonatingAuthenticator provides the IAuthenticator interface.
         """
         verifyObject(IAuthenticator, self.st)
+
+    def test_auth_me_auth_as_tenant(self):
+        """
+        _auth_me authenticates as the given tenant.
+        """
+        self.successResultOf(self.st._auth_me(111111, None))
+        self.authenticate_single_tenant.assert_called_once_with(
+            self.url, self.user, self.password, 111111, log=None)
+        self.assertFalse(self.log.msg.called)
+
+        self.authenticate_single_tenant.reset_mock()
+
+        self.successResultOf(self.st._auth_me(111111, self.log))
+        self.authenticate_single_tenant.assert_called_once_with(
+            self.url, self.user, self.password, 111111, log=self.log)
+        self.log.msg.assert_called_once_with(
+            'Authenticating as new tenant')
+
+    def test_authenticate_tenant_gets_user_for_specified_tenant(self):
+        """
+        authenticate_tenant authenticates as the given tenant
+        """
+        self.successResultOf(self.st.authenticate_tenant(111111))
+        self.authenticate_single_tenant.assert_called_once_with(
+            self.url, self.user, self.password, 111111, log=None)
+
+        self.authenticate_single_tenant.reset_mock()
+
+        self.successResultOf(self.st.authenticate_tenant(111111, log=self.log))
+
+        self.authenticate_single_tenant.assert_called_once_with(
+            self.url, self.user, self.password, 111111, log=self.log)
+
+    def test_authenticate_tenant_returns_impersonation_token_and_endpoint_list(
+            self):
+        """
+        authenticate_tenant returns the impersonation token and the endpoint
+        list.
+        """
+        result = self.successResultOf(self.st.authenticate_tenant(1111111))
+
+        self.assertEqual(result, fake_service_catalog)
+
+    def test_authenticate_tenant_propagates_user_list_errors(self):
+        """
+        authenticate_tenant propagates errors from user_for_tenant
+        """
+        self.authenticate_single_tenant.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
+
+        f = self.failureResultOf(self.st.authenticate_tenant(111111),
+                                 UpstreamError)
+        self.assertEqual(f.value.reason.value.code, 500)
 
 
 class ImpersonatingAuthenticatorTests(SynchronousTestCase):
