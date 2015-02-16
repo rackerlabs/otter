@@ -97,7 +97,7 @@ class DeleteServer(object):
             ServiceType.CLOUD_SERVERS,
             'DELETE',
             append_segments('servers', self.server_id),
-            success_pred=has_code(204))
+            success_pred=has_code(204, 404))
 
         def report_success(result):
             return StepResult.SUCCESS, []

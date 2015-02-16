@@ -100,7 +100,7 @@ class StepAsEffectTests(SynchronousTestCase):
                 ServiceType.CLOUD_SERVERS,
                 'DELETE',
                 'servers/abc123',
-                success_pred=has_code(204)).intent)
+                success_pred=has_code(204, 404)).intent)
 
         self.assertEqual(
             resolve_effect(eff, (None, {})),
