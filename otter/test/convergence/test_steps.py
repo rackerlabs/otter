@@ -593,6 +593,24 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
         result = _rcv3_check_bulk_add(pairs, (resp, body))
         self.assertEqual(result, (StepResult.SUCCESS, []))
 
+    def test_lb_inactive(self):
+        """
+        If one of the LBs we tried to attach one or more nodes to is
+        inactive, the request fails.
+        """
+        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+        pairs = [(lb_id, node_id)]
+
+        resp = StubResponse(409, {})
+        body = {"errors": [
+            "Load Balancer Pool {lb_id} is not in an ACTIVE state"
+            .format(lb_id=lb_id)]}
+        result = _rcv3_check_bulk_add(pairs, (resp, body))
+        self.assertEqual(
+            result,
+            (StepResult.FAILURE,
+             "RCv3 LB {lb_id} was inactive".format(lb_id=lb_id))
 
 class RCv3CheckBulkDeleteTests(SynchronousTestCase):
     """
