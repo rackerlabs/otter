@@ -688,8 +688,11 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         pairs = [(lb_a_id, node_a_id), (lb_b_id, node_b_id)]
         node_c_id = '08944038-80ba-4ae1-a188-c827444e02e2'
         lb_c_id = '150895a5-1aa7-45b7-b7a4-98b9c282f800'
+        node_d_id = 'bc1e94c3-0c88-4828-9e93-d42259280987'
+        lb_d_id = 'de52879e-1f84-4ecd-8988-91dfdc99570d'
         not_a_member_pairs = [(lb_a_id, node_a_id), (lb_b_id, node_b_id)]
         inactive_pairs = [(lb_c_id, node_c_id)]
+        nonexistent_lb_pairs = [(lb_d_id, node_d_id)]
 
         resp = StubResponse(409, {})
         body = {"errors":
