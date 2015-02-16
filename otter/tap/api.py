@@ -67,13 +67,16 @@ class Options(usage.Options):
 
 class FunctionalService(Service, object):
     """
-    A simple service that has functions to call when starting and stopping service
+    A simple service that has functions to call when starting and
+    stopping service.
     """
 
     def __init__(self, start=None, stop=None):
         """
-        :param start: A single argument callable to be called when service is started
-        :param stop: A single argument callable to be called when service is stopped
+        :param start: A single argument callable to be called when service
+            is started
+        :param stop: A single argument callable to be called when service
+            is stopped
         """
         self._start = start
         self._stop = stop
@@ -208,8 +211,8 @@ def makeService(config):
 
     # Setup cassandra cluster to disconnect when otter shuts down
     if 'cassandra_cluster' in locals():
-        s.addService(FunctionalService(stop=partial(call_after_supervisor,
-                                                    cassandra_cluster.disconnect, supervisor)))
+        s.addService(FunctionalService(stop=partial(
+            call_after_supervisor, cassandra_cluster.disconnect, supervisor)))
 
     otter = Otter(store, region, health_checker.health_check,
                   es_host=config_value('elasticsearch.host'))
@@ -240,11 +243,12 @@ def makeService(config):
     # Setup Kazoo client
     if config_value('zookeeper'):
         threads = config_value('zookeeper.threads') or 10
-        kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'),
-                                  # Keep trying to connect until the end of time with
-                                  # max interval of 10 minutes
-                                  connection_retry=dict(max_tries=-1, max_delay=600),
-                                  threads=threads, txlog=log.bind(system='kazoo'))
+        kz_client = TxKazooClient(
+            hosts=config_value('zookeeper.hosts'),
+            # Keep trying to connect until the end of time with
+            # max interval of 10 minutes
+            connection_retry=dict(max_tries=-1, max_delay=600),
+            threads=threads, txlog=log.bind(system='kazoo'))
         # Don't timeout. Keep trying to connect forever
         d = kz_client.start(timeout=None)
 
@@ -254,9 +258,9 @@ def makeService(config):
             health_checker.checks['scheduler'] = scheduler.health_check
             otter.scheduler = scheduler
             # Set the client after starting
-            # NOTE: There is small amount of time when the start is not finished
-            # and the kz_client is not set in which case policy execution and group
-            # delete will fail
+            # NOTE: There is small amount of time when the start is
+            # not finished and the kz_client is not set in which case
+            # policy execution and group delete will fail
             store.kz_client = kz_client
             # Setup kazoo to stop when shutting down
             s.addService(FunctionalService(
@@ -283,11 +287,13 @@ def setup_scheduler(parent, store, kz_client):
         return
     buckets = range(1, int(config_value('scheduler.buckets')) + 1)
     store.set_scheduler_buckets(buckets)
-    partition_path = config_value('scheduler.partition.path') or '/scheduler_partition'
+    partition_path = (config_value('scheduler.partition.path')
+                      or '/scheduler_partition')
     time_boundary = config_value('scheduler.partition.time_boundary') or 15
-    scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
-                                         int(config_value('scheduler.interval')),
-                                         store, kz_client, partition_path, time_boundary,
-                                         buckets)
+    scheduler_service = SchedulerService(
+        int(config_value('scheduler.batchsize')),
+        int(config_value('scheduler.interval')),
+        store, kz_client, partition_path, time_boundary,
+        buckets)
     scheduler_service.setServiceParent(parent)
     return scheduler_service

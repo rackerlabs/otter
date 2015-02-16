@@ -118,7 +118,9 @@ class HealthCheckerTests(SynchronousTestCase):
         """
         If a check raises an exception, its health is unhealthy
         """
-        checker = HealthChecker(self.clock, {'fail': mock.Mock(side_effect=Exception)})
+        checker = HealthChecker(
+            self.clock,
+            {'fail': mock.Mock(side_effect=Exception)})
         d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {
             'healthy': False,
@@ -132,7 +134,9 @@ class HealthCheckerTests(SynchronousTestCase):
         """
         Synchronous health checks are supported
         """
-        checker = HealthChecker(self.clock, {'sync': mock.Mock(return_value=(True, {}))})
+        checker = HealthChecker(
+            self.clock,
+            {'sync': mock.Mock(return_value=(True, {}))})
         d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {
             'healthy': True,
@@ -209,8 +213,9 @@ class HealthCheckerTests(SynchronousTestCase):
         Each health check is timed out after 15 seconds
         """
         checker = HealthChecker(
-            self.clock, {'a': mock.Mock(return_value=defer.Deferred()),
-                         'b': mock.Mock(return_value=defer.succeed((True, {})))})
+            self.clock,
+            {'a': mock.Mock(return_value=defer.Deferred()),
+             'b': mock.Mock(return_value=defer.succeed((True, {})))})
         d = checker.health_check()
         self.assertNoResult(d)
         self.clock.advance(16)
@@ -234,7 +239,8 @@ class CallAfterSupervisorTests(SynchronousTestCase):
         """
         supervisor = mock.Mock(spec=['deferred_pool'])
         supervisor.deferred_pool = mock.Mock(spec=DeferredPool)
-        supervisor.deferred_pool.notify_when_empty.return_value = defer.Deferred()
+        supervisor.deferred_pool.notify_when_empty.return_value = \
+            defer.Deferred()
         func = mock.Mock(return_value=defer.succeed(2))
 
         d = call_after_supervisor(func, supervisor)
@@ -262,9 +268,12 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.Site = patch(self, 'otter.tap.api.Site')
         self.clientFromString = patch(self, 'otter.tap.api.clientFromString')
 
-        self.RoundRobinCassandraCluster = patch(self, 'otter.tap.api.RoundRobinCassandraCluster')
-        self.LoggingCQLClient = patch(self, 'otter.tap.api.LoggingCQLClient')
-        self.TimingOutCQLClient = patch(self, 'otter.tap.api.TimingOutCQLClient')
+        self.RoundRobinCassandraCluster = patch(
+            self, 'otter.tap.api.RoundRobinCassandraCluster')
+        self.LoggingCQLClient = patch(
+            self, 'otter.tap.api.LoggingCQLClient')
+        self.TimingOutCQLClient = patch(
+            self, 'otter.tap.api.TimingOutCQLClient')
         self.log = patch(self, 'otter.tap.api.log')
 
         Otter_patcher = mock.patch('otter.tap.api.Otter')
@@ -286,7 +295,8 @@ class APIMakeServiceTests(SynchronousTestCase):
             self.health_checker = HealthChecker(*args, **kwargs)
             return self.health_checker
 
-        patch(self, 'otter.tap.api.HealthChecker', side_effect=make_health_checker)
+        patch(self, 'otter.tap.api.HealthChecker',
+              side_effect=make_health_checker)
 
     def test_service_site_on_port(self):
         """
@@ -312,7 +322,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         config = test_config.copy()
         del config['admin']
         makeService(config)
-        self.assertTrue('tcp:9789' not in [args[0] for args, _ in self.service.call_args_list])
+        self.assertTrue('tcp:9789' not in
+                        [args[0] for args, _ in self.service.call_args_list])
 
     def test_unicode_service_site_on_port(self):
         """
@@ -336,7 +347,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         returned MultiService.
         """
         expected_parent = makeService(test_config)
-        self.service.return_value.setServiceParent.assert_called_with(expected_parent)
+        self.service.return_value.setServiceParent.assert_called_with(
+            expected_parent)
 
     def test_cassandra_seed_hosts_endpoints(self):
         """
@@ -344,7 +356,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         cassandra seed_hosts.
         """
         makeService(test_config)
-        self.clientFromString.assert_called_once_with(self.reactor, 'tcp:127.0.0.1:9160')
+        self.clientFromString.assert_called_once_with(
+            self.reactor, 'tcp:127.0.0.1:9160')
 
     def test_unicode_cassandra_seed_hosts_endpoints(self):
         """
@@ -354,7 +367,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         """
         unicode_config = json.loads(json.dumps(test_config, encoding="utf-8"))
         makeService(unicode_config)
-        self.clientFromString.assert_called_once_with(self.reactor, 'tcp:127.0.0.1:9160')
+        self.clientFromString.assert_called_once_with(
+            self.reactor, 'tcp:127.0.0.1:9160')
         self.assertTrue(isinstance(self.clientFromString.call_args[0][1], str))
 
     def test_cassandra_cluster_with_endpoints_and_keyspace(self):
@@ -378,15 +392,18 @@ class APIMakeServiceTests(SynchronousTestCase):
             self.reactor,
             self.RoundRobinCassandraCluster.return_value,
             10)
-        self.LoggingCQLClient.assert_called_once_with(self.TimingOutCQLClient.return_value,
-                                                      self.log.bind.return_value)
+        self.LoggingCQLClient.assert_called_once_with(
+            self.TimingOutCQLClient.return_value,
+            self.log.bind.return_value)
 
-        self.assertEqual(self.store.connection, self.LoggingCQLClient.return_value)
+        self.assertEqual(self.store.connection,
+                         self.LoggingCQLClient.return_value)
         self.assertEqual(self.store.reactor, self.reactor)
 
     def test_cassandra_cluster_disconnects_on_stop(self):
         """
-        Cassandra cluster connection is disconnected when main service is stopped
+        Cassandra cluster connection is disconnected when main service is
+        stopped
         """
         service = makeService(test_config)
         service.stopService()
@@ -419,7 +436,8 @@ class APIMakeServiceTests(SynchronousTestCase):
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_health_checker_no_zookeeper(self, supervisor):
         """
-        A health checker is constructed by default with the store and kazoo health check
+        A health checker is constructed by default with the store and kazoo
+        health check
         """
         self.addCleanup(lambda: set_supervisor(None))
         self.assertIsNone(self.health_checker)
@@ -502,10 +520,12 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         # they are called after start completes
         start_d.callback(None)
-        mock_setup_scheduler.assert_called_once_with(parent, self.store, kz_client)
+        mock_setup_scheduler.assert_called_once_with(
+            parent, self.store, kz_client)
         self.assertEqual(self.store.kz_client, kz_client)
         sch = mock_setup_scheduler.return_value
-        self.assertEqual(self.health_checker.checks['scheduler'], sch.health_check)
+        self.assertEqual(self.health_checker.checks['scheduler'],
+                         sch.health_check)
         self.assertEqual(self.Otter.return_value.scheduler, sch)
 
     @mock.patch('otter.tap.api.setup_scheduler')
@@ -555,7 +575,8 @@ class APIMakeServiceTests(SynchronousTestCase):
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
-    def test_kazoo_client_stops_after_supervisor(self, mock_txkz, mock_setup_scheduler):
+    def test_kazoo_client_stops_after_supervisor(self, mock_txkz,
+                                                 mock_setup_scheduler):
         """
         Kazoo is stopped after supervisor stops
         """
@@ -618,7 +639,8 @@ class SchedulerSetupTests(SynchronousTestCase):
         self.store.set_scheduler_buckets.assert_called_once_with(buckets)
         self.scheduler_service.assert_called_once_with(
             100, 10, self.store, self.kz_client, '/part_path', 15, buckets)
-        self.scheduler_service.return_value.setServiceParent.assert_called_once_with(self.parent)
+        self.scheduler_service.return_value.setServiceParent\
+            .assert_called_once_with(self.parent)
 
     def test_mock_store_with_scheduler(self):
         """
