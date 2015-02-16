@@ -593,6 +593,94 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
         result = _rcv3_check_bulk_add(pairs, (resp, body))
         self.assertEqual(result, (StepResult.SUCCESS, []))
 
+    def test_lb_inactive(self):
+        """
+        If one of the LBs we tried to attach one or more nodes to is
+        inactive, the request fails.
+        """
+        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+        pairs = [(lb_id, node_id)]
+
+        resp = StubResponse(409, {})
+        body = {"errors": [
+            "Load Balancer Pool {lb_id} is not in an ACTIVE state"
+            .format(lb_id=lb_id)]}
+        result = _rcv3_check_bulk_add(pairs, (resp, body))
+        self.assertEqual(
+            result,
+            (StepResult.FAILURE,
+             ["RCv3 LB {lb_id} was inactive".format(lb_id=lb_id)]))
+
+    def test_multiple_lbs_inactive(self):
+        """
+        If multiple LBs we tried to attach one or more nodes to is
+        inactive, the request fails, and all of the inactive LBs are
+        reported.
+
+        By logging as much of the failure as we can see, we will
+        hopefully produce better audit logs.
+        """
+        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_1_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+        lb_2_id = 'fb32470f-6ebe-44a9-9360-3f48c9ac768c'
+        pairs = [(lb_1_id, node_id), (lb_2_id, node_id)]
+
+        resp = StubResponse(409, {})
+        body = {"errors": [
+            "Load Balancer Pool {lb_id} is not in an ACTIVE state"
+            .format(lb_id=lb_id) for lb_id in [lb_1_id, lb_2_id]]}
+        result = _rcv3_check_bulk_add(pairs, (resp, body))
+        self.assertEqual(
+            result,
+            (StepResult.FAILURE,
+             ["RCv3 LB {lb_id} was inactive".format(lb_id=lb_id)
+              for lb_id in [lb_1_id, lb_2_id]]))
+
+    def test_lb_does_not_exist(self):
+        """
+        If one of the LBs we tried to attach one or more nodes to does not
+        exist, the request fails.
+        """
+        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+        pairs = [(lb_id, node_id)]
+
+        resp = StubResponse(409, {})
+        body = {"errors": [
+            "Load Balancer Pool {lb_id} does not exist"
+            .format(lb_id=lb_id)]}
+        result = _rcv3_check_bulk_add(pairs, (resp, body))
+        self.assertEqual(
+            result,
+            (StepResult.FAILURE,
+             ["RCv3 LB {lb_id} does not exist".format(lb_id=lb_id)]))
+
+    def test_multiple_lbs_do_not_exist(self):
+        """
+        If multiple LBs we tried to attach one or more nodes to do not
+        exist, the request fails, and all of the nonexistent LBs are
+        reported.
+
+        By logging as much of the failure as we can see, we will
+        hopefully produce better audit logs.
+        """
+        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_1_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+        lb_2_id = 'fb32470f-6ebe-44a9-9360-3f48c9ac768c'
+        pairs = [(lb_1_id, node_id), (lb_2_id, node_id)]
+
+        resp = StubResponse(409, {})
+        body = {"errors": [
+            "Load Balancer Pool {lb_id} does not exist"
+            .format(lb_id=lb_id) for lb_id in [lb_1_id, lb_2_id]]}
+        result = _rcv3_check_bulk_add(pairs, (resp, body))
+        self.assertEqual(
+            result,
+            (StepResult.FAILURE,
+             ["RCv3 LB {lb_id} does not exist".format(lb_id=lb_id)
+              for lb_id in [lb_1_id, lb_2_id]]))
+
 
 class RCv3CheckBulkDeleteTests(SynchronousTestCase):
     """

@@ -377,13 +377,26 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
     if response.code == 201:  # All done!
         return StepResult.SUCCESS, []
 
+    failure_reasons = []
     to_retry = pset(attempted_pairs)
     for error in body["errors"]:
         match = _RCV3_NODE_ALREADY_A_MEMBER_PATTERN.match(error)
         if match is not None:
             to_retry -= pset([match.groups()[::-1]])
 
-    if to_retry:
+        match = _RCV3_LB_INACTIVE_PATTERN.match(error)
+        if match is not None:
+            failure_reasons.append(
+                "RCv3 LB {lb_id} was inactive".format(**match.groupdict()))
+
+        match = _RCV3_LB_DOESNT_EXIST_PATTERN.match(error)
+        if match is not None:
+            failure_reasons.append(
+                "RCv3 LB {lb_id} does not exist".format(**match.groupdict()))
+
+    if failure_reasons:
+        return StepResult.FAILURE, failure_reasons
+    elif to_retry:
         next_step = BulkAddToRCv3(lb_node_pairs=to_retry)
         return next_step.as_effect()
     else:
