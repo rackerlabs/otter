@@ -670,6 +670,28 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         self.assertEqual(partial_check_bulk_delete.args, (expected_pairs,))
         self.assertEqual(partial_check_bulk_delete.keywords, None)
 
+    def test_nothing_to_retry(self):
+        """
+        If all of the load balancer, node pairs we tried to remove were
+        already removed, there is nothing to retry, and the request
+        was successful.
+        """
+        node_1_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
+        lb_1_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+
+        node_2_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        lb_2_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
+
+        pairs = [(lb_1_id, node_1_id), (lb_2_id, node_2_id)]
+
+        resp = StubResponse(409, {})
+        body = {"errors":
+                ["Node {node_id} is not a member of Load Balancer "
+                 "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)
+                 for (lb_id, node_id) in pairs]}
+        result = _rcv3_check_bulk_delete(pairs, (resp, body))
+        self.assertEqual(result, (StepResult.SUCCESS, []))
+
     def test_inactive_lb(self):
         """
         If the load balancer pool is inactive, the response was successful.
