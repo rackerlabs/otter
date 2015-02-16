@@ -873,7 +873,7 @@ class InvalidateTokenTests(SynchronousTestCase):
 identity_config = {
     'username': 'uname', 'password': 'pwd', 'url': 'htp',
     'admin_url': 'ad', 'max_retries': 3, 'retry_interval': 5,
-    'wait': 4, 'cache_ttl': 50
+    'wait': 4, 'cache_ttl': 50, 'strategy': 'impersonation'
 }
 
 
@@ -888,7 +888,7 @@ class AuthenticatorTests(SynchronousTestCase):
         """
         self.config = deepcopy(identity_config)
 
-    def test_composition(self):
+    def test_composition_impersonation(self):
         """
         authenticator is composed correctly with values from config
         """
@@ -915,6 +915,34 @@ class AuthenticatorTests(SynchronousTestCase):
         self.assertEqual(ia._identity_admin_password, 'pwd')
         self.assertEqual(ia._url, 'htp')
         self.assertEqual(ia._admin_url, 'ad')
+
+    def test_composition_single_tenant(self):
+        """
+        authenticator is composed correctly with values from config
+        """
+        r = mock.Mock()
+        self.config['strategy'] = 'single_tenant'
+        a = generate_authenticator(r, self.config)
+        self.assertIsInstance(a, CachingAuthenticator)
+        self.assertIdentical(a._reactor, r)
+        self.assertEqual(a._ttl, 50)
+
+        wa = a._authenticator
+        self.assertIsInstance(wa, WaitingAuthenticator)
+        self.assertIdentical(wa._reactor, r)
+        self.assertEqual(wa._wait, 4)
+
+        ra = wa._authenticator
+        self.assertIsInstance(ra, RetryingAuthenticator)
+        self.assertIdentical(ra._reactor, r)
+        self.assertEqual(ra._max_retries, 3)
+        self.assertEqual(ra._retry_interval, 5)
+
+        st = ra._authenticator
+        self.assertIsInstance(st, SingleTenantAuthenticator)
+        self.assertEqual(st._identity_user, 'uname')
+        self.assertEqual(st._identity_password, 'pwd')
+        self.assertEqual(st._url, 'htp')
 
     def test_wait_defaults(self):
         """

@@ -601,6 +601,17 @@ def generate_authenticator(reactor, config):
     """
     # FIXME: Pick an arbitrary cache ttl value based on absolutely no science.
     cache_ttl = config.get('cache_ttl', 300)
+    if config['strategy'] == 'single_tenant':
+        auth = SingleTenantAuthenticator(
+            config['username'],
+            config['password'],
+            config['url'])
+    else:
+        auth = ImpersonatingAuthenticator(
+            config['username'],
+            config['password'],
+            config['url'],
+            config['admin_url'])
 
     return CachingAuthenticator(
         reactor,
@@ -608,11 +619,7 @@ def generate_authenticator(reactor, config):
             reactor,
             RetryingAuthenticator(
                 reactor,
-                ImpersonatingAuthenticator(
-                    config['username'],
-                    config['password'],
-                    config['url'],
-                    config['admin_url']),
+                auth,
                 max_retries=config['max_retries'],
                 retry_interval=config['retry_interval']),
             config.get('wait', 5)),
