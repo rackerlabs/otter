@@ -610,6 +610,7 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
         self.assertEqual(
             result,
             (StepResult.FAILURE,
+             ["RCv3 LB {lb_id} was inactive".format(lb_id=lb_id)])
              "RCv3 LB {lb_id} was inactive".format(lb_id=lb_id))
 
 class RCv3CheckBulkDeleteTests(SynchronousTestCase):
