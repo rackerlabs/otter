@@ -704,7 +704,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         body = {"errors": ["Load Balancer Pool {} is not in an ACTIVE state"
                            .format(inactive_lb_id)]}
         result = _rcv3_check_bulk_delete(pairs, (resp, body))
-        self.assertIdentical(result, None)
+        self.assertEqual(result, (StepResult.SUCCESS, []))
 
     def test_lb_does_not_exist(self):
         """
