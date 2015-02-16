@@ -31,6 +31,7 @@ from otter.auth import (
     generate_authenticator,
     impersonate_user,
     public_endpoint_url,
+    authenticate_single_tenant,
     user_for_tenant
 )
 from otter.effect_dispatcher import get_simple_dispatcher
@@ -133,6 +134,74 @@ class HelperTests(SynchronousTestCase):
         self.treq.post.return_value = succeed(response)
 
         d = authenticate_user('http://identity/v2.0', 'user', 'pass')
+        failure = self.failureResultOf(d)
+
+        self.assertTrue(failure.check(UpstreamError))
+        real_failure = failure.value.reason
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+        self.assertEqual(real_failure.value.body, 'error_body')
+
+    def _verify_single_tenant_request_invoked_with_pool(self, **kwargs):
+        pool = kwargs.get("pool", None)
+        response = mock.Mock(code=200)
+        response_body = {
+            'access': {
+                'token': {'id': '1111111111'}
+            },
+            'service_catalog': fake_service_catalog
+        }
+        self.treq.json_content.return_value = succeed(response_body)
+        self.treq.post.return_value = succeed(response)
+
+        d = authenticate_single_tenant(
+            'http://identity/v2.0', 'user', 'pass', 111111, expire_in=1000,
+            log=self.log, **kwargs)
+
+        self.assertEqual(self.successResultOf(d), response_body)
+
+        self.treq.post.assert_called_once_with(
+            'http://identity/v2.0/tokens',
+            SameJSON({'auth': {
+                'passwordCredentials': {
+                    'username': 'user',
+                    'password': 'pass'
+                },
+                "tenantId": 111111,
+                "expire-in-seconds": 1000
+            }}),
+            headers={'accept': ['application/json'],
+                     'content-type': ['application/json'],
+                     'User-Agent': ['OtterScale/0.0']},
+            log=self.log,
+            pool=pool)
+
+    def test_authenticate_single_tenant_with_pool(self):
+        """
+        authenticate_single_tenant sends the username, password, and tenant_id
+        to the tokens endpoint.  This variant issues the call with a specified
+        HTTPConnectionPool.
+        """
+        self._verify_single_tenant_request_invoked_with_pool(pool='gene')
+
+    def test_authenticate_single_tenant_without_pool(self):
+        """
+        authenticate_single_tenant sends the username, password, and tenant_id
+        to the tokens endpoint.  This variant issues the call without a
+        specified HTTPConnectionPool.
+        """
+        self._verify_single_tenant_request_invoked_with_pool()
+
+    def test_authenticate_single_tenant_propagates_error(self):
+        """
+        authenticate_user propogates API errors.
+        """
+        response = mock.Mock(code=500)
+        self.treq.content.return_value = succeed('error_body')
+        self.treq.post.return_value = succeed(response)
+
+        d = authenticate_user('http://identity/v2.0', 'user', 'pass', 111111)
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(UpstreamError))
@@ -363,7 +432,7 @@ class SingleTenantAuthenticatorTests(SynchronousTestCase):
         self.log.msg.assert_called_once_with(
             'Authenticating as new tenant')
 
-    def test_authenticate_tenant_gets_user_for_specified_tenant(self):
+    def test_authenticate_single_tenant_as_specified_tenant(self):
         """
         authenticate_tenant authenticates as the given tenant
         """
@@ -378,8 +447,7 @@ class SingleTenantAuthenticatorTests(SynchronousTestCase):
         self.authenticate_single_tenant.assert_called_once_with(
             self.url, self.user, self.password, 111111, log=self.log)
 
-    def test_authenticate_tenant_returns_impersonation_token_and_endpoint_list(
-            self):
+    def test_authenticate_tenant_returns_endpoint_list(self):
         """
         authenticate_tenant returns the impersonation token and the endpoint
         list.
