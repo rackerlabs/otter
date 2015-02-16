@@ -735,4 +735,4 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
             "Node {node_id} is not a member of Load Balancer "
             "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
         result = _rcv3_check_bulk_delete(pairs, (resp, body))
-        self.assertIdentical(result, None)
+        self.assertEqual(result, (StepResult.SUCCESS, []))
