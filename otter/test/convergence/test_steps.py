@@ -719,7 +719,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         body = {"errors": ["Load Balancer Pool {} does not exist"
                            .format(nonexistent_lb_id)]}
         result = _rcv3_check_bulk_delete(pairs, (resp, body))
-        self.assertIdentical(result, None)
+        self.assertEqual(result, (StepResult.SUCCESS, []))
 
     def test_node_not_a_member(self):
         """
