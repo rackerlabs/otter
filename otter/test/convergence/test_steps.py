@@ -702,13 +702,13 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         body = {"errors":
                 ["Node {node_id} is not a member of Load Balancer "
                  "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)
-                 for (lb_id, node_id) in not_a_member_pairs]
-                + ["Load Balancer Pool {} is not in an ACTIVE state"
-                   .format(lb_id) for (lb_id, _node_id)
-                   in inactive_pairs]
-                + ["Load Balancer Pool {} does not exist"
-                   .format(lb_id) for (lb_id, _node_id)
-                   in nonexistent_lb_pairs]}
+                 for (lb_id, node_id) in not_a_member_pairs] +
+                ["Load Balancer Pool {} is not in an ACTIVE state"
+                 .format(lb_id) for (lb_id, _node_id)
+                 in inactive_pairs] +
+                ["Load Balancer Pool {} does not exist"
+                 .format(lb_id) for (lb_id, _node_id)
+                 in nonexistent_lb_pairs]}
         result = _rcv3_check_bulk_delete(all_pairs, (resp, body))
         self.assertEqual(result, (StepResult.SUCCESS, []))
 
