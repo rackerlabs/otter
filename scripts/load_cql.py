@@ -6,6 +6,7 @@ Loads cql into Cassandra
 from __future__ import print_function
 
 import argparse
+from pprint import pprint
 import sys
 import re
 
@@ -34,6 +35,10 @@ the_parser.add_argument(
 the_parser.add_argument(
     '--webhook-migrate', action='store_true',
     help='Migrate webhook indexes to table')
+
+the_parser.add_argument(
+    '--webhook-index-only', action='store_true',
+    help='List webhook from indexes that is not there in webhook_keys table')
 
 the_parser.add_argument(
     '--keyspace', type=str, default='otter',
@@ -158,6 +163,17 @@ def setup_connection(reactor, args):
         args.keyspace)
 
 
+def webhook_index(reactor, args):
+    """
+    Show webhook indexes that is not there table connection
+    """
+    store = CassScalingGroupCollection(None, None)
+    eff = store.get_webhook_index_only()
+    conn = setup_connection(reactor, args)
+    return perform(get_cql_dispatcher(reactor, conn), eff).addCallback(
+        pprint).addCallback(lambda _: conn.disconnect())
+
+
 def webhook_migrate(reactor, args):
     """
     Migrate webhook indexes to table
@@ -172,6 +188,8 @@ def webhook_migrate(reactor, args):
 def run(args):
     if args.webhook_migrate:
         task.react(webhook_migrate, (args,))
+    elif args.webhook_index_only:
+        task.react(webhook_index, (args,))
     else:
         generate(args)
 
