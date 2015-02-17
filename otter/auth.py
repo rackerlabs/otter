@@ -295,22 +295,20 @@ class SingleTenantAuthenticator(object):
         self._url = url
 
     @wait(ignore_kwargs=['log'])
-    def _auth_me(self, tenant_id, log=None):
-        if log:
-            log.msg('Authenticating as new tenant')
-        d = authenticate_single_tenant(self._url,
-                                       self._identity_user,
-                                       self._identity_password,
-                                       tenant_id,
-                                       log=log)
-        d.addCallback(extract_service_catalog)
-        return d
-
     def authenticate_tenant(self, tenant_id, log=None):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
-        return self._auth_me(tenant_id, log=log)
+        if log:
+            log.msg('Authenticating as new tenant')
+        d = authenticate_user(self._url,
+                              self._identity_user,
+                              self._identity_password,
+                              tenant_id=tenant_id,
+                              expire_in=10800,
+                              log=log)
+        d.addCallback(extract_service_catalog)
+        return d
 
     def __hash__(self):
         """
@@ -385,7 +383,8 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
     return d
 
 
-def authenticate_user(auth_endpoint, username, password, log=None, pool=None):
+def authenticate_user(auth_endpoint, username, password, tenant_id=None,
+                      expire_in=None, log=None, pool=None):
     """
     Authenticate to a Identity auth endpoint with a username and password.
 
@@ -402,62 +401,22 @@ def authenticate_user(auth_endpoint, username, password, log=None, pool=None):
     if not log:
         log = _DoNothingLogger(None, None)
 
-    d = treq.post(
-        append_segments(auth_endpoint, 'tokens'),
-        json.dumps(
-            {
-                "auth": {
-                    "passwordCredentials": {
-                        "username": username,
-                        "password": password
-                    }
-                }
-            }),
-        headers=headers(),
-        log=log,
-        pool=pool)
-    d.addCallback(check_success, [200, 203])
-    d.addErrback(
-        wrap_upstream_error, 'identity',
-        ('authenticating', username), auth_endpoint
-    )
-    d.addCallback(treq.json_content)
-    return d
-
-
-def authenticate_single_tenant(auth_endpoint, username, password, tenant_id,
-                               expire_in=10800, log=None, pool=None):
-    """
-    Authenticate to a Identity auth endpoint with a username and password to
-    retrieve a token for the specified tenant_id.
-
-    :param str auth_endpoint: Identity API endpoint URL.
-    :param str username: Username to authenticate as.
-    :param str password: Password for the specified user.
-    :param tenant_id: The tenant ID we wish to authenticate as.
-    :param log: If provided, a BoundLog object.
-    :param twisted.web.client.HTTPConnectionPool pool: If provided,
-        a connection pool which an integration test can manually clean up
-        to avoid a race condition between Trial and Twisted.
-
-    :return: Decoded JSON response as dict.
-    """
-    if not log:
-        log = _DoNothingLogger(None, None)
+    request = {
+        "auth": {
+            "passwordCredentials": {
+                "username": username,
+                "password": password
+            }
+        }
+    }
+    if tenant_id:
+        request['auth']['tenantId'] = tenant_id
+    if expire_in:
+        request['auth']['expire-in-seconds'] = expire_in
 
     d = treq.post(
         append_segments(auth_endpoint, 'tokens'),
-        json.dumps(
-            {
-                "auth": {
-                    "passwordCredentials": {
-                        "username": username,
-                        "password": password
-                    },
-                    "tenantId": tenant_id,
-                    "expire-in-seconds": expire_in
-                }
-            }),
+        json.dumps(request),
         headers=headers(),
         log=log,
         pool=pool)
