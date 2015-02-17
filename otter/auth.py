@@ -284,6 +284,40 @@ class ImpersonatingAuthenticator(object):
                      self._url, self._admin_url))
 
 
+@implementer(IAuthenticator)
+class SingleTenantAuthenticator(object):
+    """
+    An authentication handler that authenticates using a single tenant id.
+    """
+    def __init__(self, _identity_user, _identity_password, url):
+        self._identity_user = _identity_user
+        self._identity_password = _identity_password
+        self._url = url
+
+    @wait(ignore_kwargs=['log'])
+    def authenticate_tenant(self, tenant_id, log=None):
+        """
+        see :meth:`IAuthenticator.authenticate_tenant`
+        """
+        if log:
+            log.msg('Authenticating as new tenant')
+        d = authenticate_user(self._url,
+                              self._identity_user,
+                              self._identity_password,
+                              tenant_id=tenant_id,
+                              expire_in=10800,
+                              log=log)
+        d.addCallback(extract_service_catalog)
+        return d
+
+    def __hash__(self):
+        """
+        Return hash of the object. Required for this to be stored in dict to
+        make wait() decorator work
+        """
+        return hash((self._identity_user, self._identity_password, self._url))
+
+
 def extract_token(auth_response):
     """
     Extract an auth token from an authentication response.
@@ -293,6 +327,17 @@ def extract_token(auth_response):
     :rtype: str
     """
     return auth_response['access']['token']['id'].encode('ascii')
+
+
+def extract_service_catalog(auth_response):
+    """
+    Extract the service catalog from an authentication response.
+
+    :param dict auth_response: A dictionary containing the decoded response
+        from the authentication API.
+    :rtype: str
+    """
+    return auth_response['service_catalog']
 
 
 def endpoints_for_token(auth_endpoint, identity_admin_token, user_token,
@@ -338,7 +383,8 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
     return d
 
 
-def authenticate_user(auth_endpoint, username, password, log=None, pool=None):
+def authenticate_user(auth_endpoint, username, password, tenant_id=None,
+                      expire_in=None, log=None, pool=None):
     """
     Authenticate to a Identity auth endpoint with a username and password.
 
@@ -355,17 +401,22 @@ def authenticate_user(auth_endpoint, username, password, log=None, pool=None):
     if not log:
         log = _DoNothingLogger(None, None)
 
+    request = {
+        "auth": {
+            "passwordCredentials": {
+                "username": username,
+                "password": password
+            }
+        }
+    }
+    if tenant_id:
+        request['auth']['tenantId'] = tenant_id
+    if expire_in:
+        request['auth']['expire-in-seconds'] = expire_in
+
     d = treq.post(
         append_segments(auth_endpoint, 'tokens'),
-        json.dumps(
-            {
-                "auth": {
-                    "passwordCredentials": {
-                        "username": username,
-                        "password": password
-                    }
-                }
-            }),
+        json.dumps(request),
         headers=headers(),
         log=log,
         pool=pool)
@@ -509,6 +560,17 @@ def generate_authenticator(reactor, config):
     """
     # FIXME: Pick an arbitrary cache ttl value based on absolutely no science.
     cache_ttl = config.get('cache_ttl', 300)
+    if config.get('strategy', 'impersonation') == 'single_tenant':
+        auth = SingleTenantAuthenticator(
+            config['username'],
+            config['password'],
+            config['url'])
+    else:
+        auth = ImpersonatingAuthenticator(
+            config['username'],
+            config['password'],
+            config['url'],
+            config['admin_url'])
 
     return CachingAuthenticator(
         reactor,
@@ -516,11 +578,7 @@ def generate_authenticator(reactor, config):
             reactor,
             RetryingAuthenticator(
                 reactor,
-                ImpersonatingAuthenticator(
-                    config['username'],
-                    config['password'],
-                    config['url'],
-                    config['admin_url']),
+                auth,
                 max_retries=config['max_retries'],
                 retry_interval=config['retry_interval']),
             config.get('wait', 5)),
