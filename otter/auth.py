@@ -601,7 +601,7 @@ def generate_authenticator(reactor, config):
     """
     # FIXME: Pick an arbitrary cache ttl value based on absolutely no science.
     cache_ttl = config.get('cache_ttl', 300)
-    if config['strategy'] == 'single_tenant':
+    if config.get('strategy', 'impersonation') == 'single_tenant':
         auth = SingleTenantAuthenticator(
             config['username'],
             config['password'],
