@@ -99,16 +99,19 @@ def prepare_server_launch_config(group_id, server_config, lb_args):
     since they haven't been implemented yet.
     """
     server_config = server_config.set_in(
-        ('server', 'metadata', 'rax:auto_scaling_group_id'), group_id)
+        ('server', 'metadata', 'rax:auto_scaling_group_id'), group_id).set_in(
+        ('server', 'metadata', 'rax:autoscale:group:id'), group_id)
 
-    lbs = groupby(lambda conf: conf['loadBalancerId'], lb_args)
+    lbs = groupby(
+        lambda conf: (conf['loadBalancerId'],
+                      conf.get('type', 'CloudLoadBalancer')),
+        lb_args)
 
-    for lb_id in lbs:
-        configs = [_sanitize_lb_metadata(config) for config in lbs[lb_id]
-                   if config.get('type') != 'RackConnectV3']
-
+    for (lb_id, lb_type), configs in lbs.iteritems():
+        configs = [_sanitize_lb_metadata(config) for config in configs]
         server_config = server_config.set_in(
-            ('server', 'metadata', 'rax:autoscale:lb:{0}'.format(lb_id)),
+            ('server', 'metadata', 'rax:autoscale:lb:{0}:{1}'.format(
+                lb_type, lb_id)),
             json.dumps(configs))
 
     return server_config

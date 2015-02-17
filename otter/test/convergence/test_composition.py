@@ -52,9 +52,12 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
         """
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config,
-                       'loadBalancers': [{'loadBalancerId': 23, 'port': 80,
-                                          'whatsit': 'invalid'},
-                                         {'loadBalancerId': 23, 'port': 90}]}}
+                       'loadBalancers': [
+                           {'loadBalancerId': 23, 'port': 80,
+                            'whatsit': 'invalid'},
+                           {'loadBalancerId': 23, 'port': 90},
+                           {'loadBalancerId': 23, 'type': 'RackConnectV3'},
+                           {'loadBalancerId': '12', 'type': 'RackConnectV3'}]}}
 
         expected_server_config = {
             'server': {
@@ -62,9 +65,14 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 'flavorRef': 'f',
                 'metadata': {
                     'rax:auto_scaling_group_id': 'uuid',
-                    'rax:autoscale:lb:23': json.dumps(
+                    'rax:autoscale:group:id': 'uuid',
+                    'rax:autoscale:lb:CloudLoadBalancer:23': json.dumps(
                         [{"port": 80, "type": "CloudLoadBalancer"},
-                         {"port": 90, "type": "CloudLoadBalancer"}])
+                         {"port": 90, "type": "CloudLoadBalancer"}]),
+                    'rax:autoscale:lb:RackConnectV3:23': json.dumps(
+                        [{"type": "RackConnectV3"}]),
+                    'rax:autoscale:lb:RackConnectV3:12': json.dumps(
+                        [{"type": "RackConnectV3"}])
                 }
             }
         }
@@ -91,7 +99,8 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 'name': 'test',
                 'flavorRef': 'f',
                 'metadata': {
-                    'rax:auto_scaling_group_id': 'uuid'}}}
+                    'rax:auto_scaling_group_id': 'uuid',
+                    'rax:autoscale:group:id': 'uuid'}}}
         state = get_desired_group_state('uuid', lc, 2)
         self.assertEqual(
             state,
