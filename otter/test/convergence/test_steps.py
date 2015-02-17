@@ -398,8 +398,10 @@ class StepAsEffectTests(SynchronousTestCase):
             {'load_balancer_pool': {'id': 'lb-3'},
              'cloud_server': {'id': 'node-d'}}
         ]
-        key_fn = lambda e: (e["load_balancer_pool"]["id"],
-                            e["cloud_server"]["id"])
+
+        def key_fn(e):
+            return (e["load_balancer_pool"]["id"], e["cloud_server"]["id"])
+
         request_data = sorted(request.intent.data, key=key_fn)
         self.assertEqual(request_data, expected_data)
 
