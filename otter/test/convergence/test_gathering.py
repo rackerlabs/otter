@@ -18,6 +18,7 @@ from otter.convergence.gathering import (
     get_clb_contents,
     get_scaling_group_servers,
     to_nova_server,
+    _LB_KEY_PATTERN,
     _private_ipv4_addresses,
     _servicenet_address)
 from otter.convergence.model import (
@@ -355,6 +356,68 @@ class GetLBContentsTests(SynchronousTestCase):
                      description=make_desc(lb_id='2'))])
 
 
+class RegexTests(SynchronousTestCase):
+    """
+    Tests regexes that are used in `gathering`.
+    """
+    def test_invalid_prefix_doesnt_match(self):
+        """
+        Strings that do not start with `rax:autoscale:lb:CloudLoadbalancer:`
+        or `rax:autoscale:lb:RackConnectV3` do not match.
+        """
+        invalids = (
+            "rax:autoscale:CloudLoadBalancer:123",      # no :lb:
+            "rax:monitoring:lb:CloudLoadBalancer:123",  # no :autoscale:
+            "rax:autoscale:lb:Neutron:12",              # unsupported service
+        )
+        for invalid in invalids:
+            self.assertIsNone(_LB_KEY_PATTERN.match(invalid))
+
+    def test_CLB(self):
+        """
+        Strings that look like `rax:autoscale:lb:CloudLoadbalancer:00000`,
+        without case, match cloud load balancers.
+        """
+        valids = (
+            "rax:autoscale:lb:CloudLoadBalancer:135",
+            "rax:autoscale:lb:cloudloadbalancer:135",
+        )
+        for valid in valids:
+            self.assertIsNotNone(_LB_KEY_PATTERN.match(valid))
+
+        invalids = (
+            "rax:autoscale:lb:CloudLoadBalancer:abcd",
+            "rax:autoscale:lb:CloudLoadBalancer:",
+            "rax:autoscale:lb:CloudLoadBalancer1234",
+            "rax:autoscale:lb:CloudLoadbalancer:" +
+            "de305d54-75b4-431b-adb2-eb6b9e546013"
+        )
+        for invalid in invalids:
+            self.assertIsNone(_LB_KEY_PATTERN.match(invalid))
+
+    def test_RCV3(self):
+        """
+        Strings that look like `rax:autoscale:lb:CloudLoadbalancer:00000`,
+        without case, match cloud load balancers.
+        """
+        _uuid = "de305d54-75b4-431b-adb2-eb6b9e546013"
+        valids = (
+            "rax:autoscale:lb:RackConnectV3:" + _uuid,
+            "rax:autoscale:lb:rackconnectv3:" + _uuid
+        )
+        for valid in valids:
+            self.assertIsNotNone(_LB_KEY_PATTERN.match(valid))
+
+        invalids = (
+            "rax:autoscale:lb:RackConnectV3:abcd",
+            "rax:autoscale:lb:RackConnectV3:1234",
+            "rax:autoscale:lb:RackConnectV3:"
+            "rax:autoscale:lb:RackConnectV3" + _uuid
+        )
+        for invalid in invalids:
+            self.assertIsNone(_LB_KEY_PATTERN.match(invalid))
+
+
 class ToNovaServerTests(SynchronousTestCase):
     """
     Tests for :func:`to_nova_server`
@@ -450,6 +513,9 @@ class ToNovaServerTests(SynchronousTestCase):
         data.
         """
         self.servers[0]['metadata'] = {
+            # correct lb config
+            'rax:autoscale:lb:CloudLoadBalancer:01234':
+            '[{"port":80},{"port":90}]',
             # two correct lbconfigs and one incorrect one
             'rax:autoscale:lb:CloudLoadBalancer:12345':
             '[{"port":80},{"bad":"1"},{"port":90}]',
@@ -466,8 +532,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
                        desired_lbs=pmap({
-                           '12345': [CLBDescription(lb_id='12345', port=80),
-                                     CLBDescription(lb_id='12345', port=90)]
+                           '01234': [CLBDescription(lb_id='01234', port=80),
+                                     CLBDescription(lb_id='01234', port=90)]
                        }),
                        servicenet_address=''))
 

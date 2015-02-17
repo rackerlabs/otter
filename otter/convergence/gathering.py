@@ -1,5 +1,6 @@
 """Code related to gathering data to inform convergence."""
 import json
+import re
 from collections import defaultdict
 from urllib import urlencode
 
@@ -8,7 +9,7 @@ from effect import parallel
 from pyrsistent import pmap
 
 from toolz.curried import filter, groupby, map
-from toolz.dicttoolz import get_in, keyfilter
+from toolz.dicttoolz import get_in
 from toolz.functoolz import compose, identity
 
 from otter.constants import ServiceType
@@ -19,6 +20,7 @@ from otter.convergence.model import (
     CLBNodeType,
     NovaServer,
     ServerState)
+from otter.convergence.steps import _UUID4_REGEX
 from otter.http import service_request
 from otter.indexer import atom
 from otter.util.http import append_segments
@@ -193,7 +195,11 @@ def _servicenet_address(server):
                  if ip.startswith("10.")), "")
 
 
-_key_prefix = 'rax:autoscale:lb:'
+_key_prefix = "a"
+
+_LB_KEY_PATTERN = re.compile(
+    "rax:autoscale:lb:(CloudLoadBalancer:\d+|RackConnectV3:{uuid})"
+    .format(uuid=_UUID4_REGEX), re.IGNORECASE)
 
 
 def _lb_configs_from_metadata(server):
@@ -203,30 +209,22 @@ def _lb_configs_from_metadata(server):
     """
     desired_lbs = defaultdict(list)
 
-    # throw away any value that is malformed
-
-    def parse_config(lb_type, lb_id, configs):
-        for config in configs:
-            try:
-                yield CLBDescription(lb_id=lbid, port=config['port'])
-            except (KeyError, TypeError):
-                pass
-
-    lb_metadata = keyfilter(lambda key: key.startswith(_key_prefix),
-                            server.get('metadata', {}))
-
-    for k, v in lb_metadata.iteritems():
-        lb_type, lbid = k[len(_key_prefix):].split(':')
-        if lb_type == 'RackConnectV3':
+    for k, v in server.get('metadata', {}).iteritems():
+        m = _LB_KEY_PATTERN.match(k)
+        if m is None:
             continue
 
-        try:
-            configs = json.loads(v)
-        except (ValueError, AttributeError):
-            pass
-        else:
-            if isinstance(configs, list):
-                desired_lbs[lbid] = list(parse_config(lb_type, lbid, configs))
+        lb_type, lbid = m.groups()[0].split(':', 1)
+        if lb_type.lower() == 'cloudloadbalancer':
+            # if malformed, skiped the whole key
+            try:
+                configs = json.loads(v)
+                if isinstance(configs, list):
+                    desired_lbs[lbid] = [
+                        CLBDescription(lb_id=lbid, port=c['port'])
+                        for c in configs]
+            except (ValueError, KeyError, TypeError):
+                pass
 
     return pmap(desired_lbs)
 
