@@ -6,9 +6,9 @@ Loads cql into Cassandra
 from __future__ import print_function
 
 import argparse
-from pprint import pprint
-import sys
 import re
+import sys
+from pprint import pprint
 
 from cql.apivalues import ProgrammingError
 from cql.connection import connect
