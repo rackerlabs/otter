@@ -451,11 +451,12 @@ class ToNovaServerTests(SynchronousTestCase):
         """
         self.servers[0]['metadata'] = {
             # two correct lbconfigs and one incorrect one
-            'rax:autoscale:lb:12345': '[{"port":80},{"bad":"1"},{"port":90}]',
+            'rax:autoscale:lb:CloudLoadBalancer:12345':
+            '[{"port":80},{"bad":"1"},{"port":90}]',
             # a dictionary instead of a list
-            'rax:autoscale:lb:23456': '{"port": 80}',
+            'rax:autoscale:lb:CloudLoadBalancer:23456': '{"port": 80}',
             # not even valid json
-            'rax:autoscale:lb:34567': 'invalid json string'
+            'rax:autoscale:lb:CloudLoadBalancer:34567': 'invalid json string'
         }
         self.assertEqual(
             to_nova_server(self.servers[0]),

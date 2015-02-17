@@ -8,7 +8,7 @@ from effect import parallel
 from pyrsistent import pmap
 
 from toolz.curried import filter, groupby, map
-from toolz.dicttoolz import get_in
+from toolz.dicttoolz import get_in, keyfilter
 from toolz.functoolz import compose, identity
 
 from otter.constants import ServiceType
@@ -205,23 +205,28 @@ def _lb_configs_from_metadata(server):
 
     # throw away any value that is malformed
 
-    def parse_config(config, key):
-        if config.get('type') != 'RackConnectV3':
-            lbid = k[len(_key_prefix):]
+    def parse_config(lb_type, lb_id, configs):
+        for config in configs:
             try:
-                desired_lbs[lbid].append(
-                    CLBDescription(lb_id=lbid, port=config['port']))
+                yield CLBDescription(lb_id=lbid, port=config['port'])
             except (KeyError, TypeError):
                 pass
 
-    for k in server.get('metadata', {}):
-        if k.startswith(_key_prefix):
-            try:
-                configs = json.loads(server['metadata'][k])
-                for config in configs:
-                    parse_config(config, k)
-            except (ValueError, AttributeError):
-                pass
+    lb_metadata = keyfilter(lambda key: key.startswith(_key_prefix),
+                            server.get('metadata', {}))
+
+    for k, v in lb_metadata.iteritems():
+        lb_type, lbid = k[len(_key_prefix):].split(':')
+        if lb_type == 'RackConnectV3':
+            continue
+
+        try:
+            configs = json.loads(v)
+        except (ValueError, AttributeError):
+            pass
+        else:
+            if isinstance(configs, list):
+                desired_lbs[lbid] = list(parse_config(lb_type, lbid, configs))
 
     return pmap(desired_lbs)
 
