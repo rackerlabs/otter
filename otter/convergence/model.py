@@ -146,7 +146,7 @@ class NovaServer(object):
     :ivar str image_id: The ID of the image the server was launched with
     :ivar str flavor_id: The ID of the flavor the server was launched with
 
-    :ivar PSet desired_lbs: An immutable mapping of load balancer IDs to lists
+    :ivar PMap desired_lbs: An immutable mapping of load balancer IDs to lists
         of :class:`CLBDescription` instances.
     """
 
