@@ -50,16 +50,10 @@ class SchedulerTests(SynchronousTestCase):
 
 
 class FakePartitioner(Service):
-    def __init__(self, log, kz_client,
-                 interval,
-                 partitioner_path, num_buckets, time_boundary,
-                 got_buckets):
-        self.kz_client = kz_client
-        self.partitioner_path = partitioner_path
-        self.num_buckets = num_buckets
+    """A fake version of a :obj:`Partitioner`."""
+    def __init__(self, log, callback):
         self.log = log
-        self.got_buckets = got_buckets
-        self.time_boundary = time_boundary
+        self.got_buckets = callback
         self.health = (True, {})
         self.current_buckets = []
 
@@ -91,29 +85,16 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.log = mock_log()
         otter_log.bind.return_value = self.log
 
-        kz_client = object()
-        partitioner_path = '/part_path'
-        time_boundary = 15
-        num_buckets = 10
-
-        def fake_partitioner(*args, **kwargs):
-            fp = FakePartitioner(*args, **kwargs)
-            self.fake_partitioner = fp
-            return fp
+        def pfactory(log, callable):
+            self.fake_partitioner = FakePartitioner(log, callable)
+            return self.fake_partitioner
 
         self.scheduler_service = SchedulerService(
-            100, 1, self.mock_store, kz_client, partitioner_path,
-            time_boundary, num_buckets, threshold=600,
-            partitioner=fake_partitioner)
+            100, self.mock_store, pfactory, threshold=600)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
         self.scheduler_service.running = True
-
-        # make sure the partitioner was invoked correctly:
-        fp = self.fake_partitioner
-        self.assertEqual(fp.kz_client, kz_client)
-        self.assertEqual(fp.partitioner_path, partitioner_path)
-        self.assertEqual(fp.num_buckets, num_buckets)
-        self.assertEqual(fp.time_boundary, time_boundary)
+        self.assertIdentical(self.fake_partitioner,
+                             self.scheduler_service.partitioner)
 
         self.check_events_in_bucket = patch(
             self, 'otter.scheduler.check_events_in_bucket')

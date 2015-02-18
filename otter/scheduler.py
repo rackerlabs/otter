@@ -25,31 +25,20 @@ class SchedulerService(MultiService, object):
     Service to trigger scheduled events
     """
 
-    def __init__(self, batchsize, interval, store, kz_client,
-                 zk_partition_path, time_boundary, num_buckets,
-                 threshold=60,
-                 partitioner=Partitioner):
+    def __init__(self, batchsize, store, partitioner_factory, threshold=60):
         """
         Initialize the scheduler service
 
         :param int batchsize: number of events to fetch on each iteration
-        :param int interval: time between each iteration
-        :param kz_client: `TxKazooClient` instance
-        :param num_buckets: number of buckets to allocate between scheduler
-            nodes
-        :param zk_partition_path: Partition path used by kz_client to partition
-            the buckets
-        :param time_boundary: Time to wait for partition to become stable
-        :param partitioner: Factory of :obj:`Partitioner` for testing
+        :param store: cassandra store
+        :param partitioner_factory: :obj:`Partitioner`
         """
         super(SchedulerService, self).__init__()
         self.store = store
-        self.time_boundary = time_boundary
         self.threshold = threshold
         self.log = otter_log.bind(system='otter.scheduler')
-        self.partitioner = partitioner(
-            self.log, kz_client, interval, zk_partition_path, num_buckets,
-            time_boundary, partial(self._check_events, batchsize))
+        self.partitioner = partitioner_factory(
+            self.log, partial(self._check_events, batchsize))
         self.partitioner.setServiceParent(self)
 
     def reset(self, path):
@@ -78,7 +67,7 @@ class SchedulerService(MultiService, object):
                     old_events.append(event)
             return (not bool(old_events),
                     {'old_events': old_events,
-                     'buckets': list(self.partitioner.get_current_buckets())})
+                     'buckets': self.partitioner.get_current_buckets()})
 
         def got_partitioner_health_check(result):
             if result[0] is False:

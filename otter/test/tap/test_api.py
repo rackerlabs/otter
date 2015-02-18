@@ -609,7 +609,6 @@ class SchedulerSetupTests(SynchronousTestCase):
         """
         Mock args
         """
-        self.scheduler_service = patch(self, 'otter.tap.api.SchedulerService')
         self.config = {
             'scheduler': {
                 'buckets': 10,
@@ -619,7 +618,7 @@ class SchedulerSetupTests(SynchronousTestCase):
             }
         }
         set_config_data(self.config)
-        self.parent = mock.Mock()
+        self.parent = MultiService()
         self.store = mock.Mock()
         self.kz_client = mock.Mock()
 
@@ -634,13 +633,14 @@ class SchedulerSetupTests(SynchronousTestCase):
         `SchedulerService` is configured with config values and set as parent
         to passed `MultiService`
         """
-        setup_scheduler(self.parent, self.store, self.kz_client)
+        svc = setup_scheduler(self.parent, self.store, self.kz_client)
         buckets = range(1, 11)
         self.store.set_scheduler_buckets.assert_called_once_with(buckets)
-        self.scheduler_service.assert_called_once_with(
-            100, 10, self.store, self.kz_client, '/part_path', 15, buckets)
-        self.scheduler_service.return_value.setServiceParent\
-            .assert_called_once_with(self.parent)
+        self.assertEqual(self.parent.services, [svc])
+        self.assertEqual(svc.store, self.store)
+        self.assertEqual(svc.partitioner.buckets, buckets)
+        self.assertEqual(svc.partitioner.kz_client, self.kz_client)
+        self.assertEqual(svc.partitioner.partitioner_path, '/part_path')
 
     def test_mock_store_with_scheduler(self):
         """
@@ -648,8 +648,7 @@ class SchedulerSetupTests(SynchronousTestCase):
         """
         self.config['mock'] = True
         set_config_data(self.config)
-
-        setup_scheduler(self.parent, self.store, self.kz_client)
-
+        self.assertIs(
+            setup_scheduler(self.parent, self.store, self.kz_client),
+            None)
         self.assertFalse(self.store.set_scheduler_buckets.called)
-        self.assertFalse(self.scheduler_service.called)

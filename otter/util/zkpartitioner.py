@@ -13,31 +13,32 @@ class Partitioner(MultiService, object):
     logical ``buckets`` between nodes.
 
     Multiple servers can instantiate these with the same ``partitioner_path``
-    and ``num_buckets``, and each server will get a disjoint subset of
+    and ``buckets``, and each server will get a disjoint subset of
     ``range(buckets)`` allocated to them.
 
     In order to be notified of which buckets are allocated to the current node,
     a ``got_buckets`` function must be passed in which will be called when the
     local buckets have been determined.
     """
-    def __init__(self, log, kz_client,
+    def __init__(self, kz_client,
                  interval,
-                 partitioner_path, num_buckets, time_boundary,
-                 got_buckets):
+                 partitioner_path, buckets, time_boundary,
+                 log, got_buckets):
         """
         :param log: a bound log
         :param kz_client: txKazoo client
         :param partitioner_path: ZooKeeper path, used for partitioning
-        :param int num_buckets: number of logical buckets to distribute between
-            nodes. This should be at least the number of nodes taking part in
-            this partitioner.
+        :param int buckets: buckets to distribute between nodes. Ideally there
+            should be at least as many elements as nodes taking part in this
+            partitioner.
         :param time_boundary: time to wait for partitioning to stabilize.
         :param got_buckets: Callable which will be called with a list of
             buckets when buckets have been allocated to this node.
         """
+        super(Partitioner, self).__init__()
         self.kz_client = kz_client
         self.partitioner_path = partitioner_path
-        self.num_buckets = num_buckets
+        self.buckets = buckets
         self.log = log
         self.got_buckets = got_buckets
         ts = TimerService(interval, self.check_partition)
@@ -46,7 +47,7 @@ class Partitioner(MultiService, object):
     def _new_partitioner(self):
         return self.kz_client.SetPartitioner(
             self.partitioner_path,
-            set=set(map(str, range(self.num_buckets))),
+            set=set(map(str, self.buckets)),
             time_boundary=self.time_boundary)
 
     def startService(self):

@@ -21,6 +21,7 @@ from otter.http import TenantScope
 from otter.models.intents import ModifyGroupState
 from otter.util.deferredutils import with_lock
 from otter.util.fp import assoc_obj
+from otter.util.zkpartitioner import Partitioner
 
 
 def server_to_json(server):
@@ -159,26 +160,19 @@ class Converger(MultiService, object):
     nodes.
     """
 
-    def __init__(self, log, kz_client, store, interval, num_buckets, dispatcher,
-                 partition_stabilize_time):
+    def __init__(self, log, kz_client, store, dispatcher, partitioner_factory):
         """
         :param log: a bound log
         :param kz_client: txKazoo client
         :param store: cassandra store
-        :param float interval: time between checking for groups that need
-            to be converged
-        :param int num_buckets: number of logical buckets to allocate between
-            nodes. This should be at least the number of nodes running
-            convergence.
-        :param partition_stabilize_time: Time to wait for partitioning to
-            stabilize.
         """
         self._kz_client = kz_client
         self._dispatcher = dispatcher
         self._timer = TimerService(interval, self.check_convergence)
         self._timer.setServiceParent(self)
         self._num_buckets = num_buckets
-        self.log = log
+        self.log = log.bind(system='converger')
+        self.partitioner = partitioner_factory(self.log, self.check_convergence)
 
     def startService(self):
         super(Converger, self).startService()
