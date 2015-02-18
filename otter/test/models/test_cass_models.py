@@ -29,10 +29,10 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.json_schema import group_examples
 from otter.models.cass import (
+    CQLQueryExecute,
     CassAdmin,
     CassScalingGroup,
     CassScalingGroupCollection,
-    CQLQueryExecute,
     WeakLocks,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
@@ -58,7 +58,6 @@ from otter.test.models.test_interface import (
     IScalingScheduleCollectionProviderMixin
 )
 from otter.test.utils import (
-    CheckFailure,
     DummyException,
     LockMixin,
     matches,
