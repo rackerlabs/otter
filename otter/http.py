@@ -164,8 +164,11 @@ def concretize_service_request(
         request_ = add_effect_on_response(
             invalidate_eff, service_request.reauth_codes, request_)
         request_ = add_json_request_data(request_)
-        request_ = add_bind_service(
-            catalog, service_name, region, log, request_)
+        if 'url' in service_config:
+            request_ = add_bind_root(service_config['url'], request_)
+        else:
+            request_ = add_bind_service(
+                catalog, service_name, region, log, request_)
         if service_request.json_response:
             request_ = add_json_response(request_)
         request_ = add_error_handling(
