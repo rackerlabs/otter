@@ -112,12 +112,14 @@ def get_service_metadata(service_name, metadata):
     """
     as_metadata = pmap()
     if isinstance(metadata, dict):
-        key_pattern = re.compile("^rax:{service}((:[A-Za-z0-9\-_]+)+)$"
-                                 .format(service=service_name))
+        key_pattern = re.compile(
+            "^rax:{service}(?P<subkeys>(:[A-Za-z0-9\-_]+)+)$"
+            .format(service=service_name))
+
         for k, v in metadata.iteritems():
             m = key_pattern.match(k)
             if m:
-                subkeys = m.groups()[0]  # largest group
+                subkeys = m.groupdict()['subkeys']
                 as_metadata = as_metadata.set_in(
                     [sk for sk in subkeys.split(':') if sk],
                     v)
