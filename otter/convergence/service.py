@@ -21,7 +21,6 @@ from otter.http import TenantScope
 from otter.models.intents import ModifyGroupState
 from otter.util.deferredutils import with_lock
 from otter.util.fp import assoc_obj
-from otter.util.zkpartitioner import Partitioner
 
 
 def server_to_json(server):

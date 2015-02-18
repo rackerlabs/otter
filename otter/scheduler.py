@@ -17,7 +17,6 @@ from otter.models.interface import (
     NoSuchPolicyError, NoSuchScalingGroupError, next_cron_occurrence)
 from otter.util.deferredutils import ignore_and_log
 from otter.util.hashkey import generate_transaction_id
-from otter.util.zkpartitioner import Partitioner
 
 
 class SchedulerService(MultiService, object):
@@ -49,10 +48,12 @@ class SchedulerService(MultiService, object):
 
     def health_check(self):
         """
-        Checks if scheduler service is healthy by comparing oldest event w.r.t current
-        time. If oldtest event is older than a threshold, then it is not healthy
+        Checks if scheduler service is healthy by comparing oldest event w.r.t
+        current time. If oldtest event is older than a threshold, then it is
+        not healthy
 
-        :return: Deferred that fires with tuple (Bool, `dict` of extra debug info)
+        :return: Deferred that fires with tuple (Bool, `dict` of extra debug
+        info)
         """
         if not self.running:
             return defer.succeed((False, {'reason': 'Not running'}))

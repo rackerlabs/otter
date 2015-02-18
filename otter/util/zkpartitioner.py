@@ -108,7 +108,7 @@ class Partitioner(MultiService, object):
         """
         Do a health check on the partitioner service.
 
-        :return: a Deferred that fires with (Bool, `dict` of extra debug info).
+        :return: a Deferred that fires with (Bool, `dict` of extra info).
         """
         if not self.running:
             return succeed((False, {'reason': 'Not running'}))
