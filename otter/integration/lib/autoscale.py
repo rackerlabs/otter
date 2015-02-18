@@ -115,9 +115,7 @@ class ScalingGroup(object):
             """
 
             def __init__(self, sg):
-                # Twisted will wait a period before kicking us off the first
-                # time, so we pre-accumulate that period.
-                self.elapsed_time = period
+                self.elapsed_time = 0
                 self.sg = sg
                 # To be filled in later.
                 self.loopingCall = None
