@@ -59,5 +59,6 @@
         "ttl": 432000,
         "interval": 60
     },
-    "cloudfeeds": {"service": "cloudFeeds", "tenant_id": "tenant"}
+    "cloudfeeds": {"service": "cloudFeeds", "tenant_id": "tenant",
+                   "url": "http://cfurl.net/"}
 }
