@@ -9,7 +9,7 @@ from effect.twisted import perform
 
 from toolz.itertoolz import concat
 
-from twisted.application.service import Service
+from twisted.application.service import MultiService, Service
 
 from otter.constants import CONVERGENCE_DIRTY_PATH
 from otter.convergence.composition import get_desired_group_state
@@ -149,7 +149,7 @@ class ConvergenceStarter(Service, object):
         self._mark_dirty(group_id)
 
 
-class Converger(Service, object):
+class Converger(MultiService, object):
     """
     A service that searches for groups that need converging and then does the
     work of converging them.
@@ -159,10 +159,43 @@ class Converger(Service, object):
     nodes.
     """
 
-    def __init__(self, reactor, kz_client, dispatcher):
-        self._reactor = reactor
+    def __init__(self, log, kz_client, store, interval, num_buckets, dispatcher,
+                 partition_stabilize_time):
+        """
+        :param log: a bound log
+        :param kz_client: txKazoo client
+        :param store: cassandra store
+        :param float interval: time between checking for groups that need
+            to be converged
+        :param int num_buckets: number of logical buckets to allocate between
+            nodes. This should be at least the number of nodes running
+            convergence.
+        :param partition_stabilize_time: Time to wait for partitioning to
+            stabilize.
+        """
         self._kz_client = kz_client
         self._dispatcher = dispatcher
+        self._timer = TimerService(interval, self.check_convergence)
+        self._timer.setServiceParent(self)
+        self._num_buckets = num_buckets
+        self.log = log
+
+    def startService(self):
+        super(Converger, self).startService()
+
+    def check_convergence(self):
+        """
+        Check for events occurring now and earlier
+        """
+        utcnow = datetime.utcnow()
+        log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=utcnow)
+        # TODO: This log might feel like spam since it'll occur on every tick. But
+        # it'll be useful to debug partitioning problems (at least in initial deployment)
+        log.msg('Got buckets {buckets}', buckets=buckets, path=CONVERGENCE_PARTITIONER_PATH)
+
+        return defer.gatherResults(
+            [check_events_in_bucket(
+                log, self.store, bucket, utcnow, batchsize) for bucket in buckets])
 
     def start_convergence(self, log, scaling_group, group_state,
                           launch_config,
@@ -179,19 +212,12 @@ class Converger(Service, object):
         :param execute_convergence: :func:`execute_convergence` function to use
             for testing.
         """
-        def exec_convergence():
-            eff = execute_convergence(scaling_group, group_state.desired,
-                                      launch_config, time.time(), log)
-            eff = Effect(TenantScope(eff, group_state.tenant_id))
-            d = perform(self._dispatcher, eff)
-            return d.addErrback(log.err, "Error when performing convergence",
-                                otter_msg_type='convergence-perform-error')
-        return with_lock(
-            self._reactor,
-            self._get_lock(group_state.group_id),
-            exec_convergence,
-            acquire_timeout=150,
-            release_timeout=150)
+        eff = execute_convergence(scaling_group, group_state.desired,
+                                  launch_config, time.time(), log)
+        eff = Effect(TenantScope(eff, group_state.tenant_id))
+        d = perform(self._dispatcher, eff)
+        return d.addErrback(log.err, "Error when performing convergence",
+                            otter_msg_type='convergence-perform-error')
 
 
 # We're using a global for now because it's difficult to thread a new parameter

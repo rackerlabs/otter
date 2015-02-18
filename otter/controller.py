@@ -28,7 +28,7 @@ import json
 from twisted.internet import defer
 
 from otter.convergence.composition import tenant_is_enabled
-from otter.convergence.service import get_converger
+from otter.convergence.service import get_convergence_starter
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
 from otter.supervisor import exec_scale_down, execute_launch_config
@@ -149,8 +149,7 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
     """
     if tenant_is_enabled(scaling_group.tenant_id, config_value):
         apply_delta(log, state.desired, state, config, policy)
-        get_converger().start_convergence(log, scaling_group, state,
-                                          launch_config)
+        get_convergence_starter().start_convergence(log, state.group_id)
         return None
 
     delta = calculate_delta(log, state, config, policy)
