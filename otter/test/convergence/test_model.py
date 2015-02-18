@@ -339,3 +339,24 @@ class AutoscaleMetadataTests(SynchronousTestCase):
             "rax:autoscale:lb:Neutron:456": None
         }
         self.assertEqual(NovaServer.lbs_from_metadata(metadata), pmap())
+
+    def test_generate_metadata(self):
+        """
+        :func:`NovaServer.lbs_from_metadata` produces a dictionary with
+        metadata for the group ID and any load balancers provided.
+        """
+        lbs = [
+            CLBDescription(port=80, lb_id='123'),
+            CLBDescription(port=8080, lb_id='123'),
+            CLBDescription(port=80, lb_id='234')
+        ]
+        expected = {
+            'rax:autoscale:group:id': 'group_id',
+            'rax:auto_scaling_group_id': 'group_id',
+            'rax:autoscale:lb:CloudLoadBalancer:123': (
+                '[{"port": 80}, {"port": 8080}]'),
+            'rax:autoscale:lb:CloudLoadBalancer:234': '[{"port": 80}]'
+        }
+
+        self.assertEqual(NovaServer.generate_metadata('group_id', lbs),
+                         expected)

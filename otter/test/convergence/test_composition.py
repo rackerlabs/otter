@@ -67,12 +67,8 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                     'rax:auto_scaling_group_id': 'uuid',
                     'rax:autoscale:group:id': 'uuid',
                     'rax:autoscale:lb:CloudLoadBalancer:23': json.dumps(
-                        [{"port": 80, "type": "CloudLoadBalancer"},
-                         {"port": 90, "type": "CloudLoadBalancer"}]),
-                    'rax:autoscale:lb:RackConnectV3:23': json.dumps(
-                        [{"type": "RackConnectV3"}]),
-                    'rax:autoscale:lb:RackConnectV3:12': json.dumps(
-                        [{"type": "RackConnectV3"}])
+                        [{"port": 80},
+                         {"port": 90}])
                 }
             }
         }
