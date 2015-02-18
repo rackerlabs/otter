@@ -753,7 +753,7 @@ class ConvergeTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=1,
-                                  desired_lbs=freeze(desired_lbs)),
+                                  desired_lbs=pset(desired_lbs['5'])),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1', created=0,
                             desired_lbs=freeze(desired_lbs)),
@@ -1045,7 +1045,7 @@ class PlanTests(SynchronousTestCase):
 
         desired_lbs = {5: [CLBDescription(lb_id='5', port=80)]}
         desired_group_state = DesiredGroupState(
-            server_config={}, capacity=8, desired_lbs=freeze(desired_lbs))
+            server_config={}, capacity=8, desired_lbs=pset(desired_lbs[5]))
 
         result = plan(
             desired_group_state,

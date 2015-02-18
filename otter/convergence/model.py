@@ -5,7 +5,7 @@ representation across the different phases of convergence.
 
 from characteristic import Attribute, attributes
 
-from pyrsistent import PMap, freeze, pmap
+from pyrsistent import PMap, PSet, freeze, pmap, pset
 
 from twisted.python.constants import NamedConstant, Names
 
@@ -128,7 +128,7 @@ class NovaServer(object):
 
 
 @attributes(['server_config', 'capacity',
-             Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
+             Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
              Attribute('draining_timeout', default_value=0.0,
                        instance_of=float)])
 class DesiredGroupState(object):
