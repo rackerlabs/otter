@@ -249,7 +249,8 @@ class ServiceMetadataTests(SynchronousTestCase):
             "rax:autoscale:lb otherstuff": "fails because space",
             "rax:monitoring:check": "fails because wrong service",
             ":rax:autoscale:lb": "fails because starts with colon",
-            "rax:autoscale:lb:": "fails because ends with colon"
+            "rax:autoscale:lb:": "fails because ends with colon",
+            "rax:rax:autoscale:lb:autoscale:lb": "fails because 2x'rax'"
         }
         self.assertEqual(get_service_metadata('autoscale', metadata), pmap())
 
@@ -265,7 +266,8 @@ class ServiceMetadataTests(SynchronousTestCase):
             "rax:autoscale:lb:RackConnectV3:123": "result3",
             "rax:autoscale:lb:RackConnectV3:234": "result4",
             "rax:autoscale:some:other:nested:key": "result5",
-            "rax:autoscale:topLevelKey_with_underlines-and-dashes": "result6"
+            "rax:autoscale:topLevelKey_with_underlines-and-dashes": "result6",
+            "rax:autoscale:autoscale:lb": "result7"
         }
         expected = {
             'group': {'id': 'group id'},
@@ -276,7 +278,8 @@ class ServiceMetadataTests(SynchronousTestCase):
                                   '234': 'result4'}
             },
             'some': {'other': {'nested': {'key': 'result5'}}},
-            "topLevelKey_with_underlines-and-dashes": "result6"
+            "topLevelKey_with_underlines-and-dashes": "result6",
+            'autoscale': {'lb': 'result7'}
         }
         self.assertEqual(get_service_metadata('autoscale', metadata),
                          pmap(expected))
