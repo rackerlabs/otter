@@ -1,10 +1,11 @@
 """
 Tests for convergence models.
 """
+from uuid import uuid4
 
 from characteristic import attributes
 
-from pyrsistent import pmap
+from pyrsistent import pmap, pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -229,6 +230,15 @@ class ServiceMetadataTests(SynchronousTestCase):
     """
     Tests for :func:`get_service_metadata`.
     """
+    def test_returns_empty_map_if_metadata_invalid(self):
+        """
+        If metadata is invalid (a string or otherwise not a dictionary),
+        an empty map is returned.
+        """
+        for invalid in ("string", None, [], object()):
+            self.assertEqual(get_service_metadata('autoscale', invalid),
+                             pmap())
+
     def test_skips_invalid_keys_and_mismatching_services(self):
         """
         :func:`get_service_metadata` ignores all keys that do not
@@ -278,8 +288,8 @@ class AutoscaleMetadataTests(SynchronousTestCase):
     """
     def test_get_group_id_from_metadata(self):
         """
-        Get the group ID from metadata no matter if it's old style or new
-        style.
+        :func:`NovaServer.group_id_from_metadata` returns the group ID from
+        metadata no matter if it's old style or new style.
         """
         for key in ("rax:autoscale:group:id", "rax:auto_scaling_group_id"):
             self.assertEqual(
@@ -288,8 +298,8 @@ class AutoscaleMetadataTests(SynchronousTestCase):
 
     def test_invalid_group_id_key_returns_none(self):
         """
-        If there is no group ID key, either old or new style, no group ID is
-        returned.
+        If there is no group ID key, either old or new style,
+        :func:`NovaServer.group_id_from_metadata` returns `None`.
         """
         for key in (":rax:autoscale:group:id", "rax:autoscaling_group_id",
                     "completely_wrong"):
@@ -297,3 +307,35 @@ class AutoscaleMetadataTests(SynchronousTestCase):
                 NovaServer.group_id_from_metadata({key: "group_id"}))
 
         self.assertIsNone(NovaServer.group_id_from_metadata({}))
+
+    def test_lbs_from_metadata_CLB(self):
+        """
+        :func:`NovaServer.lbs_from_metadata` returns a set of
+        `CLBDescription` objects if the metadata is parsable as a CLB config,
+        and ignores the metadata line if unparsable.
+        """
+        metadata = {
+            "rax:autoscale:lb:CloudLoadBalancer:123":
+                '[{"port": 80}, {"port": 8080}]',
+
+            # invalid because there is no port
+            "rax:autoscale:lb:CloudLoadBalancer:234": '[{}]',
+            # invalid because not a list
+            "rax:autoscale:lb:CloudLoadBalancer:345": '{"port": 80}',
+            # invalid because not JSON
+            "rax:autoscale:lb:CloudLoadBalancer:456": 'junk'
+        }
+        self.assertEqual(
+            NovaServer.lbs_from_metadata(metadata),
+            pmap({'123': [CLBDescription(lb_id='123', port=80),
+                          CLBDescription(lb_id='123', port=8080)]}))
+
+    def test_lbs_from_metadata_ignores_unsupported_lb_types(self):
+        """
+        :func:`NovaServer.lbs_from_metadata` ignores unsupported LB types
+        """
+        metadata = {
+            "rax:autoscale:lb:RackConnect:{0}".format(uuid4()): None,
+            "rax:autoscale:lb:Neutron:456": None
+        }
+        self.assertEqual(NovaServer.lbs_from_metadata(metadata), pmap())

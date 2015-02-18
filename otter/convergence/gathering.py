@@ -196,40 +196,6 @@ def _servicenet_address(server):
                  if ip.startswith("10.")), "")
 
 
-_key_prefix = "a"
-
-_LB_KEY_PATTERN = re.compile(
-    "rax:autoscale:lb:(CloudLoadBalancer:\d+|RackConnectV3:{uuid})"
-    .format(uuid=_UUID4_REGEX), re.IGNORECASE)
-
-
-def _lb_configs_from_metadata(server):
-    """
-    Construct a mapping of load balancer ID to :class:`ILBDescription` based
-    on the server metadata.
-    """
-    desired_lbs = defaultdict(list)
-
-    for k, v in server.get('metadata', {}).iteritems():
-        m = _LB_KEY_PATTERN.match(k)
-        if m is None:
-            continue
-
-        lb_type, lbid = m.groups()[0].split(':', 1)
-        if lb_type.lower() == 'cloudloadbalancer':
-            # if malformed, skiped the whole key
-            try:
-                configs = json.loads(v)
-                if isinstance(configs, list):
-                    desired_lbs[lbid] = [
-                        CLBDescription(lb_id=lbid, port=c['port'])
-                        for c in configs]
-            except (ValueError, KeyError, TypeError):
-                pass
-
-    return pmap(desired_lbs)
-
-
 def to_nova_server(server_json):
     """
     Convert from JSON format to :obj:`NovaServer` instance.
@@ -239,7 +205,8 @@ def to_nova_server(server_json):
                       created=timestamp_to_epoch(server_json['created']),
                       image_id=server_json.get('image', {}).get('id'),
                       flavor_id=server_json['flavor']['id'],
-                      desired_lbs=_lb_configs_from_metadata(server_json),
+                      desired_lbs=NovaServer.lbs_from_metadata(
+                          server_json.get('metadata')),
                       servicenet_address=_servicenet_address(server_json))
 
 

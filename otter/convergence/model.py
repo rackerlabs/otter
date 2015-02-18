@@ -108,16 +108,17 @@ def get_service_metadata(service_name, metadata):
     :return: the metadata values as a dictionary - in the example above, the
         dictionary would look like `{k1: {k2: {k3: val}}}`
     """
-    key_pattern = re.compile("^rax:{service}((:[A-Za-z0-9\-_]+)+)$"
-                             .format(service=service_name))
     as_metadata = pmap()
-    for k, v in metadata.iteritems():
-        m = key_pattern.match(k)
-        if m:
-            subkeys = m.groups()[0]  # largest group
-            as_metadata = as_metadata.set_in(
-                [sk for sk in subkeys.split(':') if sk],
-                v)
+    if isinstance(metadata, dict):
+        key_pattern = re.compile("^rax:{service}((:[A-Za-z0-9\-_]+)+)$"
+                                 .format(service=service_name))
+        for k, v in metadata.iteritems():
+            m = key_pattern.match(k)
+            if m:
+                subkeys = m.groups()[0]  # largest group
+                as_metadata = as_metadata.set_in(
+                    [sk for sk in subkeys.split(':') if sk],
+                    v)
     return as_metadata
 
 
@@ -141,7 +142,7 @@ class NovaServer(object):
     :ivar str image_id: The ID of the image the server was launched with
     :ivar str flavor_id: The ID of the flavor the server was launched with
 
-    :ivar PMap desired_lbs: An immutable mapping of load balancer IDs to lists
+    :ivar PSet desired_lbs: An immutable mapping of load balancer IDs to lists
         of :class:`CLBDescription` instances.
     """
 
@@ -161,6 +162,29 @@ class NovaServer(object):
         return metadata.get(
             "rax:autoscale:group:id",
             metadata.get("rax:auto_scaling_group_id", None))
+
+    @classmethod
+    def lbs_from_metadata(cls, metadata):
+        """
+        Get the desired load balancer descriptions based on the metadata.
+
+        :return: ``dict`` of `ILBDescription` providers
+        """
+        lbs = get_service_metadata('autoscale', metadata).get('lb', {})
+        desired_lbs = {}
+
+        for lb_id, v in lbs.get('CloudLoadBalancer', {}).iteritems():
+            # if malformed, skiped the whole key
+            try:
+                configs = json.loads(v)
+                if isinstance(configs, list):
+                    desired_lbs[lb_id] = [
+                        CLBDescription(lb_id=lb_id, port=c['port'])
+                        for c in configs]
+            except (ValueError, KeyError, TypeError):
+                pass
+
+        return pmap(desired_lbs)
 
 
 @attributes(['server_config', 'capacity',
