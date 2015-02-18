@@ -57,7 +57,7 @@ class SchedulerService(MultiService, object):
         if not self.running:
             return defer.succeed((False, {'reason': 'Not running'}))
 
-        def check_older_events(events):
+        def check_older_events(events, info):
             now = datetime.utcnow()
             old_events = []
             for event in events:
@@ -65,18 +65,18 @@ class SchedulerService(MultiService, object):
                     event['version'] = str(event['version'])
                     event['trigger'] = str(event['trigger'])
                     old_events.append(event)
-            return (not bool(old_events),
-                    {'old_events': old_events,
-                     'buckets': self.partitioner.get_current_buckets()})
+            info['old_events'] = old_events
+            return (not bool(old_events), info)
 
         def got_partitioner_health_check(result):
-            if result[0] is False:
+            healthy, info = result
+            if healthy is False:
                 return result
+            buckets = info['buckets']
             d = defer.gatherResults(
-                [self.store.get_oldest_event(bucket)
-                 for bucket in self.partitioner.get_current_buckets()],
+                [self.store.get_oldest_event(bucket) for bucket in buckets],
                 consumeErrors=True)
-            d.addCallback(check_older_events)
+            d.addCallback(check_older_events, info)
             return d
 
         d = self.partitioner.health_check()

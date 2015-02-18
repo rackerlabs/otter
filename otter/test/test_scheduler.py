@@ -54,17 +54,13 @@ class FakePartitioner(Service):
     def __init__(self, log, callback):
         self.log = log
         self.got_buckets = callback
-        self.health = (True, {})
-        self.current_buckets = []
+        self.health = (True, {'buckets': []})
 
     def reset_path(self, new_path):
         return 'partitioner reset to {}'.format(new_path)
 
     def health_check(self):
         return defer.succeed(self.health)
-
-    def get_current_buckets(self):
-        return self.current_buckets
 
 
 class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
@@ -115,7 +111,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         `service.health_check` returns False when trigger time is above
         threshold.
         """
-        self.fake_partitioner.current_buckets = [2, 3]
+        self.fake_partitioner.health = (True, {'buckets': [2, 3]})
         now = datetime.utcnow()
         returns = [{'trigger': now - timedelta(hours=1), 'version': 'v1'},
                    {'trigger': now - timedelta(seconds=2), 'version': 'v1'}]
@@ -134,7 +130,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         `service.health_check` returns True when trigger time is below
         threshold.
         """
-        self.fake_partitioner.current_buckets = [2, 3]
+        self.fake_partitioner.health = (True, {'buckets': [2, 3]})
         now = datetime.utcnow()
         self.returns = [{'trigger': now + timedelta(hours=1),
                          'version': 'v1'},
@@ -152,7 +148,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         """
         `service.health_check` returns True when there are no triggers.
         """
-        self.fake_partitioner.current_buckets = [2, 3]
+        self.fake_partitioner.health = (True, {'buckets': [2, 3]})
         self.returns = [None, None]
 
         d = self.scheduler_service.health_check()

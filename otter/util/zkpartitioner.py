@@ -96,7 +96,7 @@ class Partitioner(MultiService, object):
             self.partitioner = self._new_partitioner()
             return
 
-        buckets = self.get_current_buckets()
+        buckets = self._get_current_buckets()
         # TODO: This log might feel like spam since it'll occur on every
         # tick. But it'll be useful to debug partitioning problems (at least in
         # initial deployment)
@@ -120,9 +120,9 @@ class Partitioner(MultiService, object):
             # network issues
             return succeed((False, {'reason': 'Not acquired'}))
 
-        return succeed((True, {}))
+        return succeed((True, {'buckets': self._get_current_buckets()}))
 
-    def get_current_buckets(self):
+    def _get_current_buckets(self):
         """Retrieve the current buckets as a list."""
         return list(self.partitioner)
 
