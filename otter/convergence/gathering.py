@@ -8,7 +8,7 @@ from effect import parallel
 
 from pyrsistent import pmap
 
-from toolz.curried import filter, groupby, map
+from toolz.curried import filter, groupby, keyfilter, map
 from toolz.dicttoolz import get_in
 from toolz.functoolz import compose, identity
 
@@ -83,12 +83,13 @@ def get_scaling_group_servers(server_predicate=identity):
     """
 
     def has_group_id(s):
-        return 'metadata' in s and 'rax:auto_scaling_group_id' in s['metadata']
+        return 'metadata' in s and isinstance(s['metadata'], dict)
 
     def group_id(s):
-        return s['metadata']['rax:auto_scaling_group_id']
+        return NovaServer.group_id_from_metadata(s['metadata'])
 
-    servers_apply = compose(groupby(group_id),
+    servers_apply = compose(keyfilter(lambda k: k is not None),
+                            groupby(group_id),
                             filter(server_predicate),
                             filter(has_group_id))
 

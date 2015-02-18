@@ -2,6 +2,7 @@
 Data classes for representing bits of information that need to share a
 representation across the different phases of convergence.
 """
+import json
 import re
 
 from characteristic import Attribute, attributes
@@ -147,6 +148,19 @@ class NovaServer(object):
     def __init__(self):
         assert self.state in ServerState.iterconstants(), \
             "%r is not a ServerState" % (self.state,)
+
+    @classmethod
+    def group_id_from_metadata(cls, metadata):
+        """
+        Get the group ID of a server based on the metadata.
+
+        The old key was ``rax:auto_scaling_group_id``, but the new key is
+        ``rax:autoscale:group:id``.  Try pulling from the new key first, and
+        if it doesn't exist, pull from the old.
+        """
+        return metadata.get(
+            "rax:autoscale:group:id",
+            metadata.get("rax:auto_scaling_group_id", None))
 
 
 @attributes(['server_config', 'capacity',
