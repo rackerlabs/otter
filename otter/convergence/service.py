@@ -231,7 +231,7 @@ def get_convergence_starter():
     return _convergence_starter
 
 
-def set_converger_starter(convergence_starter):
+def set_convergence_starter(convergence_starter):
     """Set global :obj:`ConvergenceStarter` service"""
     global _convergence_starter
     _convergence_starter = convergence_starter
