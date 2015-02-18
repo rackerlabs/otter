@@ -2,6 +2,7 @@
 Data classes for representing bits of information that need to share a
 representation across the different phases of convergence.
 """
+import re
 
 from characteristic import Attribute, attributes
 
@@ -96,6 +97,27 @@ class StepResult(Names):
     """
     The step failed. Retrying convergence won't help.
     """
+
+
+def get_service_metadata(service_name, metadata):
+    """
+    Obtain all the metadata associated with a particular service from Nova
+    metadata (expecting the schema:  `rax:<service_name>:k1:k2:k3...`).
+
+    :return: the metadata values as a dictionary - in the example above, the
+        dictionary would look like `{k1: {k2: {k3: val}}}`
+    """
+    key_pattern = re.compile("^rax:{service}((:[A-Za-z0-9\-_]+)+)$"
+                             .format(service=service_name))
+    as_metadata = pmap()
+    for k, v in metadata.iteritems():
+        m = key_pattern.match(k)
+        if m:
+            subkeys = m.groups()[0]  # largest group
+            as_metadata = as_metadata.set_in(
+                [sk for sk in subkeys.split(':') if sk],
+                v)
+    return as_metadata
 
 
 @attributes(['id', 'state', 'created', 'image_id', 'flavor_id',

@@ -4,6 +4,8 @@ Tests for convergence models.
 
 from characteristic import attributes
 
+from pyrsistent import pmap
+
 from twisted.trial.unittest import SynchronousTestCase
 
 from zope.interface import implementer
@@ -17,7 +19,8 @@ from otter.convergence.model import (
     ILBDescription,
     ILBNode,
     NovaServer,
-    ServerState
+    ServerState,
+    get_service_metadata
 )
 
 
@@ -220,3 +223,50 @@ class CLBNodeTests(SynchronousTestCase):
                            condition=CLBNodeCondition.DISABLED),
                        address='10.1.1.1', drained_at=0.0, connections=1)
         self.assertFalse(node.is_active())
+
+
+class ServiceMetadataTests(SynchronousTestCase):
+    """
+    Tests for :func:`get_service_metadata`.
+    """
+    def test_skips_invalid_keys_and_mismatching_services(self):
+        """
+        :func:`get_service_metadata` ignores all keys that do not
+        match the service or the `rax:<service>:...` naming scheme.
+        """
+        metadata = {
+            "bleh:rax:autoscale:lb": "fails because starts with bleh",
+            "rax:autoscale:lb otherstuff": "fails because space",
+            "rax:monitoring:check": "fails because wrong service",
+            ":rax:autoscale:lb": "fails because starts with colon",
+            "rax:autoscale:lb:": "fails because ends with colon"
+        }
+        self.assertEqual(get_service_metadata('autoscale', metadata), pmap())
+
+    def test_creates_dictionary_of_arbitrary_depth(self):
+        """
+        :func:`get_service_metadata` creates a dictionary of arbitrary depth
+        depending on how many colons are in the keys.
+        """
+        metadata = {
+            "rax:autoscale:group:id": "group id",
+            "rax:autoscale:lb:CloudLoadBalancer:123": "result1",
+            "rax:autoscale:lb:CloudLoadBalancer:234": "result2",
+            "rax:autoscale:lb:RackConnectV3:123": "result3",
+            "rax:autoscale:lb:RackConnectV3:234": "result4",
+            "rax:autoscale:some:other:nested:key": "result5",
+            "rax:autoscale:topLevelKey_with_underlines-and-dashes": "result6"
+        }
+        expected = {
+            'group': {'id': 'group id'},
+            'lb': {
+                'CloudLoadBalancer': {'123': 'result1',
+                                      '234': 'result2'},
+                'RackConnectV3': {'123': 'result3',
+                                  '234': 'result4'}
+            },
+            'some': {'other': {'nested': {'key': 'result5'}}},
+            "topLevelKey_with_underlines-and-dashes": "result6"
+        }
+        self.assertEqual(get_service_metadata('autoscale', metadata),
+                         pmap(expected))
