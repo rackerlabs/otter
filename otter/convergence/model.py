@@ -5,7 +5,7 @@ representation across the different phases of convergence.
 
 from characteristic import Attribute, attributes
 
-from pyrsistent import PMap, PSet, freeze, pmap, pset
+from pyrsistent import PSet, freeze, pset
 
 from twisted.python.constants import NamedConstant, Names
 
@@ -99,7 +99,7 @@ class StepResult(Names):
 
 
 @attributes(['id', 'state', 'created', 'image_id', 'flavor_id',
-             Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
+             Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
              Attribute('servicenet_address',
                        default_value='',
                        instance_of=basestring)])
