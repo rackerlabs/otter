@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from characteristic import attributes
 
-from pyrsistent import pmap, pset
+from pyrsistent import pmap
 
 from twisted.trial.unittest import SynchronousTestCase
 

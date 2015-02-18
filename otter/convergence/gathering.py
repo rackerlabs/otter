@@ -1,12 +1,7 @@
 """Code related to gathering data to inform convergence."""
-import json
-import re
-from collections import defaultdict
 from urllib import urlencode
 
 from effect import parallel
-
-from pyrsistent import pmap
 
 from toolz.curried import filter, groupby, keyfilter, map
 from toolz.dicttoolz import get_in
@@ -20,7 +15,6 @@ from otter.convergence.model import (
     CLBNodeType,
     NovaServer,
     ServerState)
-from otter.convergence.steps import _UUID4_REGEX
 from otter.http import service_request
 from otter.indexer import atom
 from otter.util.http import append_segments

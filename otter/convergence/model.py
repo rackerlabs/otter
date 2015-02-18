@@ -7,9 +7,9 @@ import re
 
 from characteristic import Attribute, attributes
 
-from toolz.itertoolz import groupby
-
 from pyrsistent import PMap, freeze, pmap
+
+from toolz.itertoolz import groupby
 
 from twisted.python.constants import NamedConstant, Names
 
