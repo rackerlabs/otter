@@ -468,11 +468,12 @@ class APIMakeServiceTests(SynchronousTestCase):
         Cloud feeds observer is setup if it is there in config
         """
         conf = deepcopy(test_config)
-        conf['cloudfeeds'] = {'service': 'cloudFeeds', 'tenant_id': 'tid'}
+        conf['cloudfeeds'] = {'service': 'cloudFeeds', 'tenant_id': 'tid',
+                              'url': 'url'}
         makeService(conf)
         serv_confs = get_service_configs(conf)
         serv_confs[ServiceType.CLOUD_FEEDS] = {
-            'name': 'cloudFeeds', 'region': 'ord'}
+            'name': 'cloudFeeds', 'region': 'ord', 'url': 'url'}
         cf = CloudFeedsObserver(
             reactor=self.reactor,
             authenticator=matches(IsInstance(CachingAuthenticator)),
