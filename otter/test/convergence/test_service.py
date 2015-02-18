@@ -127,8 +127,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
-        for s in self.servers:
-            s.desired_lbs = pset()
+        for serv in self.servers:
+            serv.desired_lbs = pset()
 
         eff = execute_convergence(self.group, 2, self.lc, 0, log,
                                   get_all_convergence_data=gacd)
