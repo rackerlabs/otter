@@ -30,7 +30,8 @@ class SchedulerService(MultiService, object):
 
         :param int batchsize: number of events to fetch on each iteration
         :param store: cassandra store
-        :param partitioner_factory: :obj:`Partitioner`
+        :param partitioner_factory: Callable of (log, callback) ->
+            :obj:`Partitioner`
         """
         super(SchedulerService, self).__init__()
         self.store = store

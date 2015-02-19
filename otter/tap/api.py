@@ -288,8 +288,8 @@ def setup_scheduler(parent, store, kz_client):
         return
     buckets = range(1, int(config_value('scheduler.buckets')) + 1)
     store.set_scheduler_buckets(buckets)
-    partition_path = (config_value('scheduler.partition.path')
-                      or '/scheduler_partition')
+    partition_path = (config_value('scheduler.partition.path') or
+                      '/scheduler_partition')
     time_boundary = config_value('scheduler.partition.time_boundary') or 15
     partitioner_factory = partial(
         Partitioner,
