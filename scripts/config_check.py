@@ -11,6 +11,19 @@ import subprocess
 changed_files = subprocess.check_output(
     ["git", "diff", "--cached", "--name-only"]).split('\n')
 
+USERNAME_TEMPLATE = 'REPLACE_WITH_REAL_USERNAME'
+PASSWORD_TEMPLATE = 'REPLACE_WITH_REAL_PASSWORD'
+
+
+def throw_exception(attribute, setting):
+    """
+    Raises an Exception with the appropriate error message.
+
+    :param str attribute: Either Username or Password.
+    :param str setting: The intended setting for the given attribute.
+    """
+    raise Exception('%s values should always be %s' % (attribute, setting))
+
 
 def look_for_password_in_json(dictionary):
     """
@@ -24,13 +37,11 @@ def look_for_password_in_json(dictionary):
     """
     for key, val in dictionary.iteritems():
         if key.lower().strip() == "password":
-            if val != "REPLACE_WITH_REAL_PASSWORD":
-                raise Exception('Password values should always be '
-                                '"REPLACE_WITH_REAL_PASSWORD"')
+            if val != PASSWORD_TEMPLATE:
+                throw_exception("Passwords", PASSWORD_TEMPLATE)
         if key.lower().strip() == "username":
-            if val != "REPLACE_WITH_REAL_USERNAME":
-                raise Exception('Password values should always be '
-                                '"REPLACE_WITH_REAL_USERNAME"')
+            if val != USERNAME_TEMPLATE:
+                throw_exception("Usernames", USERNAME_TEMPLATE)
 
         if isinstance(val, dict):
             look_for_password_in_json(val)
@@ -45,12 +56,10 @@ def look_for_passwords_in_shell_script(lines):
     :param list lines: A list of lines in the script file.
     """
 
-    un_template = 'REPLACE_WITH_REAL_USERNAME'
-    pw_template = 'REPLACE_WITH_REAL_TEMPLATE'
     re_username = re.compile("USERNAME=")
     re_password = re.compile("PASSWORD=")
-    re_username_value = re.compile(un_template)
-    re_password_value = re.compile(pw_template)
+    re_username_value = re.compile(USERNAME_TEMPLATE)
+    re_password_value = re.compile(PASSWORD_TEMPLATE)
 
     usernames = [l for l in lines if re_username.search(l)]
     real_uns = [l for l in usernames if not re_username_value.search(l)]
@@ -58,14 +67,10 @@ def look_for_passwords_in_shell_script(lines):
     real_pws = [l for l in passwords if not re_password_value.search(l)]
 
     if len(real_uns) > 0:
-        raise Exception(
-            "Usernames should always be %s" % un_template
-        )
+        throw_exception("Usernames", USERNAME_TEMPLATE)
 
     if len(real_pws) > 0:
-        raise Exception(
-            "Passwords should always be %s" % pw_template
-        )
+        throw_exception("Passwords", PASSWORD_TEMPLATE)
 
 
 for f in changed_files:
