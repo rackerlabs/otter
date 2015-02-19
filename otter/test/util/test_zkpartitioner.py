@@ -113,6 +113,21 @@ class PartitionerTests(SynchronousTestCase):
             otter_msg_type='partition-acquired')
         self.assertEqual(self.buckets_received, [[2, 3]])
 
+    def test_repeat(self):
+        """
+        buckets are received every iteration that the partitioner is acquired.
+        """
+        self.kz_partitioner.acquired = True
+        self.kz_partitioner.__iter__.return_value = [2, 3]
+        self.partitioner.startService()
+        self.log.msg.assert_called_once_with(
+            'Got buckets {buckets}',
+            buckets=[2, 3], path=self.path,
+            otter_msg_type='partition-acquired')
+        self.clock.advance(10)
+        self.clock.advance(10)
+        self.assertEqual(self.buckets_received, [[2, 3], [2, 3], [2, 3]])
+
     def test_stop_service_not_acquired(self):
         """
         stopService() does not stop the allocation (i.e. call finish) if
