@@ -7,14 +7,14 @@ from twisted.application.service import MultiService
 from twisted.internet.defer import succeed
 
 
-class Partitioner(MultiService, object):
+class Partitioner(MultiService):
     """
     A Twisted service which uses a Kazoo :obj:`SetPartitioner` to allocate
     logical ``buckets`` between nodes.
 
     Multiple servers can instantiate these with the same ``partitioner_path``
-    and ``buckets``, and each server will get a disjoint subset of
-    ``range(buckets)`` allocated to them.
+    and ``buckets``, and each server will get a disjoint subset of ``buckets``
+    allocated to them.
 
     In order to be notified of which buckets are allocated to the current node,
     a ``got_buckets`` function must be passed in which will be called when the
@@ -35,7 +35,7 @@ class Partitioner(MultiService, object):
             buckets when buckets have been allocated to this node.
         :param clock: clock to use for checking the buckets on an interval.
         """
-        super(Partitioner, self).__init__()
+        MultiService.__init__(self)
         self.kz_client = kz_client
         self.partitioner_path = partitioner_path
         self.buckets = buckets
@@ -58,7 +58,7 @@ class Partitioner(MultiService, object):
         # TimerService may call `check_partition` before self.partitioner is
         # created.
         self.partitioner = self._new_partitioner()
-        super(Partitioner, self).startService()
+        MultiService.startService(self)
 
     def stopService(self):
         """Release the buckets."""

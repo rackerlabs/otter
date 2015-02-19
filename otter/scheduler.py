@@ -19,7 +19,7 @@ from otter.util.deferredutils import ignore_and_log
 from otter.util.hashkey import generate_transaction_id
 
 
-class SchedulerService(MultiService, object):
+class SchedulerService(MultiService):
     """
     Service to trigger scheduled events
     """
@@ -33,7 +33,7 @@ class SchedulerService(MultiService, object):
         :param partitioner_factory: Callable of (log, callback) ->
             :obj:`Partitioner`
         """
-        super(SchedulerService, self).__init__()
+        MultiService.__init__(self)
         self.store = store
         self.threshold = threshold
         self.log = otter_log.bind(system='otter.scheduler')
@@ -49,9 +49,9 @@ class SchedulerService(MultiService, object):
 
     def health_check(self):
         """
-        Checks if scheduler service is healthy by comparing oldest event w.r.t
-        current time. If oldtest event is older than a threshold, then it is
-        not healthy
+        Check if scheduler service is healthy by comparing oldest event to
+        current time. If the oldest event is older than the threshold, then
+        we're considered unhealthy.
 
         :return: Deferred that fires with tuple (Bool, `dict` of extra debug
         info)
