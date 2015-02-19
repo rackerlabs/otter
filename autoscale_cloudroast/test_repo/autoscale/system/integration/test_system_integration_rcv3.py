@@ -56,6 +56,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         across all tests which can benefit from it.
         """
         super(AutoscaleRackConnectFixture, cls).setUpClass()
+        # Alias the behaviors to simplify line limit compliance
+        cls.asb = cls.autoscale_behaviors
+
         cls.common = common.CommonTestUtilities(cls.server_client,
                                                 cls.autoscale_client,
                                                 cls.lbaas_client)
@@ -91,6 +94,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                     cls.pool = pool
 
         lb_pools = [{'loadBalancerId': cls.pool.id, 'type': 'RackConnectV3'}]
+
+        count_pre_nodes = cls.rcv3_client.get_pool_info(cls.pool.id)\
+                             .entity.node_counts['cloud_servers']
 
         # Many tests require us to have some servers sitting in an account
         # ahead of time.  We don't actually use these servers for anything,
@@ -135,6 +141,18 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         # testing.
         if dummy_asserter.err:
             print("SetUpClass failed: background servers")
+
+        # Wait for initial nodes to be added to the load balancer
+        cls.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            cls.pool.id,
+            count_pre_nodes + 2,
+            timeout=300,
+            api="RackConnect",
+            asserter=dummy_asserter)
+        # If there was an error waiting for servers to build, abort the
+        # testing.
+        if dummy_asserter.err:
+            print("SetUpClass failed: background LB nodes")
 
     @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
     def test_create_scaling_group_with_pool_on_cloud_network(self):
@@ -507,11 +525,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
         # Capture a list of the node_ids of all nodes on the pool before doing
         # anything.
-        init_rc_node_ids = []
-        initial_node_list = self.rcv3_client.get_nodes_on_pool(
-            self.pool.id).entity.nodes
-        for each_node in initial_node_list:
-            init_rc_node_ids.append(each_node.id)
+        init_rc_node_ids = [n.id for n in self.rcv3_client.get_nodes_on_pool(
+            self.pool.id).entity.nodes]
 
         initial_cloud_server_count = self._get_node_counts_on_pool(
             self.pool.id)['cloud_servers']
@@ -650,6 +665,116 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           'count of {1}'.format(num_clb_nodes_after_scale,
                                                 self.min_servers))
 
+    @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
+    def test_scale_down_after_manual_remove_node(self):
+        """
+        Verify that the RCV3 group can successfully scale down after a server
+        has been removed from the loadbalancer pool outside of autoscale.
+        """
+
+        # Capture a list of the node_ids of all nodes on the pool before doing
+        # anything.
+        initial_node_list = [n.id for n in self.rcv3_client.get_nodes_on_pool(
+            self.pool.id).entity.nodes]
+
+        # Create a group with an RCV3 loadbalancer pool and a minimum number
+        # of servers
+
+        lb_pools = [{'loadBalancerId': self.pool.id, 'type': 'RackConnectV3'}]
+
+        pool_group_resp = self._create_rcv3_group(
+            lb_list=lb_pools, group_min=0,
+            network_list=[self.rackconnect_network])
+        pool_group = pool_group_resp.entity
+
+        # Construct a policy to scale up servers
+        server_count_before_autoscaling = self._get_node_counts_on_pool(
+            self.pool.id)['cloud_servers']
+
+        scale_amt = 2
+        policy_up_data = {'change': scale_amt, 'cooldown': 0}
+        expected_rcv3_server_count = (server_count_before_autoscaling
+                                      + scale_amt)
+        as_server_count = scale_amt
+
+        # Create the policy and execute it immediately
+        self.asb.create_policy_webhook(pool_group.id,
+                                       policy_up_data,
+                                       execute_policy=True)
+
+        server_list_after_up, nodes_after = self._verify_rcv3_group_state(
+            pool_group,
+            pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
+            as_server_count,
+            expected_rcv3_server_count,
+            as_server_count)
+
+        # Remove one of the servers from the LB pool
+        self.rcv3_client.remove_server_from_pool(self.pool.id,
+                                                 server_list_after_up[0])
+
+        post_del_servers, post_del_nodes = self._verify_rcv3_group_state(
+            pool_group,
+            pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
+            as_server_count,
+            expected_rcv3_server_count - 1,
+            as_server_count)
+
+        # Construct, create, and execute a policy to scale back to min.
+        policy_down_data = {'change': -scale_amt, 'cooldown': 0}
+        expected_rcv3_server_count = server_count_before_autoscaling
+        as_server_count = as_server_count - scale_amt
+
+        self.asb.create_policy_webhook(pool_group.id,
+                                       policy_down_data,
+                                       execute_policy=True)
+
+        self._verify_rcv3_group_state(
+            pool_group,
+            pool_group.launchConfiguration.loadBalancers[0].loadBalancerId,
+            as_server_count,
+            expected_rcv3_server_count,
+            as_server_count)
+
+        # Confirm that after scaling back to zero, the lb state matches the
+        # inital state
+        final_node_list = [n.id for n in self.rcv3_client.get_nodes_on_pool(
+            self.pool.id).entity.nodes]
+        self.assertEquals(set(initial_node_list), set(final_node_list),
+                          msg='The set of nodes on the pool is incorrect'
+                          'after scaling')
+
+    def _verify_rcv3_group_state(self, group, pool_id,
+                                 num_as, num_rc, num_nova):
+        """
+        Verify that the expected state of rcv3, autoscale, and nova is reached
+        """
+        server_list = []
+        # Since zero servers is an exit condtion that raises and exception in
+        # wait_for_expected_number_of_servers, if the expected number is zero
+        # just check the group state.
+        if num_as == 0:
+            self.wait_for_expected_group_state(group.id, num_as)
+        else:
+            server_list = self.asb.\
+                wait_for_expected_number_of_active_servers(group.id,
+                                                           num_as,
+                                                           timeout=600,
+                                                           asserter=self)
+        # Wait for RackConnect to reflect Otter's preferred configuration.
+        node_list = self.asb.wait_for_expected_number_of_active_servers(
+            pool_id, num_rc, timeout=300, api="RackConnect",
+            asserter=self)
+        # When checking for zero nova servers, we use the deletion specific
+        # function in order to provide a longer wait time for servers to
+        # delete completely.
+        if num_nova == 0:
+            self.assert_servers_deleted_successfully(
+                group.launchConfiguration.server.name)
+        else:
+            self.verify_server_count_using_server_metadata(group.id, num_nova)
+        return server_list, node_list
+
     def _get_node_counts_on_pool(self, pool_id):
         """
         Get the node counts on a given pool.  Takes an ID string.
@@ -718,6 +843,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                             'meta_key_2': 'meta_value_2'}
         self.lc_disk_config = 'AUTO'
         self.lc_networks = network_list
+        server_name = rand_name('rc_server')
 
         self.create_resp = self.autoscale_client.create_scaling_group(
             gc_name=self.gc_name,
@@ -725,7 +851,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             gc_min_entities=group_min,
             gc_max_entities=self.gc_max_entities,
             gc_metadata=self.gc_metadata,
-            lc_name=self.lc_name,
+            lc_name=server_name,
             lc_image_ref=self.lc_image_ref,
             lc_flavor_ref=self.lc_flavor_ref,
             lc_metadata=self.lc_metadata,

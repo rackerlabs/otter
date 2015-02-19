@@ -48,6 +48,7 @@ def get_service_configs(config):
     cf = config.get('cloudfeeds')
     if cf is not None:
         configs[ServiceType.CLOUD_FEEDS] = {
-            'name': cf['service'], 'region': config['region']}
+            'name': cf['service'], 'region': config['region'],
+            'url': cf['url']}
 
     return configs

@@ -6,12 +6,18 @@ import json
 from collections import namedtuple
 from copy import deepcopy
 from datetime import datetime
+from functools import partial
+
+from effect import Effect, ParallelEffects, TypeDispatcher, sync_perform
+from effect.testing import resolve_effect
 
 from jsonschema import ValidationError
 
 from kazoo.protocol.states import KazooState
 
 import mock
+
+from pyrsistent import freeze
 
 from silverberg.client import CQLClient, ConsistencyLevel
 
@@ -23,12 +29,14 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.json_schema import group_examples
 from otter.models.cass import (
+    CQLQueryExecute,
     CassAdmin,
     CassScalingGroup,
     CassScalingGroupCollection,
     WeakLocks,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
+    perform_cql_query,
     serialize_json_data,
     verified_view
 )
@@ -50,7 +58,6 @@ from otter.test.models.test_interface import (
     IScalingScheduleCollectionProviderMixin
 )
 from otter.test.utils import (
-    CheckFailure,
     DummyException,
     LockMixin,
     matches,
@@ -104,6 +111,28 @@ def _cassandrify_data(list_of_dicts):
     This function also de-identifies the data for you.
     """
     return _de_identify(list_of_dicts)
+
+
+class PerformTests(SynchronousTestCase):
+    """
+    Tests for :func:`perform_cql_query` function
+    """
+
+    def test_perform_cql_query(self):
+        """
+        Calls given connection's execute
+        """
+        conn = mock.Mock(spec=CQLClient)
+        conn.execute.return_value = defer.succeed('ret')
+        intent = CQLQueryExecute(query='query', params={'w': 2},
+                                 consistency_level=ConsistencyLevel.ONE)
+        r = sync_perform(
+            TypeDispatcher({CQLQueryExecute: partial(perform_cql_query,
+                                                     conn)}),
+            Effect(intent))
+        self.assertEqual(r, 'ret')
+        conn.execute.assert_called_once_with(
+            'query', {'w': 2}, ConsistencyLevel.ONE)
 
 
 class SerialJsonDataTestCase(SynchronousTestCase):
@@ -2527,6 +2556,70 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
         self.assertEqual(result, [pol])
 
 
+class ScalingGroupWebhookMigrateTests(SynchronousTestCase):
+    """
+    Tests for webhook migration functions in :obj:`CassScalingGroup`
+    """
+
+    def setUp(self):
+        """
+        Sample CassScalingGroup object
+        """
+        self.store = CassScalingGroupCollection(None, None)
+
+    def test_webhook_index_only(self):
+        """
+        `get_webhook_index_only` gets webhook info from policy_webhooks table
+        and webhook_keys in parallel and returns those webhook info that is
+        there in policy_webhooks table but NOT in webhook_keys table
+        """
+        eff = self.store.get_webhook_index_only()
+        self.assertEqual(
+            eff.intent,
+            ParallelEffects([
+                Effect(
+                    CQLQueryExecute(
+                        query=('SELECT "tenantId", "groupId", "policyId", '
+                               '"webhookKey" FROM policy_webhooks'),
+                        params={}, consistency_level=ConsistencyLevel.ONE)),
+                Effect(
+                    CQLQueryExecute(
+                        query=('SELECT "tenantId", "groupId", "policyId", '
+                               '"webhookKey" FROM webhook_keys'),
+                        params={}, consistency_level=ConsistencyLevel.ONE))]))
+        r = resolve_effect(
+            eff, [[{'w1': '1'}, {'w2': '2'}], [{'w1': '1'}]])
+        self.assertEqual(r, set(freeze([{'w2': '2'}])))
+
+    def test_add_webhook_keys(self):
+        """
+        `add_webhook_keys` inserts webhook keys as a batch
+        """
+        eff = self.store.add_webhook_keys(
+            [{'tenantId': 't1', 'groupId': 'g1', 'policyId': 'p1',
+              'webhookKey': 'w1'},
+             {'tenantId': 't2', 'groupId': 'g2', 'policyId': 'p2',
+              'webhookKey': 'w2'}])
+
+        query = (
+            'BEGIN BATCH '
+            'INSERT INTO webhook_keys ("tenantId", "groupId", "policyId", '
+            '"webhookKey")'
+            'VALUES (:tenantId0, :groupId0, :policyId0, :webhookKey0) '
+            'INSERT INTO webhook_keys ("tenantId", "groupId", "policyId", '
+            '"webhookKey")'
+            'VALUES (:tenantId1, :groupId1, :policyId1, :webhookKey1) '
+            'APPLY BATCH;')
+        params = {
+            'tenantId0': 't1', 'groupId0': 'g1', 'policyId0': 'p1',
+            'webhookKey0': 'w1', 'tenantId1': 't2', 'groupId1': 'g2',
+            'policyId1': 'p2', 'webhookKey1': 'w2'}
+        self.assertEqual(
+            eff.intent,
+            CQLQueryExecute(query=query, params=params,
+                            consistency_level=ConsistencyLevel.ONE))
+
+
 class CassScalingScheduleCollectionTestCase(
         IScalingScheduleCollectionProviderMixin, SynchronousTestCase):
     """
@@ -3198,81 +3291,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(g.tenant_id, '123')
         self.assertIs(g.local_locks, self.collection.local_locks)
 
-    def test_webhook_hash_from_table(self):
+    def test_webhook_info_by_hash(self):
         """
-        `webhook_info_by_hash` returns info from _webhook_info_from_table
-        if available.
-        """
-        self.collection._webhook_info_from_table = mock.Mock(
-            return_value=defer.succeed('g'))
-        self.collection._webhook_info_by_index = mock.Mock()
-
-        d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
-
-        self.assertEqual(self.successResultOf(d), 'g')
-        self.collection._webhook_info_from_table.assert_called_once_with(
-            self.mock_log, 'hash')
-        self.assertFalse(self.collection._webhook_info_by_index.called)
-
-    def test_webhook_hash_from_index(self):
-        """
-        `webhook_info_by_hash` returns info from _webhook_info_by_index if
-        _webhook_info_from_table returns nothing.
-        """
-        self.collection._webhook_info_from_table = mock.Mock(
-            return_value=defer.fail(UnrecognizedCapabilityError('hash', 1)))
-        self.collection._webhook_info_by_index = mock.Mock(
-            return_value=defer.succeed('g'))
-
-        d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
-
-        self.assertEqual(self.successResultOf(d), 'g')
-        self.collection._webhook_info_from_table.assert_called_once_with(
-            self.mock_log, 'hash')
-        self.collection._webhook_info_by_index.assert_called_once_with(
-            self.mock_log, 'hash')
-
-    def test_webhook_hash_from_index_logs_unknown_err(self):
-        """
-        `webhook_info_by_hash` returns info from _webhook_info_by_index if
-        _webhook_info_from_table fails with unknown error.
-        """
-        self.collection._webhook_info_from_table = mock.Mock(
-            return_value=defer.fail(ValueError(1)))
-        self.collection._webhook_info_by_index = mock.Mock(
-            return_value=defer.succeed('g'))
-
-        d = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
-
-        self.assertEqual(self.successResultOf(d), 'g')
-        self.collection._webhook_info_from_table.assert_called_once_with(
-            self.mock_log, 'hash')
-        self.collection._webhook_info_by_index.assert_called_once_with(
-            self.mock_log, 'hash')
-        self.mock_log.err.assert_called_once_with(
-            CheckFailure(ValueError), 'Error getting webhook info from table')
-
-    def test_webhook_hash_index(self):
-        """
-        `_webhook_info_by_index` uses webhooks_by_token INDEX
-        """
-        self.returns = [_cassandrify_data([
-            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1'}]),
-            _cassandrify_data([{'data': '{}'}])
-        ]
-        expectedData = {'webhookKey': 'x'}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId" '
-                       'FROM policy_webhooks '
-                       'WHERE "webhookKey" = :webhookKey;')
-        d = self.collection._webhook_info_by_index(self.mock_log, 'x')
-        r = self.successResultOf(d)
-        self.assertEqual(r, ('123', 'group1', 'pol1'))
-        self.connection.execute.assert_called_once_with(
-            expectedCql, expectedData, ConsistencyLevel.ONE)
-
-    def test_webhook_hash_table(self):
-        """
-        `_webhook_info_from_table` uses webhook_keys table
+        `webhook_info_by_hash` gets the info from webhook_keys table
         """
         self.returns = [_cassandrify_data([
             {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1'}]),
@@ -3282,7 +3303,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = ('SELECT "tenantId", "groupId", "policyId" '
                        'FROM webhook_keys '
                        'WHERE "webhookKey" = :webhookKey;')
-        d = self.collection._webhook_info_from_table(self.mock_log, 'x')
+        d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
         r = self.successResultOf(d)
         self.assertEqual(r, ('123', 'group1', 'pol1'))
         self.connection.execute.assert_called_once_with(
@@ -3290,21 +3311,17 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def test_webhook_bad(self):
         """
-        Test that a bad webhook will fail predictably
+        Test that a bad webhook will fail with UnrecognizedCapabilityError
         """
-        self.returns = [[], []]
+        self.returns = [[]]
         expectedData = {'webhookKey': 'x'}
-        expectedCql = [('SELECT "tenantId", "groupId", "policyId" '
-                        'FROM webhook_keys '
-                        'WHERE "webhookKey" = :webhookKey;'),
-                       ('SELECT "tenantId", "groupId", "policyId" '
-                        'FROM policy_webhooks '
-                        'WHERE "webhookKey" = :webhookKey;')]
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId" '
+                       'FROM webhook_keys '
+                       'WHERE "webhookKey" = :webhookKey;')
         d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
         self.failureResultOf(d, UnrecognizedCapabilityError)
-        self.connection.execute.assert_has_calls(
-            [mock.call(expectedCql[0], expectedData, ConsistencyLevel.ONE),
-             mock.call(expectedCql[1], expectedData, ConsistencyLevel.ONE)])
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.ONE)
 
     def test_get_counts(self):
         """

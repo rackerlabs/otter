@@ -14,7 +14,8 @@
         "admin_url": "https://keystone_identity_endpoint.com/v2.0",
         "max_retries": 10,
         "retry_interval": 10,
-        "wait": 3
+        "wait": 3,
+        "strategy": "impersonation"
     },
     "zookeeper": {
         "hosts": "127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183",
@@ -58,5 +59,6 @@
         "ttl": 432000,
         "interval": 60
     },
-    "cloudfeeds": {"service": "cloudFeeds", "tenant_id": "tenant"}
+    "cloudfeeds": {"service": "cloudFeeds", "tenant_id": "tenant",
+                   "url": "http://cfurl.net/"}
 }

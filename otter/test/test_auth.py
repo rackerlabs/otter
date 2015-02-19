@@ -20,6 +20,7 @@ from otter.auth import (
     IAuthenticator,
     ICachingAuthenticator,
     ImpersonatingAuthenticator,
+    SingleTenantAuthenticator,
     InvalidateToken,
     RetryingAuthenticator,
     WaitingAuthenticator,
@@ -30,7 +31,7 @@ from otter.auth import (
     generate_authenticator,
     impersonate_user,
     public_endpoint_url,
-    user_for_tenant,
+    user_for_tenant
 )
 from otter.effect_dispatcher import get_simple_dispatcher
 from otter.test.utils import SameJSON, iMock, mock_log, patch
@@ -122,6 +123,39 @@ class HelperTests(SynchronousTestCase):
         HTTPConnectionPool.
         """
         self._verify_request_invoked_with_pool()
+
+    def test_authenticate_user_single_tenant(self, **kwargs):
+        pool = kwargs.get("pool", None)
+        response = mock.Mock(code=200)
+        response_body = {
+            'access': {
+                'token': {'id': '1111111111'}
+            }
+        }
+        self.treq.json_content.return_value = succeed(response_body)
+        self.treq.post.return_value = succeed(response)
+
+        d = authenticate_user('http://identity/v2.0', 'user', 'pass',
+                              tenant_id=1111, expire_in=2222,
+                              log=self.log, **kwargs)
+
+        self.assertEqual(self.successResultOf(d), response_body)
+
+        self.treq.post.assert_called_once_with(
+            'http://identity/v2.0/tokens',
+            SameJSON({'auth': {
+                'passwordCredentials': {
+                    'username': 'user',
+                    'password': 'pass'
+                },
+                'tenantId': 1111,
+                'expire-in-seconds': 2222
+            }}),
+            headers={'accept': ['application/json'],
+                     'content-type': ['application/json'],
+                     'User-Agent': ['OtterScale/0.0']},
+            log=self.log,
+            pool=pool)
 
     def test_authenticate_user_propagates_error(self):
         """
@@ -316,6 +350,72 @@ class HelperTests(SynchronousTestCase):
             public_endpoint_url(fake_service_catalog, 'cloudServersOpenStack',
                                 'DFW'),
             'http://dfw.openstack/')
+
+
+class SingleTenantAuthenticatorTests(SynchronousTestCase):
+    """
+    Tests for the end-to-end single tenant workflow.
+    """
+    def setUp(self):
+        """
+        Shortcut by mocking all the helper functions that do IO.
+        """
+        self.authenticate_user = patch(
+            self, 'otter.auth.authenticate_user')
+
+        self.authenticate_user.side_effect = lambda *a, **kw: succeed(
+            {'access': {'token': {'id': 'auth-token'}},
+             'service_catalog': fake_service_catalog})
+
+        self.url = 'http://identity/v2.0'
+        self.user = 'service_user'
+        self.password = 'service_password'
+        self.st = SingleTenantAuthenticator(self.user, self.password, self.url)
+        self.log = mock.Mock()
+
+    def test_verifyObject(self):
+        """
+        ImpersonatingAuthenticator provides the IAuthenticator interface.
+        """
+        verifyObject(IAuthenticator, self.st)
+
+    def test_authenticate_user_as_specified_tenant(self):
+        """
+        authenticate_tenant authenticates as the given tenant
+        """
+        self.successResultOf(self.st.authenticate_tenant(111111))
+        self.authenticate_user.assert_called_once_with(
+            self.url, self.user, self.password, tenant_id=111111,
+            expire_in=10800, log=None)
+
+        self.authenticate_user.reset_mock()
+
+        self.successResultOf(self.st.authenticate_tenant(111111, log=self.log))
+
+        self.authenticate_user.assert_called_once_with(
+            self.url, self.user, self.password, tenant_id=111111,
+            expire_in=10800, log=self.log)
+
+    def test_authenticate_user_returns_endpoint_list(self):
+        """
+        authenticate_tenant returns the impersonation token and the endpoint
+        list.
+        """
+        result = self.successResultOf(self.st.authenticate_tenant(1111111))
+
+        self.assertEqual(result[0], 'auth-token')
+        self.assertEqual(result[1], fake_service_catalog)
+
+    def test_authenticate_tenant_propagates_user_list_errors(self):
+        """
+        authenticate_tenant propagates errors from user_for_tenant
+        """
+        self.authenticate_user.side_effect = lambda *a, **kw: fail(
+            UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
+
+        f = self.failureResultOf(self.st.authenticate_tenant(111111),
+                                 UpstreamError)
+        self.assertEqual(f.value.reason.value.code, 500)
 
 
 class ImpersonatingAuthenticatorTests(SynchronousTestCase):
@@ -791,7 +891,7 @@ class InvalidateTokenTests(SynchronousTestCase):
 identity_config = {
     'username': 'uname', 'password': 'pwd', 'url': 'htp',
     'admin_url': 'ad', 'max_retries': 3, 'retry_interval': 5,
-    'wait': 4, 'cache_ttl': 50
+    'wait': 4, 'cache_ttl': 50, 'strategy': 'impersonation'
 }
 
 
@@ -806,7 +906,7 @@ class AuthenticatorTests(SynchronousTestCase):
         """
         self.config = deepcopy(identity_config)
 
-    def test_composition(self):
+    def test_composition_impersonation(self):
         """
         authenticator is composed correctly with values from config
         """
@@ -833,6 +933,34 @@ class AuthenticatorTests(SynchronousTestCase):
         self.assertEqual(ia._identity_admin_password, 'pwd')
         self.assertEqual(ia._url, 'htp')
         self.assertEqual(ia._admin_url, 'ad')
+
+    def test_composition_single_tenant(self):
+        """
+        authenticator is composed correctly with values from config
+        """
+        r = mock.Mock()
+        self.config['strategy'] = 'single_tenant'
+        a = generate_authenticator(r, self.config)
+        self.assertIsInstance(a, CachingAuthenticator)
+        self.assertIdentical(a._reactor, r)
+        self.assertEqual(a._ttl, 50)
+
+        wa = a._authenticator
+        self.assertIsInstance(wa, WaitingAuthenticator)
+        self.assertIdentical(wa._reactor, r)
+        self.assertEqual(wa._wait, 4)
+
+        ra = wa._authenticator
+        self.assertIsInstance(ra, RetryingAuthenticator)
+        self.assertIdentical(ra._reactor, r)
+        self.assertEqual(ra._max_retries, 3)
+        self.assertEqual(ra._retry_interval, 5)
+
+        st = ra._authenticator
+        self.assertIsInstance(st, SingleTenantAuthenticator)
+        self.assertEqual(st._identity_user, 'uname')
+        self.assertEqual(st._identity_password, 'pwd')
+        self.assertEqual(st._url, 'htp')
 
     def test_wait_defaults(self):
         """
