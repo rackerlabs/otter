@@ -120,10 +120,10 @@ class Partitioner(MultiService, object):
             return succeed((False, {'reason': 'Not running'}))
 
         if not self.partitioner.acquired:
-            # TODO: Until there is check added for not being allocated for long
-            # time it is fine to assume service is not healthy when it is
-            # allocating since allocating should happen only on deploy or
-            # network issues
+            # TODO: Until there is check added for not being allocated for too
+            # long, it is fine to indicate the service is not healthy when it
+            # is allocating, since allocating should happen only on start-up or
+            # during network issues.
             return succeed((False, {'reason': 'Not acquired'}))
 
         return succeed((True, {'buckets': self._get_current_buckets()}))

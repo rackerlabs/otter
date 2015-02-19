@@ -34,7 +34,6 @@ class PartitionerTests(SynchronousTestCase):
         """When state is ``allocating``, nothing happens."""
         self.kz_partitioner.allocating = True
         self.partitioner.startService()
-        #self.partitioner.check_events(100)
         self.log.msg.assert_called_with('Partition allocating',
                                         otter_msg_type='partition-allocating')
         self.assertEqual(self.buckets_received, [])
@@ -144,3 +143,26 @@ class PartitionerTests(SynchronousTestCase):
             time_boundary=self.time_boundary)
         self.assertEqual(self.partitioner.partitioner,
                          self.kz_client.SetPartitioner.return_value)
+
+    def test_health_check_not_running(self):
+        """When the service isn't running, the service is unhealthy."""
+        self.assertEqual(
+            self.successResultOf(self.partitioner.health_check()),
+            (False, {'reason': 'Not running'}))
+
+    def test_health_check_not_acquired(self):
+        """When the buckets aren't acquired, the service is unhealthy."""
+        self.kz_partitioner.allocating = True
+        self.partitioner.startService()
+        self.assertEqual(
+            self.successResultOf(self.partitioner.health_check()),
+            (False, {'reason': 'Not acquired'}))
+
+    def test_health_check_acquired(self):
+        """When the buckets are acquired, they're included in the info."""
+        self.kz_partitioner.acquired = True
+        self.partitioner.startService()
+        self.kz_partitioner.__iter__.return_value = iter([2, 3])
+        self.assertEqual(
+            self.successResultOf(self.partitioner.health_check()),
+            (True, {'buckets': [2, 3]}))
