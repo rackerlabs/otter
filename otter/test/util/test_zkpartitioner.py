@@ -65,7 +65,7 @@ class PartitionerTests(SynchronousTestCase):
 
         self.log.msg.assert_called_with('Partition failed. Starting new',
                                         otter_msg_type='partition-failed')
-        # # Called once when starting and now again when partition failed
+        # Called once when starting and now again when partition failed
         self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
                          [mock.call(self.path,
                                     set=self.buckets,
