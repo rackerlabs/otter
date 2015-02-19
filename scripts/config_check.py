@@ -11,13 +11,15 @@ changed_files = subprocess.check_output(
     ["git", "diff", "--cached", "--name-only"]).split('\n')
 
 
-def look_for_password(dictionary):
+def look_for_password_in_json(dictionary):
     """
     Check for dangerous plaintext passwords.
 
     Search through a dictionary to see if there is a password value that
     is not "REPLACE_WITH_REAL_PASSWORD" or a username value that is not
     "REPLACE_WITH_REAL_USERNAME".
+
+    :param dict dictionary: The decoded JSON structure to verify.
     """
     for key, val in dictionary.iteritems():
         if key.lower().strip() == "password":
@@ -33,10 +35,47 @@ def look_for_password(dictionary):
             look_for_password(val)
 
 
+def look_for_passwords_in_shell_script(lines):
+    """
+    Check for dangerous plaintext passwords in a text file organized by lines.
+    Essentially performs a grep for USERNAME= and PASSWORD= and makes sure they
+    have well-known standard values REPLACE_WITH_REAL_USERNAME, etc.
+
+    :param list lines: A list of lines in the script file.
+    """
+
+    un_template = 'REPLACE_WITH_REAL_USERNAME'
+    pw_template = 'REPLACE_WITH_REAL_TEMPLATE'
+    re_username = re.compile("USERNAME=")
+    re_password = re.compile("PASSWORD=")
+    re_username_value = re.compile(un_template)
+    re_password_value = re.compile(pw_template)
+
+    usernames = [l for l in lines if re_username.match(l)]
+    real_uns = [l for l in usernames if not re_username_value.match(l)]
+    passwords = [l for l in lines if re_password.match(l)]
+    real_pws = [l for l in passwords if not re_password_value.match(l)]
+
+    if len(real_uns) > 0:
+        raise Exception(
+            "Usernames should always be %s" % un_template
+        )
+
+    if len(real_pws) > 0:
+        raise Exception(
+            "Passwords should always be %s" % pw_template
+        )
+
+
 for f in changed_files:
-    if f.lower() == 'config.json':
-        raise Exception("DO NOT commit 'config.json'")
+    if f.lower() in ['config.json', 'config.sh']:
+        raise Exception("DO NOT commit '%s'" % f.lower())
 
     if f.endswith(".json"):
         with open(f) as fp:
             look_for_password(json.load(fp))
+
+    if f.endswith(".sh"):
+        with open(f) as fp:
+            look_for_passwords_in_shell_script(fp.readlines())
+
