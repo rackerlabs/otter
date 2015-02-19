@@ -18,15 +18,15 @@ def make_observer_chain(ultimate_observer, indent):
     """
     Return our feature observers wrapped our the ultimate_observer
     """
-    return PEP3101FormattingWrapper(
-        SpecificationObserverWrapper(
+    return SpecificationObserverWrapper(
+        PEP3101FormattingWrapper(
             SystemFilterWrapper(
                 ObserverWrapper(
                     JSONObserverWrapper(
                         ultimate_observer,
                         sort_keys=True,
                         indent=indent or None),
-                    hostname=socket.gethostname())))
+                    hostname=socket.gethostname()))))
 
 
 def observer_factory():
