@@ -111,6 +111,7 @@ class TestScaling(unittest.TestCase):
             .addCallback(dump_groups)
             .addCallback(self.scaling_policy.start, self)
             .addCallback(self.scaling_policy.execute)
+            .addCallback(self.scaling_group.wait_for_N_servers, 2)
             .addCallback(dump_groups)
         )
         return d
