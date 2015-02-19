@@ -5,6 +5,7 @@ Also explicitly forbids checking in config.json.
 """
 
 import json
+import re
 import subprocess
 
 changed_files = subprocess.check_output(
@@ -32,7 +33,7 @@ def look_for_password_in_json(dictionary):
                                 '"REPLACE_WITH_REAL_USERNAME"')
 
         if isinstance(val, dict):
-            look_for_password(val)
+            look_for_password_in_json(val)
 
 
 def look_for_passwords_in_shell_script(lines):
@@ -51,10 +52,10 @@ def look_for_passwords_in_shell_script(lines):
     re_username_value = re.compile(un_template)
     re_password_value = re.compile(pw_template)
 
-    usernames = [l for l in lines if re_username.match(l)]
-    real_uns = [l for l in usernames if not re_username_value.match(l)]
-    passwords = [l for l in lines if re_password.match(l)]
-    real_pws = [l for l in passwords if not re_password_value.match(l)]
+    usernames = [l for l in lines if re_username.search(l)]
+    real_uns = [l for l in usernames if not re_username_value.search(l)]
+    passwords = [l for l in lines if re_password.search(l)]
+    real_pws = [l for l in passwords if not re_password_value.search(l)]
 
     if len(real_uns) > 0:
         raise Exception(
@@ -72,10 +73,15 @@ for f in changed_files:
         raise Exception("DO NOT commit '%s'" % f.lower())
 
     if f.endswith(".json"):
-        with open(f) as fp:
-            look_for_password(json.load(fp))
+        try:
+            with open(f) as fp:
+                look_for_password_in_json(json.load(fp))
+        except Exception, e:
+            raise Exception("File %s: %s" % (f, e.args[0]))
 
     if f.endswith(".sh"):
-        with open(f) as fp:
-            look_for_passwords_in_shell_script(fp.readlines())
-
+        try:
+            with open(f) as fp:
+                look_for_passwords_in_shell_script(fp.readlines())
+        except Exception, e:
+            raise Exception("File %s: %s" % (f, e.args[0]))
