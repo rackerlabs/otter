@@ -27,9 +27,9 @@ class Partitioner(MultiService):
         :param log: a bound log
         :param kz_client: txKazoo client
         :param partitioner_path: ZooKeeper path, used for partitioning
-        :param list buckets: buckets to distribute between nodes. Ideally
-            there should be at least as many elements as nodes taking part in
-            this partitioner. This should be a sequence of str.
+        :param buckets: iterable of buckets to distribute between
+            nodes. Ideally there should be at least as many elements as nodes
+            taking part in this partitioner. This should be a sequence of str.
         :param time_boundary: time to wait for partitioning to stabilize.
         :param got_buckets: Callable which will be called with a list of
             buckets when buckets have been allocated to this node.
@@ -49,7 +49,7 @@ class Partitioner(MultiService):
     def _new_partitioner(self):
         return self.kz_client.SetPartitioner(
             self.partitioner_path,
-            set=set(self.buckets),
+            set=self.buckets,
             time_boundary=self.time_boundary)
 
     def startService(self):

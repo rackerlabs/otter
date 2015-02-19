@@ -68,7 +68,7 @@ class PartitionerTests(SynchronousTestCase):
         # # Called once when starting and now again when partition failed
         self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
                          [mock.call(self.path,
-                                    set=set(self.buckets),
+                                    set=self.buckets,
                                     time_boundary=self.time_boundary)] * 2)
         self.assertEqual(self.partitioner.partitioner, new_kz_partition)
         self.assertEqual(self.buckets_received, [])
@@ -97,7 +97,7 @@ class PartitionerTests(SynchronousTestCase):
         # Called once when starting and now again when got bad state
         self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
                          [mock.call(self.path,
-                                    set=set(self.buckets),
+                                    set=self.buckets,
                                     time_boundary=self.time_boundary)] * 2)
         self.assertEqual(self.partitioner.partitioner, new_kz_partition)
         self.assertEqual(self.buckets_received, [])
@@ -139,7 +139,7 @@ class PartitionerTests(SynchronousTestCase):
         self.assertEqual(self.partitioner.partitioner_path, '/new_path')
         self.kz_client.SetPartitioner.assert_called_once_with(
             '/new_path',
-            set=set(self.buckets),
+            set=self.buckets,
             time_boundary=self.time_boundary)
         self.assertEqual(self.partitioner.partitioner,
                          self.kz_client.SetPartitioner.return_value)
