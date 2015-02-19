@@ -115,9 +115,11 @@ class TestScaling(unittest.TestCase):
             .addCallback(dump_groups)
             .addCallback(self.scaling_policy.start, self)
             .addCallback(self.scaling_policy.execute)
-            .addCallback(self.scaling_group.wait_for_N_servers, 2, timeout=1800)
-            .addCallback(lambda _: self.scaling_group.get_scaling_group_state(rcs))
-            .addCallback(dump_state)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers, 2, timeout=1800
+            ).addCallback(
+                lambda _: self.scaling_group.get_scaling_group_state(rcs)
+            ).addCallback(dump_state)
         )
         return d
     test_scaling_up.timeout = 1800

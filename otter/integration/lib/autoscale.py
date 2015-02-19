@@ -8,7 +8,7 @@ from characteristic import Attribute, attributes
 
 import treq
 
-from twisted.internet import defer, reactor
+from twisted.internet import reactor
 from twisted.internet.task import LoopingCall
 
 from otter.util.http import check_success, headers
