@@ -118,12 +118,15 @@ class ConvergenceStarter(Service, object):
 
         # How do we solve this?
 
+        # STRONG
         # a. Store a counter in the node. Not sure if this can be done
         #    reliably. Each mark_dirty would increment it, each no-op
         #    convergence would decrement it. I don't think we need to care
         #    beyond 2, but I'm not sure.
         # b. Investigate using the ZK "queue" pattern to do the same general
         #    idea as in `a`.
+
+        # WEAK
         # c. After marking a group clean, check to see if desired has changed
         #    as a last-ditch check to see if we need to run convergence again.
         return self._kz_client.create(
@@ -159,7 +162,8 @@ class Converger(MultiService, object):
     nodes.
     """
 
-    def __init__(self, log, kz_client, store, dispatcher, partitioner_factory):
+    def __init__(self, log, kz_client, store, dispatcher, num_buckets,
+                 partitioner_factory):
         """
         :param log: a bound log
         :param kz_client: txKazoo client
@@ -167,33 +171,23 @@ class Converger(MultiService, object):
         """
         self._kz_client = kz_client
         self._dispatcher = dispatcher
-        self._timer = TimerService(interval, self.check_convergence)
-        self._timer.setServiceParent(self)
         self._num_buckets = num_buckets
         self.log = log.bind(system='converger')
-        self.partitioner = partitioner_factory(self.log, self.check_convergence)
+        self.partitioner = partitioner_factory(
+            self.log, self._check_convergence)
 
-    def startService(self):
-        super(Converger, self).startService()
-
-    def check_convergence(self):
+    def _check_convergence(self, buckets):
         """
-        Check for events occurring now and earlier
+        Check for groups that need convergence and which match up to the
+        buckets we've been allocated.
         """
-        utcnow = datetime.utcnow()
-        log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=utcnow)
-        # TODO: This log might feel like spam since it'll occur on every tick. But
-        # it'll be useful to debug partitioning problems (at least in initial deployment)
-        log.msg('Got buckets {buckets}', buckets=buckets, path=CONVERGENCE_PARTITIONER_PATH)
+        # list everything in CONVERGENCE_DIRTY_PATH
+        # if hash(el) % self.num_buckets in buckets: CONVERGE IT!
 
-        return defer.gatherResults(
-            [check_events_in_bucket(
-                log, self.store, bucket, utcnow, batchsize) for bucket in buckets])
-
-    def start_convergence(self, log, scaling_group, group_state,
-                          launch_config,
-                          perform=perform,
-                          execute_convergence=execute_convergence):
+    def exec_convergence(self, log, scaling_group, group_state,
+                         launch_config,
+                         perform=perform,
+                         execute_convergence=execute_convergence):
         """
         Converge a group to a capacity with a launch config.
 
