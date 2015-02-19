@@ -8,10 +8,10 @@ from characteristic import Attribute, attributes
 
 import treq
 
-from otter.util.http import check_success, headers
-
 from twisted.internet import defer, reactor
 from twisted.internet.task import LoopingCall
+
+from otter.util.http import check_success, headers
 
 
 class TimeoutError(Exception):
@@ -151,7 +151,6 @@ class ScalingGroup(object):
         looper.loopingCall = lc
         d = lc.start(period)
         return d
-
 
     def start(self, rcs, test):
         """Create a scaling group.

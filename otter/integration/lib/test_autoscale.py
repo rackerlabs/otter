@@ -83,7 +83,7 @@ class WaitForNServersTestCase(SynchronousTestCase):
             self.assertNoResult(d)
         self.clock.advance(10)
         self.successResultOf(d)
-        
+
     def test_poll_until_timeout(self):
         """When wait_for_N_servers exceeds a maximum time threshold, we expect
         it to raise an exception.
@@ -97,4 +97,3 @@ class WaitForNServersTestCase(SynchronousTestCase):
             self.assertNoResult(d)
         self.clock.advance(10)
         self.failureResultOf(d, TimeoutError)
-        
