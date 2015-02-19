@@ -45,6 +45,15 @@ class JsonToLBConfigTests(SynchronousTestCase):
 class GetDesiredGroupStateTests(SynchronousTestCase):
     """Tests for :func:`get_desired_group_state`."""
 
+    def assert_server_config_hashable(self, state):
+        """
+        Assert that a :class:`DesiredGroupState` has a hashable server config.
+        """
+        try:
+            hash(state.server_config)
+        except TypeError as e:
+            self.fail("{0} in {1}".format(e, state.server_config))
+
     def test_convert(self):
         """
         An Otter launch config a :obj:`DesiredGroupState`, ignoring extra
@@ -81,6 +90,7 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 desired_lbs=freeze({23: [
                     CLBDescription(lb_id='23', port=80),
                     CLBDescription(lb_id='23', port=90)]})))
+        self.assert_server_config_hashable(state)
 
     def test_no_lbs(self):
         """
@@ -104,6 +114,7 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 server_config=expected_server_config,
                 capacity=2,
                 desired_lbs=pmap()))
+        self.assert_server_config_hashable(state)
 
 
 class FeatureFlagTest(SynchronousTestCase):

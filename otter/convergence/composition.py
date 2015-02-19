@@ -83,7 +83,8 @@ def prepare_server_launch_config(group_id, server_config, lb_descriptions):
         :class:`ILBDescription` providers
     """
     lbs = concat(lb_descriptions.values())
-    return server_config.set_in(
-        ('server', 'metadata'),
-        merge(get_in(('server', 'metadata'), server_config, {}),
-              NovaServer.generate_metadata(group_id, lbs)))
+    updated_metadata = freeze(merge(
+        get_in(('server', 'metadata'), server_config, {}),
+        NovaServer.generate_metadata(group_id, lbs)))
+
+    return server_config.set_in(('server', 'metadata'), updated_metadata)
