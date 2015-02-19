@@ -142,17 +142,15 @@ class ScalingGroup(object):
                     self.loopingCall.stop()
 
             def check_servers(self):
-                d = defer.Deferred()\
-                    .addCallback(self.scaling_group.get_scaling_group_state)\
+                d = self.scaling_group.get_scaling_group_state(rcs)\
                     .addCallback(self.ensure_200_result)
-                d.callback(rcs)
                 return d
 
         looper = Looper(self)
         lc = LoopingCall(looper.loop)
         lc.clock = clock
         looper.loopingCall = lc
-        d = lc.start(period)
+        d = lc.start(period).addCallback(lambda _: rcs)
         return d
 
     def start(self, rcs, test):

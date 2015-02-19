@@ -43,6 +43,10 @@ def dump_groups(rcs):
     return rcs
 
 
+def dump_state(s):
+    dump_js(s)
+
+
 def find_end_point(rcs):
     rcs.token = rcs.access["access"]["token"]["id"]
     sc = rcs.access["access"]["serviceCatalog"]
@@ -111,7 +115,9 @@ class TestScaling(unittest.TestCase):
             .addCallback(dump_groups)
             .addCallback(self.scaling_policy.start, self)
             .addCallback(self.scaling_policy.execute)
-            .addCallback(self.scaling_group.wait_for_N_servers, 2)
-            .addCallback(dump_groups)
+            .addCallback(self.scaling_group.wait_for_N_servers, 2, timeout=1800)
+            .addCallback(lambda _: self.scaling_group.get_scaling_group_state(rcs))
+            .addCallback(dump_state)
         )
         return d
+    test_scaling_up.timeout = 1800
