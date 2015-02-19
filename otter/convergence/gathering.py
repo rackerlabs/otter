@@ -1,13 +1,9 @@
 """Code related to gathering data to inform convergence."""
-import json
-from collections import defaultdict
 from urllib import urlencode
 
 from effect import parallel
 
-from pyrsistent import pmap
-
-from toolz.curried import filter, groupby, map
+from toolz.curried import filter, groupby, keyfilter, map
 from toolz.dicttoolz import get_in
 from toolz.functoolz import compose, identity
 
@@ -81,12 +77,13 @@ def get_scaling_group_servers(server_predicate=identity):
     """
 
     def has_group_id(s):
-        return 'metadata' in s and 'rax:auto_scaling_group_id' in s['metadata']
+        return 'metadata' in s and isinstance(s['metadata'], dict)
 
     def group_id(s):
-        return s['metadata']['rax:auto_scaling_group_id']
+        return NovaServer.group_id_from_metadata(s['metadata'])
 
-    servers_apply = compose(groupby(group_id),
+    servers_apply = compose(keyfilter(lambda k: k is not None),
+                            groupby(group_id),
                             filter(server_predicate),
                             filter(has_group_id))
 
@@ -193,39 +190,6 @@ def _servicenet_address(server):
                  if ip.startswith("10.")), "")
 
 
-_key_prefix = 'rax:autoscale:lb:'
-
-
-def _lb_configs_from_metadata(server):
-    """
-    Construct a mapping of load balancer ID to :class:`ILBDescription` based
-    on the server metadata.
-    """
-    desired_lbs = defaultdict(list)
-
-    # throw away any value that is malformed
-
-    def parse_config(config, key):
-        if config.get('type') != 'RackConnectV3':
-            lbid = k[len(_key_prefix):]
-            try:
-                desired_lbs[lbid].append(
-                    CLBDescription(lb_id=lbid, port=config['port']))
-            except (KeyError, TypeError):
-                pass
-
-    for k in server.get('metadata', {}):
-        if k.startswith(_key_prefix):
-            try:
-                configs = json.loads(server['metadata'][k])
-                for config in configs:
-                    parse_config(config, k)
-            except (ValueError, AttributeError):
-                pass
-
-    return pmap(desired_lbs)
-
-
 def to_nova_server(server_json):
     """
     Convert from JSON format to :obj:`NovaServer` instance.
@@ -235,7 +199,8 @@ def to_nova_server(server_json):
                       created=timestamp_to_epoch(server_json['created']),
                       image_id=server_json.get('image', {}).get('id'),
                       flavor_id=server_json['flavor']['id'],
-                      desired_lbs=_lb_configs_from_metadata(server_json),
+                      desired_lbs=NovaServer.lbs_from_metadata(
+                          server_json.get('metadata')),
                       servicenet_address=_servicenet_address(server_json))
 
 
