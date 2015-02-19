@@ -62,6 +62,7 @@ class Partitioner(MultiService):
 
     def stopService(self):
         """Release the buckets."""
+        MultiService.stopService(self)
         if self.partitioner.acquired:
             return self.partitioner.finish()
 

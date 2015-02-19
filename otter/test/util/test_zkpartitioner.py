@@ -133,6 +133,21 @@ class PartitionerTests(SynchronousTestCase):
         d = self.partitioner.stopService()
         self.assertIs(self.kz_partitioner.finish.return_value, d)
 
+    def test_stop_service_stops_polling(self):
+        """
+        stopService causes the service to stop checking the partitioner every
+        interval.
+        """
+        self.kz_partitioner.allocating = True
+        self.partitioner.startService()
+        self.kz_partitioner.acquired = True
+        self.kz_partitioner.allocating = False
+        self.kz_partitioner.__iter__.return_value = iter([2, 3])
+        self.partitioner.stopService()
+        self.assertEqual(self.partitioner.running, False)
+        self.clock.advance(10)
+        self.assertEqual(self.buckets_received, [])
+
     def test_reset_path(self):
         """``reset_path`` creates a new partitioner at the given path."""
         self.partitioner.reset_path('/new_path')
