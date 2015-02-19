@@ -112,11 +112,14 @@ class ScalingGroup(object):
             """Inner-class to support looping until either of two conditions
             holds: (1) we see at least `servers_desired` servers in existence,
             or (2) a timeout is reached.
+
+            :param ScalingGroup scaling_group: The scaling group that this
+                looper should poll the state of.
             """
 
-            def __init__(self, sg):
+            def __init__(self, scaling_group):
                 self.elapsed_time = 0
-                self.sg = sg
+                self.scaling_group = scaling_group
                 # To be filled in later.
                 self.loopingCall = None
 
@@ -140,7 +143,7 @@ class ScalingGroup(object):
 
             def check_servers(self):
                 d = defer.Deferred()\
-                    .addCallback(self.sg.get_scaling_group_state)\
+                    .addCallback(self.scaling_group.get_scaling_group_state)\
                     .addCallback(self.ensure_200_result)
                 d.callback(rcs)
                 return d
