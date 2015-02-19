@@ -20,10 +20,9 @@ class Partitioner(MultiService, object):
     a ``got_buckets`` function must be passed in which will be called when the
     local buckets have been determined.
     """
-    def __init__(self, kz_client,
-                 interval,
-                 partitioner_path, buckets, time_boundary,
-                 log, got_buckets):
+    def __init__(self, kz_client, interval, partitioner_path, buckets,
+                 time_boundary, log, got_buckets,
+                 clock=None):
         """
         :param log: a bound log
         :param kz_client: txKazoo client
@@ -34,6 +33,7 @@ class Partitioner(MultiService, object):
         :param time_boundary: time to wait for partitioning to stabilize.
         :param got_buckets: Callable which will be called with a list of
             buckets when buckets have been allocated to this node.
+        :param clock: clock to use for checking the buckets on an interval.
         """
         super(Partitioner, self).__init__()
         self.kz_client = kz_client
@@ -44,6 +44,7 @@ class Partitioner(MultiService, object):
         self.time_boundary = time_boundary
         ts = TimerService(interval, self.check_partition)
         ts.setServiceParent(self)
+        ts.clock = clock
 
     def _new_partitioner(self):
         return self.kz_client.SetPartitioner(
@@ -53,6 +54,9 @@ class Partitioner(MultiService, object):
 
     def startService(self):
         """Start partitioning."""
+        # Create the partitioner *before* up-calling, because otherwise the
+        # TimerService may call `check_partition` before self.partitioner is
+        # created.
         self.partitioner = self._new_partitioner()
         super(Partitioner, self).startService()
 
@@ -127,116 +131,3 @@ class Partitioner(MultiService, object):
     def _get_current_buckets(self):
         """Retrieve the current buckets as a list."""
         return list(self.partitioner)
-
-# def test_check_events_allocating(self):
-#     """
-#     `check_events` logs message and does not check events in buckets
-#     when buckets are still allocating.
-#     """
-#     self.kz_partition.allocating = True
-#     self._start_service()
-#     self.scheduler_service.check_events(100)
-#     self.log.msg.assert_called_with('Partition allocating')
-
-#     # Ensure others are not called
-#     self.assertFalse(self.kz_partition.__iter__.called)
-#     self.assertFalse(self.check_events_in_bucket.called)
-
-# def test_check_events_release(self):
-#     """
-#     `check_events` logs message and does not check events in buckets
-#     when partitioning has changed. It calls release_set() to
-#     re-partition.
-#     """
-#     self.kz_partition.release = True
-#     self._start_service()
-#     self.scheduler_service.check_events(100)
-#     self.log.msg.assert_called_with('Partition changed. Repartitioning')
-#     self.kz_partition.release_set.assert_called_once_with()
-
-#     # Ensure others are not called
-#     self.assertFalse(self.kz_partition.__iter__.called)
-#     self.assertFalse(self.check_events_in_bucket.called)
-
-# def test_check_events_failed(self):
-#     """
-#     `check_events` logs message and does not check events in buckets
-#     when partitioning has failed. It creates a new partition.
-#     """
-#     self.kz_partition.failed = True
-#     self._start_service()
-
-#     # after starting change SetPartitioner return value to check if
-#     # new value is set in self.scheduler_service.kz_partition
-#     new_kz_partition = mock.MagicMock()
-#     self.kz_client.SetPartitioner.return_value = new_kz_partition
-
-#     self.scheduler_service.check_events(100)
-#     self.log.msg.assert_called_with('Partition failed. Starting new')
-
-#     # Called once when starting and now again when partition failed
-#     self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
-#                      [mock.call(self.zk_partition_path,
-#                                 set=set(range(self.num_buckets)),
-#                                 time_boundary=self.time_boundary)] * 2)
-#     self.assertEqual(self.scheduler_service.kz_partition, new_kz_partition)
-
-#     # Ensure others are not called
-#     self.assertFalse(self.kz_partition.__iter__.called)
-#     self.assertFalse(new_kz_partition.__iter__.called)
-#     self.assertFalse(self.check_events_in_bucket.called)
-
-# def test_check_events_bad_state(self):
-#     """`self.kz_partition.state` is none of the exepected values.
-
-#     `check_events` logs it as err and starts a new partition
-
-#     """
-#     self.kz_partition.state = 'bad'
-#     self._start_service()
-
-#     # after starting change SetPartitioner return value to check if
-#     # new value is set in self.scheduler_service.kz_partition
-#     new_kz_partition = mock.MagicMock()
-#     self.kz_client.SetPartitioner.return_value = new_kz_partition
-
-#     self.scheduler_service.check_events(100)
-
-#     self.log.err.assert_called_with(
-#         'Unknown state bad. This cannot happen. Starting new')
-#     self.kz_partition.finish.assert_called_once_with()
-
-#     # Called once when starting and now again when got bad state
-#     self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
-#                      [mock.call(self.zk_partition_path,
-#                                 set=set(range(self.buckets)),
-#                                 time_boundary=self.time_boundary)] * 2)
-#     self.assertEqual(self.scheduler_service.kz_partition, new_kz_partition)
-
-#     # Ensure others are not called
-#     self.assertFalse(self.kz_partition.__iter__.called)
-#     self.assertFalse(new_kz_partition.__iter__.called)
-#     self.assertFalse(self.check_events_in_bucket.called)
-
-# def test_get_buckets(self):
-#     log.msg.assert_called_once_with('Got buckets {buckets}',
-#                                     buckets=[2, 3], path='/part_path')
-
-# def test_stop_service_allocating(self):
-#     """
-#     stopService() does not stop the allocation (i.e. call finish) if
-#     it is not acquired.
-#     """
-#     self._start_service()
-#     d = self.scheduler_service.stopService()
-#     self.assertFalse(self.kz_partition.finish.called)
-#     self.assertIsNone(d)
-
-# def test_reset_path(self):
-#     self.assertEqual(self.scheduler_service.zk_partition_path, '/new_path')
-#     self.kz_client.SetPartitioner.assert_called_once_with(
-#         '/new_path',
-#         set=set(range(self.num_buckets)),
-#         time_boundary=self.time_boundary)
-#     self.assertEqual(self.scheduler_service.kz_partition,
-#                      self.kz_client.SetPartitioner.return_value)
