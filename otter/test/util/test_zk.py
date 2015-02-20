@@ -27,6 +27,7 @@ class ZKCrudModel(object):
         self.nodes = {}
 
     def create(self, path, content, makepath=False):
+        """Create a node."""
         assert makepath is True, "makepath must be True"
         if path in self.nodes:
             return fail(NodeExistsError("{} already exists".format(path)))
@@ -34,6 +35,7 @@ class ZKCrudModel(object):
         return succeed(path)
 
     def get(self, path):
+        """Get content of the node, and stat info."""
         if path not in self.nodes:
             return fail(NoNodeError("{} does not exist".format(path)))
         content, version = self.nodes[path]
@@ -51,6 +53,7 @@ class ZKCrudModel(object):
                                                   current_version)))
 
     def set(self, path, new_value, version=-1):
+        """Set the content of a node."""
         check = self._check_version(path, version)
         if check is not None:
             return check
@@ -60,6 +63,7 @@ class ZKCrudModel(object):
         return succeed(new_stat)
 
     def delete(self, path, version=-1):
+        """Delete a node."""
         check = self._check_version(path, version)
         if check is not None:
             return check
@@ -68,19 +72,37 @@ class ZKCrudModel(object):
 
 
 class CreateOrSetTests(SynchronousTestCase):
+    """Tests for :func:`create_or_set`."""
     def setUp(self):
         self.model = ZKCrudModel()
 
     def test_create(self):
+        """Creates a node when it doesn't exist."""
         d = create_or_set(self.model, '/foo', 'bar')
         self.assertEqual(self.successResultOf(d), '/foo')
         self.assertEqual(self.model.nodes, {'/foo': ('bar', 0)})
 
     def test_update(self):
+        """Uses `set` to update the node when it does exist."""
         self.model.create('/foo', 'initial', makepath=True)
         d = create_or_set(self.model, '/foo', 'bar')
         self.assertEqual(self.successResultOf(d), '/foo')
         self.assertEqual(self.model.nodes, {'/foo': ('bar', 1)})
 
     def test_node_disappears_during_update(self):
-        1 / 0
+        """
+        If `set` can't find the node (because it was unexpectedly deleted
+        between the `create` and `set` calls), creation will be retried.
+        """
+        def hacked_set(path, value):
+            self.model.delete('/foo')
+            del self.model.set  # Only let this behavior run once
+            return self.model.set(path, value)
+        self.model.set = hacked_set
+
+        self.model.create('/foo', 'initial', makepath=True)
+        d = create_or_set(self.model, '/foo', 'bar')
+        self.assertEqual(self.successResultOf(d), '/foo')
+        # It must be at version 0 because it's a creation, whereas normally if
+        # the node were being updated it'd be at version 1.
+        self.assertEqual(self.model.nodes, {'/foo': ('bar', 0)})

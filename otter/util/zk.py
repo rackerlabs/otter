@@ -1,4 +1,4 @@
-from kazoo.exceptions import BadVersionError, NoNodeError, NodeExistsError
+from kazoo.exceptions import NoNodeError, NodeExistsError
 
 
 def create_or_set(kz_client, path, content):
