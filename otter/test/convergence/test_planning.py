@@ -1,6 +1,6 @@
 """Tests for convergence planning."""
 
-from pyrsistent import freeze, pbag, pmap, pset, s
+from pyrsistent import pbag, pmap, pset, s
 
 from toolz import groupby
 
