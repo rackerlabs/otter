@@ -13,7 +13,6 @@ from otter.convergence.model import (
     CLBNodeCondition,
     CLBNodeType,
     NovaServer,
-    ServerState,
     group_id_from_metadata)
 from otter.http import service_request
 from otter.indexer import atom
