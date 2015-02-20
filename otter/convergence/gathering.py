@@ -13,7 +13,8 @@ from otter.convergence.model import (
     CLBNodeCondition,
     CLBNodeType,
     NovaServer,
-    ServerState)
+    ServerState,
+    group_id_from_metadata)
 from otter.http import service_request
 from otter.indexer import atom
 from otter.util.http import append_segments
@@ -79,7 +80,7 @@ def get_scaling_group_servers(server_predicate=identity):
         return 'metadata' in s and isinstance(s['metadata'], dict)
 
     def group_id(s):
-        return NovaServer.group_id_from_metadata(s['metadata'])
+        return group_id_from_metadata(s['metadata'])
 
     servers_apply = compose(keyfilter(lambda k: k is not None),
                             groupby(group_id),

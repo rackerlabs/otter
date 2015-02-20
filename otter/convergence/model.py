@@ -226,45 +226,45 @@ class NovaServer(object):
             desired_lbs=_lbs_from_metadata(server_json.get('metadata')),
             servicenet_address=_servicenet_address(server_json))
 
-    @classmethod
-    def group_id_from_metadata(cls, metadata):
-        """
-        Get the group ID of a server based on the metadata.
 
-        The old key was ``rax:auto_scaling_group_id``, but the new key is
-        ``rax:autoscale:group:id``.  Try pulling from the new key first, and
-        if it doesn't exist, pull from the old.
-        """
-        return metadata.get(
-            "rax:autoscale:group:id",
-            metadata.get("rax:auto_scaling_group_id", None))
+def group_id_from_metadata(metadata):
+    """
+    Get the group ID of a server based on the metadata.
 
-    @classmethod
-    def generate_metadata(cls, group_id, lb_descriptions):
-        """
-        Generate autoscale-specific Nova server metadata given the group ID and
-        an iterable of :class:`ILBDescription` providers.
+    The old key was ``rax:auto_scaling_group_id``, but the new key is
+    ``rax:autoscale:group:id``.  Try pulling from the new key first, and
+    if it doesn't exist, pull from the old.
+    """
+    return metadata.get(
+        "rax:autoscale:group:id",
+        metadata.get("rax:auto_scaling_group_id", None))
 
-        NOTE: Currently this ignores RCv3 settings and draining timeout
-        settings, since they haven't been implemented yet.
 
-        :return: a metadata `dict` containing the group ID and LB information
-        """
-        metadata = {
-            'rax:auto_scaling_group_id': group_id,
-            'rax:autoscale:group:id': group_id
-        }
+def generate_metadata(group_id, lb_descriptions):
+    """
+    Generate autoscale-specific Nova server metadata given the group ID and
+    an iterable of :class:`ILBDescription` providers.
 
-        descriptions = groupby(lambda desc: (desc.lb_id, type(desc)),
-                               lb_descriptions)
+    NOTE: Currently this ignores RCv3 settings and draining timeout
+    settings, since they haven't been implemented yet.
 
-        for (lb_id, desc_type), descs in descriptions.iteritems():
-            if desc_type == CLBDescription:
-                key = 'rax:autoscale:lb:CloudLoadBalancer:{0}'.format(lb_id)
-                metadata[key] = json.dumps([
-                    {'port': desc.port} for desc in descs])
+    :return: a metadata `dict` containing the group ID and LB information
+    """
+    metadata = {
+        'rax:auto_scaling_group_id': group_id,
+        'rax:autoscale:group:id': group_id
+    }
 
-        return metadata
+    descriptions = groupby(lambda desc: (desc.lb_id, type(desc)),
+                           lb_descriptions)
+
+    for (lb_id, desc_type), descs in descriptions.iteritems():
+        if desc_type == CLBDescription:
+            key = 'rax:autoscale:lb:CloudLoadBalancer:{0}'.format(lb_id)
+            metadata[key] = json.dumps([
+                {'port': desc.port} for desc in descs])
+
+    return metadata
 
 
 @attributes(['server_config', 'capacity',

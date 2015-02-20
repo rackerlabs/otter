@@ -23,7 +23,9 @@ from otter.convergence.model import (
     ServerState,
     _private_ipv4_addresses,
     _servicenet_address,
-    get_service_metadata
+    get_service_metadata,
+    generate_metadata,
+    group_id_from_metadata
 )
 
 
@@ -293,12 +295,12 @@ class AutoscaleMetadataTests(SynchronousTestCase):
     """
     def test_get_group_id_from_metadata(self):
         """
-        :func:`NovaServer.group_id_from_metadata` returns the group ID from
+        :func:`group_id_from_metadata` returns the group ID from
         metadata no matter if it's old style or new style.
         """
         for key in ("rax:autoscale:group:id", "rax:auto_scaling_group_id"):
             self.assertEqual(
-                NovaServer.group_id_from_metadata({key: "group_id"}),
+                group_id_from_metadata({key: "group_id"}),
                 "group_id")
 
     def test_invalid_group_id_key_returns_none(self):
@@ -309,9 +311,9 @@ class AutoscaleMetadataTests(SynchronousTestCase):
         for key in (":rax:autoscale:group:id", "rax:autoscaling_group_id",
                     "completely_wrong"):
             self.assertIsNone(
-                NovaServer.group_id_from_metadata({key: "group_id"}))
+                group_id_from_metadata({key: "group_id"}))
 
-        self.assertIsNone(NovaServer.group_id_from_metadata({}))
+        self.assertIsNone(group_id_from_metadata({}))
 
     def test_generate_metadata(self):
         """
@@ -331,7 +333,7 @@ class AutoscaleMetadataTests(SynchronousTestCase):
             'rax:autoscale:lb:CloudLoadBalancer:234': '[{"port": 80}]'
         }
 
-        self.assertEqual(NovaServer.generate_metadata('group_id', lbs),
+        self.assertEqual(generate_metadata('group_id', lbs),
                          expected)
 
 
