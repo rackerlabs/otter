@@ -6,7 +6,7 @@ from functools import partial
 from effect import Constant, Effect
 from effect.testing import Stub
 
-from pyrsistent import pmap
+from pyrsistent import pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -468,10 +468,9 @@ class ToNovaServerTests(SynchronousTestCase):
                        image_id='valid_image',
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
-                       desired_lbs=pmap({
-                           '01234': [CLBDescription(lb_id='01234', port=80),
-                                     CLBDescription(lb_id='01234', port=90)]
-                       }),
+                       desired_lbs=pset([
+                            CLBDescription(lb_id='01234', port=80),
+                            CLBDescription(lb_id='01234', port=90)]),
                        servicenet_address=''))
 
 

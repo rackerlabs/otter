@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from characteristic import attributes
 
-from pyrsistent import pmap
+from pyrsistent import pmap, pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -330,8 +330,8 @@ class AutoscaleMetadataTests(SynchronousTestCase):
         }
         self.assertEqual(
             NovaServer.lbs_from_metadata(metadata),
-            pmap({'123': [CLBDescription(lb_id='123', port=80),
-                          CLBDescription(lb_id='123', port=8080)]}))
+            pset([CLBDescription(lb_id='123', port=80),
+                  CLBDescription(lb_id='123', port=8080)]))
 
     def test_lbs_from_metadata_ignores_unsupported_lb_types(self):
         """
@@ -341,7 +341,7 @@ class AutoscaleMetadataTests(SynchronousTestCase):
             "rax:autoscale:lb:RackConnect:{0}".format(uuid4()): None,
             "rax:autoscale:lb:Neutron:456": None
         }
-        self.assertEqual(NovaServer.lbs_from_metadata(metadata), pmap())
+        self.assertEqual(NovaServer.lbs_from_metadata(metadata), pset())
 
     def test_generate_metadata(self):
         """

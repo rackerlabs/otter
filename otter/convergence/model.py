@@ -7,7 +7,7 @@ import re
 
 from characteristic import Attribute, attributes
 
-from pyrsistent import PSet, freeze, pset
+from pyrsistent import PSet, freeze, pset, pmap
 
 from toolz.itertoolz import groupby
 
@@ -146,7 +146,7 @@ class NovaServer(object):
     :ivar str image_id: The ID of the image the server was launched with
     :ivar str flavor_id: The ID of the flavor the server was launched with
 
-    :ivar PMap desired_lbs: An immutable mapping of load balancer IDs to lists
+    :ivar PSet desired_lbs: An immutable mapping of load balancer IDs to lists
         of :class:`CLBDescription` instances.
     """
 
@@ -175,20 +175,20 @@ class NovaServer(object):
         :return: ``dict`` of `ILBDescription` providers
         """
         lbs = get_service_metadata('autoscale', metadata).get('lb', {})
-        desired_lbs = {}
+        desired_lbs = []
 
         for lb_id, v in lbs.get('CloudLoadBalancer', {}).iteritems():
             # if malformed, skiped the whole key
             try:
                 configs = json.loads(v)
                 if isinstance(configs, list):
-                    desired_lbs[lb_id] = [
+                    desired_lbs.extend([
                         CLBDescription(lb_id=lb_id, port=c['port'])
-                        for c in configs]
+                        for c in configs])
             except (ValueError, KeyError, TypeError):
                 pass
 
-        return pmap(desired_lbs)
+        return pset(desired_lbs)
 
     @classmethod
     def generate_metadata(cls, group_id, lb_descriptions):
