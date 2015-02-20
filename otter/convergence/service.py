@@ -21,7 +21,7 @@ from otter.http import TenantScope
 from otter.models.intents import ModifyGroupState
 from otter.util.deferredutils import with_lock
 from otter.util.fp import assoc_obj
-from otter.util.zk import create_or_update
+from otter.util.zk import create_or_set
 
 
 def server_to_json(server):
@@ -103,10 +103,10 @@ class ConvergenceStarter(Service, object):
 
 
     def _mark_dirty(self, group_id):
-        # This is trickier than just "create a znode; ignore a
-        # NodeExistsError", because that will allow a race condition that can
-        # lead to stalled convergence. Here's the scenario, with Otter nodes
-        # 'A' and 'B'.
+        # This is tricky enough that just using a boolean flag for "is group
+        # dirty or not" won't work, because that will allow a race condition
+        # that can lead to stalled convergence. Here's the scenario, with Otter
+        # nodes 'A' and 'B', assuming only a boolean `dirty` flag:
 
         # - A: mark group N dirty
         # -               B: converge group N (repeat until done)
@@ -114,34 +114,38 @@ class ConvergenceStarter(Service, object):
         # -               B: mark group N clean
 
         # Here, a policy was executed on group N twice, and A tried to mark it
-        # dirty twice, but failed the second time because the group was already
-        # marked dirty. The problem is that when the converger node finished
-        # converging based on the first time it noticed the group was dirty, it
-        # then marked it clean *after* node A tried to mark it dirty a second
-        # time. Usually this will not be a problem because at the beginning of
-        # each iteration of convergence, the desired group state will be
-        # recalculated, so as long as the "duplicate" dirty happens before the
-        # final iteration, nothing will be lost. But if it happens at just the
-        # right moment, after the final iteration and before the group is
-        # marked clean, then we will be stalled.
+        # dirty twice (and ignored a NoNodeError because the fact that it's
+        # already there means it's already dirty, so recreating should be a
+        # no-op). The problem is that when the converger node finished
+        # converging, it then marked it clean *after* node A tried to mark it
+        # dirty a second time. Usually this will not be a problem because at
+        # the beginning of each iteration of convergence, the desired group
+        # state will be recalculated, so as long as the "duplicate" dirty
+        # happens before the final iteration, nothing will be lost. But if it
+        # happens at just the right moment, after the final iteration and
+        # before the group is marked clean, then the changes desired by the
+        # second policy execution will not happen.
 
-        # The way we solve this is by storing a counter in the node, using a
-        # strong version-based check-and-set. Every time we mark dirty, we
-        # either create the dirty-flag zknode with '1' as the content, or if
-        # the dirty-flag zknode already exists, it will be incremented. Then,
-        # when convergence finishes, instead of deleting the zknode outright,
-        # it will decrement it if the value is >1 and delete it if it is 1
-        # (again, with a strong version-based check-and-set).
+        # So instead of just a boolean flag, we'll takie advantage of ZK node
+        # versioning. When we mark a group as dirty, we'll create a node for it
+        # if it doesn't exist, and if it does exist, we'll write to it with
+        # `set`. The content doesn't matter - the only thing that does matter
+        # is the version, which will be incremented on every `set`
+        # operation. On the converger side, when it searches for dirty groups
+        # to converge, it will remember the version of the node. When
+        # convergence completes, it will delete the node ONLY if the version
+        # hasn't changed, with a `delete(path, version)` call.
 
-        # This is kind of like a super simple queue, in that it allows us to
-        # keep track of distinct events. Unlike a queue, there are no per-event
-        # payloads.
+        # The effect of this is that if any process updates the dirty flag
+        # after it's already been created, the node won't be deleted, so
+        # convergence will pick up that group again. We don't need to keep
+        # track of exactly how many times a group has been marked dirty
+        # (i.e. how many times a policy has been executed or config has
+        # changed), only if there are _any_ outstanding requests for
+        # convergence, since convergence always uses the most recent data.
 
         path = CONVERGENCE_DIRTY_PATH.format(group_id=group_id)
-        d = create_or_update(self._kz_client,
-                             path,
-                             lambda x: str(int(x) + 1),
-                             '1')
+        d = create_or_set(self._kz_client, path, 'dirty')
         d.addErrback(log.err, otter_msg_type='mark-dirty-failed')
         return d
 
