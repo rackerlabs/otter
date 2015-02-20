@@ -7,7 +7,7 @@ import re
 
 from characteristic import Attribute, attributes
 
-from pyrsistent import PSet, freeze, pset, pmap
+from pyrsistent import PSet, freeze, pmap, pset
 
 from toolz.itertoolz import groupby
 

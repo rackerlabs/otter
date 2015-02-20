@@ -4,7 +4,6 @@ Code for composing all of the convergence functionality together.
 from pyrsistent import freeze, pset
 
 from toolz.dicttoolz import get_in, merge
-from toolz.itertoolz import concat
 
 from otter.convergence.model import (
     CLBDescription,
