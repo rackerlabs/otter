@@ -133,6 +133,10 @@ class ConvergenceStarter(Service, object):
         # it will decrement it if the value is >1 and delete it if it is 1
         # (again, with a strong version-based check-and-set).
 
+        # This is kind of like a super simple queue, in that it allows us to
+        # keep track of distinct events. Unlike a queue, there are no per-event
+        # payloads.
+
         path = CONVERGENCE_DIRTY_PATH.format(group_id=group_id)
         d = create_or_update(self._kz_client,
                              path,
@@ -151,9 +155,8 @@ class ConvergenceStarter(Service, object):
         :param log: a bound logger.
         :param group_id: The ID of the group to converge.
         """
-        log.msg("Marking group dirty",
-                otter_msg_type='convergence-mark-dirty')
-        self._mark_dirty(group_id)
+        log.msg("Marking group dirty", otter_msg_type='convergence-mark-dirty')
+        return self._mark_dirty(group_id)
 
 
 class Converger(MultiService, object):
@@ -187,6 +190,22 @@ class Converger(MultiService, object):
         """
         # list everything in CONVERGENCE_DIRTY_PATH
         # if hash(el) % self.num_buckets in buckets: CONVERGE IT!
+        # after that:
+
+        # See the comment in `ConvergenceStarter._make_dirty` to understand
+        # this.  After finishing convergence, we decrement the dirty counter or
+        # delete it entirely if it's 0. If it's not deleted, we'll kick off
+        # another convergence.
+        path = CONVERGENCE_DIRTY_PATH.format(group_id)
+        def update_or_delete_func(content):
+            num = int(content)
+            if num > 1:
+                return str(num - 1)
+            else:
+                return DELETE_NODE
+        d = update_or_delete(self._kz_client, path, update_or_delete_func)
+        d.addErrback(log.err, otter_msg_type='mark-clean-failed')
+        return d
 
     def exec_convergence(self, log, scaling_group, group_state,
                          launch_config,
