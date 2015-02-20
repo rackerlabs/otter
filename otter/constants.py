@@ -3,7 +3,8 @@
 from twisted.python.constants import NamedConstant, Names
 
 
-CONVERGENCE_LOCK_PATH = '/groups/{group_id}/converge_lock'
+CONVERGENCE_DIRTY_PATH = '/groups/converging/{group_id}'
+CONVERGENCE_PARTITIONER_PATH = '/convergence-partitioner'
 
 
 class ServiceType(Names):

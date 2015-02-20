@@ -12,7 +12,8 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter import controller
 
-from otter.convergence.service import get_converger, set_converger
+from otter.convergence.service import (
+    get_convergence_starter, set_convergence_starter)
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError)
 from otter.util.timestamp import MIN
@@ -1001,9 +1002,9 @@ class ConvergeTestCase(SynchronousTestCase):
         self.mock_log = mock.MagicMock()
         self.mock_state = mock_group_state()
         self.group = mock_group()
-        self.converger_mock = mock.Mock()
-        self.addCleanup(set_converger, get_converger())
-        set_converger(self.converger_mock)
+        self.cvg_starter_mock = mock.Mock()
+        self.addCleanup(set_convergence_starter, get_convergence_starter())
+        set_convergence_starter(self.cvg_starter_mock)
 
     def test_no_change_returns_none(self):
         """
@@ -1034,7 +1035,7 @@ class ConvergeTestCase(SynchronousTestCase):
         bound_log.msg.assert_any_call('executing launch configs')
 
         # And converger service is _not_ called
-        self.assertFalse(self.converger_mock.start_convergence.called)
+        self.assertFalse(self.cvg_starter_mock.start_convergence.called)
 
     def test_scale_down_exec_scale_down(self):
         """
@@ -1052,7 +1053,7 @@ class ConvergeTestCase(SynchronousTestCase):
             bound_log, 'transaction', self.mock_state, self.group, 5)
         bound_log.msg.assert_any_call('scaling down')
         # And converger service is _not_ called
-        self.assertFalse(self.converger_mock.start_convergence.called)
+        self.assertFalse(self.cvg_starter_mock.start_convergence.called)
 
     def test_audit_log_scale_up(self):
         """
@@ -1105,8 +1106,8 @@ class ConvergeTestCase(SynchronousTestCase):
                                      state, 'launch', policy,
                                      config_value=config_data.get)
         self.assertIs(result, None)
-        self.converger_mock.start_convergence.assert_called_once_with(
-            log, self.group, state, 'launch')
+        self.cvg_starter_mock.start_convergence.assert_called_once_with(
+            log, 'group-id')
 
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)

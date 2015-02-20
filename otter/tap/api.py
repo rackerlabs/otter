@@ -24,7 +24,8 @@ from txkazoo import TxKazooClient
 from otter.auth import generate_authenticator
 from otter.bobby import BobbyClient
 from otter.constants import get_service_configs
-from otter.convergence.service import Converger, set_converger
+from otter.convergence.service import (
+    ConvergenceStarter, set_convergence_starter)
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log
 from otter.log.cloudfeeds import CloudFeedsObserver
@@ -269,9 +270,9 @@ def makeService(config):
                              kz_client.stop, supervisor)))
 
             # setup converger service
-            converger_service = Converger(reactor, kz_client, dispatcher)
+            converger_service = ConvergenceStarter(kz_client)
             s.addService(converger_service)
-            set_converger(converger_service)
+            set_convergence_starter(converger_service)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')

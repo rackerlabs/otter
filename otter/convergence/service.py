@@ -9,9 +9,9 @@ from effect.twisted import perform
 
 from toolz.itertoolz import concat
 
-from twisted.application.service import Service
+from twisted.application.service import MultiService, Service
 
-from otter.constants import CONVERGENCE_LOCK_PATH
+from otter.constants import CONVERGENCE_DIRTY_PATH
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
@@ -92,25 +92,102 @@ def execute_convergence(
     return all_data_eff.on(got_all_data)
 
 
-class Converger(Service, object):
-    """Converger service"""
+class ConvergenceStarter(Service, object):
+    """
+    A service that allows registering interest in convergence, but does not
+    actually execute convergence (see :obj:`Converger` for that).
+    """
+    def __init__(self, kz_client):
+        self._kz_client = kz_client
 
-    def __init__(self, reactor, kz_client, dispatcher):
-        self._reactor = reactor
+
+    def _mark_dirty(self, group_id):
+        # TODO: There's a race condition here that will still lead to
+        # convergence stalling, in rare conditions.
+
+        # - A: mark group N dirty due to policy
+        # -               B: converge group N (repeat until done)
+        # - A: mark group N dirty due to policy, get a NodeExistsError
+        # -               B: mark group N clean
+
+        # Basically, if a policy is executed just as the final convergence
+        # iteration is completing, and the group is marked dirty just before
+        # the converging node marks it clean, the change from the policy won't
+        # immediately take effect (though if another event happens later it
+        # should be resolved).
+
+        # How do we solve this?
+
+        # STRONG
+        # a. Store a counter in the node. Not sure if this can be done
+        #    reliably. Each mark_dirty would increment it, each no-op
+        #    convergence would decrement it. I don't think we need to care
+        #    beyond 2, but I'm not sure.
+        # b. Investigate using the ZK "queue" pattern to do the same general
+        #    idea as in `a`.
+
+        # WEAK
+        # c. After marking a group clean, check to see if desired has changed
+        #    as a last-ditch check to see if we need to run convergence again.
+        return self._kz_client.create(
+            CONVERGENCE_DIRTY_PATH.format(group_id=group_id),
+            makepath=True
+        ).addErrback(
+            log.err, "Failed to mark dirty",
+            otter_msg_type="convergence-mark-dirty-error"
+        )
+
+    def start_convergence(self, log, group_id):
+        """
+        Indicate that a group should be converged.
+
+        This doesn't actually do the work of convergence, it effectively just
+        puts an item in a queue.
+
+        :param log: a bound logger.
+        :param group_id: The ID of the group to converge.
+        """
+        log.msg("Marking group dirty",
+                otter_msg_type='convergence-mark-dirty')
+        self._mark_dirty(group_id)
+
+
+class Converger(MultiService, object):
+    """
+    A service that searches for groups that need converging and then does the
+    work of converging them.
+
+    Work is split up between nodes running this service by using a Kazoo
+    :obj:`SetPartitioner`. This service could be run separately from the API
+    nodes.
+    """
+
+    def __init__(self, log, kz_client, store, dispatcher, num_buckets,
+                 partitioner_factory):
+        """
+        :param log: a bound log
+        :param kz_client: txKazoo client
+        :param store: cassandra store
+        """
         self._kz_client = kz_client
         self._dispatcher = dispatcher
+        self._num_buckets = num_buckets
+        self.log = log.bind(system='converger')
+        self.partitioner = partitioner_factory(
+            self.log, self._check_convergence)
 
-    def _get_lock(self, group_id):
-        """Get a ZooKeeper-backed lock for converging the group."""
-        path = CONVERGENCE_LOCK_PATH.format(group_id=group_id)
-        lock = self._kz_client.Lock(path)
-        lock.acquire = partial(lock.acquire, timeout=120)
-        return lock
+    def _check_convergence(self, buckets):
+        """
+        Check for groups that need convergence and which match up to the
+        buckets we've been allocated.
+        """
+        # list everything in CONVERGENCE_DIRTY_PATH
+        # if hash(el) % self.num_buckets in buckets: CONVERGE IT!
 
-    def start_convergence(self, log, scaling_group, group_state,
-                          launch_config,
-                          perform=perform,
-                          execute_convergence=execute_convergence):
+    def exec_convergence(self, log, scaling_group, group_state,
+                         launch_config,
+                         perform=perform,
+                         execute_convergence=execute_convergence):
         """
         Converge a group to a capacity with a launch config.
 
@@ -122,33 +199,26 @@ class Converger(Service, object):
         :param execute_convergence: :func:`execute_convergence` function to use
             for testing.
         """
-        def exec_convergence():
-            eff = execute_convergence(scaling_group, group_state.desired,
-                                      launch_config, time.time(), log)
-            eff = Effect(TenantScope(eff, group_state.tenant_id))
-            d = perform(self._dispatcher, eff)
-            return d.addErrback(log.err, "Error when performing convergence",
-                                otter_msg_type='convergence-perform-error')
-        return with_lock(
-            self._reactor,
-            self._get_lock(group_state.group_id),
-            exec_convergence,
-            acquire_timeout=150,
-            release_timeout=150)
+        eff = execute_convergence(scaling_group, group_state.desired,
+                                  launch_config, time.time(), log)
+        eff = Effect(TenantScope(eff, group_state.tenant_id))
+        d = perform(self._dispatcher, eff)
+        return d.addErrback(log.err, "Error when performing convergence",
+                            otter_msg_type='convergence-perform-error')
 
 
 # We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this
 # service is used.
-_converger = None
+_convergence_starter = None
 
 
-def get_converger():
-    """Return global converger service"""
-    return _converger
+def get_convergence_starter():
+    """Return global :obj:`ConvergenceStarter` service"""
+    return _convergence_starter
 
 
-def set_converger(converger):
-    """Set global converger service"""
-    global _converger
-    _converger = converger
+def set_convergence_starter(convergence_starter):
+    """Set global :obj:`ConvergenceStarter` service"""
+    global _convergence_starter
+    _convergence_starter = convergence_starter
