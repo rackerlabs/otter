@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# To run the integration tests, you'll need to have various environment
+# settings established.
+
+# This is the username used to authenticate against Identity.
+export AS_USERNAME=joe_user
+
+# This is the password used to authenticate against Identity.
+export AS_PASSWORD=joes_password
+
+# This is the Identity V2 API endpoint.
+export AS_IDENTITY=https://identity.api.rackspacecloud.com/v2.0
+
+# When creating servers, use this flavor.
+export AS_FLAVOR_REF=2
+
+# When creating servers, use this image.
+export AS_IMAGE_REF=cca73d10-8953-4949-a2f2-1e5444a4130d
+
+# When creating servers, use this region.  Beware; this is case sensitive.
+export AS_REGION=IAD

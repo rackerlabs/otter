@@ -45,6 +45,15 @@ class JsonToLBConfigTests(SynchronousTestCase):
 class GetDesiredGroupStateTests(SynchronousTestCase):
     """Tests for :func:`get_desired_group_state`."""
 
+    def assert_server_config_hashable(self, state):
+        """
+        Assert that a :class:`DesiredGroupState` has a hashable server config.
+        """
+        try:
+            hash(state.server_config)
+        except TypeError as e:
+            self.fail("{0} in {1}".format(e, state.server_config))
+
     def test_convert(self):
         """
         An Otter launch config a :obj:`DesiredGroupState`, ignoring extra
@@ -52,9 +61,12 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
         """
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config,
-                       'loadBalancers': [{'loadBalancerId': 23, 'port': 80,
-                                          'whatsit': 'invalid'},
-                                         {'loadBalancerId': 23, 'port': 90}]}}
+                       'loadBalancers': [
+                           {'loadBalancerId': 23, 'port': 80,
+                            'whatsit': 'invalid'},
+                           {'loadBalancerId': 23, 'port': 90},
+                           {'loadBalancerId': 23, 'type': 'RackConnectV3'},
+                           {'loadBalancerId': '12', 'type': 'RackConnectV3'}]}}
 
         expected_server_config = {
             'server': {
@@ -62,9 +74,10 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 'flavorRef': 'f',
                 'metadata': {
                     'rax:auto_scaling_group_id': 'uuid',
-                    'rax:autoscale:lb:23': json.dumps(
-                        [{"port": 80, "type": "CloudLoadBalancer"},
-                         {"port": 90, "type": "CloudLoadBalancer"}])
+                    'rax:autoscale:group:id': 'uuid',
+                    'rax:autoscale:lb:CloudLoadBalancer:23': json.dumps(
+                        [{"port": 80},
+                         {"port": 90}])
                 }
             }
         }
@@ -77,6 +90,7 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 desired_lbs=pset([
                     CLBDescription(lb_id='23', port=80),
                     CLBDescription(lb_id='23', port=90)])))
+        self.assert_server_config_hashable(state)
 
     def test_no_lbs(self):
         """
@@ -91,7 +105,8 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 'name': 'test',
                 'flavorRef': 'f',
                 'metadata': {
-                    'rax:auto_scaling_group_id': 'uuid'}}}
+                    'rax:auto_scaling_group_id': 'uuid',
+                    'rax:autoscale:group:id': 'uuid'}}}
         state = get_desired_group_state('uuid', lc, 2)
         self.assertEqual(
             state,
@@ -99,6 +114,7 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 server_config=expected_server_config,
                 capacity=2,
                 desired_lbs=pset()))
+        self.assert_server_config_hashable(state)
 
 
 class FeatureFlagTest(SynchronousTestCase):

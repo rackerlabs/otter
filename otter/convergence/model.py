@@ -2,10 +2,14 @@
 Data classes for representing bits of information that need to share a
 representation across the different phases of convergence.
 """
+import json
+import re
 
 from characteristic import Attribute, attributes
 
 from pyrsistent import PSet, freeze, pset
+
+from toolz.itertoolz import groupby
 
 from twisted.python.constants import NamedConstant, Names
 
@@ -98,6 +102,30 @@ class StepResult(Names):
     """
 
 
+def get_service_metadata(service_name, metadata):
+    """
+    Obtain all the metadata associated with a particular service from Nova
+    metadata (expecting the schema:  `rax:<service_name>:k1:k2:k3...`).
+
+    :return: the metadata values as a dictionary - in the example above, the
+        dictionary would look like `{k1: {k2: {k3: val}}}`
+    """
+    as_metadata = pmap()
+    if isinstance(metadata, dict):
+        key_pattern = re.compile(
+            "^rax:{service}(?P<subkeys>(:[A-Za-z0-9\-_]+)+)$"
+            .format(service=service_name))
+
+        for k, v in metadata.iteritems():
+            m = key_pattern.match(k)
+            if m:
+                subkeys = m.groupdict()['subkeys']
+                as_metadata = as_metadata.set_in(
+                    [sk for sk in subkeys.split(':') if sk],
+                    v)
+    return as_metadata
+
+
 @attributes(['id', 'state', 'created', 'image_id', 'flavor_id',
              Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
              Attribute('servicenet_address',
@@ -125,6 +153,69 @@ class NovaServer(object):
     def __init__(self):
         assert self.state in ServerState.iterconstants(), \
             "%r is not a ServerState" % (self.state,)
+
+    @classmethod
+    def group_id_from_metadata(cls, metadata):
+        """
+        Get the group ID of a server based on the metadata.
+
+        The old key was ``rax:auto_scaling_group_id``, but the new key is
+        ``rax:autoscale:group:id``.  Try pulling from the new key first, and
+        if it doesn't exist, pull from the old.
+        """
+        return metadata.get(
+            "rax:autoscale:group:id",
+            metadata.get("rax:auto_scaling_group_id", None))
+
+    @classmethod
+    def lbs_from_metadata(cls, metadata):
+        """
+        Get the desired load balancer descriptions based on the metadata.
+
+        :return: ``dict`` of `ILBDescription` providers
+        """
+        lbs = get_service_metadata('autoscale', metadata).get('lb', {})
+        desired_lbs = {}
+
+        for lb_id, v in lbs.get('CloudLoadBalancer', {}).iteritems():
+            # if malformed, skiped the whole key
+            try:
+                configs = json.loads(v)
+                if isinstance(configs, list):
+                    desired_lbs[lb_id] = [
+                        CLBDescription(lb_id=lb_id, port=c['port'])
+                        for c in configs]
+            except (ValueError, KeyError, TypeError):
+                pass
+
+        return pmap(desired_lbs)
+
+    @classmethod
+    def generate_metadata(cls, group_id, lb_descriptions):
+        """
+        Generate autoscale-specific Nova server metadata given the group ID and
+        an iterable of :class:`ILBDescription` providers.
+
+        NOTE: Currently this ignores RCv3 settings and draining timeout
+        settings, since they haven't been implemented yet.
+
+        :return: a metadata `dict` containing the group ID and LB information
+        """
+        metadata = {
+            'rax:auto_scaling_group_id': group_id,
+            'rax:autoscale:group:id': group_id
+        }
+
+        descriptions = groupby(lambda desc: (desc.lb_id, type(desc)),
+                               lb_descriptions)
+
+        for (lb_id, desc_type), descs in descriptions.iteritems():
+            if desc_type == CLBDescription:
+                key = 'rax:autoscale:lb:CloudLoadBalancer:{0}'.format(lb_id)
+                metadata[key] = json.dumps([
+                    {'port': desc.port} for desc in descs])
+
+        return metadata
 
 
 @attributes(['server_config', 'capacity',
@@ -160,9 +251,11 @@ class ILBDescription(Interface):
 
     Implementers should have immutable attributes.
     """
+    lb_id = IAttribute("The ID of this node.")
+
     def equivalent_definition(other_description):  # pragma: no cover
         """
-        Checks whether two description have the same definitions.
+        Check whether two description have the same definitions.
 
         A definition is anything non-server specific information that describes
         how to add a node to a particular load balancing entity.  For instance,
@@ -195,7 +288,8 @@ class ILBNode(Interface):
         :param server: The server to match against.
         :type server: :class:`NovaServer`
 
-        :return: ``True`` if the server could match this LB node, ``False`` else
+        :return: ``True`` if the server could match this LB node,
+            ``False`` else
         :rtype: `bool`
         """
 

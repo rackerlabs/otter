@@ -403,7 +403,8 @@ class SingleTenantAuthenticatorTests(SynchronousTestCase):
         """
         result = self.successResultOf(self.st.authenticate_tenant(1111111))
 
-        self.assertEqual(result, fake_service_catalog)
+        self.assertEqual(result[0], 'auth-token')
+        self.assertEqual(result[1], fake_service_catalog)
 
     def test_authenticate_tenant_propagates_user_list_errors(self):
         """

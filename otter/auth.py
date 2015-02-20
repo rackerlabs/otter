@@ -307,7 +307,8 @@ class SingleTenantAuthenticator(object):
                               tenant_id=tenant_id,
                               expire_in=10800,
                               log=log)
-        d.addCallback(extract_service_catalog)
+        d.addCallback(
+            lambda json: (extract_token(json), extract_service_catalog(json)))
         return d
 
     def __hash__(self):
