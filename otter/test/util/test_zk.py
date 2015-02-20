@@ -25,11 +25,6 @@ class ZKCrudModel(object):
     """
     def __init__(self):
         self.nodes = {}
-        self.content_hooks = {}
-        self.delete_hooks = {}
-
-    def add_delete_hook(self, path, fn):
-        self.delete_hooks[path] = fn
 
     def create(self, path, content, makepath=False):
         assert makepath is True, "makepath must be True"
@@ -67,8 +62,6 @@ class ZKCrudModel(object):
         if check is not None:
             return check
         del self.nodes[path]
-        if path in self.delete_hooks:
-            self.delete_hooks[path]()
         return succeed(None)
 
 
