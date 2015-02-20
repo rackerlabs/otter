@@ -6,6 +6,8 @@ from functools import partial
 from effect import Constant, Effect
 from effect.testing import Stub
 
+from pyrsistent import freeze
+
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
@@ -362,14 +364,16 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
              'flavor': {'id': 'flavor'},
              'created': '1970-01-01T00:00:00Z',
              'addresses': {'private': [{'addr': u'10.0.0.1',
-                                        'version': 4}]}},
+                                        'version': 4}]},
+             'links': [{'href': 'link1', 'rel': 'self'}]},
             {'id': 'b',
              'status': 'ACTIVE',
              'image': {'id': 'image'},
              'flavor': {'id': 'flavor'},
              'created': '1970-01-01T00:00:01Z',
              'addresses': {'private': [{'addr': u'10.0.0.2',
-                                        'version': 4}]}}
+                                        'version': 4}]},
+             'links': [{'href': 'link2', 'rel': 'self'}]}
         ]
 
     def test_success(self):
@@ -391,13 +395,15 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                        image_id='image',
                        flavor_id='flavor',
                        created=0,
-                       servicenet_address='10.0.0.1'),
+                       servicenet_address='10.0.0.1',
+                       links=freeze([{'href': 'link1', 'rel': 'self'}])),
             NovaServer(id='b',
                        state=ServerState.ACTIVE,
                        image_id='image',
                        flavor_id='flavor',
                        created=1,
-                       servicenet_address='10.0.0.2'),
+                       servicenet_address='10.0.0.2',
+                       links=freeze([{'href': 'link2', 'rel': 'self'}]))
         ]
         self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))
 

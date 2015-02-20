@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from characteristic import attributes
 
-from pyrsistent import pmap
+from pyrsistent import freeze, pmap
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -345,18 +345,26 @@ class ToNovaServerTests(SynchronousTestCase):
         """
         self.createds = [('2020-10-10T10:00:00Z', 1602324000),
                          ('2020-10-20T11:30:00Z', 1603193400)]
+        self.links = [
+            [{'href': 'link1', 'rel': 'self'},
+             {'href': 'otherlink1', 'rel': 'bookmark'}],
+            [{'href': 'link2', 'rel': 'self'},
+             {'href': 'otherlink2', 'rel': 'bookmark'}]
+        ]
         self.servers = [{'id': 'a',
                          'status': 'ACTIVE',
                          'created': self.createds[0][0],
                          'image': {'id': 'valid_image'},
-                         'flavor': {'id': 'valid_flavor'}},
+                         'flavor': {'id': 'valid_flavor'},
+                         'links': self.links[0]},
                         {'id': 'b',
                          'status': 'BUILD',
                          'image': {'id': 'valid_image'},
                          'flavor': {'id': 'valid_flavor'},
                          'created': self.createds[1][0],
                          'addresses': {'private': [{'addr': u'10.0.0.1',
-                                                    'version': 4}]}}]
+                                                    'version': 4}]},
+                         'links': self.links[1]}]
 
     def test_without_address(self):
         """
@@ -369,7 +377,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        image_id='valid_image',
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
-                       servicenet_address=''))
+                       servicenet_address='',
+                       links=freeze(self.links[0])))
 
     def test_without_private(self):
         """
@@ -383,7 +392,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        image_id='valid_image',
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
-                       servicenet_address=''))
+                       servicenet_address='',
+                       links=freeze(self.links[0])))
 
     def test_with_servicenet(self):
         """
@@ -396,7 +406,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        image_id='valid_image',
                        flavor_id='valid_flavor',
                        created=self.createds[1][1],
-                       servicenet_address='10.0.0.1'))
+                       servicenet_address='10.0.0.1',
+                       links=freeze(self.links[1])))
 
     def test_without_image_id(self):
         """
@@ -412,7 +423,8 @@ class ToNovaServerTests(SynchronousTestCase):
                            image_id=None,
                            flavor_id='valid_flavor',
                            created=self.createds[0][1],
-                           servicenet_address=''))
+                           servicenet_address='',
+                           links=freeze(self.links[0])))
         del self.servers[0]['image']
         self.assertEqual(
             NovaServer.from_server_details_json(self.servers[0]),
@@ -421,7 +433,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        image_id=None,
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
-                       servicenet_address=''))
+                       servicenet_address='',
+                       links=freeze(self.links[0])))
 
     def test_with_lb_metadata(self):
         """
@@ -455,7 +468,8 @@ class ToNovaServerTests(SynchronousTestCase):
                            '1': [CLBDescription(lb_id='1', port=80),
                                  CLBDescription(lb_id='1', port=90)]
                        }),
-                       servicenet_address=''))
+                       servicenet_address='',
+                       links=freeze(self.links[0])))
 
     def test_lbs_from_metadata_ignores_unsupported_lb_types(self):
         """
@@ -473,7 +487,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
                        desired_lbs=pmap(),
-                       servicenet_address=''))
+                       servicenet_address='',
+                       links=freeze(self.links[0])))
 
 
 class IPAddressTests(SynchronousTestCase):

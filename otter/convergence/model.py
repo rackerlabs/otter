@@ -7,7 +7,7 @@ import re
 
 from characteristic import Attribute, attributes
 
-from pyrsistent import PMap, freeze, pmap
+from pyrsistent import PMap, freeze, pmap, pvector
 
 from toolz.dicttoolz import get_in
 from toolz.itertoolz import groupby
@@ -172,6 +172,10 @@ def _lbs_from_metadata(metadata):
 
 
 @attributes(['id', 'state', 'created', 'image_id', 'flavor_id',
+             # because type(pvector()) is pvectorc.PVector,
+             # which != pyrsistent.PVector
+             Attribute('links', default_factory=pvector,
+                       instance_of=type(pvector())),
              Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
              Attribute('servicenet_address',
                        default_value='',
@@ -218,6 +222,7 @@ class NovaServer(object):
             created=timestamp_to_epoch(server_json['created']),
             image_id=server_json.get('image', {}).get('id'),
             flavor_id=server_json['flavor']['id'],
+            links=freeze(server_json['links']),
             desired_lbs=_lbs_from_metadata(server_json.get('metadata')),
             servicenet_address=_servicenet_address(server_json))
 
