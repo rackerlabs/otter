@@ -1,17 +1,18 @@
 """Tests for otter.util.zk"""
 
+from characteristic import attributes
+
 from kazoo.exceptions import BadVersionError, NoNodeError, NodeExistsError
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.util.zk import create_or_set
+from otter.util.zk import create_or_set, get_children_with_stats
 
 
+@attributes(['version'])
 class ZNodeStatStub(object):
-    """Like a :obj:`ZNodeStat`, but only supporting the data we need."""
-    def __init__(self, version):
-        self.version = version
+    """Like a :obj:`ZnodeStat`, but only supporting the data we need."""
 
 
 class ZKCrudModel(object):
@@ -39,7 +40,7 @@ class ZKCrudModel(object):
         if path not in self.nodes:
             return fail(NoNodeError("{} does not exist".format(path)))
         content, version = self.nodes[path]
-        return succeed((content, ZNodeStatStub(version)))
+        return succeed((content, ZNodeStatStub(version=version)))
 
     def _check_version(self, path, version):
         if path not in self.nodes:
@@ -58,7 +59,7 @@ class ZKCrudModel(object):
         if check is not None:
             return check
         current_version = self.nodes[path][1]
-        new_stat = ZNodeStatStub(current_version + 1)
+        new_stat = ZNodeStatStub(version=current_version + 1)
         self.nodes[path] = (new_value, new_stat.version)
         return succeed(new_stat)
 
@@ -106,3 +107,34 @@ class CreateOrSetTests(SynchronousTestCase):
         # It must be at version 0 because it's a creation, whereas normally if
         # the node were being updated it'd be at version 1.
         self.assertEqual(self.model.nodes, {'/foo': ('bar', 0)})
+
+
+class GetChildrenWithStats(SynchronousTestCase):
+    """Tests for :func:`get_children_with_stats`."""
+    def setUp(self):
+        # It'd be nice if we used the standard ZK CRUD model, but implementing
+        # a tree of nodes supporting get_children is a pain
+        class Model(object):
+            pass
+        self.model = Model()
+
+    def test_get_children_with_stats(self):
+        """
+        get_children_with_stats returns path of all children along with their
+        ZnodeStat objects. Any children that disappear between ``get_children``
+        and ``exists`` are not returned.
+        """
+        def exists(p):
+            if p == '/path/foo':
+                return succeed(ZNodeStatStub(version=0))
+            if p == '/path/bar':
+                return succeed(ZNodeStatStub(version=1))
+            if p == '/path/baz':
+                return succeed(None)
+        self.model.get_children = {'/path': succeed(['foo', 'bar', 'baz'])}.get
+        self.model.exists = exists
+
+        d = get_children_with_stats(self.model, '/path')
+        self.assertEqual(self.successResultOf(d),
+                         [('foo', ZNodeStatStub(version=0)),
+                          ('bar', ZNodeStatStub(version=1))])

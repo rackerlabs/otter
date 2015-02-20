@@ -1,4 +1,8 @@
+from functools import partial
+
 from kazoo.exceptions import NoNodeError, NodeExistsError
+
+from twisted.internet.defer import gatherResults
 
 
 def create_or_set(kz_client, path, content):
@@ -19,6 +23,26 @@ def create_or_set(kz_client, path, content):
         return d.addCallback(lambda r: path)
 
     return create()
+
+
+def get_children_with_stats(kz_client, path):
+    """
+    List children along with their stat information.
+
+    :returns: Deferred of [(child_path, :obj:`ZnodeStat`)].
+    """
+    children = kz_client.get_children(path)
+
+    def got_children(children):
+        ds = [
+            kz_client.exists(path + '/' + child).addCallback(
+                lambda r, child=child: (child, r) if r is not None else None)
+            for child in children
+        ]
+        return gatherResults(ds)
+    children.addCallback(got_children)
+    children.addCallback(partial(filter, None))
+    return children
 
 
 def _handle(exc_type, fn):
