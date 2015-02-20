@@ -42,7 +42,10 @@ def JSONObserverWrapper(observer, **kwargs):
     :rtype: :class:`ILogObserver`
     """
     def JSONObserver(eventDict):
-        observer({'message': (json.dumps(eventDict, cls=LoggingEncoder, **kwargs),)})
+        if 'message' in eventDict:
+            eventDict['message'] = ''.join(eventDict['message'])
+        observer({'message': (json.dumps(eventDict,
+                                         cls=LoggingEncoder, **kwargs),)})
 
     return JSONObserver
 
@@ -123,8 +126,9 @@ def PEP3101FormattingWrapper(observer):
     return PEP3101FormattingObserver
 
 
-IGNORE_FIELDS = set(["message", "time", "isError", "system", "id", "failure",
-                     "why", "audit_log"])
+ERROR_FIELDS = {"isError", "failure", "why"}
+
+PRIMITIVE_FIELDS = {"time", "system", "id", "audit_log"}
 
 AUDIT_LOG_FIELDS = {
     "audit_log": bool,
@@ -215,6 +219,42 @@ def audit_log_formatter(eventDict, timestamp, hostname):
     return audit_log_params
 
 
+def ErrorFormattingWrapper(observer):
+    """
+    Return log observer that will format error if any and delegate it to
+    given `observer`
+    """
+
+    def error_formatting_observer(event):
+
+        message = ""
+
+        if event.get("isError", False):
+            level = 3
+
+            if 'failure' in event:
+                excp = event['failure'].value
+                message = repr(excp)
+                event['traceback'] = event['failure'].getTraceback()
+                event['exception_type'] = excp.__class__.__name__
+
+            if 'why' in event and event['why']:
+                message = '{0}: {1}'.format(event['why'], message)
+
+        else:
+            level = 6
+
+        event.update({
+            "message": event.get("message", (message, )),
+            "level": event.get("level", level)
+        })
+        event.pop('isError', None)
+
+        observer(event)
+
+    return error_formatting_observer
+
+
 def ObserverWrapper(observer, hostname, seconds=None):
     """
     Create a log observer that will format messages and delegate to
@@ -232,7 +272,6 @@ def ObserverWrapper(observer, hostname, seconds=None):
         seconds = time.time
 
     def Observer(eventDict):
-        message = None
 
         log_params = {
             "@version": 1,
@@ -242,35 +281,14 @@ def ObserverWrapper(observer, hostname, seconds=None):
             "otter_facility": eventDict.get("system", "otter"),
         }
 
-        if eventDict.get("isError", False):
-            level = 3
-
-            if 'failure' in eventDict:
-                message = repr(eventDict['failure'].value)
-                log_params['traceback'] = eventDict['failure'].getTraceback()
-
-            if 'why' in eventDict and eventDict['why']:
-                message = '{0}: {1}'.format(eventDict['why'], message)
-
-        else:
-            level = 6
-
-        if not message:
-            message = eventDict["message"][0] if eventDict["message"] else ""
-
-        log_params.update({
-            "message": message,
-            "level": eventDict.get("level", level),
-        })
-
         if "file" in eventDict:
             log_params["file"] = eventDict["file"]
         if "line" in eventDict:
             log_params["line"] = eventDict["line"]
 
         for key, value in eventDict.iteritems():
-            if key not in IGNORE_FIELDS:
-                log_params["%s" % (key, )] = value
+            if key not in PRIMITIVE_FIELDS:
+                log_params[key] = value
 
         # emit an audit log entry also, if it's an audit log
         if 'audit_log' in eventDict:
