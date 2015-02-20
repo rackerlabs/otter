@@ -149,8 +149,13 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
     """
     if tenant_is_enabled(scaling_group.tenant_id, config_value):
         apply_delta(log, state.desired, state, config, policy)
-        get_convergence_starter().start_convergence(log, state.group_id)
-        return None
+        d = get_convergence_starter().start_convergence(log, state.group_id)
+        # XXX TODO FIXME RADIX REVIEWERS this has been changed to return
+        # deferred of state. must be tested. very intentional. because now it
+        # means that we guarantee that we've marked group dirty when executing
+        # policy/changing config.
+        d.addCallback(lambda _: state)
+        return d
 
     delta = calculate_delta(log, state, config, policy)
     execute_log = log.bind(server_delta=delta)

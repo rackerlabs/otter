@@ -21,6 +21,7 @@ from otter.http import TenantScope
 from otter.models.intents import ModifyGroupState
 from otter.util.deferredutils import with_lock
 from otter.util.fp import assoc_obj
+from otter.util.zk import create_or_update
 
 
 def server_to_json(server):
@@ -102,40 +103,43 @@ class ConvergenceStarter(Service, object):
 
 
     def _mark_dirty(self, group_id):
-        # TODO: There's a race condition here that will still lead to
-        # convergence stalling, in rare conditions.
+        # This is trickier than just "create a znode; ignore a
+        # NodeExistsError", because that will allow a race condition that can
+        # lead to stalled convergence. Here's the scenario, with Otter nodes
+        # 'A' and 'B'.
 
-        # - A: mark group N dirty due to policy
+        # - A: mark group N dirty
         # -               B: converge group N (repeat until done)
-        # - A: mark group N dirty due to policy, get a NodeExistsError
+        # - A: mark group N dirty, ignore NodeExistsError
         # -               B: mark group N clean
 
-        # Basically, if a policy is executed just as the final convergence
-        # iteration is completing, and the group is marked dirty just before
-        # the converging node marks it clean, the change from the policy won't
-        # immediately take effect (though if another event happens later it
-        # should be resolved).
+        # Here, a policy was executed on group N twice, and A tried to mark it
+        # dirty twice, but failed the second time because the group was already
+        # marked dirty. The problem is that when the converger node finished
+        # converging based on the first time it noticed the group was dirty, it
+        # then marked it clean *after* node A tried to mark it dirty a second
+        # time. Usually this will not be a problem because at the beginning of
+        # each iteration of convergence, the desired group state will be
+        # recalculated, so as long as the "duplicate" dirty happens before the
+        # final iteration, nothing will be lost. But if it happens at just the
+        # right moment, after the final iteration and before the group is
+        # marked clean, then we will be stalled.
 
-        # How do we solve this?
+        # The way we solve this is by storing a counter in the node, using a
+        # strong version-based check-and-set. Every time we mark dirty, we
+        # either create the dirty-flag zknode with '1' as the content, or if
+        # the dirty-flag zknode already exists, it will be incremented. Then,
+        # when convergence finishes, instead of deleting the zknode outright,
+        # it will decrement it if the value is >1 and delete it if it is 1
+        # (again, with a strong version-based check-and-set).
 
-        # STRONG
-        # a. Store a counter in the node. Not sure if this can be done
-        #    reliably. Each mark_dirty would increment it, each no-op
-        #    convergence would decrement it. I don't think we need to care
-        #    beyond 2, but I'm not sure.
-        # b. Investigate using the ZK "queue" pattern to do the same general
-        #    idea as in `a`.
-
-        # WEAK
-        # c. After marking a group clean, check to see if desired has changed
-        #    as a last-ditch check to see if we need to run convergence again.
-        return self._kz_client.create(
-            CONVERGENCE_DIRTY_PATH.format(group_id=group_id),
-            makepath=True
-        ).addErrback(
-            log.err, "Failed to mark dirty",
-            otter_msg_type="convergence-mark-dirty-error"
-        )
+        path = CONVERGENCE_DIRTY_PATH.format(group_id=group_id)
+        d = create_or_update(self._kz_client,
+                             path,
+                             lambda x: str(int(x) + 1),
+                             '1')
+        d.addErrback(log.err, otter_msg_type='mark-dirty-failed')
+        return d
 
     def start_convergence(self, log, group_id):
         """
