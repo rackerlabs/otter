@@ -7,6 +7,8 @@ from functools import partial
 from effect import Effect
 from effect.twisted import perform
 
+from pyrsistent import thaw
+
 from twisted.application.service import Service
 
 from otter.constants import CONVERGENCE_LOCK_PATH
@@ -26,7 +28,7 @@ def server_to_json(server):
     Convert a NovaServer to a dict representation suitable for returning to the
     end-user as a part of group state.
     """
-    return {'id': server.id}
+    return {'id': server.id, 'links': thaw(server.links)}
 
 
 def determine_active(servers, lb_nodes):

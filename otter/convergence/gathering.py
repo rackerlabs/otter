@@ -3,6 +3,8 @@ from urllib import urlencode
 
 from effect import parallel
 
+from pyrsistent import freeze
+
 from toolz.curried import filter, groupby, keyfilter, map
 from toolz.dicttoolz import get_in
 from toolz.functoolz import compose, identity
@@ -199,6 +201,7 @@ def to_nova_server(server_json):
                       created=timestamp_to_epoch(server_json['created']),
                       image_id=server_json.get('image', {}).get('id'),
                       flavor_id=server_json['flavor']['id'],
+                      links=freeze(server_json['links']),
                       desired_lbs=NovaServer.lbs_from_metadata(
                           server_json.get('metadata')),
                       servicenet_address=_servicenet_address(server_json))
