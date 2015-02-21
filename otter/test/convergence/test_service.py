@@ -13,7 +13,7 @@ from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription, CLBNode, NovaServer, ServerState)
 from otter.convergence.service import (
-    Converger, determine_active, execute_convergence, server_to_json)
+    Converger, determine_active, execute_convergence)
 from otter.http import TenantScope, service_request
 from otter.models.intents import ModifyGroupState
 from otter.models.interface import GroupState
