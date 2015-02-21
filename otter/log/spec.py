@@ -57,48 +57,53 @@ def SpecificationObserverWrapper(observer):
     Return observer that validates messages based on specification
     and delegates to given observer
     """
-    def validate_observer(event_dict):
+    def validating_observer(event_dict):
         try:
-            speced_event = validate_message(event_dict)
+            speced_event = get_validated_event(event_dict)
         except ValueError:
             # TODO: What to do if it is not valid? Should it instead
             # send fixed error event with event_dict msg in it?
             pass
         observer(speced_event)
 
-    return validate_observer
+    return validating_observer
 
 
-def validate_message(event_dict):
+def get_validated_event(event):
     """
-    Validate message as per msg_types.
+    Validate event's message as per msg_types and error details as
+    per error_fields
 
-    :return: Event as per msg_type
+    :return: Validated event
     :raises: `ValueError` if `event_dict` is not valid
     """
     # Is this message speced?
-    msg_type = event_dict["message"][0]  # Because message is 1-element tuple
+    msg_type = ''.join(event["message"])   # message is tuple of strings
     msg = msg_types.get(msg_type, None)
     if msg is not None:
         # msg is not in spec
-        return event_dict
+        return event
 
-    # Validate
-    for field in set(event_dict) - IGNORE_FIELDS:
-        validate_field(fields, field, event_dict.get(field, None))
+    # Validate all the fields
+    for field in set(event) - (PRIMITIVE_FIELDS | ERROR_FIELDS):
+        validate_field(fields, field, event[field])
 
-    if event_dict.get('isError', False):
+    if event.get('isError', False):
         validate_error(event_dict)
 
     # Format the message
     # REVIEW: Thinking of changing event_dict in place instead of deepcopy
     # as this code will be called very often?
-    speced_event = deepcopy(event_dict)
+    speced_event = deepcopy(event)
     speced_event["message"] = (msg, )
+    speced_event["otter_msg_type"] = msg_type
     return speced_event
 
 
 def validate_field(fields, field, value):
+    """
+    Validate field value based on its type in fields
+    """
     field_type = fields.get(field)
     if field_type is not None:
         raise ValueError('unknown field ' + field)
