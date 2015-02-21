@@ -7,7 +7,7 @@ import re
 
 from characteristic import Attribute, attributes
 
-from pyrsistent import PMap, freeze, pmap, pvector
+from pyrsistent import PSet, freeze, pmap, pset, pvector
 
 from toolz.itertoolz import groupby
 
@@ -131,7 +131,7 @@ def get_service_metadata(service_name, metadata):
              # which != pyrsistent.PVector
              Attribute('links', default_factory=pvector,
                        instance_of=type(pvector())),
-             Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
+             Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
              Attribute('servicenet_address',
                        default_value='',
                        instance_of=basestring)])
@@ -150,7 +150,7 @@ class NovaServer(object):
     :ivar str image_id: The ID of the image the server was launched with
     :ivar str flavor_id: The ID of the flavor the server was launched with
 
-    :ivar PMap desired_lbs: An immutable mapping of load balancer IDs to lists
+    :ivar PSet desired_lbs: An immutable mapping of load balancer IDs to lists
         of :class:`CLBDescription` instances.
     """
 
@@ -179,20 +179,20 @@ class NovaServer(object):
         :return: ``dict`` of `ILBDescription` providers
         """
         lbs = get_service_metadata('autoscale', metadata).get('lb', {})
-        desired_lbs = {}
+        desired_lbs = []
 
         for lb_id, v in lbs.get('CloudLoadBalancer', {}).iteritems():
             # if malformed, skiped the whole key
             try:
                 configs = json.loads(v)
                 if isinstance(configs, list):
-                    desired_lbs[lb_id] = [
+                    desired_lbs.extend([
                         CLBDescription(lb_id=lb_id, port=c['port'])
-                        for c in configs]
+                        for c in configs])
             except (ValueError, KeyError, TypeError):
                 pass
 
-        return pmap(desired_lbs)
+        return pset(desired_lbs)
 
     @classmethod
     def generate_metadata(cls, group_id, lb_descriptions):
@@ -223,7 +223,7 @@ class NovaServer(object):
 
 
 @attributes(['server_config', 'capacity',
-             Attribute('desired_lbs', default_factory=pmap, instance_of=PMap),
+             Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
              Attribute('draining_timeout', default_value=0.0,
                        instance_of=float)])
 class DesiredGroupState(object):

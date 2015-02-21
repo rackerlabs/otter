@@ -9,8 +9,6 @@ from effect.twisted import perform
 
 from pyrsistent import thaw
 
-from toolz.itertoolz import concat
-
 from twisted.application.service import Service
 
 from otter.constants import CONVERGENCE_LOCK_PATH
@@ -46,7 +44,7 @@ def determine_active(servers, lb_nodes):
 
     def all_met(server, current_lb_nodes):
         """Determine if a server is in all the LBs it wants to be in."""
-        desired_lbs = set(concat(server.desired_lbs.values()))
+        desired_lbs = server.desired_lbs
         met_desireds = set([
             desired for desired in desired_lbs
             for node in current_lb_nodes

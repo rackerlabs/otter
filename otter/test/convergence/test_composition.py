@@ -2,7 +2,7 @@
 
 import json
 
-from pyrsistent import freeze, pmap
+from pyrsistent import pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -25,9 +25,9 @@ class JsonToLBConfigTests(SynchronousTestCase):
             json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
                                {'loadBalancerId': 20, 'port': 800},
                                {'loadBalancerId': 21, 'port': 81}]),
-            freeze({20: [CLBDescription(lb_id='20', port=80),
-                         CLBDescription(lb_id='20', port=800)],
-                    21: [CLBDescription(lb_id='21', port=81)]}))
+            pset([CLBDescription(lb_id='20', port=80),
+                  CLBDescription(lb_id='20', port=800),
+                  CLBDescription(lb_id='21', port=81)]))
 
     def test_with_rackconnect(self):
         """
@@ -38,8 +38,8 @@ class JsonToLBConfigTests(SynchronousTestCase):
                 [{'loadBalancerId': 20, 'port': 80},
                  {'loadBalancerId': 200, 'type': 'RackConnectV3'},
                  {'loadBalancerId': 21, 'port': 81}]),
-            freeze({20: [CLBDescription(lb_id='20', port=80)],
-                    21: [CLBDescription(lb_id='21', port=81)]}))
+            pset([CLBDescription(lb_id='20', port=80),
+                  CLBDescription(lb_id='21', port=81)]))
 
 
 class GetDesiredGroupStateTests(SynchronousTestCase):
@@ -87,9 +87,9 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
             DesiredGroupState(
                 server_config=expected_server_config,
                 capacity=2,
-                desired_lbs=freeze({23: [
+                desired_lbs=pset([
                     CLBDescription(lb_id='23', port=80),
-                    CLBDescription(lb_id='23', port=90)]})))
+                    CLBDescription(lb_id='23', port=90)])))
         self.assert_server_config_hashable(state)
 
     def test_no_lbs(self):
@@ -113,7 +113,7 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
             DesiredGroupState(
                 server_config=expected_server_config,
                 capacity=2,
-                desired_lbs=pmap()))
+                desired_lbs=pset()))
         self.assert_server_config_hashable(state)
 
 
