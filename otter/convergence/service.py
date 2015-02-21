@@ -11,7 +11,7 @@ from toolz.itertoolz import concat
 
 from twisted.application.service import MultiService, Service
 
-from otter.constants import CONVERGENCE_DIRTY_PATH
+from otter.constants import CONVERGENCE_DIRTY_DIR, CONVERGENCE_DIRTY_PATH
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
@@ -21,7 +21,7 @@ from otter.http import TenantScope
 from otter.models.intents import ModifyGroupState
 from otter.util.deferredutils import with_lock
 from otter.util.fp import assoc_obj
-from otter.util.zk import create_or_set
+from otter.util.zk import get_children_with_stats, create_or_set
 
 
 def server_to_json(server):
@@ -171,9 +171,14 @@ class Converger(MultiService, object):
     Work is split up between nodes running this service by using a Kazoo
     :obj:`SetPartitioner`. This service could be run separately from the API
     nodes.
+
+    This service will repeatedly check for groups that need convergence,
+    deterministically select the groups to converge based on the partitioned
+    buckets, and run convergence on any groups that are not already being
+    converged.
     """
 
-    def __init__(self, log, kz_client, store, dispatcher, num_buckets,
+    def __init__(self, log, kz_client, store, dispatcher, buckets,
                  partitioner_factory):
         """
         :param log: a bound log
@@ -181,38 +186,54 @@ class Converger(MultiService, object):
         :param store: cassandra store
         """
         self._kz_client = kz_client
+        self._store = store
         self._dispatcher = dispatcher
-        self._num_buckets = num_buckets
+        self._buckets = buckets
         self.log = log.bind(system='converger')
         self.partitioner = partitioner_factory(
             self.log, self._check_convergence)
+        self._currently_converging = set()
+
+    def _mark_clean(self, group_id, version):
+        # See the comment in `ConvergenceStarter._make_dirty` to understand
+        # this.
+        path = CONVERGENCE_DIRTY_PATH.format(group_id)
+        self._kz_client.delete(path, version=version).addErrback()
+        return self._kz_client.
 
     def _check_convergence(self, buckets):
         """
         Check for groups that need convergence and which match up to the
         buckets we've been allocated.
         """
-        # list everything in CONVERGENCE_DIRTY_PATH
-        # if hash(el) % self.num_buckets in buckets: CONVERGE IT!
-        # after that:
+        d = get_children_with_stats(CONVERGENCE_DIRTY_DIR)
 
-        # See the comment in `ConvergenceStarter._make_dirty` to understand
-        # this.  After finishing convergence, we decrement the dirty counter or
-        # delete it entirely if it's 0. If it's not deleted, we'll kick off
-        # another convergence.
-        path = CONVERGENCE_DIRTY_PATH.format(group_id)
-        def update_or_delete_func(content):
-            num = int(content)
-            if num > 1:
-                return str(num - 1)
-            else:
-                return DELETE_NODE
-        d = update_or_delete(self._kz_client, path, update_or_delete_func)
-        d.addErrback(log.err, otter_msg_type='mark-clean-failed')
+        def finish_converging(group_id, result):
+            self._currently_converging.remove(group_id)
+            # XXX Should we mark clean only on success? This marks it clean on
+            # either success or failure, which is easy to do for now and
+            # prevents infinite looping on converging groups with errors.
+            d = self._mark_clean(gid, children_to_stats[gid].version)
+            return d
+
+        def got_children(children_with_stats):
+            children_to_stats = dict(children_with_stats)
+            my_groups = [ch for ch in children_with_stats
+                         if hash(ch) % len(self._buckets) in self._buckets]
+            groups_to_converge = set(my_groups) - self._currently_converging
+            self._currently_converging.update(my_groups)
+            # consider throttling groups we'll converge at once.
+            convergences = [
+                self.exec_convergence(group_id).addBoth(
+                    partial(finish_converging, group_id))
+                for group_id in groups_to_converge
+            ]
+            
+            return gatherResults(convergences)
+        d.addCallback(got_children)
         return d
 
-    def exec_convergence(self, log, scaling_group, group_state,
-                         launch_config,
+    def exec_convergence(self, group_id,
                          perform=perform,
                          execute_convergence=execute_convergence):
         """
