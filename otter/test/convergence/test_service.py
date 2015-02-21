@@ -99,14 +99,16 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                        image_id='image',
                        flavor_id='flavor',
                        servicenet_address='10.0.0.1',
-                       desired_lbs=self.desired_lbs),
+                       desired_lbs=self.desired_lbs,
+                       links=freeze([{'href': 'link1', 'rel': 'self'}])),
             NovaServer(id='b',
                        state=ServerState.ACTIVE,
                        created=0,
                        image_id='image',
                        flavor_id='flavor',
                        servicenet_address='10.0.0.2',
-                       desired_lbs=self.desired_lbs)
+                       desired_lbs=self.desired_lbs,
+                       links=freeze([{'href': 'link2', 'rel': 'self'}]))
         ]
 
     def _get_gacd_func(self, group_id):
@@ -133,8 +135,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         eff = execute_convergence(self.group, 2, self.lc, 0, log,
                                   get_all_convergence_data=gacd)
         mgs_eff = resolve_stubs(eff)
-        expected_active = {'a': server_to_json(self.servers[0]),
-                           'b': server_to_json(self.servers[1])}
+        expected_active = {
+            'a': {'id': 'a', 'links': [{'href': 'link1', 'rel': 'self'}]},
+            'b': {'id': 'b', 'links': [{'href': 'link2', 'rel': 'self'}]}
+        }
         self._assert_active(mgs_eff, expected_active)
         p_effs = resolve_effect(mgs_eff, None)
         self.assertEqual(p_effs, parallel([]))
