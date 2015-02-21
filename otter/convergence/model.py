@@ -127,11 +127,11 @@ def get_service_metadata(service_name, metadata):
 
 
 @attributes(['id', 'state', 'created', 'image_id', 'flavor_id',
-             Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
              # because type(pvector()) is pvectorc.PVector,
              # which != pyrsistent.PVector
              Attribute('links', default_factory=pvector,
                        instance_of=type(pvector())),
+             Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
              Attribute('servicenet_address',
                        default_value='',
                        instance_of=basestring)])
