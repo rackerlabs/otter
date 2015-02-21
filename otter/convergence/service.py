@@ -10,6 +10,7 @@ from effect.twisted import perform
 from toolz.itertoolz import concat
 
 from twisted.application.service import MultiService, Service
+from twisted.internet.defer import gatherResults
 
 from otter.constants import CONVERGENCE_DIRTY_DIR, CONVERGENCE_DIRTY_PATH
 from otter.convergence.composition import get_desired_group_state
@@ -19,9 +20,8 @@ from otter.convergence.model import ServerState
 from otter.convergence.planning import plan
 from otter.http import TenantScope
 from otter.models.intents import ModifyGroupState
-from otter.util.deferredutils import with_lock
 from otter.util.fp import assoc_obj
-from otter.util.zk import get_children_with_stats, create_or_set
+from otter.util.zk import create_or_set, get_children_with_stats
 
 
 def server_to_json(server):
@@ -101,7 +101,6 @@ class ConvergenceStarter(Service, object):
     def __init__(self, kz_client):
         self._kz_client = kz_client
 
-
     def _mark_dirty(self, group_id):
         # This is tricky enough that just using a boolean flag for "is group
         # dirty or not" won't work, because that will allow a race condition
@@ -146,7 +145,7 @@ class ConvergenceStarter(Service, object):
 
         path = CONVERGENCE_DIRTY_PATH.format(group_id=group_id)
         d = create_or_set(self._kz_client, path, 'dirty')
-        d.addErrback(log.err, otter_msg_type='mark-dirty-failed')
+        d.addErrback(self.log.err, otter_msg_type='mark-dirty-failed')
         return d
 
     def start_convergence(self, log, group_id):
@@ -184,6 +183,13 @@ class Converger(MultiService, object):
         :param log: a bound log
         :param kz_client: txKazoo client
         :param store: cassandra store
+        :param dispatcher: The dispatcher to use to perform effects.
+        :param buckets: collection of logical `buckets` which are shared
+            between all Otter nodes running this service. Will be partitioned
+            up between nodes to detirmine which nodes should work on which
+            groups.
+        :param partitioner_factory: Callable of (log, callback) which should
+            create an :obj:`Partitioner` to distribute the buckets.
         """
         self._kz_client = kz_client
         self._store = store
@@ -194,32 +200,38 @@ class Converger(MultiService, object):
             self.log, self._check_convergence)
         self._currently_converging = set()
 
+    def _in_bucket(self, group_id):
+        """
+        Determine whether a group ID is associated with the given set of
+        buckets.
+        """
+        return hash(group_id) % len(self._buckets) in self._buckets
+
     def _mark_clean(self, group_id, version):
         # See the comment in `ConvergenceStarter._make_dirty` to understand
         # this.
         path = CONVERGENCE_DIRTY_PATH.format(group_id)
-        self._kz_client.delete(path, version=version).addErrback()
-        return self._kz_client.
+        d = self._kz_client.delete(path, version=version).addErrback(
+            self.log.err)
+        return d
 
     def _check_convergence(self, buckets):
         """
         Check for groups that need convergence and which match up to the
         buckets we've been allocated.
         """
-        d = get_children_with_stats(CONVERGENCE_DIRTY_DIR)
-
-        def finish_converging(group_id, result):
-            self._currently_converging.remove(group_id)
-            # XXX Should we mark clean only on success? This marks it clean on
-            # either success or failure, which is easy to do for now and
-            # prevents infinite looping on converging groups with errors.
-            d = self._mark_clean(gid, children_to_stats[gid].version)
-            return d
-
-        def got_children(children_with_stats):
-            children_to_stats = dict(children_with_stats)
-            my_groups = [ch for ch in children_with_stats
-                         if hash(ch) % len(self._buckets) in self._buckets]
+        def got_dirty_groups(my_groups_with_stats):
+            def finish_converging(group_id, result):
+                self._currently_converging.remove(group_id)
+                # XXX Should we mark clean only on success? This marks it clean
+                # on either success or failure, which is easy to do for now and
+                # prevents infinite looping on converging groups with errors.
+                d = self._mark_clean(group_id,
+                                     groups_to_stats[group_id].version)
+                return d
+            groups_to_stats = dict(my_groups_with_stats)
+            my_groups = groups_to_stats.keys()
+            # Only start converging groups that we aren't already converging.
             groups_to_converge = set(my_groups) - self._currently_converging
             self._currently_converging.update(my_groups)
             # consider throttling groups we'll converge at once.
@@ -228,9 +240,12 @@ class Converger(MultiService, object):
                     partial(finish_converging, group_id))
                 for group_id in groups_to_converge
             ]
-            
             return gatherResults(convergences)
-        d.addCallback(got_children)
+
+        d = get_children_with_stats(CONVERGENCE_DIRTY_DIR)
+        d.addCallback(
+            partial(filter, lambda (group, stat): self._in_bucket(group)))
+        d.addCallback(got_dirty_groups)
         return d
 
     def exec_convergence(self, group_id,
@@ -247,11 +262,13 @@ class Converger(MultiService, object):
         :param execute_convergence: :func:`execute_convergence` function to use
             for testing.
         """
+        # XXX TODO - gather info from `self.store`, like scaling group and
+        # group state.
         eff = execute_convergence(scaling_group, group_state.desired,
-                                  launch_config, time.time(), log)
+                                  launch_config, time.time(), self.log)
         eff = Effect(TenantScope(eff, group_state.tenant_id))
         d = perform(self._dispatcher, eff)
-        return d.addErrback(log.err, "Error when performing convergence",
+        return d.addErrback(self.log.err, "Error when performing convergence",
                             otter_msg_type='convergence-perform-error')
 
 
