@@ -281,11 +281,6 @@ def ObserverWrapper(observer, hostname, seconds=None):
             "otter_facility": eventDict.get("system", "otter"),
         }
 
-        if "file" in eventDict:
-            log_params["file"] = eventDict["file"]
-        if "line" in eventDict:
-            log_params["line"] = eventDict["line"]
-
         for key, value in eventDict.iteritems():
             if key not in PRIMITIVE_FIELDS:
                 log_params[key] = value
