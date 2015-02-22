@@ -2,8 +2,6 @@
 
 import time
 
-from functools import partial
-
 from effect import Effect
 from effect.twisted import perform
 
@@ -101,7 +99,16 @@ class ConvergenceStarter(Service, object):
     def __init__(self, kz_client):
         self._kz_client = kz_client
 
-    def _mark_dirty(self, tenant_id, group_id):
+    def start_convergence(self, log, tenant_id, group_id):
+        """
+        Indicate that a group should be converged.
+
+        This doesn't actually do the work of convergence, it effectively just
+        puts an item in a queue.
+
+        :param log: a bound logger.
+        :param group_id: The ID of the group to converge.
+        """
         # This is tricky enough that just using a boolean flag for "is group
         # dirty or not" won't work, because that will allow a race condition
         # that can lead to stalled convergence. Here's the scenario, with Otter
@@ -143,27 +150,15 @@ class ConvergenceStarter(Service, object):
         # changed), only if there are _any_ outstanding requests for
         # convergence, since convergence always uses the most recent data.
 
+        log.msg("Marking group dirty", otter_msg_type='convergence-mark-dirty')
         path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
                                              group_id=group_id)
         d = create_or_set(self._kz_client, path, 'dirty')
-        d.addErrback(self.log.err, otter_msg_type='mark-dirty-failed')
+        d.addErrback(log.err, otter_msg_type='mark-dirty-failed')
         return d
 
-    def start_convergence(self, log, tenant_id, group_id):
-        """
-        Indicate that a group should be converged.
 
-        This doesn't actually do the work of convergence, it effectively just
-        puts an item in a queue.
-
-        :param log: a bound logger.
-        :param group_id: The ID of the group to converge.
-        """
-        log.msg("Marking group dirty", otter_msg_type='convergence-mark-dirty')
-        return self._mark_dirty(tenant_id, group_id)
-
-
-class Converger(MultiService, object):
+class Converger(MultiService):
     """
     A service that searches for groups that need converging and then does the
     work of converging them.
@@ -177,6 +172,10 @@ class Converger(MultiService, object):
     buckets, and run convergence on any groups that are not already being
     converged.
     """
+
+    # TODO: A lot more of this could be Effectified. We'd need intents for:
+    # - ZK: listing children, deleting nodes, getting stats (exists)
+    # - cassandra: getting scaling group and launch config
 
     def __init__(self, log, kz_client, store, dispatcher, buckets,
                  partitioner_factory):
@@ -192,6 +191,7 @@ class Converger(MultiService, object):
         :param partitioner_factory: Callable of (log, callback) which should
             create an :obj:`Partitioner` to distribute the buckets.
         """
+        MultiService.__init__(self)
         self._kz_client = kz_client
         self._store = store
         self._dispatcher = dispatcher
@@ -199,6 +199,7 @@ class Converger(MultiService, object):
         self.log = log.bind(system='converger')
         self.partitioner = partitioner_factory(
             self.log, self._check_convergence)
+        self.partitioner.setServiceParent(self)
         self._currently_converging = set()
 
     def _mark_clean(self, tenant_id, group_id, version):
@@ -217,22 +218,36 @@ class Converger(MultiService, object):
         This is called occasionally by the Partitioner when buckets have been
         allocated.
         """
-        def exec_and_cleanup((tenant_id, group_id, stat)):
-            d = self.exec_convergence(tenant_id, group_id)
+        # XXX TODO FIXME RADIX REVIEWERS: what do we do with groups or tenants
+        # that are no longer using otter but still have converging flags?
+        self.log.msg("checking for any groups needing convergence: {buckets}",
+                     buckets=my_buckets)
+        def exec_and_cleanup(info):
+            d = self.exec_convergence(info['tenant'], info['group'])
             d.addBoth(
-                lambda _: self._mark_clean(tenant_id, group_id, stat.version))
+                lambda _: self._mark_clean(
+                    info['tenant'], info['group'], info['stat'].version))
             return d
 
+        def structure_info(x):
+            path, stat = x
+            tenant, group = x[0].split('_', 1)
+            return {'tenant': tenant, 'group': group, 'stat': stat}
+
         def got_children_with_stats(children_with_stats):
+            self.log.msg("got children with stats: {thing}", thing=children_with_stats)
             # Names of the dirty flags are {tenant_id}_{group_id}.
-            dirty_info = ((path.split('_'), stat)
-                          for (path, stat) in children_with_stats)
-            deferreds = [exec_and_cleanup(x) for x in dirty_info
-                         if hash(x[0]) % len(self._buckets) in my_buckets and
-                         x[1] not in self._currently_converging]
+            dirty_info = map(structure_info, children_with_stats)
+            converging = [
+                info for info in dirty_info
+                if hash(info['tenant']) % len(self._buckets) in my_buckets and
+                info['group'] not in self._currently_converging]
+            groups = set([info['group'] for info in converging])
+            self._currently_converging.update(groups)
+            deferreds = map(exec_and_cleanup, converging)
             return gatherResults(deferreds)
 
-        d = get_children_with_stats(CONVERGENCE_DIRTY_DIR)
+        d = get_children_with_stats(self._kz_client, CONVERGENCE_DIRTY_DIR)
         return d.addCallback(got_children_with_stats)
 
     @inlineCallbacks

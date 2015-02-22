@@ -25,7 +25,7 @@ from otter.auth import generate_authenticator
 from otter.bobby import BobbyClient
 from otter.constants import get_service_configs
 from otter.convergence.service import (
-    ConvergenceStarter, set_convergence_starter)
+    ConvergenceStarter, Converger, set_convergence_starter)
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log
 from otter.log.cloudfeeds import CloudFeedsObserver
@@ -269,10 +269,25 @@ def makeService(config):
                 stop=partial(call_after_supervisor,
                              kz_client.stop, supervisor)))
 
-            # setup converger service
+            # setup ConvergenceStarter service
             converger_service = ConvergenceStarter(kz_client)
             s.addService(converger_service)
             set_convergence_starter(converger_service)
+
+            # setup Converger service
+            converger_buckets = range(1, 10)
+            partitioner_factory = partial(
+                Partitioner,
+                kz_client,
+                10,  # interval
+                '/converger_partition',
+                converger_buckets,
+                15,  # time boundary
+            )
+            converger = Converger(log, kz_client, store, dispatcher,
+                                  converger_buckets,
+                                  partitioner_factory)
+            converger.setServiceParent(s)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
