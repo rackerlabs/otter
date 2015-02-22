@@ -72,6 +72,7 @@ def execute_convergence(
 
     :return: An Effect of a list containing the individual step results.
     """
+    log.msg("execute-convergence")
     all_data_eff = get_all_convergence_data(scaling_group.uuid)
 
     def got_all_data((servers, lb_nodes)):
@@ -79,6 +80,9 @@ def execute_convergence(
         desired_group_state = get_desired_group_state(
             scaling_group.uuid, launch_config, desired_capacity)
         steps = plan(desired_group_state, servers, lb_nodes, now)
+        log.msg("convergence-plan",
+                servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
+                desired=desired_group_state, active=active)
         active = {server.id: server_to_json(server) for server in active}
 
         def update_group_state(group, old_state):
@@ -150,6 +154,7 @@ class ConvergenceStarter(Service, object):
         # changed), only if there are _any_ outstanding requests for
         # convergence, since convergence always uses the most recent data.
 
+        log = log.bind(tenant_id=tenant_id, group_id=group_id)
         log.msg("Marking group dirty", otter_msg_type='convergence-mark-dirty')
         path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
                                              group_id=group_id)
@@ -202,13 +207,17 @@ class Converger(MultiService):
         self.partitioner.setServiceParent(self)
         self._currently_converging = set()
 
-    def _mark_clean(self, tenant_id, group_id, version):
+    def _convergence_finished(self, result, tenant_id, group_id, version):
         # See the comment in `ConvergenceStarter._make_dirty` to understand
         # this.
+        log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
+        log.msg("convergence-mark-clean")
         self._currently_converging.remove(group_id)
         path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
                                              group_id=group_id)
-        return self._kz_client.delete(path, version=version)
+        return self._kz_client.delete(path, version=version
+        ).addErrback(log.err, "mark-clean-failed"
+        ).addCallback(lambda _: result)
 
     def _check_convergence(self, my_buckets):
         """
@@ -224,9 +233,11 @@ class Converger(MultiService):
                      buckets=my_buckets)
         def exec_and_cleanup(info):
             d = self.exec_convergence(info['tenant'], info['group'])
+            # XXX FIXME TODO RADIX REVIEWERS: We're currently cleaning up dirty
+            # flag on errors. This is wrong.
             d.addBoth(
-                lambda _: self._mark_clean(
-                    info['tenant'], info['group'], info['stat'].version))
+                self._convergence_finished,
+                info['tenant'], info['group'], info['stat'].version)
             return d
 
         def structure_info(x):
@@ -235,7 +246,6 @@ class Converger(MultiService):
             return {'tenant': tenant, 'group': group, 'stat': stat}
 
         def got_children_with_stats(children_with_stats):
-            self.log.msg("got children with stats: {thing}", thing=children_with_stats)
             # Names of the dirty flags are {tenant_id}_{group_id}.
             dirty_info = map(structure_info, children_with_stats)
             converging = [
@@ -262,13 +272,15 @@ class Converger(MultiService):
         :param execute_convergence: :func:`execute_convergence` function to use
             for testing.
         """
-        scaling_group = self.store.get_scaling_group(self.log,
-                                                     tenant_id, group_id)
+        log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
+        log.msg("exec-convergence")
+        scaling_group = self._store.get_scaling_group(log, tenant_id, group_id)
         group_state = yield scaling_group.view_state()
         launch_config = yield scaling_group.view_launch_config()
         eff = execute_convergence(scaling_group, group_state.desired,
-                                  launch_config, time.time(), self.log)
+                                  launch_config, time.time(), log)
         eff = Effect(TenantScope(eff, group_state.tenant_id))
+        log.msg("exec-convergence-eff", eff=eff)
         result = yield perform(self._dispatcher, eff)
         returnValue(result)
 
