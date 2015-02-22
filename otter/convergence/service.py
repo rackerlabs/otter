@@ -10,7 +10,7 @@ from effect.twisted import perform
 from toolz.itertoolz import concat
 
 from twisted.application.service import MultiService, Service
-from twisted.internet.defer import gatherResults
+from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 
 from otter.constants import CONVERGENCE_DIRTY_DIR, CONVERGENCE_DIRTY_PATH
 from otter.convergence.composition import get_desired_group_state
@@ -101,7 +101,7 @@ class ConvergenceStarter(Service, object):
     def __init__(self, kz_client):
         self._kz_client = kz_client
 
-    def _mark_dirty(self, group_id):
+    def _mark_dirty(self, tenant_id, group_id):
         # This is tricky enough that just using a boolean flag for "is group
         # dirty or not" won't work, because that will allow a race condition
         # that can lead to stalled convergence. Here's the scenario, with Otter
@@ -143,12 +143,13 @@ class ConvergenceStarter(Service, object):
         # changed), only if there are _any_ outstanding requests for
         # convergence, since convergence always uses the most recent data.
 
-        path = CONVERGENCE_DIRTY_PATH.format(group_id=group_id)
+        path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
+                                             group_id=group_id)
         d = create_or_set(self._kz_client, path, 'dirty')
         d.addErrback(self.log.err, otter_msg_type='mark-dirty-failed')
         return d
 
-    def start_convergence(self, log, group_id):
+    def start_convergence(self, log, tenant_id, group_id):
         """
         Indicate that a group should be converged.
 
@@ -159,7 +160,7 @@ class ConvergenceStarter(Service, object):
         :param group_id: The ID of the group to converge.
         """
         log.msg("Marking group dirty", otter_msg_type='convergence-mark-dirty')
-        return self._mark_dirty(group_id)
+        return self._mark_dirty(tenant_id, group_id)
 
 
 class Converger(MultiService, object):
@@ -182,7 +183,7 @@ class Converger(MultiService, object):
         """
         :param log: a bound log
         :param kz_client: txKazoo client
-        :param store: cassandra store
+        :param IScalingGroupCollection store: scaling group collection
         :param dispatcher: The dispatcher to use to perform effects.
         :param buckets: collection of logical `buckets` which are shared
             between all Otter nodes running this service. Will be partitioned
@@ -200,76 +201,61 @@ class Converger(MultiService, object):
             self.log, self._check_convergence)
         self._currently_converging = set()
 
-    def _in_bucket(self, group_id):
-        """
-        Determine whether a group ID is associated with the given set of
-        buckets.
-        """
-        return hash(group_id) % len(self._buckets) in self._buckets
-
-    def _mark_clean(self, group_id, version):
+    def _mark_clean(self, tenant_id, group_id, version):
         # See the comment in `ConvergenceStarter._make_dirty` to understand
         # this.
-        path = CONVERGENCE_DIRTY_PATH.format(group_id)
-        d = self._kz_client.delete(path, version=version).addErrback(
-            self.log.err)
-        return d
+        self._currently_converging.remove(group_id)
+        path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
+                                             group_id=group_id)
+        return self._kz_client.delete(path, version=version)
 
-    def _check_convergence(self, buckets):
+    def _check_convergence(self, my_buckets):
         """
         Check for groups that need convergence and which match up to the
         buckets we've been allocated.
+
+        This is called occasionally by the Partitioner when buckets have been
+        allocated.
         """
-        def got_dirty_groups(my_groups_with_stats):
-            def finish_converging(group_id, result):
-                self._currently_converging.remove(group_id)
-                # XXX Should we mark clean only on success? This marks it clean
-                # on either success or failure, which is easy to do for now and
-                # prevents infinite looping on converging groups with errors.
-                d = self._mark_clean(group_id,
-                                     groups_to_stats[group_id].version)
-                return d
-            groups_to_stats = dict(my_groups_with_stats)
-            my_groups = groups_to_stats.keys()
-            # Only start converging groups that we aren't already converging.
-            groups_to_converge = set(my_groups) - self._currently_converging
-            self._currently_converging.update(my_groups)
-            # consider throttling groups we'll converge at once.
-            convergences = [
-                self.exec_convergence(group_id).addBoth(
-                    partial(finish_converging, group_id))
-                for group_id in groups_to_converge
-            ]
-            return gatherResults(convergences)
+        def exec_and_cleanup((tenant_id, group_id, stat)):
+            d = self.exec_convergence(tenant_id, group_id)
+            d.addBoth(
+                lambda _: self._mark_clean(tenant_id, group_id, stat.version))
+            return d
+
+        def got_children_with_stats(children_with_stats):
+            # Names of the dirty flags are {tenant_id}_{group_id}.
+            dirty_info = ((path.split('_'), stat)
+                          for (path, stat) in children_with_stats)
+            deferreds = [exec_and_cleanup(x) for x in dirty_info
+                         if hash(x[0]) % len(self._buckets) in my_buckets and
+                         x[1] not in self._currently_converging]
+            return gatherResults(deferreds)
 
         d = get_children_with_stats(CONVERGENCE_DIRTY_DIR)
-        d.addCallback(
-            partial(filter, lambda (group, stat): self._in_bucket(group)))
-        d.addCallback(got_dirty_groups)
-        return d
+        return d.addCallback(got_children_with_stats)
 
-    def exec_convergence(self, group_id,
+    @inlineCallbacks
+    def exec_convergence(self, tenant_id, group_id,
                          perform=perform,
                          execute_convergence=execute_convergence):
         """
         Converge a group to a capacity with a launch config.
 
-        :param log: a bound logger.
-        :param IScalingGroup scaling_group: The scaling group object.
-        :param GroupState group_state: The group state.
-        :param launch_config: An otter launch config.
+        :param group_id: The group which needs converging.
         :param perform: :func:`perform` function to use for testing.
         :param execute_convergence: :func:`execute_convergence` function to use
             for testing.
         """
-        # XXX TODO - gather info from `self.store`, like scaling group and
-        # group state.
+        scaling_group = self.store.get_scaling_group(self.log,
+                                                     tenant_id, group_id)
+        group_state = yield scaling_group.view_state()
+        launch_config = yield scaling_group.view_launch_config()
         eff = execute_convergence(scaling_group, group_state.desired,
                                   launch_config, time.time(), self.log)
         eff = Effect(TenantScope(eff, group_state.tenant_id))
-        d = perform(self._dispatcher, eff)
-        return d.addErrback(self.log.err, "Error when performing convergence",
-                            otter_msg_type='convergence-perform-error')
+        result = yield perform(self._dispatcher, eff)
+        returnValue(result)
 
 
 # We're using a global for now because it's difficult to thread a new parameter

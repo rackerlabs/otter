@@ -4,7 +4,7 @@ from twisted.python.constants import NamedConstant, Names
 
 
 CONVERGENCE_DIRTY_DIR = '/groups/converging'
-CONVERGENCE_DIRTY_PATH = CONVERGENCE_DIRTY_DIR + '/{group_id}'
+CONVERGENCE_DIRTY_PATH = CONVERGENCE_DIRTY_DIR + '/{tenant_id}_{group_id}'
 CONVERGENCE_PARTITIONER_PATH = '/convergence-partitioner'
 
 
