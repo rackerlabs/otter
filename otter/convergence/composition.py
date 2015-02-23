@@ -1,12 +1,9 @@
 """
 Code for composing all of the convergence functionality together.
 """
-from collections import defaultdict
-
-from pyrsistent import freeze
+from pyrsistent import freeze, pset
 
 from toolz.dicttoolz import get_in, merge
-from toolz.itertoolz import concat
 
 from otter.convergence.model import (
     CLBDescription,
@@ -33,17 +30,14 @@ def json_to_LBConfigs(lbs_json):
     Convert load balancer config from JSON to :obj:`CLBDescription`
 
     :param lbs_json: Sequence of load balancer configs
-    :return: mapping of LBid -> Sequence of LBDescription
+    :return: Sequence of :class:`ILBDescription` providers
 
     NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
     implemented in convergence
     """
-    lbd = defaultdict(list)
-    for lb in lbs_json:
-        if lb.get('type') != 'RackConnectV3':
-            lbd[lb['loadBalancerId']].append(CLBDescription(
-                lb_id=str(lb['loadBalancerId']), port=lb['port']))
-    return freeze(dict(lbd))
+    return pset([
+        CLBDescription(lb_id=str(lb['loadBalancerId']), port=lb['port'])
+        for lb in lbs_json if lb.get('type') != 'RackConnectV3'])
 
 
 def get_desired_group_state(group_id, launch_config, desired):
@@ -82,9 +76,8 @@ def prepare_server_launch_config(group_id, server_config, lb_descriptions):
     :param iterable lb_descriptions: iterable of
         :class:`ILBDescription` providers
     """
-    lbs = concat(lb_descriptions.values())
     updated_metadata = freeze(merge(
         get_in(('server', 'metadata'), server_config, {}),
-        generate_metadata(group_id, lbs)))
+        generate_metadata(group_id, lb_descriptions)))
 
     return server_config.set_in(('server', 'metadata'), updated_metadata)

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from characteristic import attributes
 
-from pyrsistent import freeze, pmap
+from pyrsistent import freeze, pmap, pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -466,10 +466,9 @@ class ToNovaServerTests(SynchronousTestCase):
                        image_id='valid_image',
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
-                       desired_lbs=pmap({
-                           '1': [CLBDescription(lb_id='1', port=80),
-                                 CLBDescription(lb_id='1', port=90)]
-                       }),
+                       desired_lbs=pset([
+                           CLBDescription(lb_id='1', port=80),
+                           CLBDescription(lb_id='1', port=90)]),
                        servicenet_address='',
                        links=freeze(self.links[0])))
 
@@ -488,7 +487,7 @@ class ToNovaServerTests(SynchronousTestCase):
                        image_id='valid_image',
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
-                       desired_lbs=pmap(),
+                       desired_lbs=pset(),
                        servicenet_address='',
                        links=freeze(self.links[0])))
 
