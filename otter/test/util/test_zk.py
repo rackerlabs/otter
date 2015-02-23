@@ -5,7 +5,6 @@ from functools import partial
 from characteristic import attributes
 
 from effect import Effect, TypeDispatcher
-from effect.testing import resolve_effect
 from effect.twisted import perform
 
 from kazoo.exceptions import BadVersionError, NoNodeError, NodeExistsError

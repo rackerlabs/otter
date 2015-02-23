@@ -13,7 +13,9 @@ from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription, CLBNode, NovaServer, ServerState)
 from otter.convergence.service import (
-    Converger, determine_active, execute_convergence, server_to_json)
+    ConvergenceStarter,
+    Converger, determine_active, execute_convergence, server_to_json,
+    start_convergence_eff)
 from otter.http import TenantScope, service_request
 from otter.models.intents import ModifyGroupState
 from otter.models.interface import GroupState
@@ -22,6 +24,22 @@ from otter.test.utils import (
     CheckFailure, LockMixin, mock_group, mock_log, resolve_effect,
     resolve_stubs)
 from otter.util.fp import assoc_obj
+from otter.util.zk import CreateOrSet
+
+
+class StartConvergenceEffTests(SynchronousTestCase):
+    """Tests for :func:`start_convergence_eff`."""
+
+    def test_marks_dirty(self):
+        """
+        returns an effect which will create or set a node relative to
+        ``CONVERGENCE_DIRTY_PATH``.
+        """
+        eff = start_convergence_eff('tenant-id', 'group-id')
+        self.assertEqual(
+            eff,
+            Effect(CreateOrSet('/groups/converging/tenant-id_group-id',
+                               'dirty')))
 
 
 class ConvergerTests(SynchronousTestCase):
