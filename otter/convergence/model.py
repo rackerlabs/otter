@@ -171,7 +171,6 @@ def _lbs_from_metadata(metadata):
     return pset(desired_lbs)
 
 
-
 @attributes(['id', 'state', 'created', 'image_id', 'flavor_id',
              # because type(pvector()) is pvectorc.PVector,
              # which != pyrsistent.PVector
