@@ -250,10 +250,14 @@ class ScalingGroupStatus(Names):
     """
     Status of scaling group
     """
-    ACTIVE = NamedConstant()    # Group is active and executing policies/converging
-    ERROR = NamedConstant()     # Group has errored due to (mostly) invalid
-                                # launch configuration and has stopped executing
-                                # policies/converging
+    ACTIVE = NamedConstant()
+    "Group is active and executing policies/converging"
+
+    ERROR = NamedConstant()
+    """
+    Group has errored due to (mostly) invalid launch configuration and has
+    stopped executing policies/converging
+    """
 
 
 class IScalingGroup(Interface):
