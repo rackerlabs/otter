@@ -18,6 +18,7 @@ from otter.convergence.model import ServerState
 from otter.convergence.planning import plan
 from otter.http import TenantScope
 from otter.models.intents import ModifyGroupState
+from otter.models.interface import NoSuchScalingGroupError
 from otter.util.fp import assoc_obj
 from otter.util.zk import create_or_set, get_children_with_stats
 
@@ -180,7 +181,7 @@ class Converger(MultiService):
 
     # TODO: A lot more of this could be Effectified. We'd need intents for:
     # - ZK: listing children, deleting nodes, getting stats (exists)
-    # - cassandra: getting scaling group and launch config
+    # - cassandra: getting scaling group and launch config, setting error state
 
     def __init__(self, log, kz_client, store, dispatcher, buckets,
                  partitioner_factory):
@@ -207,10 +208,9 @@ class Converger(MultiService):
         self.partitioner.setServiceParent(self)
         self._currently_converging = set()
 
-    def _convergence_finished(self, result, tenant_id, group_id, version):
+    def _convergence_finished(self, result, log, tenant_id, group_id, version):
         # See the comment in `ConvergenceStarter._make_dirty` to understand
         # this.
-        log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
         log.msg("convergence-mark-clean")
         self._currently_converging.remove(group_id)
         path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
@@ -218,6 +218,19 @@ class Converger(MultiService):
         return self._kz_client.delete(path, version=version
         ).addErrback(log.err, "mark-clean-failed"
         ).addCallback(lambda _: result)
+
+    def _handle_errors(self, failure, log):
+        """
+        handle failures during convergence.
+
+        If an error is permanent, returns None. If an error is temporary,
+        re-raises the error.
+        """
+        # TODO: This may be where we want to mark the group with an `ERROR`
+        # state if the error is permanent. We must define the exception types
+        # that we should treat as permanent.
+        failure.trap(NoSuchScalingGroupError)
+        log.err("no-scaling-group-found")
 
     def _check_convergence(self, my_buckets):
         """
@@ -227,26 +240,27 @@ class Converger(MultiService):
         This is called occasionally by the Partitioner when buckets have been
         allocated.
         """
-        # XXX TODO FIXME RADIX REVIEWERS: what do we do with groups or tenants
-        # that are no longer using otter but still have converging flags?
+
         self.log.msg("checking for any groups needing convergence: {buckets}",
                      buckets=my_buckets)
+
         def exec_and_cleanup(info):
-            d = self.exec_convergence(info['tenant'], info['group'])
-            # XXX FIXME TODO RADIX REVIEWERS: We're currently cleaning up dirty
-            # flag on errors. This is wrong.
-            d.addBoth(
-                self._convergence_finished,
-                info['tenant'], info['group'], info['stat'].version)
+            group_id = info['group']
+            tenant_id = info['tenant']
+            log = self.log.bind(group_id=group_id, tenant_id=tenant_id)
+            d = self.exec_convergence(log, tenant_id, group_id)
+            d.addErrback(self._handle_errors, log)
+            d.addCallback(self._convergence_finished,
+                          log, tenant_id, group_id, info['stat'].version)
             return d
 
         def structure_info(x):
+            # Names of the dirty flags are {tenant_id}_{group_id}.
             path, stat = x
             tenant, group = x[0].split('_', 1)
             return {'tenant': tenant, 'group': group, 'stat': stat}
 
         def got_children_with_stats(children_with_stats):
-            # Names of the dirty flags are {tenant_id}_{group_id}.
             dirty_info = map(structure_info, children_with_stats)
             converging = [
                 info for info in dirty_info
@@ -261,7 +275,7 @@ class Converger(MultiService):
         return d.addCallback(got_children_with_stats)
 
     @inlineCallbacks
-    def exec_convergence(self, tenant_id, group_id,
+    def exec_convergence(self, log, tenant_id, group_id,
                          perform=perform,
                          execute_convergence=execute_convergence):
         """
@@ -272,7 +286,6 @@ class Converger(MultiService):
         :param execute_convergence: :func:`execute_convergence` function to use
             for testing.
         """
-        log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
         log.msg("exec-convergence")
         scaling_group = self._store.get_scaling_group(log, tenant_id, group_id)
         group_state = yield scaling_group.view_state()
