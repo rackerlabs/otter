@@ -1,13 +1,20 @@
 """Tests for otter.util.zk"""
 
+from functools import partial
+
 from characteristic import attributes
+
+from effect import Effect, TypeDispatcher
+from effect.testing import resolve_effect
+from effect.twisted import perform
 
 from kazoo.exceptions import BadVersionError, NoNodeError, NodeExistsError
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.util.zk import create_or_set, get_children_with_stats
+from otter.util.zk import (
+    CreateOrSet, perform_create_or_set, get_children_with_stats)
 
 
 @attributes(['version'])
@@ -77,16 +84,22 @@ class CreateOrSetTests(SynchronousTestCase):
     def setUp(self):
         self.model = ZKCrudModel()
 
+    def _cos(self, path, content):
+        eff = Effect(CreateOrSet(path, content))
+        performer = partial(perform_create_or_set, self.model)
+        dispatcher = TypeDispatcher({CreateOrSet: performer})
+        return perform(dispatcher, eff)
+
     def test_create(self):
         """Creates a node when it doesn't exist."""
-        d = create_or_set(self.model, '/foo', 'bar')
+        d = self._cos('/foo', 'bar')
         self.assertEqual(self.successResultOf(d), '/foo')
         self.assertEqual(self.model.nodes, {'/foo': ('bar', 0)})
 
     def test_update(self):
         """Uses `set` to update the node when it does exist."""
         self.model.create('/foo', 'initial', makepath=True)
-        d = create_or_set(self.model, '/foo', 'bar')
+        d = self._cos('/foo', 'bar')
         self.assertEqual(self.successResultOf(d), '/foo')
         self.assertEqual(self.model.nodes, {'/foo': ('bar', 1)})
 
@@ -102,7 +115,7 @@ class CreateOrSetTests(SynchronousTestCase):
         self.model.set = hacked_set
 
         self.model.create('/foo', 'initial', makepath=True)
-        d = create_or_set(self.model, '/foo', 'bar')
+        d = self._cos('/foo', 'bar')
         self.assertEqual(self.successResultOf(d), '/foo')
         # It must be at version 0 because it's a creation, whereas normally if
         # the node were being updated it'd be at version 1.
