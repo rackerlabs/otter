@@ -1,11 +1,11 @@
 """
-Format logs with specification
+Format logs based on specification
 """
 
 from copy import deepcopy
 
 from otter.constants import ServiceType
-from otter.log.formatters import IGNORE_FIELDS
+from otter.log.formatters import ERROR_FIELDS, PRIMITIVE_FIELDS
 
 
 class UUID(basestring):
@@ -29,7 +29,7 @@ fields = {
 }
 
 
-# Fields that will occur in error
+# Fields that will occur in error details
 error_fields = {
     "system": SystemType,
     "operation": basestring,
@@ -69,6 +69,10 @@ def SpecificationObserverWrapper(observer):
     return validating_observer
 
 
+def try_msg_type(msg_type):
+    return msg_type is not None and msg_types.get(msg_type, None)
+
+
 def get_validated_event(event):
     """
     Validate event's message as per msg_types and error details as
@@ -78,26 +82,25 @@ def get_validated_event(event):
     :raises: `ValueError` if `event_dict` is not valid
     """
     # Is this message speced?
-    msg_type = ''.join(event["message"])   # message is tuple of strings
-    msg = msg_types.get(msg_type, None)
-    if msg is not None:
-        # msg is not in spec
-        return event
+    if event.get('isError', False):
+        msg = try_msg_type(event.get("why", None))
+        if msg is None:
+            return event
+        validate_error(event_dict)
+        event['why'] = msg
+    else:
+        # message is tuple of strings
+        msg = try_msg_type(''.join(event["message"]))
+        if msg is None:
+            return event
+        event["message"] = (msg, )
 
     # Validate all the fields
     for field in set(event) - (PRIMITIVE_FIELDS | ERROR_FIELDS):
         validate_field(fields, field, event[field])
 
-    if event.get('isError', False):
-        validate_error(event_dict)
-
-    # Format the message
-    # REVIEW: Thinking of changing event_dict in place instead of deepcopy
-    # as this code will be called very often?
-    speced_event = deepcopy(event)
-    speced_event["message"] = (msg, )
-    speced_event["otter_msg_type"] = msg_type
-    return speced_event
+    event["otter_msg_type"] = msg_type
+    return event
 
 
 def validate_field(fields, field, value):
