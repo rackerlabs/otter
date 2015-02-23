@@ -248,7 +248,7 @@ def ErrorFormattingWrapper(observer):
             "message": event.get("message", (message, )),
             "level": event.get("level", level)
         })
-        event.pop('isError', None)
+        [event.pop(k, None) for k in ERROR_FIELDS]
 
         observer(event)
 

@@ -10,9 +10,7 @@ import mock
 from testtools.matchers import (
     Contains,
     ContainsDict,
-    Equals,
-    MatchesAll,
-    Not)
+    Equals)
 
 from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
@@ -338,16 +336,20 @@ class ErrorFormatterTests(SynchronousTestCase):
         self.observer = mock.Mock()
         self.wrapper = ErrorFormattingWrapper(self.observer)
 
+    def _formatted_event(self):
+        args, _ = self.observer.call_args
+        return args[0]
+
     def test_no_failure(self):
         """
-        If event does not have failure, it sets level=6 and removes isError
+        If event does not have failure, it sets level=6 and removes
+        all error fields
         """
-        self.wrapper({'isError': False, 'foo': 'bar'})
-        self.observer.assert_called_once_with(
-            matches(
-                MatchesAll(
-                    ContainsDict({'level': Equals(6)}),
-                    Not(Contains('isError')))))
+        self.wrapper({'isError': False, 'failure': 'f', 'why': 'w',
+                      'foo': 'bar'})
+        self.assertEqual(
+            self._formatted_event(),
+            {'level': 6, 'message': ('',), 'foo': 'bar'})
 
     def test_failure_include_traceback_in_event_dict(self):
         """
@@ -378,15 +380,21 @@ class ErrorFormatterTests(SynchronousTestCase):
     def test_isError_sets_level_3(self):
         """
         The observer sets the level to 3 (syslog ERROR) when isError is true.
-        It also removes isError
         """
         self.wrapper({'failure': Failure(ValueError()), 'isError': True})
-
         self.observer.assert_called_once_with(
-            matches(
-                MatchesAll(
-                    ContainsDict({'level': Equals(3)}),
-                    Not(Contains('isError')))))
+            matches(ContainsDict({'level': Equals(3)})))
+
+    def test_isError_removes_error_fields(self):
+        """
+        Observer removes error fields before delegating when there
+        is failure in event
+        """
+        self.wrapper({'failure': Failure(ValueError()), 'isError': True,
+                      'why': 'reason'})
+        event = self._formatted_event()
+        for e in ('failure', 'why', 'isError'):
+            self.assertNotIn(e, event)
 
     def test_isError_includes_why_in_short_message(self):
         """
