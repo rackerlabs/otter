@@ -418,6 +418,15 @@ class ErrorFormatterTests(SynchronousTestCase):
         self.observer.assert_called_once_with(
             matches(ContainsDict({'exception_type': Equals("ValueError")})))
 
+    def test_empty_message(self):
+        """
+        Empty message in event is overwritten with failure message
+        """
+        self.wrapper({'message': (), 'isError': True,
+                      'failure': Failure(ValueError())})
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'message': Equals(('ValueError()',))})))
+
 
 class ObserverWrapperTests(SynchronousTestCase):
     """
