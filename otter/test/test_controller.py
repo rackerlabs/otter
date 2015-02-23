@@ -1096,18 +1096,20 @@ class ConvergeTestCase(SynchronousTestCase):
         service's ``converge`` method is invoked, and None is returned.
         """
         log = mock_log()
-        state = GroupState('tenant', 'group-id', "test", [], [], None, {},
+        state = GroupState('tenant', 'group', "test", [], [], None, {},
                            False)
         group_config = {'maxEntities': 100, 'minEntities': 0}
         policy = {'change': 5}
         config_data = {'convergence-tenants': ['tenant']}
 
+        start_convergence = self.cvg_starter_mock.start_convergence
+        start_convergence.return_value = defer.succeed("ignored")
+
         result = controller.converge(log, 'txn-id', group_config, self.group,
                                      state, 'launch', policy,
                                      config_value=config_data.get)
-        self.assertIs(result, None)
-        self.cvg_starter_mock.start_convergence.assert_called_once_with(
-            log, 'group-id')
+        self.assertEqual(self.successResultOf(result), state)
+        start_convergence.assert_called_once_with(log, 'tenant', 'group')
 
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)

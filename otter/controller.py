@@ -151,12 +151,10 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
         apply_delta(log, state.desired, state, config, policy)
         d = get_convergence_starter().start_convergence(
             log, scaling_group.tenant_id, scaling_group.uuid)
-        # XXX TODO FIXME RADIX REVIEWERS this has been changed to return
-        # deferred of state. must be tested. This is intentional, because now
-        # it means that we guarantee that we've marked group dirty when
-        # executing policy/changing config.
-        d.addCallback(lambda _: state)
-        return d
+        # We honor start_convergence's deferred here so that we can communicate
+        # back a strong acknowledgement that a group has been marked dirty for
+        # convergence.
+        return d.addCallback(lambda _: state)
 
     delta = calculate_delta(log, state, config, policy)
     execute_log = log.bind(server_delta=delta)
