@@ -166,11 +166,11 @@ class JSONObserverWrapperTests(SynchronousTestCase):
         """
         message tuple in event is concatenated before passing on
         """
-        eventDict = {'message': ('mine',)}
+        eventDict = {'message': ('mine', 'yours')}
         observer = JSONObserverWrapper(self.observer)
         observer(eventDict)
         self.observer.assert_called_once_with(
-            {'message': (SameJSON({'message': 'mine'}),)})
+            {'message': (SameJSON({'message': 'mineyours'}),)})
 
 
 class StreamObserverWrapperTests(SynchronousTestCase):
