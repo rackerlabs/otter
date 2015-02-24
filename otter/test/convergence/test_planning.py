@@ -490,19 +490,21 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
     Tests for :func:`converge` having to do with deleting draining servers,
     or servers that don't need to be drained. (:func:`_drain_and_delete`)
     """
+    clb_desc = CLBDescription(lb_id='1', port=80)
+    rcv3_desc = RCv3Description(lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
+
     def test_active_server_without_load_balancers_can_be_deleted(self):
         """
         If an active server to be scaled down is not attached to any load
         balancers, even if it should be, it can be deleted.
         It is not first put into draining state.
         """
-        desired = s(CLBDescription(lb_id='1', port=80))
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
-                            desired_lbs=desired)]),
+                            desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set(),
                 0),
             pbag([DeleteServer(server_id='abc')]))
@@ -513,20 +515,22 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         balancers, the server can be deleted.  It is not first put into
         draining state.
         """
-        desc = CLBDescription(lb_id='1', port=80)
-        desired = s(desc)
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0),
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
+                            desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
-                             description=desc)]),
+                             description=self.clb_desc),
+                     RCv3Node(node_id='2', cloud_server_id='abc',
+                              description=self.rcv3_desc)]),
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
-                RemoveNodesFromCLB(lb_id='1', node_ids=s('1'))
+                RemoveNodesFromCLB(lb_id='1', node_ids=s('1')),
+                BulkRemoveFromRCv3(lb_node_pairs=s(
+                    (self.rcv3_desc.lb_id, 'abc')))
             ]))
 
     def test_draining_server_can_be_deleted_if_all_lbs_can_be_removed(self):
@@ -534,36 +538,39 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         If draining server can be removed from all the load balancers, the
         server can be deleted.
         """
-        desired = s(CLBDescription(lb_id='1', port=80))
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0),
                 set([server('abc', state=ServerState.DRAINING,
                             servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
+                            desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
-                             description=CLBDescription(
-                                 lb_id='1', port=80,
-                                 condition=CLBNodeCondition.DRAINING))]),
+                             description=copy_clbdesc(
+                                 self.clb_desc,
+                                 condition=CLBNodeCondition.DRAINING)),
+                     RCv3Node(node_id='2', cloud_server_id='abc',
+                              description=self.rcv3_desc)]),
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
-                RemoveNodesFromCLB(lb_id='1', node_ids=s('1'))
+                RemoveNodesFromCLB(lb_id='1', node_ids=s('1')),
+                BulkRemoveFromRCv3(lb_node_pairs=s(
+                    (self.rcv3_desc.lb_id, 'abc')))
             ]))
 
     def test_draining_server_ignored_if_waiting_for_timeout(self):
         """
         If the server already in draining state is waiting for the draining
-        timeout on some load balancers, nothing is done to it.
+        timeout on some load balancers, and no further load balancers can be
+        removed, nothing is done to it.
         """
-        desired = s(CLBDescription(lb_id='1', port=80))
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.DRAINING,
                             servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
+                            desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
                              description=CLBDescription(
                                  lb_id='1', port=80,
@@ -572,22 +579,62 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 2),
             pbag([]))
 
+    def test_draining_server_waiting_for_timeout_some_lbs_removed(self):
+        """
+        Load balancers that can be removed are removed, even if the server is
+        already in draining state is waiting for the draining timeout on some
+        load balancers.
+        """
+        other_clb_desc = CLBDescription(lb_id='9', port=80)
+
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=0,
+                                  draining_timeout=2.0),
+                set([server('abc', state=ServerState.DRAINING,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(self.clb_desc, self.rcv3_desc,
+                                          other_clb_desc))]),
+                set([
+                    # This node is in draining - nothing will be done to it
+                    CLBNode(node_id='1', address='1.1.1.1',
+                            description=copy_clbdesc(
+                                self.clb_desc,
+                                condition=CLBNodeCondition.DRAINING),
+                            drained_at=1.0, connections=1),
+                    # This node is done draining, it can be removed
+                    CLBNode(node_id='2', address='1.1.1.1',
+                            description=copy_clbdesc(
+                                other_clb_desc,
+                                condition=CLBNodeCondition.DRAINING),
+                            drained_at=0.0),
+                    # This node is not drainable, it can be removed
+                    RCv3Node(node_id='3', cloud_server_id='abc',
+                             description=self.rcv3_desc)]),
+                2),
+            pbag([
+                RemoveNodesFromCLB(lb_id='9', node_ids=s('2')),
+                BulkRemoveFromRCv3(lb_node_pairs=s(
+                    (self.rcv3_desc.lb_id, 'abc')))
+            ]))
+
     def test_active_server_is_drained_if_not_all_lbs_can_be_removed(self):
         """
         If an active server to be deleted cannot be removed from all the load
         balancers, it is set to draining state and all the nodes are set to
         draining condition.
         """
-        desired = s(CLBDescription(lb_id='1', port=80))
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
+                            desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
-                             description=CLBDescription(lb_id='1', port=80))]),
+                             description=self.clb_desc),
+                     RCv3Node(node_id='2', cloud_server_id='abc',
+                              description=self.rcv3_desc)]),
                 0),
             pbag([
                 ChangeCLBNode(lb_id='1', node_id='1', weight=1,
@@ -595,7 +642,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                               type=CLBNodeType.PRIMARY),
                 SetMetadataItemOnServer(server_id='abc',
                                         key='rax:auto_scaling_draining',
-                                        value='draining')
+                                        value='draining'),
+                BulkRemoveFromRCv3(lb_node_pairs=s(
+                    (self.rcv3_desc.lb_id, 'abc')))
             ]))
 
     def test_active_server_is_drained_even_if_all_already_in_draining(self):
@@ -608,17 +657,16 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         in a previous convergence run, and the load balancers were set to
         draining but setting the server metadata failed.
         """
-        desired = s(CLBDescription(lb_id='1', port=80))
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
+                            desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
-                             description=CLBDescription(
-                                 lb_id='1', port=80,
+                             description=copy_clbdesc(
+                                 self.clb_desc,
                                  condition=CLBNodeCondition.DRAINING),
                              connections=1, drained_at=0.0)]),
                 1),
@@ -638,16 +686,15 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         in a previous convergence run, and the server metadata was set but
         the load balancers update failed.
         """
-        desired = s(CLBDescription(lb_id='1', port=80))
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.DRAINING,
                             servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
+                            desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
-                             description=CLBDescription(lb_id='1', port=80))]),
+                             description=self.clb_desc)]),
                 1),
             pbag([
                 ChangeCLBNode(lb_id='1', node_id='1', weight=1,

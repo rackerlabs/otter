@@ -138,7 +138,8 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
     # if there are no load balancers that are waiting on draining timeouts or
     # connections, just delete the server too
     if (len(lb_draining_steps) == len(current_lb_nodes) and
-        all([isinstance(step, RemoveNodesFromCLB)
+        all([isinstance(step, RemoveNodesFromCLB) or
+             isinstance(step, BulkRemoveFromRCv3)
              for step in lb_draining_steps])):
         return lb_draining_steps + [DeleteServer(server_id=server.id)]
 
