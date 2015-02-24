@@ -60,20 +60,37 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                                   draining_timeout, now):
         """
         Run the converge function on the given a server with the given
-        :class:`CLBDescription`s (and a default :class:`RCv3Description`),
-        :class:`CLBNode`s (and a default :class:`RCv3Node`), then given
+        :class:`CLBDescription`s  and :class:`CLBNode`s, the given
         draining timeout, and the given time.
 
         Assert that the LB steps produced are equivalent to the given
-        CLB steps (and that the RCv3 node is removed no matter what, because
-        RCv3 nodes are not drainable and are hence unaffected by timeouts.)
+        CLB steps.
+
+        Run the converge function again, this time with a default
+        :class:`RCv3Description` and a default :class:`RCv3Node` added, and
+        assert that the LB steps produced are equivalent to the given
+        CLB steps plus a RCv3 node removal, because RCv3 nodes are not
+        drainable and are hence unaffected by timeouts.
         """
+        without_rcv3_steps = converge(
+            DesiredGroupState(server_config={}, capacity=0,
+                              draining_timeout=draining_timeout),
+            s(server('abc',
+                     ServerState.ACTIVE,
+                     servicenet_address=self.address,
+                     desired_lbs=s(*clb_descs))),
+            s(*clb_nodes),
+            now=now)
+
+        self.assertEqual(self._filter_only_lb_steps(without_rcv3_steps),
+                         b(*clb_steps))
+
         rcv3_desc = RCv3Description(
             lb_id='e762e42a-8a4e-4ffb-be17-f9dc672729b2')
         rcv3_step = BulkRemoveFromRCv3(
             lb_node_pairs=s(('e762e42a-8a4e-4ffb-be17-f9dc672729b2', 'abc')))
 
-        all_steps = converge(
+        with_rcv3_steps = converge(
             DesiredGroupState(server_config={}, capacity=0,
                               draining_timeout=draining_timeout),
             s(server('abc',
@@ -85,9 +102,8 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
               *clb_nodes),
             now=now)
 
-        self.assertEqual(
-            self._filter_only_lb_steps(all_steps),
-            b(rcv3_step, *clb_steps))
+        self.assertEqual(self._filter_only_lb_steps(with_rcv3_steps),
+                         b(rcv3_step, *clb_steps))
 
     def _filter_only_lb_steps(self, steps):
         """
