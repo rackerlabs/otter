@@ -8,9 +8,12 @@ from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
 
 from otter.convergence.model import (
-    CLBDescription, CLBNode, CLBNodeCondition, IDrainable, ServerState)
+    CLBDescription, CLBNode, CLBNodeCondition, IDrainable,
+    RCv3Description, RCv3Node, ServerState)
 from otter.convergence.steps import (
     AddNodesToCLB,
+    BulkAddToRCv3,
+    BulkRemoveFromRCv3,
     ChangeCLBNode,
     CreateServer,
     DeleteServer,
@@ -216,7 +219,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     delete_error_steps = (
         [DeleteServer(server_id=server.id) for server in servers_in_error] +
         [RemoveNodesFromCLB(lb_id=lb_node.description.lb_id,
-                            node_ids=(lb_node.node_id,))
+                            node_ids=pset([lb_node.node_id]))
          for server in servers_in_error
          for lb_node in load_balancer_contents if lb_node.matches(server)])
 
@@ -361,6 +364,9 @@ def add_server_to_lb(server, description):
                 lb_id=description.lb_id,
                 address_configs=pset(
                     [(server.servicenet_address, description)]))
+    elif isinstance(description, RCv3Description):
+        return BulkAddToRCv3(lb_node_pairs=pset(
+            [(description.lb_id, server.id)]))
 
 
 def remove_node_from_lb(node):
@@ -372,7 +378,10 @@ def remove_node_from_lb(node):
     """
     if isinstance(node, CLBNode):
         return RemoveNodesFromCLB(lb_id=node.description.lb_id,
-                                  node_ids=(node.node_id,))
+                                  node_ids=pset([node.node_id]))
+    elif isinstance(node, RCv3Node):
+        return BulkRemoveFromRCv3(lb_node_pairs=pset(
+            [(node.description.lb_id, node.cloud_server_id)]))
 
 
 def change_lb_node(node, description):
