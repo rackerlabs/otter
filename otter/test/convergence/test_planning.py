@@ -1,6 +1,6 @@
 """Tests for convergence planning."""
 
-from pyrsistent import pbag, pmap, pset, s
+from pyrsistent import b, pbag, pmap, pset, s
 
 from toolz import groupby
 
@@ -13,6 +13,8 @@ from otter.convergence.model import (
     CLBNodeType,
     DesiredGroupState,
     NovaServer,
+    RCv3Description,
+    RCv3Node,
     ServerState)
 from otter.convergence.planning import (
     _default_limit_step_count,
@@ -31,13 +33,61 @@ from otter.convergence.steps import (
     SetMetadataItemOnServer)
 
 
+def copy_clbdesc(clb_desc, condition=CLBNodeCondition.ENABLED):
+    """
+    Produce a :class:`CLBDescription` from another, but with the given
+    condition changed to the one given
+
+    :param clb_desc: the :class:`CLBDescription` to copy
+    :param condition: the :class:`CLBNodeCondition` to use
+    """
+    return CLBDescription(lb_id=clb_desc.lb_id, port=clb_desc.port,
+                          condition=condition)
+
+
 class RemoveFromLBWithDrainingTests(SynchronousTestCase):
     """
     Tests for :func:`converge` with regards to draining a server on a load
     balanacer and removing them from the load balancer when finished draining.
     (:func:`_remove_from_lb_with_draining`).
     """
-    LB_STEPS = (AddNodesToCLB, RemoveNodesFromCLB, ChangeCLBNode)
+    LB_STEPS = (AddNodesToCLB, RemoveNodesFromCLB, ChangeCLBNode,
+                BulkAddToRCv3, BulkRemoveFromRCv3)
+
+    address = '1.1.1.1'
+
+    def assert_converge_clb_steps(self, clb_descs, clb_nodes, clb_steps,
+                                  draining_timeout, now):
+        """
+        Run the converge function on the given a server with the given
+        :class:`CLBDescription`s (and a default :class:`RCv3Description`),
+        :class:`CLBNode`s (and a default :class:`RCv3Node`), then given
+        draining timeout, and the given time.
+
+        Assert that the LB steps produced are equivalent to the given
+        CLB steps (and that the RCv3 node is removed no matter what, because
+        RCv3 nodes are not drainable and are hence unaffected by timeouts.)
+        """
+        rcv3_desc = RCv3Description(
+            lb_id='e762e42a-8a4e-4ffb-be17-f9dc672729b2')
+        rcv3_step = BulkRemoveFromRCv3(
+            lb_node_pairs=s(('e762e42a-8a4e-4ffb-be17-f9dc672729b2', 'abc')))
+
+        all_steps = converge(
+            DesiredGroupState(server_config={}, capacity=0,
+                              draining_timeout=draining_timeout),
+            s(server('abc',
+                     ServerState.ACTIVE,
+                     servicenet_address=self.address,
+                     desired_lbs=s(rcv3_desc, *clb_descs))),
+            s(RCv3Node(node_id='43a39c18-8cad-4bb1-808e-450d950be289',
+                       cloud_server_id='abc', description=rcv3_desc),
+              *clb_nodes),
+            now=now)
+
+        self.assertEqual(
+            self._filter_only_lb_steps(all_steps),
+            b(rcv3_step, *clb_steps))
 
     def _filter_only_lb_steps(self, steps):
         """
@@ -51,169 +101,147 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         """
         If the timeout is zero, all nodes are just removed.
         """
-        desc = CLBDescription(lb_id='5', port=80)
-        self.assertEqual(
-            self._filter_only_lb_steps(converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=0.0),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1',
-                            desired_lbs=s(desc))]),
-                set([CLBNode(node_id='123', address='1.1.1.1',
-                             description=desc)]),
-                now=0)),
-            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))]))
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        clb_node = CLBNode(node_id='123', address=self.address,
+                           description=clb_desc)
+        clb_step = RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))
+
+        self.assert_converge_clb_steps(
+            clb_descs=[clb_desc],
+            clb_nodes=[clb_node],
+            clb_steps=[clb_step],
+            draining_timeout=0.0,
+            now=0)
 
     def test_disabled_state_is_removed(self):
         """
         Drainable nodes in disabled state are just removed from the load
         balancer even if the timeout is positive.
         """
-        desired = s(CLBDescription(lb_id='5', port=80))
-        current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(
-                               lb_id='5', port=80,
-                               condition=CLBNodeCondition.DISABLED))]
-        self.assertEqual(
-            self._filter_only_lb_steps(converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
-                set(current),
-                now=0)),
-            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))]))
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        clb_node = CLBNode(node_id='123', address=self.address,
+                           description=copy_clbdesc(
+                               clb_desc, condition=CLBNodeCondition.DISABLED))
+        clb_step = RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))
+
+        self.assert_converge_clb_steps(
+            clb_descs=[clb_desc],
+            clb_nodes=[clb_node],
+            clb_steps=[clb_step],
+            draining_timeout=10.0,
+            now=0)
 
     def test_drainable_enabled_state_is_drained(self):
         """
         Drainable nodes in enabled state are put into draining, while
         undrainable nodes are just removed.
         """
-        desc = CLBDescription(lb_id='5', port=80)
-        current = [CLBNode(node_id='123', address='1.1.1.1', description=desc)]
-        self.assertEqual(
-            self._filter_only_lb_steps(converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1',
-                            desired_lbs=s(desc))]),
-                set(current),
-                now=0)),
-            pbag([ChangeCLBNode(lb_id='5', node_id='123', weight=1,
-                                condition=CLBNodeCondition.DRAINING,
-                                type=CLBNodeType.PRIMARY)]))
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        clb_node = CLBNode(node_id='123', address=self.address,
+                           description=clb_desc)
+        clb_step = ChangeCLBNode(lb_id='5', node_id='123', weight=1,
+                                 condition=CLBNodeCondition.DRAINING,
+                                 type=CLBNodeType.PRIMARY)
+
+        self.assert_converge_clb_steps(
+            clb_descs=[clb_desc],
+            clb_nodes=[clb_node],
+            clb_steps=[clb_step],
+            draining_timeout=10.0,
+            now=0)
 
     def test_draining_state_is_ignored_if_connections_before_timeout(self):
         """
         Nodes in draining state will be ignored if they still have connections
         and the timeout is not yet expired.
         """
-        desired = s(CLBDescription(lb_id='5', port=80))
-        current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(
-                               lb_id='5', port=80,
-                               condition=CLBNodeCondition.DRAINING),
-                           drained_at=0.0, connections=1)]
-        self.assertEqual(
-            self._filter_only_lb_steps(converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
-                set(current),
-                now=5)),
-            pbag([]))
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        clb_node = CLBNode(node_id='123', address=self.address,
+                           description=copy_clbdesc(
+                               clb_desc, condition=CLBNodeCondition.DRAINING),
+                           drained_at=0.0, connections=1)
+
+        self.assert_converge_clb_steps(
+            clb_descs=[clb_desc],
+            clb_nodes=[clb_node],
+            clb_steps=[],
+            draining_timeout=10.0,
+            now=5)
 
     def test_draining_state_removed_if_no_connections_before_timeout(self):
         """
         Nodes in draining state will be removed if they have no more
         connections, even if the timeout is not yet expired
         """
-        desired = s(CLBDescription(lb_id='5', port=80))
-        current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(
-                               lb_id='5', port=80,
-                               condition=CLBNodeCondition.DRAINING),
-                           drained_at=0.0, connections=0)]
-        self.assertEqual(
-            self._filter_only_lb_steps(converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
-                set(current),
-                now=5)),
-            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))]))
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        clb_node = CLBNode(node_id='123', address=self.address,
+                           description=copy_clbdesc(
+                               clb_desc, condition=CLBNodeCondition.DRAINING),
+                           drained_at=0.0, connections=0)
+        clb_step = RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))
+
+        self.assert_converge_clb_steps(
+            clb_descs=[clb_desc],
+            clb_nodes=[clb_node],
+            clb_steps=[clb_step],
+            draining_timeout=10.0,
+            now=5)
 
     def test_draining_state_remains_if_connections_none_before_timeout(self):
         """
         Nodes in draining state will be ignored if timeout has not yet expired
         and the number of active connections are not provided
         """
-        desired = s(CLBDescription(lb_id='5', port=80))
-        current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(
-                               lb_id='5', port=80,
-                               condition=CLBNodeCondition.DRAINING),
-                           drained_at=0.0)]
-        self.assertEqual(
-            self._filter_only_lb_steps(converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
-                set(current),
-                now=5)),
-            pbag([]))
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        clb_node = CLBNode(node_id='123', address=self.address,
+                           description=copy_clbdesc(
+                               clb_desc, condition=CLBNodeCondition.DRAINING),
+                           drained_at=0.0)
+
+        self.assert_converge_clb_steps(
+            clb_descs=[clb_desc],
+            clb_nodes=[clb_node],
+            clb_steps=[],
+            draining_timeout=10.0,
+            now=5)
 
     def test_draining_state_removed_if_connections_none_after_timeout(self):
         """
         Nodes in draining state will be removed when the timeout expires if
         the number of active connections are not provided
         """
-        desired = s(CLBDescription(lb_id='5', port=80))
-        current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(
-                               lb_id='5', port=80,
-                               condition=CLBNodeCondition.DRAINING),
-                           drained_at=0.0)]
-        self.assertEqual(
-            self._filter_only_lb_steps(converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
-                set(current),
-                now=15)),
-            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))]))
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        clb_node = CLBNode(node_id='123', address=self.address,
+                           description=copy_clbdesc(
+                               clb_desc, condition=CLBNodeCondition.DRAINING),
+                           drained_at=0.0)
+        clb_step = RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))
+
+        self.assert_converge_clb_steps(
+            clb_descs=[clb_desc],
+            clb_nodes=[clb_node],
+            clb_steps=[clb_step],
+            draining_timeout=10.0,
+            now=15)
 
     def test_draining_state_removed_if_connections_and_timeout_expired(self):
         """
         Nodes in draining state will be removed when the timeout expires even
         if they still have active connections
         """
-        desired = s(CLBDescription(lb_id='5', port=80))
-        current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(
-                               lb_id='5', port=80,
-                               condition=CLBNodeCondition.DRAINING),
-                           drained_at=0.0, connections=10)]
-        self.assertEqual(
-            self._filter_only_lb_steps(converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
-                set(current),
-                now=15)),
-            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))]))
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        clb_node = CLBNode(node_id='123', address=self.address,
+                           description=copy_clbdesc(
+                               clb_desc, condition=CLBNodeCondition.DRAINING),
+                           drained_at=0.0, connections=10)
+        clb_step = RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))
+
+        self.assert_converge_clb_steps(
+            clb_descs=[clb_desc],
+            clb_nodes=[clb_node],
+            clb_steps=[clb_step],
+            draining_timeout=10.0,
+            now=15)
 
     def test_all_clb_changes_together(self):
         """
@@ -221,56 +249,51 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         timeouts, ensure function produces the right set of step for all of
         them.
         """
-        desired = s(CLBDescription(lb_id='1', port=80),
-                    CLBDescription(lb_id='2', port=80),
-                    CLBDescription(lb_id='3', port=80),
-                    CLBDescription(lb_id='4', port=80),
-                    CLBDescription(lb_id='5', port=80))
-        current = [
+        clb_descs = [CLBDescription(lb_id='1', port=80),
+                     CLBDescription(lb_id='2', port=80),
+                     CLBDescription(lb_id='3', port=80),
+                     CLBDescription(lb_id='4', port=80),
+                     CLBDescription(lb_id='5', port=80)]
+
+        clb_nodes = [
             # enabled, should be drained
-            CLBNode(node_id='1', address='1.1.1.1',
-                    description=CLBDescription(lb_id='1', port=80)),
+            CLBNode(node_id='1', address=self.address,
+                    description=clb_descs[0]),
             # disabled, should be removed
-            CLBNode(node_id='2', address='1.1.1.1',
-                    description=CLBDescription(
-                        lb_id='2', port=80,
-                        condition=CLBNodeCondition.DISABLED)),
+            CLBNode(node_id='2', address=self.address,
+                    description=copy_clbdesc(
+                        clb_descs[1], condition=CLBNodeCondition.DISABLED)),
             # draining, still connections, should be ignored
             CLBNode(node_id='3', address='1.1.1.1',
-                    description=CLBDescription(
-                        lb_id='3', port=80,
-                        condition=CLBNodeCondition.DRAINING),
+                    description=copy_clbdesc(
+                        clb_descs[2], condition=CLBNodeCondition.DRAINING),
                     connections=3, drained_at=5.0),
             # draining, no connections, should be removed
             CLBNode(node_id='4', address='1.1.1.1',
-                    description=CLBDescription(
-                        lb_id='4', port=80,
-                        condition=CLBNodeCondition.DRAINING),
+                    description=copy_clbdesc(
+                        clb_descs[3], condition=CLBNodeCondition.DRAINING),
                     connections=0, drained_at=5.0),
             # draining, timeout exired, should be removed
             CLBNode(node_id='5', address='1.1.1.1',
-                    description=CLBDescription(
-                        lb_id='5', port=80,
-                        condition=CLBNodeCondition.DRAINING),
+                    description=copy_clbdesc(
+                        clb_descs[4], condition=CLBNodeCondition.DRAINING),
                     connections=10, drained_at=0.0)]
 
-        self.assertEqual(
-            self._filter_only_lb_steps(converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
-                set(current),
-                now=10)),
-            pbag([
-                ChangeCLBNode(lb_id='1', node_id='1', weight=1,
-                              condition=CLBNodeCondition.DRAINING,
-                              type=CLBNodeType.PRIMARY),
-                RemoveNodesFromCLB(lb_id='2', node_ids=s('2')),
-                RemoveNodesFromCLB(lb_id='4', node_ids=s('4')),
-                RemoveNodesFromCLB(lb_id='5', node_ids=s('5')),
-            ]))
+        clb_steps = [
+            ChangeCLBNode(lb_id='1', node_id='1', weight=1,
+                          condition=CLBNodeCondition.DRAINING,
+                          type=CLBNodeType.PRIMARY),
+            RemoveNodesFromCLB(lb_id='2', node_ids=s('2')),
+            RemoveNodesFromCLB(lb_id='4', node_ids=s('4')),
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('5')),
+        ]
+
+        self.assert_converge_clb_steps(
+            clb_descs=clb_descs,
+            clb_nodes=clb_nodes,
+            clb_steps=clb_steps,
+            draining_timeout=10.0,
+            now=10)
 
 
 class ConvergeLBStateTests(SynchronousTestCase):
