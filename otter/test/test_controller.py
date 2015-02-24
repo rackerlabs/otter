@@ -1105,7 +1105,6 @@ class ConvergeTestCase(SynchronousTestCase):
         result = controller.converge(log, 'txn-id', group_config, self.group,
                                      state, 'launch', policy,
                                      config_value=config_data.get)
-        self.assertIsInstance(result, defer.Deferred)
         self.assertIs(self.successResultOf(result), None)
         self.converger_mock.start_convergence.assert_called_once_with(
             log, self.group, state, 'launch')
