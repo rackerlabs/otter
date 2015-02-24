@@ -13,7 +13,8 @@ from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.zk import (
-    CreateOrSet, perform_create_or_set, get_children_with_stats)
+    CreateOrSet, GetChildrenWithStats,
+    perform_create_or_set, perform_get_children_with_stats)
 
 
 @attributes(['version'])
@@ -121,7 +122,7 @@ class CreateOrSetTests(SynchronousTestCase):
         self.assertEqual(self.model.nodes, {'/foo': ('bar', 0)})
 
 
-class GetChildrenWithStats(SynchronousTestCase):
+class GetChildrenWithStatsTests(SynchronousTestCase):
     """Tests for :func:`get_children_with_stats`."""
     def setUp(self):
         # It'd be nice if we used the standard ZK CRUD model, but implementing
@@ -129,6 +130,12 @@ class GetChildrenWithStats(SynchronousTestCase):
         class Model(object):
             pass
         self.model = Model()
+
+    def _gcws(self, path):
+        eff = Effect(GetChildrenWithStats(path))
+        performer = partial(perform_get_children_with_stats, self.model)
+        dispatcher = TypeDispatcher({GetChildrenWithStats: performer})
+        return perform(dispatcher, eff)
 
     def test_get_children_with_stats(self):
         """
@@ -146,7 +153,7 @@ class GetChildrenWithStats(SynchronousTestCase):
         self.model.get_children = {'/path': succeed(['foo', 'bar', 'baz'])}.get
         self.model.exists = exists
 
-        d = get_children_with_stats(self.model, '/path')
+        d = self._gcws('/path')
         self.assertEqual(self.successResultOf(d),
                          [('foo', ZNodeStatStub(version=0)),
                           ('bar', ZNodeStatStub(version=1))])

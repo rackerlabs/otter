@@ -65,7 +65,8 @@ class ConvergerTests(SynchronousTestCase):
         clock = Clock()
         self.kz_client = mock.Mock(Lock=LockMixin().mock_lock())
         self.dispatcher = object()
-        self.converger = Converger(clock, self.kz_client, self.dispatcher)
+        self.log = mock_log()
+        self.converger = Converger(self.log, self.kz_client, self.dispatcher)
         self.state = GroupState('tenant-id', 'group-id', 'group-name',
                                 {}, {}, None, {}, False)
         self.group = mock_group(self.state, 'tenant-id', 'group-id')

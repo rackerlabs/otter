@@ -42,20 +42,27 @@ def perform_create_or_set(kz_client, dispatcher, create_or_set):
     return create()
 
 
-@attributes(['path'])
+@attributes(['path'], apply_with_init=False)
 class GetChildrenWithStats(object):
     """
     List children along with their stat information.
 
     Results in ``[(child_path, :obj:`ZnodeStat`)]``.
     """
+    def __init__(self, path):
+        self.path = path
 
 
-def get_children_with_stats(kz_client, path):
+@deferred_performer
+def perform_get_children_with_stats(kz_client, dispatcher, intent):
     """
     Perform :obj:`GetChildrenWithStats`. Must be partialed with ``kz_client``.
+
+    :param kz_client: txKazoo client
+    :param dispatcher: dispatcher, supplied by perform
+    :param GetChildrenWithStats intent: the intent
     """
-    # path = get_children_with_stats.path
+    path = intent.path
     children = kz_client.get_children(path)
 
     def got_children(children):
