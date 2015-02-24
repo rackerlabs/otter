@@ -152,7 +152,7 @@ def start_convergence_eff(tenant_id, group_id):
 
     path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
                                          group_id=group_id)
-    eff = Effect(CreateOrSet(path, 'dirty'))
+    eff = Effect(CreateOrSet(path=path, content='dirty'))
     return eff
 
 
@@ -190,7 +190,6 @@ class Converger(MultiService):
     """
 
     # TODO: A lot more of this could be Effectified. We'd need intents for:
-    # - ZK: listing children, deleting nodes, getting stats (exists)
     # - cassandra: getting scaling group and launch config, setting error state
 
     def __init__(self, log, kz_client, store, dispatcher, buckets,

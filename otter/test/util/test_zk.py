@@ -13,8 +13,9 @@ from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.zk import (
-    CreateOrSet, GetChildrenWithStats,
-    perform_create_or_set, perform_get_children_with_stats)
+    CreateOrSet, DeleteNode, GetChildrenWithStats,
+    perform_create_or_set, perform_delete_node,
+    perform_get_children_with_stats)
 
 
 @attributes(['version'])
@@ -85,7 +86,7 @@ class CreateOrSetTests(SynchronousTestCase):
         self.model = ZKCrudModel()
 
     def _cos(self, path, content):
-        eff = Effect(CreateOrSet(path, content))
+        eff = Effect(CreateOrSet(path=path, content=content))
         performer = partial(perform_create_or_set, self.model)
         dispatcher = TypeDispatcher({CreateOrSet: performer})
         return perform(dispatcher, eff)
@@ -157,3 +158,18 @@ class GetChildrenWithStatsTests(SynchronousTestCase):
         self.assertEqual(self.successResultOf(d),
                          [('foo', ZNodeStatStub(version=0)),
                           ('bar', ZNodeStatStub(version=1))])
+
+class DeleteTests(SynchronousTestCase):
+    """Tests for :obj:`DeleteNode`."""
+    def test_delete(self):
+        model = ZKCrudModel()
+        eff = Effect(DeleteNode(path='/foo', version=1))
+        model.create('/foo', 'initial', makepath=True)
+        model.set('/foo', 'bar')
+        performer = partial(perform_delete_node, model)
+        dispatcher = TypeDispatcher({DeleteNode: performer})
+        d = perform(dispatcher, eff)
+        self.assertEqual(model.nodes, {})
+        self.assertEqual(self.successResultOf(d), None)
+
+        

@@ -8,7 +8,7 @@ from kazoo.exceptions import NoNodeError, NodeExistsError
 from twisted.internet.defer import gatherResults
 
 
-@attributes(['path', 'content'], apply_with_init=False)
+@attributes(['path', 'content'])
 class CreateOrSet(object):
     """
     Create a node, or if the node already exists, set the content.
@@ -16,9 +16,6 @@ class CreateOrSet(object):
     Handles the case where a node gets deleted in between our attempt and
     creating and setting.
     """
-    def __init__(self, path, content):
-        self.path = path
-        self.content = content
 
 
 @deferred_performer
@@ -75,6 +72,23 @@ def perform_get_children_with_stats(kz_client, dispatcher, intent):
     children.addCallback(got_children)
     children.addCallback(partial(filter, None))
     return children
+
+
+
+@attributes(['path', 'version'])
+class DeleteNode(object):
+    """Delete a node."""
+
+
+@deferred_performer
+def perform_delete_node(kz_client, dispatcher, intent):
+    """Perform :obj:`DeleteNode`.
+
+    :param kz_client: txKazoo client
+    :param dispatcher: dispatcher, supplied by perform
+    :param DeleteNode intent: the intent
+    """
+    kz_client.delete(intent.path, version=intent.version)
 
 
 def _handle(exc_type, fn):
