@@ -149,12 +149,12 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
     """
     if tenant_is_enabled(scaling_group.tenant_id, config_value):
         delta = apply_delta(log, state.desired, state, config, policy)
-        if delta == 0:
-            return None
-
         get_converger().start_convergence(log, scaling_group, state,
                                           launch_config)
-        return defer.succeed(None)
+        if delta == 0:
+            return None
+        else:
+            return defer.succeed(None)
 
     delta = calculate_delta(log, state, config, policy)
     execute_log = log.bind(server_delta=delta)
