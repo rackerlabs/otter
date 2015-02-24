@@ -5,7 +5,7 @@ import mock
 
 from pyrsistent import freeze, pmap
 
-from twisted.internet.defer import fail
+from twisted.internet.defer import fail, succeed
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -35,11 +35,28 @@ class StartConvergenceEffTests(SynchronousTestCase):
         returns an effect which will create or set a node relative to
         ``CONVERGENCE_DIRTY_PATH``.
         """
-        eff = start_convergence_eff('tenant-id', 'group-id')
+        eff = start_convergence_eff('tenant', 'group')
         self.assertEqual(
             eff,
-            Effect(CreateOrSet('/groups/converging/tenant-id_group-id',
+            Effect(CreateOrSet('/groups/converging/tenant_group',
                                'dirty')))
+
+
+class ConvergenceStarterTests(SynchronousTestCase):
+    """Tests for :obj:`ConvergenceStarter`."""
+
+    def test_start_convergence(self):
+        svc = ConvergenceStarter('my-dispatcher')
+        log = mock_log()
+
+        def perform(dispatcher, eff):
+            return succeed((dispatcher, eff))
+        d = svc.start_convergence(log, 'tenant', 'group', perform=perform)
+        self.assertEqual(
+            self.successResultOf(d),
+            ('my-dispatcher',
+             Effect(CreateOrSet('/groups/converging/tenant_group',
+                                'dirty'))))
 
 
 class ConvergerTests(SynchronousTestCase):

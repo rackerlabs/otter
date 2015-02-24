@@ -169,7 +169,7 @@ class ConvergenceStarter(Service, object):
         log = log.bind(tenant_id=tenant_id, group_id=group_id)
         log.msg("Marking group dirty", otter_msg_type='convergence-mark-dirty')
         eff = start_convergence_eff(tenant_id, group_id)
-        d = perform(self._disaptcher, eff)
+        d = perform(self._dispatcher, eff)
         d.addErrback(log.err, otter_msg_type='mark-dirty-failed')
         return d
 
