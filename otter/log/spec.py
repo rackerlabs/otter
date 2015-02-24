@@ -95,7 +95,7 @@ def get_validated_event(event):
             return event
         event["message"] = (msg, )
 
-    # Validate all the fields
+    # Validate non-primitive fields
     for field in set(event) - (PRIMITIVE_FIELDS | ERROR_FIELDS):
         validate_field(fields, field, event[field])
 
