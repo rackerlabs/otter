@@ -33,7 +33,7 @@ from otter.convergence.steps import (
     SetMetadataItemOnServer)
 
 
-def copy_clbdesc(clb_desc, condition=CLBNodeCondition.ENABLED):
+def copy_clbdesc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1):
     """
     Produce a :class:`CLBDescription` from another, but with the given
     condition changed to the one given
@@ -42,7 +42,7 @@ def copy_clbdesc(clb_desc, condition=CLBNodeCondition.ENABLED):
     :param condition: the :class:`CLBNodeCondition` to use
     """
     return CLBDescription(lb_id=clb_desc.lb_id, port=clb_desc.port,
-                          condition=condition)
+                          condition=condition, weight=weight)
 
 
 class RemoveFromLBWithDrainingTests(SynchronousTestCase):
@@ -305,39 +305,51 @@ class ConvergeLBStateTests(SynchronousTestCase):
         """
         If a desired LB config is not in the set of current configs,
         `converge_lb_state` returns the relevant adding-to-load-balancer
-        steps (:class:`AddNodesToCLB` in the case of CLB).
+        steps (:class:`AddNodesToCLB` in the case of CLB,
+        :class:`BulkAddToRCv3` in the case of RCv3).
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
+        rcv3_desc = RCv3Description(
+            lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
+
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
-                            desired_lbs=s(clb_desc))]),
+                            desired_lbs=s(clb_desc, rcv3_desc))]),
                 set(),
                 0),
             pbag([
                 AddNodesToCLB(
                     lb_id='5',
-                    address_configs=s(('1.1.1.1', clb_desc)))
+                    address_configs=s(('1.1.1.1', clb_desc))),
+                BulkAddToRCv3(
+                    lb_node_pairs=s(
+                        ('c6fe49fa-114a-4ea4-9425-0af8b30ff1e7', 'abc')))
             ]))
 
     def test_change_lb_node(self):
         """
-        If a desired LB mapping is in the set of current configs,
+        If a desired CLB mapping is in the set of current configs,
         but the configuration is wrong, `converge_lb_state` returns a
-        :class:`ChangeCLBNode` object
+        :class:`ChangeCLBNode` object.  RCv3 nodes cannot be changed - they are
+        either right or wrong.
         """
-        desired = s(CLBDescription(lb_id='5', port=80))
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        rcv3_desc = RCv3Description(
+            lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
+
         current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(
-                               lb_id='5', port=80, weight=5))]
+                           description=copy_clbdesc(clb_desc, weight=5)),
+                   RCv3Node(node_id='234', cloud_server_id='abc',
+                            description=rcv3_desc)]
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
+                            desired_lbs=s(clb_desc, rcv3_desc))]),
                 set(current),
                 0),
             pbag([
@@ -348,11 +360,15 @@ class ConvergeLBStateTests(SynchronousTestCase):
     def test_remove_lb_node(self):
         """
         If a current lb config is not in the desired set of lb configs,
-        `converge_lb_state` returns a :class:`RemoveFromCLB` object
+        `converge_lb_state` returns a :class:`RemoveFromCLB` object for CLBs
+        and a :class:`BulkRemoveFromRCv3` for RCv3 load balancers.
         """
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=CLBDescription(
-                               lb_id='5', port=80, weight=5))]
+                               lb_id='5', port=80, weight=5)),
+                   RCv3Node(node_id='234', cloud_server_id='abc',
+                            description=RCv3Description(
+                                lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7'))]
 
         self.assertEqual(
             converge(
@@ -362,23 +378,30 @@ class ConvergeLBStateTests(SynchronousTestCase):
                             desired_lbs=pset())]),
                 set(current),
                 0),
-            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))]))
+            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=s('123')),
+                  BulkRemoveFromRCv3(lb_node_pairs=s(
+                      ('c6fe49fa-114a-4ea4-9425-0af8b30ff1e7', 'abc')))]))
 
     def test_do_nothing(self):
         """
         If the desired lb state matches the current lb state,
         `converge_lb_state` returns nothing
         """
-        desired = s(CLBDescription(lb_id='5', port=80))
-        current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(lb_id='5', port=80))]
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        rcv3_desc = RCv3Description(
+            lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
+
+        current = [
+            CLBNode(node_id='123', address='1.1.1.1', description=clb_desc),
+            RCv3Node(node_id='234', cloud_server_id='abc',
+                     description=rcv3_desc)]
 
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
+                            desired_lbs=s(clb_desc, rcv3_desc))]),
                 set(current),
                 0),
             pbag([]))
@@ -387,19 +410,26 @@ class ConvergeLBStateTests(SynchronousTestCase):
         """
         Remove, change, and add a node to a load balancer all together
         """
-        desired = s(CLBDescription(lb_id='5', port=80),
-                    CLBDescription(lb_id='6', port=80, weight=2))
-        current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(lb_id='5', port=8080)),
-                   CLBNode(node_id='234', address='1.1.1.1',
-                           description=CLBDescription(lb_id='6', port=80))]
+        descs = [CLBDescription(lb_id='5', port=80),
+                 CLBDescription(lb_id='6', port=80, weight=2),
+                 RCv3Description(lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')]
+
+        current = [
+            CLBNode(node_id='123', address='1.1.1.1',
+                    description=CLBDescription(lb_id='5', port=8080)),
+            CLBNode(node_id='234', address='1.1.1.1',
+                    description=copy_clbdesc(descs[1], weight=1)),
+            RCv3Node(node_id='345', cloud_server_id='abc',
+                     description=RCv3Description(
+                         lb_id='e762e42a-8a4e-4ffb-be17-f9dc672729b2'))
+        ]
 
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
-                            desired_lbs=desired)]),
+                            desired_lbs=pset(descs))]),
                 set(current),
                 0),
             pbag([
@@ -410,13 +440,17 @@ class ConvergeLBStateTests(SynchronousTestCase):
                 ChangeCLBNode(lb_id='6', node_id='234', weight=2,
                               condition=CLBNodeCondition.ENABLED,
                               type=CLBNodeType.PRIMARY),
-                RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))
+                RemoveNodesFromCLB(lb_id='5', node_ids=s('123')),
+                BulkAddToRCv3(lb_node_pairs=s(
+                    ('c6fe49fa-114a-4ea4-9425-0af8b30ff1e7', 'abc'))),
+                BulkRemoveFromRCv3(lb_node_pairs=s(
+                    ('e762e42a-8a4e-4ffb-be17-f9dc672729b2', 'abc')))
             ]))
 
-    def test_same_lb_multiple_ports(self):
+    def test_same_clb_multiple_ports(self):
         """
-        It's possible to have the same load balancer using multiple ports on
-        the host.
+        It's possible to have the same cloud load balancer using multiple ports
+        on the host.
 
         (use case: running multiple single-threaded server processes on a
         machine)
