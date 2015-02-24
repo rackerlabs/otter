@@ -1116,7 +1116,7 @@ class ConvergeTestCase(SynchronousTestCase):
     def test_real_convergence_zero_delta(self):
         """
         When a tenant is configured to for convergence, if the delta is zero,
-        the Convergence service's ``converge`` method is invoked and
+        the Convergence service's ``converge`` method is not invoked and
         `None` is returned.
         """
         log = mock_log()
@@ -1130,8 +1130,5 @@ class ConvergeTestCase(SynchronousTestCase):
                                      state, 'launch', policy,
                                      config_value=config_data.get)
         self.assertIs(result, None)
-        self.converger_mock.start_convergence.assert_called_once_with(
-            log, self.group, state, 'launch')
-
-        # And execute_launch_config is _not_ called
+        self.assertFalse(self.converger_mock.start_convergence.called)
         self.assertFalse(self.mocks['execute_launch_config'].called)
