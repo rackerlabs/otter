@@ -159,6 +159,7 @@ class GetChildrenWithStatsTests(SynchronousTestCase):
                          [('foo', ZNodeStatStub(version=0)),
                           ('bar', ZNodeStatStub(version=1))])
 
+
 class DeleteTests(SynchronousTestCase):
     """Tests for :obj:`DeleteNode`."""
     def test_delete(self):
@@ -171,5 +172,3 @@ class DeleteTests(SynchronousTestCase):
         d = perform(dispatcher, eff)
         self.assertEqual(model.nodes, {})
         self.assertEqual(self.successResultOf(d), None)
-
-        
