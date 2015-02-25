@@ -52,8 +52,8 @@ def determine_active(servers, lb_nodes):
         return desired_lbs == met_desireds
 
     return [s for s in servers
-            if s.state == ServerState.ACTIVE
-            and all_met(s, [node for node in lb_nodes if node.matches(s)])]
+            if (s.state == ServerState.ACTIVE and
+                all_met(s, [node for node in lb_nodes if node.matches(s)]))]
 
 
 def execute_convergence(

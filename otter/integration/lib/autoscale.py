@@ -1,17 +1,29 @@
 """Contains reusable classes relating to autoscale."""
 
+from __future__ import print_function
+
 import json
 
 from characteristic import Attribute, attributes
 
 import treq
 
+from twisted.internet import reactor
+from twisted.internet.task import LoopingCall
+
 from otter.util.http import check_success, headers
+
+
+class TimeoutError(Exception):
+    """This exception will raise when an operation exceeds a maximum amount
+    of time without showing any progress.
+    """
 
 
 @attributes([
     Attribute('group_config', instance_of=dict),
     Attribute('pool', default_value=None),
+    Attribute('reactor', default_value=None),
 ])
 class ScalingGroup(object):
     """This class encapsulates a scaling group resource.  It provides a means
@@ -71,6 +83,75 @@ class ScalingGroup(object):
             ).addCallback(check_success, [200, 404])
             .addCallback(decide)
         )
+
+    def wait_for_N_servers(
+        self, rcs, servers_desired, period=10, timeout=600, clock=None
+    ):
+        """Waits for the desired number of servers.
+
+        :param TestResources rcs: The integration test resources instance.
+            This provides useful information to complete the request, like
+            which endpoint to use to make the API request.
+        :param int servers_desired: The number of servers to wait for.
+            It must be greater than or equal to one.
+        :param int period: The number of seconds between poll attempts.
+            If unspecified, defaults to 10 seconds.
+        :param int timeout: The number of seconds to wait before giving up.
+            Defaults to 600 seconds (10 minutes).
+        :param twisted.internet.interfaces.IReactorTime clock: If provided,
+            the clock to use for scheduling things.  Defaults to `reactor`
+            if not specified.
+
+        :return: If the operation succeeds, the same instance of TestResources.
+            Otherwise, an exception is raised.
+        """
+
+        clock = clock or reactor
+
+        class Looper(object):
+            """Inner-class to support looping until either of two conditions
+            holds: (1) we see at least `servers_desired` servers in existence,
+            or (2) a timeout is reached.
+
+            :param ScalingGroup scaling_group: The scaling group that this
+                looper should poll the state of.
+            """
+
+            def __init__(self, scaling_group):
+                self.elapsed_time = 0
+                self.scaling_group = scaling_group
+                # To be filled in later.
+                self.loopingCall = None
+
+            def loop(self):
+                if self.elapsed_time < timeout:
+                    self.elapsed_time += period
+                    return self.check_servers()
+                else:
+                    raise TimeoutError(
+                        "Spent %ds, polling every %ds, timeout." % (
+                            self.elapsed_time, period
+                        )
+                    )
+
+            def ensure_200_result(self, state_results):
+                if state_results[0] != 200:
+                    raise Exception("Scaling group not found.")
+                active_servers = state_results[1]["group"]["active"]
+                if len(active_servers) >= servers_desired:
+                    self.loopingCall.stop()
+
+            def check_servers(self):
+                d = self.scaling_group.get_scaling_group_state(rcs)\
+                    .addCallback(self.ensure_200_result)
+                return d
+
+        looper = Looper(self)
+        lc = LoopingCall(looper.loop)
+        lc.clock = clock
+        looper.loopingCall = lc
+        d = lc.start(period).addCallback(lambda _: rcs)
+        return d
 
     def start(self, rcs, test):
         """Create a scaling group.
