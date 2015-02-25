@@ -1,5 +1,5 @@
 """Steps for convergence."""
-
+import json
 import re
 
 from functools import partial
@@ -20,7 +20,7 @@ from otter.convergence.model import StepResult
 from otter.http import has_code, service_request
 from otter.util.fp import predicate_any
 from otter.util.hashkey import generate_server_name
-from otter.util.http import append_segments
+from otter.util.http import APIError, append_segments
 
 
 class IStep(Interface):
@@ -50,6 +50,38 @@ def set_server_name(server_config_args, name_suffix):
     return server_config_args.set_in(('server', 'name'), name)
 
 
+def _try_json_message(maybe_json_error, keys):
+    """
+    Attemp to grab the message body from possibly a JSON error body.  If
+    invalid JSON, or if the JSON is of an unexpected format (keys are not
+    found), `None` is returned.
+    """
+    try:
+        error_body = json.loads(maybe_json_error)
+    except (ValueError, TypeError):
+        return None
+    else:
+        return get_in(keys, error_body, None)
+
+
+def _forbidden_plaintext(message):
+    return re.compile(
+        "^403 Forbidden\n\nAccess was denied to this resource\.\n\n ({0})$"
+        .format(message))
+
+_NOVA_403_NO_PUBLIC_NETWORK = _forbidden_plaintext(
+    "Networks \(00000000-0000-0000-0000-000000000000\) not allowed")
+_NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED = _forbidden_plaintext(
+    "Networks \(00000000-0000-0000-0000-000000000000,"
+    "11111111-1111-1111-1111-111111111111\) required but missing")
+_NOVA_403_RACKCONNECT_NETWORK_REQUIRED = _forbidden_plaintext(
+    "Exactly 1 isolated network\(s\) must be attached")
+
+_NOVA_403_QUOTA_REACHED = re.compile(
+    "^Quota exceeded for (?P<limit>\S+): Requested \d+, but already used \d+ "
+    "of \d+ (?P=limit)$")
+
+
 @implementer(IStep)
 @attributes(['server_config'])
 class CreateServer(object):
@@ -70,12 +102,38 @@ class CreateServer(object):
                 'POST',
                 'servers',
                 data=thaw(server_config),
-                success_pred=has_code(202))
+                success_pred=has_code(202),
+                reauth_codes=(401,))
 
         def report_success(result):
             return StepResult.SUCCESS, []
 
         def report_failure(result):
+            """
+            If the failure is an APIError with a 400 or 403, attempt to parse
+            the results and return a :obj:`StepResult.FAILURE` - if the errors
+            are unrecognized, return a :obj:`StepResult.RETRY` for now.
+            """
+            err_type, error, traceback = result
+            if err_type == APIError and error.code == 400:
+                message = _try_json_message(error.body,
+                                            ("badRequest", "message"))
+                if message:
+                    return StepResult.FAILURE, [message]
+
+            elif err_type == APIError and error.code == 403:
+                message = _try_json_message(error.body,
+                                            ("forbidden", "message"))
+                if message and _NOVA_403_QUOTA_REACHED.match(message):
+                    return StepResult.FAILURE, [message]
+
+                for pat in (_NOVA_403_RACKCONNECT_NETWORK_REQUIRED,
+                            _NOVA_403_NO_PUBLIC_NETWORK,
+                            _NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED):
+                    m = pat.match(error.body)
+                    if m:
+                        return StepResult.FAILURE, [m.groups()[0]]
+
             return StepResult.RETRY, []
 
         return eff.on(got_name).on(success=report_success,
