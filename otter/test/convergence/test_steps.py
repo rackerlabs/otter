@@ -140,7 +140,8 @@ class CreateServerTests(SynchronousTestCase):
                 }),
                 headers={})
             self.assertEqual(
-                resolve_effect(eff, service_request_error_response(api_error)),
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
                 (StepResult.FAILURE, [message]))
 
     def test_create_server_400_unrecognized_failures_retry(self):
@@ -165,7 +166,8 @@ class CreateServerTests(SynchronousTestCase):
         for message in invalid_400s:
             api_error = APIError(code=400, body=message, headers={})
             self.assertEqual(
-                resolve_effect(eff, service_request_error_response(api_error)),
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
                 (StepResult.RETRY, []))
 
     def test_create_server_403_json_parseable_failures(self):
@@ -199,7 +201,8 @@ class CreateServerTests(SynchronousTestCase):
                 }),
                 headers={})
             self.assertEqual(
-                resolve_effect(eff, service_request_error_response(api_error)),
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
                 (StepResult.FAILURE, [message]))
 
     def test_create_server_403_plaintext_parseable_failures(self):
@@ -230,7 +233,8 @@ class CreateServerTests(SynchronousTestCase):
                     message)),
                 headers={})
             self.assertEqual(
-                resolve_effect(eff, service_request_error_response(api_error)),
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
                 (StepResult.FAILURE, [message]))
 
     def test_create_server_403_unrecognized_failures_retry(self):
@@ -246,14 +250,29 @@ class CreateServerTests(SynchronousTestCase):
         # 403's with JSON and plaintext bodies don't recognize
         invalid_403s = (
             json.dumps({"what?": {"message": "meh", "code": 403}}),
+            json.dumps({"forbiden": {
+                "message": ("Quota exceeded for hats: Requested 1, but "
+                            "already used 5 of 5 bunnies"),
+                "code": 403}}),
+            json.dumps({"forbiden": {
+                "message": ("Quota exceeded for hats: Requested X, but "
+                            "already used Y of Z hats"),
+                "code": 403}}),
+            json.dumps({"forbiden": {
+                "message": "Exactly 1 isolated network(s) must be attached",
+                "code": 403}}),
             "403 Forbidden\n\nAccess was denied to this resource.\n\n bleh",
+            ("403 Forbidden\n\nAccess was denied to this resource.\n\n "
+             "Quota exceeded for ram: Requested 1024, but already used 131072 "
+             "of 131072 ram"),
             "not even a message")
 
         for message in invalid_403s:
             api_error = APIError(code=403, body=message, headers={})
             self.assertEqual(
-                resolve_effect(eff, service_request_error_response(api_error)),
-                (StepResult.RETRY, [message]))
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
+                (StepResult.RETRY, []))
 
     def test_create_server_non_400_or_403_failures(self):
         """
@@ -267,7 +286,8 @@ class CreateServerTests(SynchronousTestCase):
 
         api_error = APIError(code=500, body="this is a 500", headers={})
         self.assertEqual(
-            resolve_effect(eff, service_request_error_response(api_error)),
+            resolve_effect(eff, service_request_error_response(api_error),
+                           is_error=True),
             (StepResult.RETRY, []))
 
 
