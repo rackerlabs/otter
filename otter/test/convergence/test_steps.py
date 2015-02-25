@@ -1,5 +1,4 @@
 """Tests for convergence steps."""
-
 from effect import Func
 
 from mock import ANY
@@ -31,14 +30,16 @@ from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
 
 
-class StepAsEffectTests(SynchronousTestCase):
+class CreateServerTests(SynchronousTestCase):
     """
-    Tests for converting :obj:`IStep` implementations to :obj:`Effect`s.
+    Tests for :obj:`CreateServer.as_effect`.
     """
 
-    def test_create_server(self):
+    def test_create_server_request_with_name(self):
         """
         :obj:`CreateServer.as_effect` produces a request for creating a server.
+        If the name is given, a randomly generated suffix is appended to the
+        server name.
         """
         create = CreateServer(
             server_config=freeze({'server': {'name': 'myserver',
@@ -55,16 +56,6 @@ class StepAsEffectTests(SynchronousTestCase):
                 data={'server': {'name': 'myserver-random-name',
                                  'flavorRef': '1'}},
                 success_pred=has_code(202)).intent)
-
-        self.assertEqual(
-            resolve_effect(eff, (None, {})),
-            (StepResult.SUCCESS, []))
-
-        self.assertEqual(
-            resolve_effect(eff,
-                           (APIError, APIError(500, None, None), None),
-                           is_error=True),
-            (StepResult.RETRY, []))
 
     def test_create_server_noname(self):
         """
@@ -88,6 +79,24 @@ class StepAsEffectTests(SynchronousTestCase):
                 data={'server': {'name': 'random-name', 'flavorRef': '1'}},
                 success_pred=has_code(202)).intent)
 
+    def test_create_server_success_case(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in a successful create,
+        returns with :obj:`StepResult.SUCCESS`.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        self.assertEqual(
+            resolve_effect(eff, (StubResponse(202, {}), {"server": {}})),
+            (StepResult.SUCCESS, []))
+
+
+class StepAsEffectTests(SynchronousTestCase):
+    """
+    Tests for converting :obj:`IStep` implementations to :obj:`Effect`s.
+    """
     def test_delete_server(self):
         """
         :obj:`DeleteServer.as_effect` produces a request for deleting a server.
