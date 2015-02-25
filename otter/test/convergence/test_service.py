@@ -3,7 +3,7 @@ from effect.testing import Stub
 
 import mock
 
-from pyrsistent import freeze, pmap
+from pyrsistent import freeze, pmap, pset, s
 
 from twisted.internet.defer import fail
 from twisted.internet.task import Clock
@@ -13,7 +13,7 @@ from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription, CLBNode, NovaServer, ServerState)
 from otter.convergence.service import (
-    Converger, determine_active, execute_convergence, server_to_json)
+    Converger, determine_active, execute_convergence)
 from otter.http import TenantScope, service_request
 from otter.models.intents import ModifyGroupState
 from otter.models.interface import GroupState
@@ -91,7 +91,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                 {}, {}, None, {}, False)
         self.group = mock_group(self.state, 'tenant-id', 'group-id')
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
-        self.desired_lbs = freeze({23: [CLBDescription(lb_id='23', port=80)]})
+        self.desired_lbs = s(CLBDescription(lb_id='23', port=80))
         self.servers = [
             NovaServer(id='a',
                        state=ServerState.ACTIVE,
@@ -99,14 +99,16 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                        image_id='image',
                        flavor_id='flavor',
                        servicenet_address='10.0.0.1',
-                       desired_lbs=self.desired_lbs),
+                       desired_lbs=self.desired_lbs,
+                       links=freeze([{'href': 'link1', 'rel': 'self'}])),
             NovaServer(id='b',
                        state=ServerState.ACTIVE,
                        created=0,
                        image_id='image',
                        flavor_id='flavor',
                        servicenet_address='10.0.0.2',
-                       desired_lbs=self.desired_lbs)
+                       desired_lbs=self.desired_lbs,
+                       links=freeze([{'href': 'link2', 'rel': 'self'}]))
         ]
 
     def _get_gacd_func(self, group_id):
@@ -127,14 +129,16 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
-        for s in self.servers:
-            s.desired_lbs = pmap()
+        for serv in self.servers:
+            serv.desired_lbs = pset()
 
         eff = execute_convergence(self.group, 2, self.lc, 0, log,
                                   get_all_convergence_data=gacd)
         mgs_eff = resolve_stubs(eff)
-        expected_active = {'a': server_to_json(self.servers[0]),
-                           'b': server_to_json(self.servers[1])}
+        expected_active = {
+            'a': {'id': 'a', 'links': [{'href': 'link1', 'rel': 'self'}]},
+            'b': {'id': 'b', 'links': [{'href': 'link2', 'rel': 'self'}]}
+        }
         self._assert_active(mgs_eff, expected_active)
         p_effs = resolve_effect(mgs_eff, None)
         self.assertEqual(p_effs, parallel([]))
@@ -195,7 +199,7 @@ class DetermineActiveTests(SynchronousTestCase):
         """
         When a server should be in a LB but it's not, it's not active.
         """
-        desired_lbs = pmap({'foo': [CLBDescription(lb_id='foo', port=80)]})
+        desired_lbs = s(CLBDescription(lb_id='foo', port=80))
         lb_nodes = [
             CLBNode(node_id='x',
                     description=CLBDescription(lb_id='foo', port=80),
@@ -228,10 +232,10 @@ class DetermineActiveTests(SynchronousTestCase):
                     description=CLBDescription(lb_id='bar', port=4),
                     address='1.1.1.1'),
         ]
-        desired_lbs = pmap({'foo': [CLBDescription(lb_id='foo', port=1),
-                                    CLBDescription(lb_id='foo', port=2)],
-                            'bar': [CLBDescription(lb_id='bar', port=3),
-                                    CLBDescription(lb_id='bar', port=4)]})
+        desired_lbs = s(CLBDescription(lb_id='foo', port=1),
+                        CLBDescription(lb_id='foo', port=2),
+                        CLBDescription(lb_id='bar', port=3),
+                        CLBDescription(lb_id='bar', port=4))
         servers = [
             server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1',
                    desired_lbs=desired_lbs),

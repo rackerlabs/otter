@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 
 import mock
 
+from twisted.application.service import Service
 from twisted.internet import defer
-from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.controller import CannotExecutePolicyError
@@ -49,6 +49,20 @@ class SchedulerTests(SynchronousTestCase):
             return_value='transaction-id')
 
 
+class FakePartitioner(Service):
+    """A fake version of a :obj:`Partitioner`."""
+    def __init__(self, log, callback):
+        self.log = log
+        self.got_buckets = callback
+        self.health = (True, {'buckets': []})
+
+    def reset_path(self, new_path):
+        return 'partitioner reset to {}'.format(new_path)
+
+    def health_check(self):
+        return defer.succeed(self.health)
+
+
 class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
     """
     Tests for `SchedulerService`.
@@ -58,9 +72,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         """
         Mock all the dependencies of SchedulingService.
 
-        This includes logging, store's fetch_and_delete, TxKazooClient
-        stuff, TimerService, check_events_in_bucket and
-        twisted.internet.task.Clock is used to simulate time.
+        This includes logging, store's fetch_and_delete, TxKazooClient stuff,
+        check_events_in_bucket.
         """
         super(SchedulerServiceTests, self).setUp()
 
@@ -68,27 +81,16 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.log = mock_log()
         otter_log.bind.return_value = self.log
 
-        self.kz_client = mock.Mock(spec=['SetPartitioner'])
-        self.kz_partition = mock.MagicMock(allocating=False,
-                                           release=False,
-                                           failed=False,
-                                           acquired=False)
-        self.kz_client.SetPartitioner.return_value = self.kz_partition
-        self.zk_partition_path = '/part_path'
-        self.time_boundary = 15
-        self.buckets = range(1, 10)
+        def pfactory(log, callable):
+            self.fake_partitioner = FakePartitioner(log, callable)
+            return self.fake_partitioner
 
-        self.clock = Clock()
         self.scheduler_service = SchedulerService(
-            100, 1, self.mock_store, self.kz_client, self.zk_partition_path,
-            self.time_boundary, self.buckets, self.clock, threshold=600)
+            100, self.mock_store, pfactory, threshold=600)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
-
-        # TODO: Would like to not do below 2 statements but leaving
-        # TimerService as such causes check_events to be called
-        # immediately when scheduler is started.
-        self.scheduler_service.running = False
-        self.timer_service = patch(self, 'otter.scheduler.TimerService')
+        self.scheduler_service.running = True
+        self.assertIdentical(self.fake_partitioner,
+                             self.scheduler_service.partitioner)
 
         self.check_events_in_bucket = patch(
             self, 'otter.scheduler.check_events_in_bucket')
@@ -96,46 +98,20 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.returns = []
         self.setup_func(self.mock_store.get_oldest_event)
 
-    def _start_service(self):
-        self.scheduler_service.startService()
-        self.scheduler_service.running = True
-
-    def test_start_service(self):
+    def test_partitioner_child(self):
         """
-        startService() calls super's startService() and creates
-        a SetPartitioner object.
+        The Partitioner service is registered as a child of the
+        SchedulerService.
         """
-        self._start_service()
-        self.kz_client.SetPartitioner.assert_called_once_with(
-            self.zk_partition_path,
-            set=set(self.buckets),
-            time_boundary=self.time_boundary)
-        self.assertEqual(
-            self.scheduler_service.kz_partition, self.kz_partition)
-        self.timer_service.startService.assert_called_once_with(
-            self.scheduler_service)
-
-    def test_stop_service(self):
-        """
-        stopService() calls super's stopService() and stops the allocation
-        if it is already acquired.
-        """
-        self._start_service()
-        self.kz_partition.acquired = True
-        d = self.scheduler_service.stopService()
-        self.timer_service.stopService.assert_called_once_with(
-            self.scheduler_service)
-        self.kz_partition.finish.assert_called_once_with()
-        self.assertEqual(self.kz_partition.finish.return_value, d)
+        self.assertEqual(self.scheduler_service.services,
+                         [self.fake_partitioner])
 
     def test_health_check_after_threshold(self):
         """
         `service.health_check` returns False when trigger time is above
         threshold.
         """
-        self.kz_partition.acquired = True
-        self._start_service()
-        self.kz_partition.__iter__.return_value = [2, 3]
+        self.fake_partitioner.health = (True, {'buckets': [2, 3]})
         now = datetime.utcnow()
         returns = [{'trigger': now - timedelta(hours=1), 'version': 'v1'},
                    {'trigger': now - timedelta(seconds=2), 'version': 'v1'}]
@@ -154,9 +130,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         `service.health_check` returns True when trigger time is below
         threshold.
         """
-        self.kz_partition.acquired = True
-        self._start_service()
-        self.kz_partition.__iter__.return_value = [2, 3]
+        self.fake_partitioner.health = (True, {'buckets': [2, 3]})
         now = datetime.utcnow()
         self.returns = [{'trigger': now + timedelta(hours=1),
                          'version': 'v1'},
@@ -174,9 +148,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         """
         `service.health_check` returns True when there are no triggers.
         """
-        self.kz_partition.acquired = True
-        self._start_service()
-        self.kz_partition.__iter__.return_value = [2, 3]
+        self.fake_partitioner.health = (True, {'buckets': [2, 3]})
         self.returns = [None, None]
 
         d = self.scheduler_service.health_check()
@@ -186,160 +158,41 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.mock_store.get_oldest_event.assert_has_calls(
             [mock.call(2), mock.call(3)])
 
-    def test_health_check_not_acquired(self):
+    def test_health_check_unhealthy_partitioner(self):
         """
-        `service.health_check` returns False when partition is not
-        acquired.
+        When the partitioner service is unhealthy, the scheduler service passes
+        its health message through.
         """
-        self.kz_partition.acquired = False
-        self._start_service()
-        self.kz_partition.__iter__.return_value = [2, 3]
-
+        self.fake_partitioner.health = (False, {'foo': 'bar'})
         d = self.scheduler_service.health_check()
-
         self.assertEqual(self.successResultOf(d),
-                         (False, {'reason': 'Not acquired'}))
-        self.assertFalse(self.mock_store.get_oldest_event.called)
+                         (False, {'foo': 'bar'}))
 
     def test_health_check_not_running(self):
         """
         `service.health_check` returns False when scheduler is stopped.
         """
+        self.scheduler_service.running = False
         d = self.scheduler_service.health_check()
 
         self.assertEqual(self.successResultOf(d),
                          (False, {'reason': 'Not running'}))
         self.assertFalse(self.mock_store.get_oldest_event.called)
 
-    def test_stop_service_allocating(self):
-        """
-        stopService() does not stop the allocation (i.e. call finish) if
-        it is not acquired.
-        """
-        self._start_service()
-        d = self.scheduler_service.stopService()
-        self.assertFalse(self.kz_partition.finish.called)
-        self.assertIsNone(d)
-
     def test_reset(self):
         """
         reset() starts new partition based on new path.
         """
-        self.scheduler_service.reset('/new_path')
-        self.assertEqual(self.scheduler_service.zk_partition_path, '/new_path')
-        self.kz_client.SetPartitioner.assert_called_once_with(
-            '/new_path',
-            set=set(self.buckets),
-            time_boundary=self.time_boundary)
-        self.assertEqual(self.scheduler_service.kz_partition,
-                         self.kz_client.SetPartitioner.return_value)
-
-    def test_reset_same_path(self):
-        """
-        reset() raises error on same path.
-        """
-        self.assertRaises(
-            ValueError, self.scheduler_service.reset, '/part_path')
-        self.assertFalse(self.kz_client.SetPartitioner.called)
-
-    def test_check_events_allocating(self):
-        """
-        `check_events` logs message and does not check events in buckets
-        when buckets are still allocating.
-        """
-        self.kz_partition.allocating = True
-        self._start_service()
-        self.scheduler_service.check_events(100)
-        self.log.msg.assert_called_with('Partition allocating')
-
-        # Ensure others are not called
-        self.assertFalse(self.kz_partition.__iter__.called)
-        self.assertFalse(self.check_events_in_bucket.called)
-
-    def test_check_events_release(self):
-        """
-        `check_events` logs message and does not check events in buckets
-        when partitioning has changed. It calls release_set() to
-        re-partition.
-        """
-        self.kz_partition.release = True
-        self._start_service()
-        self.scheduler_service.check_events(100)
-        self.log.msg.assert_called_with('Partition changed. Repartitioning')
-        self.kz_partition.release_set.assert_called_once_with()
-
-        # Ensure others are not called
-        self.assertFalse(self.kz_partition.__iter__.called)
-        self.assertFalse(self.check_events_in_bucket.called)
-
-    def test_check_events_failed(self):
-        """
-        `check_events` logs message and does not check events in buckets
-        when partitioning has failed. It creates a new partition.
-        """
-        self.kz_partition.failed = True
-        self._start_service()
-
-        # after starting change SetPartitioner return value to check if
-        # new value is set in self.scheduler_service.kz_partition
-        new_kz_partition = mock.MagicMock()
-        self.kz_client.SetPartitioner.return_value = new_kz_partition
-
-        self.scheduler_service.check_events(100)
-        self.log.msg.assert_called_with('Partition failed. Starting new')
-
-        # Called once when starting and now again when partition failed
-        self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
-                         [mock.call(self.zk_partition_path,
-                                    set=set(self.buckets),
-                                    time_boundary=self.time_boundary)] * 2)
-        self.assertEqual(self.scheduler_service.kz_partition, new_kz_partition)
-
-        # Ensure others are not called
-        self.assertFalse(self.kz_partition.__iter__.called)
-        self.assertFalse(new_kz_partition.__iter__.called)
-        self.assertFalse(self.check_events_in_bucket.called)
-
-    def test_check_events_bad_state(self):
-        """`self.kz_partition.state` is none of the exepected values.
-
-        `check_events` logs it as err and starts a new partition
-
-        """
-        self.kz_partition.state = 'bad'
-        self._start_service()
-
-        # after starting change SetPartitioner return value to check if
-        # new value is set in self.scheduler_service.kz_partition
-        new_kz_partition = mock.MagicMock()
-        self.kz_client.SetPartitioner.return_value = new_kz_partition
-
-        self.scheduler_service.check_events(100)
-
-        self.log.err.assert_called_with(
-            'Unknown state bad. This cannot happen. Starting new')
-        self.kz_partition.finish.assert_called_once_with()
-
-        # Called once when starting and now again when got bad state
-        self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
-                         [mock.call(self.zk_partition_path,
-                                    set=set(self.buckets),
-                                    time_boundary=self.time_boundary)] * 2)
-        self.assertEqual(self.scheduler_service.kz_partition, new_kz_partition)
-
-        # Ensure others are not called
-        self.assertFalse(self.kz_partition.__iter__.called)
-        self.assertFalse(new_kz_partition.__iter__.called)
-        self.assertFalse(self.check_events_in_bucket.called)
+        self.assertEqual(
+            self.scheduler_service.reset('/new_path'),
+            'partitioner reset to /new_path')
 
     @mock.patch('otter.scheduler.datetime')
     def test_check_events_acquired(self, mock_datetime):
         """
-        `check_events` checks events in each bucket when they are partitoned.
+        the got_buckets callback checks events in each bucket when they are
+        partitoned.
         """
-        self.kz_partition.acquired = True
-        self._start_service()
-        self.kz_partition.__iter__.return_value = [2, 3]
         self.scheduler_service.log = mock.Mock()
         mock_datetime.utcnow.return_value = 'utcnow'
 
@@ -347,15 +200,12 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.check_events_in_bucket.side_effect = \
             lambda *_: defer.succeed(responses.pop(0))
 
-        d = self.scheduler_service.check_events(100)
+        d = self.fake_partitioner.got_buckets([2, 3])
 
         self.assertEqual(self.successResultOf(d), [4, 5])
-        self.assertEqual(self.kz_partition.__iter__.call_count, 1)
         self.scheduler_service.log.bind.assert_called_once_with(
             scheduler_run_id='transaction-id', utcnow='utcnow')
         log = self.scheduler_service.log.bind.return_value
-        log.msg.assert_called_once_with('Got buckets {buckets}',
-                                        buckets=[2, 3], path='/part_path')
         self.assertEqual(self.check_events_in_bucket.mock_calls,
                          [mock.call(log, self.mock_store, 2, 'utcnow', 100),
                           mock.call(log, self.mock_store, 3, 'utcnow', 100)])
