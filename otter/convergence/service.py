@@ -2,13 +2,13 @@
 
 import time
 
-from effect import Effect
+from effect import Effect, parallel
+from effect.do import do, do_return
 from effect.twisted import exc_info_to_failure, perform
 
 from toolz.itertoolz import concat
 
 from twisted.application.service import MultiService, Service
-from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 
 from otter.constants import CONVERGENCE_DIRTY_DIR, CONVERGENCE_DIRTY_PATH
 from otter.convergence.composition import get_desired_group_state
@@ -17,10 +17,10 @@ from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState
 from otter.convergence.planning import plan
 from otter.http import TenantScope
-from otter.models.intents import ModifyGroupState, GetScalingGroupInfo
+from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
 from otter.models.interface import NoSuchScalingGroupError
-from otter.util.fp import assoc_obj
-from otter.util.zk import CreateOrSet, get_children_with_stats
+from otter.util.fp import ERef, assoc_obj
+from otter.util.zk import CreateOrSet, DeleteNode, GetChildrenWithStats
 
 
 def server_to_json(server):
@@ -205,101 +205,21 @@ class Converger(MultiService):
         self._dispatcher = dispatcher
         self._buckets = buckets
         self.log = log.bind(system='converger')
-        self.partitioner = partitioner_factory(
-            self.log, self._check_convergence)
+        self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self.partitioner.setServiceParent(self)
-        self._currently_converging = set()
+        self._currently_converging = ERef()
 
-    @inlineCallbacks
-    def _check_convergence(self, my_buckets):
+    def buckets_acquired(self, my_buckets, perform=perform):
         """
-        Check for groups that need convergence and which match up to the
-        buckets we've been allocated.
+        Perform the effectful result of :func:`check_convergence`.
 
-        This is called occasionally by the Partitioner when buckets have been
-        allocated.
-
-        This function is side-effecty. It mostly just performs some effects,
-        but it also does the bookkeeping on ``_currently_converging``.
-
-        :return: None (the partitioner does nothing with the result of this
-            function).
+        This is used as the partitioner callback.
         """
-        # This is a complex. We need to do a bunch of stuff!
-        # Each step here has side-effects.
-        # 1. look for dirty flags to figure out what groups need converging,
-        #    filtering for only groups that THIS node must handle and which
-        #    aren't currently converging
-        # 2. start convergence on those
-        # 3. record those groups in _currently_converging.
-        # 4. when convergence is done, handle errors (maybe setting group state
-        #    to ERROR)
-        # 5. clean up the dirty flag as each group finished convergences.
-        eff = self.find_groups_needing_convergence(
-            my_buckets, self._currently_converging)
-        d = perform(self._dispatcher, eff)
+        eff = self.check_convergence_eff(my_buckets)
+        return perform(self._dispatcher, eff)
 
-        def cleanup(group_id, r):
-            self._currently_converging.remove(group_id)
-
-        def got_my_group_info(group_infos):
-            self._currently_converging.update(
-                x['group_id'] for x in group_infos)
-            effs = map(self.exec_and_cleanup, group_infos)
-            return perform(self._dispatcher, parallel(effs))
-        d.addCallback(got_my_group_info)
-        d.addErrback(log.err)
-
-    def _convergence_finished(self, log, tenant_id, group_id, version, result):
-        # See the comment in `ConvergenceStarter._make_dirty` to understand
-        # this.
-        log.msg("convergence-mark-clean")
-        path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
-                                             group_id=group_id)
-        eff = Effect(DeleteNode(path=path, version=version)
-        ).on(error=lambda e: log.err(exc_info_to_failure(e),
-                                     "mark-clean-failed")
-        )
-        return eff
-
-    def _handle_errors(self, log, exc_info):
-        """
-        handle failures during convergence.
-
-        If an error is permanent, returns None. If an error is temporary,
-        re-raises the error.
-        """
-        # TODO: This may be where we want to mark the group with an `ERROR`
-        # state if the error is permanent. We must define the exception types
-        # that we should treat as permanent.
-        failure = exc_info_to_failure(exc_info)
-        failure.trap(NoSuchScalingGroupError)
-        log.err(failure, "no-scaling-group-found")
-
-    def exec_and_cleanup(self, info):
-        """
-        Execute convergence for a group and then clean up.
-
-        :return: An Effect of the group ID that is being converged.
-        """
-        group_id = info['group_id']
-        tenant_id = info['tenant_id']
-        log = self.log.bind(group_id=group_id, tenant_id=tenant_id)
-
-        eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
-                                         group_id=group_id))
-        def got_group((scaling_group, group_state, launch_config)):
-            eff = execute_convergence(scaling_group, group_state.desired,
-                                      launch_config, time.time(), log)
-            eff = Effect(TenantScope(eff, group_state.tenant_id))
-            return eff
-        eff = eff.on(got_group)
-        eff = eff.on(error=partial(self._handle_errors, log))
-        eff = eff.on(partial(self._convergence_finished,
-                             log, tenant_id, group_id, info['version']))
-        return eff
-
-    def find_groups_needing_convergence(self, my_buckets):
+    def find_groups_needing_convergence(self, my_buckets,
+                                        currently_converging):
         """
         Look up which groups need convergence by this node.
 
@@ -320,14 +240,66 @@ class Converger(MultiService):
             dirty_info = map(structure_info, children_with_stats)
             converging = [
                 info for info in dirty_info
-                if hash(info['tenant']) % len(self._buckets) in my_buckets and
-                info['group'] not in self._currently_converging]
+                if hash(info['tenant']) % len(self._buckets) in my_buckets]
             groups = set([info['group'] for info in converging])
             return groups
 
         eff = Effect(GetChildrenWithStats(CONVERGENCE_DIRTY_DIR))
         return eff.on(got_children_with_stats)
 
+    @do
+    def converge_all(self, my_buckets):
+        """
+        Check for groups that need convergence and which match up to the
+        buckets we've been allocated.
+        """
+        group_infos = yield self.find_groups_needing_convergence(my_buckets)
+        currently_converging = yield self._currently_converging.get()
+        new_converging = currently_converging.union(
+            x['group_id'] for x in group_infos)
+        yield self._currently_converging.set(new_converging)
+        effs = map(self.converge_one, group_infos)
+        yield do_return(parallel(effs))
+
+    @do
+    def converge_one(self, info):
+        """
+        Execute convergence for a single group and then clean up.
+
+        :return: An Effect of the group ID that is being converged.
+        """
+        group_id = info['group_id']
+        tenant_id = info['tenant_id']
+        version = info['version']
+        log = self.log.bind(group_id=group_id, tenant_id=tenant_id)
+
+        (scaling_group, group_state, launch_config) = yield Effect(
+            GetScalingGroupInfo(tenant_id=tenant_id, group_id=group_id))
+        converge_eff = execute_convergence(
+            scaling_group, group_state.desired, launch_config,
+            time.time(), log)
+        try:
+            yield Effect(TenantScope(converge_eff, group_state.tenant_id))
+        except NoSuchScalingGroupError as e:
+            log.err(e, "no-scaling-group-found")
+            yield self._cleanup(log, tenant_id, group_id, version)
+        except Exception as e:
+            log.err(e, "unhandled-convergence-error")
+            # TODO: This may be where we want to mark the group with an `ERROR`
+            # state if the error is permanent. We must define the exception
+            # types that we should treat as permanent.
+        else:
+            yield self._cleanup(log, tenant_id, group_id, version)
+
+        yield self._currently_converging.modify(
+            lambda cc: cc.difference([group_id]))
+
+    def _cleanup(self, log, tenant_id, group_id, version):
+        log.msg("convergence-mark-clean")
+        path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
+                                             group_id=group_id)
+        return Effect(DeleteNode(path=path, version=version)).on(
+            lambda e: log.err(exc_info_to_failure(e), 'mark-clean-failed'))
 
 # We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this

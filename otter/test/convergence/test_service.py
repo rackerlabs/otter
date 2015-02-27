@@ -6,7 +6,6 @@ import mock
 from pyrsistent import freeze, pmap
 
 from twisted.internet.defer import fail, succeed
-from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
@@ -62,7 +61,6 @@ class ConvergenceStarterTests(SynchronousTestCase):
 class ConvergerTests(SynchronousTestCase):
 
     def setUp(self):
-        clock = Clock()
         self.kz_client = mock.Mock(Lock=LockMixin().mock_lock())
         self.dispatcher = object()
         self.log = mock_log()

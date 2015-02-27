@@ -1,6 +1,7 @@
 from functools import partial
 
 from characteristic import attributes
+
 from effect.twisted import deferred_performer
 
 from kazoo.exceptions import NoNodeError, NodeExistsError
@@ -72,7 +73,6 @@ def perform_get_children_with_stats(kz_client, dispatcher, intent):
     children.addCallback(got_children)
     children.addCallback(partial(filter, None))
     return children
-
 
 
 @attributes(['path', 'version'])
