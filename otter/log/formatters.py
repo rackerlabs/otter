@@ -222,7 +222,13 @@ def audit_log_formatter(eventDict, timestamp, hostname):
 def ErrorFormattingWrapper(observer):
     """
     Return log observer that will format error if any and delegate it to
-    given `observer`
+    given `observer`.
+
+    If the event contains error, the formatter forms a decent message from
+    "failure" and "why" and replaces that as message if the event does not
+    already contain one. It also adds traceback and exception_type and removes
+    existing error fields: "isError", "why" and "failure". "level" is also
+    updated if not already found.
     """
 
     def error_formatting_observer(event):

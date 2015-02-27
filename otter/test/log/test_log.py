@@ -427,6 +427,20 @@ class ErrorFormatterTests(SynchronousTestCase):
         self.observer.assert_called_once_with(
             matches(ContainsDict({'message': Equals(('ValueError()',))})))
 
+    def test_message_why_iserror(self):
+        """
+        When message, why and isError is given, then message is updated
+        based on why if it is not already there
+        """
+        failure = Failure(ValueError())
+        self.wrapper({'message': ('mine', 'yours'), 'isError': True,
+                      'why': 'reason', 'failure': failure})
+        self.assertEqual(
+            self._formatted_event(),
+            {'message': ('mineyours',), 'level': 3,
+             'traceback': failure.getTraceback(),
+             'exception_type': 'ValueError'})
+
 
 class ObserverWrapperTests(SynchronousTestCase):
     """
