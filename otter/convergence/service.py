@@ -2,9 +2,11 @@
 
 import time
 
-from effect import Effect, parallel
+from effect import Effect, Func, parallel
 from effect.do import do, do_return
 from effect.twisted import exc_info_to_failure, perform
+
+from pyrsistent import pset
 
 from toolz.itertoolz import concat
 
@@ -74,12 +76,13 @@ def execute_convergence(
     :return: An Effect of a list containing the individual step results.
     """
     log.msg("execute-convergence")
-    all_data_eff = get_all_convergence_data(scaling_group.uuid)
+    group_id = scaling_group.uuid
+    all_data_eff = get_all_convergence_data(group_id)
 
     def got_all_data((servers, lb_nodes)):
         active = determine_active(servers, lb_nodes)
         desired_group_state = get_desired_group_state(
-            scaling_group.uuid, launch_config, desired_capacity)
+            group_id, launch_config, desired_capacity)
         steps = plan(desired_group_state, servers, lb_nodes, now)
         log.msg("convergence-plan",
                 servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
@@ -91,7 +94,8 @@ def execute_convergence(
 
         eff = Effect(ModifyGroupState(scaling_group=scaling_group,
                                       modifier=update_group_state))
-        return eff.on(lambda _: steps_to_effect(steps))
+        eff = eff.on(lambda _: steps_to_effect(steps))
+        return Effect(TenantScope(eff, group_id))
 
     return all_data_eff.on(got_all_data)
 
@@ -114,23 +118,18 @@ def start_convergence_eff(tenant_id, group_id):
     # that can lead to stalled convergence. Here's the scenario, with Otter
     # nodes 'A' and 'B', assuming only a boolean `dirty` flag:
 
-    # - A: mark group N dirty
+    # - A: policy executed: groupN.dirty = True
     # -               B: converge group N (repeat until done)
-    # - A: mark group N dirty, ignore NodeExistsError
-    # -               B: mark group N clean
+    # - A: policy executed: groupN.dirty = True
+    # -               B: groupN.dirty = False
 
     # Here, a policy was executed on group N twice, and A tried to mark it
-    # dirty twice (and ignored a NoNodeError because the fact that it's
-    # already there means it's already dirty, so recreating should be a
-    # no-op). The problem is that when the converger node finished
-    # converging, it then marked it clean *after* node A tried to mark it
-    # dirty a second time. Usually this will not be a problem because at
-    # the beginning of each iteration of convergence, the desired group
-    # state will be recalculated, so as long as the "duplicate" dirty
-    # happens before the final iteration, nothing will be lost. But if it
-    # happens at just the right moment, after the final iteration and
-    # before the group is marked clean, then the changes desired by the
-    # second policy execution will not happen.
+    # dirty twice. The problem is that when the converger node finished
+    # converging, it then marked it clean *after* node A tried to mark it dirty
+    # a second time. It's a small window of time, but if it happens at just the
+    # right moment, after the final iteration of convergence and before the
+    # group is marked clean, then the changes desired by the second policy
+    # execution will not happen.
 
     # So instead of just a boolean flag, we'll takie advantage of ZK node
     # versioning. When we mark a group as dirty, we'll create a node for it
@@ -207,7 +206,7 @@ class Converger(MultiService):
         self.log = log.bind(system='converger')
         self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self.partitioner.setServiceParent(self)
-        self._currently_converging = ERef()
+        self._currently_converging = ERef(pset())
 
     def buckets_acquired(self, my_buckets, perform=perform):
         """
@@ -215,20 +214,16 @@ class Converger(MultiService):
 
         This is used as the partitioner callback.
         """
-        eff = self.check_convergence_eff(my_buckets)
+        eff = self.converge_all(my_buckets)
         return perform(self._dispatcher, eff)
 
-    def find_groups_needing_convergence(self, my_buckets,
-                                        currently_converging):
+    def find_groups_needing_convergence(self, my_buckets):
         """
         Look up which groups need convergence by this node.
 
         :returns: list of dicts, where each dict has ``tenant_id``,
-            ``group_id``, and ``dirty_version`` keys.
+            ``group_id``, and ``version`` keys.
         """
-        self.log.msg("checking for any groups needing convergence: {buckets}",
-                     buckets=my_buckets)
-
         def structure_info(x):
             # Names of the dirty flags are {tenant_id}_{group_id}.
             path, stat = x
@@ -238,10 +233,10 @@ class Converger(MultiService):
 
         def got_children_with_stats(children_with_stats):
             dirty_info = map(structure_info, children_with_stats)
-            converging = [
+            converging = (
                 info for info in dirty_info
-                if hash(info['tenant']) % len(self._buckets) in my_buckets]
-            groups = set([info['group'] for info in converging])
+                if hash(info['tenant_id']) % len(self._buckets) in my_buckets)
+            groups = set(info['group_id'] for info in converging)
             return groups
 
         eff = Effect(GetChildrenWithStats(CONVERGENCE_DIRTY_DIR))
@@ -254,52 +249,60 @@ class Converger(MultiService):
         buckets we've been allocated.
         """
         group_infos = yield self.find_groups_needing_convergence(my_buckets)
-        currently_converging = yield self._currently_converging.get()
-        new_converging = currently_converging.union(
-            x['group_id'] for x in group_infos)
-        yield self._currently_converging.set(new_converging)
         effs = map(self.converge_one, group_infos)
         yield do_return(parallel(effs))
 
     @do
-    def converge_one(self, info):
+    def converge_one(self, tenant_id, group_id, version):
         """
         Execute convergence for a single group and then clean up.
 
+        :param tenant_id: tenant ID of the group
+        :param group_id: ID of group to be converged
+        :param version: version of the ZK node representing dirtiness. See
+            comment in :func:`start_convergence_eff` for more info.
+
         :return: An Effect of the group ID that is being converged.
         """
-        group_id = info['group_id']
-        tenant_id = info['tenant_id']
-        version = info['version']
+        if group_id in (yield self._currently_converging.read()):
+            return
+        yield self._currently_converging.modify(lambda cc: cc.add(group_id))
         log = self.log.bind(group_id=group_id, tenant_id=tenant_id)
 
         (scaling_group, group_state, launch_config) = yield Effect(
             GetScalingGroupInfo(tenant_id=tenant_id, group_id=group_id))
+        now = yield Effect(Func(time.time))
         converge_eff = execute_convergence(
             scaling_group, group_state.desired, launch_config,
-            time.time(), log)
+            now, log)
+
         try:
-            yield Effect(TenantScope(converge_eff, group_state.tenant_id))
-        except NoSuchScalingGroupError as e:
-            log.err(e, "no-scaling-group-found")
+            try:
+                yield converge_eff
+            except NoSuchScalingGroupError as e:
+                log.err(e, "no-scaling-group-found")
+            # TODO: For permanent errors, put the group in ERROR state.
             yield self._cleanup(log, tenant_id, group_id, version)
         except Exception as e:
+            # For unexpected errors, we don't clean up the ZK dirty flag, so
+            # convergence will be retried.
             log.err(e, "unhandled-convergence-error")
-            # TODO: This may be where we want to mark the group with an `ERROR`
-            # state if the error is permanent. We must define the exception
-            # types that we should treat as permanent.
-        else:
-            yield self._cleanup(log, tenant_id, group_id, version)
 
-        yield self._currently_converging.modify(
-            lambda cc: cc.difference([group_id]))
+        yield self._currently_converging.modify(lambda cc: cc.remove(group_id))
 
     def _cleanup(self, log, tenant_id, group_id, version):
+        """
+        Delete the dirty flag, if its version hasn't changed. See comment in
+        :func:`start_convergence_eff` for more info.
+
+        :return: Effect of None.
+        """
         log.msg("convergence-mark-clean")
         path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
                                              group_id=group_id)
         return Effect(DeleteNode(path=path, version=version)).on(
-            lambda e: log.err(exc_info_to_failure(e), 'mark-clean-failed'))
+            error=lambda e: log.err(exc_info_to_failure(e),
+                                    'mark-clean-failed'))
 
 # We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this
