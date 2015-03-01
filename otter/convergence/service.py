@@ -90,14 +90,16 @@ def execute_convergence(
         active = {server.id: server_to_json(server) for server in active}
 
         def update_group_state(group, old_state):
+            log.msg("updating-group-state", active=active)
             return assoc_obj(old_state, active=active)
 
         eff = Effect(ModifyGroupState(scaling_group=scaling_group,
                                       modifier=update_group_state))
         eff = eff.on(lambda _: steps_to_effect(steps))
-        return Effect(TenantScope(eff, group_id))
+        return eff
 
-    return all_data_eff.on(got_all_data)
+    return Effect(TenantScope(all_data_eff.on(got_all_data),
+                              scaling_group.tenant_id))
 
 
 def start_convergence_eff(tenant_id, group_id):
@@ -166,10 +168,10 @@ class ConvergenceStarter(Service, object):
     def start_convergence(self, log, tenant_id, group_id, perform=perform):
         """Record that a group needs converged."""
         log = log.bind(tenant_id=tenant_id, group_id=group_id)
-        log.msg("Marking group dirty", otter_msg_type='convergence-mark-dirty')
+        log.msg("Marking group dirty", 'mark-dirty')
         eff = start_convergence_eff(tenant_id, group_id)
         d = perform(self._dispatcher, eff)
-        d.addErrback(log.err, otter_msg_type='mark-dirty-failed')
+        d.addErrback(log.err, 'mark-dirty-failed')
         return d
 
 
@@ -188,8 +190,7 @@ class Converger(MultiService):
     converged.
     """
 
-    def __init__(self, log, kz_client, dispatcher, buckets,
-                 partitioner_factory):
+    def __init__(self, log, dispatcher, buckets, partitioner_factory):
         """
         :param log: a bound log
         :param dispatcher: The dispatcher to use to perform effects.
@@ -214,8 +215,10 @@ class Converger(MultiService):
 
         This is used as the partitioner callback.
         """
+        self.log.msg("buckets-acquired", my_buckets=my_buckets)
         eff = self.converge_all(my_buckets)
-        return perform(self._dispatcher, eff)
+        return perform(self._dispatcher, eff).addErrback(
+            self.log.err, "converge-all-error")
 
     def find_groups_needing_convergence(self, my_buckets):
         """
@@ -236,8 +239,7 @@ class Converger(MultiService):
             converging = (
                 info for info in dirty_info
                 if hash(info['tenant_id']) % len(self._buckets) in my_buckets)
-            groups = set(info['group_id'] for info in converging)
-            return groups
+            return list(converging)
 
         eff = Effect(GetChildrenWithStats(CONVERGENCE_DIRTY_DIR))
         return eff.on(got_children_with_stats)
@@ -249,7 +251,11 @@ class Converger(MultiService):
         buckets we've been allocated.
         """
         group_infos = yield self.find_groups_needing_convergence(my_buckets)
-        effs = map(self.converge_one, group_infos)
+        self.log.msg("converge-all", group_infos=group_infos)
+        effs = [
+            self.converge_one(info['tenant_id'], info['group_id'],
+                              info['version'])
+            for info in group_infos]
         yield do_return(parallel(effs))
 
     @do
@@ -264,23 +270,28 @@ class Converger(MultiService):
 
         :return: An Effect of the group ID that is being converged.
         """
+        log = self.log.bind(group_id=group_id, tenant_id=tenant_id)
         if group_id in (yield self._currently_converging.read()):
+            log.msg("already-converging", group_id=group_id)
             return
         yield self._currently_converging.modify(lambda cc: cc.add(group_id))
-        log = self.log.bind(group_id=group_id, tenant_id=tenant_id)
+        log.msg("converge-one")
 
-        (scaling_group, group_state, launch_config) = yield Effect(
-            GetScalingGroupInfo(tenant_id=tenant_id, group_id=group_id))
+        try:
+            (scaling_group, group_state, launch_config) = yield Effect(
+                GetScalingGroupInfo(tenant_id=tenant_id, group_id=group_id))
+        except NoSuchScalingGroupError as e:
+            log.err(e, "no-scaling-group-found")
+            yield self._cleanup(log, tenant_id, group_id, version)
+            return
+
         now = yield Effect(Func(time.time))
         converge_eff = execute_convergence(
             scaling_group, group_state.desired, launch_config,
             now, log)
 
         try:
-            try:
-                yield converge_eff
-            except NoSuchScalingGroupError as e:
-                log.err(e, "no-scaling-group-found")
+            yield converge_eff
             # TODO: For permanent errors, put the group in ERROR state.
             yield self._cleanup(log, tenant_id, group_id, version)
         except Exception as e:
@@ -288,6 +299,7 @@ class Converger(MultiService):
             # convergence will be retried.
             log.err(e, "unhandled-convergence-error")
 
+        log.msg("convergence-complete")
         yield self._currently_converging.modify(lambda cc: cc.remove(group_id))
 
     def _cleanup(self, log, tenant_id, group_id, version):

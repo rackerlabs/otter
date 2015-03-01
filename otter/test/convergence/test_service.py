@@ -54,8 +54,8 @@ class ConvergenceStarterTests(SynchronousTestCase):
         self.assertEqual(
             self.successResultOf(d),
             ('my-dispatcher',
-             Effect(CreateOrSet('/groups/converging/tenant_group',
-                                'dirty'))))
+             Effect(CreateOrSet(path='/groups/converging/tenant_group',
+                                content='dirty'))))
 
 
 class ConvergerTests(SynchronousTestCase):
