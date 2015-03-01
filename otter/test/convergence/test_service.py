@@ -37,8 +37,8 @@ class StartConvergenceEffTests(SynchronousTestCase):
         eff = start_convergence_eff('tenant', 'group')
         self.assertEqual(
             eff,
-            Effect(CreateOrSet('/groups/converging/tenant_group',
-                               'dirty')))
+            Effect(CreateOrSet(path='/groups/converging/tenant_group',
+                               content='dirty')))
 
 
 class ConvergenceStarterTests(SynchronousTestCase):
