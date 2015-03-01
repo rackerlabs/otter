@@ -2,6 +2,7 @@ from functools import partial
 
 from characteristic import attributes
 
+from effect import TypeDispatcher
 from effect.twisted import deferred_performer
 
 from kazoo.exceptions import NoNodeError, NodeExistsError
@@ -100,3 +101,14 @@ def _handle(exc_type, fn):
         f.trap(exc_type)
         return fn()
     return handler
+
+
+def get_zk_dispatcher(kz_client):
+    return TypeDispatcher({
+        CreateOrSet:
+            partial(perform_create_or_set, kz_client),
+        DeleteNode:
+            partial(perform_delete_node, kz_client),
+        GetChildrenWithStats:
+            partial(perform_get_children_with_stats, kz_client),
+    })

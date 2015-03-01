@@ -16,9 +16,11 @@ from .auth import (
 )
 from .http import TenantScope, perform_tenant_scope
 from .models.cass import CQLQueryExecute, perform_cql_query
-from .models.intents import ModifyGroupState, perform_modify_group_state
+from .models.intents import get_cassandra_dispatcher
+from .util.fp import eref_dispatcher
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
+from .util.zk import get_zk_dispatcher
 
 
 def get_simple_dispatcher(reactor):
@@ -38,13 +40,14 @@ def get_simple_dispatcher(reactor):
             InvalidateToken: perform_invalidate_token,
             Request: perform_request,
             Retry: perform_retry,
-            ModifyGroupState: perform_modify_group_state,
         }),
         make_twisted_dispatcher(reactor),
+        eref_dispatcher,
     ])
 
 
-def get_full_dispatcher(reactor, authenticator, log, service_config):
+def get_full_dispatcher(reactor, authenticator, log, service_config,
+                        kz_client, store):
     """
     Return a dispatcher that can perform all of Otter's effects.
     """
@@ -53,6 +56,8 @@ def get_full_dispatcher(reactor, authenticator, log, service_config):
             TenantScope: partial(perform_tenant_scope, authenticator, log,
                                  service_config)}),
         get_simple_dispatcher(reactor),
+        get_zk_dispatcher(kz_client),
+        get_cassandra_dispatcher(log, store),
     ])
 
 
