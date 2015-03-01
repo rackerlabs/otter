@@ -1,4 +1,4 @@
-from effect import Constant, Effect, ParallelEffects, parallel
+from effect import Constant, Effect, ParallelEffects, base_dispatcher, parallel, sync_perform
 from effect.testing import Stub
 
 import mock
@@ -166,7 +166,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         eff = execute_convergence(self.group, 2, self.lc, 0, log,
                                   get_all_convergence_data=gacd)
-        mgs_eff = resolve_stubs(eff)
+        self.assertEqual(eff.intent.tenant_id, 'tenant-id')
+        self.assertEqual(eff.callbacks, [])
+        mgs_eff = resolve_stubs(eff.intent.effect)
         expected_active = {'a': server_to_json(self.servers[0]),
                            'b': server_to_json(self.servers[1])}
         self._assert_active(mgs_eff, expected_active)
@@ -184,9 +186,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         gacd = self._get_gacd_func(self.group.uuid)
         eff = execute_convergence(self.group, 2, self.lc, 0, log,
                                   get_all_convergence_data=gacd)
-        mgs_eff = resolve_stubs(eff)
+        self.assertEqual(eff.intent.tenant_id, 'tenant-id')
+        self.assertEqual(eff.callbacks, [])
+        mgs_eff = resolve_stubs(eff.intent.effect)
         self._assert_active(mgs_eff, {})
-
         eff = resolve_effect(mgs_eff, None)
         # The steps are optimized
         self.assertIsInstance(eff.intent, ParallelEffects)

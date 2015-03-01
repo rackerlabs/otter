@@ -66,7 +66,7 @@ def execute_convergence(
     group state, and then execute the convergence.
 
     :param IScalingGroup scaling_group: The scaling group object.
-    :param GroupState group_state: The group state.
+    :param int desired_capacity: number of desired servers
     :param launch_config: An otter launch config.
     :param now: The current time in seconds.
     :param log: A bound logger.
