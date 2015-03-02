@@ -636,3 +636,17 @@ def defaults_by_name(fn):
     """Returns a mapping of args of fn to their default values."""
     args, _, _, defaults = getargspec(fn)
     return dict(zip(reversed(args), reversed(defaults)))
+
+
+class FakePartitioner(Service):
+    """A fake version of a :obj:`Partitioner`."""
+    def __init__(self, log, callback):
+        self.log = log
+        self.got_buckets = callback
+        self.health = (True, {'buckets': []})
+
+    def reset_path(self, new_path):
+        return 'partitioner reset to {}'.format(new_path)
+
+    def health_check(self):
+        return defer.succeed(self.health)

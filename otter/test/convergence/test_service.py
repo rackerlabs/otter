@@ -1,9 +1,11 @@
-from effect import Constant, Effect, ParallelEffects, base_dispatcher, parallel, sync_perform
-from effect.testing import Stub
+import time
+
+from effect import ComposedDispatcher, Constant, Effect, Func, ParallelEffects, TypeDispatcher, base_dispatcher, parallel, sync_perform
+from effect.testing import EQDispatcher, Stub
 
 import mock
 
-from pyrsistent import freeze, pmap
+from pyrsistent import freeze, pmap, pset
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
@@ -16,13 +18,13 @@ from otter.convergence.service import (
     Converger, determine_active, execute_convergence, server_to_json,
     start_convergence_eff)
 from otter.http import TenantScope, service_request
-from otter.models.intents import ModifyGroupState
+from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
 from otter.models.interface import GroupState
 from otter.test.convergence.test_planning import server
 from otter.test.utils import (
-    CheckFailure, LockMixin, mock_group, mock_log, resolve_effect,
-    resolve_stubs)
-from otter.util.fp import assoc_obj
+    CheckFailure, FakePartitioner, LockMixin,
+    mock_group, mock_log, resolve_effect, resolve_stubs)
+from otter.util.fp import ModifyERef, ReadERef, assoc_obj, eref_dispatcher
 from otter.util.zk import CreateOrSet
 
 
@@ -59,62 +61,62 @@ class ConvergenceStarterTests(SynchronousTestCase):
 
 
 class ConvergerTests(SynchronousTestCase):
+    """
+    converge_one:
+    - early-out if in currently_converging
+    - adds the group to currently_converging
+    - gets scaling group info
+    - 'executes' execute_convergence with that scaling group info
+    - remove from currently converging set
+    - CURRENTLY deletes the znode, but now that I think of it that's horribly misbalanced
+
+
+    CONSIDER:
+    - factor out `zk dirty logic` into separate abstraction
+    - factor out `currently converging` into a separate abstraction
+    
+    """
 
     def setUp(self):
         self.kz_client = mock.Mock(Lock=LockMixin().mock_lock())
         self.dispatcher = object()
         self.log = mock_log()
-        self.converger = Converger(self.log, self.kz_client, self.dispatcher)
+        self.buckets = range(10)
+
+        def pfactory(log, callable):
+            self.fake_partitioner = FakePartitioner(log, callable)
+            return self.fake_partitioner
+
+        self.converger = Converger(self.log, self.dispatcher, self.buckets,
+                                   pfactory)
         self.state = GroupState('tenant-id', 'group-id', 'group-name',
                                 {}, {}, None, {}, False)
         self.group = mock_group(self.state, 'tenant-id', 'group-id')
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
 
-    @mock.patch('time.time')
-    def test_converge(self, time):
+    def test_converge_one(self):
         """
-        The ``converge`` method acquires a lock and performs the result of
-        :func:`execute_convergence` within that lock.
         """
-        perform = mock.Mock()
-
-        def execute_convergence(group, desired, lc, now, log):
-            return Effect(Constant((group, desired, lc, now, log)))
-
-        log = mock_log()
-        self.converger.start_convergence(
-            log,
-            self.group,
-            self.state,
-            self.lc,
-            execute_convergence=execute_convergence,
-            perform=perform)
-        self.kz_client.Lock.assert_called_once_with(
-            '/groups/group-id/converge_lock')
-        # acquire is a monkey-patched partial function. :-(
-        self.kz_client.Lock().acquire.func.assert_called_once_with(timeout=120)
-        self.kz_client.Lock().release.assert_called_once_with()
-        expected_converge_args = (self.group, 0, self.lc, time(), log)
-        perform.assert_called_once_with(
-            self.dispatcher,
-            Effect(TenantScope(Effect(Constant(expected_converge_args)),
-                               'tenant-id')))
-
-    def test_converge_error_log(self):
-        """If performance fails, the error is logged."""
-        perform = mock.MagicMock()
-        perform.return_value = fail(ZeroDivisionError('foo'))
-        log = mock_log()
-        self.converger.start_convergence(
-            log,
-            self.group, self.state, self.lc,
-            execute_convergence=lambda *args: None,
-            perform=perform)
-
-        log.err.assert_called_once_with(
-            CheckFailure(ZeroDivisionError),
-            "Error when performing convergence",
-            otter_msg_type='convergence-perform-error')
+        eff = self.converger.converge_one('tenant-id', 'group-id', 0)
+        dispatcher = ComposedDispatcher([
+            EQDispatcher({
+                Func(time.time): 100,
+                GetScalingGroupInfo(tenant_id='tenant-id',
+                                    group_id='group-id'):
+                    (self.group, self.state, self.lc)
+                
+            #     ReadERef(eref=self.converger._currently_converging):
+            #         pset(),
+            
+            }),
+            # TypeDispatcher({
+            #     ModifyERef: sync_performer()
+            # })
+            eref_dispatcher,
+            base_dispatcher,
+        ])
+        result = sync_perform(dispatcher, eff)
+        print "the result is", result
 
 
 class ExecuteConvergenceTests(SynchronousTestCase):

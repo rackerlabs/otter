@@ -58,48 +58,68 @@ def determine_active(servers, lb_nodes):
             and all_met(s, [node for node in lb_nodes if node.matches(s)])]
 
 
-def execute_convergence(
-        scaling_group, desired_capacity, launch_config, now, log,
-        get_all_convergence_data=get_all_convergence_data):
+def _update_active(scaling_group, active):
+    """
+    :param scaling_group: scaling group
+    :param active: list of active NovaServer objects
+    """
+    active = {server.id: server_to_json(server) for server in active}
+
+    def update_group_state(group, old_state):
+        return assoc_obj(old_state, active=active)
+
+    return Effect(ModifyGroupState(scaling_group=scaling_group,
+                                   modifier=update_group_state))
+
+
+def execute_convergence(tenant_id, group_id, log,
+                        get_all_convergence_data=get_all_convergence_data):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
 
-    :param IScalingGroup scaling_group: The scaling group object.
-    :param int desired_capacity: number of desired servers
-    :param launch_config: An otter launch config.
-    :param now: The current time in seconds.
-    :param log: A bound logger.
-    :param get_all_convergence_data: The :func`get_all_convergence_data` to use
+    :param group_id: group id
+    :param log: bound logger
+    :param get_all_convergence_data: like :func`get_all_convergence_data`, used
         for testing.
 
     :return: An Effect of a list containing the individual step results.
+    :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
     log.msg("execute-convergence")
-    group_id = scaling_group.uuid
-    all_data_eff = get_all_convergence_data(group_id)
+    # Huh! It turns out we can parallelize the gathering of data with the
+    # fetching of the scaling group info from cassandra.
+    sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
+                                        group_id=group_id))
+    gather_eff = get_all_convergence_data(group_id)
 
-    def got_all_data((servers, lb_nodes)):
-        active = determine_active(servers, lb_nodes)
-        desired_group_state = get_desired_group_state(
-            group_id, launch_config, desired_capacity)
-        steps = plan(desired_group_state, servers, lb_nodes, now)
-        log.msg("convergence-plan",
-                servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
-                desired=desired_group_state, active=active)
-        active = {server.id: server_to_json(server) for server in active}
+    def got_all_data(((scaling_group, group_state, launch_config),
+                      (servers, lb_nodes))):
+        # XXX RADIX REVIEWERS FIXME TODO - not using time_eff, do it
+        time_eff = Effect(Func(time.time))
+        def got_time(now):
+            desired_group_state = get_desired_group_state(
+                group_id, launch_config, group_state.desired)
+            steps = plan(desired_group_state, servers, lb_nodes, now)
+            active = determine_active(servers, lb_nodes)
+            log.msg("convergence-plan",
+                    servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
+                    desired=desired_group_state, active=active)
+            eff = _update_active(scaling_group, active)
+            eff = eff.on(lambda _: steps_to_effect(steps))
+            return eff
+        return time_eff.on(got_time)
 
-        def update_group_state(group, old_state):
-            log.msg("updating-group-state", active=active)
-            return assoc_obj(old_state, active=active)
+    return Effect(TenantScope(
+        parallel([sg_eff, gather_eff]).on(
+            success=got_all_data,
+            error=lambda fe: raise_(fe[1].exc_info)), # throw out the FirstError
+        tenant_id
+    ))
 
-        eff = Effect(ModifyGroupState(scaling_group=scaling_group,
-                                      modifier=update_group_state))
-        eff = eff.on(lambda _: steps_to_effect(steps))
-        return eff
 
-    return Effect(TenantScope(all_data_eff.on(got_all_data),
-                              scaling_group.tenant_id))
+def raise_(exc_info):
+    raise exc_info[0], exc_info[1], exc_info[2]
 
 
 def start_convergence_eff(tenant_id, group_id):
@@ -173,6 +193,17 @@ class ConvergenceStarter(Service, object):
         d = perform(self._dispatcher, eff)
         d.addErrback(log.err, 'mark-dirty-failed')
         return d
+
+
+def _is_fatal(exception):
+    """
+    Determine if an exception is fatal -- and should cause the group to be put
+    into an ERROR state.
+
+    Unknown errors are non-fatal, which mean that convergence should be
+    retried.
+    """
+    return False
 
 
 class Converger(MultiService):
@@ -253,54 +284,54 @@ class Converger(MultiService):
         group_infos = yield self.find_groups_needing_convergence(my_buckets)
         self.log.msg("converge-all", group_infos=group_infos)
         effs = [
-            self.converge_one(info['tenant_id'], info['group_id'],
-                              info['version'])
+            self.converge_one_then_cleanup(
+                info['tenant_id'], info['group_id'], info['version'])
             for info in group_infos]
         yield do_return(parallel(effs))
 
     @do
-    def converge_one(self, tenant_id, group_id, version):
-        """
-        Execute convergence for a single group and then clean up.
+    def converge_one_then_cleanup(self, tenant_id, group_id, version):
+        """Converge one group, and clean up the dirty flag after we're done."""
+        log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
+        try:
+            yield self.converge_one_non_concurrently(tenant_id, group_id, log)
+        except NoSuchScalingGroupError:
+            yield self._cleanup(log, tenant_id, group_id, version)
+            log.err(None, 'converge-no-such-scaling-group')
+        except Exception as e:
+            if _is_fatal(e):
+                yield self._cleanup(log, tenant_id, group_id, version)
+                # TODO: change group state to ERROR.
+                raise
+            else:
+                log.err(None, "converge-non-fatal-error")
+        else:
+            yield self._cleanup(log, tenant_id, group_id, version)
 
-        :param tenant_id: tenant ID of the group
-        :param group_id: ID of group to be converged
-        :param version: version of the ZK node representing dirtiness. See
-            comment in :func:`start_convergence_eff` for more info.
-
-        :return: An Effect of the group ID that is being converged.
-        """
-        log = self.log.bind(group_id=group_id, tenant_id=tenant_id)
+    @do
+    def converge_one_non_concurrently(self, tenant_id, group_id, log):
+        """Converge one group if we're not already converging it."""
+        # Even though we yield for ERef access/modification, we can rely on it
+        # being synchronous, so no worries about race conditions for this
+        # conditional and the following addition of the group:
         if group_id in (yield self._currently_converging.read()):
-            log.msg("already-converging", group_id=group_id)
+            log.msg("already-converging")
             return
         yield self._currently_converging.modify(lambda cc: cc.add(group_id))
-        log.msg("converge-one")
-
+        # However, _this_ is asynchronous.  Can we have a race condition here?
+        # In fact, won't this have the same problem that we have with the
+        # `dirty` flag? Kind of, but it doesn't matter. It's possible that
+        # another call to maybe_converge_one will happen to this same group
+        # just after this converge_one call, and before we remove the group
+        # from the group. But it doesn't matter! Because the surrounding
+        # dirty-checking, with its version-numbered flag, will keep us in
+        # "needs converging" state no matter what. :-)
         try:
-            (scaling_group, group_state, launch_config) = yield Effect(
-                GetScalingGroupInfo(tenant_id=tenant_id, group_id=group_id))
-        except NoSuchScalingGroupError as e:
-            log.err(e, "no-scaling-group-found")
-            yield self._cleanup(log, tenant_id, group_id, version)
-            return
-
-        now = yield Effect(Func(time.time))
-        converge_eff = execute_convergence(
-            scaling_group, group_state.desired, launch_config,
-            now, log)
-
-        try:
-            yield converge_eff
-            # TODO: For permanent errors, put the group in ERROR state.
-            yield self._cleanup(log, tenant_id, group_id, version)
-        except Exception as e:
-            # For unexpected errors, we don't clean up the ZK dirty flag, so
-            # convergence will be retried.
-            log.err(e, "unhandled-convergence-error")
-
-        log.msg("convergence-complete")
-        yield self._currently_converging.modify(lambda cc: cc.remove(group_id))
+            result = yield execute_convergence(tenant_id, group_id, log)
+        finally:
+            yield self._currently_converging.modify(
+                lambda cc: cc.remove(group_id))
+        yield do_return(result)
 
     def _cleanup(self, log, tenant_id, group_id, version):
         """
