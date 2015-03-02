@@ -16,7 +16,7 @@ from otter.convergence.model import (
 from otter.convergence.service import (
     ConvergenceStarter,
     Converger, determine_active, execute_convergence, server_to_json,
-    start_convergence_eff)
+    mark_divergent)
 from otter.http import TenantScope, service_request
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
 from otter.models.interface import GroupState
@@ -28,18 +28,18 @@ from otter.util.fp import ModifyERef, ReadERef, assoc_obj, eref_dispatcher
 from otter.util.zk import CreateOrSet
 
 
-class StartConvergenceEffTests(SynchronousTestCase):
-    """Tests for :func:`start_convergence_eff`."""
+class MarkDivergentTests(SynchronousTestCase):
+    """Tests for :func:`mark_divergent`."""
 
     def test_marks_dirty(self):
         """
         returns an effect which will create or set a node relative to
         ``CONVERGENCE_DIRTY_PATH``.
         """
-        eff = start_convergence_eff('tenant', 'group')
+        eff = mark_divergent('tenant', 'group')
         self.assertEqual(
             eff,
-            Effect(CreateOrSet(path='/groups/converging/tenant_group',
+            Effect(CreateOrSet(path='/groups/divergent/tenant_group',
                                content='dirty')))
 
 
@@ -56,7 +56,7 @@ class ConvergenceStarterTests(SynchronousTestCase):
         self.assertEqual(
             self.successResultOf(d),
             ('my-dispatcher',
-             Effect(CreateOrSet(path='/groups/converging/tenant_group',
+             Effect(CreateOrSet(path='/groups/divergent/tenant_group',
                                 content='dirty'))))
 
 

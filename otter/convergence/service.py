@@ -122,12 +122,12 @@ def raise_(exc_info):
     raise exc_info[0], exc_info[1], exc_info[2]
 
 
-def start_convergence_eff(tenant_id, group_id):
+def mark_divergent(tenant_id, group_id):
     """
     Indicate that a group should be converged.
 
-    This doesn't actually do the work of convergence, it effectively just
-    puts an item in a queue.
+    This doesn't actually do the work of convergence -- it simply records a
+    note that the group is divergent.
 
     :param tenant_id: tenant ID that owns the group.
     :param group_id: ID of the group to converge.
@@ -189,7 +189,7 @@ class ConvergenceStarter(Service, object):
         """Record that a group needs converged."""
         log = log.bind(tenant_id=tenant_id, group_id=group_id)
         log.msg("Marking group dirty", 'mark-dirty')
-        eff = start_convergence_eff(tenant_id, group_id)
+        eff = mark_divergent(tenant_id, group_id)
         d = perform(self._dispatcher, eff)
         d.addErrback(log.err, 'mark-dirty-failed')
         return d
