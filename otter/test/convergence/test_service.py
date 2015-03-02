@@ -71,6 +71,27 @@ class ConvergerTests(SynchronousTestCase):
     - early-out if in currently_converging
     - adds the group to currently_converging
     - remove from currently converging set
+
+    converge_one_then_cleanup
+    - handles NoSuchScalingGroupError to log and cleanup
+    - handles any other error to cleanup and raise
+    - TODO: handles non-fatal error by logging and swallowing
+    - cleans up after a successful run
+
+    converge_all
+    - finds all divergent groups associated with us
+    - parallelizes converge_one_then_cleanup for each group
+
+    get_my_divergent_groups
+    - uses GetChildrenWithStats to find tenant_group children
+    - splits them up, filters out groups we don't like
+    - returns structured info
+
+    buckets_acquired:
+    - logs
+    - converge_all
+    - performs result
+    - logs error with converge-all-error
     """
 
     def setUp(self):
@@ -90,21 +111,27 @@ class ConvergerTests(SynchronousTestCase):
         self.group = mock_group(self.state, 'tenant-id', 'group-id')
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
 
-    def test_converge_one(self):
-        """
-        """
-        eff = self.converger.converge_one('tenant-id', 'group-id', 0)
-        dispatcher = ComposedDispatcher([
-            EQDispatcher({
-                Func(time.time): 100,
-                GetScalingGroupInfo(tenant_id='tenant-id',
-                                    group_id='group-id'):
-                    (self.group, self.state, self.lc)
+    def _get_dispatcher(self):
+        return ComposedDispatcher([
+            TypeDispatcher({
+                ParallelEffects: perform_parallel_async,
             }),
             eref_dispatcher,
             base_dispatcher,
         ])
-        result = sync_perform(dispatcher, eff)
+
+    # - check currently converging
+    # - add group
+    # - remove currently converging
+    def test_converge_one_non_concurrently_success(self):
+        log = mock_log()
+        ec_calls = {
+            ('tenant-id', 'group-id', log): Effect(Constant('converged!'))}
+        eff = self.converger.converge_one_non_concurrently(
+            'tenant-id', 'group-id', log,
+            execute_convergence=lambda t, g, l: ec_calls[(t, g, l)])
+        self.assertEqual(sync_perform(self._get_dispatcher(), eff),
+                         'converged!')
 
 
 class ExecuteConvergenceTests(SynchronousTestCase):

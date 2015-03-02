@@ -194,13 +194,16 @@ class ConvergenceStarter(Service, object):
 
 def _is_fatal(exception):
     """
-    Determine if an exception is fatal -- and should cause the group to be put
-    into an ERROR state.
+    Determine if an exception is fatal -- and should consider the group wedged
+    so we don't try to converge again.
 
     Unknown errors are non-fatal, which mean that convergence should be
     retried.
     """
-    return False
+    if type(exception) is NoSuchScalingGroupError:
+        return True
+    else:
+        return False
 
 
 class Converger(MultiService):
@@ -250,9 +253,10 @@ class Converger(MultiService):
         return perform(self._dispatcher, eff).addErrback(
             self.log.err, "converge-all-error")
 
-    def find_groups_needing_convergence(self, my_buckets):
+    def get_my_divergent_groups(self, my_buckets):
         """
-        Look up which groups need convergence by this node.
+        Look up groups that are divergent and that are this node's
+        responsibility, according to the ``self.buckets``.
 
         :returns: list of dicts, where each dict has ``tenant_id``,
             ``group_id``, and ``version`` keys.
@@ -280,7 +284,7 @@ class Converger(MultiService):
         Check for groups that need convergence and which match up to the
         buckets we've been allocated.
         """
-        group_infos = yield self.find_groups_needing_convergence(my_buckets)
+        group_infos = yield self.get_my_divergent_groups(my_buckets)
         self.log.msg("converge-all", group_infos=group_infos)
         effs = [
             self.converge_one_then_cleanup(
@@ -290,13 +294,16 @@ class Converger(MultiService):
 
     @do
     def converge_one_then_cleanup(self, tenant_id, group_id, version):
-        """Converge one group, and clean up the dirty flag after we're done."""
+        """
+        Converge one group, and clean up the dirty flag after we're done.
+
+        :param version: The version number associated with the dirty flag at
+            the time we read it. The dirty flag will only be cleaned up if the
+            version number doesn't change.
+        """
         log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
         try:
             yield self.converge_one_non_concurrently(tenant_id, group_id, log)
-        except NoSuchScalingGroupError:
-            yield self._cleanup(log, tenant_id, group_id, version)
-            log.err(None, 'converge-no-such-scaling-group')
         except Exception as e:
             if _is_fatal(e):
                 yield self._cleanup(log, tenant_id, group_id, version)
@@ -308,7 +315,8 @@ class Converger(MultiService):
             yield self._cleanup(log, tenant_id, group_id, version)
 
     @do
-    def converge_one_non_concurrently(self, tenant_id, group_id, log):
+    def converge_one_non_concurrently(self, tenant_id, group_id, log,
+                                      execute_convergence=execute_convergence):
         """Converge one group if we're not already converging it."""
         # Even though we yield for ERef access/modification, we can rely on it
         # being synchronous, so no worries about race conditions for this
@@ -317,14 +325,14 @@ class Converger(MultiService):
             log.msg("already-converging")
             return
         yield self._currently_converging.modify(lambda cc: cc.add(group_id))
-        # However, _this_ is asynchronous.  Can we have a race condition here?
-        # In fact, won't this have the same problem that we have with the
-        # `dirty` flag? Kind of, but it doesn't matter. It's possible that
-        # another call to maybe_converge_one will happen to this same group
-        # just after this converge_one call, and before we remove the group
-        # from the group. But it doesn't matter! Because the surrounding
-        # dirty-checking, with its version-numbered flag, will keep us in
-        # "needs converging" state no matter what. :-)
+        # However, the convergence itself is asynchronous.  Can we have a race
+        # condition here?  In fact, won't this have the same problem that we
+        # have with the `dirty` flag? Kind of, but it doesn't matter. It's
+        # possible that another call to maybe_converge_one will happen to this
+        # same group just after this converge_one call, and before we remove
+        # the group from currently_converging. But it doesn't matter! Because
+        # the surrounding dirty-checking, with its version-numbered flag, will
+        # keep the group in the "divergent" state no matter what. :-)
         try:
             result = yield execute_convergence(tenant_id, group_id, log)
         finally:
