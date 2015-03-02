@@ -1,13 +1,16 @@
 import time
 
-from effect import ComposedDispatcher, Constant, Effect, Func, ParallelEffects, TypeDispatcher, base_dispatcher, parallel, sync_perform
-from effect.testing import EQDispatcher, Stub
+from effect import (
+    ComposedDispatcher, Constant, Effect, Func, ParallelEffects,
+    TypeDispatcher, base_dispatcher, sync_perform)
+from effect.async import perform_parallel_async
+from effect.testing import EQDispatcher
 
 import mock
 
-from pyrsistent import freeze, pmap, pset
+from pyrsistent import freeze, pmap
 
-from twisted.internet.defer import fail, succeed
+from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
@@ -15,16 +18,18 @@ from otter.convergence.model import (
     CLBDescription, CLBNode, NovaServer, ServerState)
 from otter.convergence.service import (
     ConvergenceStarter,
-    Converger, determine_active, execute_convergence, server_to_json,
-    mark_divergent)
-from otter.http import TenantScope, service_request
-from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
+    Converger, determine_active, execute_convergence, mark_divergent,
+    server_to_json)
+from otter.http import service_request
+from otter.models.intents import (
+    GetScalingGroupInfo, ModifyGroupState, perform_modify_group_state)
 from otter.models.interface import GroupState
 from otter.test.convergence.test_planning import server
 from otter.test.utils import (
-    CheckFailure, FakePartitioner, LockMixin,
-    mock_group, mock_log, resolve_effect, resolve_stubs)
-from otter.util.fp import ModifyERef, ReadERef, assoc_obj, eref_dispatcher
+    FakePartitioner, LockMixin,
+    mock_group, mock_log,
+    transform_eq)
+from otter.util.fp import eref_dispatcher
 from otter.util.zk import CreateOrSet
 
 
@@ -62,19 +67,10 @@ class ConvergenceStarterTests(SynchronousTestCase):
 
 class ConvergerTests(SynchronousTestCase):
     """
-    converge_one:
+    converge_one_non_concurrently
     - early-out if in currently_converging
     - adds the group to currently_converging
-    - gets scaling group info
-    - 'executes' execute_convergence with that scaling group info
     - remove from currently converging set
-    - CURRENTLY deletes the znode, but now that I think of it that's horribly misbalanced
-
-
-    CONSIDER:
-    - factor out `zk dirty logic` into separate abstraction
-    - factor out `currently converging` into a separate abstraction
-    
     """
 
     def setUp(self):
@@ -104,28 +100,22 @@ class ConvergerTests(SynchronousTestCase):
                 GetScalingGroupInfo(tenant_id='tenant-id',
                                     group_id='group-id'):
                     (self.group, self.state, self.lc)
-                
-            #     ReadERef(eref=self.converger._currently_converging):
-            #         pset(),
-            
             }),
-            # TypeDispatcher({
-            #     ModifyERef: sync_performer()
-            # })
             eref_dispatcher,
             base_dispatcher,
         ])
         result = sync_perform(dispatcher, eff)
-        print "the result is", result
 
 
 class ExecuteConvergenceTests(SynchronousTestCase):
     """Tests for :func:`execute_convergence`."""
 
     def setUp(self):
-        self.state = GroupState('tenant-id', 'group-id', 'group-name',
-                                {}, {}, None, {}, False)
-        self.group = mock_group(self.state, 'tenant-id', 'group-id')
+        self.tenant_id = 'tenant-id'
+        self.group_id = 'group-id'
+        self.state = GroupState(self.tenant_id, self.group_id, 'group-name',
+                                {}, {}, None, {}, False, desired=2)
+        self.group = mock_group(self.state, self.tenant_id, self.group_id)
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
         self.desired_lbs = freeze({23: [CLBDescription(lb_id='23', port=80)]})
         self.servers = [
@@ -144,18 +134,24 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                        servicenet_address='10.0.0.2',
                        desired_lbs=self.desired_lbs)
         ]
+        self.expected_intents = {
+            GetScalingGroupInfo(tenant_id='tenant-id', group_id='group-id'):
+                (self.group, self.state, self.lc),
+        }
+        self.dispatcher = ComposedDispatcher([
+            EQDispatcher(self.expected_intents),
+            TypeDispatcher({
+                ParallelEffects: perform_parallel_async,
+                ModifyGroupState: perform_modify_group_state,
+            }),
+            base_dispatcher,
+        ])
 
     def _get_gacd_func(self, group_id):
         def get_all_convergence_data(grp_id):
             self.assertEqual(grp_id, group_id)
-            return Effect(Stub(Constant((self.servers, []))))
+            return Effect(Constant((tuple(self.servers), ())))
         return get_all_convergence_data
-
-    def _assert_active(self, effect, active):
-        self.assertIsInstance(effect.intent, ModifyGroupState)
-        self.assertEqual(effect.intent.scaling_group, self.group)
-        self.assertEqual(effect.intent.modifier(self.group, self.state),
-                         assoc_obj(self.state, active=active))
 
     def test_no_steps(self):
         """
@@ -166,16 +162,15 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         for s in self.servers:
             s.desired_lbs = pmap()
 
-        eff = execute_convergence(self.group, 2, self.lc, 0, log,
-                                  get_all_convergence_data=gacd)
-        self.assertEqual(eff.intent.tenant_id, 'tenant-id')
-        self.assertEqual(eff.callbacks, [])
-        mgs_eff = resolve_stubs(eff.intent.effect)
+        tscope_eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                         get_all_convergence_data=gacd)
+        self.assertEqual(tscope_eff.intent.tenant_id, self.tenant_id)
+        self.assertEqual(tscope_eff.callbacks, [])
         expected_active = {'a': server_to_json(self.servers[0]),
                            'b': server_to_json(self.servers[1])}
-        self._assert_active(mgs_eff, expected_active)
-        p_effs = resolve_effect(mgs_eff, None)
-        self.assertEqual(p_effs, parallel([]))
+        result = sync_perform(self.dispatcher, tscope_eff.intent.effect)
+        self.assertEqual(self.group.modify_state_values[-1].active,
+                         expected_active)
 
     def test_success(self):
         """
@@ -186,35 +181,32 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         # yet. convergence should add them to the LBs.
         log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
-        eff = execute_convergence(self.group, 2, self.lc, 0, log,
-                                  get_all_convergence_data=gacd)
-        self.assertEqual(eff.intent.tenant_id, 'tenant-id')
-        self.assertEqual(eff.callbacks, [])
-        mgs_eff = resolve_stubs(eff.intent.effect)
-        self._assert_active(mgs_eff, {})
-        eff = resolve_effect(mgs_eff, None)
-        # The steps are optimized
-        self.assertIsInstance(eff.intent, ParallelEffects)
-        self.assertEqual(len(eff.intent.effects), 1)
+        tscope_eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                         get_all_convergence_data=gacd)
+        self.assertEqual(tscope_eff.intent.tenant_id, self.tenant_id)
+        self.assertEqual(tscope_eff.callbacks, [])
         expected_req = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'POST',
             'loadbalancers/23/nodes',
-            data=mock.ANY,
+            data=transform_eq(
+                freeze,
+                pmap({
+                    'nodes': transform_eq(
+                        lambda nodes: set(freeze(nodes)),
+                        set([pmap({'weight': 1, 'type': 'PRIMARY',
+                                   'port': 80,
+                                   'condition': 'ENABLED',
+                                   'address': '10.0.0.2'}),
+                             pmap({'weight': 1, 'type': 'PRIMARY',
+                                   'port': 80,
+                                   'condition': 'ENABLED',
+                                   'address': '10.0.0.1'})]))})),
             success_pred=mock.ANY)
-        got_req = eff.intent.effects[0].intent
-        self.assertEqual(got_req, expected_req.intent)
-        # separate check for nodes; they are unique, but can be in any order
-        self.assertEqual(
-            set(freeze(got_req.data['nodes'])),
-            set([pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
-                       'condition': 'ENABLED', 'address': '10.0.0.2'}),
-                 pmap({'weight': 1, 'type': 'PRIMARY', 'port': 80,
-                       'condition': 'ENABLED', 'address': '10.0.0.1'})]))
-        r = resolve_effect(eff, ['stuff'])
-        # The result of the parallel is returned directly
-        # TODO: This must change with issue #844.
-        self.assertEqual(r, ['stuff'])
+        self.expected_intents[expected_req.intent] = 'stuff'
+        result = sync_perform(self.dispatcher, tscope_eff.intent.effect)
+        self.assertEqual(self.group.modify_state_values[-1].active, {})
+        self.assertEqual(result, ['stuff'])
 
 
 class DetermineActiveTests(SynchronousTestCase):

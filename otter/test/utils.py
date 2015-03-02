@@ -650,3 +650,23 @@ class FakePartitioner(Service):
 
     def health_check(self):
         return defer.succeed(self.health)
+
+
+def transform_eq(transformer, rhs):
+    """
+    Return an object that can be compared to another object after transforming
+    that other object.
+
+    :param transformer: a function that takes the compared objects and returns
+        a transformed version
+    :param rhs: the actual data that should be compared with the result of
+        transforming the compared object
+    """
+    class Foo(object):
+        def __eq__(self, other):
+            return transformer(other) == rhs
+
+        def __ne__(self, other):
+            return not self == other
+
+    return Foo()

@@ -2,11 +2,13 @@
 
 import time
 
-from effect import Effect, Func, parallel
+from effect import Effect, FirstError, Func, catch, parallel
 from effect.do import do, do_return
 from effect.twisted import exc_info_to_failure, perform
 
 from pyrsistent import pset
+
+import six
 
 from toolz.itertoolz import concat
 
@@ -95,7 +97,6 @@ def execute_convergence(tenant_id, group_id, log,
 
     def got_all_data(((scaling_group, group_state, launch_config),
                       (servers, lb_nodes))):
-        # XXX RADIX REVIEWERS FIXME TODO - not using time_eff, do it
         time_eff = Effect(Func(time.time))
         def got_time(now):
             desired_group_state = get_desired_group_state(
@@ -113,13 +114,9 @@ def execute_convergence(tenant_id, group_id, log,
     return Effect(TenantScope(
         parallel([sg_eff, gather_eff]).on(
             success=got_all_data,
-            error=lambda fe: raise_(fe[1].exc_info)), # throw out the FirstError
+            error=catch(FirstError, lambda fe: six.reraise(*fe[1].exc_info))),
         tenant_id
     ))
-
-
-def raise_(exc_info):
-    raise exc_info[0], exc_info[1], exc_info[2]
 
 
 def mark_divergent(tenant_id, group_id):
@@ -211,14 +208,16 @@ class Converger(MultiService):
     A service that searches for groups that need converging and then does the
     work of converging them.
 
-    Work is split up between nodes running this service by using a Kazoo
-    :obj:`SetPartitioner`. This service could be run separately from the API
-    nodes.
+    This service is pretty much just a wrapper for :func:`execute_convergence`,
+    with a few important layers above it:
 
-    This service will repeatedly check for groups that need convergence,
-    deterministically select the groups to converge based on the partitioned
-    buckets, and run convergence on any groups that are not already being
-    converged.
+    - virtual "buckets" are partitioned between nodes running this service by
+      using ZooKeeper (thus, this service could/should be run separately from
+      the API). group IDs are deterministically mapped to these buckets.
+    - we repeatedly check for 'dirty flags' created by the
+      :obj:`ConvergenceStarter` service, and determine if they're "ours" with
+      the partitioner.
+    - we ensure we don't execute convergence for the same group concurrently.
     """
 
     def __init__(self, log, dispatcher, buckets, partitioner_factory):
