@@ -538,7 +538,7 @@ class OtterGroup(object):
 
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.group_id)
-        deferred = group.view_manifest(with_webhooks(request))
+        deferred = group.view_manifest(with_webhooks=with_webhooks(request))
         deferred.addCallback(openstack_formatting, group.uuid)
         deferred.addCallback(json.dumps)
         return deferred
@@ -568,22 +568,24 @@ class OtterGroup(object):
             # There is no argument
             pass
         if force:
-            config = []
-            d = group.view_config()
+            d = group.view_manifest(with_policies=False)
 
-            def update_config(_config):
-                _config['minEntities'] = 0
-                _config['maxEntities'] = 0
-                config.append(_config)
-                return group.update_config(_config)
+            def update_config(group_info):
+                group_info['groupConfiguration']['minEntities'] = 0
+                group_info['groupConfiguration']['maxEntities'] = 0
+                du = group.update_config(group_info['groupConfiguration'])
+                return du.addCallback(lambda _: group_info)
+
             d.addCallback(update_config)
 
-            def modify_state(_):
-                _config = config[0]
+            def modify_state(group_info):
                 d = group.modify_state(
-                    partial(controller.obey_config_change, self.log,
-                            transaction_id(request), _config,
-                            launch_config=None))
+                    partial(
+                        controller.obey_config_change,
+                        self.log,
+                        transaction_id(request),
+                        group_info['groupConfiguration'],
+                        launch_config=group_info['launchConfiguration']))
                 return d
             d.addCallback(modify_state)
 
