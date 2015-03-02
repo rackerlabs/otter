@@ -162,14 +162,14 @@ def add_headers(fixed_headers, request_func):
     Decorate a request function so that some fixed headers are added.
 
     :param fixed_headers: The headers that will be added to all requests
-        made with the resulting request function. These override any
-        headers passed to the request function.
+        made with the resulting request function. The headers passed
+        override fixed_headers
     """
     @wraps(request_func)
     def request(*args, **kwargs):
         headers = kwargs.pop('headers', {})
         headers = headers if headers is not None else {}
-        return request_func(*args, headers=merge(headers, fixed_headers),
+        return request_func(*args, headers=merge(fixed_headers, headers),
                             **kwargs)
     return request
 
