@@ -2,7 +2,7 @@ import time
 
 from effect import (
     ComposedDispatcher, Constant, Effect, Func, ParallelEffects,
-    TypeDispatcher, base_dispatcher, sync_perform)
+    TypeDispatcher, base_dispatcher, sync_perform, sync_performer)
 from effect.async import perform_parallel_async
 from effect.testing import EQDispatcher
 
@@ -134,12 +134,17 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                        servicenet_address='10.0.0.2',
                        desired_lbs=self.desired_lbs)
         ]
-        self.expected_intents = {
-            GetScalingGroupInfo(tenant_id='tenant-id', group_id='group-id'):
-                (self.group, self.state, self.lc),
-        }
-        self.dispatcher = ComposedDispatcher([
-            EQDispatcher(self.expected_intents),
+
+    def _get_dispatcher(self, expected_intents=None, additional=None):
+        if expected_intents is None:
+            gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
+                                       group_id='group-id')
+            gsgi_result = (self.group, self.state, self.lc)
+            expected_intents = {gsgi: gsgi_result}
+        if additional is not None:
+            expected_intents.update(additional)
+        return ComposedDispatcher([
+            EQDispatcher(expected_intents),
             TypeDispatcher({
                 ParallelEffects: perform_parallel_async,
                 ModifyGroupState: perform_modify_group_state,
@@ -155,7 +160,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
     def test_no_steps(self):
         """
-        If state of world matches desired, no steps are executed.
+        If state of world matches desired, no steps are executed, but the
+        `active` servers are still updated.
         """
         log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
@@ -168,9 +174,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.assertEqual(tscope_eff.callbacks, [])
         expected_active = {'a': server_to_json(self.servers[0]),
                            'b': server_to_json(self.servers[1])}
-        result = sync_perform(self.dispatcher, tscope_eff.intent.effect)
+        result = sync_perform(self._get_dispatcher(), tscope_eff.intent.effect)
         self.assertEqual(self.group.modify_state_values[-1].active,
                          expected_active)
+        self.assertEqual(result, [])
 
     def test_success(self):
         """
@@ -203,10 +210,37 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                    'condition': 'ENABLED',
                                    'address': '10.0.0.1'})]))})),
             success_pred=mock.ANY)
-        self.expected_intents[expected_req.intent] = 'stuff'
-        result = sync_perform(self.dispatcher, tscope_eff.intent.effect)
+        expected_intents = {expected_req.intent: 'stuff'}
+        result = sync_perform(
+            self._get_dispatcher(additional=expected_intents),
+            tscope_eff.intent.effect)
         self.assertEqual(self.group.modify_state_values[-1].active, {})
         self.assertEqual(result, ['stuff'])
+
+    def test_first_error_extraction(self):
+        """
+        If the GetScalingGroupInfo effect fails, its exception is raised
+        directly, without the FirstError wrapper.
+        """
+        log = mock_log()
+        gacd = self._get_gacd_func(self.group.uuid)
+        for s in self.servers:
+            s.desired_lbs = pmap()
+
+        @sync_performer
+        def perform_gsgi(dispatcher, intent):
+            raise RuntimeError('foo')
+
+        tscope_eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                         get_all_convergence_data=gacd)
+
+        dispatcher = ComposedDispatcher([
+            TypeDispatcher({GetScalingGroupInfo: perform_gsgi}),
+            self._get_dispatcher(None)])
+        e = self.assertRaises(
+            RuntimeError,
+            sync_perform, dispatcher, tscope_eff.intent.effect)
+        self.assertEqual(str(e), 'foo')
 
 
 class DetermineActiveTests(SynchronousTestCase):
