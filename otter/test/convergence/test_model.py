@@ -1,8 +1,11 @@
 """
 Tests for convergence models.
 """
+from uuid import uuid4
 
 from characteristic import attributes
+
+from pyrsistent import pmap, pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -17,7 +20,8 @@ from otter.convergence.model import (
     ILBDescription,
     ILBNode,
     NovaServer,
-    ServerState
+    ServerState,
+    get_service_metadata
 )
 
 
@@ -220,3 +224,142 @@ class CLBNodeTests(SynchronousTestCase):
                            condition=CLBNodeCondition.DISABLED),
                        address='10.1.1.1', drained_at=0.0, connections=1)
         self.assertFalse(node.is_active())
+
+
+class ServiceMetadataTests(SynchronousTestCase):
+    """
+    Tests for :func:`get_service_metadata`.
+    """
+    def test_returns_empty_map_if_metadata_invalid(self):
+        """
+        If metadata is invalid (a string or otherwise not a dictionary),
+        an empty map is returned.
+        """
+        for invalid in ("string", None, [], object()):
+            self.assertEqual(get_service_metadata('autoscale', invalid),
+                             pmap())
+
+    def test_skips_invalid_keys_and_mismatching_services(self):
+        """
+        :func:`get_service_metadata` ignores all keys that do not
+        match the service or the `rax:<service>:...` naming scheme.
+        """
+        metadata = {
+            "bleh:rax:autoscale:lb": "fails because starts with bleh",
+            "rax:autoscale:lb otherstuff": "fails because space",
+            "rax:monitoring:check": "fails because wrong service",
+            ":rax:autoscale:lb": "fails because starts with colon",
+            "rax:autoscale:lb:": "fails because ends with colon",
+            "rax:rax:autoscale:lb:autoscale:lb": "fails because 2x'rax'"
+        }
+        self.assertEqual(get_service_metadata('autoscale', metadata), pmap())
+
+    def test_creates_dictionary_of_arbitrary_depth(self):
+        """
+        :func:`get_service_metadata` creates a dictionary of arbitrary depth
+        depending on how many colons are in the keys.
+        """
+        metadata = {
+            "rax:autoscale:group:id": "group id",
+            "rax:autoscale:lb:CloudLoadBalancer:123": "result1",
+            "rax:autoscale:lb:CloudLoadBalancer:234": "result2",
+            "rax:autoscale:lb:RackConnectV3:123": "result3",
+            "rax:autoscale:lb:RackConnectV3:234": "result4",
+            "rax:autoscale:some:other:nested:key": "result5",
+            "rax:autoscale:topLevelKey_with_underlines-and-dashes": "result6",
+            "rax:autoscale:autoscale:lb": "result7"
+        }
+        expected = {
+            'group': {'id': 'group id'},
+            'lb': {
+                'CloudLoadBalancer': {'123': 'result1',
+                                      '234': 'result2'},
+                'RackConnectV3': {'123': 'result3',
+                                  '234': 'result4'}
+            },
+            'some': {'other': {'nested': {'key': 'result5'}}},
+            "topLevelKey_with_underlines-and-dashes": "result6",
+            'autoscale': {'lb': 'result7'}
+        }
+        self.assertEqual(get_service_metadata('autoscale', metadata),
+                         pmap(expected))
+
+
+class AutoscaleMetadataTests(SynchronousTestCase):
+    """
+    Tests for generating and parsing Nova server metadata.
+    """
+    def test_get_group_id_from_metadata(self):
+        """
+        :func:`NovaServer.group_id_from_metadata` returns the group ID from
+        metadata no matter if it's old style or new style.
+        """
+        for key in ("rax:autoscale:group:id", "rax:auto_scaling_group_id"):
+            self.assertEqual(
+                NovaServer.group_id_from_metadata({key: "group_id"}),
+                "group_id")
+
+    def test_invalid_group_id_key_returns_none(self):
+        """
+        If there is no group ID key, either old or new style,
+        :func:`NovaServer.group_id_from_metadata` returns `None`.
+        """
+        for key in (":rax:autoscale:group:id", "rax:autoscaling_group_id",
+                    "completely_wrong"):
+            self.assertIsNone(
+                NovaServer.group_id_from_metadata({key: "group_id"}))
+
+        self.assertIsNone(NovaServer.group_id_from_metadata({}))
+
+    def test_lbs_from_metadata_CLB(self):
+        """
+        :func:`NovaServer.lbs_from_metadata` returns a set of
+        `CLBDescription` objects if the metadata is parsable as a CLB config,
+        and ignores the metadata line if unparsable.
+        """
+        metadata = {
+            "rax:autoscale:lb:CloudLoadBalancer:123":
+                '[{"port": 80}, {"port": 8080}]',
+
+            # invalid because there is no port
+            "rax:autoscale:lb:CloudLoadBalancer:234": '[{}]',
+            # invalid because not a list
+            "rax:autoscale:lb:CloudLoadBalancer:345": '{"port": 80}',
+            # invalid because not JSON
+            "rax:autoscale:lb:CloudLoadBalancer:456": 'junk'
+        }
+        self.assertEqual(
+            NovaServer.lbs_from_metadata(metadata),
+            pset([CLBDescription(lb_id='123', port=80),
+                  CLBDescription(lb_id='123', port=8080)]))
+
+    def test_lbs_from_metadata_ignores_unsupported_lb_types(self):
+        """
+        :func:`NovaServer.lbs_from_metadata` ignores unsupported LB types
+        """
+        metadata = {
+            "rax:autoscale:lb:RackConnect:{0}".format(uuid4()): None,
+            "rax:autoscale:lb:Neutron:456": None
+        }
+        self.assertEqual(NovaServer.lbs_from_metadata(metadata), pset())
+
+    def test_generate_metadata(self):
+        """
+        :func:`NovaServer.lbs_from_metadata` produces a dictionary with
+        metadata for the group ID and any load balancers provided.
+        """
+        lbs = [
+            CLBDescription(port=80, lb_id='123'),
+            CLBDescription(port=8080, lb_id='123'),
+            CLBDescription(port=80, lb_id='234')
+        ]
+        expected = {
+            'rax:autoscale:group:id': 'group_id',
+            'rax:auto_scaling_group_id': 'group_id',
+            'rax:autoscale:lb:CloudLoadBalancer:123': (
+                '[{"port": 80}, {"port": 8080}]'),
+            'rax:autoscale:lb:CloudLoadBalancer:234': '[{"port": 80}]'
+        }
+
+        self.assertEqual(NovaServer.generate_metadata('group_id', lbs),
+                         expected)

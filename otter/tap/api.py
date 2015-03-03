@@ -37,6 +37,7 @@ from otter.supervisor import SupervisorService, set_supervisor
 from otter.util.config import config_value, set_config_data
 from otter.util.cqlbatch import TimingOutCQLClient
 from otter.util.deferredutils import timeout_deferred
+from otter.util.zkpartitioner import Partitioner
 
 
 class Options(usage.Options):
@@ -287,13 +288,15 @@ def setup_scheduler(parent, store, kz_client):
         return
     buckets = range(1, int(config_value('scheduler.buckets')) + 1)
     store.set_scheduler_buckets(buckets)
-    partition_path = (config_value('scheduler.partition.path')
-                      or '/scheduler_partition')
+    partition_path = (config_value('scheduler.partition.path') or
+                      '/scheduler_partition')
     time_boundary = config_value('scheduler.partition.time_boundary') or 15
+    partitioner_factory = partial(
+        Partitioner,
+        kz_client, int(config_value('scheduler.interval')), partition_path,
+        buckets, time_boundary)
     scheduler_service = SchedulerService(
         int(config_value('scheduler.batchsize')),
-        int(config_value('scheduler.interval')),
-        store, kz_client, partition_path, time_boundary,
-        buckets)
+        store, partitioner_factory)
     scheduler_service.setServiceParent(parent)
     return scheduler_service

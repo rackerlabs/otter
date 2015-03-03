@@ -130,6 +130,20 @@ class PerformServiceRequestTests(SynchronousTestCase):
         self.assertEqual(invalidate_eff.intent, expected_intent)
         self.assertRaises(APIError, resolve_effect, invalidate_eff, None)
 
+    def test_binds_url(self):
+        """
+        Binds a URL from service config if it has URL instead of binding
+        URL from service catalog
+        """
+        self.service_configs[ServiceType.CLOUD_SERVERS]['url'] = 'myurl'
+        eff = self._concrete(self.svcreq)
+        next_eff = resolve_authenticate(eff)
+        # URL in HTTP request is configured URL
+        self.assertEqual(
+            next_eff.intent,
+            Request(method='GET', url='myurl/servers',
+                    headers=headers('token'), log=self.log))
+
     def test_json(self):
         """
         JSON-serializable requests are dumped before being sent, and

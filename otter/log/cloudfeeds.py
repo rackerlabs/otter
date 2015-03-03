@@ -123,7 +123,7 @@ def add_event(event, tenant_id, region, log):
     Add event to cloud feeds
     """
     event, error, timestamp = sanitize_event(event)
-    eff = Effect(Func(uuid.uuid4)).on(
+    eff = Effect(Func(uuid.uuid4)).on(str).on(
         partial(prepare_request, request_format, event,
                 error, timestamp, region))
 
@@ -132,6 +132,8 @@ def add_event(event, tenant_id, region, log):
             service_request(
                 ServiceType.CLOUD_FEEDS, 'POST',
                 append_segments('autoscale', 'events'),
+                headers={
+                    'content-type': ['application/vnd.rackspace.atom+json']},
                 data=req, log=log, success_pred=has_code(201)),
             retry_times(5), exponential_backoff_interval(2))
         return Effect(TenantScope(tenant_id=tenant_id, effect=eff))
@@ -160,7 +162,7 @@ class CloudFeedsObserver(object):
             lambda k: k not in ('message', 'cloud_feed'), event_dict)
         log = self.log.bind(
             system='otter.cloud_feed', cf_msg=event_dict['message'][0],
-            **log_keys)
+            event_data=log_keys)
         try:
             eff = self.add_event(event_dict, self.tenant_id, self.region, log)
         except UnsuitableMessage as me:

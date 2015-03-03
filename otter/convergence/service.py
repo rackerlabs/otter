@@ -7,7 +7,7 @@ from functools import partial
 from effect import Effect
 from effect.twisted import perform
 
-from toolz.itertoolz import concat
+from pyrsistent import thaw
 
 from twisted.application.service import Service
 
@@ -28,7 +28,7 @@ def server_to_json(server):
     Convert a NovaServer to a dict representation suitable for returning to the
     end-user as a part of group state.
     """
-    return {'id': server.id}
+    return {'id': server.id, 'links': thaw(server.links)}
 
 
 def determine_active(servers, lb_nodes):
@@ -44,7 +44,7 @@ def determine_active(servers, lb_nodes):
 
     def all_met(server, current_lb_nodes):
         """Determine if a server is in all the LBs it wants to be in."""
-        desired_lbs = set(concat(server.desired_lbs.values()))
+        desired_lbs = server.desired_lbs
         met_desireds = set([
             desired for desired in desired_lbs
             for node in current_lb_nodes
@@ -52,8 +52,8 @@ def determine_active(servers, lb_nodes):
         return desired_lbs == met_desireds
 
     return [s for s in servers
-            if s.state == ServerState.ACTIVE
-            and all_met(s, [node for node in lb_nodes if node.matches(s)])]
+            if (s.state == ServerState.ACTIVE and
+                all_met(s, [node for node in lb_nodes if node.matches(s)]))]
 
 
 def execute_convergence(

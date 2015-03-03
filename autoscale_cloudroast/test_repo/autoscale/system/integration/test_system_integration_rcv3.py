@@ -693,8 +693,8 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
 
         scale_amt = 2
         policy_up_data = {'change': scale_amt, 'cooldown': 0}
-        expected_rcv3_server_count = (server_count_before_autoscaling
-                                      + scale_amt)
+        expected_rcv3_server_count = (server_count_before_autoscaling +
+                                      scale_amt)
         as_server_count = scale_amt
 
         # Create the policy and execute it immediately

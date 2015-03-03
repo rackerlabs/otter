@@ -20,7 +20,7 @@ class GetServiceMappingTests(SynchronousTestCase):
                        'region': 'DFW',
                        'metrics': {'service': 'm',
                                    'region': 'IAD'},
-                       'cloudfeeds': {'service': 'cf'}}
+                       'cloudfeeds': {'service': 'cf', 'url': 'url'}}
 
     def test_takes_from_config(self):
         """
@@ -48,6 +48,7 @@ class GetServiceMappingTests(SynchronousTestCase):
                 ServiceType.CLOUD_FEEDS: {
                     'name': 'cf',
                     'region': 'DFW',
+                    'url': 'url'
                 }
             })
 

@@ -181,7 +181,8 @@ class EventTests(SynchronousTestCase):
 
         # effect is to generate UUID
         self.assertIs(eff.intent.func, uuid.uuid4)
-        eff = resolve_effect(eff, 'uuid')
+        eff = resolve_effect(eff, uuid.UUID(int=0))
+        uid = '00000000-0000-0000-0000-000000000000'
 
         # effect scoped on on tenant id
         self.assertIs(type(eff.intent), TenantScope)
@@ -200,7 +201,9 @@ class EventTests(SynchronousTestCase):
             eff,
             service_request(
                 ServiceType.CLOUD_FEEDS, 'POST', 'autoscale/events',
-                data=self._get_request('INFO', 'uuid'), log=log,
+                headers={
+                    'content-type': ['application/vnd.rackspace.atom+json']},
+                data=self._get_request('INFO', uid), log=log,
                 success_pred=has_code(201)))
 
     def test_prepare_request_error(self):
@@ -280,9 +283,9 @@ class CloudFeedsObserverTests(SynchronousTestCase):
         self.successResultOf(d)
         # log doesn't have cloud_feed in it
         self.log.err.assert_called_once_with(
-            CheckFailure(ValueError), "Failed to add event", event='dict',
-            system='otter.cloud_feed', cf_msg='m',
-            otter_msg_type='cf-add-failure')
+            CheckFailure(ValueError), "Failed to add event",
+            event_data={'event': 'dict'}, system='otter.cloud_feed',
+            cf_msg='m', otter_msg_type='cf-add-failure')
 
     def test_unsuitable_msg_logs(self):
         """
@@ -297,5 +300,6 @@ class CloudFeedsObserverTests(SynchronousTestCase):
         self.log.err.assert_called_once_with(
             None, ('Tried to add unsuitable message in cloud feeds: '
                    '{unsuitable_message}'),
-            unsuitable_message='bad', event='dict', system='otter.cloud_feed',
-            cf_msg='m', otter_msg_type='cf-unsuitable-message')
+            unsuitable_message='bad', event_data={'event': 'dict'},
+            system='otter.cloud_feed', cf_msg='m',
+            otter_msg_type='cf-unsuitable-message')

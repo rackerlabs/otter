@@ -196,14 +196,14 @@ class AddHeadersTest(TestCase):
     """Tests for :func:`add_headers`."""
 
     def test_add_headers(self):
-        """Headers are merged, with fixed headers taking precedence."""
+        """Headers are merged, with passed headers taking precedence."""
         request_ = add_headers({'one': '1', 'two': '2'}, request)
         eff = request_('m', 'u', headers={'one': 'hey', 'three': '3'})
         self.assertEqual(
             resolve_stubs(eff).intent,
             Request(method='m',
                     url='u',
-                    headers={'one': '1', 'two': '2', 'three': '3'}))
+                    headers={'one': 'hey', 'two': '2', 'three': '3'}))
 
     def test_add_headers_optional(self):
         """It's okay if no headers are passed."""

@@ -641,13 +641,17 @@ class CassScalingGroup(object):
             return d
         return wrapper
 
-    def view_manifest(self, with_webhooks=False):
+    def view_manifest(self, with_policies=True, with_webhooks=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
+        def _set_policies_on_group(policies, group):
+            group['scalingPolicies'] = policies
+            return group
+
         def _get_policies(group):
             d = self._naive_list_policies()
-            return d.addCallback(lambda policies: (group, policies))
+            return d.addCallback(_set_policies_on_group, group)
 
         def _get_policies_and_webhooks(group):
             d = defer.gatherResults(
@@ -657,13 +661,14 @@ class CassScalingGroup(object):
 
         def _assemble_webhooks((group, results)):
             policies, webhooks = results
-            return group, assemble_webhooks_in_policies(policies, webhooks)
+            return _set_policies_on_group(
+                assemble_webhooks_in_policies(policies, webhooks),
+                group)
 
-        def _generate_manifest((group, policies)):
+        def _generate_manifest_group_part(group):
             return {
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
-                'scalingPolicies': policies,
                 'id': self.uuid,
                 'state': _unmarshal_state(group)
             }
@@ -678,12 +683,15 @@ class CassScalingGroup(object):
                           DEFAULT_CONSISTENCY,
                           NoSuchScalingGroupError(self.tenant_id, self.uuid),
                           self.log)
-        if with_webhooks:
-            d.addCallback(_get_policies_and_webhooks)
-            d.addCallback(_assemble_webhooks)
-        else:
-            d.addCallback(_get_policies)
-        d.addCallback(_generate_manifest)
+        d.addCallback(_generate_manifest_group_part)
+
+        if with_policies:
+            if with_webhooks:
+                d.addCallback(_get_policies_and_webhooks)
+                d.addCallback(_assemble_webhooks)
+            else:
+                d.addCallback(_get_policies)
+
         return d
 
     def view_config(self):
@@ -1465,20 +1473,6 @@ class CassScalingGroupCollection:
         """
         see :meth:`IScalingGroupCollection.webhook_info_by_hash`
         """
-        d = self._webhook_info_from_table(log, capability_hash)
-
-        def not_found(f):
-            if not f.check(UnrecognizedCapabilityError):
-                log.err(f, 'Error getting webhook info from table')
-            return self._webhook_info_by_index(log, capability_hash)
-
-        d.addErrback(not_found)
-        return d
-
-    def _webhook_info_from_table(self, log, capability_hash):
-        """
-        Get webhook info based on hash by using the new webhook_keys table
-        """
         d = self.connection.execute(
             _cql_find_webhook_token.format(cf=self.webhook_keys_table),
             {"webhookKey": capability_hash}, ConsistencyLevel.ONE)
@@ -1490,24 +1484,6 @@ class CassScalingGroupCollection:
             return (r['tenantId'], r['groupId'], r['policyId'])
 
         d.addCallback(extract_info)
-        return d
-
-    def _webhook_info_by_index(self, log, capability_hash):
-        """
-        Get webhook info based on hash by using the INDEX
-        """
-        def _do_webhook_lookup(webhook_rec):
-            res = webhook_rec
-            if len(res) == 0:
-                raise UnrecognizedCapabilityError(capability_hash, 1)
-            res = res[0]
-            return (res['tenantId'], res['groupId'], res['policyId'])
-
-        query = _cql_find_webhook_token.format(cf=self.webhooks_table)
-        d = self.connection.execute(query,
-                                    {"webhookKey": capability_hash},
-                                    ConsistencyLevel.ONE)
-        d.addCallback(_do_webhook_lookup)
         return d
 
     def get_webhook_index_only(self):
