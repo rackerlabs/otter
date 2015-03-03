@@ -124,8 +124,10 @@ class HelperTests(SynchronousTestCase):
         """
         self._verify_request_invoked_with_pool()
 
-    def test_authenticate_user_single_tenant(self, **kwargs):
-        pool = kwargs.get("pool", None)
+    def test_authenticate_user_with_tenant_id(self):
+        """
+        authenticate_user will include tenant_id in request if given
+        """
         response = mock.Mock(code=200)
         response_body = {
             'access': {
@@ -136,8 +138,7 @@ class HelperTests(SynchronousTestCase):
         self.treq.post.return_value = succeed(response)
 
         d = authenticate_user('http://identity/v2.0', 'user', 'pass',
-                              tenant_id=1111, expire_in=2222,
-                              log=self.log, **kwargs)
+                              tenant_id='1111', log=self.log)
 
         self.assertEqual(self.successResultOf(d), response_body)
 
@@ -148,14 +149,13 @@ class HelperTests(SynchronousTestCase):
                     'username': 'user',
                     'password': 'pass'
                 },
-                'tenantId': 1111,
-                'expire-in-seconds': 2222
+                'tenantId': '1111',
             }}),
             headers={'accept': ['application/json'],
                      'content-type': ['application/json'],
                      'User-Agent': ['OtterScale/0.0']},
             log=self.log,
-            pool=pool)
+            pool=None)
 
     def test_authenticate_user_propagates_error(self):
         """
@@ -364,14 +364,14 @@ class SingleTenantAuthenticatorTests(SynchronousTestCase):
             self, 'otter.auth.authenticate_user')
 
         self.authenticate_user.side_effect = lambda *a, **kw: succeed(
-            {'access': {'token': {'id': 'auth-token'}},
-             'service_catalog': fake_service_catalog})
+            {'access': {'token': {'id': 'auth-token'},
+                        'serviceCatalog': fake_service_catalog}})
 
         self.url = 'http://identity/v2.0'
         self.user = 'service_user'
         self.password = 'service_password'
         self.st = SingleTenantAuthenticator(self.user, self.password, self.url)
-        self.log = mock.Mock()
+        self.log = mock_log()
 
     def test_verifyObject(self):
         """
@@ -383,28 +383,28 @@ class SingleTenantAuthenticatorTests(SynchronousTestCase):
         """
         authenticate_tenant authenticates as the given tenant
         """
-        self.successResultOf(self.st.authenticate_tenant(111111))
+        self.successResultOf(self.st.authenticate_tenant('111111'))
         self.authenticate_user.assert_called_once_with(
-            self.url, self.user, self.password, tenant_id=111111,
-            expire_in=10800, log=None)
+            self.url, self.user, self.password, tenant_id='111111', log=None)
 
         self.authenticate_user.reset_mock()
 
-        self.successResultOf(self.st.authenticate_tenant(111111, log=self.log))
+        self.successResultOf(
+            self.st.authenticate_tenant('111111', log=self.log))
 
         self.authenticate_user.assert_called_once_with(
-            self.url, self.user, self.password, tenant_id=111111,
-            expire_in=10800, log=self.log)
+            self.url, self.user, self.password, tenant_id='111111',
+            log=self.log)
+        self.log.msg.assert_called_once_with(
+            'Authenticating as new tenant', auth_tenant_id='111111')
 
     def test_authenticate_user_returns_endpoint_list(self):
         """
         authenticate_tenant returns the impersonation token and the endpoint
         list.
         """
-        result = self.successResultOf(self.st.authenticate_tenant(1111111))
-
-        self.assertEqual(result[0], 'auth-token')
-        self.assertEqual(result[1], fake_service_catalog)
+        result = self.successResultOf(self.st.authenticate_tenant('1111111'))
+        self.assertEqual(result, ('auth-token', fake_service_catalog))
 
     def test_authenticate_tenant_propagates_user_list_errors(self):
         """
@@ -413,7 +413,7 @@ class SingleTenantAuthenticatorTests(SynchronousTestCase):
         self.authenticate_user.side_effect = lambda *a, **kw: fail(
             UpstreamError(Failure(APIError(500, '500')), 'identity', 'o'))
 
-        f = self.failureResultOf(self.st.authenticate_tenant(111111),
+        f = self.failureResultOf(self.st.authenticate_tenant('111111'),
                                  UpstreamError)
         self.assertEqual(f.value.reason.value.code, 500)
 
