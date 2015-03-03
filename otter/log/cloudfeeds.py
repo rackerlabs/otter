@@ -123,7 +123,7 @@ def add_event(event, tenant_id, region, log):
     Add event to cloud feeds
     """
     event, error, timestamp = sanitize_event(event)
-    eff = Effect(Func(uuid.uuid4)).on(
+    eff = Effect(Func(uuid.uuid4)).on(str).on(
         partial(prepare_request, request_format, event,
                 error, timestamp, region))
 
