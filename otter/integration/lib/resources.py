@@ -9,6 +9,7 @@ from characteristic import Attribute, attributes
     Attribute('access', default_value=None),
     Attribute('endpoints', default_value={}),
     Attribute('groups', default_value=[]),
+    Attribute('clbs', default_value=[]),
 ])
 class TestResources(object):
     """This class records the various resources used by a test.
