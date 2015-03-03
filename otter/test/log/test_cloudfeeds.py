@@ -74,7 +74,7 @@ class SanitizeEventTests(SynchronousTestCase):
         se, err, _time = sanitize_event(self.event)
         self.assertLessEqual(set(se.keys()), set(self.exp_cf_event))
         self.assertEqual(err, exp_err)
-        self.assertEqual(_time, '1970-01-01T00:00:00')
+        self.assertEqual(_time, '1970-01-01T00:00:00Z')
         for key, value in self.exp_cf_event.items():
             if key in se:
                 self.assertEqual(se[key], value)
@@ -143,7 +143,7 @@ class EventTests(SynchronousTestCase):
                         "@type": "http://docs.rackspace.com/core/event",
                         "id": "",
                         "version": "2",
-                        "eventTime": "1970-01-01T00:00:00",
+                        "eventTime": "1970-01-01T00:00:00Z",
                         "type": "INFO",
                         "region": "ord",
                         "product": {
@@ -211,7 +211,7 @@ class EventTests(SynchronousTestCase):
         `prepare_request` returns formatted request with error in type
         """
         req = prepare_request(
-            request_format, self.cf_event, True, "1970-01-01T00:00:00",
+            request_format, self.cf_event, True, "1970-01-01T00:00:00Z",
             'ord', 'uuid')
         self.assertEqual(req, self._get_request('ERROR', 'uuid'))
 

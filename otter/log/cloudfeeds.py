@@ -4,7 +4,6 @@ Publishing events to Cloud feeds
 
 import uuid
 from copy import deepcopy
-from datetime import datetime
 from functools import partial
 
 from characteristic import attributes
@@ -25,6 +24,7 @@ from otter.util.retry import (
     exponential_backoff_interval,
     retry_effect,
     retry_times)
+from otter.util.timestamp import epoch_to_utctimestr
 
 
 class UnsuitableMessage(Exception):
@@ -76,8 +76,7 @@ def sanitize_event(event):
            'exception' in cf_event['message']):
             raise UnsuitableMessage(cf_event['message'])
 
-    return (cf_event, error,
-            datetime.utcfromtimestamp(event["time"]).isoformat())
+    return (cf_event, error, epoch_to_utctimestr(event["time"]))
 
 
 request_format = {
