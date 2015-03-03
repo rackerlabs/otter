@@ -4,7 +4,6 @@ Publishing events to Cloud feeds
 
 import uuid
 from copy import deepcopy
-from datetime import datetime
 from functools import partial
 
 from characteristic import attributes
