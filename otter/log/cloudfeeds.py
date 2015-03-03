@@ -162,7 +162,7 @@ class CloudFeedsObserver(object):
             lambda k: k not in ('message', 'cloud_feed'), event_dict)
         log = self.log.bind(
             system='otter.cloud_feed', cf_msg=event_dict['message'][0],
-            **log_keys)
+            event_data=log_keys)
         try:
             eff = self.add_event(event_dict, self.tenant_id, self.region, log)
         except UnsuitableMessage as me:
