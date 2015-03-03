@@ -132,6 +132,8 @@ def add_event(event, tenant_id, region, log):
             service_request(
                 ServiceType.CLOUD_FEEDS, 'POST',
                 append_segments('autoscale', 'events'),
+                headers={
+                    'content-type': ['application/vnd.rackspace.atom+json']},
                 data=req, log=log, success_pred=has_code(201)),
             retry_times(5), exponential_backoff_interval(2))
         return Effect(TenantScope(tenant_id=tenant_id, effect=eff))

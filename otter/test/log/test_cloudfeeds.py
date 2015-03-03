@@ -200,6 +200,8 @@ class EventTests(SynchronousTestCase):
             eff,
             service_request(
                 ServiceType.CLOUD_FEEDS, 'POST', 'autoscale/events',
+                headers={
+                    'content-type': ['application/vnd.rackspace.atom+json']},
                 data=self._get_request('INFO', 'uuid'), log=log,
                 success_pred=has_code(201)))
 
