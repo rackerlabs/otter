@@ -14,7 +14,7 @@ from twisted.internet import defer
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.auth import CachingAuthenticator
+from otter.auth import CachingAuthenticator, SingleTenantAuthenticator
 from otter.constants import ServiceType, get_service_configs
 from otter.log.cloudfeeds import CloudFeedsObserver
 from otter.models.cass import CassScalingGroupCollection as OriginalStore
@@ -480,6 +480,12 @@ class APIMakeServiceTests(SynchronousTestCase):
             region='ord', tenant_id='tid',
             service_configs=serv_confs)
         mock_addobserver.assert_called_once_with(cf)
+
+        # Observer has single tenant auth
+        real_cf = mock_addobserver.call_args[0][0]
+        self.assertIsInstance(
+            real_cf.authenticator._authenticator._authenticator._authenticator,
+            SingleTenantAuthenticator)
 
     @mock.patch('otter.tap.api.addObserver')
     def test_cloudfeeds_no_setup(self, mock_addobserver):
