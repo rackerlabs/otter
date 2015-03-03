@@ -1,5 +1,3 @@
-import time
-
 from effect import (
     ComposedDispatcher, Constant, Effect, Func, ParallelEffects,
     TypeDispatcher, base_dispatcher, sync_perform, sync_performer)
@@ -8,7 +6,7 @@ from effect.testing import EQDispatcher
 
 import mock
 
-from pyrsistent import freeze, pmap
+from pyrsistent import freeze, pmap, pset
 
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
@@ -120,18 +118,58 @@ class ConvergerTests(SynchronousTestCase):
             base_dispatcher,
         ])
 
+    def _get_cc(self):
+        return sync_perform(self._get_dispatcher(),
+                            self.converger.currently_converging.read())
+
+    def _add_cc(self, value):
+        return sync_perform(self._get_dispatcher(),
+                            self.converger.currently_converging.modify(
+                                lambda cc: cc.add(value)))
+
     # - check currently converging
     # - add group
     # - remove currently converging
     def test_converge_one_non_concurrently_success(self):
+        """
+        :func:`converge_one_non_concurrently` returns the result of executing
+        convergence, and marks the group as currently converging while
+        executing convergence.
+        """
         log = mock_log()
-        ec_calls = {
-            ('tenant-id', 'group-id', log): Effect(Constant('converged!'))}
+        dispatcher = self._get_dispatcher()
+
+        def perform_execute_convergence(tenant_id, group_id, ec_log):
+            # Ensure that when execute_convergence is being performed,
+            # the group is marked as currently converging.
+            self.assertEqual(tenant_id, 'tenant-id')
+            self.assertEqual(group_id, 'group-id')
+            self.assertIs(ec_log, log)
+            self.assertEqual(self._get_cc(), pset(['group-id']))
+            return 'converged!'
+
+        def execute_convergence(tenant_id, group_id, log):
+            return Effect(Func(
+                lambda: perform_execute_convergence(tenant_id, group_id, log)))
+
         eff = self.converger.converge_one_non_concurrently(
             'tenant-id', 'group-id', log,
-            execute_convergence=lambda t, g, l: ec_calls[(t, g, l)])
+            execute_convergence=execute_convergence)
+        self.assertEqual(sync_perform(dispatcher, eff), 'converged!')
+        # and after convergence, nothing is marked as converging
+        self.assertEqual(self._get_cc(), pset([]))
+
+    def test_converge_one_non_concurrently_refuses_concurrency(self):
+        """
+        :func:`converge_one_non_concurrently` returns None when the group is
+        already being converged.
+        """
+        self._add_cc('group-id')
+        eff = self.converger.converge_one_non_concurrently(
+            'tenant-id', 'group-id', mock_log(),
+            execute_convergence=lambda t, g, l: 1 / 0)
         self.assertEqual(sync_perform(self._get_dispatcher(), eff),
-                         'converged!')
+                         None)
 
 
 class ExecuteConvergenceTests(SynchronousTestCase):

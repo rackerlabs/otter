@@ -98,6 +98,7 @@ def execute_convergence(tenant_id, group_id, log,
     def got_all_data(((scaling_group, group_state, launch_config),
                       (servers, lb_nodes))):
         time_eff = Effect(Func(time.time))
+
         def got_time(now):
             desired_group_state = get_desired_group_state(
                 group_id, launch_config, group_state.desired)
@@ -240,7 +241,7 @@ class Converger(MultiService):
         self.log = log.bind(system='converger')
         self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self.partitioner.setServiceParent(self)
-        self._currently_converging = ERef(pset())
+        self.currently_converging = ERef(pset())
 
     def buckets_acquired(self, my_buckets, perform=perform):
         """
@@ -321,10 +322,10 @@ class Converger(MultiService):
         # Even though we yield for ERef access/modification, we can rely on it
         # being synchronous, so no worries about race conditions for this
         # conditional and the following addition of the group:
-        if group_id in (yield self._currently_converging.read()):
+        if group_id in (yield self.currently_converging.read()):
             log.msg("already-converging")
             return
-        yield self._currently_converging.modify(lambda cc: cc.add(group_id))
+        yield self.currently_converging.modify(lambda cc: cc.add(group_id))
         # However, the convergence itself is asynchronous.  Can we have a race
         # condition here?  In fact, won't this have the same problem that we
         # have with the `dirty` flag? Kind of, but it doesn't matter. It's
@@ -336,7 +337,7 @@ class Converger(MultiService):
         try:
             result = yield execute_convergence(tenant_id, group_id, log)
         finally:
-            yield self._currently_converging.modify(
+            yield self.currently_converging.modify(
                 lambda cc: cc.remove(group_id))
         yield do_return(result)
 
