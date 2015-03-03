@@ -181,7 +181,8 @@ class EventTests(SynchronousTestCase):
 
         # effect is to generate UUID
         self.assertIs(eff.intent.func, uuid.uuid4)
-        eff = resolve_effect(eff, 'uuid')
+        eff = resolve_effect(eff, uuid.UUID(int=0))
+        uid = '00000000-0000-0000-0000-000000000000'
 
         # effect scoped on on tenant id
         self.assertIs(type(eff.intent), TenantScope)
@@ -200,7 +201,7 @@ class EventTests(SynchronousTestCase):
             eff,
             service_request(
                 ServiceType.CLOUD_FEEDS, 'POST', 'autoscale/events',
-                data=self._get_request('INFO', 'uuid'), log=log,
+                data=self._get_request('INFO', uid), log=log,
                 success_pred=has_code(201)))
 
     def test_prepare_request_error(self):
