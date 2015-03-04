@@ -35,8 +35,8 @@ from otter.convergence.steps import (
 
 def copy_clb_desc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1):
     """
-    Produce a :class:`CLBDescription` from another, but with the given
-    condition changed to the one given
+    Produce a :class:`CLBDescription` from another, but with the provided
+    conditions and weights instead of the original conditions and weights.
 
     :param clb_desc: the :class:`CLBDescription` to copy
     :param condition: the :class:`CLBNodeCondition` to use
