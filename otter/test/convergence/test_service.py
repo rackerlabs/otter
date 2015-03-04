@@ -1,6 +1,6 @@
 from effect import (
     ComposedDispatcher, Constant, Effect, Func, ParallelEffects,
-    TypeDispatcher, base_dispatcher, sync_perform, sync_performer)
+    TypeDispatcher, base_dispatcher, sync_perform)
 from effect.async import perform_parallel_async
 from effect.ref import eref_dispatcher
 from effect.testing import EQDispatcher, EQFDispatcher

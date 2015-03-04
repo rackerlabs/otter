@@ -1,7 +1,5 @@
 """Tests for otter.util.fp"""
 
-from effect import Effect, sync_perform
-
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.fp import predicate_all, predicate_any

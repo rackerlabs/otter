@@ -4,10 +4,6 @@
 
 from copy import deepcopy
 
-from characteristic import attributes
-
-from effect import Effect, TypeDispatcher, sync_performer
-
 from toolz.itertoolz import groupby
 
 

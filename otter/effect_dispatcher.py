@@ -6,8 +6,8 @@ from effect import (
     ComposedDispatcher,
     TypeDispatcher,
     base_dispatcher)
-from effect.twisted import make_twisted_dispatcher
 from effect.ref import eref_dispatcher
+from effect.twisted import make_twisted_dispatcher
 
 from .auth import (
     Authenticate,
