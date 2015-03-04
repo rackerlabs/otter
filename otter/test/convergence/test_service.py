@@ -3,11 +3,13 @@ from effect import (
     TypeDispatcher, base_dispatcher, sync_perform, sync_performer)
 from effect.async import perform_parallel_async
 from effect.ref import eref_dispatcher
-from effect.testing import EQDispatcher
+from effect.testing import EQDispatcher, EQFDispatcher
 
 import mock
 
 from pyrsistent import freeze, pmap, pset
+
+from toolz import assoc
 
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
@@ -196,15 +198,14 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                        servicenet_address='10.0.0.2',
                        desired_lbs=self.desired_lbs)
         ]
+        gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
+                                   group_id='group-id')
+        gsgi_result = (self.group, self.state, self.lc)
+        self.expected_intents = {gsgi: gsgi_result}
 
-    def _get_dispatcher(self, expected_intents=None, additional=None):
+    def _get_dispatcher(self, expected_intents=None):
         if expected_intents is None:
-            gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
-                                       group_id='group-id')
-            gsgi_result = (self.group, self.state, self.lc)
-            expected_intents = {gsgi: gsgi_result}
-        if additional is not None:
-            expected_intents.update(additional)
+            expected_intents = self.expected_intents
         return ComposedDispatcher([
             EQDispatcher(expected_intents),
             TypeDispatcher({
@@ -272,9 +273,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                    'condition': 'ENABLED',
                                    'address': '10.0.0.1'})]))})),
             success_pred=mock.ANY)
-        expected_intents = {expected_req.intent: 'stuff'}
+        expected_intents = assoc(self.expected_intents,
+                                 expected_req.intent, 'stuff')
         result = sync_perform(
-            self._get_dispatcher(additional=expected_intents),
+            self._get_dispatcher(expected_intents),
             tscope_eff.intent.effect)
         self.assertEqual(self.group.modify_state_values[-1].active, {})
         self.assertEqual(result, ['stuff'])
@@ -289,20 +291,27 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         for s in self.servers:
             s.desired_lbs = pmap()
 
-        @sync_performer
-        def perform_gsgi(dispatcher, intent):
-            raise RuntimeError('foo')
-
         tscope_eff = execute_convergence(self.tenant_id, self.group_id, log,
                                          get_all_convergence_data=gacd)
 
+        # Perform the GetScalingGroupInfo by raising an exception
         dispatcher = ComposedDispatcher([
-            TypeDispatcher({GetScalingGroupInfo: perform_gsgi}),
-            self._get_dispatcher(None)])
+            EQFDispatcher({
+                GetScalingGroupInfo(
+                    tenant_id='tenant-id',
+                    group_id='group-id'):
+                lambda i: raise_(RuntimeError('foo'))}),
+            self._get_dispatcher()])
+
+        # And make sure that exception isn't wrapped in FirstError.
         e = self.assertRaises(
             RuntimeError,
             sync_perform, dispatcher, tscope_eff.intent.effect)
         self.assertEqual(str(e), 'foo')
+
+
+def raise_(e):
+    raise e
 
 
 class DetermineActiveTests(SynchronousTestCase):
