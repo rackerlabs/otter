@@ -2,7 +2,7 @@ from effect import (
     ComposedDispatcher, Constant, Effect, Func, ParallelEffects,
     TypeDispatcher, base_dispatcher, sync_perform)
 from effect.async import perform_parallel_async
-from effect.ref import eref_dispatcher
+from effect.ref import ERef, eref_dispatcher
 from effect.testing import EQDispatcher, EQFDispatcher
 
 import mock
@@ -19,7 +19,8 @@ from otter.convergence.model import (
     CLBDescription, CLBNode, NovaServer, ServerState)
 from otter.convergence.service import (
     ConvergenceStarter,
-    Converger, determine_active, execute_convergence, mark_divergent,
+    Converger, converge_one_non_concurrently,
+    determine_active, execute_convergence, mark_divergent,
     server_to_json)
 from otter.http import service_request
 from otter.models.intents import (
@@ -67,12 +68,6 @@ class ConvergenceStarterTests(SynchronousTestCase):
 
 class ConvergerTests(SynchronousTestCase):
     """
-    converge_one_then_cleanup
-    - handles NoSuchScalingGroupError to log and cleanup
-    - handles any other error to cleanup and raise
-    - TODO: handles non-fatal error by logging and swallowing
-    - cleans up after a successful run
-
     converge_all
     - finds all divergent groups associated with us
     - parallelizes converge_one_then_cleanup for each group
@@ -101,30 +96,48 @@ class ConvergerTests(SynchronousTestCase):
 
         self.converger = Converger(self.log, self.dispatcher, self.buckets,
                                    pfactory)
-        self.state = GroupState('tenant-id', 'group-id', 'group-name',
+        self.tenant_id = 'tenant-id'
+        self.group_id = 'group-id'
+        self.state = GroupState(self.tenant_id, self.group_id, 'group-name',
                                 {}, {}, None, {}, False)
-        self.group = mock_group(self.state, 'tenant-id', 'group-id')
+        self.group = mock_group(self.state, self.tenant_id, self.group_id)
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
 
-    def _get_dispatcher(self):
-        return ComposedDispatcher([
-            TypeDispatcher({
-                ParallelEffects: perform_parallel_async,
-            }),
-            eref_dispatcher,
-            base_dispatcher,
-        ])
+    # converge_one_then_cleanup
+    # - handles NoSuchScalingGroupError to log and cleanup
+    # - handles any other error to cleanup and raise
+    # - TODO: handles non-fatal error by logging and swallowing
+    # - cleans up after a successful run
+
+
+def _get_dispatcher():
+    return ComposedDispatcher([
+        TypeDispatcher({
+            ParallelEffects: perform_parallel_async,
+        }),
+        eref_dispatcher,
+        base_dispatcher,
+    ])
+
+
+class ConvergeOneNonConcurrentlyTests(SynchronousTestCase):
+    """Tests for :func:`converge_one_non_concurrently`."""
+
+    def setUp(self):
+        self.tenant_id = 'tenant-id'
+        self.group_id = 'group-id'
+        self.currently_converging = ERef(pset())
 
     def _get_cc(self):
         """Get the currently_converging set."""
-        return sync_perform(self._get_dispatcher(),
-                            self.converger.currently_converging.read())
+        return sync_perform(_get_dispatcher(),
+                            self.currently_converging.read())
 
     def _add_cc(self, value):
         """Add an item to the currently_converging set."""
-        return sync_perform(self._get_dispatcher(),
-                            self.converger.currently_converging.modify(
-                                lambda cc: cc.add(value)))
+        return sync_perform(
+            _get_dispatcher(),
+            self.currently_converging.modify(lambda cc: cc.add(value)))
 
     def test_converge_one_non_concurrently_success(self):
         """
@@ -133,13 +146,13 @@ class ConvergerTests(SynchronousTestCase):
         executing convergence.
         """
         log = mock_log()
-        dispatcher = self._get_dispatcher()
+        dispatcher = _get_dispatcher()
 
         def perform_execute_convergence(tenant_id, group_id, ec_log):
             # Ensure that when execute_convergence is being performed,
             # the group is marked as currently converging.
-            self.assertEqual(tenant_id, 'tenant-id')
-            self.assertEqual(group_id, 'group-id')
+            self.assertEqual(tenant_id, self.tenant_id)
+            self.assertEqual(group_id, self.group_id)
             self.assertIs(ec_log, log)
             self.assertEqual(self._get_cc(), pset(['group-id']))
             return 'converged!'
@@ -148,8 +161,9 @@ class ConvergerTests(SynchronousTestCase):
             return Effect(Func(
                 lambda: perform_execute_convergence(tenant_id, group_id, log)))
 
-        eff = self.converger.converge_one_non_concurrently(
-            'tenant-id', 'group-id', log,
+        eff = converge_one_non_concurrently(
+            self.currently_converging,
+            self.tenant_id, self.group_id, log,
             execute_convergence=execute_convergence)
         self.assertEqual(sync_perform(dispatcher, eff), 'converged!')
         # and after convergence, nothing is marked as converging
@@ -160,12 +174,12 @@ class ConvergerTests(SynchronousTestCase):
         :func:`converge_one_non_concurrently` returns None when the group is
         already being converged.
         """
-        self._add_cc('group-id')
-        eff = self.converger.converge_one_non_concurrently(
-            'tenant-id', 'group-id', mock_log(),
+        self._add_cc(self.group_id)
+        eff = converge_one_non_concurrently(
+            self.currently_converging,
+            self.tenant_id, self.group_id, mock_log(),
             execute_convergence=lambda t, g, l: 1 / 0)
-        self.assertEqual(sync_perform(self._get_dispatcher(), eff),
-                         None)
+        self.assertEqual(sync_perform(_get_dispatcher(), eff), None)
 
 
 class ExecuteConvergenceTests(SynchronousTestCase):

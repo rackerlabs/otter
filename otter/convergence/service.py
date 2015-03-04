@@ -208,6 +208,49 @@ def _is_fatal(exception):
         return False
 
 
+@do
+def converge_one_non_concurrently(currently_converging,
+                                  tenant_id, group_id, log,
+                                  execute_convergence=execute_convergence):
+    """Converge one group if we're not already converging it."""
+    # Even though we yield for ERef access/modification, we can rely on it
+    # being synchronous, so no worries about race conditions for this
+    # conditional and the following addition of the group:
+    if group_id in (yield currently_converging.read()):
+        log.msg('already-converging')
+        return
+    yield currently_converging.modify(lambda cc: cc.add(group_id))
+    # However, the convergence itself is asynchronous. Can we have a race
+    # condition here?  In fact, won't this have the same problem that we
+    # have with the `dirty` flag? Kind of, but it doesn't matter. It's
+    # possible that another call to maybe_converge_one will happen to this
+    # same group just after this converge_one call, and before we remove
+    # the group from currently_converging. But it doesn't matter! Because
+    # the surrounding dirty-checking, with its version-numbered flag, will
+    # keep the group in the "divergent" state no matter what. :-)
+    try:
+        result = yield execute_convergence(tenant_id, group_id, log)
+    finally:
+        yield currently_converging.modify(
+            lambda cc: cc.remove(group_id))
+    yield do_return(result)
+
+
+def delete_dirty_flag(log, tenant_id, group_id, version):
+    """
+    Delete the dirty flag, if its version hasn't changed. See comment in
+    :func:`start_convergence_eff` for more info.
+
+    :return: Effect of None.
+    """
+    log.msg('convergence-mark-clean')
+    path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
+                                         group_id=group_id)
+    return Effect(DeleteNode(path=path, version=version)).on(
+        error=lambda e: log.err(exc_info_to_failure(e),
+                                'mark-clean-failed'))
+
+
 class Converger(MultiService):
     """
     A service that searches for groups that need converging and then does the
@@ -302,7 +345,9 @@ class Converger(MultiService):
     # running on a removed group?
 
     @do
-    def converge_one_then_cleanup(self, tenant_id, group_id, version):
+    def converge_one_then_cleanup(
+            self, tenant_id, group_id, version,
+            converge_one_non_concurrently=converge_one_non_concurrently):
         """
         Converge one group, and clean up the dirty flag after we're done.
 
@@ -312,56 +357,18 @@ class Converger(MultiService):
         """
         log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
         try:
-            yield self.converge_one_non_concurrently(tenant_id, group_id, log)
+            yield converge_one_non_concurrently(
+                self.currently_converging, tenant_id, group_id, log)
         except Exception as e:
             if _is_fatal(e):
                 log.err(None, 'converge-fatal-error')
-                yield self._cleanup(log, tenant_id, group_id, version)
+                yield delete_dirty_flag(log, tenant_id, group_id, version)
                 # TODO: change group state to ERROR.
             else:
                 log.err(None, 'converge-non-fatal-error')
         else:
-            yield self._cleanup(log, tenant_id, group_id, version)
+            yield delete_dirty_flag(log, tenant_id, group_id, version)
 
-    @do
-    def converge_one_non_concurrently(self, tenant_id, group_id, log,
-                                      execute_convergence=execute_convergence):
-        """Converge one group if we're not already converging it."""
-        # Even though we yield for ERef access/modification, we can rely on it
-        # being synchronous, so no worries about race conditions for this
-        # conditional and the following addition of the group:
-        if group_id in (yield self.currently_converging.read()):
-            log.msg('already-converging')
-            return
-        yield self.currently_converging.modify(lambda cc: cc.add(group_id))
-        # However, the convergence itself is asynchronous. Can we have a race
-        # condition here?  In fact, won't this have the same problem that we
-        # have with the `dirty` flag? Kind of, but it doesn't matter. It's
-        # possible that another call to maybe_converge_one will happen to this
-        # same group just after this converge_one call, and before we remove
-        # the group from currently_converging. But it doesn't matter! Because
-        # the surrounding dirty-checking, with its version-numbered flag, will
-        # keep the group in the "divergent" state no matter what. :-)
-        try:
-            result = yield execute_convergence(tenant_id, group_id, log)
-        finally:
-            yield self.currently_converging.modify(
-                lambda cc: cc.remove(group_id))
-        yield do_return(result)
-
-    def _cleanup(self, log, tenant_id, group_id, version):
-        """
-        Delete the dirty flag, if its version hasn't changed. See comment in
-        :func:`start_convergence_eff` for more info.
-
-        :return: Effect of None.
-        """
-        log.msg('convergence-mark-clean')
-        path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
-                                             group_id=group_id)
-        return Effect(DeleteNode(path=path, version=version)).on(
-            error=lambda e: log.err(exc_info_to_failure(e),
-                                    'mark-clean-failed'))
 
 # We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this
