@@ -19,7 +19,7 @@ from otter.convergence.model import (
     CLBDescription, CLBNode, NovaServer, ServerState)
 from otter.convergence.service import (
     ConvergenceStarter,
-    Converger, converge_one_non_concurrently,
+    Converger, converge_non_concurrently,
     determine_active, execute_convergence, mark_divergent,
     server_to_json)
 from otter.http import service_request
@@ -118,8 +118,8 @@ def _get_dispatcher():
     ])
 
 
-class ConvergeOneNonConcurrentlyTests(SynchronousTestCase):
-    """Tests for :func:`converge_one_non_concurrently`."""
+class ConvergeNonConcurrentlyTests(SynchronousTestCase):
+    """Tests for :func:`converge_non_concurrently`."""
 
     def setUp(self):
         self.tenant_id = 'tenant-id'
@@ -139,7 +139,7 @@ class ConvergeOneNonConcurrentlyTests(SynchronousTestCase):
 
     def test_success(self):
         """
-        :func:`converge_one_non_concurrently` returns the result of executing
+        :func:`converge_non_concurrently` returns the result of executing
         convergence, and marks the group as currently converging while
         executing convergence.
         """
@@ -159,7 +159,7 @@ class ConvergeOneNonConcurrentlyTests(SynchronousTestCase):
             return Effect(Func(
                 lambda: perform_execute_convergence(tenant_id, group_id, log)))
 
-        eff = converge_one_non_concurrently(
+        eff = converge_non_concurrently(
             self.currently_converging,
             self.tenant_id, self.group_id, log,
             execute_convergence=execute_convergence)
@@ -169,11 +169,11 @@ class ConvergeOneNonConcurrentlyTests(SynchronousTestCase):
 
     def test_refuses_concurrency(self):
         """
-        :func:`converge_one_non_concurrently` returns None when the group is
+        :func:`converge_non_concurrently` returns None when the group is
         already being converged.
         """
         self._add_cc(self.group_id)
-        eff = converge_one_non_concurrently(
+        eff = converge_non_concurrently(
             self.currently_converging,
             self.tenant_id, self.group_id, mock_log(),
             execute_convergence=lambda t, g, l: 1 / 0)
@@ -191,7 +191,7 @@ class ConvergeOneNonConcurrentlyTests(SynchronousTestCase):
         def execute_convergence(tenant_id, group_id, log):
             return Effect(Error(RuntimeError('foo!')))
 
-        eff = converge_one_non_concurrently(
+        eff = converge_non_concurrently(
             self.currently_converging,
             self.tenant_id, self.group_id, log,
             execute_convergence=execute_convergence)

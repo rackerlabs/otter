@@ -211,9 +211,9 @@ class ConvergenceStarter(Service, object):
 
 
 @do
-def converge_one_non_concurrently(currently_converging,
-                                  tenant_id, group_id, log,
-                                  execute_convergence=execute_convergence):
+def converge_non_concurrently(currently_converging,
+                              tenant_id, group_id, log,
+                              execute_convergence=execute_convergence):
     """
     Converge one group if it's not already being converged.
 
@@ -232,13 +232,13 @@ def converge_one_non_concurrently(currently_converging,
         return
     yield currently_converging.modify(lambda cc: cc.add(group_id))
     # However, the convergence itself is asynchronous. Can we have a race
-    # condition here?  In fact, won't this have the same problem that we
-    # have with the `dirty` flag? Kind of, but it doesn't matter. It's
-    # possible that another call to maybe_converge_one will happen to this
-    # same group just after this converge_one call, and before we remove
-    # the group from currently_converging. But it doesn't matter! Because
-    # the surrounding dirty-checking, with its version-numbered flag, will
-    # keep the group in the "divergent" state no matter what. :-)
+    # condition here?  In fact, won't this have the same problem that we have
+    # with the `dirty` flag? Kind of, but it doesn't matter. It's possible that
+    # another call to this function will happen just after this
+    # execute_convergence call, and before we remove the group from
+    # currently_converging. But it doesn't matter! Because the surrounding
+    # dirty-checking, with its version-numbered flag, will keep the group in
+    # the "divergent" state no matter what. :-)
     try:
         result = yield execute_convergence(tenant_id, group_id, log)
     finally:
@@ -327,7 +327,7 @@ class Converger(MultiService):
         """
         group_infos = yield self.get_my_divergent_groups(my_buckets)
         self.log.msg('converge-all', group_infos=group_infos)
-        effs = map(self._converge_one, group_infos)
+        effs = map(self.converge_one, group_infos)
         yield do_return(parallel(effs))
 
     def converge_one(self, info):
@@ -335,7 +335,7 @@ class Converger(MultiService):
         group_id = info['group_id']
         version = info['version']
         log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
-        return converge_one_non_concurrently(
+        return converge_non_concurrently(
             self.currently_converging, tenant_id, group_id, log
         ).on(
             success=lambda r: delete_divergent_flag(log, tenant_id,
