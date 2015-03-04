@@ -89,7 +89,7 @@ def execute_convergence(tenant_id, group_id, log,
     :return: An Effect of a list containing the individual step results.
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
-    log.msg("execute-convergence")
+    log.msg('execute-convergence')
     # Huh! It turns out we can parallelize the gathering of data with the
     # fetching of the scaling group info from cassandra.
     sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
@@ -105,7 +105,7 @@ def execute_convergence(tenant_id, group_id, log,
                 group_id, launch_config, group_state.desired)
             steps = plan(desired_group_state, servers, lb_nodes, now)
             active = determine_active(servers, lb_nodes)
-            log.msg("convergence-plan",
+            log.msg('convergence-plan',
                     servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
                     desired=desired_group_state, active=active)
             eff = _update_active(scaling_group, active)
@@ -250,7 +250,7 @@ class Converger(MultiService):
 
         This is used as the partitioner callback.
         """
-        self.log.msg("buckets-acquired", my_buckets=my_buckets)
+        self.log.msg('buckets-acquired', my_buckets=my_buckets)
         eff = self.converge_all(my_buckets)
         return perform(self._dispatcher, eff).addErrback(
             self.log.err, 'converge-all-error')
@@ -287,7 +287,7 @@ class Converger(MultiService):
         buckets we've been allocated.
         """
         group_infos = yield self.get_my_divergent_groups(my_buckets)
-        self.log.msg("converge-all", group_infos=group_infos)
+        self.log.msg('converge-all', group_infos=group_infos)
         effs = [
             self.converge_one_then_cleanup(
                 info['tenant_id'], info['group_id'], info['version'])
@@ -319,7 +319,7 @@ class Converger(MultiService):
                 yield self._cleanup(log, tenant_id, group_id, version)
                 # TODO: change group state to ERROR.
             else:
-                log.err(None, "converge-non-fatal-error")
+                log.err(None, 'converge-non-fatal-error')
         else:
             yield self._cleanup(log, tenant_id, group_id, version)
 
@@ -331,7 +331,7 @@ class Converger(MultiService):
         # being synchronous, so no worries about race conditions for this
         # conditional and the following addition of the group:
         if group_id in (yield self.currently_converging.read()):
-            log.msg("already-converging")
+            log.msg('already-converging')
             return
         yield self.currently_converging.modify(lambda cc: cc.add(group_id))
         # However, the convergence itself is asynchronous. Can we have a race
@@ -356,7 +356,7 @@ class Converger(MultiService):
 
         :return: Effect of None.
         """
-        log.msg("convergence-mark-clean")
+        log.msg('convergence-mark-clean')
         path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
                                              group_id=group_id)
         return Effect(DeleteNode(path=path, version=version)).on(

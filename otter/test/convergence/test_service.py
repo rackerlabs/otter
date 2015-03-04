@@ -67,11 +67,6 @@ class ConvergenceStarterTests(SynchronousTestCase):
 
 class ConvergerTests(SynchronousTestCase):
     """
-    converge_one_non_concurrently
-    - early-out if in currently_converging
-    - adds the group to currently_converging
-    - remove from currently converging set
-
     converge_one_then_cleanup
     - handles NoSuchScalingGroupError to log and cleanup
     - handles any other error to cleanup and raise
@@ -121,10 +116,12 @@ class ConvergerTests(SynchronousTestCase):
         ])
 
     def _get_cc(self):
+        """Get the currently_converging set."""
         return sync_perform(self._get_dispatcher(),
                             self.converger.currently_converging.read())
 
     def _add_cc(self, value):
+        """Add an item to the currently_converging set."""
         return sync_perform(self._get_dispatcher(),
                             self.converger.currently_converging.modify(
                                 lambda cc: cc.add(value)))
