@@ -176,6 +176,21 @@ def mark_divergent(tenant_id, group_id):
     return eff
 
 
+def delete_divergent_flag(log, tenant_id, group_id, version):
+    """
+    Delete the dirty flag, if its version hasn't changed. See comment in
+    :func:`mark_divergent` for more info.
+
+    :return: Effect of None.
+    """
+    log.msg('convergence-mark-clean')
+    path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
+                                         group_id=group_id)
+    return Effect(DeleteNode(path=path, version=version)).on(
+        error=lambda e: log.err(exc_info_to_failure(e),
+                                'mark-clean-failed'))
+
+
 class ConvergenceStarter(Service, object):
     """
     A service that allows registering interest in convergence, but does not
@@ -202,7 +217,7 @@ def _is_fatal(exception):
     Unknown errors are non-fatal, which mean that convergence should be
     retried.
     """
-    if type(exception) is NoSuchScalingGroupError:
+    if isinstance(exception, NoSuchScalingGroupError):
         return True
     else:
         return False
@@ -212,7 +227,16 @@ def _is_fatal(exception):
 def converge_one_non_concurrently(currently_converging,
                                   tenant_id, group_id, log,
                                   execute_convergence=execute_convergence):
-    """Converge one group if we're not already converging it."""
+    """
+    Converge one group if it's not already being converged.
+
+    :param ERef currently_converging: An ERef of PSet, representing groups
+        currently being converged.
+    :param tenant_id: tenant
+    :param group_id: group
+    :param log: log
+    :param execute_convergence: The :func:`execute_convergence`, used for tests
+    """
     # Even though we yield for ERef access/modification, we can rely on it
     # being synchronous, so no worries about race conditions for this
     # conditional and the following addition of the group:
@@ -234,21 +258,6 @@ def converge_one_non_concurrently(currently_converging,
         yield currently_converging.modify(
             lambda cc: cc.remove(group_id))
     yield do_return(result)
-
-
-def delete_dirty_flag(log, tenant_id, group_id, version):
-    """
-    Delete the dirty flag, if its version hasn't changed. See comment in
-    :func:`start_convergence_eff` for more info.
-
-    :return: Effect of None.
-    """
-    log.msg('convergence-mark-clean')
-    path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
-                                         group_id=group_id)
-    return Effect(DeleteNode(path=path, version=version)).on(
-        error=lambda e: log.err(exc_info_to_failure(e),
-                                'mark-clean-failed'))
 
 
 class Converger(MultiService):
@@ -362,12 +371,12 @@ class Converger(MultiService):
         except Exception as e:
             if _is_fatal(e):
                 log.err(None, 'converge-fatal-error')
-                yield delete_dirty_flag(log, tenant_id, group_id, version)
+                yield delete_divergent_flag(log, tenant_id, group_id, version)
                 # TODO: change group state to ERROR.
             else:
                 log.err(None, 'converge-non-fatal-error')
         else:
-            yield delete_dirty_flag(log, tenant_id, group_id, version)
+            yield delete_divergent_flag(log, tenant_id, group_id, version)
 
 
 # We're using a global for now because it's difficult to thread a new parameter
