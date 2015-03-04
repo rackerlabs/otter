@@ -1,13 +1,6 @@
 """A quick trial-based test to exercise scale-up and scale-down functionality.
 """
 
-# TODO(sfalvo): Scale-up functionality isn't finished yet.  I'll finish this
-# after refactoring is done.
-#
-# TODO(sfalvo): Scale-down functionality isn't implemented yet.  I'll finish
-# this after refactoring is done.
-
-
 from __future__ import print_function
 
 import json
@@ -20,7 +13,7 @@ from twisted.trial import unittest
 from twisted.web.client import HTTPConnectionPool
 
 from otter import auth
-from otter.integration.lib import autoscale
+from otter.integration.lib import autoscale, cloud_load_balancer
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
 
@@ -134,14 +127,14 @@ class TestScaling(unittest.TestCase):
     def test_policy_execution_after_adding_clb(self):
         rcs = TestResources()
 
-        self.clb1 = CloudLoadBalancer(pool=self.pool)
+        self.clb1 = cloud_load_balancer.CloudLoadBalancer(pool=self.pool)
 
         def finish_setup(x, self):
             scaling_group_body = {
                 "launchConfiguration": {
                     "type": "launch_server",
                     "args": {
-                        "loadbalancers": [{
+                        "loadBalancers": [{
                             "port": 80,
                             "loadBalancerId": self.clb1.clb_id,
                         }],
@@ -191,106 +184,3 @@ class TestScaling(unittest.TestCase):
         return d
 
     test_policy_execution_after_adding_clb.timeout = 1800
-
-
-@attributes([
-    Attribute('pool', default_value=None),
-])
-class CloudLoadBalancer(object):
-    def config(self):
-        return {
-            "loadBalancer": {
-                "name": "a-load-balancer",
-                "port": 80,
-                "protocol": "HTTP",
-                "virtualIps": [{
-                    "type": "PUBLIC",
-                    "ipVersion": "IPV6",
-                }],
-            }
-        }
-
-    def get_state(self, rcs):
-        return (
-            treq.get(
-                "%s/loadbalancers/%s" % (
-                    str(rcs.endpoints["loadbalancers"]),
-                    self.clb_id
-                ),
-                headers = headers(str(rcs.token)),
-                pool = self.pool,
-            )
-            .addCallback(check_success, [200])
-            .addCallback(treq.json_content)
-        )
-
-    def wait_for_state(self, rcs, state_desired, timeout, period=10, clock=None):
-        clock = clock or reactor
-
-        class Looper(object):
-            def __init__(self, load_balancer):
-                self.elapsed_time = 0
-                self.load_balancer = load_balancer
-                # To be filled in later.
-                self.loopingCall = None
-
-            def loop(self):
-                if self.elapsed_time < timeout:
-                    self.elapsed_time += period
-                    return self.check_load_balancer()
-                else:
-                    raise TimeoutError(
-                        "Spent %ds, polling every %ds, timeout." % (
-                            self.elapsed_time, period
-                        )
-                    )
-
-            def check_status(self, state_results):
-                lb_state = state_results["loadBalancer"]["status"]
-                if lb_state == state_desired:
-                    self.loopingCall.stop()
-
-            def check_load_balancer(self):
-                d = (self.load_balancer.get_state(rcs)
-                     .addCallback(self.check_status))
-                return d
-
-        looper = Looper(self)
-        lc = LoopingCall(looper.loop)
-        lc.clock = clock
-        looper.loopingCall = lc
-        d = lc.start(period).addCallback(lambda _: rcs)
-        return d
-
-    def stop(self, rcs):
-        return self.delete(rcs)
-
-    def start(self, rcs, test):
-        test.addCleanup(self.stop, rcs)
-
-        def record_results(resp):
-            print(resp)
-            rcs.clbs.append(resp)
-            self.clb_id = str(resp["loadBalancer"]["id"])
-            return rcs
-
-        return (treq.post("%s/loadbalancers" %
-                              str(rcs.endpoints["loadbalancers"]),
-                          json.dumps(self.config()),
-                          headers=headers(str(rcs.token)),
-                          pool=self.pool)
-                .addCallback(check_success, [202])
-                .addCallback(treq.json_content)
-                .addCallback(record_results))
-
-    def delete(self, rcs):
-        return (
-            treq.delete(
-                "%s/loadbalancers/%s" % (
-                    str(rcs.endpoints["loadbalancers"]),
-                    self.clb_id
-                ),
-                headers=headers(str(rcs.token)),
-                pool=self.pool
-            ).addCallback(check_success, [202, 404])
-        ).addCallback(lambda _: rcs)
