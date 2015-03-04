@@ -46,20 +46,29 @@ def get_simple_dispatcher(reactor):
     ])
 
 
-def get_full_dispatcher(reactor, authenticator, log, service_config,
+def get_full_dispatcher(reactor, authenticator, log, service_configs,
                         kz_client, store):
     """
     Return a dispatcher that can perform all of Otter's effects.
     """
     return ComposedDispatcher([
-        TypeDispatcher({
-            TenantScope: partial(perform_tenant_scope, authenticator, log,
-                                 service_config)}),
-        get_simple_dispatcher(reactor),
+        get_legacy_dispatcher(reactor, authenticator, log, service_configs),
         get_zk_dispatcher(kz_client),
         get_cassandra_dispatcher(log, store),
     ])
 
+
+def get_legacy_dispatcher(reactor, authenticator, log, service_configs):
+    """
+    Return a dispatcher that can perform effects that are needed by the old
+    worker code.
+    """
+    return ComposedDispatcher([
+        TypeDispatcher({
+            TenantScope: partial(perform_tenant_scope, authenticator, log,
+                                 service_configs)}),
+        get_simple_dispatcher(reactor),
+    ])
 
 def get_cql_dispatcher(reactor, connection):
     """
