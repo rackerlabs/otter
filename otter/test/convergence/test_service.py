@@ -103,10 +103,8 @@ class ConvergerTests(SynchronousTestCase):
         self.group = mock_group(self.state, self.tenant_id, self.group_id)
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
 
-    # converge_one_then_cleanup
     # - handles NoSuchScalingGroupError to log and cleanup
-    # - handles any other error to cleanup and raise
-    # - TODO: handles non-fatal error by logging and swallowing
+    # - handles any other error to NOT mark convergent and swallow
     # - cleans up after a successful run
 
 

@@ -1,6 +1,7 @@
 """Converger service"""
 
 import time
+from functools import partial
 
 from effect import Effect, FirstError, Func, catch, parallel
 from effect.do import do, do_return
@@ -209,20 +210,6 @@ class ConvergenceStarter(Service, object):
         return d
 
 
-def _is_fatal(exception):
-    """
-    Determine if an exception is fatal -- and should consider the group wedged
-    so we don't try to converge again.
-
-    Unknown errors are non-fatal, which mean that convergence should be
-    retried.
-    """
-    if isinstance(exception, NoSuchScalingGroupError):
-        return True
-    else:
-        return False
-
-
 @do
 def converge_one_non_concurrently(currently_converging,
                                   tenant_id, group_id, log,
@@ -340,11 +327,21 @@ class Converger(MultiService):
         """
         group_infos = yield self.get_my_divergent_groups(my_buckets)
         self.log.msg('converge-all', group_infos=group_infos)
-        effs = [
-            self.converge_one_then_cleanup(
-                info['tenant_id'], info['group_id'], info['version'])
-            for info in group_infos]
+        effs = map(self._converge_one, group_infos)
         yield do_return(parallel(effs))
+
+    def converge_one(self, info):
+        tenant_id = info['tenant_id']
+        group_id = info['group_id']
+        version = info['version']
+        log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
+        return converge_one_non_concurrently(
+            self.currently_converging, tenant_id, group_id, log
+        ).on(
+            success=lambda r: delete_divergent_flag(log, tenant_id,
+                                                    group_id, version),
+            error=partial(_cleanup_convergence_error, log, tenant_id,
+                          group_id, version))
 
     # RADIX FIXME TODO REVIEWERS XXX:
 
@@ -353,30 +350,18 @@ class Converger(MultiService):
     # convergence runs, but it can't find the group. so why is convergence
     # running on a removed group?
 
-    @do
-    def converge_one_then_cleanup(
-            self, tenant_id, group_id, version,
-            converge_one_non_concurrently=converge_one_non_concurrently):
-        """
-        Converge one group, and clean up the dirty flag after we're done.
 
-        :param version: The version number associated with the dirty flag at
-            the time we read it. The dirty flag will only be cleaned up if the
-            version number doesn't change.
-        """
-        log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
-        try:
-            yield converge_one_non_concurrently(
-                self.currently_converging, tenant_id, group_id, log)
-        except Exception as e:
-            if _is_fatal(e):
-                log.err(None, 'converge-fatal-error')
-                yield delete_divergent_flag(log, tenant_id, group_id, version)
-                # TODO: change group state to ERROR.
-            else:
-                log.err(None, 'converge-non-fatal-error')
-        else:
-            yield delete_divergent_flag(log, tenant_id, group_id, version)
+def _cleanup_convergence_error(log, tenant_id, group_id, version, exc_info):
+    failure = exc_info_to_failure(exc_info)
+    if failure.check(NoSuchScalingGroupError):
+        log.err(failure, 'converge-fatal-error')
+        return delete_divergent_flag(log, tenant_id, group_id, version)
+    # TODO: Check for other fatal errors, and put the group into ERROR
+    # state.
+    else:
+        log.err(failure, 'converge-non-fatal-error')
+        # We specifically don't clean up the dirty flag in this case, so
+        # convergence will be retried.
 
 
 # We're using a global for now because it's difficult to thread a new parameter
