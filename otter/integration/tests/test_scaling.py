@@ -18,12 +18,6 @@ from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
 
 
-from characteristic import attributes, Attribute
-import treq
-from otter.util.http import check_success, headers
-from twisted.internet.task import LoopingCall
-
-
 username = os.environ['AS_USERNAME']
 password = os.environ['AS_PASSWORD']
 endpoint = os.environ['AS_IDENTITY']

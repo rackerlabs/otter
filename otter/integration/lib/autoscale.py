@@ -11,9 +11,8 @@ import treq
 from twisted.internet import reactor
 from twisted.internet.task import LoopingCall
 
-from otter.util.http import check_success, headers
-
 from otter.integration.lib.timeout import TimeoutError
+from otter.util.http import check_success, headers
 
 
 @attributes([
