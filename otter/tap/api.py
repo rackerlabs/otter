@@ -275,24 +275,27 @@ def makeService(config):
             s.addService(converger_service)
             set_convergence_starter(converger_service)
 
-            # setup Converger service
-            converger_buckets = range(1, 10)
-            partitioner_factory = partial(
-                Partitioner,
-                kz_client,
-                10,  # interval
-                '/converger_partition',
-                converger_buckets,
-                15,  # time boundary
-            )
-            converger = Converger(log, dispatcher, converger_buckets,
-                                  partitioner_factory)
-            converger.setServiceParent(s)
+            setup_converger(s, kz_client, dispatcher)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
 
     return s
+
+
+def setup_converger(parent, kz_client, dispatcher):
+    """Create a Converger service."""
+    converger_buckets = range(1, 10)
+    partitioner_factory = partial(
+        Partitioner,
+        kz_client,
+        10,  # interval
+        '/converger_partition',
+        converger_buckets,
+        15,  # time boundary
+    )
+    cvg = Converger(log, dispatcher, converger_buckets, partitioner_factory)
+    cvg.setServiceParent(parent)
 
 
 def setup_scheduler(parent, store, kz_client):

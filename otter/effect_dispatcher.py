@@ -70,6 +70,7 @@ def get_legacy_dispatcher(reactor, authenticator, log, service_configs):
         get_simple_dispatcher(reactor),
     ])
 
+
 def get_cql_dispatcher(reactor, connection):
     """
     Get dispatcher with `CQLQueryExecute`'s performer in it

@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 
 import mock
 
-from twisted.application.service import Service
 from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 

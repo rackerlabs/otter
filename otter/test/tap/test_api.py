@@ -554,7 +554,11 @@ class APIMakeServiceTests(SynchronousTestCase):
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
-    def test_kazoo_client_stops(self, mock_txkz, mock_setup_scheduler):
+    @mock.patch('otter.tap.api.setup_converger')
+    def test_kazoo_client_stops(self,
+                                mock_setup_converger,
+                                mock_txkz,
+                                mock_setup_scheduler):
         """
         TxKazooClient is stopped when parent service stops
         """
@@ -576,7 +580,10 @@ class APIMakeServiceTests(SynchronousTestCase):
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
-    def test_kazoo_client_stops_after_supervisor(self, mock_txkz,
+    @mock.patch('otter.tap.api.setup_converger')
+    def test_kazoo_client_stops_after_supervisor(self,
+                                                 mock_setup_converger,
+                                                 mock_txkz,
                                                  mock_setup_scheduler):
         """
         Kazoo is stopped after supervisor stops
