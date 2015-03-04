@@ -128,7 +128,7 @@ def PEP3101FormattingWrapper(observer):
 
 ERROR_FIELDS = {"isError", "failure", "why"}
 
-PRIMITIVE_FIELDS = {"time", "system", "id", "audit_log"}
+PRIMITIVE_FIELDS = {"time", "system", "id", "audit_log", "message"}
 
 AUDIT_LOG_FIELDS = {
     "audit_log": bool,
@@ -285,6 +285,7 @@ def ObserverWrapper(observer, hostname, seconds=None):
             "@timestamp": datetime.fromtimestamp(
                 eventDict.get("time", seconds())).isoformat(),
             "otter_facility": eventDict.get("system", "otter"),
+            "message": eventDict["message"]
         }
 
         for key, value in eventDict.iteritems():
