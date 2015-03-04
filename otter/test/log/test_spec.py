@@ -2,15 +2,43 @@
 Tests for log_spec.py
 """
 
+from twisted.trial.unittest import SynchronousTestCase
+
+from otter.log.spec import SpecificationObserverWrapper
+
 
 class SpecificationObserverWrapperTests(SynchronousTestCase):
     """
     Tests for `SpecificationObserverWrapper`
     """
 
-    def returns_validating_observer(self):
+    def setUp(self):
         """
-        Returns observer that validates event and delgates to given observer
+        Sample delegating observer
+        """
+        self.e = None
+
+        def observer(event):
+            self.e = event
+
+        self.observer = observer
+
+    def test_returns_validating_observer(self):
+        """
+        Returns observer that gets validated event and delgates
+        to given observer
+        """
+        SpecificationObserverWrapper(self.observer)(
+            {'message': ("launch-servers",), "num_servers": 2})
+        self.assertEqual(
+            self.e,
+            {'message': ('Launching 2 servers', ),
+             'otter_msg_type': 'launch-servers'})
+
+    def test_error_validating_observer(self):
+        """
+        The observer returned replaces event with error if it fails to
+        type check
         """
 
 
@@ -24,7 +52,7 @@ class GetValidatedEventTests(SynchronousTestCase):
 
     def test_error_not_found(self):
         """
-        Nothing is changed if Error-based event is not found
+        Nothing is changed if Error-based event is not found in msg_types
         """
 
     def test_error_why_is_changed(self):

@@ -5,7 +5,15 @@ Format logs based on specification
 from copy import deepcopy
 
 from otter.constants import ServiceType
-from otter.log.formatters import ERROR_FIELDS, PRIMITIVE_FIELDS
+#from otter.log.formatters import ERROR_FIELDS, PRIMITIVE_FIELDS
+
+from twisted.python.failure import Failure
+
+
+# Temp until refactor is committed
+ERROR_FIELDS = {"isError", "failure", "why"}
+
+PRIMITIVE_FIELDS = {"time", "system", "id", "audit_log"}
 
 
 class UUID(basestring):
@@ -31,7 +39,7 @@ fields = {
 
 # Fields that will occur in error details
 error_fields = {
-    "system": SystemType,
+    "system": ServiceType,
     "operation": basestring,
     "url": basestring,
     "code": int,
@@ -52,6 +60,18 @@ msg_types = {
 }
 
 
+def error_event(event, failure, why):
+    """
+    Convert event to error with failure and why
+    """
+    event["isError"] = True
+    event["failure"] = failure
+    event["why"] = why
+    event["original_message"] = event["message"]
+    event["message"] = ()
+    return event
+
+
 def SpecificationObserverWrapper(observer):
     """
     Return observer that validates messages based on specification
@@ -60,10 +80,10 @@ def SpecificationObserverWrapper(observer):
     def validating_observer(event_dict):
         try:
             speced_event = get_validated_event(event_dict)
-        except ValueError:
-            # TODO: What to do if it is not valid? Should it instead
-            # send fixed error event with event_dict msg in it?
-            pass
+        except (ValueError, TypeError) as e:
+            print e
+            speced_event = error_event(
+                event_dict, Failure(), "Error validating event")
         observer(speced_event)
 
     return validating_observer
@@ -79,7 +99,7 @@ def get_validated_event(event):
     per error_fields
 
     :return: Validated event
-    :raises: `ValueError` if `event_dict` is not valid
+    :raises: `ValueError` or `TypeError` if `event_dict` is not valid
     """
     # Is this message speced?
     if event.get('isError', False):
@@ -110,8 +130,9 @@ def validate_field(fields, field, value):
     field_type = fields.get(field)
     if field_type is not None:
         raise ValueError('unknown field ' + field)
+    print value, field_type
     if not isinstance(value, field_type):
-        raise ValueError('unexpected type ' + field)
+        raise TypeError('{} of unexpected type {}'.format(value, field))
 
 
 def validate_error(event):
