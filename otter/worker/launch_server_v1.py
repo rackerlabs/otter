@@ -32,7 +32,7 @@ from twisted.internet.task import deferLater
 from twisted.python.failure import Failure
 
 from otter.auth import public_endpoint_url
-from otter.convergence.gathering import _servicenet_address
+from otter.convergence.model import _servicenet_address
 from otter.convergence.steps import set_server_name
 from otter.util import logging_treq as treq
 from otter.util.config import config_value

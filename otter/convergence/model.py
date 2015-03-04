@@ -9,11 +9,14 @@ from characteristic import Attribute, attributes
 
 from pyrsistent import PSet, freeze, pmap, pset, pvector
 
+from toolz.dicttoolz import get_in
 from toolz.itertoolz import groupby
 
 from twisted.python.constants import NamedConstant, Names
 
 from zope.interface import Attribute as IAttribute, Interface, implementer
+
+from otter.util.timestamp import timestamp_to_epoch
 
 
 class CLBNodeCondition(Names):
@@ -126,6 +129,48 @@ def get_service_metadata(service_name, metadata):
     return as_metadata
 
 
+def _private_ipv4_addresses(server):
+    """
+    Get all private IPv4 addresses from the addresses section of a server.
+
+    :param dict server: A server dict.
+    :return: List of IP addresses as strings.
+    """
+    private_addresses = get_in(["addresses", "private"], server, [])
+    return [addr['addr'] for addr in private_addresses if addr['version'] == 4]
+
+
+def _servicenet_address(server):
+    """
+    Find the ServiceNet address for the given server.
+    """
+    return next((ip for ip in _private_ipv4_addresses(server)
+                 if ip.startswith("10.")), "")
+
+
+def _lbs_from_metadata(metadata):
+    """
+    Get the desired load balancer descriptions based on the metadata.
+
+    :return: ``dict`` of `ILBDescription` providers
+    """
+    lbs = get_service_metadata('autoscale', metadata).get('lb', {})
+    desired_lbs = []
+
+    for lb_id, v in lbs.get('CloudLoadBalancer', {}).iteritems():
+        # if malformed, skiped the whole key
+        try:
+            configs = json.loads(v)
+            if isinstance(configs, list):
+                desired_lbs.extend([
+                    CLBDescription(lb_id=lb_id, port=c['port'])
+                    for c in configs])
+        except (ValueError, KeyError, TypeError):
+            pass
+
+    return pset(desired_lbs)
+
+
 @attributes(['id', 'state', 'created', 'image_id', 'flavor_id',
              # because type(pvector()) is pvectorc.PVector,
              # which != pyrsistent.PVector
@@ -159,67 +204,67 @@ class NovaServer(object):
             "%r is not a ServerState" % (self.state,)
 
     @classmethod
-    def group_id_from_metadata(cls, metadata):
+    def from_server_details_json(cls, server_json):
         """
-        Get the group ID of a server based on the metadata.
+        Create a :obj:`NovaServer` instance from a server details JSON
+        dictionary, although without any 'server' or 'servers' initial resource
+        key.
 
-        The old key was ``rax:auto_scaling_group_id``, but the new key is
-        ``rax:autoscale:group:id``.  Try pulling from the new key first, and
-        if it doesn't exist, pull from the old.
+        See
+        http://docs.rackspace.com/servers/api/v2/cs-devguide/content/
+        Get_Server_Details-d1e2623.html
+
+        :return: :obj:`NovaServer` instance
         """
-        return metadata.get(
-            "rax:autoscale:group:id",
-            metadata.get("rax:auto_scaling_group_id", None))
+        return cls(
+            id=server_json['id'],
+            state=ServerState.lookupByName(server_json['status']),
+            created=timestamp_to_epoch(server_json['created']),
+            image_id=server_json.get('image', {}).get('id'),
+            flavor_id=server_json['flavor']['id'],
+            links=freeze(server_json['links']),
+            desired_lbs=_lbs_from_metadata(server_json.get('metadata')),
+            servicenet_address=_servicenet_address(server_json))
 
-    @classmethod
-    def lbs_from_metadata(cls, metadata):
-        """
-        Get the desired load balancer descriptions based on the metadata.
 
-        :return: ``dict`` of `ILBDescription` providers
-        """
-        lbs = get_service_metadata('autoscale', metadata).get('lb', {})
-        desired_lbs = []
+def group_id_from_metadata(metadata):
+    """
+    Get the group ID of a server based on the metadata.
 
-        for lb_id, v in lbs.get('CloudLoadBalancer', {}).iteritems():
-            # if malformed, skiped the whole key
-            try:
-                configs = json.loads(v)
-                if isinstance(configs, list):
-                    desired_lbs.extend([
-                        CLBDescription(lb_id=lb_id, port=c['port'])
-                        for c in configs])
-            except (ValueError, KeyError, TypeError):
-                pass
+    The old key was ``rax:auto_scaling_group_id``, but the new key is
+    ``rax:autoscale:group:id``.  Try pulling from the new key first, and
+    if it doesn't exist, pull from the old.
+    """
+    return metadata.get(
+        "rax:autoscale:group:id",
+        metadata.get("rax:auto_scaling_group_id", None))
 
-        return pset(desired_lbs)
 
-    @classmethod
-    def generate_metadata(cls, group_id, lb_descriptions):
-        """
-        Generate autoscale-specific Nova server metadata given the group ID and
-        an iterable of :class:`ILBDescription` providers.
+def generate_metadata(group_id, lb_descriptions):
+    """
+    Generate autoscale-specific Nova server metadata given the group ID and
+    an iterable of :class:`ILBDescription` providers.
 
-        NOTE: Currently this ignores RCv3 settings and draining timeout
-        settings, since they haven't been implemented yet.
+    NOTE: Currently this ignores RCv3 settings and draining timeout
+    settings, since they haven't been implemented yet.
 
-        :return: a metadata `dict` containing the group ID and LB information
-        """
-        metadata = {
-            'rax:auto_scaling_group_id': group_id,
-            'rax:autoscale:group:id': group_id
-        }
+    :return: a metadata `dict` containing the group ID and LB information
+    """
+    metadata = {
+        'rax:auto_scaling_group_id': group_id,
+        'rax:autoscale:group:id': group_id
+    }
 
-        descriptions = groupby(lambda desc: (desc.lb_id, type(desc)),
-                               lb_descriptions)
+    descriptions = groupby(lambda desc: (desc.lb_id, type(desc)),
+                           lb_descriptions)
 
-        for (lb_id, desc_type), descs in descriptions.iteritems():
-            if desc_type == CLBDescription:
-                key = 'rax:autoscale:lb:CloudLoadBalancer:{0}'.format(lb_id)
-                metadata[key] = json.dumps([
-                    {'port': desc.port} for desc in descs])
+    for (lb_id, desc_type), descs in descriptions.iteritems():
+        if desc_type == CLBDescription:
+            key = 'rax:autoscale:lb:CloudLoadBalancer:{0}'.format(lb_id)
+            metadata[key] = json.dumps([
+                {'port': desc.port} for desc in descs])
 
-        return metadata
+    return metadata
 
 
 @attributes(['server_config', 'capacity',

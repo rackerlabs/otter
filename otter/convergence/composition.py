@@ -8,7 +8,7 @@ from toolz.dicttoolz import get_in, merge
 from otter.convergence.model import (
     CLBDescription,
     DesiredGroupState,
-    NovaServer)
+    generate_metadata)
 
 
 def tenant_is_enabled(tenant_id, get_config_value):
@@ -78,6 +78,6 @@ def prepare_server_launch_config(group_id, server_config, lb_descriptions):
     """
     updated_metadata = freeze(merge(
         get_in(('server', 'metadata'), server_config, {}),
-        NovaServer.generate_metadata(group_id, lb_descriptions)))
+        generate_metadata(group_id, lb_descriptions)))
 
     return server_config.set_in(('server', 'metadata'), updated_metadata)
