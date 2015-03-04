@@ -4,6 +4,7 @@ import time
 
 from effect import Effect, FirstError, Func, catch, parallel
 from effect.do import do, do_return
+from effect.ref import ERef
 from effect.twisted import exc_info_to_failure, perform
 
 from pyrsistent import pset
@@ -23,7 +24,7 @@ from otter.convergence.planning import plan
 from otter.http import TenantScope
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
 from otter.models.interface import NoSuchScalingGroupError
-from otter.util.fp import ERef, assoc_obj
+from otter.util.fp import assoc_obj
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildrenWithStats
 
 
@@ -186,7 +187,7 @@ class ConvergenceStarter(Service, object):
     def start_convergence(self, log, tenant_id, group_id, perform=perform):
         """Record that a group needs converged."""
         log = log.bind(tenant_id=tenant_id, group_id=group_id)
-        log.msg("Marking group dirty", 'mark-dirty')
+        log.msg('mark-dirty')
         eff = mark_divergent(tenant_id, group_id)
         d = perform(self._dispatcher, eff)
         d.addErrback(log.err, 'mark-dirty-failed')
@@ -252,7 +253,7 @@ class Converger(MultiService):
         self.log.msg("buckets-acquired", my_buckets=my_buckets)
         eff = self.converge_all(my_buckets)
         return perform(self._dispatcher, eff).addErrback(
-            self.log.err, "converge-all-error")
+            self.log.err, 'converge-all-error')
 
     def get_my_divergent_groups(self, my_buckets):
         """
@@ -293,6 +294,13 @@ class Converger(MultiService):
             for info in group_infos]
         yield do_return(parallel(effs))
 
+    # RADIX FIXME TODO REVIEWERS XXX:
+
+    # I think something is going wrong with respect to deleting groups. When
+    # integration tests clean up they're deleting the groups, and then
+    # convergence runs, but it can't find the group. so why is convergence
+    # running on a removed group?
+
     @do
     def converge_one_then_cleanup(self, tenant_id, group_id, version):
         """
@@ -307,9 +315,9 @@ class Converger(MultiService):
             yield self.converge_one_non_concurrently(tenant_id, group_id, log)
         except Exception as e:
             if _is_fatal(e):
+                log.err(None, 'converge-fatal-error')
                 yield self._cleanup(log, tenant_id, group_id, version)
                 # TODO: change group state to ERROR.
-                raise
             else:
                 log.err(None, "converge-non-fatal-error")
         else:
@@ -326,7 +334,7 @@ class Converger(MultiService):
             log.msg("already-converging")
             return
         yield self.currently_converging.modify(lambda cc: cc.add(group_id))
-        # However, the convergence itself is asynchronous.  Can we have a race
+        # However, the convergence itself is asynchronous. Can we have a race
         # condition here?  In fact, won't this have the same problem that we
         # have with the `dirty` flag? Kind of, but it doesn't matter. It's
         # possible that another call to maybe_converge_one will happen to this

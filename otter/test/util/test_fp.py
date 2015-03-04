@@ -4,8 +4,7 @@ from effect import Effect, sync_perform
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.util.fp import (
-    ERef, ModifyERef, ReadERef, eref_dispatcher, predicate_all, predicate_any)
+from otter.util.fp import predicate_all, predicate_any
 
 
 class PredicateAllTests(SynchronousTestCase):
@@ -96,38 +95,3 @@ class PredicateAnyTests(SynchronousTestCase):
             predicate_any(
                 lambda **k: k['a'] % 2 == 0 and k['b'] % 2 == 0,
                 lambda **k: k['a'] % 3 == 0 and k['b'] % 3 == 0)(a=2, b=4))
-
-
-class ERefTests(SynchronousTestCase):
-    """Tests for :obj:`ERef`."""
-
-    def test_read(self):
-        """``read`` returns an Effect that represents the current value."""
-        ref = ERef('initial')
-        self.assertEqual(ref.read(), Effect(ReadERef(eref=ref)))
-
-    def test_modify(self):
-        """``modify`` returns an Effect that represents modification."""
-        ref = ERef(0)
-        transformer = lambda x: x + 1
-        eff = ref.modify(transformer)
-        self.assertEqual(eff,
-                         Effect(ModifyERef(eref=ref, transformer=transformer)))
-
-    def test_perform_read(self):
-        """Performing the reading results in the current value."""
-        ref = ERef('initial')
-        result = sync_perform(eref_dispatcher, ref.read())
-        self.assertEqual(result, 'initial')
-
-    def test_perform_modify(self):
-        """
-        Performing the modification results in transforming the current value,
-        and also returns the new value.
-        """
-        ref = ERef(0)
-        transformer = lambda x: x + 1
-        result = sync_perform(eref_dispatcher, ref.modify(transformer))
-        self.assertEqual(result, 1)
-        self.assertEqual(sync_perform(eref_dispatcher, ref.read()),
-                         1)

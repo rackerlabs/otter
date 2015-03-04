@@ -2,6 +2,7 @@ from effect import (
     ComposedDispatcher, Constant, Effect, Func, ParallelEffects,
     TypeDispatcher, base_dispatcher, sync_perform, sync_performer)
 from effect.async import perform_parallel_async
+from effect.ref import eref_dispatcher
 from effect.testing import EQDispatcher
 
 import mock
@@ -27,7 +28,6 @@ from otter.test.utils import (
     FakePartitioner, LockMixin,
     mock_group, mock_log,
     transform_eq)
-from otter.util.fp import eref_dispatcher
 from otter.util.zk import CreateOrSet
 
 
@@ -127,9 +127,6 @@ class ConvergerTests(SynchronousTestCase):
                             self.converger.currently_converging.modify(
                                 lambda cc: cc.add(value)))
 
-    # - check currently converging
-    # - add group
-    # - remove currently converging
     def test_converge_one_non_concurrently_success(self):
         """
         :func:`converge_one_non_concurrently` returns the result of executing

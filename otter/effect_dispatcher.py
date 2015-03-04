@@ -7,6 +7,7 @@ from effect import (
     TypeDispatcher,
     base_dispatcher)
 from effect.twisted import make_twisted_dispatcher
+from effect.ref import eref_dispatcher
 
 from .auth import (
     Authenticate,
@@ -17,7 +18,6 @@ from .auth import (
 from .http import TenantScope, perform_tenant_scope
 from .models.cass import CQLQueryExecute, perform_cql_query
 from .models.intents import get_cassandra_dispatcher
-from .util.fp import eref_dispatcher
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
 from .util.zk import get_zk_dispatcher
