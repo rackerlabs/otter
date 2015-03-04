@@ -13,11 +13,7 @@ from twisted.internet.task import LoopingCall
 
 from otter.util.http import check_success, headers
 
-
-class TimeoutError(Exception):
-    """This exception will raise when an operation exceeds a maximum amount
-    of time without showing any progress.
-    """
+from otter.integration.lib.timeout import TimeoutError
 
 
 @attributes([
