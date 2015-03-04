@@ -165,7 +165,6 @@ class TestScaling(unittest.TestCase):
 
             d = (
                 self.scaling_group.start(rcs, self)
-                .addCallback(self.scaling_group.start, self)
                 .addCallback(self.scale_up_policy.start, self)
                 .addCallback(self.scale_down_policy.start, self)
             )
