@@ -33,7 +33,7 @@ from otter.convergence.steps import (
     SetMetadataItemOnServer)
 
 
-def copy_clbdesc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1):
+def copy_clb_desc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1):
     """
     Produce a :class:`CLBDescription` from another, but with the given
     condition changed to the one given
@@ -136,7 +136,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
         clb_node = CLBNode(node_id='123', address=self.address,
-                           description=copy_clbdesc(
+                           description=copy_clb_desc(
                                clb_desc, condition=CLBNodeCondition.DISABLED))
         clb_step = RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))
 
@@ -173,7 +173,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
         clb_node = CLBNode(node_id='123', address=self.address,
-                           description=copy_clbdesc(
+                           description=copy_clb_desc(
                                clb_desc, condition=CLBNodeCondition.DRAINING),
                            drained_at=0.0, connections=1)
 
@@ -191,7 +191,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
         clb_node = CLBNode(node_id='123', address=self.address,
-                           description=copy_clbdesc(
+                           description=copy_clb_desc(
                                clb_desc, condition=CLBNodeCondition.DRAINING),
                            drained_at=0.0, connections=0)
         clb_step = RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))
@@ -210,7 +210,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
         clb_node = CLBNode(node_id='123', address=self.address,
-                           description=copy_clbdesc(
+                           description=copy_clb_desc(
                                clb_desc, condition=CLBNodeCondition.DRAINING),
                            drained_at=0.0)
 
@@ -228,7 +228,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
         clb_node = CLBNode(node_id='123', address=self.address,
-                           description=copy_clbdesc(
+                           description=copy_clb_desc(
                                clb_desc, condition=CLBNodeCondition.DRAINING),
                            drained_at=0.0)
         clb_step = RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))
@@ -247,7 +247,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
         clb_node = CLBNode(node_id='123', address=self.address,
-                           description=copy_clbdesc(
+                           description=copy_clb_desc(
                                clb_desc, condition=CLBNodeCondition.DRAINING),
                            drained_at=0.0, connections=10)
         clb_step = RemoveNodesFromCLB(lb_id='5', node_ids=s('123'))
@@ -277,21 +277,21 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                     description=clb_descs[0]),
             # disabled, should be removed
             CLBNode(node_id='2', address=self.address,
-                    description=copy_clbdesc(
+                    description=copy_clb_desc(
                         clb_descs[1], condition=CLBNodeCondition.DISABLED)),
             # draining, still connections, should be ignored
             CLBNode(node_id='3', address='1.1.1.1',
-                    description=copy_clbdesc(
+                    description=copy_clb_desc(
                         clb_descs[2], condition=CLBNodeCondition.DRAINING),
                     connections=3, drained_at=5.0),
             # draining, no connections, should be removed
             CLBNode(node_id='4', address='1.1.1.1',
-                    description=copy_clbdesc(
+                    description=copy_clb_desc(
                         clb_descs[3], condition=CLBNodeCondition.DRAINING),
                     connections=0, drained_at=5.0),
             # draining, timeout exired, should be removed
             CLBNode(node_id='5', address='1.1.1.1',
-                    description=copy_clbdesc(
+                    description=copy_clb_desc(
                         clb_descs[4], condition=CLBNodeCondition.DRAINING),
                     connections=10, drained_at=0.0)]
 
@@ -357,7 +357,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
             lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
 
         current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=copy_clbdesc(clb_desc, weight=5)),
+                           description=copy_clb_desc(clb_desc, weight=5)),
                    RCv3Node(node_id='234', cloud_server_id='abc',
                             description=rcv3_desc)]
         self.assertEqual(
@@ -434,7 +434,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
             CLBNode(node_id='123', address='1.1.1.1',
                     description=CLBDescription(lb_id='5', port=8080)),
             CLBNode(node_id='234', address='1.1.1.1',
-                    description=copy_clbdesc(descs[1], weight=1)),
+                    description=copy_clb_desc(descs[1], weight=1)),
             RCv3Node(node_id='345', cloud_server_id='abc',
                      description=RCv3Description(
                          lb_id='e762e42a-8a4e-4ffb-be17-f9dc672729b2'))
@@ -561,7 +561,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
-                             description=copy_clbdesc(
+                             description=copy_clb_desc(
                                  self.clb_desc,
                                  condition=CLBNodeCondition.DRAINING)),
                      RCv3Node(node_id='2', cloud_server_id='abc',
@@ -614,13 +614,13 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 set([
                     # This node is in draining - nothing will be done to it
                     CLBNode(node_id='1', address='1.1.1.1',
-                            description=copy_clbdesc(
+                            description=copy_clb_desc(
                                 self.clb_desc,
                                 condition=CLBNodeCondition.DRAINING),
                             drained_at=1.0, connections=1),
                     # This node is done draining, it can be removed
                     CLBNode(node_id='2', address='1.1.1.1',
-                            description=copy_clbdesc(
+                            description=copy_clb_desc(
                                 other_clb_desc,
                                 condition=CLBNodeCondition.DRAINING),
                             drained_at=0.0),
@@ -681,7 +681,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
-                             description=copy_clbdesc(
+                             description=copy_clb_desc(
                                  self.clb_desc,
                                  condition=CLBNodeCondition.DRAINING),
                              connections=1, drained_at=0.0)]),
