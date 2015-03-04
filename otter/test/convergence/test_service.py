@@ -1,5 +1,5 @@
 from effect import (
-    ComposedDispatcher, Constant, Effect, Func, ParallelEffects,
+    ComposedDispatcher, Constant, Effect, Error, Func, ParallelEffects,
     TypeDispatcher, base_dispatcher, sync_perform)
 from effect.async import perform_parallel_async
 from effect.ref import ERef, eref_dispatcher
@@ -139,7 +139,7 @@ class ConvergeOneNonConcurrentlyTests(SynchronousTestCase):
             _get_dispatcher(),
             self.currently_converging.modify(lambda cc: cc.add(value)))
 
-    def test_converge_one_non_concurrently_success(self):
+    def test_success(self):
         """
         :func:`converge_one_non_concurrently` returns the result of executing
         convergence, and marks the group as currently converging while
@@ -169,7 +169,7 @@ class ConvergeOneNonConcurrentlyTests(SynchronousTestCase):
         # and after convergence, nothing is marked as converging
         self.assertEqual(self._get_cc(), pset([]))
 
-    def test_converge_one_non_concurrently_refuses_concurrency(self):
+    def test_refuses_concurrency(self):
         """
         :func:`converge_one_non_concurrently` returns None when the group is
         already being converged.
@@ -180,6 +180,28 @@ class ConvergeOneNonConcurrentlyTests(SynchronousTestCase):
             self.tenant_id, self.group_id, mock_log(),
             execute_convergence=lambda t, g, l: 1 / 0)
         self.assertEqual(sync_perform(_get_dispatcher(), eff), None)
+        self.assertEqual(self._get_cc(), pset([self.group_id]))
+
+    def test_cleans_up_on_exception(self):
+        """
+        The group being converged is removed from the set even when an
+        exception is raised.
+        """
+        log = mock_log()
+        dispatcher = _get_dispatcher()
+
+        def execute_convergence(tenant_id, group_id, log):
+            return Effect(Error(RuntimeError('foo!')))
+
+        eff = converge_one_non_concurrently(
+            self.currently_converging,
+            self.tenant_id, self.group_id, log,
+            execute_convergence=execute_convergence)
+        e = self.assertRaises(
+            RuntimeError,
+            sync_perform, dispatcher, eff)
+        self.assertEqual(str(e), 'foo!')
+        self.assertEqual(self._get_cc(), pset([]))
 
 
 class ExecuteConvergenceTests(SynchronousTestCase):
