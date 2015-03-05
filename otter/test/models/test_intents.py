@@ -6,7 +6,8 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.models.intents import (
     GetScalingGroupInfo, ModifyGroupState, get_model_dispatcher)
-from otter.test.utils import mock_group, mock_log
+from otter.models.interface import IScalingGroupCollection
+from otter.test.utils import iMock, mock_group, mock_log
 
 
 class ModifyGroupStateTests(SynchronousTestCase):
@@ -30,18 +31,16 @@ class GetScalingGroupInfoTests(SynchronousTestCase):
             self.assertEqual(with_webhooks, False)
             return succeed(manifest)
 
+        def get_scaling_group(log, tenant_id, group_id):
+            return data[(log, tenant_id, group_id)]
+
         log = mock_log()
         manifest = {}
         group = mock_group(None)
         group.view_manifest.side_effect = view_manifest
-
         data = {(log, '00', 'g1'): group}
-
-        class Store(object):
-            def get_scaling_group(self, log, tenant_id, group_id):
-                return data[(log, tenant_id, group_id)]
-
-        store = Store()
+        store = iMock(IScalingGroupCollection)
+        store.get_scaling_group.side_effect = get_scaling_group
         dispatcher = get_model_dispatcher(log, store)
         info = sync_perform(
             dispatcher,
