@@ -82,6 +82,37 @@ _NOVA_403_QUOTA_REACHED = re.compile(
     "of \d+ (?P=limit)$")
 
 
+def _parse_nova_create_error(api_error):
+    """
+    Parse API errors for user failures on creating a server.
+
+    :param api_error: The error returned from Nova
+    :type api_error: :class:`APIError`
+
+    :return: the nova message as to why the creation failed, if it was a user
+        failure.  None otherwise.
+    :rtype: `str` or `None`
+    """
+    if api_error.code == 400:
+        message = _try_json_message(api_error.body,
+                                    ("badRequest", "message"))
+        if message:
+            return message
+
+    elif api_error.code == 403:
+        message = _try_json_message(api_error.body,
+                                    ("forbidden", "message"))
+        if message and _NOVA_403_QUOTA_REACHED.match(message):
+            return message
+
+        for pat in (_NOVA_403_RACKCONNECT_NETWORK_REQUIRED,
+                    _NOVA_403_NO_PUBLIC_NETWORK,
+                    _NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED):
+            m = pat.match(api_error.body)
+            if m:
+                return m.groups()[0]
+
+
 @implementer(IStep)
 @attributes(['server_config'])
 class CreateServer(object):
@@ -115,24 +146,10 @@ class CreateServer(object):
             are unrecognized, return a :obj:`StepResult.RETRY` for now.
             """
             err_type, error, traceback = result
-            if err_type == APIError and error.code == 400:
-                message = _try_json_message(error.body,
-                                            ("badRequest", "message"))
-                if message:
+            if err_type == APIError:
+                message = _parse_nova_create_error(error)
+                if message is not None:
                     return StepResult.FAILURE, [message]
-
-            elif err_type == APIError and error.code == 403:
-                message = _try_json_message(error.body,
-                                            ("forbidden", "message"))
-                if message and _NOVA_403_QUOTA_REACHED.match(message):
-                    return StepResult.FAILURE, [message]
-
-                for pat in (_NOVA_403_RACKCONNECT_NETWORK_REQUIRED,
-                            _NOVA_403_NO_PUBLIC_NETWORK,
-                            _NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED):
-                    m = pat.match(error.body)
-                    if m:
-                        return StepResult.FAILURE, [m.groups()[0]]
 
             return StepResult.RETRY, []
 
