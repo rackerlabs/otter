@@ -45,6 +45,7 @@ def perform_get_scaling_group_info(log, store, dispatcher, intent):
 
 
 def get_cassandra_dispatcher(log, store):
+    """Get a dispatcher that can handle all the cass-related intents."""
     return TypeDispatcher({
         ModifyGroupState:
             perform_modify_group_state,
