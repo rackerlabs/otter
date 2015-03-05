@@ -240,6 +240,70 @@ def non_concurrently(log, locks, key, eff):
     yield do_return(result)
 
 
+def converge_one(log, currently_converging, tenant_id, group_id, version):
+    """
+    Converge one group, non concurrently, and clean up the dirty flag when
+    done.
+
+    :param ERef currently_converging: PSet of currently converging groups
+    :param version: version number of ZNode of the group's dirty flag
+    """
+    log = log.bind(tenant_id=tenant_id, group_id=group_id)
+    eff = execute_convergence(tenant_id, group_id, log)
+    return non_concurrently(
+        log, currently_converging, group_id, eff
+    ).on(
+        success=lambda r: delete_divergent_flag(log, tenant_id,
+                                                group_id, version),
+        error=partial(_cleanup_convergence_error, log, tenant_id,
+                      group_id, version))
+
+
+def get_my_divergent_groups(my_buckets, all_buckets):
+    """
+    Look up groups that are divergent and that are this node's
+    responsibility, according to ``my_buckets``.
+
+    :param my_buckets: collection of buckets allocated to this node
+    :param all_buckets: collection of all buckets
+
+    :returns: list of dicts, where each dict has ``tenant_id``,
+        ``group_id``, and ``version`` keys.
+    """
+    def structure_info(x):
+        # Names of the dirty flags are {tenant_id}_{group_id}.
+        path, stat = x
+        tenant, group = x[0].split('_', 1)
+        return {'tenant_id': tenant, 'group_id': group,
+                'version': stat.version}
+
+    def got_children_with_stats(children_with_stats):
+        dirty_info = map(structure_info, children_with_stats)
+        num_buckets = len(all_buckets)
+        converging = (
+            info for info in dirty_info
+            if _stable_hash(info['tenant_id']) % num_buckets in my_buckets)
+        return list(converging)
+
+    eff = Effect(GetChildrenWithStats(CONVERGENCE_DIRTY_DIR))
+    return eff.on(got_children_with_stats)
+
+
+@do
+def converge_all(self, log, currently_converging, my_buckets, all_buckets):
+    """
+    Check for groups that need convergence and which match up to the
+    buckets we've been allocated.
+    """
+    group_infos = yield get_my_divergent_groups(my_buckets, all_buckets)
+    log.msg('converge-all', group_infos=group_infos)
+    effs = [converge_one(log, currently_converging,
+                         info['tenant_id'], info['group_id'],
+                         info['version'])
+            for info in group_infos]
+    yield do_return(parallel(effs))
+
+
 def _stable_hash(s):
     """Get a stable hash of a string as an integer."""
     # :func:`hash` is not stable with different pythons/architectures.
@@ -289,60 +353,10 @@ class Converger(MultiService):
         This is used as the partitioner callback.
         """
         self.log.msg('buckets-acquired', my_buckets=my_buckets)
-        eff = self.converge_all(my_buckets)
+        eff = converge_all(self.log, self.currently_converging, my_buckets,
+                           self._buckets)
         return perform(self._dispatcher, eff).addErrback(
             self.log.err, 'converge-all-error')
-
-    def get_my_divergent_groups(self, my_buckets):
-        """
-        Look up groups that are divergent and that are this node's
-        responsibility, according to the ``self.buckets``.
-
-        :returns: list of dicts, where each dict has ``tenant_id``,
-            ``group_id``, and ``version`` keys.
-        """
-        def structure_info(x):
-            # Names of the dirty flags are {tenant_id}_{group_id}.
-            path, stat = x
-            tenant, group = x[0].split('_', 1)
-            return {'tenant_id': tenant, 'group_id': group,
-                    'version': stat.version}
-
-        def got_children_with_stats(children_with_stats):
-            dirty_info = map(structure_info, children_with_stats)
-            num_buckets = len(self._buckets)
-            converging = (
-                info for info in dirty_info
-                if _stable_hash(info['tenant_id']) % num_buckets in my_buckets)
-            return list(converging)
-
-        eff = Effect(GetChildrenWithStats(CONVERGENCE_DIRTY_DIR))
-        return eff.on(got_children_with_stats)
-
-    @do
-    def converge_all(self, my_buckets):
-        """
-        Check for groups that need convergence and which match up to the
-        buckets we've been allocated.
-        """
-        group_infos = yield self.get_my_divergent_groups(my_buckets)
-        self.log.msg('converge-all', group_infos=group_infos)
-        effs = map(self.converge_one, group_infos)
-        yield do_return(parallel(effs))
-
-    def converge_one(self, info):
-        tenant_id = info['tenant_id']
-        group_id = info['group_id']
-        version = info['version']
-        log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
-        eff = execute_convergence(tenant_id, group_id, log)
-        return non_concurrently(
-            log, self.currently_converging, group_id, eff
-        ).on(
-            success=lambda r: delete_divergent_flag(log, tenant_id,
-                                                    group_id, version),
-            error=partial(_cleanup_convergence_error, log, tenant_id,
-                          group_id, version))
 
     # RADIX FIXME TODO REVIEWERS XXX:
 

@@ -20,7 +20,8 @@ from otter.convergence.model import (
 from otter.convergence.service import (
     ConvergenceStarter,
     Converger,
-    determine_active, execute_convergence, mark_divergent,
+    determine_active, execute_convergence, get_my_divergent_groups,
+    mark_divergent,
     non_concurrently,
     server_to_json)
 from otter.http import service_request
@@ -105,9 +106,13 @@ class ConvergerTests(SynchronousTestCase):
         self.group = mock_group(self.state, self.tenant_id, self.group_id)
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
 
+    # converge_one
     # - handles NoSuchScalingGroupError to log and cleanup
     # - handles any other error to NOT mark convergent and swallow
     # - cleans up after a successful run
+
+
+class GetMyDivergentGroupsTests(SynchronousTestCase):
 
     def test_get_my_divergent_groups(self):
         """
@@ -125,7 +130,7 @@ class ConvergerTests(SynchronousTestCase):
             _get_dispatcher()
         ])
         result = sync_perform(
-            dispatcher, self.converger.get_my_divergent_groups([6]))
+            dispatcher, get_my_divergent_groups([6], range(10)))
         self.assertEqual(
             result,
             [{'tenant_id': '00', 'group_id': 'gr1', 'version': 0},
