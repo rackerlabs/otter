@@ -31,7 +31,8 @@ from otter.models.interface import GroupState
 from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
-    FakePartitioner, LockMixin,
+    CheckFailureValue, FakePartitioner, IsBoundWith,
+    matches,
     mock_group, mock_log,
     transform_eq)
 from otter.util.zk import CreateOrSet, GetChildrenWithStats
@@ -70,41 +71,59 @@ class ConvergenceStarterTests(SynchronousTestCase):
 
 
 class ConvergerTests(SynchronousTestCase):
-    """
-    converge_all
-    - finds all divergent groups associated with us
-    - parallelizes converge_one_then_cleanup for each group
-
-    get_my_divergent_groups
-    - uses GetChildrenWithStats to find tenant_group children
-    - splits them up, filters out groups we don't like
-    - returns structured info
-
-    buckets_acquired:
-    - logs
-    - converge_all
-    - performs result
-    - logs error with converge-all-error
-    """
+    """Tests for :obj:`Converger`."""
 
     def setUp(self):
-        self.kz_client = mock.Mock(Lock=LockMixin().mock_lock())
-        self.dispatcher = object()
+        self.dispatcher = _get_dispatcher()
         self.log = mock_log()
         self.buckets = range(10)
 
-        def pfactory(log, callable):
-            self.fake_partitioner = FakePartitioner(log, callable)
-            return self.fake_partitioner
+    def _pfactory(self, log, callable):
+        self.fake_partitioner = FakePartitioner(log, callable)
+        return self.fake_partitioner
 
-        self.converger = Converger(self.log, self.dispatcher, self.buckets,
-                                   pfactory)
-        self.tenant_id = 'tenant-id'
-        self.group_id = 'group-id'
-        self.state = GroupState(self.tenant_id, self.group_id, 'group-name',
-                                {}, {}, None, {}, False)
-        self.group = mock_group(self.state, self.tenant_id, self.group_id)
-        self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
+    def test_buckets_acquired(self):
+        """
+        When buckets are allocated, the result of converge_all is performed.
+        """
+        def converge_all(log, currently_converging, _my_buckets, all_buckets):
+            self.assertEqual(log, matches(IsBoundWith(system='converger')))
+            self.assertIs(currently_converging, converger.currently_converging)
+            self.assertEqual(_my_buckets, my_buckets)
+            self.assertEqual(all_buckets, self.buckets)
+            return Effect(Constant('foo'))
+
+        my_buckets = [0, 5]
+        converger = Converger(
+            self.log, self.dispatcher, self.buckets,
+            self._pfactory, converge_all=converge_all)
+
+        result = self.fake_partitioner.got_buckets(my_buckets)
+        self.assertEqual(self.successResultOf(result), 'foo')
+        self.log.msg.assert_called_once_with(
+            'buckets-acquired', my_buckets=[0, 5], system='converger')
+
+    def test_buckets_acquired_errors(self):
+        """
+        Errors raised from performing the converge_all effect are logged, and
+        None is the ultimate result.
+        """
+        def converge_all(log, currently_converging, _my_buckets, all_buckets):
+            return Effect(Error(RuntimeError('foo')))
+
+        Converger(
+            self.log, self.dispatcher, self.buckets,
+            self._pfactory, converge_all=converge_all)
+
+        result = self.fake_partitioner.got_buckets([0])
+        self.assertEqual(self.successResultOf(result), None)
+        self.log.err.assert_called_once_with(
+            CheckFailureValue(RuntimeError('foo')),
+            'converge-all-error', system='converger')
+
+    # converge_all
+    # - finds all divergent groups associated with us
+    # - parallelizes converge_one_then_cleanup for each group
 
     # converge_one
     # - handles NoSuchScalingGroupError to log and cleanup

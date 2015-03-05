@@ -214,10 +214,9 @@ class ConvergenceStarter(Service, object):
 @do
 def non_concurrently(log, locks, key, eff):
     """
-    Perform some Effect non-concurrently.
+    RUn some Effect non-concurrently.
 
-    :param log: log
-
+    :param log: bound log
     :param ERef locks: An ERef of PSet that will be used to record which
         operations are currently being executed.
     :param key: the key to use for this particular operation, which will be
@@ -238,25 +237,6 @@ def non_concurrently(log, locks, key, eff):
     finally:
         yield locks.modify(lambda cc: cc.remove(key))
     yield do_return(result)
-
-
-def converge_one(log, currently_converging, tenant_id, group_id, version):
-    """
-    Converge one group, non concurrently, and clean up the dirty flag when
-    done.
-
-    :param ERef currently_converging: PSet of currently converging groups
-    :param version: version number of ZNode of the group's dirty flag
-    """
-    log = log.bind(tenant_id=tenant_id, group_id=group_id)
-    eff = execute_convergence(tenant_id, group_id, log)
-    return non_concurrently(
-        log, currently_converging, group_id, eff
-    ).on(
-        success=lambda r: delete_divergent_flag(log, tenant_id,
-                                                group_id, version),
-        error=partial(_cleanup_convergence_error, log, tenant_id,
-                      group_id, version))
 
 
 def get_my_divergent_groups(my_buckets, all_buckets):
@@ -290,7 +270,7 @@ def get_my_divergent_groups(my_buckets, all_buckets):
 
 
 @do
-def converge_all(self, log, currently_converging, my_buckets, all_buckets):
+def converge_all(log, currently_converging, my_buckets, all_buckets):
     """
     Check for groups that need convergence and which match up to the
     buckets we've been allocated.
@@ -302,6 +282,38 @@ def converge_all(self, log, currently_converging, my_buckets, all_buckets):
                          info['version'])
             for info in group_infos]
     yield do_return(parallel(effs))
+
+
+def converge_one(log, currently_converging, tenant_id, group_id, version):
+    """
+    Converge one group, non concurrently, and clean up the dirty flag when
+    done.
+
+    :param ERef currently_converging: PSet of currently converging groups
+    :param version: version number of ZNode of the group's dirty flag
+    """
+    log = log.bind(tenant_id=tenant_id, group_id=group_id)
+    eff = execute_convergence(tenant_id, group_id, log)
+    return non_concurrently(
+        log, currently_converging, group_id, eff
+    ).on(
+        success=lambda r: delete_divergent_flag(log, tenant_id,
+                                                group_id, version),
+        error=partial(_cleanup_convergence_error, log, tenant_id,
+                      group_id, version))
+
+
+def _cleanup_convergence_error(log, tenant_id, group_id, version, exc_info):
+    failure = exc_info_to_failure(exc_info)
+    if failure.check(NoSuchScalingGroupError):
+        log.err(failure, 'converge-fatal-error')
+        return delete_divergent_flag(log, tenant_id, group_id, version)
+    # TODO: Check for other fatal errors, and put the group into ERROR
+    # state.
+    else:
+        log.err(failure, 'converge-non-fatal-error')
+        # We specifically don't clean up the dirty flag in this case, so
+        # convergence will be retried.
 
 
 def _stable_hash(s):
@@ -327,7 +339,8 @@ class Converger(MultiService):
     - we ensure we don't execute convergence for the same group concurrently.
     """
 
-    def __init__(self, log, dispatcher, buckets, partitioner_factory):
+    def __init__(self, log, dispatcher, buckets, partitioner_factory,
+                 converge_all=converge_all):
         """
         :param log: a bound log
         :param dispatcher: The dispatcher to use to perform effects.
@@ -345,18 +358,20 @@ class Converger(MultiService):
         self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self.partitioner.setServiceParent(self)
         self.currently_converging = ERef(pset())
+        self._converge_all = converge_all
 
-    def buckets_acquired(self, my_buckets, perform=perform):
+    def buckets_acquired(self, my_buckets):
         """
         Perform the effectful result of :func:`check_convergence`.
 
         This is used as the partitioner callback.
         """
         self.log.msg('buckets-acquired', my_buckets=my_buckets)
-        eff = converge_all(self.log, self.currently_converging, my_buckets,
-                           self._buckets)
-        return perform(self._dispatcher, eff).addErrback(
+        eff = self._converge_all(self.log, self.currently_converging,
+                                 my_buckets, self._buckets)
+        result = perform(self._dispatcher, eff).addErrback(
             self.log.err, 'converge-all-error')
+        return result
 
     # RADIX FIXME TODO REVIEWERS XXX:
 
@@ -364,19 +379,6 @@ class Converger(MultiService):
     # integration tests clean up they're deleting the groups, and then
     # convergence runs, but it can't find the group. so why is convergence
     # running on a removed group?
-
-
-def _cleanup_convergence_error(log, tenant_id, group_id, version, exc_info):
-    failure = exc_info_to_failure(exc_info)
-    if failure.check(NoSuchScalingGroupError):
-        log.err(failure, 'converge-fatal-error')
-        return delete_divergent_flag(log, tenant_id, group_id, version)
-    # TODO: Check for other fatal errors, and put the group into ERROR
-    # state.
-    else:
-        log.err(failure, 'converge-non-fatal-error')
-        # We specifically don't clean up the dirty flag in this case, so
-        # convergence will be retried.
 
 
 # We're using a global for now because it's difficult to thread a new parameter
