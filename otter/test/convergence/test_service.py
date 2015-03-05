@@ -18,8 +18,11 @@ from otter.constants import CONVERGENCE_DIRTY_DIR, ServiceType
 from otter.convergence.model import (
     CLBDescription, CLBNode, NovaServer, ServerState)
 from otter.convergence.service import (
+    ConcurrentError,
     ConvergenceStarter,
     Converger,
+    converge_all,
+    converge_one,
     determine_active, execute_convergence, get_my_divergent_groups,
     mark_divergent,
     non_concurrently,
@@ -35,7 +38,7 @@ from otter.test.utils import (
     matches,
     mock_group, mock_log,
     transform_eq)
-from otter.util.zk import CreateOrSet, GetChildrenWithStats
+from otter.util.zk import CreateOrSet, DeleteNode, GetChildrenWithStats
 
 
 class MarkDivergentTests(SynchronousTestCase):
@@ -68,6 +71,8 @@ class ConvergenceStarterTests(SynchronousTestCase):
             ('my-dispatcher',
              Effect(CreateOrSet(path='/groups/divergent/tenant_group',
                                 content='dirty'))))
+        # TODO: Assert log message
+        # TODO: failure case log message
 
 
 class ConvergerTests(SynchronousTestCase):
@@ -121,14 +126,101 @@ class ConvergerTests(SynchronousTestCase):
             CheckFailureValue(RuntimeError('foo')),
             'converge-all-error', system='converger')
 
-    # converge_all
-    # - finds all divergent groups associated with us
-    # - parallelizes converge_one_then_cleanup for each group
 
+class ConvergeOneTests(SynchronousTestCase):
     # converge_one
     # - handles NoSuchScalingGroupError to log and cleanup
     # - handles any other error to NOT mark convergent and swallow
-    # - cleans up after a successful run
+    def test_success(self):
+        """
+        runs execute_convergence and returns None, then deletes the dirty flag.
+        """
+        calls = []
+
+        def execute_convergence(tenant_id, group_id, log):
+            return Effect(Func(
+                lambda: calls.append((tenant_id, group_id, log))))
+
+        log = mock_log()
+        tenant_id = 'tenant-id'
+        group_id = 'g1'
+        version = 5
+
+        deletions = []
+        dispatcher = ComposedDispatcher([
+            EQFDispatcher({
+                DeleteNode(path='/groups/divergent/tenant-id_g1',
+                           version=version):
+                lambda i: deletions.append(True)
+            }),
+            _get_dispatcher(),
+        ])
+
+        eff = converge_one(log, ERef(pset()), tenant_id, group_id, version,
+                           execute_convergence=execute_convergence)
+        result = sync_perform(dispatcher, eff)
+        self.assertEqual(result, None)
+        self.assertEqual(
+            calls,
+            [(tenant_id, group_id,
+              matches(IsBoundWith(tenant_id=tenant_id, group_id=group_id)))])
+        self.assertEqual(deletions, [True])
+        log.msg.assert_any_call(
+            'mark-clean-success', tenant_id=tenant_id, group_id=group_id)
+
+    def test_non_concurrent(self):
+        """Runs execute_convergence non-concurrently, based on the group ID."""
+        calls = []
+
+        def execute_convergence(tenant_id, group_id, log):
+            return Effect(Func(lambda: calls.append('should not be run')))
+
+        log = mock_log()
+        tenant_id = 'tenant-id'
+        group_id = 'g1'
+        version = 5
+        eff = converge_one(log, ERef(pset([group_id])), tenant_id, group_id,
+                           version, execute_convergence=execute_convergence)
+        result = sync_perform(_get_dispatcher(), eff)
+        self.assertEqual(result, None)
+        self.assertEqual(calls, [])
+
+
+class ConvergeAllTests(SynchronousTestCase):
+    """Tests for :func:`converge_all`."""
+
+    def test_converge_all(self):
+        """
+        Fetches divergent groups and runs converge_one for each one needing
+        convergence.
+        """
+        def get_my_divergent_groups(_my_buckets, _all_buckets):
+            self.assertEqual(_my_buckets, my_buckets)
+            self.assertEqual(_all_buckets, all_buckets)
+            return Effect(Constant([
+                {'tenant_id': '00', 'group_id': 'g1', 'version': 1},
+                {'tenant_id': '01', 'group_id': 'g2', 'version': 5}
+            ]))
+
+        def converge_one(log, locks, tenant_id, group_id, version):
+            return Effect(Constant(
+                (tenant_id, group_id, version, 'converge!')))
+
+        log = mock_log()
+        locks = ERef(pset())
+        my_buckets = [0, 5]
+        all_buckets = range(10)
+        result = converge_all(log, locks, my_buckets, all_buckets,
+                              get_my_divergent_groups=get_my_divergent_groups,
+                              converge_one=converge_one)
+        self.assertEqual(
+            sync_perform(_get_dispatcher(), result),
+            [('00', 'g1', 1, 'converge!'),
+             ('01', 'g2', 5, 'converge!')])
+        log.msg.assert_called_once_with(
+            'converge-all',
+            group_infos=[{'tenant_id': '00', 'group_id': 'g1', 'version': 1},
+                         {'tenant_id': '01', 'group_id': 'g2', 'version': 5}])
 
 
 class GetMyDivergentGroupsTests(SynchronousTestCase):
@@ -186,7 +278,6 @@ class NonConcurrentlyTests(SynchronousTestCase):
         :func:`non_concurrently` returns the result of the passed effect, and
         adds the ``key`` to the ``locks`` while executing.
         """
-        log = mock_log()
         dispatcher = _get_dispatcher()
 
         def execute_stuff():
@@ -195,7 +286,7 @@ class NonConcurrentlyTests(SynchronousTestCase):
 
         eff = Effect(Func(execute_stuff))
 
-        non_c_eff = non_concurrently(log, self.locks, 'the-key', eff)
+        non_c_eff = non_concurrently(self.locks, 'the-key', eff)
         self.assertEqual(sync_perform(dispatcher, non_c_eff), 'foo')
         # and after convergence, nothing is marked as converging
         self.assertEqual(self._get_locks(), pset([]))
@@ -204,23 +295,22 @@ class NonConcurrentlyTests(SynchronousTestCase):
         """
         :func:`non_concurrently` returns None when the key is already locked.
         """
-        log = mock_log()
         self._add_lock('the-key')
         eff = Effect(Error(RuntimeError('foo')))
-        non_c_eff = non_concurrently(log, self.locks, 'the-key', eff)
-        self.assertEqual(sync_perform(_get_dispatcher(), non_c_eff), None)
+        non_c_eff = non_concurrently(self.locks, 'the-key', eff)
+        self.assertRaises(
+            ConcurrentError,
+            sync_perform, _get_dispatcher(), non_c_eff)
         self.assertEqual(self._get_locks(), pset(['the-key']))
-        log.msg.assert_called_once_with('already-converging')
 
     def test_cleans_up_on_exception(self):
         """
         When the effect results in error, the key is still removed from the
         locked set.
         """
-        log = mock_log()
         dispatcher = _get_dispatcher()
         eff = Effect(Error(RuntimeError('foo!')))
-        non_c_eff = non_concurrently(log, self.locks, 'the-key', eff)
+        non_c_eff = non_concurrently(self.locks, 'the-key', eff)
         e = self.assertRaises(RuntimeError, sync_perform, dispatcher,
                               non_c_eff)
         self.assertEqual(str(e), 'foo!')

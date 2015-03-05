@@ -91,7 +91,6 @@ def execute_convergence(tenant_id, group_id, log,
     :return: An Effect of a list containing the individual step results.
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
-    log.msg('execute-convergence')
     # Huh! It turns out we can parallelize the gathering of data with the
     # fetching of the scaling group info from cassandra.
     sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
@@ -107,7 +106,7 @@ def execute_convergence(tenant_id, group_id, log,
                 group_id, launch_config, group_state.desired)
             steps = plan(desired_group_state, servers, lb_nodes, now)
             active = determine_active(servers, lb_nodes)
-            log.msg('convergence-plan',
+            log.msg('execute-convergence',
                     servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
                     desired=desired_group_state, active=active)
             eff = _update_active(scaling_group, active)
@@ -185,12 +184,11 @@ def delete_divergent_flag(log, tenant_id, group_id, version):
 
     :return: Effect of None.
     """
-    log.msg('convergence-mark-clean')
     path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
                                          group_id=group_id)
     return Effect(DeleteNode(path=path, version=version)).on(
-        error=lambda e: log.err(exc_info_to_failure(e),
-                                'mark-clean-failed'))
+        success=lambda r: log.msg('mark-clean-success'),
+        error=lambda e: log.err(exc_info_to_failure(e), 'mark-clean-failure'))
 
 
 class ConvergenceStarter(Service, object):
@@ -204,17 +202,24 @@ class ConvergenceStarter(Service, object):
     def start_convergence(self, log, tenant_id, group_id, perform=perform):
         """Record that a group needs converged."""
         log = log.bind(tenant_id=tenant_id, group_id=group_id)
-        log.msg('mark-dirty')
         eff = mark_divergent(tenant_id, group_id)
         d = perform(self._dispatcher, eff)
-        d.addErrback(log.err, 'mark-dirty-failed')
+
+        def success(r):
+            log.msg('mark-dirty-success')
+            return r  # The result is ignored normally, but return it for tests
+        d.addCallbacks(success, log.err, errbackArgs=('mark-dirty-failure',))
         return d
 
 
+class ConcurrentError(Exception):
+    """Tried to run an effect concurrently when it shouldn't be."""
+
+
 @do
-def non_concurrently(log, locks, key, eff):
+def non_concurrently(locks, key, eff):
     """
-    RUn some Effect non-concurrently.
+    Run some Effect non-concurrently.
 
     :param log: bound log
     :param ERef locks: An ERef of PSet that will be used to record which
@@ -229,8 +234,7 @@ def non_concurrently(log, locks, key, eff):
     guaranteed that it will definitely not be executed concurrently.
     """
     if key in (yield locks.read()):
-        log.msg('already-converging')
-        return
+        raise ConcurrentError(key)
     yield locks.modify(lambda cc: cc.add(key))
     try:
         result = yield eff
@@ -269,8 +273,30 @@ def get_my_divergent_groups(my_buckets, all_buckets):
     return eff.on(got_children_with_stats)
 
 
+def converge_one(log, currently_converging, tenant_id, group_id, version,
+                 execute_convergence=execute_convergence):
+    """
+    Converge one group, non-concurrently, and clean up the dirty flag when
+    done.
+
+    :param ERef currently_converging: PSet of currently converging groups
+    :param version: version number of ZNode of the group's dirty flag
+    """
+    log = log.bind(tenant_id=tenant_id, group_id=group_id)
+    eff = execute_convergence(tenant_id, group_id, log)
+    return non_concurrently(
+        currently_converging, group_id, eff
+    ).on(
+        success=lambda r: delete_divergent_flag(log, tenant_id,
+                                                group_id, version),
+        error=partial(_cleanup_convergence_error, log, tenant_id,
+                      group_id, version))
+
+
 @do
-def converge_all(log, currently_converging, my_buckets, all_buckets):
+def converge_all(log, currently_converging, my_buckets, all_buckets,
+                 get_my_divergent_groups=get_my_divergent_groups,
+                 converge_one=converge_one):
     """
     Check for groups that need convergence and which match up to the
     buckets we've been allocated.
@@ -284,30 +310,14 @@ def converge_all(log, currently_converging, my_buckets, all_buckets):
     yield do_return(parallel(effs))
 
 
-def converge_one(log, currently_converging, tenant_id, group_id, version):
-    """
-    Converge one group, non concurrently, and clean up the dirty flag when
-    done.
-
-    :param ERef currently_converging: PSet of currently converging groups
-    :param version: version number of ZNode of the group's dirty flag
-    """
-    log = log.bind(tenant_id=tenant_id, group_id=group_id)
-    eff = execute_convergence(tenant_id, group_id, log)
-    return non_concurrently(
-        log, currently_converging, group_id, eff
-    ).on(
-        success=lambda r: delete_divergent_flag(log, tenant_id,
-                                                group_id, version),
-        error=partial(_cleanup_convergence_error, log, tenant_id,
-                      group_id, version))
-
-
 def _cleanup_convergence_error(log, tenant_id, group_id, version, exc_info):
     failure = exc_info_to_failure(exc_info)
     if failure.check(NoSuchScalingGroupError):
         log.err(failure, 'converge-fatal-error')
         return delete_divergent_flag(log, tenant_id, group_id, version)
+    if failure.check(ConcurrentError):
+        # We don't need to spam the logs about this, it's to be expected
+        pass
     # TODO: Check for other fatal errors, and put the group into ERROR
     # state.
     else:
@@ -371,6 +381,7 @@ class Converger(MultiService):
                                  my_buckets, self._buckets)
         result = perform(self._dispatcher, eff).addErrback(
             self.log.err, 'converge-all-error')
+        # the return value is ignored, but we return this for testing
         return result
 
     # RADIX FIXME TODO REVIEWERS XXX:
