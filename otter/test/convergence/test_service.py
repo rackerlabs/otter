@@ -11,7 +11,7 @@ from pyrsistent import freeze, pmap, pset
 
 from toolz import assoc
 
-from twisted.internet.defer import succeed
+from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import CONVERGENCE_DIRTY_DIR, ServiceType
@@ -60,6 +60,7 @@ class ConvergenceStarterTests(SynchronousTestCase):
     """Tests for :obj:`ConvergenceStarter`."""
 
     def test_start_convergence(self):
+        """Starting convergence marks dirty and logs a message."""
         svc = ConvergenceStarter('my-dispatcher')
         log = mock_log()
 
@@ -71,8 +72,21 @@ class ConvergenceStarterTests(SynchronousTestCase):
             ('my-dispatcher',
              Effect(CreateOrSet(path='/groups/divergent/tenant_group',
                                 content='dirty'))))
-        # TODO: Assert log message
-        # TODO: failure case log message
+        log.msg.assert_called_once_with(
+            'mark-dirty-success', tenant_id='tenant', group_id='group')
+
+    def test_error_marking_dirty(self):
+        """An error is logged when marking dirty fails."""
+        svc = ConvergenceStarter('my-dispatcher')
+        log = mock_log()
+
+        def perform(dispatcher, eff):
+            return fail(RuntimeError('oh no'))
+        d = svc.start_convergence(log, 'tenant', 'group', perform=perform)
+        self.assertEqual(self.successResultOf(d), None)
+        log.err.assert_called_once_with(
+            CheckFailureValue(RuntimeError('oh no')),
+            'mark-dirty-failure', tenant_id='tenant', group_id='group')
 
 
 class ConvergerTests(SynchronousTestCase):
