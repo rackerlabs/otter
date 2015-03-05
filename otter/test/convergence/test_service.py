@@ -19,8 +19,9 @@ from otter.convergence.model import (
     CLBDescription, CLBNode, NovaServer, ServerState)
 from otter.convergence.service import (
     ConvergenceStarter,
-    Converger, converge_non_concurrently,
+    Converger,
     determine_active, execute_convergence, mark_divergent,
+    non_concurrently,
     server_to_json)
 from otter.http import service_request
 from otter.models.intents import (
@@ -118,88 +119,66 @@ def _get_dispatcher():
     ])
 
 
-class ConvergeNonConcurrentlyTests(SynchronousTestCase):
-    """Tests for :func:`converge_non_concurrently`."""
+class NonConcurrentlyTests(SynchronousTestCase):
+    """Tests for :func:`non_concurrently`."""
 
     def setUp(self):
-        self.tenant_id = 'tenant-id'
-        self.group_id = 'group-id'
-        self.currently_converging = ERef(pset())
+        self.locks = ERef(pset())
 
-    def _get_cc(self):
-        """Get the currently_converging set."""
+    def _get_locks(self):
+        """Get the locks set."""
+        return sync_perform(_get_dispatcher(), self.locks.read())
+
+    def _add_lock(self, value):
+        """Add an item to the locks set."""
         return sync_perform(_get_dispatcher(),
-                            self.currently_converging.read())
-
-    def _add_cc(self, value):
-        """Add an item to the currently_converging set."""
-        return sync_perform(
-            _get_dispatcher(),
-            self.currently_converging.modify(lambda cc: cc.add(value)))
+                            self.locks.modify(lambda cc: cc.add(value)))
 
     def test_success(self):
         """
-        :func:`converge_non_concurrently` returns the result of executing
-        convergence, and marks the group as currently converging while
-        executing convergence.
+        :func:`non_concurrently` returns the result of the passed effect, and
+        adds the ``key`` to the ``locks`` while executing.
         """
         log = mock_log()
         dispatcher = _get_dispatcher()
 
-        def perform_execute_convergence(tenant_id, group_id, ec_log):
-            # Ensure that when execute_convergence is being performed,
-            # the group is marked as currently converging.
-            self.assertEqual(tenant_id, self.tenant_id)
-            self.assertEqual(group_id, self.group_id)
-            self.assertIs(ec_log, log)
-            self.assertEqual(self._get_cc(), pset(['group-id']))
-            return 'converged!'
+        def execute_stuff():
+            self.assertEqual(self._get_locks(), pset(['the-key']))
+            return 'foo'
 
-        def execute_convergence(tenant_id, group_id, log):
-            return Effect(Func(
-                lambda: perform_execute_convergence(tenant_id, group_id, log)))
+        eff = Effect(Func(execute_stuff))
 
-        eff = converge_non_concurrently(
-            self.currently_converging,
-            self.tenant_id, self.group_id, log,
-            execute_convergence=execute_convergence)
-        self.assertEqual(sync_perform(dispatcher, eff), 'converged!')
+        non_c_eff = non_concurrently(log, self.locks, 'the-key', eff)
+        self.assertEqual(sync_perform(dispatcher, non_c_eff), 'foo')
         # and after convergence, nothing is marked as converging
-        self.assertEqual(self._get_cc(), pset([]))
+        self.assertEqual(self._get_locks(), pset([]))
 
     def test_refuses_concurrency(self):
         """
-        :func:`converge_non_concurrently` returns None when the group is
-        already being converged.
+        :func:`non_concurrently` returns None when the key is already locked.
         """
-        self._add_cc(self.group_id)
-        eff = converge_non_concurrently(
-            self.currently_converging,
-            self.tenant_id, self.group_id, mock_log(),
-            execute_convergence=lambda t, g, l: 1 / 0)
-        self.assertEqual(sync_perform(_get_dispatcher(), eff), None)
-        self.assertEqual(self._get_cc(), pset([self.group_id]))
+        log = mock_log()
+        self._add_lock('the-key')
+        eff = Effect(Error(RuntimeError('foo')))
+        non_c_eff = non_concurrently(log, self.locks, 'the-key', eff)
+        self.assertEqual(sync_perform(_get_dispatcher(), non_c_eff), None)
+        self.assertEqual(self._get_locks(), pset(['the-key']))
+        log.msg.assert_called_once_with('already-converging')
 
     def test_cleans_up_on_exception(self):
         """
-        The group being converged is removed from the set even when an
-        exception is raised.
+        When the effect results in error, the key is still removed from the
+        locked set.
         """
         log = mock_log()
         dispatcher = _get_dispatcher()
 
-        def execute_convergence(tenant_id, group_id, log):
-            return Effect(Error(RuntimeError('foo!')))
+        eff = Effect(Error(RuntimeError('foo!')))
 
-        eff = converge_non_concurrently(
-            self.currently_converging,
-            self.tenant_id, self.group_id, log,
-            execute_convergence=execute_convergence)
-        e = self.assertRaises(
-            RuntimeError,
-            sync_perform, dispatcher, eff)
+        non_c_eff = non_concurrently(log, self.locks, 'the-key', eff)
+        e = self.assertRaises(RuntimeError, sync_perform, dispatcher, eff)
         self.assertEqual(str(e), 'foo!')
-        self.assertEqual(self._get_cc(), pset([]))
+        self.assertEqual(self._get_locks(), pset([]))
 
 
 class ExecuteConvergenceTests(SynchronousTestCase):

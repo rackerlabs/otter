@@ -211,39 +211,31 @@ class ConvergenceStarter(Service, object):
 
 
 @do
-def converge_non_concurrently(currently_converging,
-                              tenant_id, group_id, log,
-                              execute_convergence=execute_convergence):
+def non_concurrently(log, locks, key, eff):
     """
-    Converge one group if it's not already being converged.
+    Perform some Effect non-concurrently.
 
-    :param ERef currently_converging: An ERef of PSet, representing groups
-        currently being converged.
-    :param tenant_id: tenant
-    :param group_id: group
     :param log: log
-    :param execute_convergence: The :func:`execute_convergence`, used for tests
+
+    :param ERef locks: An ERef of PSet that will be used to record which
+        operations are currently being executed.
+    :param key: the key to use for this particular operation, which will be
+        stored in ``locks``
+    :param Effect eff: the effect to execute.
+
+    :return: Effect with the result of ``eff``.
+
+    It's not guaranteed that the eff will ever be executed, but it is
+    guaranteed that it will definitely not be executed concurrently.
     """
-    # Even though we yield for ERef access/modification, we can rely on it
-    # being synchronous, so no worries about race conditions for this
-    # conditional and the following addition of the group:
-    if group_id in (yield currently_converging.read()):
+    if key in (yield locks.read()):
         log.msg('already-converging')
         return
-    yield currently_converging.modify(lambda cc: cc.add(group_id))
-    # However, the convergence itself is asynchronous. Can we have a race
-    # condition here?  In fact, won't this have the same problem that we have
-    # with the `dirty` flag? Kind of, but it doesn't matter. It's possible that
-    # another call to this function will happen just after this
-    # execute_convergence call, and before we remove the group from
-    # currently_converging. But it doesn't matter! Because the surrounding
-    # dirty-checking, with its version-numbered flag, will keep the group in
-    # the "divergent" state no matter what. :-)
+    yield locks.modify(lambda cc: cc.add(key))
     try:
-        result = yield execute_convergence(tenant_id, group_id, log)
+        result = yield eff
     finally:
-        yield currently_converging.modify(
-            lambda cc: cc.remove(group_id))
+        yield locks.modify(lambda cc: cc.remove(key))
     yield do_return(result)
 
 
@@ -335,8 +327,8 @@ class Converger(MultiService):
         group_id = info['group_id']
         version = info['version']
         log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
-        return converge_non_concurrently(
-            self.currently_converging, tenant_id, group_id, log
+        eff = execute_convergence(tenant_id, group_id, log)
+        return non_concurrently(log, self.currently_converging, group_id, eff
         ).on(
             success=lambda r: delete_divergent_flag(log, tenant_id,
                                                     group_id, version),
