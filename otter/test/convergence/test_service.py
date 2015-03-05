@@ -30,7 +30,7 @@ from otter.convergence.service import (
 from otter.http import service_request
 from otter.models.intents import (
     GetScalingGroupInfo, ModifyGroupState, perform_modify_group_state)
-from otter.models.interface import GroupState
+from otter.models.interface import GroupState, NoSuchScalingGroupError
 from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
@@ -128,9 +128,22 @@ class ConvergerTests(SynchronousTestCase):
 
 
 class ConvergeOneTests(SynchronousTestCase):
-    # converge_one
-    # - handles NoSuchScalingGroupError to log and cleanup
-    # - handles any other error to NOT mark convergent and swallow
+
+    def setUp(self):
+        self.log = mock_log()
+        self.tenant_id = 'tenant-id'
+        self.group_id = 'g1'
+        self.version = 5
+        self.deletions = []
+        self.dispatcher = ComposedDispatcher([
+            EQFDispatcher({
+                DeleteNode(path='/groups/divergent/tenant-id_g1',
+                           version=self.version):
+                lambda i: self.deletions.append(True)
+            }),
+            _get_dispatcher(),
+        ])
+
     def test_success(self):
         """
         runs execute_convergence and returns None, then deletes the dirty flag.
@@ -141,32 +154,21 @@ class ConvergeOneTests(SynchronousTestCase):
             return Effect(Func(
                 lambda: calls.append((tenant_id, group_id, log))))
 
-        log = mock_log()
-        tenant_id = 'tenant-id'
-        group_id = 'g1'
-        version = 5
-
-        deletions = []
-        dispatcher = ComposedDispatcher([
-            EQFDispatcher({
-                DeleteNode(path='/groups/divergent/tenant-id_g1',
-                           version=version):
-                lambda i: deletions.append(True)
-            }),
-            _get_dispatcher(),
-        ])
-
-        eff = converge_one(log, ERef(pset()), tenant_id, group_id, version,
-                           execute_convergence=execute_convergence)
-        result = sync_perform(dispatcher, eff)
+        eff = converge_one(
+            self.log, ERef(pset()), self.tenant_id, self.group_id,
+            self.version,
+            execute_convergence=execute_convergence)
+        result = sync_perform(self.dispatcher, eff)
         self.assertEqual(result, None)
         self.assertEqual(
             calls,
-            [(tenant_id, group_id,
-              matches(IsBoundWith(tenant_id=tenant_id, group_id=group_id)))])
-        self.assertEqual(deletions, [True])
-        log.msg.assert_any_call(
-            'mark-clean-success', tenant_id=tenant_id, group_id=group_id)
+            [(self.tenant_id, self.group_id,
+              matches(IsBoundWith(tenant_id=self.tenant_id,
+                                  group_id=self.group_id)))])
+        self.assertEqual(self.deletions, [True])
+        self.log.msg.assert_any_call(
+            'mark-clean-success',
+            tenant_id=self.tenant_id, group_id=self.group_id)
 
     def test_non_concurrent(self):
         """Runs execute_convergence non-concurrently, based on the group ID."""
@@ -175,15 +177,76 @@ class ConvergeOneTests(SynchronousTestCase):
         def execute_convergence(tenant_id, group_id, log):
             return Effect(Func(lambda: calls.append('should not be run')))
 
-        log = mock_log()
-        tenant_id = 'tenant-id'
-        group_id = 'g1'
-        version = 5
-        eff = converge_one(log, ERef(pset([group_id])), tenant_id, group_id,
-                           version, execute_convergence=execute_convergence)
-        result = sync_perform(_get_dispatcher(), eff)
+        eff = converge_one(
+            self.log, ERef(pset([self.group_id])), self.tenant_id,
+            self.group_id, self.version,
+            execute_convergence=execute_convergence)
+        result = sync_perform(self.dispatcher, eff)
         self.assertEqual(result, None)
         self.assertEqual(calls, [])
+
+    def test_no_scaling_group(self):
+        """
+        When the scaling group disappears, a fatal error is logged and the
+        dirty flag is cleaned up.
+        """
+        def execute_convergence(tenant_id, group_id, log):
+            return Effect(Error(NoSuchScalingGroupError(tenant_id, group_id)))
+
+        eff = converge_one(
+            self.log, ERef(pset([])), self.tenant_id, self.group_id,
+            self.version,
+            execute_convergence=execute_convergence)
+        result = sync_perform(self.dispatcher, eff)
+        self.assertEqual(result, None)
+
+        self.log.err.assert_any_call(
+            CheckFailureValue(NoSuchScalingGroupError(self.tenant_id,
+                                                      self.group_id)),
+            'converge-fatal-error',
+            tenant_id=self.tenant_id, group_id=self.group_id)
+
+        self.assertEqual(self.deletions, [True])
+        self.log.msg.assert_any_call(
+            'mark-clean-success',
+            tenant_id=self.tenant_id, group_id=self.group_id)
+
+    def test_concurrent_error_ignored(self):
+        """
+        ConcurrentError does not cause a log message, and doesn't clean up the
+        dirty flag.
+        """
+        def execute_convergence(tenant_id, group_id, log):
+            return Effect(Error(ConcurrentError(group_id)))
+
+        eff = converge_one(
+            self.log, ERef(pset([])), self.tenant_id, self.group_id,
+            self.version,
+            execute_convergence=execute_convergence)
+        result = sync_perform(self.dispatcher, eff)
+        self.assertEqual(result, None)
+        self.assertEqual(self.log.err.mock_calls, [])
+        self.assertEqual(self.deletions, [])
+
+    def test_unexpected_errors(self):
+        """
+        Unexpected exceptions log a non-fatal error and don't clean up the
+        dirty flag.
+        """
+        def execute_convergence(tenant_id, group_id, log):
+            return Effect(Error(RuntimeError('uh oh!')))
+
+        eff = converge_one(
+            self.log, ERef(pset([])), self.tenant_id, self.group_id,
+            self.version,
+            execute_convergence=execute_convergence)
+        result = sync_perform(self.dispatcher, eff)
+        self.assertEqual(result, None)
+        self.log.err.assert_any_call(
+            CheckFailureValue(RuntimeError('uh oh!')),
+            'converge-non-fatal-error',
+            tenant_id=self.tenant_id, group_id=self.group_id)
+        self.assertEqual(self.deletions, [])
 
 
 class ConvergeAllTests(SynchronousTestCase):
