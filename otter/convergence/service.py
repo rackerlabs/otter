@@ -2,6 +2,7 @@
 
 import time
 from functools import partial
+from hashlib import sha1
 
 from effect import Effect, FirstError, Func, catch, parallel
 from effect.do import do, do_return
@@ -239,6 +240,12 @@ def non_concurrently(log, locks, key, eff):
     yield do_return(result)
 
 
+def _stable_hash(s):
+    """Get a stable hash of a string as an integer."""
+    # :func:`hash` is not stable with different pythons/architectures.
+    return int(sha1(s).hexdigest(), 16)
+
+
 class Converger(MultiService):
     """
     A service that searches for groups that need converging and then does the
@@ -303,9 +310,10 @@ class Converger(MultiService):
 
         def got_children_with_stats(children_with_stats):
             dirty_info = map(structure_info, children_with_stats)
+            num_buckets = len(self._buckets)
             converging = (
                 info for info in dirty_info
-                if hash(info['tenant_id']) % len(self._buckets) in my_buckets)
+                if _stable_hash(info['tenant_id']) % num_buckets in my_buckets)
             return list(converging)
 
         eff = Effect(GetChildrenWithStats(CONVERGENCE_DIRTY_DIR))
@@ -328,7 +336,8 @@ class Converger(MultiService):
         version = info['version']
         log = self.log.bind(tenant_id=tenant_id, group_id=group_id)
         eff = execute_convergence(tenant_id, group_id, log)
-        return non_concurrently(log, self.currently_converging, group_id, eff
+        return non_concurrently(
+            log, self.currently_converging, group_id, eff
         ).on(
             success=lambda r: delete_divergent_flag(log, tenant_id,
                                                     group_id, version),

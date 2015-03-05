@@ -14,7 +14,7 @@ from toolz import assoc
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.constants import ServiceType
+from otter.constants import CONVERGENCE_DIRTY_DIR, ServiceType
 from otter.convergence.model import (
     CLBDescription, CLBNode, NovaServer, ServerState)
 from otter.convergence.service import (
@@ -28,11 +28,12 @@ from otter.models.intents import (
     GetScalingGroupInfo, ModifyGroupState, perform_modify_group_state)
 from otter.models.interface import GroupState
 from otter.test.convergence.test_planning import server
+from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
     FakePartitioner, LockMixin,
     mock_group, mock_log,
     transform_eq)
-from otter.util.zk import CreateOrSet
+from otter.util.zk import CreateOrSet, GetChildrenWithStats
 
 
 class MarkDivergentTests(SynchronousTestCase):
@@ -108,6 +109,28 @@ class ConvergerTests(SynchronousTestCase):
     # - handles any other error to NOT mark convergent and swallow
     # - cleans up after a successful run
 
+    def test_get_my_divergent_groups(self):
+        """
+        :func:`get_my_divergent_groups` gets information about divergent groups
+        that are associated with the given buckets.
+        """
+        # sha1('00') % 10 is 6, sh1('01') % 10 is 1.
+        dispatcher = ComposedDispatcher([
+            EQDispatcher({
+                GetChildrenWithStats(CONVERGENCE_DIRTY_DIR):
+                [('00_gr1', ZNodeStatStub(version=0)),
+                 ('00_gr2', ZNodeStatStub(version=3)),
+                 ('01_gr3', ZNodeStatStub(version=5))]
+            }),
+            _get_dispatcher()
+        ])
+        result = sync_perform(
+            dispatcher, self.converger.get_my_divergent_groups([6]))
+        self.assertEqual(
+            result,
+            [{'tenant_id': '00', 'group_id': 'gr1', 'version': 0},
+             {'tenant_id': '00', 'group_id': 'gr2', 'version': 3}])
+
 
 def _get_dispatcher():
     return ComposedDispatcher([
@@ -172,11 +195,10 @@ class NonConcurrentlyTests(SynchronousTestCase):
         """
         log = mock_log()
         dispatcher = _get_dispatcher()
-
         eff = Effect(Error(RuntimeError('foo!')))
-
         non_c_eff = non_concurrently(log, self.locks, 'the-key', eff)
-        e = self.assertRaises(RuntimeError, sync_perform, dispatcher, eff)
+        e = self.assertRaises(RuntimeError, sync_perform, dispatcher,
+                              non_c_eff)
         self.assertEqual(str(e), 'foo!')
         self.assertEqual(self._get_locks(), pset([]))
 
