@@ -989,8 +989,8 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
 
 class ConvergeTestCase(SynchronousTestCase):
     """
-    Tests for :func:`otter.controller.converge`, currently using the Otter
-    launch_server backend.
+    Tests for :func:`otter.controller.converge`, using both the Otter
+    launch_server backend and the real convergence backend.
     """
 
     def setUp(self):
@@ -1090,10 +1090,11 @@ class ConvergeTestCase(SynchronousTestCase):
             active_capacity=3, desired_capacity=5, pending_capacity=2,
             audit_log=True)
 
-    def test_real_convergence(self):
+    def test_real_convergence_nonzero_delta(self):
         """
-        When a tenant is configured to for convergence, the Convergence
-        service's ``converge`` method is invoked, and None is returned.
+        When a tenant is configured to for convergence, if the delta is
+        non-zero, the Convergence service's ``converge`` method is invoked and
+        a Deferred that fires with `None` is returned.
         """
         log = mock_log()
         state = GroupState('tenant', 'group', "test", [], [], None, {},
@@ -1109,6 +1110,32 @@ class ConvergeTestCase(SynchronousTestCase):
                                      state, 'launch', policy,
                                      config_value=config_data.get)
         self.assertEqual(self.successResultOf(result), state)
+        start_convergence.assert_called_once_with(log, 'tenant', 'group')
+
+        # And execute_launch_config is _not_ called
+        self.assertFalse(self.mocks['execute_launch_config'].called)
+
+
+    def test_real_convergence_zero_delta(self):
+        """
+        When a tenant is configured for convergence, if the delta is zero, the
+        ConvergenceStarter service's ``start_convergence`` method is still
+        invoked.
+        """
+        log = mock_log()
+        state = GroupState('tenant', 'group-id', "test", [], [], None, {},
+                           False)
+        group_config = {'maxEntities': 100, 'minEntities': 0}
+        policy = {'change': 0}
+        config_data = {'convergence-tenants': ['tenant']}
+
+        start_convergence = self.cvg_starter_mock.start_convergence
+        start_convergence.return_value = defer.succeed("ignored")
+
+        result = controller.converge(log, 'txn-id', group_config, self.group,
+                                     state, 'launch', policy,
+                                     config_value=config_data.get)
+        self.assertIs(self.successResultOf(result), state)
         start_convergence.assert_called_once_with(log, 'tenant', 'group')
 
         # And execute_launch_config is _not_ called

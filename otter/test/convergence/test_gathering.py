@@ -6,7 +6,7 @@ from functools import partial
 from effect import Constant, Effect
 from effect.testing import Stub
 
-from pyrsistent import pmap
+from pyrsistent import freeze
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -16,10 +16,7 @@ from otter.convergence.gathering import (
     extract_CLB_drained_at,
     get_all_server_details,
     get_clb_contents,
-    get_scaling_group_servers,
-    to_nova_server,
-    _private_ipv4_addresses,
-    _servicenet_address)
+    get_scaling_group_servers)
 from otter.convergence.model import (
     CLBDescription,
     CLBNode,
@@ -355,182 +352,6 @@ class GetLBContentsTests(SynchronousTestCase):
                      description=make_desc(lb_id='2'))])
 
 
-class ToNovaServerTests(SynchronousTestCase):
-    """
-    Tests for :func:`to_nova_server`
-    """
-    def setUp(self):
-        """
-        Sample servers
-        """
-        self.createds = [('2020-10-10T10:00:00Z', 1602324000),
-                         ('2020-10-20T11:30:00Z', 1603193400)]
-        self.servers = [{'id': 'a',
-                         'status': 'ACTIVE',
-                         'created': self.createds[0][0],
-                         'image': {'id': 'valid_image'},
-                         'flavor': {'id': 'valid_flavor'}},
-                        {'id': 'b',
-                         'status': 'BUILD',
-                         'image': {'id': 'valid_image'},
-                         'flavor': {'id': 'valid_flavor'},
-                         'created': self.createds[1][0],
-                         'addresses': {'private': [{'addr': u'10.0.0.1',
-                                                    'version': 4}]}}]
-
-    def test_without_address(self):
-        """
-        Handles server json that does not have "addresses" in it.
-        """
-        self.assertEqual(
-            to_nova_server(self.servers[0]),
-            NovaServer(id='a',
-                       state=ServerState.ACTIVE,
-                       image_id='valid_image',
-                       flavor_id='valid_flavor',
-                       created=self.createds[0][1],
-                       servicenet_address=''))
-
-    def test_without_private(self):
-        """
-        Creates server that does not have private/servicenet IP in it.
-        """
-        self.servers[0]['addresses'] = {'public': 'p'}
-        self.assertEqual(
-            to_nova_server(self.servers[0]),
-            NovaServer(id='a',
-                       state=ServerState.ACTIVE,
-                       image_id='valid_image',
-                       flavor_id='valid_flavor',
-                       created=self.createds[0][1],
-                       servicenet_address=''))
-
-    def test_with_servicenet(self):
-        """
-        Create server that has servicenet IP in it.
-        """
-        self.assertEqual(
-            to_nova_server(self.servers[1]),
-            NovaServer(id='b',
-                       state=ServerState.BUILD,
-                       image_id='valid_image',
-                       flavor_id='valid_flavor',
-                       created=self.createds[1][1],
-                       servicenet_address='10.0.0.1'))
-
-    def test_without_image_id(self):
-        """
-        Create server that has missing image in it in various ways.
-        (for the case of BFV)
-        """
-        for image in ({}, {'id': None}):
-            self.servers[0]['image'] = image
-            self.assertEqual(
-                to_nova_server(self.servers[0]),
-                NovaServer(id='a',
-                           state=ServerState.ACTIVE,
-                           image_id=None,
-                           flavor_id='valid_flavor',
-                           created=self.createds[0][1],
-                           servicenet_address=''))
-        del self.servers[0]['image']
-        self.assertEqual(
-            to_nova_server(self.servers[0]),
-            NovaServer(id='a',
-                       state=ServerState.ACTIVE,
-                       image_id=None,
-                       flavor_id='valid_flavor',
-                       created=self.createds[0][1],
-                       servicenet_address=''))
-
-    def test_with_lb_metadata(self):
-        """
-        Create a server that has load balancer config metadata in it.
-        The only desired load balancers created are the ones with valid
-        data.
-        """
-        self.servers[0]['metadata'] = {
-            # two correct lbconfigs and one incorrect one
-            'rax:autoscale:lb:12345': '[{"port":80},{"bad":"1"},{"port":90}]',
-            # a dictionary instead of a list
-            'rax:autoscale:lb:23456': '{"port": 80}',
-            # not even valid json
-            'rax:autoscale:lb:34567': 'invalid json string'
-        }
-        self.assertEqual(
-            to_nova_server(self.servers[0]),
-            NovaServer(id='a',
-                       state=ServerState.ACTIVE,
-                       image_id='valid_image',
-                       flavor_id='valid_flavor',
-                       created=self.createds[0][1],
-                       desired_lbs=pmap({
-                           '12345': [CLBDescription(lb_id='12345', port=80),
-                                     CLBDescription(lb_id='12345', port=90)]
-                       }),
-                       servicenet_address=''))
-
-
-class IPAddressTests(SynchronousTestCase):
-    """
-    Tests for utility functions that extract IP addresses from server
-    dicts.
-    """
-    def setUp(self):
-        """
-        Set up a bunch of addresses and a server dict.
-        """
-        self.addresses = {
-            'private': [
-                {'addr': '192.168.1.1', 'version': 4},
-                {'addr': '10.0.0.1', 'version': 4},
-                {'addr': '10.0.0.2', 'version': 4},
-                {'addr': '::1', 'version': 6}
-            ],
-            'public': [
-                {'addr': '50.50.50.50', 'version': 4},
-                {'addr': '::::', 'version': 6}
-            ]}
-        self.server_dict = {'addresses': self.addresses}
-
-    def test_private_ipv4_addresses(self):
-        """
-        :func:`_private_ipv4_addresses` returns all private IPv4 addresses
-        from a complete server body.
-        """
-        result = _private_ipv4_addresses(self.server_dict)
-        self.assertEqual(result, ['192.168.1.1', '10.0.0.1', '10.0.0.2'])
-
-    def test_no_private_ip_addresses(self):
-        """
-        :func:`_private_ipv4_addresses` returns an empty list if the given
-        server has no private IPv4 addresses.
-        """
-        del self.addresses["private"]
-        result = _private_ipv4_addresses(self.server_dict)
-        self.assertEqual(result, [])
-
-    def test_servicenet_address(self):
-        """
-        :func:`_servicenet_address` returns the correct ServiceNet
-        address, which is the first IPv4 address in the ``private``
-        group in the 10.x.x.x range.
-
-        It even does this when there are other addresses in the
-        ``private`` group. This happens when the tenant specifies
-        their own network named ``private``.
-        """
-        self.assertEqual(_servicenet_address(self.server_dict), "10.0.0.1")
-
-    def test_no_servicenet_address(self):
-        """
-        :func:`_servicenet_address` returns :data:`None` if the server has no
-        ServiceNet address.
-        """
-        del self.addresses["private"]
-        self.assertEqual(_servicenet_address(self.server_dict), "")
-
-
 class GetAllConvergenceDataTests(SynchronousTestCase):
     """Tests for :func:`get_all_convergence_data`."""
 
@@ -543,14 +364,16 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
              'flavor': {'id': 'flavor'},
              'created': '1970-01-01T00:00:00Z',
              'addresses': {'private': [{'addr': u'10.0.0.1',
-                                        'version': 4}]}},
+                                        'version': 4}]},
+             'links': [{'href': 'link1', 'rel': 'self'}]},
             {'id': 'b',
              'status': 'ACTIVE',
              'image': {'id': 'image'},
              'flavor': {'id': 'flavor'},
              'created': '1970-01-01T00:00:01Z',
              'addresses': {'private': [{'addr': u'10.0.0.2',
-                                        'version': 4}]}}
+                                        'version': 4}]},
+             'links': [{'href': 'link2', 'rel': 'self'}]}
         ]
 
     def test_success(self):
@@ -572,13 +395,15 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                        image_id='image',
                        flavor_id='flavor',
                        created=0,
-                       servicenet_address='10.0.0.1'),
+                       servicenet_address='10.0.0.1',
+                       links=freeze([{'href': 'link1', 'rel': 'self'}])),
             NovaServer(id='b',
                        state=ServerState.ACTIVE,
                        image_id='image',
                        flavor_id='flavor',
                        created=1,
-                       servicenet_address='10.0.0.2'),
+                       servicenet_address='10.0.0.2',
+                       links=freeze([{'href': 'link2', 'rel': 'self'}]))
         ]
         self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))
 

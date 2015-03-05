@@ -1,16 +1,14 @@
 """
 Code for composing all of the convergence functionality together.
 """
-import json
+from pyrsistent import freeze, pset
 
-from collections import defaultdict
+from toolz.dicttoolz import get_in, merge
 
-from pyrsistent import freeze
-
-from toolz.dicttoolz import keyfilter
-from toolz.itertoolz import groupby
-
-from otter.convergence.model import CLBDescription, DesiredGroupState
+from otter.convergence.model import (
+    CLBDescription,
+    DesiredGroupState,
+    generate_metadata)
 
 
 def tenant_is_enabled(tenant_id, get_config_value):
@@ -32,17 +30,14 @@ def json_to_LBConfigs(lbs_json):
     Convert load balancer config from JSON to :obj:`CLBDescription`
 
     :param lbs_json: Sequence of load balancer configs
-    :return: mapping of LBid -> Sequence of LBDescription
+    :return: Sequence of :class:`ILBDescription` providers
 
     NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
     implemented in convergence
     """
-    lbd = defaultdict(list)
-    for lb in lbs_json:
-        if lb.get('type') != 'RackConnectV3':
-            lbd[lb['loadBalancerId']].append(CLBDescription(
-                lb_id=str(lb['loadBalancerId']), port=lb['port']))
-    return freeze(dict(lbd))
+    return pset([
+        CLBDescription(lb_id=str(lb['loadBalancerId']), port=lb['port'])
+        for lb in lbs_json if lb.get('type') != 'RackConnectV3'])
 
 
 def get_desired_group_state(group_id, launch_config, desired):
@@ -58,57 +53,31 @@ def get_desired_group_state(group_id, launch_config, desired):
     not been added to any schema yet.
     """
     lbs = freeze(launch_config['args'].get('loadBalancers', []))
+    lbs = json_to_LBConfigs(lbs)
     server_lc = prepare_server_launch_config(
         group_id,
         freeze({'server': launch_config['args']['server']}),
         lbs)
-    lbs = json_to_LBConfigs(lbs)
     desired_state = DesiredGroupState(
         server_config=server_lc,
         capacity=desired, desired_lbs=lbs)
     return desired_state
 
 
-def _sanitize_lb_metadata(lb_config_json):
+def prepare_server_launch_config(group_id, server_config, lb_descriptions):
     """
-    Takes load balancer config json, as from :obj:`otter.json_schema._clb_lb`
-    and :obj:`otter.json_schema._rcv3_lb` and normalizes it.
-    """
-    sanitized = keyfilter(lambda k: k in ('type', 'port'), lb_config_json)
-    # provide a default type
-    sanitized.setdefault('type', 'CloudLoadBalancer')
-    return sanitized
-
-
-def prepare_server_launch_config(group_id, server_config, lb_args):
-    """
-    Prepares a server config (the server part of the Group's launch config)
+    Prepare a server config (the server part of the Group's launch config)
     with any necessary dynamic data.
 
     :param str group_id: The group ID
     :param PMap server_config: The server part of the Group's launch config,
         as per :obj:`otter.json_schema.group_schemas.server` except as the
         value of a one-element PMap with key "server".
-    :param PMap lb_args: The load balancer part of the Group's launch_config
-
-    This function assumes that `lb_args` is mostly well-formed data, and is
-    not missing any data, since it should have been sanitized before getting
-    to this point.
-
-    NOTE: Currently this ignores RCv3 settings and draining timeout settings,
-    since they haven't been implemented yet.
+    :param iterable lb_descriptions: iterable of
+        :class:`ILBDescription` providers
     """
-    server_config = server_config.set_in(
-        ('server', 'metadata', 'rax:auto_scaling_group_id'), group_id)
+    updated_metadata = freeze(merge(
+        get_in(('server', 'metadata'), server_config, {}),
+        generate_metadata(group_id, lb_descriptions)))
 
-    lbs = groupby(lambda conf: conf['loadBalancerId'], lb_args)
-
-    for lb_id in lbs:
-        configs = [_sanitize_lb_metadata(config) for config in lbs[lb_id]
-                   if config.get('type') != 'RackConnectV3']
-
-        server_config = server_config.set_in(
-            ('server', 'metadata', 'rax:autoscale:lb:{0}'.format(lb_id)),
-            json.dumps(configs))
-
-    return server_config
+    return server_config.set_in(('server', 'metadata'), updated_metadata)

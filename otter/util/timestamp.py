@@ -41,3 +41,13 @@ def timestamp_to_epoch(timestamp):
     :return: EPOCH seconds as float
     """
     return calendar.timegm(from_timestamp(timestamp).utctimetuple())
+
+
+def epoch_to_utctimestr(epoch):
+    """
+    Convert EPOCH seconds to a ISO8601 formatted time
+
+    :param float epoch: UTC EPOCH seconds
+    :return: ISO8601 formatted UTC time string
+    """
+    return '{}Z'.format(datetime.utcfromtimestamp(epoch).isoformat())
