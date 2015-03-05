@@ -23,7 +23,7 @@ def perform_modify_group_state(dispatcher, mgs_intent):
 
 @attributes(['tenant_id', 'group_id'])
 class GetScalingGroupInfo(object):
-    """Look up a scaling group, along with its `state` and launch config."""
+    """Get a scaling group and its manifest."""
 
 
 @deferred_performer
@@ -37,15 +37,14 @@ def perform_get_scaling_group_info(log, store, dispatcher, intent):
     :param dispatcher: dispatcher provided by perform
     :param GetScalingGroupInfo intent: the intent
     """
-    group = yield store.get_scaling_group(
-        log, intent.tenant_id, intent.group_id)
-    state = yield group.view_state()
-    lc = yield group.view_launch_config()
-    returnValue((group, state, lc))
+    group = store.get_scaling_group(log, intent.tenant_id, intent.group_id)
+    manifest = yield group.view_manifest(with_policies=False,
+                                         with_webhooks=False)
+    returnValue((group, manifest))
 
 
-def get_cassandra_dispatcher(log, store):
-    """Get a dispatcher that can handle all the cass-related intents."""
+def get_model_dispatcher(log, store):
+    """Get a dispatcher that can handle all the model-related intents."""
     return TypeDispatcher({
         ModifyGroupState:
             perform_modify_group_state,

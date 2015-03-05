@@ -1,13 +1,11 @@
-from effect import Effect, TypeDispatcher
+from effect import Effect
 from effect import sync_perform
 
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.models.intents import (
-    GetScalingGroupInfo, ModifyGroupState,
-    get_cassandra_dispatcher,
-    perform_modify_group_state)
+    GetScalingGroupInfo, ModifyGroupState, get_model_dispatcher)
 from otter.test.utils import mock_group, mock_log
 
 
@@ -17,8 +15,7 @@ class ModifyGroupStateTests(SynchronousTestCase):
         group = mock_group(None)
         mgs = ModifyGroupState(scaling_group=group,
                                modifier=lambda g, o: 'new state')
-        dispatcher = TypeDispatcher({
-            ModifyGroupState: perform_modify_group_state})
+        dispatcher = get_model_dispatcher(mock_log(), None)
         result = sync_perform(dispatcher, Effect(mgs))
         self.assertEqual(result, 'new state')
         self.assertEqual(group.modify_state_values, ['new state'])
@@ -28,23 +25,25 @@ class GetScalingGroupInfoTests(SynchronousTestCase):
     """Tests for :obj:`GetScalingGroupInfo`."""
     def test_perform(self):
         """Performing returns the group, the state, and the launch config."""
-        log = mock_log()
-        state = object()
-        lc = object()
-        group = mock_group(state)
-        group.view_state.return_value = succeed(state)
-        group.view_launch_config.return_value = succeed(lc)
+        def view_manifest(with_policies, with_webhooks):
+            self.assertEqual(with_policies, False)
+            self.assertEqual(with_webhooks, False)
+            return succeed(manifest)
 
-        data = {('00', 'g1'): group}
+        log = mock_log()
+        manifest = {}
+        group = mock_group(None)
+        group.view_manifest.side_effect = view_manifest
+
+        data = {(log, '00', 'g1'): group}
 
         class Store(object):
-            def get_scaling_group(s_self, _log, tenant_id, group_id):
-                self.assertEqual(_log, log)
-                return data[(tenant_id, group_id)]
+            def get_scaling_group(self, log, tenant_id, group_id):
+                return data[(log, tenant_id, group_id)]
 
         store = Store()
-        dispatcher = get_cassandra_dispatcher(log, store)
+        dispatcher = get_model_dispatcher(log, store)
         info = sync_perform(
             dispatcher,
             Effect(GetScalingGroupInfo(tenant_id='00', group_id='g1')))
-        self.assertEqual(info, (group, state, lc))
+        self.assertEqual(info, (group, manifest))
