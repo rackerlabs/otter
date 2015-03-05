@@ -147,6 +147,9 @@ class CheckFailure(object):
         return isinstance(other, Failure) and other.check(
             self.exception_type)
 
+    def __ne__(self, other):
+        return not self == other
+
 
 class CheckFailureValue(object):
     """
@@ -161,9 +164,13 @@ class CheckFailureValue(object):
 
     def __eq__(self, other):
         matcher = MatchesException(self.exception)
-        return (isinstance(other, Failure)
-                and other.check(type(self.exception)) is not None
-                and matcher.match((type(other.value), other.value, None)) is None)
+        return (
+            isinstance(other, Failure)
+            and other.check(type(self.exception)) is not None
+            and matcher.match((type(other.value), other.value, None)) is None)
+
+    def __ne__(self, other):
+        return not self == other
 
 
 class IsCallable(object):
@@ -312,7 +319,11 @@ def mock_log(*args, **kwargs):
     Since in all likelyhood, testing that certain values are bound would be
     more important than testing the exact logged message.
     """
-    return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
+    msg = mock.Mock(spec=[])
+    msg.return_value = None
+    err = mock.Mock(spec=[])
+    err.return_value = None
+    return BoundLog(msg, err)
 
 
 class StubResponse(object):
