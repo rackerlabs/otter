@@ -239,7 +239,8 @@ class ImpersonatingAuthenticator(object):
             """
             Log this as a string we know we can find in the logging feed
             """
-            log.err('Failed to do identity impersonation')
+            log.err(err, 'Failed to get a new identity admin token.', otter_msg_type='impersonation-failed')
+            return err
 
         if log:
             log.msg('Getting new identity admin token')
