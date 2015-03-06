@@ -199,20 +199,18 @@ def iMock(*ifaces, **kwargs):
         as a provider of the interface
     :rtype: :class:``mock.MagicMock``
     """
-    # Interface classes themselves have other methods and attributes related
-    # to them being interfaces - spec the attributes and methods directly
-    all_attributes = [attrname for iface in ifaces for attrname in iface]
+    all_names = [name for iface in ifaces for name in iface.names()]
 
     attribute_kwargs = pmap()
     for k, v in list(kwargs.iteritems()):
         result = k.split('.', 1)
-        if result[0] in all_attributes:
+        if result[0] in all_names:
             attribute_kwargs = attribute_kwargs.set_in(result, v)
             kwargs.pop(k)
 
     kwargs.pop('spec', None)
 
-    imock = mock.MagicMock(spec=all_attributes, **kwargs)
+    imock = mock.MagicMock(spec=all_names, **kwargs)
     directlyProvides(imock, *ifaces)
 
     # autospec all the methods on the interface, and set attributes to None
