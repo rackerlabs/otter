@@ -214,12 +214,7 @@ def iMock(*ifaces, **kwargs):
     directlyProvides(imock, *ifaces)
 
     # autospec all the methods on the interface, and set attributes to None
-    # (just something not callable) - Mock will not do this because methods
-    # defined for an Interface aren't really methods, they're
-    # zopeInterface.interface.interface.Method objects.
-
-    # There are methods and attributes on Interface, but they are specific to
-    # the zope interface library, used by things checking an Interface class.
+    # (just something not callable)
     for iface in ifaces:
         for attr in iface:
             if isinstance(iface[attr], interface.Method):
