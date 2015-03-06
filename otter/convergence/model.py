@@ -459,3 +459,48 @@ class CLBNode(object):
         See :func:`ILBNode.is_active`.
         """
         return self.description.condition != CLBNodeCondition.DISABLED
+
+
+@implementer(ILBDescription)
+@attributes([Attribute("lb_id", instance_of=str)])
+class RCv3Description(object):
+    """
+    Information representing a RackConnect V3/server mapping: how a particular
+    server *should* be added a RackConnect V3 load balancer pool.
+
+    RackConnect V3 nodes aren't really configurable, so only has the load
+    balancer ID.
+
+    :ivar int lb_id: The Load Balancer ID.
+    """
+    def equivalent_definition(self, other_description):
+        """
+        Given that no customization is available, is the same as testing
+        equivalence.
+
+        See :func:`ILBDescription.equivalent_definition`.
+        """
+        return self == other_description
+
+
+@implementer(ILBNode)
+@attributes([Attribute("node_id", instance_of=str),
+             Attribute("description", instance_of=RCv3Description),
+             Attribute("cloud_server_id", instance_of=str)])
+class RCv3Node(object):
+    """
+    A RackConnect V3 node.
+
+    :ivar str node_id: See :obj:`ILBNode.node_id`.
+    :ivar description: See :obj:`ILBNode.description`.
+    :type description: :class:`RCv3Description`
+
+    :ivar str cloud_server_id: The ID of the cloud server represented by this
+        node
+    """
+    def matches(self, server):
+        """
+        See :func:`ILBNode.matches`.
+        """
+        return (isinstance(server, NovaServer) and
+                server.id == self.cloud_server_id)

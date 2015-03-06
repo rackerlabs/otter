@@ -3,7 +3,7 @@ Mixins and utilities to be used for testing.
 """
 import json
 import os
-from functools import partial
+from functools import partial, wraps
 from inspect import getargspec
 
 from effect import base_dispatcher
@@ -13,7 +13,7 @@ from effect.testing import (
 
 import mock
 
-from pyrsistent import freeze
+from pyrsistent import freeze, pmap
 
 from testtools.matchers import MatchesException, Mismatch
 
@@ -24,7 +24,7 @@ from twisted.internet import defer
 from twisted.internet.defer import Deferred, maybeDeferred, succeed
 from twisted.python.failure import Failure
 
-from zope.interface import directlyProvides, implementer
+from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
 
 from otter.log.bound import BoundLog
@@ -199,13 +199,43 @@ def iMock(*ifaces, **kwargs):
         as a provider of the interface
     :rtype: :class:``mock.MagicMock``
     """
-    if 'spec' in kwargs:
-        del kwargs['spec']
-
     all_names = [name for iface in ifaces for name in iface.names()]
+
+    attribute_kwargs = pmap()
+    for k, v in list(kwargs.iteritems()):
+        result = k.split('.', 1)
+        if result[0] in all_names:
+            attribute_kwargs = attribute_kwargs.set_in(result, v)
+            kwargs.pop(k)
+
+    kwargs.pop('spec', None)
 
     imock = mock.MagicMock(spec=all_names, **kwargs)
     directlyProvides(imock, *ifaces)
+
+    # autospec all the methods on the interface, and set attributes to None
+    # (just something not callable)
+    for iface in ifaces:
+        for attr in iface:
+            if isinstance(iface[attr], interface.Method):
+                # We need to create a fake function for mock to autospec,
+                # since mock does some magic with introspecting function
+                # signatures - can't a full function signature to a  mock
+                # constructor (eg. positional args, defaults, etc.) - so
+                # just using a lambda here.  So sorry.
+                fake_func = eval("lambda {0}: None".format(
+                    iface[attr].getSignatureString().strip('()')))
+                wraps(iface[attr])(fake_func)
+
+                fmock = mock.create_autospec(
+                    fake_func,
+                    **dict(attribute_kwargs.get(attr, {})))
+
+                setattr(imock, attr, fmock)
+
+            elif isinstance(iface[attr], interface.Attribute):
+                setattr(imock, attr, attribute_kwargs.get(attr, None))
+
     return imock
 
 

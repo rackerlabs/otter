@@ -535,6 +535,14 @@ class APIMakeServiceTests(SynchronousTestCase):
                          sch.health_check)
         self.assertEqual(self.Otter.return_value.scheduler, sch)
 
+        # Check for no logs case also
+        mock_txkz.reset_mock()
+        config['zookeeper']['no_logs'] = True
+        parent = makeService(config)
+        mock_txkz.assert_called_once_with(
+            hosts='zk_hosts', threads=20,
+            connection_retry=dict(max_tries=-1, max_delay=600), txlog=None)
+
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     def test_kazoo_client_failed(self, mock_txkz, mock_setup_scheduler):
