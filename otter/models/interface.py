@@ -855,7 +855,7 @@ class IAdmin(Interface):
     Interface to administrative information and actions.
     """
 
-    def get_metrics(self, log):
+    def get_metrics(log):
         """
         Returns total current count of policies, webhooks and groups in the
         following format::
