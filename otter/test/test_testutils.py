@@ -1,11 +1,11 @@
 """
 Tests for :obj:`otter.test.utils`.
 """
-from otter.test.utils import iMock
-
 from twisted.trial.unittest import SynchronousTestCase
 
 from zope.interface import Attribute, Interface
+
+from otter.test.utils import iMock
 
 
 class _ITest1(Interface):
