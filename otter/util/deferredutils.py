@@ -120,8 +120,8 @@ def retry_and_timeout(do_work, timeout, can_retry=None, next_interval=None,
     :param number timeout: The number of seconds beyond which is considered a
         timeout condition.
     :param callable can_retry: Takes a Twisted Failure instance as a
-        parameter, and decides whether or not the work should be retried (True
-        if retry is desired; False otherwise).
+        parameter, and decides whether or not the work should be retried
+        (returns True if retry is desired; it returns False otherwise).
     :param callable next_interval: Takes a Twisted Failure instance as a
         parameter, and decides how long to wait based on the error received.
         Returns a number.
