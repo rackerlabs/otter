@@ -74,7 +74,7 @@ class SanitizeEventTests(SynchronousTestCase):
         se, err, _time = sanitize_event(self.event)
         self.assertLessEqual(set(se.keys()), set(self.exp_cf_event))
         self.assertEqual(err, exp_err)
-        self.assertEqual(_time, '1970-01-01T00:00:00')
+        self.assertEqual(_time, '1970-01-01T00:00:00Z')
         for key, value in self.exp_cf_event.items():
             if key in se:
                 self.assertEqual(se[key], value)
@@ -143,7 +143,7 @@ class EventTests(SynchronousTestCase):
                         "@type": "http://docs.rackspace.com/core/event",
                         "id": "",
                         "version": "2",
-                        "eventTime": "1970-01-01T00:00:00",
+                        "eventTime": "1970-01-01T00:00:00Z",
                         "type": "INFO",
                         "region": "ord",
                         "product": {
@@ -181,7 +181,8 @@ class EventTests(SynchronousTestCase):
 
         # effect is to generate UUID
         self.assertIs(eff.intent.func, uuid.uuid4)
-        eff = resolve_effect(eff, 'uuid')
+        eff = resolve_effect(eff, uuid.UUID(int=0))
+        uid = '00000000-0000-0000-0000-000000000000'
 
         # effect scoped on on tenant id
         self.assertIs(type(eff.intent), TenantScope)
@@ -200,7 +201,9 @@ class EventTests(SynchronousTestCase):
             eff,
             service_request(
                 ServiceType.CLOUD_FEEDS, 'POST', 'autoscale/events',
-                data=self._get_request('INFO', 'uuid'), log=log,
+                headers={
+                    'content-type': ['application/vnd.rackspace.atom+json']},
+                data=self._get_request('INFO', uid), log=log,
                 success_pred=has_code(201)))
 
     def test_prepare_request_error(self):
@@ -208,7 +211,7 @@ class EventTests(SynchronousTestCase):
         `prepare_request` returns formatted request with error in type
         """
         req = prepare_request(
-            request_format, self.cf_event, True, "1970-01-01T00:00:00",
+            request_format, self.cf_event, True, "1970-01-01T00:00:00Z",
             'ord', 'uuid')
         self.assertEqual(req, self._get_request('ERROR', 'uuid'))
 
@@ -280,9 +283,9 @@ class CloudFeedsObserverTests(SynchronousTestCase):
         self.successResultOf(d)
         # log doesn't have cloud_feed in it
         self.log.err.assert_called_once_with(
-            CheckFailure(ValueError), "Failed to add event", event='dict',
-            system='otter.cloud_feed', cf_msg='m',
-            otter_msg_type='cf-add-failure')
+            CheckFailure(ValueError), "Failed to add event",
+            event_data={'event': 'dict'}, system='otter.cloud_feed',
+            cf_msg='m', otter_msg_type='cf-add-failure')
 
     def test_unsuitable_msg_logs(self):
         """
@@ -297,5 +300,6 @@ class CloudFeedsObserverTests(SynchronousTestCase):
         self.log.err.assert_called_once_with(
             None, ('Tried to add unsuitable message in cloud feeds: '
                    '{unsuitable_message}'),
-            unsuitable_message='bad', event='dict', system='otter.cloud_feed',
-            cf_msg='m', otter_msg_type='cf-unsuitable-message')
+            unsuitable_message='bad', event_data={'event': 'dict'},
+            system='otter.cloud_feed', cf_msg='m',
+            otter_msg_type='cf-unsuitable-message')

@@ -300,12 +300,11 @@ class SingleTenantAuthenticator(object):
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         if log:
-            log.msg('Authenticating as new tenant')
+            log.msg('Authenticating as new tenant', auth_tenant_id=tenant_id)
         d = authenticate_user(self._url,
                               self._identity_user,
                               self._identity_password,
                               tenant_id=tenant_id,
-                              expire_in=10800,
                               log=log)
         d.addCallback(
             lambda json: (extract_token(json), extract_service_catalog(json)))
@@ -338,7 +337,7 @@ def extract_service_catalog(auth_response):
         from the authentication API.
     :rtype: str
     """
-    return auth_response['service_catalog']
+    return auth_response['access']['serviceCatalog']
 
 
 def endpoints_for_token(auth_endpoint, identity_admin_token, user_token,
@@ -385,13 +384,14 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
 
 
 def authenticate_user(auth_endpoint, username, password, tenant_id=None,
-                      expire_in=None, log=None, pool=None):
+                      log=None, pool=None):
     """
     Authenticate to a Identity auth endpoint with a username and password.
 
     :param str auth_endpoint: Identity API endpoint URL.
     :param str username: Username to authenticate as.
     :param str password: Password for the specified user.
+    :param str tenant_id: Tenant ID to include in auth request
     :param log: If provided, a BoundLog object.
     :param twisted.web.client.HTTPConnectionPool pool: If provided,
         a connection pool which an integration test can manually clean up
@@ -412,8 +412,6 @@ def authenticate_user(auth_endpoint, username, password, tenant_id=None,
     }
     if tenant_id:
         request['auth']['tenantId'] = tenant_id
-    if expire_in:
-        request['auth']['expire-in-seconds'] = expire_in
 
     d = treq.post(
         append_segments(auth_endpoint, 'tokens'),

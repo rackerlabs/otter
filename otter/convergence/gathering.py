@@ -3,10 +3,7 @@ from urllib import urlencode
 
 from effect import parallel
 
-from pyrsistent import freeze
-
 from toolz.curried import filter, groupby, keyfilter, map
-from toolz.dicttoolz import get_in
 from toolz.functoolz import compose, identity
 
 from otter.constants import ServiceType
@@ -16,7 +13,7 @@ from otter.convergence.model import (
     CLBNodeCondition,
     CLBNodeType,
     NovaServer,
-    ServerState)
+    group_id_from_metadata)
 from otter.http import service_request
 from otter.indexer import atom
 from otter.util.http import append_segments
@@ -82,7 +79,7 @@ def get_scaling_group_servers(server_predicate=identity):
         return 'metadata' in s and isinstance(s['metadata'], dict)
 
     def group_id(s):
-        return NovaServer.group_id_from_metadata(s['metadata'])
+        return group_id_from_metadata(s['metadata'])
 
     servers_apply = compose(keyfilter(lambda k: k is not None),
                             groupby(group_id),
@@ -173,40 +170,6 @@ def extract_CLB_drained_at(feed):
         raise ValueError('Unexpected summary: {}'.format(summary))
 
 
-def _private_ipv4_addresses(server):
-    """
-    Get all private IPv4 addresses from the addresses section of a server.
-
-    :param dict server: A server dict.
-    :return: List of IP addresses as strings.
-    """
-    private_addresses = get_in(["addresses", "private"], server, [])
-    return [addr['addr'] for addr in private_addresses if addr['version'] == 4]
-
-
-def _servicenet_address(server):
-    """
-    Find the ServiceNet address for the given server.
-    """
-    return next((ip for ip in _private_ipv4_addresses(server)
-                 if ip.startswith("10.")), "")
-
-
-def to_nova_server(server_json):
-    """
-    Convert from JSON format to :obj:`NovaServer` instance.
-    """
-    return NovaServer(id=server_json['id'],
-                      state=ServerState.lookupByName(server_json['status']),
-                      created=timestamp_to_epoch(server_json['created']),
-                      image_id=server_json.get('image', {}).get('id'),
-                      flavor_id=server_json['flavor']['id'],
-                      links=freeze(server_json['links']),
-                      desired_lbs=NovaServer.lbs_from_metadata(
-                          server_json.get('metadata')),
-                      servicenet_address=_servicenet_address(server_json))
-
-
 def get_all_convergence_data(
         group_id,
         get_scaling_group_servers=get_scaling_group_servers,
@@ -220,7 +183,7 @@ def get_all_convergence_data(
     eff = parallel(
         [get_scaling_group_servers()
          .on(lambda servers: servers.get(group_id, []))
-         .on(map(to_nova_server)).on(list),
+         .on(map(NovaServer.from_server_details_json)).on(list),
          get_clb_contents()]
     ).on(tuple)
     return eff

@@ -780,7 +780,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         response_body = self.assert_status_code(404, method="GET")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
-        self.mock_group.view_manifest.assert_called_once_with(False)
+        self.mock_group.view_manifest.assert_called_once_with(
+            with_webhooks=False)
 
         resp = json.loads(response_body)
         self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
@@ -852,7 +853,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
 
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
-        self.mock_group.view_manifest.assert_called_once_with(False)
+        self.mock_group.view_manifest.assert_called_once_with(
+            with_webhooks=False)
 
     def test_view_manifest_with_webhooks(self):
         """
@@ -958,8 +960,12 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
 
-        self.mock_group.view_config.return_value = defer.succeed(
-            {'name': 'group1', 'minEntities': '10', 'maxEntities': '1000'})
+        self.mock_group.view_manifest.return_value = defer.succeed(
+            {'groupConfiguration':
+                {'name': 'group1', 'minEntities': '10', 'maxEntities': '1000'},
+             'launchConfiguration':
+                {'this': 'is_a_launch_config'},
+             'id': 'one'})
         self.mock_group.delete_group.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
         self.mock_controller.obey_config_change.return_value = defer.succeed(
@@ -972,10 +978,12 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         expected_config = {'maxEntities': 0,
                            'minEntities': 0,
                            'name': 'group1'}
+        self.mock_group.view_manifest.assert_called_once_with(
+            with_policies=False)
         self.mock_group.update_config.assert_called_once_with(expected_config)
         self.mock_controller.obey_config_change.assert_called_once_with(
             mock.ANY, "transaction-id", expected_config, self.mock_group,
-            self.mock_state, launch_config=None)
+            self.mock_state, launch_config={'this': 'is_a_launch_config'})
         self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_force_case_insensitive(self):
@@ -984,8 +992,10 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
 
-        self.mock_group.view_config.return_value = defer.succeed(
-            {'name': 'group1'})
+        self.mock_group.view_manifest.return_value = defer.succeed(
+            {'groupConfiguration': {'name': 'group1'},
+             'launchConfiguration': {'this': 'is_a_launch_config'},
+             'id': 'one'})
         self.mock_group.delete_group.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
         self.mock_controller.obey_config_change.return_value = defer.succeed(
@@ -998,10 +1008,12 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         expected_config = {'maxEntities': 0,
                            'minEntities': 0,
                            'name': 'group1'}
+        self.mock_group.view_manifest.assert_called_once_with(
+            with_policies=False)
         self.mock_group.update_config.assert_called_once_with(expected_config)
         self.mock_controller.obey_config_change.assert_called_once_with(
             mock.ANY, "transaction-id", expected_config, self.mock_group,
-            self.mock_state, launch_config=None)
+            self.mock_state, launch_config={'this': 'is_a_launch_config'})
         self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_force_garbage_arg(self):

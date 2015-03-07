@@ -48,7 +48,7 @@ class AllPoliciesTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         self.mock_group.list_policies.return_value = defer.succeed([])
         response_body = self.assert_status_code(200)
-        self.mock_group.list_policies.assert_called_once()
+        self.mock_group.list_policies.assert_called_once_with(limit=100)
 
         resp = json.loads(response_body)
         validate(resp, rest_schemas.list_policies_response)
@@ -65,7 +65,7 @@ class AllPoliciesTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_group.list_policies.return_value = defer.succeed(
             [dict(id='5', **policy_examples()[0])])
         response_body = self.assert_status_code(200)
-        self.mock_group.list_policies.assert_called_once()
+        self.mock_group.list_policies.assert_called_once_with(limit=100)
 
         resp = json.loads(response_body)
         validate(resp, rest_schemas.list_policies_response)
@@ -110,7 +110,7 @@ class AllPoliciesTestCase(RestAPITestMixin, SynchronousTestCase):
             [dict(id='{}'.format(i), **policy_examples()[0])
              for i in range(1, 102)])
         response_body = self.assert_status_code(200)
-        self.mock_group.list_policies.assert_called_once()
+        self.mock_group.list_policies.assert_called_once_with(limit=100)
 
         resp = json.loads(response_body)
         validate(resp, rest_schemas.list_policies_response)

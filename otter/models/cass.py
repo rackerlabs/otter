@@ -641,13 +641,17 @@ class CassScalingGroup(object):
             return d
         return wrapper
 
-    def view_manifest(self, with_webhooks=False):
+    def view_manifest(self, with_policies=True, with_webhooks=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
+        def _set_policies_on_group(policies, group):
+            group['scalingPolicies'] = policies
+            return group
+
         def _get_policies(group):
             d = self._naive_list_policies()
-            return d.addCallback(lambda policies: (group, policies))
+            return d.addCallback(_set_policies_on_group, group)
 
         def _get_policies_and_webhooks(group):
             d = defer.gatherResults(
@@ -657,13 +661,14 @@ class CassScalingGroup(object):
 
         def _assemble_webhooks((group, results)):
             policies, webhooks = results
-            return group, assemble_webhooks_in_policies(policies, webhooks)
+            return _set_policies_on_group(
+                assemble_webhooks_in_policies(policies, webhooks),
+                group)
 
-        def _generate_manifest((group, policies)):
+        def _generate_manifest_group_part(group):
             return {
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
-                'scalingPolicies': policies,
                 'id': self.uuid,
                 'state': _unmarshal_state(group)
             }
@@ -678,12 +683,15 @@ class CassScalingGroup(object):
                           DEFAULT_CONSISTENCY,
                           NoSuchScalingGroupError(self.tenant_id, self.uuid),
                           self.log)
-        if with_webhooks:
-            d.addCallback(_get_policies_and_webhooks)
-            d.addCallback(_assemble_webhooks)
-        else:
-            d.addCallback(_get_policies)
-        d.addCallback(_generate_manifest)
+        d.addCallback(_generate_manifest_group_part)
+
+        if with_policies:
+            if with_webhooks:
+                d.addCallback(_get_policies_and_webhooks)
+                d.addCallback(_assemble_webhooks)
+            else:
+                d.addCallback(_get_policies)
+
         return d
 
     def view_config(self):

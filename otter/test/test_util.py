@@ -373,6 +373,13 @@ class TimestampTests(SynchronousTestCase):
         self.assertTrue(parsed.tzinfo is not None)
         self.assertEqual(parsed.replace(tzinfo=None), datetime.min)
 
+    def test_epoch_to_utctimestr(self):
+        """
+        ``epoch_to_utctimestr`` generates correct ISO formatted string
+        """
+        self.assertEqual(
+            timestamp.epoch_to_utctimestr(0), '1970-01-01T00:00:00Z')
+
 
 class ConfigTest(SynchronousTestCase):
     """

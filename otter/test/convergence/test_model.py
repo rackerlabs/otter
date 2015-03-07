@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from characteristic import attributes
 
-from pyrsistent import pmap, pset
+from pyrsistent import freeze, pmap, pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -21,7 +21,11 @@ from otter.convergence.model import (
     ILBNode,
     NovaServer,
     ServerState,
-    get_service_metadata
+    _private_ipv4_addresses,
+    _servicenet_address,
+    get_service_metadata,
+    generate_metadata,
+    group_id_from_metadata
 )
 
 
@@ -291,12 +295,12 @@ class AutoscaleMetadataTests(SynchronousTestCase):
     """
     def test_get_group_id_from_metadata(self):
         """
-        :func:`NovaServer.group_id_from_metadata` returns the group ID from
+        :func:`group_id_from_metadata` returns the group ID from
         metadata no matter if it's old style or new style.
         """
         for key in ("rax:autoscale:group:id", "rax:auto_scaling_group_id"):
             self.assertEqual(
-                NovaServer.group_id_from_metadata({key: "group_id"}),
+                group_id_from_metadata({key: "group_id"}),
                 "group_id")
 
     def test_invalid_group_id_key_returns_none(self):
@@ -307,41 +311,9 @@ class AutoscaleMetadataTests(SynchronousTestCase):
         for key in (":rax:autoscale:group:id", "rax:autoscaling_group_id",
                     "completely_wrong"):
             self.assertIsNone(
-                NovaServer.group_id_from_metadata({key: "group_id"}))
+                group_id_from_metadata({key: "group_id"}))
 
-        self.assertIsNone(NovaServer.group_id_from_metadata({}))
-
-    def test_lbs_from_metadata_CLB(self):
-        """
-        :func:`NovaServer.lbs_from_metadata` returns a set of
-        `CLBDescription` objects if the metadata is parsable as a CLB config,
-        and ignores the metadata line if unparsable.
-        """
-        metadata = {
-            "rax:autoscale:lb:CloudLoadBalancer:123":
-                '[{"port": 80}, {"port": 8080}]',
-
-            # invalid because there is no port
-            "rax:autoscale:lb:CloudLoadBalancer:234": '[{}]',
-            # invalid because not a list
-            "rax:autoscale:lb:CloudLoadBalancer:345": '{"port": 80}',
-            # invalid because not JSON
-            "rax:autoscale:lb:CloudLoadBalancer:456": 'junk'
-        }
-        self.assertEqual(
-            NovaServer.lbs_from_metadata(metadata),
-            pset([CLBDescription(lb_id='123', port=80),
-                  CLBDescription(lb_id='123', port=8080)]))
-
-    def test_lbs_from_metadata_ignores_unsupported_lb_types(self):
-        """
-        :func:`NovaServer.lbs_from_metadata` ignores unsupported LB types
-        """
-        metadata = {
-            "rax:autoscale:lb:RackConnect:{0}".format(uuid4()): None,
-            "rax:autoscale:lb:Neutron:456": None
-        }
-        self.assertEqual(NovaServer.lbs_from_metadata(metadata), pset())
+        self.assertIsNone(group_id_from_metadata({}))
 
     def test_generate_metadata(self):
         """
@@ -361,5 +333,220 @@ class AutoscaleMetadataTests(SynchronousTestCase):
             'rax:autoscale:lb:CloudLoadBalancer:234': '[{"port": 80}]'
         }
 
-        self.assertEqual(NovaServer.generate_metadata('group_id', lbs),
+        self.assertEqual(generate_metadata('group_id', lbs),
                          expected)
+
+
+class ToNovaServerTests(SynchronousTestCase):
+    """
+    Tests for :func:`NovaServer.from_server_details_json`
+    """
+    def setUp(self):
+        """
+        Sample servers
+        """
+        self.createds = [('2020-10-10T10:00:00Z', 1602324000),
+                         ('2020-10-20T11:30:00Z', 1603193400)]
+        self.links = [
+            [{'href': 'link1', 'rel': 'self'},
+             {'href': 'otherlink1', 'rel': 'bookmark'}],
+            [{'href': 'link2', 'rel': 'self'},
+             {'href': 'otherlink2', 'rel': 'bookmark'}]
+        ]
+        self.servers = [{'id': 'a',
+                         'status': 'ACTIVE',
+                         'created': self.createds[0][0],
+                         'image': {'id': 'valid_image'},
+                         'flavor': {'id': 'valid_flavor'},
+                         'links': self.links[0]},
+                        {'id': 'b',
+                         'status': 'BUILD',
+                         'image': {'id': 'valid_image'},
+                         'flavor': {'id': 'valid_flavor'},
+                         'created': self.createds[1][0],
+                         'addresses': {'private': [{'addr': u'10.0.0.1',
+                                                    'version': 4}]},
+                         'links': self.links[1]}]
+
+    def test_without_address(self):
+        """
+        Handles server json that does not have "addresses" in it.
+        """
+        self.assertEqual(
+            NovaServer.from_server_details_json(self.servers[0]),
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       image_id='valid_image',
+                       flavor_id='valid_flavor',
+                       created=self.createds[0][1],
+                       servicenet_address='',
+                       links=freeze(self.links[0])))
+
+    def test_without_private(self):
+        """
+        Creates server that does not have private/servicenet IP in it.
+        """
+        self.servers[0]['addresses'] = {'public': 'p'}
+        self.assertEqual(
+            NovaServer.from_server_details_json(self.servers[0]),
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       image_id='valid_image',
+                       flavor_id='valid_flavor',
+                       created=self.createds[0][1],
+                       servicenet_address='',
+                       links=freeze(self.links[0])))
+
+    def test_with_servicenet(self):
+        """
+        Create server that has servicenet IP in it.
+        """
+        self.assertEqual(
+            NovaServer.from_server_details_json(self.servers[1]),
+            NovaServer(id='b',
+                       state=ServerState.BUILD,
+                       image_id='valid_image',
+                       flavor_id='valid_flavor',
+                       created=self.createds[1][1],
+                       servicenet_address='10.0.0.1',
+                       links=freeze(self.links[1])))
+
+    def test_without_image_id(self):
+        """
+        Create server that has missing image in it in various ways.
+        (for the case of BFV)
+        """
+        for image in ({}, {'id': None}):
+            self.servers[0]['image'] = image
+            self.assertEqual(
+                NovaServer.from_server_details_json(self.servers[0]),
+                NovaServer(id='a',
+                           state=ServerState.ACTIVE,
+                           image_id=None,
+                           flavor_id='valid_flavor',
+                           created=self.createds[0][1],
+                           servicenet_address='',
+                           links=freeze(self.links[0])))
+        del self.servers[0]['image']
+        self.assertEqual(
+            NovaServer.from_server_details_json(self.servers[0]),
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       image_id=None,
+                       flavor_id='valid_flavor',
+                       created=self.createds[0][1],
+                       servicenet_address='',
+                       links=freeze(self.links[0])))
+
+    def test_with_lb_metadata(self):
+        """
+        Create a server that has load balancer config metadata in it.
+        The only desired load balancers created are the ones with valid
+        data.
+        """
+        self.servers[0]['metadata'] = {
+            # correct clb config
+            'rax:autoscale:lb:CloudLoadBalancer:1':
+            '[{"port":80},{"port":90}]',
+
+            # invalid because there is no port
+            "rax:autoscale:lb:CloudLoadBalancer:2": '[{}]',
+            # two correct lbconfigs and one incorrect one
+            'rax:autoscale:lb:CloudLoadBalancer:3':
+            '[{"port":80},{"bad":"1"},{"port":90}]',
+            # a dictionary instead of a list
+            'rax:autoscale:lb:CloudLoadBalancer:4': '{"port": 80}',
+            # not even valid json
+            'rax:autoscale:lb:CloudLoadBalancer:5': 'invalid json string'
+        }
+        self.assertEqual(
+            NovaServer.from_server_details_json(self.servers[0]),
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       image_id='valid_image',
+                       flavor_id='valid_flavor',
+                       created=self.createds[0][1],
+                       desired_lbs=pset([
+                           CLBDescription(lb_id='1', port=80),
+                           CLBDescription(lb_id='1', port=90)]),
+                       servicenet_address='',
+                       links=freeze(self.links[0])))
+
+    def test_lbs_from_metadata_ignores_unsupported_lb_types(self):
+        """
+        Creating from server json ignores unsupported LB types
+        """
+        self.servers[0]['metadata'] = {
+            "rax:autoscale:lb:RackConnect:{0}".format(uuid4()): None,
+            "rax:autoscale:lb:Neutron:456": None
+        }
+        self.assertEqual(
+            NovaServer.from_server_details_json(self.servers[0]),
+            NovaServer(id='a',
+                       state=ServerState.ACTIVE,
+                       image_id='valid_image',
+                       flavor_id='valid_flavor',
+                       created=self.createds[0][1],
+                       desired_lbs=pset(),
+                       servicenet_address='',
+                       links=freeze(self.links[0])))
+
+
+class IPAddressTests(SynchronousTestCase):
+    """
+    Tests for utility functions that extract IP addresses from server
+    dicts.
+    """
+    def setUp(self):
+        """
+        Set up a bunch of addresses and a server dict.
+        """
+        self.addresses = {
+            'private': [
+                {'addr': '192.168.1.1', 'version': 4},
+                {'addr': '10.0.0.1', 'version': 4},
+                {'addr': '10.0.0.2', 'version': 4},
+                {'addr': '::1', 'version': 6}
+            ],
+            'public': [
+                {'addr': '50.50.50.50', 'version': 4},
+                {'addr': '::::', 'version': 6}
+            ]}
+        self.server_dict = {'addresses': self.addresses}
+
+    def test_private_ipv4_addresses(self):
+        """
+        :func:`_private_ipv4_addresses` returns all private IPv4 addresses
+        from a complete server body.
+        """
+        result = _private_ipv4_addresses(self.server_dict)
+        self.assertEqual(result, ['192.168.1.1', '10.0.0.1', '10.0.0.2'])
+
+    def test_no_private_ip_addresses(self):
+        """
+        :func:`_private_ipv4_addresses` returns an empty list if the given
+        server has no private IPv4 addresses.
+        """
+        del self.addresses["private"]
+        result = _private_ipv4_addresses(self.server_dict)
+        self.assertEqual(result, [])
+
+    def test_servicenet_address(self):
+        """
+        :func:`_servicenet_address` returns the correct ServiceNet
+        address, which is the first IPv4 address in the ``private``
+        group in the 10.x.x.x range.
+
+        It even does this when there are other addresses in the
+        ``private`` group. This happens when the tenant specifies
+        their own network named ``private``.
+        """
+        self.assertEqual(_servicenet_address(self.server_dict), "10.0.0.1")
+
+    def test_no_servicenet_address(self):
+        """
+        :func:`_servicenet_address` returns :data:`None` if the server has no
+        ServiceNet address.
+        """
+        del self.addresses["private"]
+        self.assertEqual(_servicenet_address(self.server_dict), "")

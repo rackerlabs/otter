@@ -250,10 +250,14 @@ class ScalingGroupStatus(Names):
     """
     Status of scaling group
     """
-    ACTIVE = NamedConstant()    # Group is active and executing policies/converging
-    ERROR = NamedConstant()     # Group has errored due to (mostly) invalid
-                                # launch configuration and has stopped executing
-                                # policies/converging
+    ACTIVE = NamedConstant()
+    "Group is active and executing policies/converging"
+
+    ERROR = NamedConstant()
+    """
+    Group has errored due to (mostly) invalid launch configuration and has
+    stopped executing policies/converging
+    """
 
 
 class IScalingGroup(Interface):
@@ -263,12 +267,14 @@ class IScalingGroup(Interface):
     uuid = Attribute("UUID of the scaling group - immutable.")
     tenant_id = Attribute("Rackspace Tenant ID of the owner of this group.")
 
-    def view_manifest(with_webhooks=False):
+    def view_manifest(with_policies=True, with_webhooks=False):
         """
         The manifest contains everything required to configure this scaling:
         the config, the launch config, and all the scaling policies.
 
-        :param bool with_webhooks: Should webhooks information be included?
+        :param bool with_policies: Should policies information be included?
+        :param bool with_webhooks: If policies are included, should webhooks
+            information be included?
 
         :return: a dictionary corresponding to the JSON schema at
             :data:`otter.json_schema.model_schemas.manifest`
@@ -849,7 +855,7 @@ class IAdmin(Interface):
     Interface to administrative information and actions.
     """
 
-    def get_metrics(self, log):
+    def get_metrics(log):
         """
         Returns total current count of policies, webhooks and groups in the
         following format::
