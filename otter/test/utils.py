@@ -165,9 +165,9 @@ class CheckFailureValue(object):
     def __eq__(self, other):
         matcher = MatchesException(self.exception)
         return (
-            isinstance(other, Failure)
-            and other.check(type(self.exception)) is not None
-            and matcher.match((type(other.value), other.value, None)) is None)
+            isinstance(other, Failure) and
+            other.check(type(self.exception)) is not None and
+            matcher.match((type(other.value), other.value, None)) is None)
 
     def __ne__(self, other):
         return not self == other
