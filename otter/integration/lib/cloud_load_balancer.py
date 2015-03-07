@@ -13,6 +13,12 @@ from twisted.internet.task import LoopingCall
 
 from otter.integration.lib.timeout import TimeoutError
 from otter.util.http import check_success, headers
+from otter.util.deferredutils import retry_and_timeout
+from otter.util.retry import (
+    TransientRetryError,
+    transient_errors_except,
+    repeating_interval,
+)
 
 
 @attributes([
@@ -81,42 +87,27 @@ class CloudLoadBalancer(object):
             reached.  If the state has not been attained in the timeout period,
             an exception will be raised, which can be caught in an Errback.
         """
-        clock = clock or reactor
+        def check(state):
+            lb_state = state["loadBalancer"]["status"]
+            if lb_state == state_desired:
+                return rcs
 
-        class Looper(object):
-            def __init__(self, load_balancer):
-                self.elapsed_time = 0
-                self.load_balancer = load_balancer
-                # To be filled in later.
-                self.loopingCall = None
+            raise TransientRetryError()
 
-            def loop(self):
-                if self.elapsed_time < timeout:
-                    self.elapsed_time += period
-                    return self.check_load_balancer()
-                else:
-                    raise TimeoutError(
-                        "Spent %ds, polling every %ds, timeout." % (
-                            self.elapsed_time, period
-                        )
-                    )
+        def poll():
+            return self.get_state(rcs).addCallback(check)
 
-            def check_status(self, state_results):
-                lb_state = state_results["loadBalancer"]["status"]
-                if lb_state == state_desired:
-                    self.loopingCall.stop()
-
-            def check_load_balancer(self):
-                d = (self.load_balancer.get_state(rcs)
-                     .addCallback(self.check_status))
-                return d
-
-        looper = Looper(self)
-        lc = LoopingCall(looper.loop)
-        lc.clock = clock
-        looper.loopingCall = lc
-        d = lc.start(period).addCallback(lambda _: rcs)
-        return d
+        return retry_and_timeout(
+            poll, timeout,
+            can_retry=transient_errors_except(),
+            next_interval=repeating_interval(period),
+            clock=clock or reactor,
+            deferred_description=(
+                "State {} not reached in {} s timeout.".format(
+                    state_desired, timeout
+                )
+            )
+        )
 
     def stop(self, rcs):
         """Stops and deletes the cloud load balancer.
