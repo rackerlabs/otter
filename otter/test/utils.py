@@ -147,6 +147,9 @@ class CheckFailure(object):
         return isinstance(other, Failure) and other.check(
             self.exception_type)
 
+    def __ne__(self, other):
+        return not self == other
+
 
 class CheckFailureValue(object):
     """
@@ -161,9 +164,13 @@ class CheckFailureValue(object):
 
     def __eq__(self, other):
         matcher = MatchesException(self.exception)
-        return (isinstance(other, Failure)
-                and other.check(type(self.exception)) is not None
-                and matcher.match((type(other.value), other.value, None)) is None)
+        return (
+            isinstance(other, Failure) and
+            other.check(type(self.exception)) is not None and
+            matcher.match((type(other.value), other.value, None)) is None)
+
+    def __ne__(self, other):
+        return not self == other
 
 
 class IsCallable(object):
@@ -342,7 +349,11 @@ def mock_log(*args, **kwargs):
     Since in all likelyhood, testing that certain values are bound would be
     more important than testing the exact logged message.
     """
-    return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
+    msg = mock.Mock(spec=[])
+    msg.return_value = None
+    err = mock.Mock(spec=[])
+    err.return_value = None
+    return BoundLog(msg, err)
 
 
 class StubResponse(object):
@@ -666,3 +677,37 @@ def defaults_by_name(fn):
     """Returns a mapping of args of fn to their default values."""
     args, _, _, defaults = getargspec(fn)
     return dict(zip(reversed(args), reversed(defaults)))
+
+
+class FakePartitioner(Service):
+    """A fake version of a :obj:`Partitioner`."""
+    def __init__(self, log, callback):
+        self.log = log
+        self.got_buckets = callback
+        self.health = (True, {'buckets': []})
+
+    def reset_path(self, new_path):
+        return 'partitioner reset to {}'.format(new_path)
+
+    def health_check(self):
+        return defer.succeed(self.health)
+
+
+def transform_eq(transformer, rhs):
+    """
+    Return an object that can be compared to another object after transforming
+    that other object.
+
+    :param transformer: a function that takes the compared objects and returns
+        a transformed version
+    :param rhs: the actual data that should be compared with the result of
+        transforming the compared object
+    """
+    class Foo(object):
+        def __eq__(self, other):
+            return transformer(other) == rhs
+
+        def __ne__(self, other):
+            return not self == other
+
+    return Foo()
