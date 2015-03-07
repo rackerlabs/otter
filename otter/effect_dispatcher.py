@@ -17,7 +17,7 @@ from .auth import (
 )
 from .http import TenantScope, perform_tenant_scope
 from .models.cass import CQLQueryExecute, perform_cql_query
-from .models.intents import get_cassandra_dispatcher
+from .models.intents import get_model_dispatcher
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
 from .util.zk import get_zk_dispatcher
@@ -54,7 +54,7 @@ def get_full_dispatcher(reactor, authenticator, log, service_configs,
     return ComposedDispatcher([
         get_legacy_dispatcher(reactor, authenticator, log, service_configs),
         get_zk_dispatcher(kz_client),
-        get_cassandra_dispatcher(log, store),
+        get_model_dispatcher(log, store),
     ])
 
 

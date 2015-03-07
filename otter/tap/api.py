@@ -247,12 +247,14 @@ def makeService(config):
     # Setup Kazoo client
     if config_value('zookeeper'):
         threads = config_value('zookeeper.threads') or 10
+        disable_logs = config_value('zookeeper.no_logs')
         kz_client = TxKazooClient(
             hosts=config_value('zookeeper.hosts'),
             # Keep trying to connect until the end of time with
             # max interval of 10 minutes
             connection_retry=dict(max_tries=-1, max_delay=600),
-            threads=threads, txlog=log.bind(system='kazoo'))
+            threads=threads,
+            txlog=None if disable_logs else log.bind(system='kazoo'))
         # Don't timeout. Keep trying to connect forever
         d = kz_client.start(timeout=None)
 
