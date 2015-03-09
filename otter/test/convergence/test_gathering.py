@@ -37,7 +37,7 @@ from otter.convergence.model import (
     RCv3Description,
     RCv3Node,
     ServerState)
-from otter.http import ServiceRequest, service_request
+from otter.http import service_request
 from otter.test.utils import (
     patch,
     resolve_effect,
@@ -506,17 +506,23 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         ]
 
     def test_success(self):
-        """The data is returned as a tuple of ([NovaServer], [CLBNode])."""
-        lb_nodes = [CLBNode(node_id='node1', address='ip1',
-                            description=CLBDescription(lb_id='lb1', port=80))]
+        """
+        The data is returned as a tuple of ([NovaServer], [CLBNode/RCv3Node]).
+        """
+        clb_nodes = [CLBNode(node_id='node1', address='ip1',
+                             description=CLBDescription(lb_id='lb1', port=80))]
+        rcv3_nodes = [RCv3Node(node_id='node2', cloud_server_id='a',
+                               description=RCv3Description(lb_id='lb2'))]
 
         get_servers = lambda: Effect(Stub(Constant({'gid': self.servers})))
-        get_lb = lambda: Effect(Stub(Constant(lb_nodes)))
+        get_clb = lambda: Effect(Stub(Constant(clb_nodes)))
+        get_rcv3 = lambda: Effect(Stub(Constant(rcv3_nodes)))
 
         eff = get_all_convergence_data(
             'gid',
             get_scaling_group_servers=get_servers,
-            get_clb_contents=get_lb)
+            get_clb_contents=get_clb,
+            get_rcv3_contents=get_rcv3)
 
         expected_servers = [
             NovaServer(id='a',
@@ -534,7 +540,8 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                        servicenet_address='10.0.0.2',
                        links=freeze([{'href': 'link2', 'rel': 'self'}]))
         ]
-        self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))
+        self.assertEqual(resolve_stubs(eff),
+                         (expected_servers, clb_nodes + rcv3_nodes))
 
     def test_no_group_servers(self):
         """
@@ -542,11 +549,13 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         an empty list.
         """
         get_servers = lambda: Effect(Stub(Constant({})))
-        get_lb = lambda: Effect(Stub(Constant([])))
+        get_clb = lambda: Effect(Stub(Constant([])))
+        get_rcv3 = lambda: Effect(Stub(Constant([])))
 
         eff = get_all_convergence_data(
             'gid',
             get_scaling_group_servers=get_servers,
-            get_clb_contents=get_lb)
+            get_clb_contents=get_clb,
+            get_rcv3_contents=get_rcv3)
 
         self.assertEqual(resolve_stubs(eff), ([], []))

@@ -216,7 +216,8 @@ def get_rcv3_contents():
 def get_all_convergence_data(
         group_id,
         get_scaling_group_servers=get_scaling_group_servers,
-        get_clb_contents=get_clb_contents):
+        get_clb_contents=get_clb_contents,
+        get_rcv3_contents=get_rcv3_contents):
     """
     Gather all data relevant for convergence, in parallel where
     possible.
@@ -227,6 +228,7 @@ def get_all_convergence_data(
         [get_scaling_group_servers()
          .on(lambda servers: servers.get(group_id, []))
          .on(map(NovaServer.from_server_details_json)).on(list),
-         get_clb_contents()]
-    ).on(tuple)
+         get_clb_contents(),
+         get_rcv3_contents()]
+    ).on(lambda (servers, clb, rcv3): (servers, list(concat([clb, rcv3]))))
     return eff
