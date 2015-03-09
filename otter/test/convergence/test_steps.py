@@ -250,17 +250,6 @@ class CreateServerTests(SynchronousTestCase):
         # 403's with JSON and plaintext bodies don't recognize
         invalid_403s = (
             json.dumps({"what?": {"message": "meh", "code": 403}}),
-            json.dumps({"forbidden": {
-                "message": ("Quota exceeded for hats: Requested 1, but "
-                            "already used 5 of 5 bunnies"),
-                "code": 403}}),
-            json.dumps({"forbidden": {
-                "message": ("Quota exceeded for hats: Requested X, but "
-                            "already used Y of Z hats"),
-                "code": 403}}),
-            json.dumps({"forbidden": {
-                "message": "Exactly 1 isolated network(s) must be attached",
-                "code": 403}}),
             "403 Forbidden\n\nAccess was denied to this resource.\n\n bleh",
             ("403 Forbidden\n\nAccess was denied to this resource.\n\n "
              "Quota exceeded for ram: Requested 1024, but already used 131072 "

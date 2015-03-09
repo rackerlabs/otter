@@ -77,10 +77,6 @@ _NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED = _forbidden_plaintext(
 _NOVA_403_RACKCONNECT_NETWORK_REQUIRED = _forbidden_plaintext(
     "Exactly 1 isolated network\(s\) must be attached")
 
-_NOVA_403_QUOTA_REACHED = re.compile(
-    "^Quota exceeded for (?P<limit>\S+): Requested \d+, but already used \d+ "
-    "of \d+ (?P=limit)$")
-
 
 def _parse_nova_user_error(api_error):
     """
@@ -102,7 +98,7 @@ def _parse_nova_user_error(api_error):
     elif api_error.code == 403:
         message = _try_json_message(api_error.body,
                                     ("forbidden", "message"))
-        if message and _NOVA_403_QUOTA_REACHED.match(message):
+        if message:
             return message
 
         for pat in (_NOVA_403_RACKCONNECT_NETWORK_REQUIRED,
