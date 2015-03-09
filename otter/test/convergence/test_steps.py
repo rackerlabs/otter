@@ -1,4 +1,5 @@
 """Tests for convergence steps."""
+import json
 
 from effect import Func
 
@@ -31,14 +32,28 @@ from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
 
 
-class StepAsEffectTests(SynchronousTestCase):
+def service_request_error_response(error):
     """
-    Tests for converting :obj:`IStep` implementations to :obj:`Effect`s.
+    Returns the error response that gets passed to error handlers on the
+    service request effect.
+
+    That is, (type of error, actual error, traceback object)
+
+    Just returns None for the traceback object.
+    """
+    return (type(error), error, None)
+
+
+class CreateServerTests(SynchronousTestCase):
+    """
+    Tests for :obj:`CreateServer.as_effect`.
     """
 
-    def test_create_server(self):
+    def test_create_server_request_with_name(self):
         """
         :obj:`CreateServer.as_effect` produces a request for creating a server.
+        If the name is given, a randomly generated suffix is appended to the
+        server name.
         """
         create = CreateServer(
             server_config=freeze({'server': {'name': 'myserver',
@@ -54,17 +69,8 @@ class StepAsEffectTests(SynchronousTestCase):
                 'servers',
                 data={'server': {'name': 'myserver-random-name',
                                  'flavorRef': '1'}},
-                success_pred=has_code(202)).intent)
-
-        self.assertEqual(
-            resolve_effect(eff, (None, {})),
-            (StepResult.SUCCESS, []))
-
-        self.assertEqual(
-            resolve_effect(eff,
-                           (APIError, APIError(500, None, None), None),
-                           is_error=True),
-            (StepResult.RETRY, []))
+                success_pred=has_code(202),
+                reauth_codes=(401,)).intent)
 
     def test_create_server_noname(self):
         """
@@ -86,8 +92,198 @@ class StepAsEffectTests(SynchronousTestCase):
                 'POST',
                 'servers',
                 data={'server': {'name': 'random-name', 'flavorRef': '1'}},
-                success_pred=has_code(202)).intent)
+                success_pred=has_code(202),
+                reauth_codes=(401,)).intent)
 
+    def test_create_server_success_case(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in a successful create,
+        returns with :obj:`StepResult.SUCCESS`.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        self.assertEqual(
+            resolve_effect(eff, (StubResponse(202, {}), {"server": {}})),
+            (StepResult.SUCCESS, []))
+
+    def test_create_server_400_parseable_failures(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in 400 failure code,
+        returns with :obj:`StepResult.FAILURE` and whatever message was
+        included in the Nova bad request message.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        # 400's we've seen so far
+        nova_400s = (
+            ("Bad networks format: network uuid is not in proper format "
+             "(2b55377-890e-4fc9-9ece-ad5a414a788e)"),
+            "Image 644d0755-e69b-4ca0-b99b-3abc2f20f7c0 is not active.",
+            "Flavor's disk is too small for requested image.",
+            "Invalid key_name provided.",
+            ("Requested image 1dff348d-c06e-4567-a0b2-f4342575979e has "
+             "automatic disk resize disabled."),
+            "OS-DCF:diskConfig must be either 'MANUAL' or 'AUTO'.",
+        )
+        for message in nova_400s:
+            api_error = APIError(
+                code=400,
+                body=json.dumps({
+                    'badRequest': {
+                        'message': message,
+                        'code': 400
+                    }
+                }),
+                headers={})
+            self.assertEqual(
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
+                (StepResult.FAILURE, [message]))
+
+    def test_create_server_400_unrecognized_failures_retry(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in a 400 failure code
+        without a recognized body, invalidates the auth cache and returns with
+        :obj:`StepResult.RETRY`.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        # 400's with we don't recognize
+        invalid_400s = (
+            json.dumps({
+                "what?": {
+                    "message": "Invalid key_name provided.", "code": 400
+                }}),
+            json.dumps(["not expected json format"]),
+            "not json")
+
+        for message in invalid_400s:
+            api_error = APIError(code=400, body=message, headers={})
+            self.assertEqual(
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
+                (StepResult.RETRY, []))
+
+    def test_create_server_403_json_parseable_failures(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in a 403 failure code
+        with a recognized JSON body, returns with :obj:`StepResult.FAILURE` and
+        whatever message was included in the Nova forbidden message.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        # 403's with JSON bodies we've seen so far that are not auth issues
+        nova_json_403s = (
+            ("Quota exceeded for ram: Requested 1024, but already used 131072 "
+             "of 131072 ram"),
+            ("Quota exceeded for instances: Requested 1, but already used "
+             "100 of 100 instances"),
+            ("Quota exceeded for onmetal-compute-v1-instances: Requested 1, "
+             "but already used 10 of 10 onmetal-compute-v1-instances")
+        )
+
+        for message in nova_json_403s:
+            api_error = APIError(
+                code=403,
+                body=json.dumps({
+                    "forbidden": {
+                        "message": message,
+                        "code": 403
+                    }
+                }),
+                headers={})
+            self.assertEqual(
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
+                (StepResult.FAILURE, [message]))
+
+    def test_create_server_403_plaintext_parseable_failures(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in a 403 failure code
+        with a recognized plain text body, returns with
+        :obj:`StepResult.FAILURE` and whatever message was included in the
+        Nova forbidden message.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        # 403's with JSON bodies we've seen so far that are not auth issues
+        nova_plain_403s = (
+            ("Networks (00000000-0000-0000-0000-000000000000,"
+             "11111111-1111-1111-1111-111111111111) required but missing"),
+            "Networks (00000000-0000-0000-0000-000000000000) not allowed",
+            "Exactly 1 isolated network(s) must be attached"
+        )
+
+        for message in nova_plain_403s:
+            api_error = APIError(
+                code=403,
+                body="".join((
+                    "403 Forbidden\n\n",
+                    "Access was denied to this resource.\n\n ",
+                    message)),
+                headers={})
+            self.assertEqual(
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
+                (StepResult.FAILURE, [message]))
+
+    def test_create_server_403_unrecognized_failures_retry(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in a 403 failure code
+        without a recognized body, invalidates the auth cache and returns with
+        :obj:`StepResult.RETRY`.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        # 403's with JSON and plaintext bodies don't recognize
+        invalid_403s = (
+            json.dumps({"what?": {"message": "meh", "code": 403}}),
+            "403 Forbidden\n\nAccess was denied to this resource.\n\n bleh",
+            ("403 Forbidden\n\nAccess was denied to this resource.\n\n "
+             "Quota exceeded for ram: Requested 1024, but already used 131072 "
+             "of 131072 ram"),
+            "not even a message")
+
+        for message in invalid_403s:
+            api_error = APIError(code=403, body=message, headers={})
+            self.assertEqual(
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
+                (StepResult.RETRY, []))
+
+    def test_create_server_non_400_or_403_failures(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in a non-400, non-403
+        failure code without a recognized body, invalidates the auth cache and
+        returns with :obj:`StepResult.RETRY`.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        api_error = APIError(code=500, body="this is a 500", headers={})
+        self.assertEqual(
+            resolve_effect(eff, service_request_error_response(api_error),
+                           is_error=True),
+            (StepResult.RETRY, []))
+
+
+class StepAsEffectTests(SynchronousTestCase):
+    """
+    Tests for converting :obj:`IStep` implementations to :obj:`Effect`s.
+    """
     def test_delete_server(self):
         """
         :obj:`DeleteServer.as_effect` produces a request for deleting a server.
