@@ -3,7 +3,15 @@
 import calendar
 from functools import partial
 
-from effect import Constant, Effect
+from effect import (
+    Constant,
+    Effect,
+    ParallelEffects,
+    TypeDispatcher,
+    sync_performer,
+    sync_perform)
+
+from effect.async import perform_parallel_async
 from effect.testing import Stub
 
 from pyrsistent import freeze
@@ -16,6 +24,7 @@ from otter.convergence.gathering import (
     extract_CLB_drained_at,
     get_all_server_details,
     get_clb_contents,
+    get_rcv3_contents,
     get_scaling_group_servers)
 from otter.convergence.model import (
     CLBDescription,
@@ -23,8 +32,10 @@ from otter.convergence.model import (
     CLBNodeCondition,
     CLBNodeType,
     NovaServer,
+    RCv3Description,
+    RCv3Node,
     ServerState)
-from otter.http import service_request
+from otter.http import ServiceRequest, service_request
 from otter.test.utils import (
     patch,
     resolve_effect,
@@ -32,7 +43,7 @@ from otter.test.utils import (
     resolve_stubs
 )
 from otter.util.retry import (
-    ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
+    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import from_timestamp
 
 
@@ -207,7 +218,7 @@ class ExtractDrainedTests(SynchronousTestCase):
         self.assertRaises(ValueError, extract_CLB_drained_at, feed)
 
 
-class GetLBContentsTests(SynchronousTestCase):
+class GetCLBContentsTests(SynchronousTestCase):
     """
     Tests for :func:`otter.convergence.get_clb_contents`
     """
@@ -350,6 +361,103 @@ class GetLBContentsTests(SynchronousTestCase):
                      description=make_desc(lb_id='1')),
              CLBNode(node_id='21', address='a21',
                      description=make_desc(lb_id='2'))])
+
+
+class GetRCv3ContentsTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.convergence.get_rcv3_contents`
+    """
+    def setUp(self):
+        """
+        Set up an empty dictionary of intents to fake responses, and set up
+        the dispatcher.
+        """
+        @sync_performer
+        def unwrap_retry(_, retry_intent):
+            self.assertEqual(
+                retry_intent.should_retry,
+                ShouldDelayAndRetry(
+                    can_retry=retry_times(5),
+                    next_interval=exponential_backoff_interval(2)))
+            return retry_intent.effect
+
+        self.intent_responses = {}
+        self.dispatcher = TypeDispatcher({
+            ServiceRequest: sync_performer(
+                lambda _, intent: self.intent_responses[intent]),
+            Retry: unwrap_retry,
+            ParallelEffects: perform_parallel_async
+        })
+
+    def test_returns_flat_list_of_rcv3nodes(self):
+        """
+        All the nodes returned are in a flat list.
+        """
+        self.intent_responses = {
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            'load_balancer_pools').intent:
+            (None, [{'id': str(i)} for i in range(2)]),
+
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            'load_balancer_pools/0/nodes').intent:
+            (None,
+             [{'id': "0node{0}".format(i),
+               'cloud_server': {'id': '0server{0}'.format(i)}}
+              for i in range(2)]),
+
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            'load_balancer_pools/1/nodes').intent:
+            (None,
+             [{'id': "1node{0}".format(i),
+               'cloud_server': {'id': '1server{0}'.format(i)}}
+              for i in range(2)]),
+        }
+
+        self.assertEqual(
+            sorted(sync_perform(self.dispatcher, get_rcv3_contents())),
+            sorted(
+                [RCv3Node(node_id='0node0', cloud_server_id='0server0',
+                          description=RCv3Description(lb_id='0')),
+                 RCv3Node(node_id='0node1', cloud_server_id='0server1',
+                          description=RCv3Description(lb_id='0')),
+                 RCv3Node(node_id='1node0', cloud_server_id='1server0',
+                          description=RCv3Description(lb_id='1')),
+                 RCv3Node(node_id='1node1', cloud_server_id='1server1',
+                          description=RCv3Description(lb_id='1'))]))
+
+    def test_no_lb_pools_returns_no_nodes(self):
+        """
+        If there are no load balancer pools, there are no nodes.
+        """
+        self.intent_responses = {
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            'load_balancer_pools').intent:
+            (None, [])
+        }
+        self.assertEqual(
+            sync_perform(self.dispatcher, get_rcv3_contents()), [])
+
+    def test_no_nodes_on_lbs_no_nodes(self):
+        """
+        If there are no nodes on each of the load balancer pools, there are no
+        nodes returned overall.
+        """
+        self.intent_responses = {
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            'load_balancer_pools').intent:
+            (None, [{'id': str(i)} for i in range(2)]),
+
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            'load_balancer_pools/0/nodes').intent:
+            (None, []),
+
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            'load_balancer_pools/1/nodes').intent:
+            (None, [])
+        }
+
+        self.assertEqual(
+            sync_perform(self.dispatcher, get_rcv3_contents()), [])
 
 
 class GetAllConvergenceDataTests(SynchronousTestCase):

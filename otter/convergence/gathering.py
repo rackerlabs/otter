@@ -1,10 +1,13 @@
 """Code related to gathering data to inform convergence."""
+from functools import partial
 from urllib import urlencode
 
 from effect import parallel
 
 from toolz.curried import filter, groupby, keyfilter, map
+from toolz.dicttoolz import get_in
 from toolz.functoolz import compose, identity
+from toolz.itertoolz import concat
 
 from otter.constants import ServiceType
 from otter.convergence.model import (
@@ -13,6 +16,8 @@ from otter.convergence.model import (
     CLBNodeCondition,
     CLBNodeType,
     NovaServer,
+    RCv3Description,
+    RCv3Node,
     group_id_from_metadata)
 from otter.http import service_request
 from otter.indexer import atom
@@ -168,6 +173,41 @@ def extract_CLB_drained_at(feed):
         return timestamp_to_epoch(atom.updated(entry))
     else:
         raise ValueError('Unexpected summary: {}'.format(summary))
+
+
+def get_rcv3_contents():
+    """
+    Get Rackspace Cloud Load Balancer contents as list of `RCv3Node`.
+    """
+    eff = retry_effect(
+        service_request(ServiceType.RACKCONNECT_V3,
+                        'GET', 'load_balancer_pools'),
+        retry_times(5), exponential_backoff_interval(2))
+
+    def on_listing_pools(lblist_result):
+        _, body = lblist_result
+        return parallel([
+            retry_effect(
+                service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                                append_segments('load_balancer_pools',
+                                                lb_pool['id'], 'nodes')),
+                retry_times(5), exponential_backoff_interval(2)
+            ).on(
+                partial(on_listing_nodes,
+                        RCv3Description(lb_id=lb_pool['id'])))
+
+            for lb_pool in body
+        ])
+
+    def on_listing_nodes(rcv3_description, lbnodes_result):
+        _, body = lbnodes_result
+        return [
+            RCv3Node(node_id=node['id'], description=rcv3_description,
+                     cloud_server_id=get_in(('cloud_server', 'id'), node))
+            for node in body
+        ]
+
+    return eff.on(on_listing_pools).on(compose(list, concat))
 
 
 def get_all_convergence_data(
