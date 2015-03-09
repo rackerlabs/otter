@@ -9,15 +9,13 @@ from characteristic import Attribute, attributes
 import treq
 
 from twisted.internet import reactor
-from twisted.internet.task import LoopingCall
 
-from otter.integration.lib.timeout import TimeoutError
-from otter.util.http import check_success, headers
 from otter.util.deferredutils import retry_and_timeout
+from otter.util.http import check_success, headers
 from otter.util.retry import (
     TransientRetryError,
-    transient_errors_except,
     repeating_interval,
+    transient_errors_except,
 )
 
 
