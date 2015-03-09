@@ -82,7 +82,7 @@ _NOVA_403_QUOTA_REACHED = re.compile(
     "of \d+ (?P=limit)$")
 
 
-def _parse_nova_create_error(api_error):
+def _parse_nova_user_error(api_error):
     """
     Parse API errors for user failures on creating a server.
 
@@ -147,7 +147,7 @@ class CreateServer(object):
             """
             err_type, error, traceback = result
             if err_type == APIError:
-                message = _parse_nova_create_error(error)
+                message = _parse_nova_user_error(error)
                 if message is not None:
                     return StepResult.FAILURE, [message]
 
