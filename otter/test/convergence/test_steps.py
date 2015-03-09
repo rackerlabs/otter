@@ -9,7 +9,11 @@ from pyrsistent import freeze, pset
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
-from otter.convergence.model import CLBDescription, StepResult
+from otter.convergence.model import (
+    CLBDescription,
+    CLBNodeCondition,
+    CLBNodeType,
+    StepResult)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -26,7 +30,7 @@ from otter.convergence.steps import (
     _rcv3_check_bulk_add,
     _rcv3_check_bulk_delete)
 from otter.http import has_code, service_request
-from otter.test.utils import StubResponse, resolve_effect
+from otter.test.utils import StubResponse, resolve_effect, transform_eq
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
 
@@ -135,9 +139,9 @@ class StepAsEffectTests(SynchronousTestCase):
         changenode = ChangeCLBNode(
             lb_id='abc123',
             node_id='node1',
-            condition='DRAINING',
+            condition=CLBNodeCondition.DRAINING,
             weight=50,
-            type="PRIMARY")
+            type=CLBNodeType.PRIMARY)
         self.assertEqual(
             changenode.as_effect(),
             service_request(
@@ -248,7 +252,7 @@ class StepAsEffectTests(SynchronousTestCase):
         lb_id = "12345"
         node_ids = [str(i) for i in range(5)]
 
-        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=node_ids)
+        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=pset(node_ids))
         request = step.as_effect()
         self.assertEqual(
             request.intent,
@@ -256,7 +260,7 @@ class StepAsEffectTests(SynchronousTestCase):
                 ServiceType.CLOUD_LOAD_BALANCERS,
                 'DELETE',
                 "loadbalancers/12345/nodes",
-                params={'id': list(node_ids)},
+                params={'id': transform_eq(sorted, node_ids)},
                 json_response=True,
                 success_pred=ANY).intent)
 
@@ -268,7 +272,7 @@ class StepAsEffectTests(SynchronousTestCase):
         """
         lb_id = "12345"
         node_ids = [str(i) for i in range(5)]
-        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=node_ids)
+        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=pset(node_ids))
         request = step.as_effect()
 
         self.assertTrue(request.intent.json_response)
@@ -335,7 +339,7 @@ class StepAsEffectTests(SynchronousTestCase):
             "details": "The object is not valid"
         }
 
-        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=node_ids)
+        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=pset(node_ids))
         eff = resolve_effect(step.as_effect(),
                              (StubResponse(400, {}), error_body))
         self.assertEqual(
@@ -344,7 +348,7 @@ class StepAsEffectTests(SynchronousTestCase):
                 ServiceType.CLOUD_LOAD_BALANCERS,
                 'DELETE',
                 'loadbalancers/12345/nodes',
-                params={'id': ['0', '4']},
+                params={'id': transform_eq(sorted, ['0', '4'])},
                 success_pred=ANY,
                 json_response=True).intent)
 
