@@ -2,13 +2,14 @@
 from functools import partial
 from urllib import urlencode
 
-from effect import parallel
+from effect import catch, parallel
 
 from toolz.curried import filter, groupby, keyfilter, map
 from toolz.dicttoolz import get_in
 from toolz.functoolz import compose, identity
 from toolz.itertoolz import concat
 
+from otter.auth import NoSuchEndpoint
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
@@ -207,7 +208,9 @@ def get_rcv3_contents():
             for node in body
         ]
 
-    return eff.on(on_listing_pools).on(compose(list, concat))
+    return eff.on(on_listing_pools).on(
+        success=compose(list, concat),
+        error=catch(NoSuchEndpoint, lambda _: []))
 
 
 def get_all_convergence_data(

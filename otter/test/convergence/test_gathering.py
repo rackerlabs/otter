@@ -7,17 +7,19 @@ from effect import (
     Constant,
     Effect,
     ParallelEffects,
+    ComposedDispatcher,
     TypeDispatcher,
     sync_performer,
     sync_perform)
 
 from effect.async import perform_parallel_async
-from effect.testing import Stub
+from effect.testing import EQDispatcher, EQFDispatcher, Stub
 
 from pyrsistent import freeze
 
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.auth import NoSuchEndpoint
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
     get_all_convergence_data,
@@ -367,7 +369,7 @@ class GetRCv3ContentsTests(SynchronousTestCase):
     """
     Tests for :func:`otter.convergence.get_rcv3_contents`
     """
-    def setUp(self):
+    def get_dispatcher(self, service_request_mappings):
         """
         Set up an empty dictionary of intents to fake responses, and set up
         the dispatcher.
@@ -381,19 +383,23 @@ class GetRCv3ContentsTests(SynchronousTestCase):
                     next_interval=exponential_backoff_interval(2)))
             return retry_intent.effect
 
-        self.intent_responses = {}
-        self.dispatcher = TypeDispatcher({
-            ServiceRequest: sync_performer(
-                lambda _, intent: self.intent_responses[intent]),
-            Retry: unwrap_retry,
-            ParallelEffects: perform_parallel_async
-        })
+        eq_dispatcher = EQDispatcher
+        if callable(service_request_mappings.values()[0]):
+            eq_dispatcher = EQFDispatcher
+
+        return ComposedDispatcher([
+            TypeDispatcher({
+                Retry: unwrap_retry,
+                ParallelEffects: perform_parallel_async
+            }),
+            eq_dispatcher(service_request_mappings)
+        ])
 
     def test_returns_flat_list_of_rcv3nodes(self):
         """
         All the nodes returned are in a flat list.
         """
-        self.intent_responses = {
+        dispatcher = self.get_dispatcher({
             service_request(ServiceType.RACKCONNECT_V3, 'GET',
                             'load_balancer_pools').intent:
             (None, [{'id': str(i)} for i in range(2)]),
@@ -411,10 +417,10 @@ class GetRCv3ContentsTests(SynchronousTestCase):
              [{'id': "1node{0}".format(i),
                'cloud_server': {'id': '1server{0}'.format(i)}}
               for i in range(2)]),
-        }
+        })
 
         self.assertEqual(
-            sorted(sync_perform(self.dispatcher, get_rcv3_contents())),
+            sorted(sync_perform(dispatcher, get_rcv3_contents())),
             sorted(
                 [RCv3Node(node_id='0node0', cloud_server_id='0server0',
                           description=RCv3Description(lb_id='0')),
@@ -429,20 +435,20 @@ class GetRCv3ContentsTests(SynchronousTestCase):
         """
         If there are no load balancer pools, there are no nodes.
         """
-        self.intent_responses = {
+        dispatcher = self.get_dispatcher({
             service_request(ServiceType.RACKCONNECT_V3, 'GET',
                             'load_balancer_pools').intent:
             (None, [])
-        }
+        })
         self.assertEqual(
-            sync_perform(self.dispatcher, get_rcv3_contents()), [])
+            sync_perform(dispatcher, get_rcv3_contents()), [])
 
     def test_no_nodes_on_lbs_no_nodes(self):
         """
         If there are no nodes on each of the load balancer pools, there are no
         nodes returned overall.
         """
-        self.intent_responses = {
+        dispatcher = self.get_dispatcher({
             service_request(ServiceType.RACKCONNECT_V3, 'GET',
                             'load_balancer_pools').intent:
             (None, [{'id': str(i)} for i in range(2)]),
@@ -454,10 +460,25 @@ class GetRCv3ContentsTests(SynchronousTestCase):
             service_request(ServiceType.RACKCONNECT_V3, 'GET',
                             'load_balancer_pools/1/nodes').intent:
             (None, [])
-        }
+        })
 
         self.assertEqual(
-            sync_perform(self.dispatcher, get_rcv3_contents()), [])
+            sync_perform(dispatcher, get_rcv3_contents()), [])
+
+    def test_rackconnect_not_supported_on_tenant(self):
+        """
+        If RackConnectV3 is not supported, return no nodes.
+        """
+        def no_endpoint(intent):
+            raise NoSuchEndpoint(service_name='RackConnect', region='DFW')
+
+        dispatcher = self.get_dispatcher({
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            'load_balancer_pools').intent:
+            no_endpoint
+        })
+        self.assertEqual(
+            sync_perform(dispatcher, get_rcv3_contents()), [])
 
 
 class GetAllConvergenceDataTests(SynchronousTestCase):
