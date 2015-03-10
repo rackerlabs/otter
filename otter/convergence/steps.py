@@ -292,13 +292,22 @@ class AddNodesToCLB(object):
                             for address, lbc in self.address_configs]},
             success_pred=predicate_any(
                 has_code(202, 413),
-                _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN,
-                               _CLB_PENDING_UPDATE_PATTERN)))
+                _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN)))
 
         def report_success(result):
             return StepResult.SUCCESS, []
 
         def report_failure(result):
+            """
+            If the error is a 422 - PENDING UPDATE, retry.  Otherwise, fail.
+            """
+            err_type, error, traceback = result
+            if err_type == APIError and error.code == 422:
+                # body has already become JSON
+                message = error.body.get("message", None)
+                if message and _CLB_PENDING_UPDATE_PATTERN.search(message):
+                    return StepResult.RETRY, []
+
             return StepResult.FAILURE, []
 
         return eff.on(success=report_success, error=report_failure)

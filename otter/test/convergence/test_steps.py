@@ -440,20 +440,10 @@ class StepAsEffectTests(SynchronousTestCase):
                 }),
             (StepResult.SUCCESS, []))
 
-        self.assertEqual(
-            get_result(
-                StubResponse(422, {}),
-                {
-                    "message": "Load Balancer '12345' has a status of "
-                               "'PENDING_UPDATE' and is considered immutable.",
-                    "code": 422
-                }),
-            (StepResult.SUCCESS, []))
-
     def test_add_nodes_to_clb_failure_response_codes(self):
         """
-        :obj:`AddNodesToCLB` fails on non-202, non-413, and non-422 recognized
-        response codes.
+        :obj:`AddNodesToCLB` retries on 422 Pending Update responses, and
+        fails on non-202, non-413 errors, non-422 recognized responses.
         """
         lb_id = "12345"
         lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
@@ -468,6 +458,18 @@ class StepAsEffectTests(SynchronousTestCase):
                 }),
                 request)
 
+        # Retry on pending update
+        self.assertEqual(
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "Load Balancer '12345' has a status of "
+                               "'PENDING_UPDATE' and is considered immutable.",
+                    "code": 422
+                }),
+            (StepResult.RETRY, []))
+
+        # Fail on everything else
         self.assertEqual(get_result(StubResponse(404, {}), ''),
                          (StepResult.FAILURE, []))
 
