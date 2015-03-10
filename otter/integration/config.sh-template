@@ -11,6 +11,8 @@ export AS_PASSWORD=joes_password
 
 # This is the Identity V2 API endpoint.
 export AS_IDENTITY=https://identity.api.rackspacecloud.com/v2.0
+# To run agains mimic, use the following default endpoint:
+# export AS_IDENTITY=http://localhost:8900/identity/v2.0
 
 # When creating servers, use this flavor.
 export AS_FLAVOR_REF=2
