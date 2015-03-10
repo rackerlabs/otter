@@ -726,7 +726,7 @@ def get_fake_service_request_performer(stub_response):
     if not isinstance(stub_response, basestring):
         try:
             stub_response = (stub_response[0], json.dumps(stub_response[-1]))
-        except:
+        except TypeError:
             stub_response = (stub_response[0], str(stub_response[-1]))
 
     @sync_performer
