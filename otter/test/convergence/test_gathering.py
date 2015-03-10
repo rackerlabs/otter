@@ -9,8 +9,8 @@ from effect import (
     Effect,
     ParallelEffects,
     TypeDispatcher,
-    sync_performer,
-    sync_perform)
+    sync_perform,
+    sync_performer)
 
 from effect.async import perform_parallel_async
 from effect.testing import EQDispatcher, EQFDispatcher, Stub
