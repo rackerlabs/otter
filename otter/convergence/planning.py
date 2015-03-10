@@ -176,12 +176,16 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     """
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
 
-    servers_in_error, servers_in_active, servers_in_build, draining_servers = (
-        partition_groups(
-            lambda s: s.state, newest_to_oldest, [ServerState.ERROR,
-                                                  ServerState.ACTIVE,
-                                                  ServerState.BUILD,
-                                                  ServerState.DRAINING]))
+    (servers_in_error,
+     servers_in_active,
+     servers_in_build,
+     draining_servers,
+     deleted_servers) = partition_groups(
+        lambda s: s.state, newest_to_oldest, [ServerState.ERROR,
+                                              ServerState.ACTIVE,
+                                              ServerState.BUILD,
+                                              ServerState.DRAINING,
+                                              ServerState.DELETED])
 
     building_too_long, waiting_for_build = partition_bool(
         lambda server: now - server.created >= timeout,
@@ -217,12 +221,14 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # delete all servers in error - draining does not need to be
     # handled because servers in error presumably are not serving
     # traffic anyway
-    delete_error_steps = (
-        [DeleteServer(server_id=server.id) for server in servers_in_error] +
-        [RemoveNodesFromCLB(lb_id=lb_node.description.lb_id,
-                            node_ids=pset([lb_node.node_id]))
-         for server in servers_in_error
-         for lb_node in load_balancer_contents if lb_node.matches(server)])
+    delete_error_steps = [
+        DeleteServer(server_id=server.id) for server in servers_in_error]
+
+    # clean up all the load balancers from deleted and errored servers
+    cleanup_errored_and_deleted_steps = [
+        remove_node_from_lb(lb_node)
+        for server in servers_in_error + deleted_servers
+        for lb_node in load_balancer_contents if lb_node.matches(server)]
 
     # converge all the servers that remain to their desired load balancer state
     still_active_servers = filter(lambda s: s not in servers_to_delete,
@@ -235,11 +241,12 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
             [node for node in load_balancer_contents if node.matches(server)])
         ]
 
-    return pbag(create_steps
-                + scale_down_steps
-                + delete_error_steps
-                + delete_timeout_steps
-                + lb_converge_steps)
+    return pbag(create_steps +
+                scale_down_steps +
+                delete_error_steps +
+                cleanup_errored_and_deleted_steps +
+                delete_timeout_steps +
+                lb_converge_steps)
 
 
 _optimizers = {}
