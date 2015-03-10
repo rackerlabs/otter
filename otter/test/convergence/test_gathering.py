@@ -183,8 +183,9 @@ class ExtractDrainedTests(SynchronousTestCase):
     """
     Tests for :func:`otter.convergence.extract_CLB_drained_at`
     """
-    summary = ("Node successfully updated with address: " +
-               "'10.23.45.6', port: '8080', weight: '1', condition: 'DRAINING'")
+    summary = ("Node successfully updated with address: "
+               "'10.23.45.6', port: '8080', weight: '1', "
+               "condition: 'DRAINING'")
     updated = '2014-10-23T18:10:48.000Z'
     feed = ('<feed xmlns="http://www.w3.org/2005/Atom">' +
             '<entry><summary>{}</summary><updated>{}</updated></entry>' +
@@ -197,13 +198,15 @@ class ExtractDrainedTests(SynchronousTestCase):
         """
         feed = self.feed.format(self.summary, self.updated)
         self.assertEqual(extract_CLB_drained_at(feed),
-                         calendar.timegm(from_timestamp(self.updated).utctimetuple()))
+                         calendar.timegm(
+                             from_timestamp(self.updated).utctimetuple()))
 
     def test_invalid_first_entry(self):
         """
         Raises error if first entry is not DRAINING entry
         """
-        feed = self.feed.format("Node successfully updated with ENABLED", self.updated)
+        feed = self.feed.format("Node successfully updated with ENABLED",
+                                self.updated)
         self.assertRaises(ValueError, extract_CLB_drained_at, feed)
 
 
@@ -381,8 +384,11 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         lb_nodes = [CLBNode(node_id='node1', address='ip1',
                             description=CLBDescription(lb_id='lb1', port=80))]
 
-        get_servers = lambda: Effect(Stub(Constant({'gid': self.servers})))
-        get_lb = lambda: Effect(Stub(Constant(lb_nodes)))
+        def get_servers():
+            return Effect(Stub(Constant({'gid': self.servers})))
+
+        def get_lb():
+            return Effect(Stub(Constant(lb_nodes)))
 
         eff = get_all_convergence_data(
             'gid',
@@ -412,8 +418,11 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         If there are no servers in a group, get_all_convergence_data includes
         an empty list.
         """
-        get_servers = lambda: Effect(Stub(Constant({})))
-        get_lb = lambda: Effect(Stub(Constant([])))
+        def get_lb():
+            return Effect(Stub(Constant([])))
+
+        def get_servers():
+            return Effect(Stub(Constant({})))
 
         eff = get_all_convergence_data(
             'gid',
