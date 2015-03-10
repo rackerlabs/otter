@@ -384,7 +384,7 @@ class GetRCv3ContentsTests(SynchronousTestCase):
             return retry_intent.effect
 
         eq_dispatcher = EQDispatcher
-        if callable(service_request_mappings.values()[0]):
+        if callable(service_request_mappings[0][-1]):
             eq_dispatcher = EQFDispatcher
 
         return ComposedDispatcher([
@@ -399,25 +399,25 @@ class GetRCv3ContentsTests(SynchronousTestCase):
         """
         All the nodes returned are in a flat list.
         """
-        dispatcher = self.get_dispatcher({
-            service_request(ServiceType.RACKCONNECT_V3, 'GET',
-                            'load_balancer_pools').intent:
-            (None, [{'id': str(i)} for i in range(2)]),
+        dispatcher = self.get_dispatcher([
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools').intent,
+             (None, [{'id': str(i)} for i in range(2)])),
 
-            service_request(ServiceType.RACKCONNECT_V3, 'GET',
-                            'load_balancer_pools/0/nodes').intent:
-            (None,
-             [{'id': "0node{0}".format(i),
-               'cloud_server': {'id': '0server{0}'.format(i)}}
-              for i in range(2)]),
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools/0/nodes').intent,
+             (None,
+              [{'id': "0node{0}".format(i),
+                'cloud_server': {'id': '0server{0}'.format(i)}}
+               for i in range(2)])),
 
-            service_request(ServiceType.RACKCONNECT_V3, 'GET',
-                            'load_balancer_pools/1/nodes').intent:
-            (None,
-             [{'id': "1node{0}".format(i),
-               'cloud_server': {'id': '1server{0}'.format(i)}}
-              for i in range(2)]),
-        })
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools/1/nodes').intent,
+             (None,
+              [{'id': "1node{0}".format(i),
+                'cloud_server': {'id': '1server{0}'.format(i)}}
+               for i in range(2)])),
+        ])
 
         self.assertEqual(
             sorted(sync_perform(dispatcher, get_rcv3_contents())),
@@ -435,11 +435,11 @@ class GetRCv3ContentsTests(SynchronousTestCase):
         """
         If there are no load balancer pools, there are no nodes.
         """
-        dispatcher = self.get_dispatcher({
+        dispatcher = self.get_dispatcher([(
             service_request(ServiceType.RACKCONNECT_V3, 'GET',
-                            'load_balancer_pools').intent:
+                            'load_balancer_pools').intent,
             (None, [])
-        })
+        )])
         self.assertEqual(
             sync_perform(dispatcher, get_rcv3_contents()), [])
 
@@ -448,19 +448,19 @@ class GetRCv3ContentsTests(SynchronousTestCase):
         If there are no nodes on each of the load balancer pools, there are no
         nodes returned overall.
         """
-        dispatcher = self.get_dispatcher({
-            service_request(ServiceType.RACKCONNECT_V3, 'GET',
-                            'load_balancer_pools').intent:
-            (None, [{'id': str(i)} for i in range(2)]),
+        dispatcher = self.get_dispatcher([
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools').intent,
+             (None, [{'id': str(i)} for i in range(2)])),
 
-            service_request(ServiceType.RACKCONNECT_V3, 'GET',
-                            'load_balancer_pools/0/nodes').intent:
-            (None, []),
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools/0/nodes').intent,
+             (None, [])),
 
-            service_request(ServiceType.RACKCONNECT_V3, 'GET',
-                            'load_balancer_pools/1/nodes').intent:
-            (None, [])
-        })
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools/1/nodes').intent,
+             (None, []))
+        ])
 
         self.assertEqual(
             sync_perform(dispatcher, get_rcv3_contents()), [])
@@ -472,11 +472,11 @@ class GetRCv3ContentsTests(SynchronousTestCase):
         def no_endpoint(intent):
             raise NoSuchEndpoint(service_name='RackConnect', region='DFW')
 
-        dispatcher = self.get_dispatcher({
+        dispatcher = self.get_dispatcher([(
             service_request(ServiceType.RACKCONNECT_V3, 'GET',
-                            'load_balancer_pools').intent:
+                            'load_balancer_pools').intent,
             no_endpoint
-        })
+        )])
         self.assertEqual(
             sync_perform(dispatcher, get_rcv3_contents()), [])
 
