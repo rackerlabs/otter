@@ -7,7 +7,10 @@ from datetime import datetime
 
 import mock
 
-from testtools.matchers import Contains, ContainsDict, Equals
+from testtools.matchers import (
+    Contains,
+    ContainsDict,
+    Equals)
 
 from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
@@ -15,6 +18,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.log import audit
 from otter.log.bound import BoundLog
 from otter.log.formatters import (
+    ErrorFormattingWrapper,
     JSONObserverWrapper,
     ObserverWrapper,
     PEP3101FormattingWrapper,
@@ -157,6 +161,16 @@ class JSONObserverWrapperTests(SynchronousTestCase):
         observer(eventDict)
         self.observer.assert_called_once_with(
             {'message': (SameJSON({'foo': str(failure)}),)})
+
+    def test_message_is_concatenated(self):
+        """
+        message tuple in event is concatenated before passing on
+        """
+        eventDict = {'message': ('mine', 'yours')}
+        observer = JSONObserverWrapper(self.observer)
+        observer(eventDict)
+        self.observer.assert_called_once_with(
+            {'message': (SameJSON({'message': 'mineyours'}),)})
 
 
 class StreamObserverWrapperTests(SynchronousTestCase):
@@ -310,10 +324,129 @@ class PEP3101FormattingWrapperTests(SynchronousTestCase):
         })
 
 
+class ErrorFormatterTests(SynchronousTestCase):
+    """
+    Test for ErrorFormatterTests
+    """
+
+    def setUp(self):
+        """
+        Set up a mock observer.
+        """
+        self.observer = mock.Mock()
+        self.wrapper = ErrorFormattingWrapper(self.observer)
+
+    def _formatted_event(self):
+        args, _ = self.observer.call_args
+        return args[0]
+
+    def test_no_failure(self):
+        """
+        If event does not have failure, it sets level=6 and removes
+        all error fields
+        """
+        self.wrapper({'isError': False, 'failure': 'f', 'why': 'w',
+                      'foo': 'bar'})
+        self.assertEqual(
+            self._formatted_event(),
+            {'level': 6, 'message': ('',), 'foo': 'bar'})
+
+    def test_failure_include_traceback_in_event_dict(self):
+        """
+        The observer puts the traceback in the ``traceback`` key.
+        """
+        self.wrapper({'failure': Failure(ValueError()), 'isError': True})
+
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'traceback': Contains('Traceback')})))
+
+    def test_failure_repr_in_short_message(self):
+        """
+        The observer includes the repr of failure.value in short_message.
+        """
+        self.wrapper({'failure': Failure(ValueError()), 'isError': True})
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'message': Equals((repr(ValueError()),))})))
+
+    def test_isError_with_message_instead_of_failure(self):
+        """
+        The observer should use message when there is no failure.
+        """
+        self.wrapper({'message': ('uh oh',), 'isError': True})
+
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'message': Equals(('uh oh',))})))
+
+    def test_isError_sets_level_3(self):
+        """
+        The observer sets the level to 3 (syslog ERROR) when isError is true.
+        """
+        self.wrapper({'failure': Failure(ValueError()), 'isError': True})
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'level': Equals(3)})))
+
+    def test_isError_removes_error_fields(self):
+        """
+        Observer removes error fields before delegating when there
+        is failure in event
+        """
+        self.wrapper({'failure': Failure(ValueError()), 'isError': True,
+                      'why': 'reason'})
+        event = self._formatted_event()
+        for e in ('failure', 'why', 'isError'):
+            self.assertNotIn(e, event)
+
+    def test_isError_includes_why_in_short_message(self):
+        """
+        The observer includes 'why' in the short_message when isError is true.
+        """
+        self.wrapper({'failure': Failure(ValueError()),
+                      'isError': True,
+                      'why': 'Everything is terrible.'})
+        self.observer.assert_called_once_with(
+            matches(
+                ContainsDict(
+                    {'message': Equals(
+                        ('Everything is terrible.: ValueError()',))})))
+
+    def test_contains_exception_type(self):
+        """
+        The observer includes "exception_type" if event contains error
+        """
+        self.wrapper({'failure': Failure(ValueError()),
+                      'isError': True})
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'exception_type': Equals("ValueError")})))
+
+    def test_empty_message(self):
+        """
+        Empty message in event is overwritten with failure message
+        """
+        self.wrapper({'message': (), 'isError': True,
+                      'failure': Failure(ValueError())})
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'message': Equals(('ValueError()',))})))
+
+    def test_message_why_iserror(self):
+        """
+        When message, why and isError is given, then message takes precedence
+        and why and isError is ignored to construct message
+        """
+        failure = Failure(ValueError())
+        self.wrapper({'message': ('mine', 'yours'), 'isError': True,
+                      'why': 'reason', 'failure': failure})
+        self.assertEqual(
+            self._formatted_event(),
+            {'message': ('mineyours',), 'level': 3,
+             'traceback': failure.getTraceback(),
+             'exception_type': 'ValueError'})
+
+
 class ObserverWrapperTests(SynchronousTestCase):
     """
     Test the ObserverWrapper.
     """
+
     def setUp(self):
         """
         Set up a mock observer.
@@ -333,60 +466,10 @@ class ObserverWrapperTests(SynchronousTestCase):
         self.observer.assert_called_once_with({
             'host': 'localhost',
             '@version': 1,
-            'message': 'Hello',
+            'message': ('Hello',),
             'otter_facility': 'otter',
-            '@timestamp': datetime.fromtimestamp(0).isoformat(),
-            'level': 6,
+            '@timestamp': datetime.fromtimestamp(0).isoformat()
         })
-
-    def test_failure_include_traceback_in_event_dict(self):
-        """
-        The observer puts the traceback in the ``traceback`` key.
-        """
-        self.wrapper({'failure': Failure(ValueError()), 'isError': True})
-
-        self.observer.assert_called_once_with(
-            matches(ContainsDict({'traceback': Contains('Traceback')})))
-
-    def test_failure_repr_in_short_message(self):
-        """
-        The observer includes the repr of failure.value in short_message.
-        """
-        self.wrapper({'failure': Failure(ValueError()), 'isError': True})
-        self.observer.assert_called_once_with(
-            matches(ContainsDict({'message': Equals(repr(ValueError()))})))
-
-    def test_isError_with_message_instead_of_failure(self):
-        """
-        The observer should use message when there is no failure.
-        """
-        self.wrapper({'message': ('uh oh',), 'isError': True})
-
-        self.observer.assert_called_once_with(
-            matches(ContainsDict({'message': Equals('uh oh')})))
-
-    def test_isError_sets_level_3(self):
-        """
-        The observer sets the level to 3 (syslog ERROR) when isError is true.
-        """
-
-        self.wrapper({'failure': Failure(ValueError()), 'isError': True})
-
-        self.observer.assert_called_once_with(
-            matches(ContainsDict({'level': Equals(3)})))
-
-    def test_isError_includes_why_in_short_message(self):
-        """
-        The observer includes 'why' in the short_message when isError is true.
-        """
-        self.wrapper({'failure': Failure(ValueError()),
-                      'isError': True,
-                      'why': 'Everything is terrible.'})
-
-        self.observer.assert_called_once_with(
-            matches(
-                ContainsDict(
-                    {'message': Contains('Everything is terrible.')})))
 
     def test_includes_structured_data(self):
         """
