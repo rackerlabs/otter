@@ -418,12 +418,10 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         If there are no servers in a group, get_all_convergence_data includes
         an empty list.
         """
+        get_lb = lambda: Effect(Stub(Constant([])))
 
         def get_servers():
             return Effect(Stub(Constant({})))
-
-        def get_lb():
-            return Effect(Stub(Constant([])))
 
         eff = get_all_convergence_data(
             'gid',
