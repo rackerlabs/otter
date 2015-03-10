@@ -384,9 +384,11 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         lb_nodes = [CLBNode(node_id='node1', address='ip1',
                             description=CLBDescription(lb_id='lb1', port=80))]
 
-        get_lb = lambda: Effect(Stub(Constant(lb_nodes)))
         def get_servers():
             return Effect(Stub(Constant({'gid': self.servers})))
+
+        def get_lb():
+            return Effect(Stub(Constant(lb_nodes)))
 
         eff = get_all_convergence_data(
             'gid',
