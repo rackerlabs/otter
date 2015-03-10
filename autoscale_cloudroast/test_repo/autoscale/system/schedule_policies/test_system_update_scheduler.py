@@ -108,18 +108,25 @@ class UpdateSchedulerTests(AutoscaleFixture):
     def test_system_update_change_for_cron_style_scheduled_policy(self):
         """
         Create an cron style scheduler policy to execute the next minute,
-        update the policy only change in the policy and verify the server
-        count on the group is as expected.
+        wait for it to execute (because we never know where in the scheduler
+        cycle we are going to pick it up), update the policy only change in
+        the policy and verify the server count on the group is as expected.
         """
-        cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
+        ab = self.autoscale_behaviors
+        cron_style_policy = ab.create_schedule_policy_given(
             group_id=self.group.id,
             sp_change=1,
-            schedule_cron=self.cron_policy_args['cron'])
-        sleep(self.scheduler_interval)
-        self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
-        self._update_policy(self.group.id, cron_style_policy, self.cron_policy_args, change_value=2)
-        sleep(60 + self.scheduler_interval)
-        self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities + 2)
+            schedule_cron=self.cron_policy_args['cron'],
+            sp_cooldown=0)
+        self.wait_for_expected_group_state(
+            self.group.id, self.group.groupConfiguration.minEntities + 1,
+            60 + self.scheduler_interval)
+        self._update_policy(
+            self.group.id, cron_style_policy, self.cron_policy_args,
+            change_value=2)
+        self.wait_for_expected_group_state(
+            self.group.id, self.group.groupConfiguration.minEntities + 3,
+            60 + self.scheduler_interval)
 
     @tags(speed='slow')
     def test_system_update_name_for_cron_style_scheduled_policy(self):
