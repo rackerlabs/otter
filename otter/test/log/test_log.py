@@ -429,8 +429,8 @@ class ErrorFormatterTests(SynchronousTestCase):
 
     def test_message_why_iserror(self):
         """
-        When message, why and isError is given, then message is updated
-        based on why if it is not already there
+        When message, why and isError is given, then message takes precedence
+        and why and isError is ignored to construct message
         """
         failure = Failure(ValueError())
         self.wrapper({'message': ('mine', 'yours'), 'isError': True,
