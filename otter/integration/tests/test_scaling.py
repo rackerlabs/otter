@@ -37,8 +37,7 @@ def dump_groups(rcs):
 
 
 def print_endpoints(rcs):
-    for e in rcs.endpoints:
-        print("... {0}".format(e))
+    print(rcs.endpoints)
     return rcs
 
 
@@ -49,9 +48,15 @@ def dump_state(s):
 def find_end_point(rcs):
     rcs.token = rcs.access["access"]["token"]["id"]
     sc = rcs.access["access"]["serviceCatalog"]
-    rcs.endpoints["otter"] = 'http://localhost:9000/v1.0/{0}'.format(
-        rcs.access['access']['token']['tenant']['id'])
-#    rcs.endpoints["otter"] = auth.public_endpoint_url(sc, "autoscale", region)
+    try:
+        rcs.endpoints["otter"] = auth.public_endpoint_url(sc,
+                                                          "autoscale",
+                                                          region)
+    except StopIteration:
+        # If the autoscale endpoint is not defined, use local otter
+        rcs.endpoints["otter"] = 'http://localhost:9000/v1.0/{0}'.format(
+            rcs.access['access']['token']['tenant']['id'])
+
     rcs.endpoints["loadbalancers"] = auth.public_endpoint_url(
         sc, "cloudLoadBalancers", region
     )
@@ -170,7 +175,6 @@ class TestScaling(unittest.TestCase):
             self.identity.authenticate_user(rcs)
             .addCallback(find_end_point)
             .addCallback(print_token_and_ep)
-            .addCallback(print_endpoints)
             .addCallback(self.scaling_group.start, self)
             .addCallback(self.scaling_policy_up_2.start, self)
             .addCallback(self.scaling_policy_up_2.execute)

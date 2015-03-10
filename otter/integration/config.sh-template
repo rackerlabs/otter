@@ -22,3 +22,6 @@ export AS_IMAGE_REF=cca73d10-8953-4949-a2f2-1e5444a4130d
 
 # When creating servers, use this region.  Beware; this is case sensitive.
 export AS_REGION=IAD
+# Mimic defaults to using ORD as the region
+#export AS_REGION=ORD
+
