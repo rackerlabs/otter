@@ -4,10 +4,10 @@ import calendar
 from functools import partial
 
 from effect import (
+    ComposedDispatcher,
     Constant,
     Effect,
     ParallelEffects,
-    ComposedDispatcher,
     TypeDispatcher,
     sync_performer,
     sync_perform)
