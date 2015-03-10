@@ -793,20 +793,71 @@ class ConvergeTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ERROR,
-                            servicenet_address='1.1.1.1')]),
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(CLBDescription(lb_id='5', port=80),
+                                          CLBDescription(lb_id='5', port=8080),
+                                          RCv3Description(lb_id='6')))]),
                 set([CLBNode(address='1.1.1.1', node_id='3',
                              description=CLBDescription(lb_id='5',
                                                         port=80)),
                      CLBNode(address='1.1.1.1', node_id='5',
                              description=CLBDescription(lb_id='5',
-                                                        port=8080))]),
+                                                        port=8080)),
+                     RCv3Node(node_id='123', cloud_server_id='abc',
+                              description=RCv3Description(lb_id='6'))]),
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
                 RemoveNodesFromCLB(lb_id='5', node_ids=s('3')),
                 RemoveNodesFromCLB(lb_id='5', node_ids=s('5')),
+                BulkRemoveFromRCv3(lb_node_pairs=s(('6', 'abc'))),
                 CreateServer(server_config=pmap()),
             ]))
+
+    def test_clean_up_deleted_servers_with_lb_nodes(self):
+        """
+        If a server has been deleted, we want to remove any dangling LB nodes
+        referencing the server.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=0),
+                set([server('abc', ServerState.DELETED,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(CLBDescription(lb_id='5', port=80),
+                                          CLBDescription(lb_id='5', port=8080),
+                                          RCv3Description(lb_id='6')))]),
+                set([CLBNode(address='1.1.1.1', node_id='3',
+                             description=CLBDescription(lb_id='5',
+                                                        port=80)),
+                     CLBNode(address='1.1.1.1', node_id='5',
+                             description=CLBDescription(lb_id='5',
+                                                        port=8080)),
+                     RCv3Node(node_id='123', cloud_server_id='abc',
+                              description=RCv3Description(lb_id='6'))]),
+                0),
+            pbag([
+                RemoveNodesFromCLB(lb_id='5', node_ids=s('3')),
+                RemoveNodesFromCLB(lb_id='5', node_ids=s('5')),
+                BulkRemoveFromRCv3(lb_node_pairs=s(('6', 'abc'))),
+            ]))
+
+    def test_clean_up_deleted_servers_with_no_lb_nodes(self):
+        """
+        If a server has been deleted, but it is not attached to any load
+        balancers, we do nothing.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=0),
+                set([server('abc', ServerState.DELETED,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(CLBDescription(lb_id='5', port=80),
+                                          CLBDescription(lb_id='5', port=8080),
+                                          RCv3Description(lb_id='6')))]),
+                set(),
+                0),
+            pbag([]))
 
     def test_scale_down(self):
         """If we have more servers than desired, we delete the oldest."""
