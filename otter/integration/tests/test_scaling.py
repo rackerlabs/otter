@@ -121,6 +121,10 @@ class TestScaling(unittest.TestCase):
     test_scaling_up.timeout = 1800
 
     def test_policy_execution_after_adding_clb(self):
+        """This test attempts to reproduce the steps documented in a bug
+        submitted to Otter, documented in
+        https://github.com/rackerlabs/otter/issues/1135
+        """
         rcs = TestResources()
 
         self.clb1 = cloud_load_balancer.CloudLoadBalancer(pool=self.pool)
