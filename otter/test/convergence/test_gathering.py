@@ -183,8 +183,9 @@ class ExtractDrainedTests(SynchronousTestCase):
     """
     Tests for :func:`otter.convergence.extract_CLB_drained_at`
     """
-    summary = ("Node successfully updated with address: " +
-               "'10.23.45.6', port: '8080', weight: '1', condition: 'DRAINING'")
+    summary = ("Node successfully updated with address: "
+               "'10.23.45.6', port: '8080', weight: '1', "
+               "condition: 'DRAINING'")
     updated = '2014-10-23T18:10:48.000Z'
     feed = ('<feed xmlns="http://www.w3.org/2005/Atom">' +
             '<entry><summary>{}</summary><updated>{}</updated></entry>' +
