@@ -9,6 +9,8 @@ from operator import itemgetter
 from effect import Effect
 from effect.twisted import perform
 
+from pyrsistent import s
+
 from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3
 from otter.http import TenantScope
 from otter.util.pure_http import has_code
@@ -27,7 +29,7 @@ def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
         firing with the parsed result of the request, or :data:`None` if the
         request has no body.
     """
-    effect = step_class(lb_node_pairs=[(lb_id, server_id)])._bare_effect()
+    effect = step_class(lb_node_pairs=s((lb_id, server_id)))._bare_effect()
 
     if step_class is BulkAddToRCv3:
         svc_req = effect.intent
