@@ -125,8 +125,9 @@ class CreateOrSetTests(SynchronousTestCase):
 
     def test_loop_limit(self):
         """
-        performing a :obj:`CreateOrSet` will only try to loop between creating
-        and setting 100 times.
+        performing a :obj:`CreateOrSet` will avoid infinitely looping in
+        pathological cases, and eventually blow up with a
+        :obj:`CreateOrSetLoopLimitReachedError`.
         """
         def hacked_set(path, value):
             return fail(NoNodeError())

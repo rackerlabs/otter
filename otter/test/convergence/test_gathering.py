@@ -12,8 +12,8 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
-    get_all_convergence_data,
     extract_CLB_drained_at,
+    get_all_convergence_data,
     get_all_server_details,
     get_clb_contents,
     get_scaling_group_servers)
