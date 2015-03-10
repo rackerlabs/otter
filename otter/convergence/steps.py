@@ -156,7 +156,7 @@ class CreateServer(object):
 
 
 @implementer(IStep)
-@attributes([Attribute('server_id', instance_of=str)])
+@attributes([Attribute('server_id', instance_of=basestring)])
 class DeleteServer(object):
     """
     A server must be deleted.
@@ -182,9 +182,9 @@ class DeleteServer(object):
 
 
 @implementer(IStep)
-@attributes([Attribute('server_id', instance_of=str),
-             Attribute('key', instance_of=str),
-             Attribute('value', instance_of=str)])
+@attributes([Attribute('server_id', instance_of=basestring),
+             Attribute('key', instance_of=basestring),
+             Attribute('value', instance_of=basestring)])
 class SetMetadataItemOnServer(object):
     """
     A metadata key/value item must be set on a server.
@@ -241,7 +241,7 @@ def _check_clb_422(*regex_matches):
 
 
 @implementer(IStep)
-@attributes([Attribute('lb_id', instance_of=str),
+@attributes([Attribute('lb_id', instance_of=basestring),
              Attribute('address_configs', instance_of=PSet)])
 class AddNodesToCLB(object):
     """
@@ -284,7 +284,7 @@ class AddNodesToCLB(object):
 
 
 @implementer(IStep)
-@attributes([Attribute('lb_id', instance_of=str),
+@attributes([Attribute('lb_id', instance_of=basestring),
              Attribute('node_ids', instance_of=PSet)])
 class RemoveNodesFromCLB(object):
     """
@@ -351,8 +351,8 @@ def _clb_check_bulk_delete(lb_id, attempted_nodes, result):
 
 
 @implementer(IStep)
-@attributes([Attribute('lb_id', instance_of=str),
-             Attribute('node_id', instance_of=str),
+@attributes([Attribute('lb_id', instance_of=basestring),
+             Attribute('node_id', instance_of=basestring),
              Attribute('condition', instance_of=NamedConstant),
              Attribute('weight', instance_of=int),
              Attribute('type', instance_of=NamedConstant)])
