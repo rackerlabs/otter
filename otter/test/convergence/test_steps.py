@@ -1,8 +1,7 @@
 """Tests for convergence steps."""
 import json
 
-from effect import Func, sync_perform
-from effect.testing import EQDispatcher
+from effect import Func, TypeDispatcher, sync_perform
 
 from mock import ANY
 
@@ -27,8 +26,11 @@ from otter.convergence.steps import (
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
     _rcv3_check_bulk_add,
     _rcv3_check_bulk_delete)
-from otter.http import has_code, service_request
-from otter.test.utils import StubResponse, resolve_effect
+from otter.http import ServiceRequest, has_code, service_request
+from otter.test.utils import (
+    StubResponse,
+    get_fake_service_request_performer,
+    resolve_effect)
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
 
@@ -401,17 +403,7 @@ class StepAsEffectTests(SynchronousTestCase):
              'weight': 1}
         ])
 
-        self.assertEqual(
-            resolve_effect(request, (None, {})),
-            (StepResult.SUCCESS, []))
-
-        self.assertEqual(
-            resolve_effect(request,
-                           (APIError, APIError(500, None, None), None),
-                           is_error=True),
-            (StepResult.FAILURE, []))
-
-    def test_add_nodes_to_clb_predicate(self):
+    def test_add_nodes_to_clb_success_response_codes(self):
         """
         :obj:`AddNodesToCLB` only accepts 202, 413, and some 422 responses.
         """
@@ -420,84 +412,81 @@ class StepAsEffectTests(SynchronousTestCase):
         step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
         request = step.as_effect()
 
-        self.assertTrue(request.intent.json_response)
+        def get_result(response, body):
+            return sync_perform(
+                TypeDispatcher({
+                    ServiceRequest:
+                    get_fake_service_request_performer((response, body))
+                }),
+                request)
 
-        predicate = request.intent.success_pred
+        self.assertEqual(get_result(StubResponse(202, {}), ''),
+                         (StepResult.SUCCESS, []))
+        self.assertEqual(get_result(StubResponse(413, {}), ''),
+                         (StepResult.SUCCESS, []))
+        self.assertEqual(
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "Duplicate nodes detected. One or more "
+                               "nodes already configured on load "
+                               "balancer.",
+                    "code": 422
+                }),
+            (StepResult.SUCCESS, []))
 
         self.assertEqual(
-            resolve_effect(request,
-                           (APIError, APIError(422, None, None), None),
-                           is_error=True),
-            (StepResult.FAILURE, []))
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "Load Balancer '12345' has a status of "
+                               "'PENDING_UPDATE' and is considered immutable.",
+                    "code": 422
+                }),
+            (StepResult.SUCCESS, []))
 
-        self.assertTrue(predicate(StubResponse(202, {}), None))
-        self.assertTrue(predicate(StubResponse(413, {}), None))
-        self.assertTrue(predicate(
-            StubResponse(422, {}),
-            {
-                "message": "Duplicate nodes detected. One or more "
-                           "nodes already configured on load "
-                           "balancer.",
-                "code": 422
-            }))
-        self.assertTrue(predicate(
-            StubResponse(422, {}),
-            {
-                "message": "Load Balancer '12345' has a status of "
-                           "'PENDING_UPDATE' and is considered immutable.",
-                "code": 422
-            }))
-
-        self.assertFalse(predicate(StubResponse(404, {}), None))
-        self.assertFalse(predicate(
-            StubResponse(422, {}),
-            {
-                "message": "The load balancer is deleted and considered "
-                           "immutable.",
-                "code": 422
-            }))
-        self.assertFalse(predicate(
-            StubResponse(422, {}),
-            {
-                "message": "Load Balancer '{0}' has a status of "
-                           "'PENDING_DELETE' and is considered immutable."
-                           .format(lb_id),
-                "code": 422
-            }))
-
-    def test_add_nodes_to_clb_422_success_and_failures(self):
+    def test_add_nodes_to_clb_failure_response_codes(self):
         """
-        :obj:`AddNodesToCLB` returns SUCCESS on recognized 422 failures, and
-        FAILURE on unrecognized 422 failures.
+        :obj:`AddNodesToCLB` fails on non-202, non-413, and non-422 recognized
+        response codes.
         """
         lb_id = "12345"
         lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
         step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
-        eff = step.as_effect()
+        request = step.as_effect()
 
-        bad_response = ("Load Balancer '12345' has a status of "
-                        "'PENDING_DELETE' and is considered immutable.")
-        good_response = ("Load Balancer '12345' has a status of "
-                         "'PENDING_UPDATE' and is considered immutable.")
+        def get_result(response, body):
+            return sync_perform(
+                TypeDispatcher({
+                    ServiceRequest:
+                    get_fake_service_request_performer((response, body))
+                }),
+                request)
+
+        self.assertEqual(get_result(StubResponse(404, {}), ''),
+                         (StepResult.FAILURE, []))
+
+        self.assertEqual(get_result(StubResponse(400, {}), ''),
+                         (StepResult.FAILURE, []))
 
         self.assertEqual(
-            sync_perform(
-                EQDispatcher([(
-                    eff.intent,
-                    (StubResponse(422, {}),
-                     {'message': good_response, 'code': 422})
-                )]),
-                eff),
-            (StepResult.SUCCESS, []))
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "The load balancer is deleted and considered "
+                               "immutable.",
+                    "code": 422
+                }),
+            (StepResult.FAILURE, []))
 
         self.assertEqual(
-            sync_perform(
-                EQDispatcher([(
-                    eff.intent,
-                    (StubResponse(422, {}),
-                     {'message': bad_response, 'code': 422})
-                )]),
-                eff),
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "Load Balancer '12345' has a status of "
+                               "'PENDING_DELETE' and is considered immutable.",
+                    "code": 422
+                }),
             (StepResult.FAILURE, []))
 
     def test_remove_nodes_from_clb(self):
