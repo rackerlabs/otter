@@ -315,13 +315,25 @@ class StepAsEffectTests(SynchronousTestCase):
         """
         meta = SetMetadataItemOnServer(server_id='abc123', key='metadata_key',
                                        value='teapot')
+        eff = meta.as_effect()
         self.assertEqual(
-            meta.as_effect(),
+            eff.intent,
             service_request(
                 ServiceType.CLOUD_SERVERS,
                 'PUT',
                 'servers/abc123/metadata/metadata_key',
-                data={'meta': {'metadata_key': 'teapot'}}))
+                data={'meta': {'metadata_key': 'teapot'}},
+                success_pred=has_code(200, 404)).intent)
+
+        self.assertEqual(
+            resolve_effect(eff, (None, {})),
+            (StepResult.SUCCESS, []))
+
+        self.assertEqual(
+            resolve_effect(eff,
+                           (APIError, APIError(500, None, None), None),
+                           is_error=True),
+            (StepResult.RETRY, []))
 
     def test_change_load_balancer_node(self):
         """

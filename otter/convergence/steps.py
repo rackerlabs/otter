@@ -188,14 +188,26 @@ class SetMetadataItemOnServer(object):
     :ivar str server_id: a Nova server ID.
     :ivar str key: The metadata key to set (<=256 characters)
     :ivar str value: The value to assign to the metadata key (<=256 characters)
+
+    Succeed unconditionally on 200 (success) or 404 (if the server's gone, no
+    need to retry or fail).
     """
     def as_effect(self):
         """Produce a :obj:`Effect` to set a metadata item on a server"""
-        return service_request(
+        eff = service_request(
             ServiceType.CLOUD_SERVERS,
             'PUT',
             append_segments('servers', self.server_id, 'metadata', self.key),
-            data={'meta': {self.key: self.value}})
+            data={'meta': {self.key: self.value}},
+            success_pred=has_code(200, 404))
+
+        def report_success(result):
+            return StepResult.SUCCESS, []
+
+        def report_failure(result):
+            return StepResult.RETRY, []
+
+        return eff.on(success=report_success, error=report_failure)
 
 
 _CLB_DUPLICATE_NODES_PATTERN = re.compile(
