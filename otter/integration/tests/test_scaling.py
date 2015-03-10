@@ -1,13 +1,6 @@
 """A quick trial-based test to exercise scale-up and scale-down functionality.
 """
 
-# TODO(sfalvo): Scale-up functionality isn't finished yet.  I'll finish this
-# after refactoring is done.
-#
-# TODO(sfalvo): Scale-down functionality isn't implemented yet.  I'll finish
-# this after refactoring is done.
-
-
 from __future__ import print_function
 
 import json
@@ -20,7 +13,7 @@ from twisted.trial import unittest
 from twisted.web.client import HTTPConnectionPool
 
 from otter import auth
-from otter.integration.lib import autoscale
+from otter.integration.lib import autoscale, cloud_load_balancer
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
 
@@ -51,6 +44,9 @@ def find_end_point(rcs):
     rcs.token = rcs.access["access"]["token"]["id"]
     sc = rcs.access["access"]["serviceCatalog"]
     rcs.endpoints["otter"] = auth.public_endpoint_url(sc, "autoscale", region)
+    rcs.endpoints["loadbalancers"] = auth.public_endpoint_url(
+        sc, "cloudLoadBalancers", region
+    )
     return rcs
 
 
@@ -123,3 +119,67 @@ class TestScaling(unittest.TestCase):
         )
         return d
     test_scaling_up.timeout = 1800
+
+    def test_policy_execution_after_adding_clb(self):
+        """This test attempts to reproduce the steps documented in a bug
+        submitted to Otter, documented in
+        https://github.com/rackerlabs/otter/issues/1135
+        """
+        rcs = TestResources()
+
+        self.clb1 = cloud_load_balancer.CloudLoadBalancer(pool=self.pool)
+
+        def finish_setup(x, self):
+            scaling_group_body = {
+                "launchConfiguration": {
+                    "type": "launch_server",
+                    "args": {
+                        "loadBalancers": [{
+                            "port": 80,
+                            "loadBalancerId": self.clb1.clb_id,
+                        }],
+                        "server": {
+                            "flavorRef": flavor_ref,
+                            "imageRef": image_ref,
+                        }
+                    }
+                },
+                "groupConfiguration": {
+                    "name": "my-group-configuration",
+                    "cooldown": 0,
+                    "minEntities": 0,
+                },
+                "scalingPolicies": [],
+            }
+
+            self.scaling_group = autoscale.ScalingGroup(
+                group_config=scaling_group_body,
+                pool=self.pool
+            )
+
+            self.scale_up_policy = autoscale.ScalingPolicy(
+                scale_by=2,
+                scaling_group=self.scaling_group
+            )
+
+            self.scale_down_policy = autoscale.ScalingPolicy(
+                scale_by=-2,
+                scaling_group=self.scaling_group
+            )
+
+            d = (
+                self.scaling_group.start(rcs, self)
+                .addCallback(self.scale_up_policy.start, self)
+                .addCallback(self.scale_down_policy.start, self)
+            )
+            return d
+
+        d = (
+            self.identity.authenticate_user(rcs)
+            .addCallback(find_end_point)
+            .addCallback(self.clb1.start, self)
+            .addCallback(self.clb1.wait_for_state, "ACTIVE", 600)
+        ).addCallback(finish_setup, self)
+        return d
+
+    test_policy_execution_after_adding_clb.timeout = 1800

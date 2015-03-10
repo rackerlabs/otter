@@ -7,7 +7,8 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.integration.lib.autoscale import ScalingGroup
-from otter.integration.lib.autoscale import TimeoutError
+
+from otter.util.deferredutils import TimedOutError
 
 
 class WaitForNServersTestCase(SynchronousTestCase):
@@ -96,4 +97,4 @@ class WaitForNServersTestCase(SynchronousTestCase):
             self.clock.advance(10)
             self.assertNoResult(d)
         self.clock.advance(10)
-        self.failureResultOf(d, TimeoutError)
+        self.failureResultOf(d, TimedOutError)

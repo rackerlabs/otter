@@ -83,6 +83,11 @@ class ServerState(Names):
     Autoscale is deleting the server.
     """
 
+    DELETED = NamedConstant()
+    """
+    Corresponds to Nova's ``DELETED`` state.
+    """
+
 
 class StepResult(Names):
     """

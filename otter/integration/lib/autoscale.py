@@ -9,15 +9,18 @@ from characteristic import Attribute, attributes
 import treq
 
 from twisted.internet import reactor
-from twisted.internet.task import LoopingCall
 
+from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
+from otter.util.retry import (
+    TransientRetryError,
+    repeating_interval,
+    transient_errors_except,
+)
 
 
-class TimeoutError(Exception):
-    """This exception will raise when an operation exceeds a maximum amount
-    of time without showing any progress.
-    """
+class BreakLoopException(Exception):
+    """This serves to break out of a `retry_and_timeout` loop."""
 
 
 @attributes([
@@ -106,52 +109,29 @@ class ScalingGroup(object):
             Otherwise, an exception is raised.
         """
 
-        clock = clock or reactor
+        def check(state):
+            if state[0] != 200:
+                raise BreakLoopException("Scaling group not found.")
+            servers_active = len(state[1]["group"]["active"])
+            if servers_active == servers_desired:
+                return rcs
 
-        class Looper(object):
-            """Inner-class to support looping until either of two conditions
-            holds: (1) we see at least `servers_desired` servers in existence,
-            or (2) a timeout is reached.
+            raise TransientRetryError()
 
-            :param ScalingGroup scaling_group: The scaling group that this
-                looper should poll the state of.
-            """
+        def poll():
+            return self.get_scaling_group_state(rcs).addCallback(check)
 
-            def __init__(self, scaling_group):
-                self.elapsed_time = 0
-                self.scaling_group = scaling_group
-                # To be filled in later.
-                self.loopingCall = None
-
-            def loop(self):
-                if self.elapsed_time < timeout:
-                    self.elapsed_time += period
-                    return self.check_servers()
-                else:
-                    raise TimeoutError(
-                        "Spent %ds, polling every %ds, timeout." % (
-                            self.elapsed_time, period
-                        )
-                    )
-
-            def ensure_200_result(self, state_results):
-                if state_results[0] != 200:
-                    raise Exception("Scaling group not found.")
-                active_servers = state_results[1]["group"]["active"]
-                if len(active_servers) >= servers_desired:
-                    self.loopingCall.stop()
-
-            def check_servers(self):
-                d = self.scaling_group.get_scaling_group_state(rcs)\
-                    .addCallback(self.ensure_200_result)
-                return d
-
-        looper = Looper(self)
-        lc = LoopingCall(looper.loop)
-        lc.clock = clock
-        looper.loopingCall = lc
-        d = lc.start(period).addCallback(lambda _: rcs)
-        return d
+        return retry_and_timeout(
+            poll, timeout,
+            can_retry=transient_errors_except(BreakLoopException),
+            next_interval=repeating_interval(period),
+            clock=clock or reactor,
+            deferred_description=(
+                "Waiting for {} servers to go active.".format(
+                    servers_desired
+                )
+            )
+        )
 
     def start(self, rcs, test):
         """Create a scaling group.
