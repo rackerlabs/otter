@@ -1,3 +1,5 @@
+from functools import partial
+
 from effect import (
     ComposedDispatcher, Constant, Effect, Error, Func, ParallelEffects,
     TypeDispatcher, base_dispatcher, sync_perform)
@@ -8,8 +10,6 @@ from effect.testing import EQDispatcher, EQFDispatcher
 import mock
 
 from pyrsistent import freeze, pmap, pset, s
-
-from toolz import assoc
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
@@ -24,13 +24,13 @@ from otter.convergence.service import (
     converge_all,
     converge_one,
     determine_active, execute_convergence, get_my_divergent_groups,
+    make_lock_set,
     mark_divergent,
-    non_concurrently,
-    server_to_json)
+    non_concurrently)
+from otter.http import service_request
 from otter.models.intents import (
     GetScalingGroupInfo, ModifyGroupState, perform_modify_group_state)
 from otter.models.interface import GroupState, NoSuchScalingGroupError
-from otter.http import TenantScope, service_request
 from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
@@ -105,9 +105,9 @@ class ConvergerTests(SynchronousTestCase):
         """
         When buckets are allocated, the result of converge_all is performed.
         """
-        def converge_all(log, currently_converging, _my_buckets, all_buckets):
+        def converge_all(log, group_locks, _my_buckets, all_buckets):
             self.assertEqual(log, matches(IsBoundWith(system='converger')))
-            self.assertIs(currently_converging, converger.currently_converging)
+            self.assertIs(group_locks, converger.group_locks)
             self.assertEqual(_my_buckets, my_buckets)
             self.assertEqual(all_buckets, self.buckets)
             return Effect(Constant('foo'))
@@ -127,7 +127,7 @@ class ConvergerTests(SynchronousTestCase):
         Errors raised from performing the converge_all effect are logged, and
         None is the ultimate result.
         """
-        def converge_all(log, currently_converging, _my_buckets, all_buckets):
+        def converge_all(log, group_locks, _my_buckets, all_buckets):
             return Effect(Error(RuntimeError('foo')))
 
         Converger(
@@ -150,11 +150,11 @@ class ConvergeOneTests(SynchronousTestCase):
         self.version = 5
         self.deletions = []
         self.dispatcher = ComposedDispatcher([
-            EQFDispatcher({
-                DeleteNode(path='/groups/divergent/tenant-id_g1',
-                           version=self.version):
-                lambda i: self.deletions.append(True)
-            }),
+            EQFDispatcher([
+                (DeleteNode(path='/groups/divergent/tenant-id_g1',
+                            version=self.version),
+                 lambda i: self.deletions.append(True))
+            ]),
             _get_dispatcher(),
         ])
 
@@ -169,7 +169,7 @@ class ConvergeOneTests(SynchronousTestCase):
                 lambda: calls.append((tenant_id, group_id, log))))
 
         eff = converge_one(
-            self.log, Reference(pset()), self.tenant_id, self.group_id,
+            self.log, make_lock_set(), self.tenant_id, self.group_id,
             self.version,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
@@ -191,8 +191,9 @@ class ConvergeOneTests(SynchronousTestCase):
         def execute_convergence(tenant_id, group_id, log):
             return Effect(Func(lambda: calls.append('should not be run')))
 
+        lock_set = partial(non_concurrently, Reference(pset([self.group_id])))
         eff = converge_one(
-            self.log, Reference(pset([self.group_id])), self.tenant_id,
+            self.log, lock_set, self.tenant_id,
             self.group_id, self.version,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
@@ -208,7 +209,7 @@ class ConvergeOneTests(SynchronousTestCase):
             return Effect(Error(NoSuchScalingGroupError(tenant_id, group_id)))
 
         eff = converge_one(
-            self.log, Reference(pset([])), self.tenant_id, self.group_id,
+            self.log, make_lock_set(), self.tenant_id, self.group_id,
             self.version,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
@@ -234,7 +235,7 @@ class ConvergeOneTests(SynchronousTestCase):
             return Effect(Error(ConcurrentError(group_id)))
 
         eff = converge_one(
-            self.log, Reference(pset([])), self.tenant_id, self.group_id,
+            self.log, make_lock_set(), self.tenant_id, self.group_id,
             self.version,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
@@ -251,7 +252,7 @@ class ConvergeOneTests(SynchronousTestCase):
             return Effect(Error(RuntimeError('uh oh!')))
 
         eff = converge_one(
-            self.log, Reference(pset([])), self.tenant_id, self.group_id,
+            self.log, make_lock_set(), self.tenant_id, self.group_id,
             self.version,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
@@ -279,15 +280,15 @@ class ConvergeAllTests(SynchronousTestCase):
                 {'tenant_id': '01', 'group_id': 'g2', 'version': 5}
             ]))
 
-        def converge_one(log, locks, tenant_id, group_id, version):
+        def converge_one(log, lock_set, tenant_id, group_id, version):
             return Effect(Constant(
                 (tenant_id, group_id, version, 'converge!')))
 
         log = mock_log()
-        locks = Reference(pset())
+        lock_set = make_lock_set()
         my_buckets = [0, 5]
         all_buckets = range(10)
-        result = converge_all(log, locks, my_buckets, all_buckets,
+        result = converge_all(log, lock_set, my_buckets, all_buckets,
                               get_my_divergent_groups=get_my_divergent_groups,
                               converge_one=converge_one)
         self.assertEqual(
@@ -309,12 +310,12 @@ class GetMyDivergentGroupsTests(SynchronousTestCase):
         """
         # sha1('00') % 10 is 6, sh1('01') % 10 is 1.
         dispatcher = ComposedDispatcher([
-            EQDispatcher({
-                GetChildrenWithStats(CONVERGENCE_DIRTY_DIR):
-                [('00_gr1', ZNodeStatStub(version=0)),
-                 ('00_gr2', ZNodeStatStub(version=3)),
-                 ('01_gr3', ZNodeStatStub(version=5))]
-            }),
+            EQDispatcher([
+                (GetChildrenWithStats(CONVERGENCE_DIRTY_DIR),
+                 [('00_gr1', ZNodeStatStub(version=0)),
+                  ('00_gr2', ZNodeStatStub(version=3)),
+                  ('01_gr3', ZNodeStatStub(version=5))]),
+            ]),
             _get_dispatcher()
         ])
         result = sync_perform(
@@ -333,6 +334,22 @@ def _get_dispatcher():
         reference_dispatcher,
         base_dispatcher,
     ])
+
+
+class MakeLockSetTests(SynchronousTestCase):
+    """Tests for :func:`make_lock_set`."""
+
+    def test_make_lock_set(self):
+        """
+        Returns a :obj:`Reference` to an empty :obj:`PSet` partially applied to
+        :func:`non_concurrently`.
+        """
+        lock_set = make_lock_set()
+        self.assertIs(lock_set.func, non_concurrently)
+        self.assertEqual(lock_set.keywords, None)
+        (ref,) = lock_set.args
+        self.assertEqual(sync_perform(_get_dispatcher(), ref.read()),
+                         pset())
 
 
 class NonConcurrentlyTests(SynchronousTestCase):
@@ -426,7 +443,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
                                    group_id='group-id')
         gsgi_result = (self.group, self.state, self.lc)
-        self.expected_intents = {gsgi: gsgi_result}
+        self.expected_intents = [(gsgi, gsgi_result)]
 
     def _get_dispatcher(self, expected_intents=None):
         if expected_intents is None:
@@ -499,8 +516,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                    'condition': 'ENABLED',
                                    'address': '10.0.0.1'})]))})),
             success_pred=mock.ANY)
-        expected_intents = assoc(self.expected_intents,
-                                 expected_req.intent, 'stuff')
+        expected_intents = self.expected_intents + [
+            (expected_req.intent, 'stuff')]
         result = sync_perform(
             self._get_dispatcher(expected_intents),
             tscope_eff.intent.effect)
@@ -514,19 +531,19 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
-        for s in self.servers:
-            s.desired_lbs = pmap()
+        for srv in self.servers:
+            srv.desired_lbs = pmap()
 
         tscope_eff = execute_convergence(self.tenant_id, self.group_id, log,
                                          get_all_convergence_data=gacd)
 
         # Perform the GetScalingGroupInfo by raising an exception
         dispatcher = ComposedDispatcher([
-            EQFDispatcher({
-                GetScalingGroupInfo(
+            EQFDispatcher([
+                (GetScalingGroupInfo(
                     tenant_id='tenant-id',
-                    group_id='group-id'):
-                lambda i: raise_(RuntimeError('foo'))}),
+                    group_id='group-id'),
+                 lambda i: raise_(RuntimeError('foo')))]),
             self._get_dispatcher()])
 
         # And make sure that exception isn't wrapped in FirstError.

@@ -10,10 +10,9 @@ from effect.ref import Reference
 from effect.twisted import exc_info_to_failure, perform
 
 from pyrsistent import pset
+from pyrsistent import thaw
 
 import six
-
-from pyrsistent import thaw
 
 from twisted.application.service import MultiService, Service
 
@@ -216,6 +215,20 @@ class ConcurrentError(Exception):
     """Tried to run an effect concurrently when it shouldn't be."""
 
 
+def make_lock_set():
+    """
+    Create a multi-lock function, which is a function that takes a key and an
+    effect, and runs the effect as long as no other multi-locked effect for the
+    same key is being run.
+
+    :return: a callable of (key, Effect) -> Effect, where the result of the
+        returned Effect will be the given effect's result, or an error of
+        :obj:`ConcurrentError` if the given key already has an effect being
+        performed by the same multi-lock function.
+    """
+    return partial(non_concurrently, Reference(pset()))
+
+
 @do
 def non_concurrently(locks, key, eff):
     """
@@ -228,10 +241,9 @@ def non_concurrently(locks, key, eff):
         stored in ``locks``
     :param Effect eff: the effect to execute.
 
-    :return: Effect with the result of ``eff``.
-
-    It's not guaranteed that the eff will ever be executed, but it is
-    guaranteed that it will definitely not be executed concurrently.
+    :return: Effect with the result of ``eff``, or an error of
+        :obj:`ConcurrentError` if the given key already has an associated
+        effect being performed.
     """
     if key in (yield locks.read()):
         raise ConcurrentError(key)
@@ -273,21 +285,18 @@ def get_my_divergent_groups(my_buckets, all_buckets):
     return eff.on(got_children_with_stats)
 
 
-def converge_one(log, currently_converging, tenant_id, group_id, version,
+def converge_one(log, group_locks, tenant_id, group_id, version,
                  execute_convergence=execute_convergence):
     """
     Converge one group, non-concurrently, and clean up the dirty flag when
     done.
 
-    :param Reference currently_converging: reference to a PSet of currently
-        converging groups
+    :param group_locks: A lock function, produced from :func:`make_lock_set`.
     :param version: version number of ZNode of the group's dirty flag
     """
     log = log.bind(tenant_id=tenant_id, group_id=group_id)
     eff = execute_convergence(tenant_id, group_id, log)
-    return non_concurrently(
-        currently_converging, group_id, eff
-    ).on(
+    return group_locks(group_id, eff).on(
         success=lambda r: delete_divergent_flag(log, tenant_id,
                                                 group_id, version),
         error=partial(_cleanup_convergence_error, log, tenant_id,
@@ -295,7 +304,7 @@ def converge_one(log, currently_converging, tenant_id, group_id, version,
 
 
 @do
-def converge_all(log, currently_converging, my_buckets, all_buckets,
+def converge_all(log, group_locks, my_buckets, all_buckets,
                  get_my_divergent_groups=get_my_divergent_groups,
                  converge_one=converge_one):
     """
@@ -304,7 +313,7 @@ def converge_all(log, currently_converging, my_buckets, all_buckets,
     """
     group_infos = yield get_my_divergent_groups(my_buckets, all_buckets)
     log.msg('converge-all', group_infos=group_infos)
-    effs = [converge_one(log, currently_converging,
+    effs = [converge_one(log, group_locks,
                          info['tenant_id'], info['group_id'],
                          info['version'])
             for info in group_infos]
@@ -368,7 +377,7 @@ class Converger(MultiService):
         self.log = log.bind(system='converger')
         self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self.partitioner.setServiceParent(self)
-        self.currently_converging = Reference(pset())
+        self.group_locks = make_lock_set()
         self._converge_all = converge_all
 
     def buckets_acquired(self, my_buckets):
@@ -378,7 +387,7 @@ class Converger(MultiService):
         This is used as the partitioner callback.
         """
         self.log.msg('buckets-acquired', my_buckets=my_buckets)
-        eff = self._converge_all(self.log, self.currently_converging,
+        eff = self._converge_all(self.log, self.group_locks,
                                  my_buckets, self._buckets)
         result = perform(self._dispatcher, eff).addErrback(
             self.log.err, 'converge-all-error')

@@ -1115,7 +1115,6 @@ class ConvergeTestCase(SynchronousTestCase):
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)
 
-
     def test_real_convergence_zero_delta(self):
         """
         When a tenant is configured for convergence, if the delta is zero, the
