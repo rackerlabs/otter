@@ -275,7 +275,7 @@ class AddNodesToCLB(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to add nodes to CLB"""
-        return service_request(
+        eff = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'POST',
             append_segments('loadbalancers', str(self.lb_id), "nodes"),
@@ -288,6 +288,14 @@ class AddNodesToCLB(object):
                 has_code(202, 413),
                 _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN,
                                _CLB_PENDING_UPDATE_PATTERN)))
+
+        def report_success(result):
+            return StepResult.SUCCESS, []
+
+        def report_failure(result):
+            return StepResult.FAILURE, []
+
+        return eff.on(success=report_success, error=report_failure)
 
 
 @implementer(IStep)

@@ -1,7 +1,8 @@
 """Tests for convergence steps."""
 import json
 
-from effect import Func
+from effect import Func, sync_perform
+from effect.testing import EQDispatcher
 
 from mock import ANY
 
@@ -400,6 +401,16 @@ class StepAsEffectTests(SynchronousTestCase):
              'weight': 1}
         ])
 
+        self.assertEqual(
+            resolve_effect(request, (None, {})),
+            (StepResult.SUCCESS, []))
+
+        self.assertEqual(
+            resolve_effect(request,
+                           (APIError, APIError(500, None, None), None),
+                           is_error=True),
+            (StepResult.FAILURE, []))
+
     def test_add_nodes_to_clb_predicate(self):
         """
         :obj:`AddNodesToCLB` only accepts 202, 413, and some 422 responses.
@@ -412,6 +423,12 @@ class StepAsEffectTests(SynchronousTestCase):
         self.assertTrue(request.intent.json_response)
 
         predicate = request.intent.success_pred
+
+        self.assertEqual(
+            resolve_effect(request,
+                           (APIError, APIError(422, None, None), None),
+                           is_error=True),
+            (StepResult.FAILURE, []))
 
         self.assertTrue(predicate(StubResponse(202, {}), None))
         self.assertTrue(predicate(StubResponse(413, {}), None))
@@ -447,6 +464,41 @@ class StepAsEffectTests(SynchronousTestCase):
                            .format(lb_id),
                 "code": 422
             }))
+
+    def test_add_nodes_to_clb_422_success_and_failures(self):
+        """
+        :obj:`AddNodesToCLB` returns SUCCESS on recognized 422 failures, and
+        FAILURE on unrecognized 422 failures.
+        """
+        lb_id = "12345"
+        lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
+        step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
+        eff = step.as_effect()
+
+        bad_response = ("Load Balancer '12345' has a status of "
+                        "'PENDING_DELETE' and is considered immutable.")
+        good_response = ("Load Balancer '12345' has a status of "
+                         "'PENDING_UPDATE' and is considered immutable.")
+
+        self.assertEqual(
+            sync_perform(
+                EQDispatcher([(
+                    eff.intent,
+                    (StubResponse(422, {}),
+                     {'message': good_response, 'code': 422})
+                )]),
+                eff),
+            (StepResult.SUCCESS, []))
+
+        self.assertEqual(
+            sync_perform(
+                EQDispatcher([(
+                    eff.intent,
+                    (StubResponse(422, {}),
+                     {'message': bad_response, 'code': 422})
+                )]),
+                eff),
+            (StepResult.FAILURE, []))
 
     def test_remove_nodes_from_clb(self):
         """
