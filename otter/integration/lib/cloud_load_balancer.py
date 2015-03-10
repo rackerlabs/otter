@@ -101,8 +101,8 @@ class CloudLoadBalancer(object):
             next_interval=repeating_interval(period),
             clock=clock or reactor,
             deferred_description=(
-                "State {} not reached in {} s timeout.".format(
-                    state_desired, timeout
+                "Waiting for cloud load balancer to reach state {}".format(
+                    state_desired
                 )
             )
         )

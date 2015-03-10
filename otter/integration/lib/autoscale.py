@@ -127,8 +127,8 @@ class ScalingGroup(object):
             next_interval=repeating_interval(period),
             clock=clock or reactor,
             deferred_description=(
-                "Server count {} not reached in {}s timeout.".format(
-                    servers_desired, timeout
+                "Waiting for {} servers to go active.".format(
+                    servers_desired
                 )
             )
         )
