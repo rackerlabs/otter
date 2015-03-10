@@ -198,8 +198,7 @@ class ExtractDrainedTests(SynchronousTestCase):
         """
         feed = self.feed.format(self.summary, self.updated)
         self.assertEqual(extract_CLB_drained_at(feed),
-                         calendar.timegm(
-                             from_timestamp(self.updated).utctimetuple()))
+                         calendar.timegm(from_timestamp(self.updated).utctimetuple()))
 
     def test_invalid_first_entry(self):
         """
