@@ -137,9 +137,10 @@ class CreateServer(object):
 
         def report_failure(result):
             """
-            If the failure is an APIError with a 400 or 403, attempt to parse
-            the results and return a :obj:`StepResult.FAILURE` - if the errors
-            are unrecognized, return a :obj:`StepResult.RETRY` for now.
+            If the failure is an APIError with a recognized user error,
+            return a :obj:`StepResult.FAILURE` along with that user error as
+            a message, otherwise return a :obj:`StepResult.RETRY` without
+            a message.
             """
             err_type, error, traceback = result
             if err_type == APIError:
