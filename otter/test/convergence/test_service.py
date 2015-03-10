@@ -2,7 +2,7 @@ from effect import (
     ComposedDispatcher, Constant, Effect, Error, Func, ParallelEffects,
     TypeDispatcher, base_dispatcher, sync_perform)
 from effect.async import perform_parallel_async
-from effect.ref import ERef, eref_dispatcher
+from effect.ref import Reference, reference_dispatcher
 from effect.testing import EQDispatcher, EQFDispatcher
 
 import mock
@@ -169,7 +169,7 @@ class ConvergeOneTests(SynchronousTestCase):
                 lambda: calls.append((tenant_id, group_id, log))))
 
         eff = converge_one(
-            self.log, ERef(pset()), self.tenant_id, self.group_id,
+            self.log, Reference(pset()), self.tenant_id, self.group_id,
             self.version,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
@@ -192,7 +192,7 @@ class ConvergeOneTests(SynchronousTestCase):
             return Effect(Func(lambda: calls.append('should not be run')))
 
         eff = converge_one(
-            self.log, ERef(pset([self.group_id])), self.tenant_id,
+            self.log, Reference(pset([self.group_id])), self.tenant_id,
             self.group_id, self.version,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
@@ -208,7 +208,7 @@ class ConvergeOneTests(SynchronousTestCase):
             return Effect(Error(NoSuchScalingGroupError(tenant_id, group_id)))
 
         eff = converge_one(
-            self.log, ERef(pset([])), self.tenant_id, self.group_id,
+            self.log, Reference(pset([])), self.tenant_id, self.group_id,
             self.version,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
@@ -234,7 +234,7 @@ class ConvergeOneTests(SynchronousTestCase):
             return Effect(Error(ConcurrentError(group_id)))
 
         eff = converge_one(
-            self.log, ERef(pset([])), self.tenant_id, self.group_id,
+            self.log, Reference(pset([])), self.tenant_id, self.group_id,
             self.version,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
@@ -251,7 +251,7 @@ class ConvergeOneTests(SynchronousTestCase):
             return Effect(Error(RuntimeError('uh oh!')))
 
         eff = converge_one(
-            self.log, ERef(pset([])), self.tenant_id, self.group_id,
+            self.log, Reference(pset([])), self.tenant_id, self.group_id,
             self.version,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
@@ -284,7 +284,7 @@ class ConvergeAllTests(SynchronousTestCase):
                 (tenant_id, group_id, version, 'converge!')))
 
         log = mock_log()
-        locks = ERef(pset())
+        locks = Reference(pset())
         my_buckets = [0, 5]
         all_buckets = range(10)
         result = converge_all(log, locks, my_buckets, all_buckets,
@@ -330,7 +330,7 @@ def _get_dispatcher():
         TypeDispatcher({
             ParallelEffects: perform_parallel_async,
         }),
-        eref_dispatcher,
+        reference_dispatcher,
         base_dispatcher,
     ])
 
@@ -339,7 +339,7 @@ class NonConcurrentlyTests(SynchronousTestCase):
     """Tests for :func:`non_concurrently`."""
 
     def setUp(self):
-        self.locks = ERef(pset())
+        self.locks = Reference(pset())
 
     def _get_locks(self):
         """Get the locks set."""

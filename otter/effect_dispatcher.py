@@ -6,7 +6,7 @@ from effect import (
     ComposedDispatcher,
     TypeDispatcher,
     base_dispatcher)
-from effect.ref import eref_dispatcher
+from effect.ref import reference_dispatcher
 from effect.twisted import make_twisted_dispatcher
 
 from .auth import (
@@ -42,7 +42,7 @@ def get_simple_dispatcher(reactor):
             Retry: perform_retry,
         }),
         make_twisted_dispatcher(reactor),
-        eref_dispatcher,
+        reference_dispatcher,
     ])
 
 

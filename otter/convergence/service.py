@@ -6,7 +6,7 @@ from hashlib import sha1
 
 from effect import Effect, FirstError, Func, catch, parallel
 from effect.do import do, do_return
-from effect.ref import ERef
+from effect.ref import Reference
 from effect.twisted import exc_info_to_failure, perform
 
 from pyrsistent import pset
@@ -222,8 +222,8 @@ def non_concurrently(locks, key, eff):
     Run some Effect non-concurrently.
 
     :param log: bound log
-    :param ERef locks: An ERef of PSet that will be used to record which
-        operations are currently being executed.
+    :param Reference locks: A reference to a PSet that will be used to record
+        which operations are currently being executed.
     :param key: the key to use for this particular operation, which will be
         stored in ``locks``
     :param Effect eff: the effect to execute.
@@ -279,7 +279,8 @@ def converge_one(log, currently_converging, tenant_id, group_id, version,
     Converge one group, non-concurrently, and clean up the dirty flag when
     done.
 
-    :param ERef currently_converging: PSet of currently converging groups
+    :param Reference currently_converging: reference to a PSet of currently
+        converging groups
     :param version: version number of ZNode of the group's dirty flag
     """
     log = log.bind(tenant_id=tenant_id, group_id=group_id)
@@ -367,7 +368,7 @@ class Converger(MultiService):
         self.log = log.bind(system='converger')
         self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self.partitioner.setServiceParent(self)
-        self.currently_converging = ERef(pset())
+        self.currently_converging = Reference(pset())
         self._converge_all = converge_all
 
     def buckets_acquired(self, my_buckets):
