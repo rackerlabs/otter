@@ -300,3 +300,16 @@ def wait(ignore_kwargs=()):
         return wrapped_f
 
     return decorator
+
+
+def catch_failure(exc_type, fn, *args, **kwargs):
+    """
+    Returns an errback which will call ``fn(failure, *args, **kwargs)`` only
+    after ensuring that a failure wraps the specified exception type.
+
+    Use like d.addErrback(catch_failure(ExampleError, lambda: 'foo'))
+    """
+    def handler(f):
+        f.trap(exc_type)
+        return fn(f, *args, **kwargs)
+    return handler
