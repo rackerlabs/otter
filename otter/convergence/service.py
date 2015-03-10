@@ -395,7 +395,7 @@ class Converger(MultiService):
         # the return value is ignored, but we return this for testing
         return result
 
-    # RADIX FIXME TODO REVIEWERS XXX:
+    # RADIX FIXME TODO REVIEWERS:
 
     # I think something is going wrong with respect to deleting groups. When
     # integration tests clean up they're deleting the groups, and then
