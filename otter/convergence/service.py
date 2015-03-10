@@ -96,8 +96,9 @@ def execute_convergence(tenant_id, group_id, log,
                                         group_id=group_id))
     gather_eff = get_all_convergence_data(group_id)
 
-    def got_all_data(((scaling_group, group_state, launch_config),
-                      (servers, lb_nodes))):
+    def got_all_data(((scaling_group, manifest), (servers, lb_nodes))):
+        group_state = manifest['state']
+        launch_config = manifest['launchConfiguration']
         time_eff = Effect(Func(time.time))
 
         def got_time(now):

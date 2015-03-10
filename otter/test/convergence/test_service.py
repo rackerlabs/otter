@@ -442,7 +442,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
         gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
                                    group_id='group-id')
-        gsgi_result = (self.group, self.state, self.lc)
+        manifest = {  # Many details elided!
+            'state': self.state,
+            'launchConfiguration': self.lc,
+        }
+        gsgi_result = (self.group, manifest)
         self.expected_intents = [(gsgi, gsgi_result)]
 
     def _get_dispatcher(self, expected_intents=None):
