@@ -4,14 +4,16 @@ import re
 
 from functools import partial
 
-from characteristic import attributes
+from characteristic import Attribute, attributes
 
 from effect import Effect, Func
 
-from pyrsistent import pset, thaw
+from pyrsistent import PMap, PSet, pset, thaw
 
 from toolz.dicttoolz import get_in
 from toolz.itertoolz import concat
+
+from twisted.python.constants import NamedConstant
 
 from zope.interface import Interface, implementer
 
@@ -110,7 +112,7 @@ def _parse_nova_user_error(api_error):
 
 
 @implementer(IStep)
-@attributes(['server_config'])
+@attributes([Attribute('server_config', instance_of=PMap)])
 class CreateServer(object):
     """
     A server must be created.
@@ -155,7 +157,7 @@ class CreateServer(object):
 
 
 @implementer(IStep)
-@attributes(['server_id'])
+@attributes([Attribute('server_id', instance_of=str)])
 class DeleteServer(object):
     """
     A server must be deleted.
@@ -181,7 +183,9 @@ class DeleteServer(object):
 
 
 @implementer(IStep)
-@attributes(['server_id', 'key', 'value'])
+@attributes([Attribute('server_id', instance_of=str),
+             Attribute('key', instance_of=str),
+             Attribute('value', instance_of=str)])
 class SetMetadataItemOnServer(object):
     """
     A metadata key/value item must be set on a server.
@@ -250,7 +254,8 @@ def _check_clb_422(*regex_matches):
 
 
 @implementer(IStep)
-@attributes(['lb_id', 'address_configs'])
+@attributes([Attribute('lb_id', instance_of=str),
+             Attribute('address_configs', instance_of=PSet)])
 class AddNodesToCLB(object):
     """
     Multiple nodes must be added to a load balancer.
@@ -300,7 +305,8 @@ class AddNodesToCLB(object):
 
 
 @implementer(IStep)
-@attributes(['lb_id', 'node_ids'])
+@attributes([Attribute('lb_id', instance_of=str),
+             Attribute('node_ids', instance_of=PSet)])
 class RemoveNodesFromCLB(object):
     """
     One or more IPs must be removed from a load balancer.
@@ -366,7 +372,11 @@ def _clb_check_bulk_delete(lb_id, attempted_nodes, result):
 
 
 @implementer(IStep)
-@attributes(['lb_id', 'node_id', 'condition', 'weight', 'type'])
+@attributes([Attribute('lb_id', instance_of=str),
+             Attribute('node_id', instance_of=str),
+             Attribute('condition', instance_of=NamedConstant),
+             Attribute('weight', instance_of=int),
+             Attribute('type', instance_of=NamedConstant)])
 class ChangeCLBNode(object):
     """
     An existing port mapping on a load balancer must have its condition,
@@ -380,7 +390,7 @@ class ChangeCLBNode(object):
             'PUT',
             append_segments('loadbalancers', self.lb_id,
                             'nodes', self.node_id),
-            data={'condition': self.condition,
+            data={'condition': self.condition.name,
                   'weight': self.weight},
             success_pred=has_code(202))
 
@@ -430,7 +440,7 @@ _RCV3_LB_DOESNT_EXIST_PATTERN = _rcv3_re(
 
 
 @implementer(IStep)
-@attributes(['lb_node_pairs'])
+@attributes([Attribute('lb_node_pairs', instance_of=PSet)])
 class BulkAddToRCv3(object):
     """
     Some connections must be made between some combination of servers
@@ -496,7 +506,7 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
 
 
 @implementer(IStep)
-@attributes(['lb_node_pairs'])
+@attributes([Attribute('lb_node_pairs', instance_of=PSet)])
 class BulkRemoveFromRCv3(object):
     """
     Some connections must be removed between some combination of nodes
