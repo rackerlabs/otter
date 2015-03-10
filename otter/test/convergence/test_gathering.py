@@ -205,8 +205,7 @@ class ExtractDrainedTests(SynchronousTestCase):
         """
         Raises error if first entry is not DRAINING entry
         """
-        feed = self.feed.format("Node successfully updated with ENABLED",
-                                self.updated)
+        feed = self.feed.format("Node successfully updated with ENABLED", self.updated)
         self.assertRaises(ValueError, extract_CLB_drained_at, feed)
 
 
