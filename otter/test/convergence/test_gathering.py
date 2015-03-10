@@ -22,8 +22,8 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.auth import NoSuchEndpoint
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
-    get_all_convergence_data,
     extract_CLB_drained_at,
+    get_all_convergence_data,
     get_all_server_details,
     get_clb_contents,
     get_rcv3_contents,
@@ -196,8 +196,9 @@ class ExtractDrainedTests(SynchronousTestCase):
     """
     Tests for :func:`otter.convergence.extract_CLB_drained_at`
     """
-    summary = ("Node successfully updated with address: " +
-               "'10.23.45.6', port: '8080', weight: '1', condition: 'DRAINING'")
+    summary = ("Node successfully updated with address: "
+               "'10.23.45.6', port: '8080', weight: '1', "
+               "condition: 'DRAINING'")
     updated = '2014-10-23T18:10:48.000Z'
     feed = ('<feed xmlns="http://www.w3.org/2005/Atom">' +
             '<entry><summary>{}</summary><updated>{}</updated></entry>' +
@@ -210,13 +211,15 @@ class ExtractDrainedTests(SynchronousTestCase):
         """
         feed = self.feed.format(self.summary, self.updated)
         self.assertEqual(extract_CLB_drained_at(feed),
-                         calendar.timegm(from_timestamp(self.updated).utctimetuple()))
+                         calendar.timegm(
+                             from_timestamp(self.updated).utctimetuple()))
 
     def test_invalid_first_entry(self):
         """
         Raises error if first entry is not DRAINING entry
         """
-        feed = self.feed.format("Node successfully updated with ENABLED", self.updated)
+        feed = self.feed.format("Node successfully updated with ENABLED",
+                                self.updated)
         self.assertRaises(ValueError, extract_CLB_drained_at, feed)
 
 
@@ -481,6 +484,10 @@ class GetRCv3ContentsTests(SynchronousTestCase):
             sync_perform(dispatcher, get_rcv3_contents()), [])
 
 
+def _constant_as_eff(constant):
+    return lambda: Effect(Stub(Constant(constant)))
+
+
 class GetAllConvergenceDataTests(SynchronousTestCase):
     """Tests for :func:`get_all_convergence_data`."""
 
@@ -514,15 +521,11 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         rcv3_nodes = [RCv3Node(node_id='node2', cloud_server_id='a',
                                description=RCv3Description(lb_id='lb2'))]
 
-        get_servers = lambda: Effect(Stub(Constant({'gid': self.servers})))
-        get_clb = lambda: Effect(Stub(Constant(clb_nodes)))
-        get_rcv3 = lambda: Effect(Stub(Constant(rcv3_nodes)))
-
         eff = get_all_convergence_data(
             'gid',
-            get_scaling_group_servers=get_servers,
-            get_clb_contents=get_clb,
-            get_rcv3_contents=get_rcv3)
+            get_scaling_group_servers=_constant_as_eff({'gid': self.servers}),
+            get_clb_contents=_constant_as_eff(clb_nodes),
+            get_rcv3_contents=_constant_as_eff(rcv3_nodes))
 
         expected_servers = [
             NovaServer(id='a',
@@ -548,14 +551,10 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         If there are no servers in a group, get_all_convergence_data includes
         an empty list.
         """
-        get_servers = lambda: Effect(Stub(Constant({})))
-        get_clb = lambda: Effect(Stub(Constant([])))
-        get_rcv3 = lambda: Effect(Stub(Constant([])))
-
         eff = get_all_convergence_data(
             'gid',
-            get_scaling_group_servers=get_servers,
-            get_clb_contents=get_clb,
-            get_rcv3_contents=get_rcv3)
+            get_scaling_group_servers=_constant_as_eff({}),
+            get_clb_contents=_constant_as_eff([]),
+            get_rcv3_contents=_constant_as_eff([]))
 
         self.assertEqual(resolve_stubs(eff), ([], []))

@@ -38,7 +38,9 @@ run:
 env:
 	./scripts/bootstrap-virtualenv.sh
 
-lint: listoutdated flake8diff
+lint: listoutdated lint-code
+
+lint-code: flake8diff
 	pyflakes ${PYDIRS}
 
 listoutdated:
