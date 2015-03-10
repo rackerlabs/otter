@@ -9,6 +9,8 @@ from kazoo.exceptions import NoNodeError, NodeExistsError
 
 from twisted.internet.defer import gatherResults
 
+from otter.util.deferredutils import catch_failure
+
 
 CREATE_OR_SET_LOOP_LIMIT = 50
 """
@@ -47,12 +49,14 @@ def perform_create_or_set(kz_client, dispatcher, create_or_set):
         if count >= CREATE_OR_SET_LOOP_LIMIT:
             raise CreateOrSetLoopLimitReachedError(path)
         d = kz_client.create(path, content, makepath=True)
-        d.addErrback(_handle(NodeExistsError, set_content, count))
+        d.addErrback(catch_failure(NodeExistsError,
+                                   lambda f: set_content(count)))
         return d
 
     def set_content(count):
         d = kz_client.set(path, content)
-        d.addErrback(_handle(NoNodeError, create, count + 1))
+        d.addErrback(catch_failure(NoNodeError,
+                                   lambda f: create(count + 1)))
         return d.addCallback(lambda r: path)
 
     return create(0)
@@ -107,17 +111,6 @@ def perform_delete_node(kz_client, dispatcher, intent):
     :param DeleteNode intent: the intent
     """
     kz_client.delete(intent.path, version=intent.version)
-
-
-def _handle(exc_type, fn, *args, **kwargs):
-    """
-    Stupid utility function that calls a function only after ensuring that a
-    failure wraps the specified exception type.
-    """
-    def handler(f):
-        f.trap(exc_type)
-        return fn(*args, **kwargs)
-    return handler
 
 
 def get_zk_dispatcher(kz_client):
