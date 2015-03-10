@@ -13,7 +13,8 @@ from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.zk import (
-    CreateOrSet, DeleteNode, GetChildrenWithStats,
+    CreateOrSet, CreateOrSetLoopLimitReachedError,
+    DeleteNode, GetChildrenWithStats,
     perform_create_or_set, perform_delete_node,
     perform_get_children_with_stats)
 
@@ -121,6 +122,25 @@ class CreateOrSetTests(SynchronousTestCase):
         # It must be at version 0 because it's a creation, whereas normally if
         # the node were being updated it'd be at version 1.
         self.assertEqual(self.model.nodes, {'/foo': ('bar', 0)})
+
+    def test_loop_limit(self):
+        """
+        performing a :obj:`CreateOrSet` will only try to loop between creating
+        and setting 100 times.
+        """
+        def hacked_set(path, value):
+            return fail(NoNodeError())
+
+        def hacked_create(path, content, makepath):
+            return fail(NodeExistsError())
+
+        self.model.set = hacked_set
+        self.model.create = hacked_create
+
+        d = self._cos('/foo', 'bar')
+        failure = self.failureResultOf(d)
+        self.assertEqual(failure.type, CreateOrSetLoopLimitReachedError)
+        self.assertEqual(failure.getErrorMessage(), '/foo')
 
 
 class GetChildrenWithStatsTests(SynchronousTestCase):

@@ -10,6 +10,13 @@ from kazoo.exceptions import NoNodeError, NodeExistsError
 from twisted.internet.defer import gatherResults
 
 
+CREATE_OR_SET_LOOP_LIMIT = 50
+"""
+A limit on the number of times we'll jump between trying to create a node
+vs trying to set a node's contents in perform_create_or_set.
+"""
+
+
 @attributes(['path', 'content'])
 class CreateOrSet(object):
     """
@@ -17,6 +24,14 @@ class CreateOrSet(object):
 
     Handles the case where a node gets deleted in between our attempt and
     creating and setting.
+    """
+
+
+class CreateOrSetLoopLimitReachedError(Exception):
+    """
+    Raised when the number of times trying to create a node in
+    :func:`perform_create_or_set` has gone over
+    :obj:`CREATE_OR_SET_LOOP_LIMIT`.
     """
 
 
@@ -28,17 +43,19 @@ def perform_create_or_set(kz_client, dispatcher, create_or_set):
     path = create_or_set.path
     content = create_or_set.content
 
-    def create():
+    def create(count):
+        if count >= CREATE_OR_SET_LOOP_LIMIT:
+            raise CreateOrSetLoopLimitReachedError(path)
         d = kz_client.create(path, content, makepath=True)
-        d.addErrback(_handle(NodeExistsError, set_content))
+        d.addErrback(_handle(NodeExistsError, set_content, count))
         return d
 
-    def set_content():
+    def set_content(count):
         d = kz_client.set(path, content)
-        d.addErrback(_handle(NoNodeError, create))
+        d.addErrback(_handle(NoNodeError, create, count + 1))
         return d.addCallback(lambda r: path)
 
-    return create()
+    return create(0)
 
 
 @attributes(['path'], apply_with_init=False)
@@ -92,14 +109,14 @@ def perform_delete_node(kz_client, dispatcher, intent):
     kz_client.delete(intent.path, version=intent.version)
 
 
-def _handle(exc_type, fn):
+def _handle(exc_type, fn, *args, **kwargs):
     """
     Stupid utility function that calls a function only after ensuring that a
     failure wraps the specified exception type.
     """
     def handler(f):
         f.trap(exc_type)
-        return fn()
+        return fn(*args, **kwargs)
     return handler
 
 
