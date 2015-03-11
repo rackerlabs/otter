@@ -210,7 +210,7 @@ class SetMetadataItemOnServer(object):
             return StepResult.SUCCESS, []
 
         def report_failure(result):
-            return StepResult.RETRY, []
+            return StepResult.RETRY, [result[1]]
 
         return eff.on(success=report_success, error=report_failure)
 
@@ -304,14 +304,14 @@ class AddNodesToCLB(object):
             err_type, error, traceback = result
             if err_type == APIError and error.code == 413:
                 # over-limit, retry
-                return StepResult.RETRY, []
+                return StepResult.RETRY, [error]
             if err_type == APIError and error.code == 422:
                 # body has already become JSON
                 message = error.body.get("message", None)
                 if message and _CLB_PENDING_UPDATE_PATTERN.search(message):
-                    return StepResult.RETRY, []
+                    return StepResult.RETRY, [error]
 
-            return StepResult.FAILURE, []
+            return StepResult.FAILURE, [error]
 
         return eff.on(success=report_success, error=report_failure)
 

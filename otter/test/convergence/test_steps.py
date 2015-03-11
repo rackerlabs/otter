@@ -7,6 +7,8 @@ from mock import ANY
 
 from pyrsistent import freeze, pset
 
+from testtools.matchers import IsInstance
+
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import ServiceType
@@ -34,6 +36,7 @@ from otter.http import ServiceRequest, has_code, service_request
 from otter.test.utils import (
     StubResponse,
     get_fake_service_request_performer,
+    matches,
     resolve_effect,
     transform_eq)
 from otter.util.hashkey import generate_server_name
@@ -337,11 +340,12 @@ class StepAsEffectTests(SynchronousTestCase):
             resolve_effect(eff, (None, {})),
             (StepResult.SUCCESS, []))
 
+        err = APIError(500, None, None)
         self.assertEqual(
             resolve_effect(eff,
-                           (APIError, APIError(500, None, None), None),
+                           (APIError, err, None),
                            is_error=True),
-            (StepResult.RETRY, []))
+            (StepResult.RETRY, [err]))
 
     def test_change_load_balancer_node(self):
         """
@@ -466,17 +470,17 @@ class StepAsEffectTests(SynchronousTestCase):
                                "'PENDING_UPDATE' and is considered immutable.",
                     "code": 422
                 }),
-            (StepResult.RETRY, []))
+            (StepResult.RETRY, [matches(IsInstance(APIError))]))
 
         self.assertEqual(get_result(StubResponse(413, {}), ''),
-                         (StepResult.RETRY, []))
+                         (StepResult.RETRY, [matches(IsInstance(APIError))]))
 
         # Fail on everything else
         self.assertEqual(get_result(StubResponse(404, {}), ''),
-                         (StepResult.FAILURE, []))
+                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
 
         self.assertEqual(get_result(StubResponse(400, {}), ''),
-                         (StepResult.FAILURE, []))
+                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
 
         self.assertEqual(
             get_result(
@@ -486,7 +490,7 @@ class StepAsEffectTests(SynchronousTestCase):
                                "immutable.",
                     "code": 422
                 }),
-            (StepResult.FAILURE, []))
+            (StepResult.FAILURE, [matches(IsInstance(APIError))]))
 
         self.assertEqual(
             get_result(
@@ -496,7 +500,7 @@ class StepAsEffectTests(SynchronousTestCase):
                                "'PENDING_DELETE' and is considered immutable.",
                     "code": 422
                 }),
-            (StepResult.FAILURE, []))
+            (StepResult.FAILURE, [matches(IsInstance(APIError))]))
 
     def test_remove_nodes_from_clb(self):
         """
