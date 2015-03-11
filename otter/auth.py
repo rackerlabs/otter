@@ -487,6 +487,14 @@ def endpoints(service_catalog, service_name, region):
             yield endpoint
 
 
+@attributes(['service_name', 'region'])
+class NoSuchEndpoint(Exception):
+    """
+    Exception to be raised when the service catalog does not contain an
+    endpoint for the given service in the given region.
+    """
+
+
 def public_endpoint_url(service_catalog, service_name, region):
     """
     Return the first publicURL for a given service in a given region.
@@ -497,8 +505,12 @@ def public_endpoint_url(service_catalog, service_name, region):
 
     :return: URL as a string.
     """
-    first_endpoint = next(endpoints(service_catalog, service_name, region))
-    return first_endpoint['publicURL']
+    try:
+        first_endpoint = next(endpoints(service_catalog, service_name, region))
+    except StopIteration:
+        raise NoSuchEndpoint(service_name=service_name, region=region)
+    else:
+        return first_endpoint['publicURL']
 
 
 @attributes(['authenticator', 'tenant_id', 'log'], apply_with_init=False)

@@ -3,19 +3,30 @@
 import calendar
 from functools import partial
 
-from effect import Constant, Effect
-from effect.testing import Stub
+from effect import (
+    ComposedDispatcher,
+    Constant,
+    Effect,
+    ParallelEffects,
+    TypeDispatcher,
+    sync_perform,
+    sync_performer)
+
+from effect.async import perform_parallel_async
+from effect.testing import EQDispatcher, EQFDispatcher, Stub
 
 from pyrsistent import freeze
 
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.auth import NoSuchEndpoint
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
     extract_CLB_drained_at,
     get_all_convergence_data,
     get_all_server_details,
     get_clb_contents,
+    get_rcv3_contents,
     get_scaling_group_servers)
 from otter.convergence.model import (
     CLBDescription,
@@ -23,6 +34,8 @@ from otter.convergence.model import (
     CLBNodeCondition,
     CLBNodeType,
     NovaServer,
+    RCv3Description,
+    RCv3Node,
     ServerState)
 from otter.http import service_request
 from otter.test.utils import (
@@ -32,7 +45,7 @@ from otter.test.utils import (
     resolve_stubs
 )
 from otter.util.retry import (
-    ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
+    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import from_timestamp
 
 
@@ -210,7 +223,7 @@ class ExtractDrainedTests(SynchronousTestCase):
         self.assertRaises(ValueError, extract_CLB_drained_at, feed)
 
 
-class GetLBContentsTests(SynchronousTestCase):
+class GetCLBContentsTests(SynchronousTestCase):
     """
     Tests for :func:`otter.convergence.get_clb_contents`
     """
@@ -355,6 +368,126 @@ class GetLBContentsTests(SynchronousTestCase):
                      description=make_desc(lb_id='2'))])
 
 
+class GetRCv3ContentsTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.convergence.get_rcv3_contents`
+    """
+    def get_dispatcher(self, service_request_mappings):
+        """
+        Set up an empty dictionary of intents to fake responses, and set up
+        the dispatcher.
+        """
+        @sync_performer
+        def unwrap_retry(_, retry_intent):
+            self.assertEqual(
+                retry_intent.should_retry,
+                ShouldDelayAndRetry(
+                    can_retry=retry_times(5),
+                    next_interval=exponential_backoff_interval(2)))
+            return retry_intent.effect
+
+        eq_dispatcher = EQDispatcher
+        if callable(service_request_mappings[0][-1]):
+            eq_dispatcher = EQFDispatcher
+
+        return ComposedDispatcher([
+            TypeDispatcher({
+                Retry: unwrap_retry,
+                ParallelEffects: perform_parallel_async
+            }),
+            eq_dispatcher(service_request_mappings)
+        ])
+
+    def test_returns_flat_list_of_rcv3nodes(self):
+        """
+        All the nodes returned are in a flat list.
+        """
+        dispatcher = self.get_dispatcher([
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools').intent,
+             (None, [{'id': str(i)} for i in range(2)])),
+
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools/0/nodes').intent,
+             (None,
+              [{'id': "0node{0}".format(i),
+                'cloud_server': {'id': '0server{0}'.format(i)}}
+               for i in range(2)])),
+
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools/1/nodes').intent,
+             (None,
+              [{'id': "1node{0}".format(i),
+                'cloud_server': {'id': '1server{0}'.format(i)}}
+               for i in range(2)])),
+        ])
+
+        self.assertEqual(
+            sorted(sync_perform(dispatcher, get_rcv3_contents())),
+            sorted(
+                [RCv3Node(node_id='0node0', cloud_server_id='0server0',
+                          description=RCv3Description(lb_id='0')),
+                 RCv3Node(node_id='0node1', cloud_server_id='0server1',
+                          description=RCv3Description(lb_id='0')),
+                 RCv3Node(node_id='1node0', cloud_server_id='1server0',
+                          description=RCv3Description(lb_id='1')),
+                 RCv3Node(node_id='1node1', cloud_server_id='1server1',
+                          description=RCv3Description(lb_id='1'))]))
+
+    def test_no_lb_pools_returns_no_nodes(self):
+        """
+        If there are no load balancer pools, there are no nodes.
+        """
+        dispatcher = self.get_dispatcher([(
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            'load_balancer_pools').intent,
+            (None, [])
+        )])
+        self.assertEqual(
+            sync_perform(dispatcher, get_rcv3_contents()), [])
+
+    def test_no_nodes_on_lbs_no_nodes(self):
+        """
+        If there are no nodes on each of the load balancer pools, there are no
+        nodes returned overall.
+        """
+        dispatcher = self.get_dispatcher([
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools').intent,
+             (None, [{'id': str(i)} for i in range(2)])),
+
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools/0/nodes').intent,
+             (None, [])),
+
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools/1/nodes').intent,
+             (None, []))
+        ])
+
+        self.assertEqual(
+            sync_perform(dispatcher, get_rcv3_contents()), [])
+
+    def test_rackconnect_not_supported_on_tenant(self):
+        """
+        If RackConnectV3 is not supported, return no nodes.
+        """
+        def no_endpoint(intent):
+            raise NoSuchEndpoint(service_name='RackConnect', region='DFW')
+
+        dispatcher = self.get_dispatcher([(
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            'load_balancer_pools').intent,
+            no_endpoint
+        )])
+        self.assertEqual(
+            sync_perform(dispatcher, get_rcv3_contents()), [])
+
+
+def _constant_as_eff(constant):
+    return lambda: Effect(Stub(Constant(constant)))
+
+
 class GetAllConvergenceDataTests(SynchronousTestCase):
     """Tests for :func:`get_all_convergence_data`."""
 
@@ -380,20 +513,19 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         ]
 
     def test_success(self):
-        """The data is returned as a tuple of ([NovaServer], [CLBNode])."""
-        lb_nodes = [CLBNode(node_id='node1', address='ip1',
-                            description=CLBDescription(lb_id='lb1', port=80))]
-
-        def get_servers():
-            return Effect(Stub(Constant({'gid': self.servers})))
-
-        def get_lb():
-            return Effect(Stub(Constant(lb_nodes)))
+        """
+        The data is returned as a tuple of ([NovaServer], [CLBNode/RCv3Node]).
+        """
+        clb_nodes = [CLBNode(node_id='node1', address='ip1',
+                             description=CLBDescription(lb_id='lb1', port=80))]
+        rcv3_nodes = [RCv3Node(node_id='node2', cloud_server_id='a',
+                               description=RCv3Description(lb_id='lb2'))]
 
         eff = get_all_convergence_data(
             'gid',
-            get_scaling_group_servers=get_servers,
-            get_clb_contents=get_lb)
+            get_scaling_group_servers=_constant_as_eff({'gid': self.servers}),
+            get_clb_contents=_constant_as_eff(clb_nodes),
+            get_rcv3_contents=_constant_as_eff(rcv3_nodes))
 
         expected_servers = [
             NovaServer(id='a',
@@ -411,22 +543,18 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                        servicenet_address='10.0.0.2',
                        links=freeze([{'href': 'link2', 'rel': 'self'}]))
         ]
-        self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))
+        self.assertEqual(resolve_stubs(eff),
+                         (expected_servers, clb_nodes + rcv3_nodes))
 
     def test_no_group_servers(self):
         """
         If there are no servers in a group, get_all_convergence_data includes
         an empty list.
         """
-        def get_lb():
-            return Effect(Stub(Constant([])))
-
-        def get_servers():
-            return Effect(Stub(Constant({})))
-
         eff = get_all_convergence_data(
             'gid',
-            get_scaling_group_servers=get_servers,
-            get_clb_contents=get_lb)
+            get_scaling_group_servers=_constant_as_eff({}),
+            get_clb_contents=_constant_as_eff([]),
+            get_rcv3_contents=_constant_as_eff([]))
 
         self.assertEqual(resolve_stubs(eff), ([], []))
