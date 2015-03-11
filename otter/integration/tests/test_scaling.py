@@ -36,6 +36,11 @@ def dump_groups(rcs):
     return rcs
 
 
+def print_endpoints(rcs):
+    print(rcs.endpoints)
+    return rcs
+
+
 def dump_state(s):
     dump_js(s)
 
@@ -43,7 +48,15 @@ def dump_state(s):
 def find_end_point(rcs):
     rcs.token = rcs.access["access"]["token"]["id"]
     sc = rcs.access["access"]["serviceCatalog"]
-    rcs.endpoints["otter"] = auth.public_endpoint_url(sc, "autoscale", region)
+    try:
+        rcs.endpoints["otter"] = auth.public_endpoint_url(sc,
+                                                          "autoscale",
+                                                          region)
+    except StopIteration:
+        # If the autoscale endpoint is not defined, use local otter
+        rcs.endpoints["otter"] = 'http://localhost:9000/v1.0/{0}'.format(
+            rcs.access['access']['token']['tenant']['id'])
+
     rcs.endpoints["loadbalancers"] = auth.public_endpoint_url(
         sc, "cloudLoadBalancers", region
     )
@@ -119,6 +132,68 @@ class TestScaling(unittest.TestCase):
         )
         return d
     test_scaling_up.timeout = 1800
+
+    def test_scaling_down(self):
+        """
+        Verify that a basic scale down operation completes as expected.
+        """
+        group_configuration = {
+            "name": "tr-scaledown-conf",
+            "cooldown": 0,
+            "minEntities": 0,
+        }
+        launch_configuration = {
+            "type": "launch_server",
+            "args": {
+                "server": {
+                    "flavorRef": flavor_ref,
+                    "imageRef": image_ref,
+                }
+            }
+        }
+        scaling_group_body = {
+            "launchConfiguration": launch_configuration,
+            "groupConfiguration": group_configuration,
+            "scalingPolicies": [],
+        }
+        self.scaling_group = autoscale.ScalingGroup(
+            group_config=scaling_group_body,
+            pool=self.pool
+        )
+
+        self.scaling_policy_up_2 = autoscale.ScalingPolicy(
+            scale_by=2,
+            scaling_group=self.scaling_group
+        )
+        self.scaling_policy_down_1 = autoscale.ScalingPolicy(
+            scale_by=-1,
+            scaling_group=self.scaling_group
+        )
+
+        rcs = TestResources()
+        d = (
+            self.identity.authenticate_user(rcs)
+            .addCallback(find_end_point)
+            .addCallback(print_token_and_ep)
+            .addCallback(self.scaling_group.start, self)
+            .addCallback(self.scaling_policy_up_2.start, self)
+            .addCallback(self.scaling_policy_up_2.execute)
+            .addCallback(self.scaling_group.wait_for_N_servers,
+                         2, timeout=1800)
+            .addCallback(
+                lambda _: self.scaling_group.get_scaling_group_state(rcs))
+            .addCallback(dump_state)
+            .addCallback(lambda _: rcs)
+            .addCallback(self.scaling_policy_down_1.start, self)
+            .addCallback(self.scaling_policy_down_1.execute)
+            .addCallback(self.scaling_group.wait_for_N_servers,
+                         1, timeout=900)
+            .addCallback(
+                lambda _: self.scaling_group.get_scaling_group_state(rcs)
+            ).addCallback(dump_state)
+        )
+        return d
+    test_scaling_down.timeout = 2700
 
     def test_policy_execution_after_adding_clb(self):
         """This test attempts to reproduce the steps documented in a bug
