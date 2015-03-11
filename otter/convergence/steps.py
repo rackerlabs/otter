@@ -6,7 +6,7 @@ from functools import partial
 
 from characteristic import Attribute, attributes
 
-from effect import Effect, Func
+from effect import Effect, Func, catch
 
 from pyrsistent import PMap, PSet, pset, thaw
 
@@ -23,6 +23,8 @@ from otter.http import has_code, service_request
 from otter.util.fp import predicate_any
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError, append_segments
+from otter.util.retry import (
+    exponential_backoff_interval, retry_effect, retry_times)
 
 
 class IStep(Interface):
@@ -160,6 +162,55 @@ class CreateServer(object):
                                    error=report_failure)
 
 
+class UnexpectedServerStatus(Exception):
+    """
+    An exception to be raised when a server is found in an unexpected state.
+    """
+    def __init__(self, server_id, status, expected_status):
+        super(UnexpectedServerStatus, self).__init__(
+            'Expected {server_id} to have {expected_status}, '
+            'has {status}'.format(server_id=server_id,
+                                  status=status,
+                                  expected_status=expected_status)
+        )
+        self.server_id = server_id
+        self.status = status
+        self.expected_status = expected_status
+
+
+def delete_and_verify(server_id):
+    """
+    Check the status of the server to see if it's actually been deleted.
+    Succeeds only if it has been either deleted (404) or acknowledged by Nova
+    to be deleted (task_state = "deleted").
+
+    Note that ``task_state`` is in the server details key
+    ``OS-EXT-STS:task_state``, which is supported by Openstack but available
+    only when looking at the extended status of a server.
+    """
+
+    def check_task_state((resp, json_blob)):
+        server_details = json_blob['server']
+        is_deleting = server_details.get("OS-EXT-STS:task_state", "")
+        if is_deleting.strip().lower() != "deleting":
+            raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
+
+    def verify((_type, error, traceback)):
+        if _type is not APIError or error.code != 204:
+            raise error
+        ver_eff = service_request(
+            ServiceType.CLOUD_SERVERS, 'GET',
+            append_segments('servers', server_id, 'details'),
+            success_pred=has_code(200))
+        return ver_eff.on(check_task_state).on(
+            error=catch(APIError, lambda (t, e, _): e.code == 404))
+
+    return service_request(
+        ServiceType.CLOUD_SERVERS, 'DELETE',
+        append_segments('servers', server_id),
+        success_pred=has_code(404)).on(error=verify)
+
+
 @implementer(IStep)
 @attributes([Attribute('server_id', instance_of=str)])
 class DeleteServer(object):
@@ -171,11 +222,10 @@ class DeleteServer(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to delete a server."""
-        eff = service_request(
-            ServiceType.CLOUD_SERVERS,
-            'DELETE',
-            append_segments('servers', self.server_id),
-            success_pred=has_code(204, 404))
+
+        eff = retry_effect(
+            delete_and_verify(self.server_id), can_retry=retry_times(10),
+            next_interval=exponential_backoff_interval(2))
 
         def report_success(result):
             return StepResult.SUCCESS, []

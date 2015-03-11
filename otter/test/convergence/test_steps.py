@@ -1,9 +1,9 @@
 """Tests for convergence steps."""
 import json
 
-from effect import Func
+from effect import Effect, Func
 
-from mock import ANY
+from mock import ANY, patch
 
 from pyrsistent import freeze, pset
 
@@ -24,16 +24,20 @@ from otter.convergence.steps import (
     DeleteServer,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
+    UnexpectedServerStatus,
     _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_ALREADY_A_MEMBER_PATTERN,
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
+    delete_and_verify,
     _rcv3_check_bulk_add,
     _rcv3_check_bulk_delete)
 from otter.http import has_code, service_request
 from otter.test.utils import StubResponse, resolve_effect, transform_eq
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
+from otter.util.retry import (
+    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 
 
 def service_request_error_response(error):
@@ -284,23 +288,25 @@ class CreateServerTests(SynchronousTestCase):
             (StepResult.RETRY, []))
 
 
-class StepAsEffectTests(SynchronousTestCase):
+class DeleteServerTests(SynchronousTestCase):
     """
-    Tests for converting :obj:`IStep` implementations to :obj:`Effect`s.
+    Tests for :obj:`DeleteServer`
     """
-    def test_delete_server(self):
+
+    @patch('otter.convergence.steps.delete_and_verify')
+    def test_delete_server(self, mock_dav):
         """
-        :obj:`DeleteServer.as_effect` produces a request for deleting a server.
+        :obj:`DeleteServer.as_effect` calls `delete_and_verify` with
+        retries. It returns SUCCESS on completion and RETRY on failure
         """
-        delete = DeleteServer(server_id='abc123')
-        eff = delete.as_effect()
+        mock_dav.side_effect = lambda sid: Effect(sid)
+        eff = DeleteServer(server_id='abc123').as_effect()
+        self.assertIsInstance(eff.intent, Retry)
         self.assertEqual(
-            eff.intent,
-            service_request(
-                ServiceType.CLOUD_SERVERS,
-                'DELETE',
-                'servers/abc123',
-                success_pred=has_code(204, 404)).intent)
+            eff.intent.should_retry,
+            ShouldDelayAndRetry(can_retry=retry_times(10),
+                                next_interval=exponential_backoff_interval(2)))
+        self.assertEqual(eff.intent.effect.intent, 'abc123')
 
         self.assertEqual(
             resolve_effect(eff, (None, {})),
@@ -312,6 +318,99 @@ class StepAsEffectTests(SynchronousTestCase):
                            is_error=True),
             (StepResult.RETRY, []))
 
+    def test_delete_and_verify_del_404(self):
+        """
+        :func:`delete_and_verify` invokes server delete and succeeds on 404
+        """
+        eff = delete_and_verify('sid')
+        self.assertEqual(
+            eff.intent,
+            service_request(
+                ServiceType.CLOUD_SERVERS, 'DELETE', 'servers/sid',
+                success_pred=has_code(404)).intent)
+        self.assertEqual(resolve_effect(eff, (ANY, {})), (ANY, {}))
+
+    def test_delete_and_verify_del_fails(self):
+        """
+        :func:`delete_and_verify` fails if delete server fails
+        """
+        eff = delete_and_verify('sid')
+        self.assertRaises(
+            APIError,
+            resolve_effect,
+            eff,
+            service_request_error_response(APIError(500, '')),
+            is_error=True)
+
+    def test_delete_and_verify_del_fails_non_apierror(self):
+        """
+        :func:`delete_and_verify` fails if delete server fails with error
+        other than APIError
+        """
+        eff = delete_and_verify('sid')
+        self.assertRaises(
+            ValueError,
+            resolve_effect,
+            eff,
+            service_request_error_response(ValueError('meh')),
+            is_error=True)
+
+    def test_delete_and_verify_verifies(self):
+        """
+        :func:`delete_and_verify` verifies if the server task_state has changed
+        to "deleting" after successful delete server call and suceeds if that
+        has happened
+        """
+        eff = delete_and_verify('sid')
+        eff = resolve_effect(
+            eff, service_request_error_response(APIError(204, {})),
+            is_error=True)
+
+        self.assertEqual(
+            eff.intent,
+            service_request(
+                ServiceType.CLOUD_SERVERS, 'GET', 'servers/sid/details',
+                success_pred=has_code(200)).intent)
+        r = resolve_effect(
+            eff, (object(),
+                  {'server': {"OS-EXT-STS:task_state": 'deleting'}}))
+        self.assertIsNone(r)
+
+    def test_delete_and_verify_verify_unexpectedstatus(self):
+        """
+        :func:`delete_and_verify` raises `UnexpectedServerStatus` error
+        if server status returned after deleting is not "deleting"
+        """
+        eff = delete_and_verify('sid')
+        eff = resolve_effect(
+            eff, service_request_error_response(APIError(204, {})),
+            is_error=True)
+        self.assertRaises(
+            UnexpectedServerStatus,
+            resolve_effect,
+            eff,
+            (object(), {'server': {"OS-EXT-STS:task_state": 'bad'}})
+        )
+
+    def test_delete_and_verify_verify_404_succeeds(self):
+        """
+        :func:`delete_and_verify` succeeds if get details after deleting
+        returns 404
+        """
+        eff = delete_and_verify('sid')
+        eff = resolve_effect(
+            eff, service_request_error_response(APIError(204, {})),
+            is_error=True)
+        r = resolve_effect(
+            eff, service_request_error_response(APIError(404, {})),
+            is_error=True)
+        self.assertTrue(r)
+
+
+class StepAsEffectTests(SynchronousTestCase):
+    """
+    Tests for converting :obj:`IStep` implementations to :obj:`Effect`s.
+    """
     def test_set_metadata_item(self):
         """
         :obj:`SetMetadataItemOnServer.as_effect` produces a request for
