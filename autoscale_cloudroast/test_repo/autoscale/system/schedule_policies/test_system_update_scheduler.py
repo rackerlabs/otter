@@ -120,7 +120,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
             sp_cooldown=0)
         self.wait_for_expected_group_state(
             self.group.id, self.group.groupConfiguration.minEntities + 1,
-            60 + self.scheduler_interval)
+            60 + self.scheduler_interval, 2)
         self._update_policy(
             self.group.id, cron_style_policy, self.cron_policy_args,
             change_value=2)

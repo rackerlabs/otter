@@ -407,23 +407,28 @@ class AutoscaleFixture(BaseTestFixture):
                     api=api, asserter=self))
 
     def wait_for_expected_group_state(self, group_id, expected_servers,
-                                      wait_time=180):
+                                      wait_time=180, interval=None):
         """
         :summary: verify the group state reached the expected servers count.
         :param group_id: Group id
         :param expected_servers: Number of servers expected
         """
+        if interval is None:
+            interval = self.interval_time
+
         end_time = time.time() + wait_time
         while time.time() < end_time:
-            group_state = self.autoscale_client.list_status_entities_sgroups(group_id).entity
+            group_state = self.autoscale_client.list_status_entities_sgroups(
+                group_id).entity
             if group_state.desiredCapacity == expected_servers:
                 return
-            time.sleep(self.interval_time)
+            time.sleep(interval)
         else:
             self.fail(
-                "wait_for_exepected_group_state ran for 180 seconds for group {0} and did not "
-                "observe the active server list achieving the expected servers count: {1}.".format(
-                    group_id, expected_servers))
+                "wait_for_exepected_group_state ran for 180 seconds for group "
+                "{0} and did not observe the active server list achieving the "
+                "expected servers count: {1}.  Got {2} instead.".format(
+                    group_id, expected_servers, group_state.desiredCapacity))
 
     def check_for_expected_number_of_building_servers(
         self, group_id, expected_servers,
