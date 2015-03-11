@@ -12,7 +12,7 @@ from twisted.internet.defer import succeed
 
 from zope.interface import Interface, implementer
 
-from otter.effect_dispatcher import get_full_dispatcher
+from otter.effect_dispatcher import get_legacy_dispatcher
 from otter.log import audit
 from otter.models.interface import NoSuchScalingGroupError
 from otter.undo import InMemoryUndoStack
@@ -104,8 +104,8 @@ class SupervisorService(object, Service):
         HTTP requests.
         """
         tenant_id = scaling_group.tenant_id
-        dispatcher = get_full_dispatcher(reactor, self.authenticator, log,
-                                         self.service_configs)
+        dispatcher = get_legacy_dispatcher(reactor, self.authenticator, log,
+                                           self.service_configs)
         lb_region = config_value('regionOverrides.cloudLoadBalancers')
 
         log.msg("Authenticating for tenant")

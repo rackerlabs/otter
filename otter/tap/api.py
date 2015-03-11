@@ -197,8 +197,6 @@ def makeService(config):
     service_configs = get_service_configs(config)
 
     authenticator = generate_authenticator(reactor, config['identity'])
-    dispatcher = get_full_dispatcher(reactor, authenticator, log,
-                                     get_service_configs(config))
     supervisor = SupervisorService(authenticator, region, coiterate,
                                    service_configs)
     supervisor.setServiceParent(s)
@@ -260,6 +258,9 @@ def makeService(config):
         d = kz_client.start(timeout=None)
 
         def on_client_ready(_):
+            dispatcher = get_full_dispatcher(reactor, authenticator, log,
+                                             get_service_configs(config),
+                                             kz_client, store)
             # Setup scheduler service after starting
             scheduler = setup_scheduler(s, store, kz_client)
             health_checker.checks['scheduler'] = scheduler.health_check
