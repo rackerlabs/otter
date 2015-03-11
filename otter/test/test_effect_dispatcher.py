@@ -47,6 +47,11 @@ def full_intents():
 
 
 class IntentSupportMixin(object):
+    """
+    Mixin for testing dispatchers. Subclasses must define ``get_dispatcher``
+    and ``get_intents``.
+    """
+
     def test_intent_support(self):
         """Pretty basic intents have performers in the dispatcher."""
         dispatcher = self.get_dispatcher()
