@@ -17,8 +17,4 @@ class TestResources(object):
     :func:`unittest.addCleanup` for this purpose).  Instead, it's just a
     useful scratchpad for passing test resource availability amongst Twisted
     callbacks.
-
-    If you have custom state you'd like to pass around, use the :attr:`other`
-    attribute for this purpose.  The library will not interpret this attribute,
-    nor will it change it (bugs notwithstanding).
     """

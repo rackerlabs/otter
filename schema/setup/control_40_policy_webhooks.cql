@@ -42,8 +42,6 @@ CREATE TABLE policy_webhooks (
     'min_threshold' : '2'
 } AND gc_grace_seconds = 3600;
 
-CREATE INDEX webhooks_by_token ON policy_webhooks ("webhookKey");
-
 CREATE TABLE webhook_keys (
     "webhookKey" ascii PRIMARY KEY,
     "tenantId" ascii,
