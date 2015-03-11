@@ -241,7 +241,7 @@ class ImpersonatingAuthenticator(object):
             """
             if log:
                 log.err(err, 'Failed to get a new identity admin token.',
-                        otter_msg_type='impersonation-failed')
+                        otter_msg_type='admin-login-failed')
             return err
 
         if log:
