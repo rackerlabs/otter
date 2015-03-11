@@ -1,11 +1,13 @@
 """Tests for convergence steps."""
 import json
 
-from effect import Func
+from effect import Func, TypeDispatcher, base_dispatcher, sync_perform
 
 from mock import ANY
 
 from pyrsistent import freeze, pset
+
+from testtools.matchers import IsInstance
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -20,6 +22,7 @@ from otter.convergence.steps import (
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
+    ConvergeLater,
     CreateServer,
     DeleteServer,
     RemoveNodesFromCLB,
@@ -30,8 +33,13 @@ from otter.convergence.steps import (
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
     _rcv3_check_bulk_add,
     _rcv3_check_bulk_delete)
-from otter.http import has_code, service_request
-from otter.test.utils import StubResponse, resolve_effect, transform_eq
+from otter.http import ServiceRequest, has_code, service_request
+from otter.test.utils import (
+    StubResponse,
+    get_fake_service_request_performer,
+    matches,
+    resolve_effect,
+    transform_eq)
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
 
@@ -102,7 +110,7 @@ class CreateServerTests(SynchronousTestCase):
     def test_create_server_success_case(self):
         """
         :obj:`CreateServer.as_effect`, when it results in a successful create,
-        returns with :obj:`StepResult.SUCCESS`.
+        returns with :obj:`StepResult.RETRY`.
         """
         eff = CreateServer(
             server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
@@ -110,7 +118,7 @@ class CreateServerTests(SynchronousTestCase):
 
         self.assertEqual(
             resolve_effect(eff, (StubResponse(202, {}), {"server": {}})),
-            (StepResult.SUCCESS, []))
+            (StepResult.RETRY, []))
 
     def test_create_server_400_parseable_failures(self):
         """
@@ -319,13 +327,26 @@ class StepAsEffectTests(SynchronousTestCase):
         """
         meta = SetMetadataItemOnServer(server_id='abc123', key='metadata_key',
                                        value='teapot')
+        eff = meta.as_effect()
         self.assertEqual(
-            meta.as_effect(),
+            eff.intent,
             service_request(
                 ServiceType.CLOUD_SERVERS,
                 'PUT',
                 'servers/abc123/metadata/metadata_key',
-                data={'meta': {'metadata_key': 'teapot'}}))
+                data={'meta': {'metadata_key': 'teapot'}},
+                success_pred=has_code(200, 404)).intent)
+
+        self.assertEqual(
+            resolve_effect(eff, (None, {})),
+            (StepResult.SUCCESS, []))
+
+        err = APIError(500, None, None)
+        self.assertEqual(
+            resolve_effect(eff,
+                           (APIError, err, None),
+                           is_error=True),
+            (StepResult.RETRY, [err]))
 
     def test_change_load_balancer_node(self):
         """
@@ -392,7 +413,7 @@ class StepAsEffectTests(SynchronousTestCase):
              'weight': 1}
         ])
 
-    def test_add_nodes_to_clb_predicate(self):
+    def test_add_nodes_to_clb_success_response_codes(self):
         """
         :obj:`AddNodesToCLB` only accepts 202, 413, and some 422 responses.
         """
@@ -401,44 +422,86 @@ class StepAsEffectTests(SynchronousTestCase):
         step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
         request = step.as_effect()
 
-        self.assertTrue(request.intent.json_response)
+        def get_result(response, body):
+            return sync_perform(
+                TypeDispatcher({
+                    ServiceRequest:
+                    get_fake_service_request_performer((response, body))
+                }),
+                request)
 
-        predicate = request.intent.success_pred
+        self.assertEqual(get_result(StubResponse(202, {}), ''),
+                         (StepResult.SUCCESS, []))
 
-        self.assertTrue(predicate(StubResponse(202, {}), None))
-        self.assertTrue(predicate(StubResponse(413, {}), None))
-        self.assertTrue(predicate(
-            StubResponse(422, {}),
-            {
-                "message": "Duplicate nodes detected. One or more "
-                           "nodes already configured on load "
-                           "balancer.",
-                "code": 422
-            }))
-        self.assertTrue(predicate(
-            StubResponse(422, {}),
-            {
-                "message": "Load Balancer '12345' has a status of "
-                           "'PENDING_UPDATE' and is considered immutable.",
-                "code": 422
-            }))
+        self.assertEqual(
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "Duplicate nodes detected. One or more "
+                               "nodes already configured on load "
+                               "balancer.",
+                    "code": 422
+                }),
+            (StepResult.SUCCESS, []))
 
-        self.assertFalse(predicate(StubResponse(404, {}), None))
-        self.assertFalse(predicate(
-            StubResponse(422, {}),
-            {
-                "message": "The load balancer is deleted and considered "
-                           "immutable.",
-                "code": 422
-            }))
-        self.assertFalse(predicate(
-            StubResponse(422, {}),
-            {
-                "message": "Load Balancer '{0}' has a status of "
-                           "'PENDING_DELETE' and is considered immutable."
-                           .format(lb_id),
-                "code": 422
-            }))
+    def test_add_nodes_to_clb_failure_response_codes(self):
+        """
+        :obj:`AddNodesToCLB` retries on 422 Pending Update responses, and
+        fails on non-202, non-413 errors, non-422 recognized responses.
+        """
+        lb_id = "12345"
+        lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
+        step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
+        request = step.as_effect()
+
+        def get_result(response, body):
+            return sync_perform(
+                TypeDispatcher({
+                    ServiceRequest:
+                    get_fake_service_request_performer((response, body))
+                }),
+                request)
+
+        # Retry on pending update or on over-limit
+        self.assertEqual(
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "Load Balancer '12345' has a status of "
+                               "'PENDING_UPDATE' and is considered immutable.",
+                    "code": 422
+                }),
+            (StepResult.RETRY, [matches(IsInstance(APIError))]))
+
+        self.assertEqual(get_result(StubResponse(413, {}), ''),
+                         (StepResult.RETRY, [matches(IsInstance(APIError))]))
+
+        # Fail on everything else
+        self.assertEqual(get_result(StubResponse(404, {}), ''),
+                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
+
+        self.assertEqual(get_result(StubResponse(400, {}), ''),
+                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
+
+        self.assertEqual(
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "The load balancer is deleted and considered "
+                               "immutable.",
+                    "code": 422
+                }),
+            (StepResult.FAILURE, [matches(IsInstance(APIError))]))
+
+        self.assertEqual(
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "Load Balancer '12345' has a status of "
+                               "'PENDING_DELETE' and is considered immutable.",
+                    "code": 422
+                }),
+            (StepResult.FAILURE, [matches(IsInstance(APIError))]))
 
     def test_remove_nodes_from_clb(self):
         """
@@ -1044,3 +1107,17 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
             "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
         result = _rcv3_check_bulk_delete(pairs, (resp, body))
         self.assertEqual(result, (StepResult.SUCCESS, []))
+
+
+class ConvergeLaterTests(SynchronousTestCase):
+    """
+    Tests for :func:`ConvergeLater`
+    """
+
+    def test_returns_retry(self):
+        """
+        `ConvergeLater.as_effect` returns effect with RETRY
+        """
+        eff = ConvergeLater().as_effect()
+        self.assertEqual(
+            sync_perform(base_dispatcher, eff), (StepResult.RETRY, []))

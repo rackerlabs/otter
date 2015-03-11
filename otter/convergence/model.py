@@ -377,7 +377,7 @@ class IDrainable(Interface):
 
 
 @implementer(ILBDescription)
-@attributes([Attribute("lb_id", instance_of=str),
+@attributes([Attribute("lb_id", instance_of=basestring),
              Attribute("port", instance_of=int),
              Attribute("weight", default_value=1, instance_of=int),
              Attribute("condition", default_value=CLBNodeCondition.ENABLED,
@@ -416,9 +416,9 @@ class CLBDescription(object):
 
 
 @implementer(ILBNode, IDrainable)
-@attributes([Attribute("node_id", instance_of=str),
+@attributes([Attribute("node_id", instance_of=basestring),
              Attribute("description", instance_of=CLBDescription),
-             Attribute("address", instance_of=str),
+             Attribute("address", instance_of=basestring),
              Attribute("drained_at", default_value=0.0, instance_of=float),
              Attribute("connections", default_value=None)])
 class CLBNode(object):
@@ -467,7 +467,7 @@ class CLBNode(object):
 
 
 @implementer(ILBDescription)
-@attributes([Attribute("lb_id", instance_of=str)])
+@attributes([Attribute("lb_id", instance_of=basestring)])
 class RCv3Description(object):
     """
     Information representing a RackConnect V3/server mapping: how a particular
@@ -489,9 +489,9 @@ class RCv3Description(object):
 
 
 @implementer(ILBNode)
-@attributes([Attribute("node_id", instance_of=str),
+@attributes([Attribute("node_id", instance_of=basestring),
              Attribute("description", instance_of=RCv3Description),
-             Attribute("cloud_server_id", instance_of=str)])
+             Attribute("cloud_server_id", instance_of=basestring)])
 class RCv3Node(object):
     """
     A RackConnect V3 node.

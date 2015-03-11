@@ -20,6 +20,7 @@ from otter.auth import (
     IAuthenticator,
     ICachingAuthenticator,
     ImpersonatingAuthenticator,
+    NoSuchEndpoint,
     SingleTenantAuthenticator,
     InvalidateToken,
     RetryingAuthenticator,
@@ -350,6 +351,14 @@ class HelperTests(SynchronousTestCase):
             public_endpoint_url(fake_service_catalog, 'cloudServersOpenStack',
                                 'DFW'),
             'http://dfw.openstack/')
+
+    def test_public_endpoint_url_no_such_endpoint(self):
+        """
+        ``public_endpoint_url`` raises :class:`NoSuchEndpoint` exception for
+        the named service in a specific region, if there is no endpoint
+        """
+        self.assertRaises(NoSuchEndpoint, public_endpoint_url,
+                          [], 'cloudServersOpenstack', 'DFW')
 
 
 class SingleTenantAuthenticatorTests(SynchronousTestCase):

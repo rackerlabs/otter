@@ -1,15 +1,16 @@
 """
 Observer factories which will be used to configure twistd logging.
 """
-import sys
 import socket
+import sys
 
 from otter.log.formatters import (
+    ErrorFormattingWrapper,
     JSONObserverWrapper,
-    StreamObserverWrapper,
-    SystemFilterWrapper,
+    ObserverWrapper,
     PEP3101FormattingWrapper,
-    ObserverWrapper
+    StreamObserverWrapper,
+    SystemFilterWrapper
 )
 
 
@@ -19,12 +20,13 @@ def make_observer_chain(ultimate_observer, indent):
     """
     return PEP3101FormattingWrapper(
         SystemFilterWrapper(
-            ObserverWrapper(
-                JSONObserverWrapper(
-                    ultimate_observer,
-                    sort_keys=True,
-                    indent=indent or None),
-                hostname=socket.gethostname())))
+            ErrorFormattingWrapper(
+                ObserverWrapper(
+                    JSONObserverWrapper(
+                        ultimate_observer,
+                        sort_keys=True,
+                        indent=indent or None),
+                    hostname=socket.gethostname()))))
 
 
 def observer_factory():
