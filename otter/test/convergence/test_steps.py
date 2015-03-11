@@ -427,8 +427,7 @@ class StepAsEffectTests(SynchronousTestCase):
 
         self.assertEqual(get_result(StubResponse(202, {}), ''),
                          (StepResult.SUCCESS, []))
-        self.assertEqual(get_result(StubResponse(413, {}), ''),
-                         (StepResult.SUCCESS, []))
+
         self.assertEqual(
             get_result(
                 StubResponse(422, {}),
@@ -458,7 +457,7 @@ class StepAsEffectTests(SynchronousTestCase):
                 }),
                 request)
 
-        # Retry on pending update
+        # Retry on pending update or on over-limit
         self.assertEqual(
             get_result(
                 StubResponse(422, {}),
@@ -468,6 +467,9 @@ class StepAsEffectTests(SynchronousTestCase):
                     "code": 422
                 }),
             (StepResult.RETRY, []))
+
+        self.assertEqual(get_result(StubResponse(413, {}), ''),
+                         (StepResult.RETRY, []))
 
         # Fail on everything else
         self.assertEqual(get_result(StubResponse(404, {}), ''),
