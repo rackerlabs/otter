@@ -16,7 +16,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.constants import CONVERGENCE_DIRTY_DIR, ServiceType
 from otter.convergence.model import (
-    CLBDescription, CLBNode, NovaServer, ServerState)
+    CLBDescription, CLBNode, NovaServer, ServerState, StepResult)
 from otter.convergence.service import (
     ConcurrentError,
     ConvergenceStarter,
@@ -526,7 +526,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             self._get_dispatcher(expected_intents),
             tscope_eff.intent.effect)
         self.assertEqual(self.group.modify_state_values[-1].active, {})
-        self.assertEqual(result, ['stuff'])
+        self.assertEqual(result, [(StepResult.SUCCESS, [])])
 
     def test_first_error_extraction(self):
         """
