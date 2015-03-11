@@ -561,7 +561,6 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
 
 
 @implementer(IStep)
-@attributes([Attribute('seconds', instance_of=float)])
 class ConvergeLater(object):
     """
     Converge later in some time

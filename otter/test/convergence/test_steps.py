@@ -1056,6 +1056,6 @@ class ConvergeLaterTests(SynchronousTestCase):
         """
         `ConvergeLater.as_effect` returns effect with RETRY
         """
-        eff = ConvergeLater(seconds=2.0).as_effect()
+        eff = ConvergeLater().as_effect()
         self.assertEqual(
             sync_perform(base_dispatcher, eff), (StepResult.RETRY, []))
