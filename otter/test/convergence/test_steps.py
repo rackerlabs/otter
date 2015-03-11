@@ -102,7 +102,7 @@ class CreateServerTests(SynchronousTestCase):
     def test_create_server_success_case(self):
         """
         :obj:`CreateServer.as_effect`, when it results in a successful create,
-        returns with :obj:`StepResult.SUCCESS`.
+        returns with :obj:`StepResult.RETRY`.
         """
         eff = CreateServer(
             server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
@@ -110,7 +110,7 @@ class CreateServerTests(SynchronousTestCase):
 
         self.assertEqual(
             resolve_effect(eff, (StubResponse(202, {}), {"server": {}})),
-            (StepResult.SUCCESS, []))
+            (StepResult.RETRY, []))
 
     def test_create_server_400_parseable_failures(self):
         """
