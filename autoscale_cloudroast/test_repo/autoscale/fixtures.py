@@ -425,10 +425,11 @@ class AutoscaleFixture(BaseTestFixture):
             time.sleep(interval)
         else:
             self.fail(
-                "wait_for_exepected_group_state ran for 180 seconds for group "
-                "{0} and did not observe the active server list achieving the "
-                "expected servers count: {1}.  Got {2} instead.".format(
-                    group_id, expected_servers, group_state.desiredCapacity))
+                "wait_for_exepected_group_state ran for {0} seconds for group "
+                "{1} and did not observe the active server list achieving the "
+                "expected servers count: {2}.  Got {3} instead.".format(
+                    interval, group_id, expected_servers,
+                    group_state.desiredCapacity))
 
     def check_for_expected_number_of_building_servers(
         self, group_id, expected_servers,
