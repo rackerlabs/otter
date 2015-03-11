@@ -52,7 +52,7 @@ def find_end_point(rcs):
         rcs.endpoints["otter"] = auth.public_endpoint_url(sc,
                                                           "autoscale",
                                                           region)
-    except StopIteration:
+    except auth.NoSuchEndpoint:
         # If the autoscale endpoint is not defined, use local otter
         rcs.endpoints["otter"] = 'http://localhost:9000/v1.0/{0}'.format(
             rcs.access['access']['token']['tenant']['id'])
