@@ -1,7 +1,7 @@
 """Tests for convergence steps."""
 import json
 
-from effect import Func
+from effect import Func, base_dispatcher, sync_perform
 
 from mock import ANY
 
@@ -20,6 +20,7 @@ from otter.convergence.steps import (
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
+    ConvergeLater,
     CreateServer,
     DeleteServer,
     RemoveNodesFromCLB,
@@ -1044,3 +1045,17 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
             "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
         result = _rcv3_check_bulk_delete(pairs, (resp, body))
         self.assertEqual(result, (StepResult.SUCCESS, []))
+
+
+class ConvergeLaterTests(SynchronousTestCase):
+    """
+    Tests for :func:`ConvergeLater`
+    """
+
+    def test_returns_retry(self):
+        """
+        `ConvergeLater.as_effect` returns effect with RETRY
+        """
+        eff = ConvergeLater().as_effect()
+        self.assertEqual(
+            sync_perform(base_dispatcher, eff), (StepResult.RETRY, []))

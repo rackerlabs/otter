@@ -6,7 +6,7 @@ from functools import partial
 
 from characteristic import Attribute, attributes
 
-from effect import Effect, Func
+from effect import Constant, Effect, Func
 
 from pyrsistent import PMap, PSet, pset, thaw
 
@@ -563,3 +563,16 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
         return next_step.as_effect()
     else:
         return StepResult.SUCCESS, []
+
+
+@implementer(IStep)
+class ConvergeLater(object):
+    """
+    Converge later in some time
+    """
+
+    def as_effect(self):
+        """
+        Return an effect that always results in retry
+        """
+        return Effect(Constant((StepResult.RETRY, [])))
