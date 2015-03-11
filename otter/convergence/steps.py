@@ -135,7 +135,12 @@ class CreateServer(object):
                 reauth_codes=(401,))
 
         def report_success(result):
-            return StepResult.SUCCESS, []
+            """
+            On success, return "RETRY", because servers go into building for
+            a while, and we need to retry convergence to ensure it goes into
+            active.
+            """
+            return StepResult.RETRY, []
 
         def report_failure(result):
             """
