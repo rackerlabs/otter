@@ -193,14 +193,15 @@ def delete_divergent_flag(log, tenant_id, group_id, version):
 
 class ConvergenceStarter(Service, object):
     """
-    A service that allows registering interest in convergence, but does not
-    actually execute convergence (see :obj:`Converger` for that).
+    A service that allows indicating that a group has diverged and needs
+    convergence, but does not do the converging itself (see :obj:`Converger`
+    for that).
     """
     def __init__(self, dispatcher):
         self._dispatcher = dispatcher
 
     def start_convergence(self, log, tenant_id, group_id, perform=perform):
-        """Record that a group needs converged."""
+        """Record that a group needs converged by creating a ZooKeeper node."""
         log = log.bind(tenant_id=tenant_id, group_id=group_id)
         eff = mark_divergent(tenant_id, group_id)
         d = perform(self._dispatcher, eff)
