@@ -16,7 +16,7 @@ import six
 
 from twisted.application.service import MultiService, Service
 
-from otter.constants import CONVERGENCE_DIRTY_DIR, CONVERGENCE_DIRTY_PATH
+from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
@@ -122,6 +122,16 @@ def execute_convergence(tenant_id, group_id, log,
     ))
 
 
+def format_dirty_flag(tenant_id, group_id):
+    """Format a dirty flag ZooKeeper node name."""
+    return tenant_id + '_' + group_id
+
+
+def parse_dirty_flag(flag):
+    """Parse a dirty flag ZooKeeper node name into (tenant_id, group_id)."""
+    return flag.split('_', 1)
+
+
 def mark_divergent(tenant_id, group_id):
     """
     Indicate that a group should be converged.
@@ -153,7 +163,7 @@ def mark_divergent(tenant_id, group_id):
     # group is marked clean, then the changes desired by the second policy
     # execution will not happen.
 
-    # So instead of just a boolean flag, we'll takie advantage of ZK node
+    # So instead of just a boolean flag, we'll take advantage of ZK node
     # versioning. When we mark a group as dirty, we'll create a node for it
     # if it doesn't exist, and if it does exist, we'll write to it with
     # `set`. The content doesn't matter - the only thing that does matter
@@ -171,8 +181,8 @@ def mark_divergent(tenant_id, group_id):
     # changed), only if there are _any_ outstanding requests for
     # convergence, since convergence always uses the most recent data.
 
-    path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
-                                         group_id=group_id)
+    flag = format_dirty_flag(tenant_id, group_id)
+    path = CONVERGENCE_DIRTY_DIR + '/' + flag
     eff = Effect(CreateOrSet(path=path, content='dirty'))
     return eff
 
@@ -184,8 +194,8 @@ def delete_divergent_flag(log, tenant_id, group_id, version):
 
     :return: Effect of None.
     """
-    path = CONVERGENCE_DIRTY_PATH.format(tenant_id=tenant_id,
-                                         group_id=group_id)
+    flag = format_dirty_flag(tenant_id, group_id)
+    path = CONVERGENCE_DIRTY_DIR + '/' + flag
     return Effect(DeleteNode(path=path, version=version)).on(
         success=lambda r: log.msg('mark-clean-success'),
         error=lambda e: log.err(exc_info_to_failure(e), 'mark-clean-failure'))
@@ -271,7 +281,7 @@ def get_my_divergent_groups(my_buckets, all_buckets):
     def structure_info(x):
         # Names of the dirty flags are {tenant_id}_{group_id}.
         path, stat = x
-        tenant, group = x[0].split('_', 1)
+        tenant, group = parse_dirty_flag(x[0])
         return {'tenant_id': tenant, 'group_id': group,
                 'version': stat.version}
 

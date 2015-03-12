@@ -47,7 +47,7 @@ class MarkDivergentTests(SynchronousTestCase):
     def test_marks_dirty(self):
         """
         returns an effect which will create or set a node relative to
-        ``CONVERGENCE_DIRTY_PATH``.
+        ``CONVERGENCE_DIRTY_DIR``.
         """
         eff = mark_divergent('tenant', 'group')
         self.assertEqual(
