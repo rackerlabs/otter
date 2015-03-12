@@ -6,7 +6,7 @@ from functools import partial
 
 from characteristic import Attribute, attributes
 
-from effect import Effect, Func, catch
+from effect import Constant, Effect, Func, catch
 
 from pyrsistent import PMap, PSet, pset, thaw
 
@@ -146,9 +146,10 @@ class CreateServer(object):
 
         def report_failure(result):
             """
-            If the failure is an APIError with a 400 or 403, attempt to parse
-            the results and return a :obj:`StepResult.FAILURE` - if the errors
-            are unrecognized, return a :obj:`StepResult.RETRY` for now.
+            If the failure is an APIError with a recognized user error,
+            return a :obj:`StepResult.FAILURE` along with that user error as
+            a message, otherwise return a :obj:`StepResult.RETRY` without
+            a message.
             """
             err_type, error, traceback = result
             if err_type == APIError:
@@ -212,7 +213,7 @@ def delete_and_verify(server_id):
 
 
 @implementer(IStep)
-@attributes([Attribute('server_id', instance_of=str)])
+@attributes([Attribute('server_id', instance_of=basestring)])
 class DeleteServer(object):
     """
     A server must be deleted.
@@ -237,9 +238,9 @@ class DeleteServer(object):
 
 
 @implementer(IStep)
-@attributes([Attribute('server_id', instance_of=str),
-             Attribute('key', instance_of=str),
-             Attribute('value', instance_of=str)])
+@attributes([Attribute('server_id', instance_of=basestring),
+             Attribute('key', instance_of=basestring),
+             Attribute('value', instance_of=basestring)])
 class SetMetadataItemOnServer(object):
     """
     A metadata key/value item must be set on a server.
@@ -247,14 +248,26 @@ class SetMetadataItemOnServer(object):
     :ivar str server_id: a Nova server ID.
     :ivar str key: The metadata key to set (<=256 characters)
     :ivar str value: The value to assign to the metadata key (<=256 characters)
+
+    Succeed unconditionally on 200 (success) or 404 (if the server's gone, no
+    need to retry or fail).
     """
     def as_effect(self):
         """Produce a :obj:`Effect` to set a metadata item on a server"""
-        return service_request(
+        eff = service_request(
             ServiceType.CLOUD_SERVERS,
             'PUT',
             append_segments('servers', self.server_id, 'metadata', self.key),
-            data={'meta': {self.key: self.value}})
+            data={'meta': {self.key: self.value}},
+            success_pred=has_code(200, 404))
+
+        def report_success(result):
+            return StepResult.SUCCESS, []
+
+        def report_failure(result):
+            return StepResult.RETRY, [result[1]]
+
+        return eff.on(success=report_success, error=report_failure)
 
 
 _CLB_DUPLICATE_NODES_PATTERN = re.compile(
@@ -296,7 +309,7 @@ def _check_clb_422(*regex_matches):
 
 
 @implementer(IStep)
-@attributes([Attribute('lb_id', instance_of=str),
+@attributes([Attribute('lb_id', instance_of=basestring),
              Attribute('address_configs', instance_of=PSet)])
 class AddNodesToCLB(object):
     """
@@ -323,7 +336,7 @@ class AddNodesToCLB(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to add nodes to CLB"""
-        return service_request(
+        eff = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'POST',
             append_segments('loadbalancers', str(self.lb_id), "nodes"),
@@ -333,13 +346,33 @@ class AddNodesToCLB(object):
                              'type': lbc.type.name}
                             for address, lbc in self.address_configs]},
             success_pred=predicate_any(
-                has_code(202, 413),
-                _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN,
-                               _CLB_PENDING_UPDATE_PATTERN)))
+                has_code(202),
+                _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN)))
+
+        def report_success(result):
+            return StepResult.SUCCESS, []
+
+        def report_failure(result):
+            """
+            If the error is a 422 - PENDING UPDATE, retry.  Otherwise, fail.
+            """
+            err_type, error, traceback = result
+            if err_type == APIError and error.code == 413:
+                # over-limit, retry
+                return StepResult.RETRY, [error]
+            if err_type == APIError and error.code == 422:
+                # body has already become JSON
+                message = error.body.get("message", None)
+                if message and _CLB_PENDING_UPDATE_PATTERN.search(message):
+                    return StepResult.RETRY, [error]
+
+            return StepResult.FAILURE, [error]
+
+        return eff.on(success=report_success, error=report_failure)
 
 
 @implementer(IStep)
-@attributes([Attribute('lb_id', instance_of=str),
+@attributes([Attribute('lb_id', instance_of=basestring),
              Attribute('node_ids', instance_of=PSet)])
 class RemoveNodesFromCLB(object):
     """
@@ -406,8 +439,8 @@ def _clb_check_bulk_delete(lb_id, attempted_nodes, result):
 
 
 @implementer(IStep)
-@attributes([Attribute('lb_id', instance_of=str),
-             Attribute('node_id', instance_of=str),
+@attributes([Attribute('lb_id', instance_of=basestring),
+             Attribute('node_id', instance_of=basestring),
              Attribute('condition', instance_of=NamedConstant),
              Attribute('weight', instance_of=int),
              Attribute('type', instance_of=NamedConstant)])
@@ -613,3 +646,16 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
         return next_step.as_effect()
     else:
         return StepResult.SUCCESS, []
+
+
+@implementer(IStep)
+class ConvergeLater(object):
+    """
+    Converge later in some time
+    """
+
+    def as_effect(self):
+        """
+        Return an effect that always results in retry
+        """
+        return Effect(Constant((StepResult.RETRY, [])))

@@ -235,6 +235,15 @@ class ImpersonatingAuthenticator(object):
 
     @wait(ignore_kwargs=['log'])
     def _auth_me(self, log=None):
+        def _log_failed_auth(err):
+            """
+            Log this as a string we know we can find in the logging feed
+            """
+            if log:
+                log.err(err, 'Failed to get a new identity admin token.',
+                        otter_msg_type='admin-login-failed')
+            return err
+
         if log:
             log.msg('Getting new identity admin token')
         d = authenticate_user(self._url,
@@ -242,6 +251,8 @@ class ImpersonatingAuthenticator(object):
                               self._identity_admin_password,
                               log=log)
         d.addCallback(extract_token)
+
+        d.addErrback(_log_failed_auth)
         d.addCallback(partial(setattr, self, "_token"))
         return d
 
