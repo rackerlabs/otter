@@ -24,7 +24,7 @@ from txkazoo import TxKazooClient
 
 from otter.auth import generate_authenticator
 from otter.bobby import BobbyClient
-from otter.constants import get_service_configs
+from otter.constants import CONVERGENCE_PARTITIONER_PATH, get_service_configs
 from otter.convergence.service import (
     ConvergenceStarter, Converger, set_convergence_starter)
 from otter.effect_dispatcher import get_full_dispatcher
@@ -296,7 +296,7 @@ def setup_converger(parent, kz_client, dispatcher):
         Partitioner,
         kz_client,
         10,  # interval
-        '/converger_partition',
+        CONVERGENCE_PARTITIONER_PATH,
         converger_buckets,
         15,  # time boundary
     )
