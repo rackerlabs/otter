@@ -25,7 +25,6 @@ from otter.convergence.service import (
     converge_one,
     determine_active, execute_convergence, get_my_divergent_groups,
     make_lock_set,
-    mark_divergent,
     non_concurrently)
 from otter.http import service_request
 from otter.models.intents import (
@@ -39,21 +38,6 @@ from otter.test.utils import (
     mock_group, mock_log,
     transform_eq)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildrenWithStats
-
-
-class MarkDivergentTests(SynchronousTestCase):
-    """Tests for :func:`mark_divergent`."""
-
-    def test_marks_dirty(self):
-        """
-        returns an effect which will create or set a node relative to
-        ``CONVERGENCE_DIRTY_DIR``.
-        """
-        eff = mark_divergent('tenant', 'group')
-        self.assertEqual(
-            eff,
-            Effect(CreateOrSet(path='/groups/divergent/tenant_group',
-                               content='dirty')))
 
 
 class ConvergenceStarterTests(SynchronousTestCase):
