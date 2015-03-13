@@ -5,6 +5,8 @@ import json
 import time
 from datetime import datetime
 
+from pyrsistent import pmap
+
 from twisted.python.failure import Failure
 
 
@@ -301,3 +303,56 @@ def ObserverWrapper(observer, hostname, seconds=None):
         observer(log_params)
 
     return Observer
+
+
+class ThrottlingWrapper(object):
+    """
+    An observer that throttles specific messages so they don't spam the logs.
+    """
+
+    throttled_messages = [
+        pmap({'system': 'kazoo', 'message': ('Received Ping',)}),
+        pmap({'system': 'kazoo',
+              'message': ('Sending request(xid=-2): Ping()',)}),
+        pmap({
+            'system': 'otter.silverberg',
+            'message': ('CQL query executed successfully',),
+            'query': (
+                'SELECT "tenantId", "groupId", "policyId", "trigger", '
+                'cron, version FROM scaling_schedule_v2 '
+                'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')}),
+    ]
+    throttle_count = 50
+
+    def __init__(self, observer):
+        self.event_counts = {
+            template: 0 for template in self.throttled_messages}
+        self.observer = observer
+
+    def _get_matching_template(self, event):
+        for template in self.throttled_messages:
+            if self._match(event, template):
+                return template
+
+    def _match(self, event, template):
+        """See if a log event matches a throttled message template."""
+        for k, v in template.items():
+            if (k not in event) or (event[k] != template[k]):
+                return False
+        return True
+
+    def __call__(self, event):
+        """
+        If a message matches a throttled template, throttle it, otherwise pass
+        it on to the next observer.
+        """
+        template = self._get_matching_template(event)
+        if template is not None:
+            self.event_counts[template] += 1
+            if self.event_counts[template] >= self.throttle_count:
+                event['num_duplicate_throttled'] = (
+                    self.event_counts[template])
+                self.event_counts[template] = 0
+                return self.observer(event)
+        else:
+            return self.observer(event)
