@@ -109,7 +109,7 @@ class PartitionerTests(SynchronousTestCase):
         self.partitioner.startService()
         self.log.msg.assert_called_once_with(
             'Got buckets {buckets}',
-            buckets=[2, 3], path=self.path,
+            buckets=[2, 3], old_buckets=[], path=self.path,
             otter_msg_type='partition-acquired')
         self.assertEqual(self.buckets_received, [[2, 3]])
 
@@ -122,11 +122,43 @@ class PartitionerTests(SynchronousTestCase):
         self.partitioner.startService()
         self.log.msg.assert_called_once_with(
             'Got buckets {buckets}',
-            buckets=[2, 3], path=self.path,
+            buckets=[2, 3], old_buckets=[], path=self.path,
             otter_msg_type='partition-acquired')
         self.clock.advance(10)
         self.clock.advance(10)
         self.assertEqual(self.buckets_received, [[2, 3], [2, 3], [2, 3]])
+
+    def test_no_log_spam(self):
+        """
+        Bucket changes are only logged when the buckets actually change.
+        """
+        self.kz_partitioner.acquired = True
+        self.kz_partitioner.__iter__.return_value = [2, 3]
+        self.partitioner.startService()
+        self.clock.advance(10)
+        self.clock.advance(10)
+        self.log.msg.assert_called_once_with(
+            'Got buckets {buckets}',
+            buckets=[2, 3], old_buckets=[], path=self.path,
+            otter_msg_type='partition-acquired')
+
+    def test_no_log_spam(self):
+        """
+        Bucket changes are only logged when the buckets actually change.
+        """
+        self.kz_partitioner.acquired = True
+        self.kz_partitioner.__iter__.return_value = [2, 3]
+        self.partitioner.startService()
+        self.log.msg.assert_called_once_with(
+            'Got buckets {buckets}',
+            buckets=[2, 3], old_buckets=[], path=self.path,
+            otter_msg_type='partition-acquired')
+        self.kz_partitioner.__iter__.return_value = [3, 4]
+        self.clock.advance(10)
+        self.log.msg.assert_called_with(
+            'Got buckets {buckets}',
+            buckets=[3, 4], old_buckets=[2, 3], path=self.path,
+            otter_msg_type='partition-acquired')
 
     def test_stop_service_not_acquired(self):
         """
