@@ -129,9 +129,7 @@ class PartitionerTests(SynchronousTestCase):
         self.assertEqual(self.buckets_received, [[2, 3], [2, 3], [2, 3]])
 
     def test_no_log_spam(self):
-        """
-        Bucket changes are only logged when the buckets actually change.
-        """
+        """Bucket changes are not logged when the buckets don't change."""
         self.kz_partitioner.acquired = True
         self.kz_partitioner.__iter__.return_value = [2, 3]
         self.partitioner.startService()
@@ -142,10 +140,8 @@ class PartitionerTests(SynchronousTestCase):
             buckets=[2, 3], old_buckets=[], path=self.path,
             otter_msg_type='partition-acquired')
 
-    def test_no_log_spam(self):
-        """
-        Bucket changes are only logged when the buckets actually change.
-        """
+    def test_log_on_difference(self):
+        """Bucket changes are logged when the buckets change."""
         self.kz_partitioner.acquired = True
         self.kz_partitioner.__iter__.return_value = [2, 3]
         self.partitioner.startService()
