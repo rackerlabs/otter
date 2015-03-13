@@ -10,6 +10,22 @@ from pyrsistent import pmap
 from twisted.python.failure import Failure
 
 
+THROTTLED_MESSAGES = [
+    pmap({'system': 'kazoo', 'message': ('Received Ping',)}),
+    pmap({'system': 'kazoo',
+          'message': ('Sending request(xid=-2): Ping()',)}),
+    pmap({
+        'system': 'otter.silverberg',
+        'message': ('CQL query executed successfully',),
+        'query': (
+            'SELECT "tenantId", "groupId", "policyId", "trigger", '
+            'cron, version FROM scaling_schedule_v2 '
+            'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')}),
+]
+
+THROTTLE_COUNT = 50
+
+
 class LoggingEncoder(json.JSONEncoder):
     """
     A JSONEncoder that will decide how to serialize objects that the base
@@ -305,54 +321,36 @@ def ObserverWrapper(observer, hostname, seconds=None):
     return Observer
 
 
-class ThrottlingWrapper(object):
+def throttling_wrapper(observer):
     """
     An observer that throttles specific messages so they don't spam the logs.
     """
+    event_counts = {template: 0 for template in THROTTLED_MESSAGES}
+    observer = observer
 
-    throttled_messages = [
-        pmap({'system': 'kazoo', 'message': ('Received Ping',)}),
-        pmap({'system': 'kazoo',
-              'message': ('Sending request(xid=-2): Ping()',)}),
-        pmap({
-            'system': 'otter.silverberg',
-            'message': ('CQL query executed successfully',),
-            'query': (
-                'SELECT "tenantId", "groupId", "policyId", "trigger", '
-                'cron, version FROM scaling_schedule_v2 '
-                'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')}),
-    ]
-    throttle_count = 50
-
-    def __init__(self, observer):
-        self.event_counts = {
-            template: 0 for template in self.throttled_messages}
-        self.observer = observer
-
-    def _get_matching_template(self, event):
-        for template in self.throttled_messages:
-            if self._match(event, template):
+    def _get_matching_template(event):
+        for template in THROTTLED_MESSAGES:
+            if _match(event, template):
                 return template
 
-    def _match(self, event, template):
+    def _match(event, template):
         """See if a log event matches a throttled message template."""
         for k, v in template.items():
             if (k not in event) or (event[k] != template[k]):
                 return False
         return True
 
-    def __call__(self, event):
-        """
-        If a message matches a throttled template, throttle it, otherwise pass
-        it on to the next observer.
-        """
-        template = self._get_matching_template(event)
+    def emit(event):
+        event = event.copy()
+        template = _get_matching_template(event)
         if template is not None:
-            self.event_counts[template] += 1
-            if self.event_counts[template] >= self.throttle_count:
+            event_counts[template] += 1
+            if event_counts[template] >= THROTTLE_COUNT:
                 event['num_duplicate_throttled'] = (
-                    self.event_counts[template])
-                self.event_counts[template] = 0
-                return self.observer(event)
+                    event_counts[template])
+                event_counts[template] = 0
+                return observer(event)
         else:
-            return self.observer(event)
+            return observer(event)
+
+    return emit

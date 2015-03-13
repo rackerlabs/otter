@@ -11,7 +11,7 @@ from otter.log.formatters import (
     PEP3101FormattingWrapper,
     StreamObserverWrapper,
     SystemFilterWrapper,
-    ThrottlingWrapper,
+    throttling_wrapper,
 )
 
 
@@ -19,7 +19,7 @@ def make_observer_chain(ultimate_observer, indent):
     """
     Return our feature observers wrapped our the ultimate_observer
     """
-    return ThrottlingWrapper(
+    return throttling_wrapper(
         PEP3101FormattingWrapper(
             SystemFilterWrapper(
                 ErrorFormattingWrapper(
