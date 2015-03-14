@@ -24,6 +24,7 @@ from otter.log.formatters import (
     PEP3101FormattingWrapper,
     StreamObserverWrapper,
     SystemFilterWrapper,
+    throttling_wrapper,
     audit_log_formatter)
 from otter.test.utils import SameJSON, matches
 
@@ -663,3 +664,43 @@ class AuditLogFormatterTests(SynchronousTestCase):
                     'details': {'x': 'y', '1': 2}
                 }
             })
+
+
+class ThrottlingWrapperTests(SynchronousTestCase):
+    """Tests for :obj:`ThrottlingWrapper`."""
+
+    def test_non_matching(self):
+        """If a log doesn't match a template, it's just logged as normal."""
+        logs = []
+        observer = logs.append
+        throttler = throttling_wrapper(observer)
+        event = {'message': ('foo bar',), 'system': 'baz'}
+        throttler(event)
+        self.assertEqual(logs, [event])
+
+    def test_matching(self):
+        """
+        If a log matches a template, it's not immediately logged.
+        """
+        logs = []
+        observer = logs.append
+        throttler = throttling_wrapper(observer)
+        event = {'message': ('Received Ping',), 'system': 'kazoo'}
+        throttler(event)
+        self.assertEqual(logs, [])
+
+    def test_aggregate(self):
+        """
+        After so many events are received, a matching message gets logged along
+        with the number of times it was throttled.
+        """
+        logs = []
+        observer = logs.append
+        throttler = throttling_wrapper(observer)
+        event = {'message': ('Received Ping',), 'system': 'kazoo'}
+        for i in range(50):
+            throttler(event)
+        self.assertEqual(
+            logs,
+            [{'message': ('Received Ping',), 'system': 'kazoo',
+              'num_duplicate_throttled': 50}])
