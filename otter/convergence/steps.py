@@ -17,9 +17,9 @@ from twisted.python.constants import NamedConstant
 
 from zope.interface import Interface, implementer
 
+from otter.cloud_client import has_code, service_request
 from otter.constants import ServiceType
 from otter.convergence.model import StepResult
-from otter.http import has_code, service_request
 from otter.util.fp import predicate_any
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError, append_segments
