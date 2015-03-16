@@ -2270,7 +2270,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.assertEqual(len(called), 1)
         self.group.log.msg.assert_called_with(
             "Error cleaning up lock path (when deleting group)",
-            exc=matches(IsInstance(NotEmptyError)))
+            exc=matches(IsInstance(NotEmptyError)),
+            otter_msg_type="ignore-delete-lock-error")
 
 
 class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
