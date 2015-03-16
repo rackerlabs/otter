@@ -11,6 +11,7 @@ from testtools.matchers import IsInstance
 
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.cloud_client import ServiceRequest, has_code, service_request
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
@@ -33,7 +34,6 @@ from otter.convergence.steps import (
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
     _rcv3_check_bulk_add,
     _rcv3_check_bulk_delete)
-from otter.http import ServiceRequest, has_code, service_request
 from otter.test.utils import (
     StubResponse,
     get_fake_service_request_performer,

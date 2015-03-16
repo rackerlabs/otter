@@ -20,6 +20,7 @@ from pyrsistent import freeze
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
+from otter.cloud_client import service_request
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
     extract_CLB_drained_at,
@@ -37,7 +38,6 @@ from otter.convergence.model import (
     RCv3Description,
     RCv3Node,
     ServerState)
-from otter.http import service_request
 from otter.test.utils import (
     patch,
     resolve_effect,

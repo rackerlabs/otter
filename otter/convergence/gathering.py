@@ -10,6 +10,7 @@ from toolz.functoolz import compose, identity
 from toolz.itertoolz import concat
 
 from otter.auth import NoSuchEndpoint
+from otter.cloud_client import service_request
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
@@ -20,7 +21,6 @@ from otter.convergence.model import (
     RCv3Description,
     RCv3Node,
     group_id_from_metadata)
-from otter.http import service_request
 from otter.indexer import atom
 from otter.util.http import append_segments
 from otter.util.retry import (

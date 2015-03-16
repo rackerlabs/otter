@@ -27,7 +27,7 @@ from twisted.python.failure import Failure
 from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
 
-from otter.http import concretize_service_request
+from otter.cloud_client import concretize_service_request
 from otter.log.bound import BoundLog
 from otter.models.interface import IScalingGroup
 from otter.supervisor import ISupervisor

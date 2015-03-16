@@ -14,14 +14,14 @@ from effect import (
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import Authenticate, InvalidateToken
-from otter.constants import ServiceType
-from otter.http import (
+from otter.cloud_client import (
     ServiceRequest,
     TenantScope,
     add_bind_service,
     concretize_service_request,
     perform_tenant_scope,
     service_request)
+from otter.constants import ServiceType
 from otter.test.utils import resolve_effect, stub_pure_response
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.http import APIError, headers

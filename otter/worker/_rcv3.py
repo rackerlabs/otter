@@ -11,8 +11,8 @@ from effect.twisted import perform
 
 from pyrsistent import s
 
+from otter.cloud_client import TenantScope
 from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3
-from otter.http import TenantScope
 from otter.util.pure_http import has_code
 
 

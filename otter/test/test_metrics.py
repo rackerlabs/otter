@@ -23,8 +23,8 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import IAuthenticator
+from otter.cloud_client import TenantScope
 from otter.constants import ServiceType
-from otter.http import TenantScope
 from otter.metrics import (
     GroupMetrics,
     MetricsService,

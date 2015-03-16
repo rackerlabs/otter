@@ -15,8 +15,8 @@ from twisted.internet.task import Cooperator
 from zope.interface.verify import verifyObject
 
 from otter import supervisor
+from otter.cloud_client import TenantScope
 from otter.constants import ServiceType
-from otter.http import TenantScope
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchScalingGroupError)
 from otter.supervisor import (

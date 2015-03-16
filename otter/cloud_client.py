@@ -110,9 +110,9 @@ class ServiceRequest(object):
         # numbers, too. It's also not *thin* enough, since this will allow
         # lists and dicts of *anything*. But it's a good approximation of what
         # rackspace/openstack services can return.
-        return (isinstance(result, tuple)
-                and isinstance(result[1],
-                               (dict, list) if self.json_response else str))
+        return (isinstance(result, tuple) and
+                isinstance(result[1],
+                           (dict, list) if self.json_response else str))
 
 
 @attributes(['effect', 'tenant_id'], apply_with_init=False)
