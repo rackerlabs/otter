@@ -78,7 +78,7 @@ class ZKCrudModel(object):
         if check is not None:
             return check
         del self.nodes[path]
-        return succeed(None)
+        return succeed('delete return value')
 
 
 class CreateOrSetTests(SynchronousTestCase):
@@ -192,4 +192,4 @@ class DeleteTests(SynchronousTestCase):
         dispatcher = TypeDispatcher({DeleteNode: performer})
         d = perform(dispatcher, eff)
         self.assertEqual(model.nodes, {})
-        self.assertEqual(self.successResultOf(d), None)
+        self.assertEqual(self.successResultOf(d), 'delete return value')
