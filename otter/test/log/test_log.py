@@ -454,8 +454,6 @@ class ErrorFormatterTests(SynchronousTestCase):
             matches(ContainsDict({'error_details': Equals(err.details)})))
 
 
-
-
 class ObserverWrapperTests(SynchronousTestCase):
     """
     Test the ObserverWrapper.
