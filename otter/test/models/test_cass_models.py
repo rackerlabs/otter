@@ -13,6 +13,7 @@ from effect.testing import resolve_effect
 
 from jsonschema import ValidationError
 
+from kazoo.exceptions import NotEmptyError
 from kazoo.protocol.states import KazooState
 
 import mock
@@ -2105,6 +2106,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.assertTrue(mock_view_state.called)
         self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(GroupNotEmptyError)
+        # locks znode is not deleted
+        self.assertFalse(self.kz_client.delete.called)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
@@ -2237,6 +2240,33 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             system='CassScalingGroup.delete_group')
         log.bind().bind.assert_called_once_with(category='locking')
         self.assertEqual(log.bind().bind().msg.call_count, 4)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_state')
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
+    def test_delete_group_successful_but_deleting_znode_fails(self, mock_naive,
+                                                              mock_view_state):
+        """
+        ``delete_group``, if the rest is successful, attempts to delete the
+        lock znode but if that fails, succeeds anyway.
+        """
+        mock_view_state.return_value = defer.succeed(GroupState(
+            self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
+        mock_naive.return_value = defer.succeed([])
+        called = []
+
+        def not_empty_error(lockpath, recursive):
+            called.append(0)
+            self.assertEqual(lockpath, '/locks/' + self.group.uuid)
+            self.assertTrue(recursive)
+            return defer.fail(NotEmptyError((), {}))
+
+        self.kz_client.delete.side_effect = not_empty_error
+
+        self.returns = [None]
+        self.clock.advance(34.575)
+        result = self.successResultOf(self.group.delete_group())
+        self.assertIsNone(result)  # delete returns None
+        self.assertEqual(len(called), 1)
 
 
 class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):

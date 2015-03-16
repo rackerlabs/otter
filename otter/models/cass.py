@@ -1215,7 +1215,8 @@ class CassScalingGroup(object):
         def _delete_lock_znode(result):
             d = self.kz_client.delete(LOCK_PATH + '/' + self.uuid,
                                       recursive=True)
-            d.addCallback(lambda _: result)
+            # If we fail to delete the node, ignore it.
+            d.addBoth(lambda _: result)
             return d
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
