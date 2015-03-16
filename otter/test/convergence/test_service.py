@@ -26,7 +26,7 @@ from otter.convergence.service import (
     determine_active, execute_convergence, get_my_divergent_groups,
     make_lock_set,
     non_concurrently)
-from otter.http import service_request
+from otter.http import TenantScope, service_request
 from otter.models.intents import (
     GetScalingGroupInfo, ModifyGroupState, perform_modify_group_state)
 from otter.models.interface import GroupState, NoSuchScalingGroupError
@@ -438,6 +438,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             expected_intents = self.expected_intents
         return ComposedDispatcher([
             EQDispatcher(expected_intents),
+            EQFDispatcher([(TenantScope(mock.ANY, self.tenant_id),
+                            lambda tscope: tscope.effect)]),
             TypeDispatcher({
                 ParallelEffects: perform_parallel_async,
                 ModifyGroupState: perform_modify_group_state,
@@ -460,15 +462,13 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         gacd = self._get_gacd_func(self.group.uuid)
         for serv in self.servers:
             serv.desired_lbs = pset()
-        tscope_eff = execute_convergence(self.tenant_id, self.group_id, log,
-                                         get_all_convergence_data=gacd)
-        self.assertEqual(tscope_eff.intent.tenant_id, self.tenant_id)
-        self.assertEqual(tscope_eff.callbacks, [])
+        eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                  get_all_convergence_data=gacd)
         expected_active = {
             'a': {'id': 'a', 'links': [{'href': 'link1', 'rel': 'self'}]},
             'b': {'id': 'b', 'links': [{'href': 'link2', 'rel': 'self'}]}
         }
-        result = sync_perform(self._get_dispatcher(), tscope_eff.intent.effect)
+        result = sync_perform(self._get_dispatcher(), eff)
         self.assertEqual(self.group.modify_state_values[-1].active,
                          expected_active)
         self.assertEqual(result, [])
@@ -482,10 +482,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         # yet. convergence should add them to the LBs.
         log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
-        tscope_eff = execute_convergence(self.tenant_id, self.group_id, log,
-                                         get_all_convergence_data=gacd)
-        self.assertEqual(tscope_eff.intent.tenant_id, self.tenant_id)
-        self.assertEqual(tscope_eff.callbacks, [])
+        eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                  get_all_convergence_data=gacd)
         expected_req = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'POST',
@@ -506,9 +504,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             success_pred=mock.ANY)
         expected_intents = self.expected_intents + [
             (expected_req.intent, 'stuff')]
-        result = sync_perform(
-            self._get_dispatcher(expected_intents),
-            tscope_eff.intent.effect)
+        result = sync_perform(self._get_dispatcher(expected_intents), eff)
         self.assertEqual(self.group.modify_state_values[-1].active, {})
         self.assertEqual(result, [(StepResult.SUCCESS, [])])
 
