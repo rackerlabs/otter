@@ -26,6 +26,7 @@ from silverberg.client import ConsistencyLevel
 from toolz.dicttoolz import keymap
 
 from twisted.internet import defer
+from twisted.python.failure import Failure
 
 from zope.interface import implementer
 
@@ -1215,8 +1216,17 @@ class CassScalingGroup(object):
         def _delete_lock_znode(result):
             d = self.kz_client.delete(LOCK_PATH + '/' + self.uuid,
                                       recursive=True)
-            # If we fail to delete the node, ignore it.
-            d.addBoth(lambda _: result)
+
+            def return_result_ignore_errors(zk_delete_result):
+                # If we fail to delete the node, log and otherwise ignore it.
+                if isinstance(zk_delete_result, Failure):
+                    self.log.msg(
+                        "Error cleaning up lock path (when deleting group)",
+                        exc=zk_delete_result.value)
+
+                return result
+
+            d.addBoth(return_result_ignore_errors)
             return d
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)

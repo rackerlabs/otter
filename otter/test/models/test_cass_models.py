@@ -2247,7 +2247,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                                               mock_view_state):
         """
         ``delete_group``, if the rest is successful, attempts to delete the
-        lock znode but if that fails, succeeds anyway.
+        lock znode but if that fails, succeeds anyway. The znode deletion is
+        logged, though.
         """
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
@@ -2267,6 +2268,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         result = self.successResultOf(self.group.delete_group())
         self.assertIsNone(result)  # delete returns None
         self.assertEqual(len(called), 1)
+        self.group.log.msg.assert_called_with(
+            "Error cleaning up lock path (when deleting group)",
+            exc=matches(IsInstance(NotEmptyError)))
 
 
 class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
