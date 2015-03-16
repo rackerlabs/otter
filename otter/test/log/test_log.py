@@ -442,6 +442,19 @@ class ErrorFormatterTests(SynchronousTestCase):
              'traceback': failure.getTraceback(),
              'exception_type': 'ValueError'})
 
+    def test_details(self):
+        """
+        If exception has details property, it is extracted and logged as
+        "error_details"
+        """
+        err = ValueError('heh')
+        err.details = {'a': 2, 'b': 2}
+        self.wrapper({'message': (), 'isError': True, 'failure': Failure(err)})
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'error_details': Equals(err.details)})))
+
+
+
 
 class ObserverWrapperTests(SynchronousTestCase):
     """
