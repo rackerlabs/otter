@@ -297,8 +297,8 @@ def get_my_divergent_groups(my_buckets, all_buckets):
     return eff.on(got_children_with_stats)
 
 
-def converge_one(log, group_locks, tenant_id, group_id, version,
-                 execute_convergence=execute_convergence):
+def converge_one_group(log, group_locks, tenant_id, group_id, version,
+                       execute_convergence=execute_convergence):
     """
     Converge one group, non-concurrently, and clean up the dirty flag when
     done.
@@ -316,18 +316,18 @@ def converge_one(log, group_locks, tenant_id, group_id, version,
 
 
 @do
-def converge_all(log, group_locks, my_buckets, all_buckets,
-                 get_my_divergent_groups=get_my_divergent_groups,
-                 converge_one=converge_one):
+def converge_all_groups(log, group_locks, my_buckets, all_buckets,
+                        get_my_divergent_groups=get_my_divergent_groups,
+                        converge_one_group=converge_one_group):
     """
     Check for groups that need convergence and which match up to the
     buckets we've been allocated.
     """
     group_infos = yield get_my_divergent_groups(my_buckets, all_buckets)
-    log.msg('converge-all', group_infos=group_infos)
-    effs = [converge_one(log, group_locks,
-                         info['tenant_id'], info['group_id'],
-                         info['version'])
+    log.msg('converge-all-groups', group_infos=group_infos)
+    effs = [converge_one_group(log, group_locks,
+                               info['tenant_id'], info['group_id'],
+                               info['version'])
             for info in group_infos]
     yield do_return(parallel(effs))
 
@@ -372,7 +372,7 @@ class Converger(MultiService):
     """
 
     def __init__(self, log, dispatcher, buckets, partitioner_factory,
-                 converge_all=converge_all):
+                 converge_all_groups=converge_all_groups):
         """
         :param log: a bound log
         :param dispatcher: The dispatcher to use to perform effects.
@@ -390,7 +390,7 @@ class Converger(MultiService):
         self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self.partitioner.setServiceParent(self)
         self.group_locks = make_lock_set()
-        self._converge_all = converge_all
+        self._converge_all_groups = converge_all_groups
 
     def buckets_acquired(self, my_buckets):
         """
@@ -399,10 +399,10 @@ class Converger(MultiService):
         This is used as the partitioner callback.
         """
         self.log.msg('buckets-acquired', my_buckets=my_buckets)
-        eff = self._converge_all(self.log, self.group_locks,
-                                 my_buckets, self._buckets)
+        eff = self._converge_all_groups(self.log, self.group_locks,
+                                        my_buckets, self._buckets)
         result = perform(self._dispatcher, eff).addErrback(
-            self.log.err, 'converge-all-error')
+            self.log.err, 'converge-all-groups-error')
         # the return value is ignored, but we return this for testing
         return result
 

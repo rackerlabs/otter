@@ -21,8 +21,8 @@ from otter.convergence.service import (
     ConcurrentError,
     ConvergenceStarter,
     Converger,
-    converge_all,
-    converge_one,
+    converge_all_groups,
+    converge_one_group,
     determine_active, execute_convergence, get_my_divergent_groups,
     make_lock_set,
     non_concurrently)
@@ -87,9 +87,10 @@ class ConvergerTests(SynchronousTestCase):
 
     def test_buckets_acquired(self):
         """
-        When buckets are allocated, the result of converge_all is performed.
+        When buckets are allocated, the result of converge_all_groups is
+        performed.
         """
-        def converge_all(log, group_locks, _my_buckets, all_buckets):
+        def converge_all_groups(log, group_locks, _my_buckets, all_buckets):
             self.assertEqual(log, matches(IsBoundWith(system='converger')))
             self.assertIs(group_locks, converger.group_locks)
             self.assertEqual(_my_buckets, my_buckets)
@@ -99,7 +100,7 @@ class ConvergerTests(SynchronousTestCase):
         my_buckets = [0, 5]
         converger = Converger(
             self.log, self.dispatcher, self.buckets,
-            self._pfactory, converge_all=converge_all)
+            self._pfactory, converge_all_groups=converge_all_groups)
 
         result = self.fake_partitioner.got_buckets(my_buckets)
         self.assertEqual(self.successResultOf(result), 'foo')
@@ -108,21 +109,21 @@ class ConvergerTests(SynchronousTestCase):
 
     def test_buckets_acquired_errors(self):
         """
-        Errors raised from performing the converge_all effect are logged, and
-        None is the ultimate result.
+        Errors raised from performing the converge_all_groups effect are
+        logged, and None is the ultimate result.
         """
-        def converge_all(log, group_locks, _my_buckets, all_buckets):
+        def converge_all_groups(log, group_locks, _my_buckets, all_buckets):
             return Effect(Error(RuntimeError('foo')))
 
         Converger(
             self.log, self.dispatcher, self.buckets,
-            self._pfactory, converge_all=converge_all)
+            self._pfactory, converge_all_groups=converge_all_groups)
 
         result = self.fake_partitioner.got_buckets([0])
         self.assertEqual(self.successResultOf(result), None)
         self.log.err.assert_called_once_with(
             CheckFailureValue(RuntimeError('foo')),
-            'converge-all-error', system='converger')
+            'converge-all-groups-error', system='converger')
 
 
 class ConvergeOneTests(SynchronousTestCase):
@@ -152,7 +153,7 @@ class ConvergeOneTests(SynchronousTestCase):
             return Effect(Func(
                 lambda: calls.append((tenant_id, group_id, log))))
 
-        eff = converge_one(
+        eff = converge_one_group(
             self.log, make_lock_set(), self.tenant_id, self.group_id,
             self.version,
             execute_convergence=execute_convergence)
@@ -179,7 +180,7 @@ class ConvergeOneTests(SynchronousTestCase):
             return Effect(Func(lambda: calls.append('should not be run')))
 
         lock_set = partial(non_concurrently, Reference(pset([self.group_id])))
-        eff = converge_one(
+        eff = converge_one_group(
             self.log, lock_set, self.tenant_id,
             self.group_id, self.version,
             execute_convergence=execute_convergence)
@@ -195,7 +196,7 @@ class ConvergeOneTests(SynchronousTestCase):
         def execute_convergence(tenant_id, group_id, log):
             return Effect(Error(NoSuchScalingGroupError(tenant_id, group_id)))
 
-        eff = converge_one(
+        eff = converge_one_group(
             self.log, make_lock_set(), self.tenant_id, self.group_id,
             self.version,
             execute_convergence=execute_convergence)
@@ -221,7 +222,7 @@ class ConvergeOneTests(SynchronousTestCase):
         def execute_convergence(tenant_id, group_id, log):
             return Effect(Error(ConcurrentError(group_id)))
 
-        eff = converge_one(
+        eff = converge_one_group(
             self.log, make_lock_set(), self.tenant_id, self.group_id,
             self.version,
             execute_convergence=execute_convergence)
@@ -238,7 +239,7 @@ class ConvergeOneTests(SynchronousTestCase):
         def execute_convergence(tenant_id, group_id, log):
             return Effect(Error(RuntimeError('uh oh!')))
 
-        eff = converge_one(
+        eff = converge_one_group(
             self.log, make_lock_set(), self.tenant_id, self.group_id,
             self.version,
             execute_convergence=execute_convergence)
@@ -252,12 +253,12 @@ class ConvergeOneTests(SynchronousTestCase):
 
 
 class ConvergeAllTests(SynchronousTestCase):
-    """Tests for :func:`converge_all`."""
+    """Tests for :func:`converge_all_groups`."""
 
-    def test_converge_all(self):
+    def test_converge_all_groups(self):
         """
-        Fetches divergent groups and runs converge_one for each one needing
-        convergence.
+        Fetches divergent groups and runs converge_one_group for each one
+        needing convergence.
         """
         def get_my_divergent_groups(_my_buckets, _all_buckets):
             self.assertEqual(_my_buckets, my_buckets)
@@ -267,7 +268,7 @@ class ConvergeAllTests(SynchronousTestCase):
                 {'tenant_id': '01', 'group_id': 'g2', 'version': 5}
             ]))
 
-        def converge_one(log, lock_set, tenant_id, group_id, version):
+        def converge_one_group(log, lock_set, tenant_id, group_id, version):
             return Effect(Constant(
                 (tenant_id, group_id, version, 'converge!')))
 
@@ -275,15 +276,16 @@ class ConvergeAllTests(SynchronousTestCase):
         lock_set = make_lock_set()
         my_buckets = [0, 5]
         all_buckets = range(10)
-        result = converge_all(log, lock_set, my_buckets, all_buckets,
-                              get_my_divergent_groups=get_my_divergent_groups,
-                              converge_one=converge_one)
+        result = converge_all_groups(
+            log, lock_set, my_buckets, all_buckets,
+            get_my_divergent_groups=get_my_divergent_groups,
+            converge_one_group=converge_one_group)
         self.assertEqual(
             sync_perform(_get_dispatcher(), result),
             [('00', 'g1', 1, 'converge!'),
              ('01', 'g2', 5, 'converge!')])
         log.msg.assert_called_once_with(
-            'converge-all',
+            'converge-all-groups',
             group_infos=[{'tenant_id': '00', 'group_id': 'g1', 'version': 1},
                          {'tenant_id': '01', 'group_id': 'g2', 'version': 5}])
 
