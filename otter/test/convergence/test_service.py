@@ -169,7 +169,10 @@ class ConvergeOneTests(SynchronousTestCase):
             tenant_id=self.tenant_id, group_id=self.group_id)
 
     def test_non_concurrent(self):
-        """Runs execute_convergence non-concurrently, based on the group ID."""
+        """
+        Won't run execute_convergence if it's already running for the same
+        group ID.
+        """
         calls = []
 
         def execute_convergence(tenant_id, group_id, log):
@@ -292,7 +295,7 @@ class GetMyDivergentGroupsTests(SynchronousTestCase):
         :func:`get_my_divergent_groups` gets information about divergent groups
         that are associated with the given buckets.
         """
-        # sha1('00') % 10 is 6, sh1('01') % 10 is 1.
+        # sha1('00') % 10 is 6, sha1('01') % 10 is 1.
         dispatcher = ComposedDispatcher([
             EQDispatcher([
                 (GetChildrenWithStats(CONVERGENCE_DIRTY_DIR),
@@ -366,12 +369,13 @@ class NonConcurrentlyTests(SynchronousTestCase):
 
         non_c_eff = non_concurrently(self.locks, 'the-key', eff)
         self.assertEqual(sync_perform(dispatcher, non_c_eff), 'foo')
-        # and after convergence, nothing is marked as converging
+        # after the effect completes, its lock is released
         self.assertEqual(self._get_locks(), pset([]))
 
     def test_refuses_concurrency(self):
         """
-        :func:`non_concurrently` returns None when the key is already locked.
+        :func:`non_concurrently` raises :obj:`ConcurrentError` when the key is
+        already locked.
         """
         self._add_lock('the-key')
         eff = Effect(Error(RuntimeError('foo')))
@@ -503,7 +507,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                    'address': '10.0.0.1'})]))})),
             success_pred=mock.ANY)
         expected_intents = self.expected_intents + [
-            (expected_req.intent, 'stuff')]
+            (expected_req.intent, 'successful response')]
         result = sync_perform(self._get_dispatcher(expected_intents), eff)
         self.assertEqual(self.group.modify_state_values[-1].active, {})
         self.assertEqual(result, [(StepResult.SUCCESS, [])])

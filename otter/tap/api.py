@@ -290,7 +290,10 @@ def makeService(config):
 
 
 def setup_converger(parent, kz_client, dispatcher):
-    """Create a Converger service."""
+    """
+    Create a Converger service, which has a Partitioner as a child service, so
+    that if the Converger is stopped, the partitioner is also stopped.
+    """
     converger_buckets = range(1, 10)
     partitioner_factory = partial(
         Partitioner,
