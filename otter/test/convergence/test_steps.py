@@ -380,8 +380,20 @@ class DeleteServerTests(SynchronousTestCase):
                 ServiceType.CLOUD_SERVERS, 'GET', 'servers/sid/details',
                 success_pred=has_code(200, 404)).intent)
         r = resolve_effect(
-            eff, (object(),
+            eff, (StubResponse(200, {}),
                   {'server': {"OS-EXT-STS:task_state": 'deleting'}}))
+        self.assertIsNone(r)
+
+    def test_delete_and_verify_verify_404(self):
+        """
+        :func:`delete_and_verify` gets server details after successful delete
+        and succeeds if get server details returns 404
+        """
+        eff = delete_and_verify('sid')
+        eff = resolve_effect(
+            eff, service_request_error_response(APIError(204, {})),
+            is_error=True)
+        r = resolve_effect(eff, (StubResponse(404, {}), {}))
         self.assertIsNone(r)
 
     def test_delete_and_verify_verify_unexpectedstatus(self):
@@ -397,7 +409,8 @@ class DeleteServerTests(SynchronousTestCase):
             UnexpectedServerStatus,
             resolve_effect,
             eff,
-            (object(), {'server': {"OS-EXT-STS:task_state": 'bad'}})
+            (StubResponse(200, {}),
+             {'server': {"OS-EXT-STS:task_state": 'bad'}})
         )
 
 

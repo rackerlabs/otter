@@ -191,6 +191,8 @@ def delete_and_verify(server_id):
     """
 
     def check_task_state((resp, json_blob)):
+        if resp.code == 404:
+            return
         server_details = json_blob['server']
         is_deleting = server_details.get("OS-EXT-STS:task_state", "")
         if is_deleting.strip().lower() != "deleting":
