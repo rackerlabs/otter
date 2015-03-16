@@ -366,8 +366,8 @@ class DeleteServerTests(SynchronousTestCase):
     def test_delete_and_verify_verifies(self):
         """
         :func:`delete_and_verify` verifies if the server task_state has changed
-        to "deleting" after successful delete server call and suceeds if that
-        has happened
+        to "deleting" after successful delete server call and succeeds if that
+        has happened. The details call succeeds if it returns 404
         """
         eff = delete_and_verify('sid')
         eff = resolve_effect(
@@ -378,7 +378,7 @@ class DeleteServerTests(SynchronousTestCase):
             eff.intent,
             service_request(
                 ServiceType.CLOUD_SERVERS, 'GET', 'servers/sid/details',
-                success_pred=has_code(200)).intent)
+                success_pred=has_code(200, 404)).intent)
         r = resolve_effect(
             eff, (object(),
                   {'server': {"OS-EXT-STS:task_state": 'deleting'}}))
@@ -399,20 +399,6 @@ class DeleteServerTests(SynchronousTestCase):
             eff,
             (object(), {'server': {"OS-EXT-STS:task_state": 'bad'}})
         )
-
-    def test_delete_and_verify_verify_404_succeeds(self):
-        """
-        :func:`delete_and_verify` succeeds if get details after deleting
-        returns 404
-        """
-        eff = delete_and_verify('sid')
-        eff = resolve_effect(
-            eff, service_request_error_response(APIError(204, {})),
-            is_error=True)
-        r = resolve_effect(
-            eff, service_request_error_response(APIError(404, {})),
-            is_error=True)
-        self.assertTrue(r)
 
 
 class StepAsEffectTests(SynchronousTestCase):

@@ -197,19 +197,18 @@ def delete_and_verify(server_id):
             raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
 
     def verify((_type, error, traceback)):
-        if _type is not APIError or error.code != 204:
-            raise error
+        if error.code != 204:
+            raise _type, error, traceback
         ver_eff = service_request(
             ServiceType.CLOUD_SERVERS, 'GET',
             append_segments('servers', server_id, 'details'),
-            success_pred=has_code(200))
-        return ver_eff.on(check_task_state).on(
-            error=catch(APIError, lambda (t, e, _): e.code == 404))
+            success_pred=has_code(200, 404))
+        return ver_eff.on(check_task_state)
 
     return service_request(
         ServiceType.CLOUD_SERVERS, 'DELETE',
         append_segments('servers', server_id),
-        success_pred=has_code(404)).on(error=verify)
+        success_pred=has_code(404)).on(error=catch(APIError, verify))
 
 
 @implementer(IStep)
