@@ -5,15 +5,9 @@ Format logs based on specification
 from copy import deepcopy
 
 from otter.constants import ServiceType
-#from otter.log.formatters import ERROR_FIELDS, PRIMITIVE_FIELDS
+from otter.log.formatters import ERROR_FIELDS, PRIMITIVE_FIELDS
 
 from twisted.python.failure import Failure
-
-
-# Temp until refactor is committed
-ERROR_FIELDS = {"isError", "failure", "why"}
-
-PRIMITIVE_FIELDS = {"time", "system", "id", "audit_log"}
 
 
 class UUID(basestring):
