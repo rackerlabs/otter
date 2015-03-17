@@ -127,6 +127,7 @@ class ConvergerTests(SynchronousTestCase):
 
 
 class ConvergeOneTests(SynchronousTestCase):
+    """Tests for :func:`converge_one_group`."""
 
     def setUp(self):
         self.log = mock_log()
@@ -187,6 +188,8 @@ class ConvergeOneTests(SynchronousTestCase):
         result = sync_perform(self.dispatcher, eff)
         self.assertEqual(result, None)
         self.assertEqual(calls, [])
+        self.assertEqual(self.log.err.mock_calls, [])
+        self.assertEqual(self.deletions, [])
 
     def test_no_scaling_group(self):
         """
@@ -213,23 +216,6 @@ class ConvergeOneTests(SynchronousTestCase):
         self.log.msg.assert_any_call(
             'mark-clean-success',
             tenant_id=self.tenant_id, group_id=self.group_id)
-
-    def test_concurrent_error_ignored(self):
-        """
-        ConcurrentError does not cause a log message, and doesn't clean up the
-        dirty flag.
-        """
-        def execute_convergence(tenant_id, group_id, log):
-            return Effect(Error(ConcurrentError(group_id)))
-
-        eff = converge_one_group(
-            self.log, make_lock_set(), self.tenant_id, self.group_id,
-            self.version,
-            execute_convergence=execute_convergence)
-        result = sync_perform(self.dispatcher, eff)
-        self.assertEqual(result, None)
-        self.assertEqual(self.log.err.mock_calls, [])
-        self.assertEqual(self.deletions, [])
 
     def test_unexpected_errors(self):
         """
