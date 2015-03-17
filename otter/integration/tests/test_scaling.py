@@ -246,6 +246,8 @@ class TestScaling(unittest.TestCase):
                 self.scaling_group.start(rcs, self)
                 .addCallback(self.scale_up_policy.start, self)
                 .addCallback(self.scale_down_policy.start, self)
+                .addCallback(self.scale_up_policy.execute)
+                .addCallback(self.scaling_group.wait_for_N_servers, 2, timeout=1800)
             )
             return d
 
@@ -256,5 +258,4 @@ class TestScaling(unittest.TestCase):
             .addCallback(self.clb1.wait_for_state, "ACTIVE", 600)
         ).addCallback(finish_setup, self)
         return d
-
     test_policy_execution_after_adding_clb.timeout = 1800
