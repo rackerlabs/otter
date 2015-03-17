@@ -336,18 +336,17 @@ def converge_all_groups(log, group_locks, my_buckets, all_buckets,
 
 def _cleanup_convergence_error(log, tenant_id, group_id, version, exc_info):
     failure = exc_info_to_failure(exc_info)
+    if failure.check(ConcurrentError):
+        # We don't need to spam the logs about this, it's to be expected
+        return
     if failure.check(NoSuchScalingGroupError):
         log.err(failure, 'converge-fatal-error')
         return delete_divergent_flag(log, tenant_id, group_id, version)
-    if failure.check(ConcurrentError):
-        # We don't need to spam the logs about this, it's to be expected
-        pass
-    # TODO: Check for other fatal errors, and put the group into ERROR
-    # state.
-    else:
-        log.err(failure, 'converge-non-fatal-error')
-        # We specifically don't clean up the dirty flag in this case, so
-        # convergence will be retried.
+
+    # TODO: Check for other fatal errors, and put the group into ERROR state.
+    log.err(failure, 'converge-non-fatal-error')
+    # We specifically don't clean up the dirty flag in this case, so
+    # convergence will be retried.
 
 
 def _stable_hash(s):
