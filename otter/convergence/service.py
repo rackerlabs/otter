@@ -96,6 +96,8 @@ def execute_convergence(tenant_id, group_id, log,
                                         group_id=group_id))
     gather_eff = get_all_convergence_data(group_id)
 
+    log.msg("convergence-gathering")
+
     def got_all_data(((scaling_group, manifest), (servers, lb_nodes))):
         group_state = manifest['state']
         launch_config = manifest['launchConfiguration']
