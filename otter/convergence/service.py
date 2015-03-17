@@ -14,7 +14,7 @@ from pyrsistent import thaw
 
 import six
 
-from twisted.application.service import MultiService, Service
+from twisted.application.service import MultiService
 
 from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
@@ -95,8 +95,6 @@ def execute_convergence(tenant_id, group_id, log,
     sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
                                         group_id=group_id))
     gather_eff = get_all_convergence_data(group_id)
-
-    log.msg("convergence-gathering")
 
     def got_all_data(((scaling_group, manifest), (servers, lb_nodes))):
         group_state = manifest['state']
