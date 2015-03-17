@@ -34,6 +34,31 @@ class ScalingGroup(object):
     dispose of them upon integration test completion.
     """
 
+    def set_launch_config(self, rcs, launch_config):
+        """Changes the launch configuration used by the scaling group.
+
+        :param TestResources rcs: The integration test resources instance.
+            This provides useful information to complete the request, like
+            which endpoint to use to make the API request.
+
+        :param dict launch_config: The new launch configuration.
+
+        :return: A :class:`Deferred` which, upon firing, alters the scaling
+            group's launch configuration.  If successful, the test resources
+            provided will be returned.  Otherwise, an exception will rise.
+        """
+        return (
+            treq.put(
+                "%s/groups/%s/launch" % (
+                    str(rcs.endpoints["otter"]), self.group_id
+                ),
+                json.dumps(launch_config),
+                headers=headers(str(rcs.token)),
+                pool=self.pool
+            ).addCallback(check_success, [204])
+            .addCallback(lambda _: rcs)
+        )
+
     def stop(self, rcs):
         """Clean up a scaling group.  Although safe to call yourself, you
         should think twice about it.  Let :method:`start` handle registering
@@ -42,6 +67,10 @@ class ScalingGroup(object):
         At the present time, this function DOES NOT stop to verify
         servers are removed.  (This is because I haven't created
         any tests which create them yet.)
+
+        :param TestResources rcs: The integration test resources instance.
+            This provides useful information to complete the request, like
+            which endpoint to use to make the API request.
         """
 
         return self.delete_scaling_group(rcs)
@@ -49,6 +78,10 @@ class ScalingGroup(object):
     def delete_scaling_group(self, rcs):
         """Unconditionally delete the scaling group.  You may call this only
         once.
+
+        :param TestResources rcs: The integration test resources instance.
+            This provides useful information to complete the request, like
+            which endpoint to use to make the API request.
 
         :return: A :class:`Deferred` which, upon firing, disposes of the
             scaling group.
@@ -64,6 +97,10 @@ class ScalingGroup(object):
 
     def get_scaling_group_state(self, rcs):
         """Retrieve the state of the scaling group.
+
+        :param TestResources rcs: The integration test resources instance.
+            This provides useful information to complete the request, like
+            which endpoint to use to make the API request.
 
         :return: A :class:`Deferred` which, upon firing, returns the result
             code and, optionally, scaling group state as a 2-tuple, in that
