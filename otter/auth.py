@@ -235,6 +235,15 @@ class ImpersonatingAuthenticator(object):
 
     @wait(ignore_kwargs=['log'])
     def _auth_me(self, log=None):
+        def _log_failed_auth(err):
+            """
+            Log this as a string we know we can find in the logging feed
+            """
+            if log:
+                log.err(err, 'Failed to get a new identity admin token.',
+                        otter_msg_type='admin-login-failed')
+            return err
+
         if log:
             log.msg('Getting new identity admin token')
         d = authenticate_user(self._url,
@@ -242,6 +251,8 @@ class ImpersonatingAuthenticator(object):
                               self._identity_admin_password,
                               log=log)
         d.addCallback(extract_token)
+
+        d.addErrback(_log_failed_auth)
         d.addCallback(partial(setattr, self, "_token"))
         return d
 
@@ -487,6 +498,14 @@ def endpoints(service_catalog, service_name, region):
             yield endpoint
 
 
+@attributes(['service_name', 'region'])
+class NoSuchEndpoint(Exception):
+    """
+    Exception to be raised when the service catalog does not contain an
+    endpoint for the given service in the given region.
+    """
+
+
 def public_endpoint_url(service_catalog, service_name, region):
     """
     Return the first publicURL for a given service in a given region.
@@ -497,8 +516,12 @@ def public_endpoint_url(service_catalog, service_name, region):
 
     :return: URL as a string.
     """
-    first_endpoint = next(endpoints(service_catalog, service_name, region))
-    return first_endpoint['publicURL']
+    try:
+        first_endpoint = next(endpoints(service_catalog, service_name, region))
+    except StopIteration:
+        raise NoSuchEndpoint(service_name=service_name, region=region)
+    else:
+        return first_endpoint['publicURL']
 
 
 @attributes(['authenticator', 'tenant_id', 'log'], apply_with_init=False)

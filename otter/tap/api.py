@@ -2,6 +2,7 @@
 Twisted Application plugin for otter API nodes.
 """
 
+from copy import deepcopy
 from functools import partial
 
 import jsonfig
@@ -196,8 +197,6 @@ def makeService(config):
     service_configs = get_service_configs(config)
 
     authenticator = generate_authenticator(reactor, config['identity'])
-    dispatcher = get_full_dispatcher(reactor, authenticator, log,
-                                     get_service_configs(config))
     supervisor = SupervisorService(authenticator, region, coiterate,
                                    service_configs)
     supervisor.setServiceParent(s)
@@ -235,25 +234,33 @@ def makeService(config):
     # setup cloud feed
     cf_conf = config.get('cloudfeeds', None)
     if cf_conf is not None:
+        id_conf = deepcopy(config['identity'])
+        id_conf['strategy'] = 'single_tenant'
         addObserver(
             CloudFeedsObserver(
-                reactor=reactor, authenticator=authenticator,
+                reactor=reactor,
+                authenticator=generate_authenticator(reactor, id_conf),
                 region=region, tenant_id=cf_conf['tenant_id'],
                 service_configs=service_configs))
 
     # Setup Kazoo client
     if config_value('zookeeper'):
         threads = config_value('zookeeper.threads') or 10
+        disable_logs = config_value('zookeeper.no_logs')
         kz_client = TxKazooClient(
             hosts=config_value('zookeeper.hosts'),
             # Keep trying to connect until the end of time with
             # max interval of 10 minutes
             connection_retry=dict(max_tries=-1, max_delay=600),
-            threads=threads, txlog=log.bind(system='kazoo'))
+            threads=threads,
+            txlog=None if disable_logs else log.bind(system='kazoo'))
         # Don't timeout. Keep trying to connect forever
         d = kz_client.start(timeout=None)
 
         def on_client_ready(_):
+            dispatcher = get_full_dispatcher(reactor, authenticator, log,
+                                             get_service_configs(config),
+                                             kz_client, store)
             # Setup scheduler service after starting
             scheduler = setup_scheduler(s, store, kz_client)
             health_checker.checks['scheduler'] = scheduler.health_check

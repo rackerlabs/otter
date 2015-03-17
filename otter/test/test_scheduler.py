@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 
 import mock
 
-from twisted.application.service import Service
 from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -27,6 +26,7 @@ from otter.scheduler import (
 from otter.test.utils import (
     CheckFailure,
     DeferredFunctionMixin,
+    FakePartitioner,
     iMock,
     mock_log,
     patch
@@ -47,20 +47,6 @@ class SchedulerTests(SynchronousTestCase):
         self.mock_generate_transaction_id = patch(
             self, 'otter.scheduler.generate_transaction_id',
             return_value='transaction-id')
-
-
-class FakePartitioner(Service):
-    """A fake version of a :obj:`Partitioner`."""
-    def __init__(self, log, callback):
-        self.log = log
-        self.got_buckets = callback
-        self.health = (True, {'buckets': []})
-
-    def reset_path(self, new_path):
-        return 'partitioner reset to {}'.format(new_path)
-
-    def health_check(self):
-        return defer.succeed(self.health)
 
 
 class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):

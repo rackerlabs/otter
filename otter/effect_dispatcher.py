@@ -6,6 +6,7 @@ from effect import (
     ComposedDispatcher,
     TypeDispatcher,
     base_dispatcher)
+from effect.ref import reference_dispatcher
 from effect.twisted import make_twisted_dispatcher
 
 from .auth import (
@@ -14,11 +15,12 @@ from .auth import (
     perform_authenticate,
     perform_invalidate_token,
 )
-from .http import TenantScope, perform_tenant_scope
+from .cloud_client import TenantScope, perform_tenant_scope
 from .models.cass import CQLQueryExecute, perform_cql_query
-from .models.intents import ModifyGroupState, perform_modify_group_state
+from .models.intents import get_model_dispatcher
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
+from .util.zk import get_zk_dispatcher
 
 
 def get_simple_dispatcher(reactor):
@@ -38,20 +40,33 @@ def get_simple_dispatcher(reactor):
             InvalidateToken: perform_invalidate_token,
             Request: perform_request,
             Retry: perform_retry,
-            ModifyGroupState: perform_modify_group_state,
         }),
         make_twisted_dispatcher(reactor),
+        reference_dispatcher,
     ])
 
 
-def get_full_dispatcher(reactor, authenticator, log, service_config):
+def get_full_dispatcher(reactor, authenticator, log, service_configs,
+                        kz_client, store):
     """
     Return a dispatcher that can perform all of Otter's effects.
     """
     return ComposedDispatcher([
+        get_legacy_dispatcher(reactor, authenticator, log, service_configs),
+        get_zk_dispatcher(kz_client),
+        get_model_dispatcher(log, store),
+    ])
+
+
+def get_legacy_dispatcher(reactor, authenticator, log, service_configs):
+    """
+    Return a dispatcher that can perform effects that are needed by the old
+    worker code.
+    """
+    return ComposedDispatcher([
         TypeDispatcher({
             TenantScope: partial(perform_tenant_scope, authenticator, log,
-                                 service_config)}),
+                                 service_configs)}),
         get_simple_dispatcher(reactor),
     ])
 

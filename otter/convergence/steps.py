@@ -1,26 +1,30 @@
 """Steps for convergence."""
-
+import json
 import re
 
 from functools import partial
 
-from characteristic import attributes
+from characteristic import Attribute, attributes
 
-from effect import Effect, Func
+from effect import Constant, Effect, Func, catch
 
-from pyrsistent import pset, thaw
+from pyrsistent import PMap, PSet, pset, thaw
 
 from toolz.dicttoolz import get_in
 from toolz.itertoolz import concat
 
+from twisted.python.constants import NamedConstant
+
 from zope.interface import Interface, implementer
 
+from otter.cloud_client import has_code, service_request
 from otter.constants import ServiceType
 from otter.convergence.model import StepResult
-from otter.http import has_code, service_request
 from otter.util.fp import predicate_any
 from otter.util.hashkey import generate_server_name
-from otter.util.http import append_segments
+from otter.util.http import APIError, append_segments
+from otter.util.retry import (
+    exponential_backoff_interval, retry_effect, retry_times)
 
 
 class IStep(Interface):
@@ -50,8 +54,67 @@ def set_server_name(server_config_args, name_suffix):
     return server_config_args.set_in(('server', 'name'), name)
 
 
+def _try_json_message(maybe_json_error, keys):
+    """
+    Attemp to grab the message body from possibly a JSON error body.  If
+    invalid JSON, or if the JSON is of an unexpected format (keys are not
+    found), `None` is returned.
+    """
+    try:
+        error_body = json.loads(maybe_json_error)
+    except (ValueError, TypeError):
+        return None
+    else:
+        return get_in(keys, error_body, None)
+
+
+def _forbidden_plaintext(message):
+    return re.compile(
+        "^403 Forbidden\n\nAccess was denied to this resource\.\n\n ({0})$"
+        .format(message))
+
+_NOVA_403_NO_PUBLIC_NETWORK = _forbidden_plaintext(
+    "Networks \(00000000-0000-0000-0000-000000000000\) not allowed")
+_NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED = _forbidden_plaintext(
+    "Networks \(00000000-0000-0000-0000-000000000000,"
+    "11111111-1111-1111-1111-111111111111\) required but missing")
+_NOVA_403_RACKCONNECT_NETWORK_REQUIRED = _forbidden_plaintext(
+    "Exactly 1 isolated network\(s\) must be attached")
+
+
+def _parse_nova_user_error(api_error):
+    """
+    Parse API errors for user failures on creating a server.
+
+    :param api_error: The error returned from Nova
+    :type api_error: :class:`APIError`
+
+    :return: the nova message as to why the creation failed, if it was a user
+        failure.  None otherwise.
+    :rtype: `str` or `None`
+    """
+    if api_error.code == 400:
+        message = _try_json_message(api_error.body,
+                                    ("badRequest", "message"))
+        if message:
+            return message
+
+    elif api_error.code == 403:
+        message = _try_json_message(api_error.body,
+                                    ("forbidden", "message"))
+        if message:
+            return message
+
+        for pat in (_NOVA_403_RACKCONNECT_NETWORK_REQUIRED,
+                    _NOVA_403_NO_PUBLIC_NETWORK,
+                    _NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED):
+            m = pat.match(api_error.body)
+            if m:
+                return m.groups()[0]
+
+
 @implementer(IStep)
-@attributes(['server_config'])
+@attributes([Attribute('server_config', instance_of=PMap)])
 class CreateServer(object):
     """
     A server must be created.
@@ -70,20 +133,88 @@ class CreateServer(object):
                 'POST',
                 'servers',
                 data=thaw(server_config),
-                success_pred=has_code(202))
+                success_pred=has_code(202),
+                reauth_codes=(401,))
 
         def report_success(result):
-            return StepResult.SUCCESS, []
+            """
+            On success, return "RETRY", because servers go into building for
+            a while, and we need to retry convergence to ensure it goes into
+            active.
+            """
+            return StepResult.RETRY, []
 
         def report_failure(result):
+            """
+            If the failure is an APIError with a recognized user error,
+            return a :obj:`StepResult.FAILURE` along with that user error as
+            a message, otherwise return a :obj:`StepResult.RETRY` without
+            a message.
+            """
+            err_type, error, traceback = result
+            if err_type == APIError:
+                message = _parse_nova_user_error(error)
+                if message is not None:
+                    return StepResult.FAILURE, [message]
+
             return StepResult.RETRY, []
 
         return eff.on(got_name).on(success=report_success,
                                    error=report_failure)
 
 
+class UnexpectedServerStatus(Exception):
+    """
+    An exception to be raised when a server is found in an unexpected state.
+    """
+    def __init__(self, server_id, status, expected_status):
+        super(UnexpectedServerStatus, self).__init__(
+            'Expected {server_id} to have {expected_status}, '
+            'has {status}'.format(server_id=server_id,
+                                  status=status,
+                                  expected_status=expected_status)
+        )
+        self.server_id = server_id
+        self.status = status
+        self.expected_status = expected_status
+
+
+def delete_and_verify(server_id):
+    """
+    Check the status of the server to see if it's actually been deleted.
+    Succeeds only if it has been either deleted (404) or acknowledged by Nova
+    to be deleted (task_state = "deleted").
+
+    Note that ``task_state`` is in the server details key
+    ``OS-EXT-STS:task_state``, which is supported by Openstack but available
+    only when looking at the extended status of a server.
+    """
+
+    def check_task_state((resp, json_blob)):
+        if resp.code == 404:
+            return
+        server_details = json_blob['server']
+        is_deleting = server_details.get("OS-EXT-STS:task_state", "")
+        if is_deleting.strip().lower() != "deleting":
+            raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
+
+    def verify((_type, error, traceback)):
+        if error.code != 204:
+            raise _type, error, traceback
+        ver_eff = service_request(
+            ServiceType.CLOUD_SERVERS, 'GET',
+            append_segments('servers', server_id, 'details'),
+            success_pred=has_code(200, 404))
+        return ver_eff.on(check_task_state)
+
+    return service_request(
+        ServiceType.CLOUD_SERVERS, 'DELETE',
+        append_segments('servers', server_id),
+        success_pred=has_code(404)).on(error=catch(APIError, verify))
+
+
 @implementer(IStep)
-@attributes(['server_id'])
+@attributes([Attribute('server_id', instance_of=basestring)])
 class DeleteServer(object):
     """
     A server must be deleted.
@@ -93,11 +224,10 @@ class DeleteServer(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to delete a server."""
-        eff = service_request(
-            ServiceType.CLOUD_SERVERS,
-            'DELETE',
-            append_segments('servers', self.server_id),
-            success_pred=has_code(204, 404))
+
+        eff = retry_effect(
+            delete_and_verify(self.server_id), can_retry=retry_times(10),
+            next_interval=exponential_backoff_interval(2))
 
         def report_success(result):
             return StepResult.SUCCESS, []
@@ -109,7 +239,9 @@ class DeleteServer(object):
 
 
 @implementer(IStep)
-@attributes(['server_id', 'key', 'value'])
+@attributes([Attribute('server_id', instance_of=basestring),
+             Attribute('key', instance_of=basestring),
+             Attribute('value', instance_of=basestring)])
 class SetMetadataItemOnServer(object):
     """
     A metadata key/value item must be set on a server.
@@ -117,14 +249,26 @@ class SetMetadataItemOnServer(object):
     :ivar str server_id: a Nova server ID.
     :ivar str key: The metadata key to set (<=256 characters)
     :ivar str value: The value to assign to the metadata key (<=256 characters)
+
+    Succeed unconditionally on 200 (success) or 404 (if the server's gone, no
+    need to retry or fail).
     """
     def as_effect(self):
         """Produce a :obj:`Effect` to set a metadata item on a server"""
-        return service_request(
+        eff = service_request(
             ServiceType.CLOUD_SERVERS,
             'PUT',
             append_segments('servers', self.server_id, 'metadata', self.key),
-            data={'meta': {self.key: self.value}})
+            data={'meta': {self.key: self.value}},
+            success_pred=has_code(200, 404))
+
+        def report_success(result):
+            return StepResult.SUCCESS, []
+
+        def report_failure(result):
+            return StepResult.RETRY, [result[1]]
+
+        return eff.on(success=report_success, error=report_failure)
 
 
 _CLB_DUPLICATE_NODES_PATTERN = re.compile(
@@ -166,7 +310,8 @@ def _check_clb_422(*regex_matches):
 
 
 @implementer(IStep)
-@attributes(['lb_id', 'address_configs'])
+@attributes([Attribute('lb_id', instance_of=basestring),
+             Attribute('address_configs', instance_of=PSet)])
 class AddNodesToCLB(object):
     """
     Multiple nodes must be added to a load balancer.
@@ -192,7 +337,7 @@ class AddNodesToCLB(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to add nodes to CLB"""
-        return service_request(
+        eff = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'POST',
             append_segments('loadbalancers', str(self.lb_id), "nodes"),
@@ -202,13 +347,34 @@ class AddNodesToCLB(object):
                              'type': lbc.type.name}
                             for address, lbc in self.address_configs]},
             success_pred=predicate_any(
-                has_code(202, 413),
-                _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN,
-                               _CLB_PENDING_UPDATE_PATTERN)))
+                has_code(202),
+                _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN)))
+
+        def report_success(result):
+            return StepResult.SUCCESS, []
+
+        def report_failure(result):
+            """
+            If the error is a 422 - PENDING UPDATE, retry.  Otherwise, fail.
+            """
+            err_type, error, traceback = result
+            if err_type == APIError and error.code == 413:
+                # over-limit, retry
+                return StepResult.RETRY, [error]
+            if err_type == APIError and error.code == 422:
+                # body has already become JSON
+                message = error.body.get("message", None)
+                if message and _CLB_PENDING_UPDATE_PATTERN.search(message):
+                    return StepResult.RETRY, [error]
+
+            return StepResult.FAILURE, [error]
+
+        return eff.on(success=report_success, error=report_failure)
 
 
 @implementer(IStep)
-@attributes(['lb_id', 'node_ids'])
+@attributes([Attribute('lb_id', instance_of=basestring),
+             Attribute('node_ids', instance_of=PSet)])
 class RemoveNodesFromCLB(object):
     """
     One or more IPs must be removed from a load balancer.
@@ -274,7 +440,11 @@ def _clb_check_bulk_delete(lb_id, attempted_nodes, result):
 
 
 @implementer(IStep)
-@attributes(['lb_id', 'node_id', 'condition', 'weight', 'type'])
+@attributes([Attribute('lb_id', instance_of=basestring),
+             Attribute('node_id', instance_of=basestring),
+             Attribute('condition', instance_of=NamedConstant),
+             Attribute('weight', instance_of=int),
+             Attribute('type', instance_of=NamedConstant)])
 class ChangeCLBNode(object):
     """
     An existing port mapping on a load balancer must have its condition,
@@ -288,7 +458,7 @@ class ChangeCLBNode(object):
             'PUT',
             append_segments('loadbalancers', self.lb_id,
                             'nodes', self.node_id),
-            data={'condition': self.condition,
+            data={'condition': self.condition.name,
                   'weight': self.weight},
             success_pred=has_code(202))
 
@@ -338,7 +508,7 @@ _RCV3_LB_DOESNT_EXIST_PATTERN = _rcv3_re(
 
 
 @implementer(IStep)
-@attributes(['lb_node_pairs'])
+@attributes([Attribute('lb_node_pairs', instance_of=PSet)])
 class BulkAddToRCv3(object):
     """
     Some connections must be made between some combination of servers
@@ -404,7 +574,7 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
 
 
 @implementer(IStep)
-@attributes(['lb_node_pairs'])
+@attributes([Attribute('lb_node_pairs', instance_of=PSet)])
 class BulkRemoveFromRCv3(object):
     """
     Some connections must be removed between some combination of nodes
@@ -477,3 +647,16 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
         return next_step.as_effect()
     else:
         return StepResult.SUCCESS, []
+
+
+@implementer(IStep)
+class ConvergeLater(object):
+    """
+    Converge later in some time
+    """
+
+    def as_effect(self):
+        """
+        Return an effect that always results in retry
+        """
+        return Effect(Constant((StepResult.RETRY, [])))

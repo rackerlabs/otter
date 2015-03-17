@@ -1,44 +1,75 @@
 """Tests for convergence steps."""
+import json
 
-from effect import Func
+from effect import Effect, Func, TypeDispatcher, base_dispatcher, sync_perform
 
-from mock import ANY
+from mock import ANY, patch
 
 from pyrsistent import freeze, pset
 
+from testtools.matchers import IsInstance
+
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.cloud_client import ServiceRequest, has_code, service_request
 from otter.constants import ServiceType
-from otter.convergence.model import CLBDescription, StepResult
+from otter.convergence.model import (
+    CLBDescription,
+    CLBNodeCondition,
+    CLBNodeType,
+    StepResult)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
+    ConvergeLater,
     CreateServer,
     DeleteServer,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
+    UnexpectedServerStatus,
     _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_ALREADY_A_MEMBER_PATTERN,
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
+    delete_and_verify,
     _rcv3_check_bulk_add,
     _rcv3_check_bulk_delete)
-from otter.http import has_code, service_request
-from otter.test.utils import StubResponse, resolve_effect
+from otter.test.utils import (
+    StubResponse,
+    get_fake_service_request_performer,
+    matches,
+    resolve_effect,
+    transform_eq)
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
+from otter.util.retry import (
+    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 
 
-class StepAsEffectTests(SynchronousTestCase):
+def service_request_error_response(error):
     """
-    Tests for converting :obj:`IStep` implementations to :obj:`Effect`s.
+    Returns the error response that gets passed to error handlers on the
+    service request effect.
+
+    That is, (type of error, actual error, traceback object)
+
+    Just returns None for the traceback object.
+    """
+    return (type(error), error, None)
+
+
+class CreateServerTests(SynchronousTestCase):
+    """
+    Tests for :obj:`CreateServer.as_effect`.
     """
 
-    def test_create_server(self):
+    def test_create_server_request_with_name(self):
         """
         :obj:`CreateServer.as_effect` produces a request for creating a server.
+        If the name is given, a randomly generated suffix is appended to the
+        server name.
         """
         create = CreateServer(
             server_config=freeze({'server': {'name': 'myserver',
@@ -54,17 +85,8 @@ class StepAsEffectTests(SynchronousTestCase):
                 'servers',
                 data={'server': {'name': 'myserver-random-name',
                                  'flavorRef': '1'}},
-                success_pred=has_code(202)).intent)
-
-        self.assertEqual(
-            resolve_effect(eff, (None, {})),
-            (StepResult.SUCCESS, []))
-
-        self.assertEqual(
-            resolve_effect(eff,
-                           (APIError, APIError(500, None, None), None),
-                           is_error=True),
-            (StepResult.RETRY, []))
+                success_pred=has_code(202),
+                reauth_codes=(401,)).intent)
 
     def test_create_server_noname(self):
         """
@@ -86,21 +108,213 @@ class StepAsEffectTests(SynchronousTestCase):
                 'POST',
                 'servers',
                 data={'server': {'name': 'random-name', 'flavorRef': '1'}},
-                success_pred=has_code(202)).intent)
+                success_pred=has_code(202),
+                reauth_codes=(401,)).intent)
 
-    def test_delete_server(self):
+    def test_create_server_success_case(self):
         """
-        :obj:`DeleteServer.as_effect` produces a request for deleting a server.
+        :obj:`CreateServer.as_effect`, when it results in a successful create,
+        returns with :obj:`StepResult.RETRY`.
         """
-        delete = DeleteServer(server_id='abc123')
-        eff = delete.as_effect()
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
         self.assertEqual(
-            eff.intent,
-            service_request(
-                ServiceType.CLOUD_SERVERS,
-                'DELETE',
-                'servers/abc123',
-                success_pred=has_code(204, 404)).intent)
+            resolve_effect(eff, (StubResponse(202, {}), {"server": {}})),
+            (StepResult.RETRY, []))
+
+    def test_create_server_400_parseable_failures(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in 400 failure code,
+        returns with :obj:`StepResult.FAILURE` and whatever message was
+        included in the Nova bad request message.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        # 400's we've seen so far
+        nova_400s = (
+            ("Bad networks format: network uuid is not in proper format "
+             "(2b55377-890e-4fc9-9ece-ad5a414a788e)"),
+            "Image 644d0755-e69b-4ca0-b99b-3abc2f20f7c0 is not active.",
+            "Flavor's disk is too small for requested image.",
+            "Invalid key_name provided.",
+            ("Requested image 1dff348d-c06e-4567-a0b2-f4342575979e has "
+             "automatic disk resize disabled."),
+            "OS-DCF:diskConfig must be either 'MANUAL' or 'AUTO'.",
+        )
+        for message in nova_400s:
+            api_error = APIError(
+                code=400,
+                body=json.dumps({
+                    'badRequest': {
+                        'message': message,
+                        'code': 400
+                    }
+                }),
+                headers={})
+            self.assertEqual(
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
+                (StepResult.FAILURE, [message]))
+
+    def test_create_server_400_unrecognized_failures_retry(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in a 400 failure code
+        without a recognized body, invalidates the auth cache and returns with
+        :obj:`StepResult.RETRY`.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        # 400's with we don't recognize
+        invalid_400s = (
+            json.dumps({
+                "what?": {
+                    "message": "Invalid key_name provided.", "code": 400
+                }}),
+            json.dumps(["not expected json format"]),
+            "not json")
+
+        for message in invalid_400s:
+            api_error = APIError(code=400, body=message, headers={})
+            self.assertEqual(
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
+                (StepResult.RETRY, []))
+
+    def test_create_server_403_json_parseable_failures(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in a 403 failure code
+        with a recognized JSON body, returns with :obj:`StepResult.FAILURE` and
+        whatever message was included in the Nova forbidden message.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        # 403's with JSON bodies we've seen so far that are not auth issues
+        nova_json_403s = (
+            ("Quota exceeded for ram: Requested 1024, but already used 131072 "
+             "of 131072 ram"),
+            ("Quota exceeded for instances: Requested 1, but already used "
+             "100 of 100 instances"),
+            ("Quota exceeded for onmetal-compute-v1-instances: Requested 1, "
+             "but already used 10 of 10 onmetal-compute-v1-instances")
+        )
+
+        for message in nova_json_403s:
+            api_error = APIError(
+                code=403,
+                body=json.dumps({
+                    "forbidden": {
+                        "message": message,
+                        "code": 403
+                    }
+                }),
+                headers={})
+            self.assertEqual(
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
+                (StepResult.FAILURE, [message]))
+
+    def test_create_server_403_plaintext_parseable_failures(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in a 403 failure code
+        with a recognized plain text body, returns with
+        :obj:`StepResult.FAILURE` and whatever message was included in the
+        Nova forbidden message.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        # 403's with JSON bodies we've seen so far that are not auth issues
+        nova_plain_403s = (
+            ("Networks (00000000-0000-0000-0000-000000000000,"
+             "11111111-1111-1111-1111-111111111111) required but missing"),
+            "Networks (00000000-0000-0000-0000-000000000000) not allowed",
+            "Exactly 1 isolated network(s) must be attached"
+        )
+
+        for message in nova_plain_403s:
+            api_error = APIError(
+                code=403,
+                body="".join((
+                    "403 Forbidden\n\n",
+                    "Access was denied to this resource.\n\n ",
+                    message)),
+                headers={})
+            self.assertEqual(
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
+                (StepResult.FAILURE, [message]))
+
+    def test_create_server_403_unrecognized_failures_retry(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in a 403 failure code
+        without a recognized body, invalidates the auth cache and returns with
+        :obj:`StepResult.RETRY`.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        # 403's with JSON and plaintext bodies don't recognize
+        invalid_403s = (
+            json.dumps({"what?": {"message": "meh", "code": 403}}),
+            "403 Forbidden\n\nAccess was denied to this resource.\n\n bleh",
+            ("403 Forbidden\n\nAccess was denied to this resource.\n\n "
+             "Quota exceeded for ram: Requested 1024, but already used 131072 "
+             "of 131072 ram"),
+            "not even a message")
+
+        for message in invalid_403s:
+            api_error = APIError(code=403, body=message, headers={})
+            self.assertEqual(
+                resolve_effect(eff, service_request_error_response(api_error),
+                               is_error=True),
+                (StepResult.RETRY, []))
+
+    def test_create_server_non_400_or_403_failures(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in a non-400, non-403
+        failure code without a recognized body, invalidates the auth cache and
+        returns with :obj:`StepResult.RETRY`.
+        """
+        eff = CreateServer(
+            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
+        eff = resolve_effect(eff, 'random-name')
+
+        api_error = APIError(code=500, body="this is a 500", headers={})
+        self.assertEqual(
+            resolve_effect(eff, service_request_error_response(api_error),
+                           is_error=True),
+            (StepResult.RETRY, []))
+
+
+class DeleteServerTests(SynchronousTestCase):
+    """
+    Tests for :obj:`DeleteServer`
+    """
+
+    @patch('otter.convergence.steps.delete_and_verify')
+    def test_delete_server(self, mock_dav):
+        """
+        :obj:`DeleteServer.as_effect` calls `delete_and_verify` with
+        retries. It returns SUCCESS on completion and RETRY on failure
+        """
+        mock_dav.side_effect = lambda sid: Effect(sid)
+        eff = DeleteServer(server_id='abc123').as_effect()
+        self.assertIsInstance(eff.intent, Retry)
+        self.assertEqual(
+            eff.intent.should_retry,
+            ShouldDelayAndRetry(can_retry=retry_times(10),
+                                next_interval=exponential_backoff_interval(2)))
+        self.assertEqual(eff.intent.effect.intent, 'abc123')
 
         self.assertEqual(
             resolve_effect(eff, (None, {})),
@@ -112,6 +326,98 @@ class StepAsEffectTests(SynchronousTestCase):
                            is_error=True),
             (StepResult.RETRY, []))
 
+    def test_delete_and_verify_del_404(self):
+        """
+        :func:`delete_and_verify` invokes server delete and succeeds on 404
+        """
+        eff = delete_and_verify('sid')
+        self.assertEqual(
+            eff.intent,
+            service_request(
+                ServiceType.CLOUD_SERVERS, 'DELETE', 'servers/sid',
+                success_pred=has_code(404)).intent)
+        self.assertEqual(resolve_effect(eff, (ANY, {})), (ANY, {}))
+
+    def test_delete_and_verify_del_fails(self):
+        """
+        :func:`delete_and_verify` fails if delete server fails
+        """
+        eff = delete_and_verify('sid')
+        self.assertRaises(
+            APIError,
+            resolve_effect,
+            eff,
+            service_request_error_response(APIError(500, '')),
+            is_error=True)
+
+    def test_delete_and_verify_del_fails_non_apierror(self):
+        """
+        :func:`delete_and_verify` fails if delete server fails with error
+        other than APIError
+        """
+        eff = delete_and_verify('sid')
+        self.assertRaises(
+            ValueError,
+            resolve_effect,
+            eff,
+            service_request_error_response(ValueError('meh')),
+            is_error=True)
+
+    def test_delete_and_verify_verifies(self):
+        """
+        :func:`delete_and_verify` verifies if the server task_state has changed
+        to "deleting" after successful delete server call and succeeds if that
+        has happened. The details call succeeds if it returns 404
+        """
+        eff = delete_and_verify('sid')
+        eff = resolve_effect(
+            eff, service_request_error_response(APIError(204, {})),
+            is_error=True)
+
+        self.assertEqual(
+            eff.intent,
+            service_request(
+                ServiceType.CLOUD_SERVERS, 'GET', 'servers/sid/details',
+                success_pred=has_code(200, 404)).intent)
+        r = resolve_effect(
+            eff, (StubResponse(200, {}),
+                  {'server': {"OS-EXT-STS:task_state": 'deleting'}}))
+        self.assertIsNone(r)
+
+    def test_delete_and_verify_verify_404(self):
+        """
+        :func:`delete_and_verify` gets server details after successful delete
+        and succeeds if get server details returns 404
+        """
+        eff = delete_and_verify('sid')
+        eff = resolve_effect(
+            eff, service_request_error_response(APIError(204, {})),
+            is_error=True)
+        r = resolve_effect(eff, (StubResponse(404, {}), {}))
+        self.assertIsNone(r)
+
+    def test_delete_and_verify_verify_unexpectedstatus(self):
+        """
+        :func:`delete_and_verify` raises `UnexpectedServerStatus` error
+        if server status returned after deleting is not "deleting"
+        """
+        eff = delete_and_verify('sid')
+        eff = resolve_effect(
+            eff, service_request_error_response(APIError(204, {})),
+            is_error=True)
+        self.assertRaises(
+            UnexpectedServerStatus,
+            resolve_effect,
+            eff,
+            (StubResponse(200, {}),
+             {'server': {"OS-EXT-STS:task_state": 'bad'}})
+        )
+
+
+class StepAsEffectTests(SynchronousTestCase):
+    """
+    Tests for converting :obj:`IStep` implementations to :obj:`Effect`s.
+    """
     def test_set_metadata_item(self):
         """
         :obj:`SetMetadataItemOnServer.as_effect` produces a request for
@@ -119,13 +425,26 @@ class StepAsEffectTests(SynchronousTestCase):
         """
         meta = SetMetadataItemOnServer(server_id='abc123', key='metadata_key',
                                        value='teapot')
+        eff = meta.as_effect()
         self.assertEqual(
-            meta.as_effect(),
+            eff.intent,
             service_request(
                 ServiceType.CLOUD_SERVERS,
                 'PUT',
                 'servers/abc123/metadata/metadata_key',
-                data={'meta': {'metadata_key': 'teapot'}}))
+                data={'meta': {'metadata_key': 'teapot'}},
+                success_pred=has_code(200, 404)).intent)
+
+        self.assertEqual(
+            resolve_effect(eff, (None, {})),
+            (StepResult.SUCCESS, []))
+
+        err = APIError(500, None, None)
+        self.assertEqual(
+            resolve_effect(eff,
+                           (APIError, err, None),
+                           is_error=True),
+            (StepResult.RETRY, [err]))
 
     def test_change_load_balancer_node(self):
         """
@@ -135,9 +454,9 @@ class StepAsEffectTests(SynchronousTestCase):
         changenode = ChangeCLBNode(
             lb_id='abc123',
             node_id='node1',
-            condition='DRAINING',
+            condition=CLBNodeCondition.DRAINING,
             weight=50,
-            type="PRIMARY")
+            type=CLBNodeType.PRIMARY)
         self.assertEqual(
             changenode.as_effect(),
             service_request(
@@ -192,7 +511,7 @@ class StepAsEffectTests(SynchronousTestCase):
              'weight': 1}
         ])
 
-    def test_add_nodes_to_clb_predicate(self):
+    def test_add_nodes_to_clb_success_response_codes(self):
         """
         :obj:`AddNodesToCLB` only accepts 202, 413, and some 422 responses.
         """
@@ -201,44 +520,86 @@ class StepAsEffectTests(SynchronousTestCase):
         step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
         request = step.as_effect()
 
-        self.assertTrue(request.intent.json_response)
+        def get_result(response, body):
+            return sync_perform(
+                TypeDispatcher({
+                    ServiceRequest:
+                    get_fake_service_request_performer((response, body))
+                }),
+                request)
 
-        predicate = request.intent.success_pred
+        self.assertEqual(get_result(StubResponse(202, {}), ''),
+                         (StepResult.SUCCESS, []))
 
-        self.assertTrue(predicate(StubResponse(202, {}), None))
-        self.assertTrue(predicate(StubResponse(413, {}), None))
-        self.assertTrue(predicate(
-            StubResponse(422, {}),
-            {
-                "message": "Duplicate nodes detected. One or more "
-                           "nodes already configured on load "
-                           "balancer.",
-                "code": 422
-            }))
-        self.assertTrue(predicate(
-            StubResponse(422, {}),
-            {
-                "message": "Load Balancer '12345' has a status of "
-                           "'PENDING_UPDATE' and is considered immutable.",
-                "code": 422
-            }))
+        self.assertEqual(
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "Duplicate nodes detected. One or more "
+                               "nodes already configured on load "
+                               "balancer.",
+                    "code": 422
+                }),
+            (StepResult.SUCCESS, []))
 
-        self.assertFalse(predicate(StubResponse(404, {}), None))
-        self.assertFalse(predicate(
-            StubResponse(422, {}),
-            {
-                "message": "The load balancer is deleted and considered "
-                           "immutable.",
-                "code": 422
-            }))
-        self.assertFalse(predicate(
-            StubResponse(422, {}),
-            {
-                "message": "Load Balancer '{0}' has a status of "
-                           "'PENDING_DELETE' and is considered immutable."
-                           .format(lb_id),
-                "code": 422
-            }))
+    def test_add_nodes_to_clb_failure_response_codes(self):
+        """
+        :obj:`AddNodesToCLB` retries on 422 Pending Update responses, and
+        fails on non-202, non-413 errors, non-422 recognized responses.
+        """
+        lb_id = "12345"
+        lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
+        step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
+        request = step.as_effect()
+
+        def get_result(response, body):
+            return sync_perform(
+                TypeDispatcher({
+                    ServiceRequest:
+                    get_fake_service_request_performer((response, body))
+                }),
+                request)
+
+        # Retry on pending update or on over-limit
+        self.assertEqual(
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "Load Balancer '12345' has a status of "
+                               "'PENDING_UPDATE' and is considered immutable.",
+                    "code": 422
+                }),
+            (StepResult.RETRY, [matches(IsInstance(APIError))]))
+
+        self.assertEqual(get_result(StubResponse(413, {}), ''),
+                         (StepResult.RETRY, [matches(IsInstance(APIError))]))
+
+        # Fail on everything else
+        self.assertEqual(get_result(StubResponse(404, {}), ''),
+                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
+
+        self.assertEqual(get_result(StubResponse(400, {}), ''),
+                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
+
+        self.assertEqual(
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "The load balancer is deleted and considered "
+                               "immutable.",
+                    "code": 422
+                }),
+            (StepResult.FAILURE, [matches(IsInstance(APIError))]))
+
+        self.assertEqual(
+            get_result(
+                StubResponse(422, {}),
+                {
+                    "message": "Load Balancer '12345' has a status of "
+                               "'PENDING_DELETE' and is considered immutable.",
+                    "code": 422
+                }),
+            (StepResult.FAILURE, [matches(IsInstance(APIError))]))
 
     def test_remove_nodes_from_clb(self):
         """
@@ -248,7 +609,7 @@ class StepAsEffectTests(SynchronousTestCase):
         lb_id = "12345"
         node_ids = [str(i) for i in range(5)]
 
-        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=node_ids)
+        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=pset(node_ids))
         request = step.as_effect()
         self.assertEqual(
             request.intent,
@@ -256,7 +617,7 @@ class StepAsEffectTests(SynchronousTestCase):
                 ServiceType.CLOUD_LOAD_BALANCERS,
                 'DELETE',
                 "loadbalancers/12345/nodes",
-                params={'id': list(node_ids)},
+                params={'id': transform_eq(sorted, node_ids)},
                 json_response=True,
                 success_pred=ANY).intent)
 
@@ -268,7 +629,7 @@ class StepAsEffectTests(SynchronousTestCase):
         """
         lb_id = "12345"
         node_ids = [str(i) for i in range(5)]
-        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=node_ids)
+        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=pset(node_ids))
         request = step.as_effect()
 
         self.assertTrue(request.intent.json_response)
@@ -335,7 +696,7 @@ class StepAsEffectTests(SynchronousTestCase):
             "details": "The object is not valid"
         }
 
-        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=node_ids)
+        step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=pset(node_ids))
         eff = resolve_effect(step.as_effect(),
                              (StubResponse(400, {}), error_body))
         self.assertEqual(
@@ -344,7 +705,7 @@ class StepAsEffectTests(SynchronousTestCase):
                 ServiceType.CLOUD_LOAD_BALANCERS,
                 'DELETE',
                 'loadbalancers/12345/nodes',
-                params={'id': ['0', '4']},
+                params={'id': transform_eq(sorted, ['0', '4'])},
                 success_pred=ANY,
                 json_response=True).intent)
 
@@ -844,3 +1205,17 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
             "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
         result = _rcv3_check_bulk_delete(pairs, (resp, body))
         self.assertEqual(result, (StepResult.SUCCESS, []))
+
+
+class ConvergeLaterTests(SynchronousTestCase):
+    """
+    Tests for :func:`ConvergeLater`
+    """
+
+    def test_returns_retry(self):
+        """
+        `ConvergeLater.as_effect` returns effect with RETRY
+        """
+        eff = ConvergeLater().as_effect()
+        self.assertEqual(
+            sync_perform(base_dispatcher, eff), (StepResult.RETRY, []))

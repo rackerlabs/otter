@@ -114,6 +114,24 @@ def retry_and_timeout(do_work, timeout, can_retry=None, next_interval=None,
     Retry a function until the function succeeds or timeout has been reached.
     This is just a composition of :func:`timeout_deferred` and :func:`retry`
     for convenience.  Please see their respective arguments.
+
+    :param callable do_work: Takes no arguments.  Implements the work you want
+        to perform on a periodic basis.
+    :param number timeout: The number of seconds beyond which is considered a
+        timeout condition.
+    :param callable can_retry: Takes a Twisted Failure instance as a
+        parameter, and decides whether or not the work should be retried
+        (returns True if retry is desired; it returns False otherwise).
+    :param callable next_interval: Takes a Twisted Failure instance as a
+        parameter, and decides how long to wait based on the error received.
+        Returns a number.
+    :param IReactorTime clock: The clock authority; if left unspecified, the
+        normal Twisted reactor will be used.
+    :param str deferred_description: A textual description of what timed out.
+    :return: A deferred, which when fired, contains the output of do_work if
+        do_work actually succeeds.  Otherwise, returns a Failure instance.
+        The Failure can be a timeout error or the exception which prevents
+        retrying.
     """
     if clock is None:  # pragma: no cover
         from twisted.internet import reactor
@@ -300,3 +318,16 @@ def wait(ignore_kwargs=()):
         return wrapped_f
 
     return decorator
+
+
+def catch_failure(exc_type, fn, *args, **kwargs):
+    """
+    Returns an errback which will call ``fn(failure, *args, **kwargs)`` only
+    after ensuring that a failure wraps the specified exception type.
+
+    Use like d.addErrback(catch_failure(ExampleError, lambda: 'foo'))
+    """
+    def handler(f):
+        f.trap(exc_type)
+        return fn(f, *args, **kwargs)
+    return handler

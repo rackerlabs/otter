@@ -3,31 +3,41 @@
 import calendar
 from functools import partial
 
-from effect import Constant, Effect
-from effect.testing import Stub
+from effect import (
+    ComposedDispatcher,
+    Constant,
+    Effect,
+    ParallelEffects,
+    TypeDispatcher,
+    sync_perform,
+    sync_performer)
 
-from pyrsistent import freeze, pset
+from effect.async import perform_parallel_async
+from effect.testing import EQDispatcher, EQFDispatcher, Stub
+
+from pyrsistent import freeze
 
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.auth import NoSuchEndpoint
+from otter.cloud_client import service_request
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
-    get_all_convergence_data,
     extract_CLB_drained_at,
+    get_all_convergence_data,
     get_all_server_details,
     get_clb_contents,
-    get_scaling_group_servers,
-    to_nova_server,
-    _private_ipv4_addresses,
-    _servicenet_address)
+    get_rcv3_contents,
+    get_scaling_group_servers)
 from otter.convergence.model import (
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
     CLBNodeType,
     NovaServer,
+    RCv3Description,
+    RCv3Node,
     ServerState)
-from otter.http import service_request
 from otter.test.utils import (
     patch,
     resolve_effect,
@@ -35,7 +45,7 @@ from otter.test.utils import (
     resolve_stubs
 )
 from otter.util.retry import (
-    ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
+    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import from_timestamp
 
 
@@ -186,8 +196,9 @@ class ExtractDrainedTests(SynchronousTestCase):
     """
     Tests for :func:`otter.convergence.extract_CLB_drained_at`
     """
-    summary = ("Node successfully updated with address: " +
-               "'10.23.45.6', port: '8080', weight: '1', condition: 'DRAINING'")
+    summary = ("Node successfully updated with address: "
+               "'10.23.45.6', port: '8080', weight: '1', "
+               "condition: 'DRAINING'")
     updated = '2014-10-23T18:10:48.000Z'
     feed = ('<feed xmlns="http://www.w3.org/2005/Atom">' +
             '<entry><summary>{}</summary><updated>{}</updated></entry>' +
@@ -200,17 +211,19 @@ class ExtractDrainedTests(SynchronousTestCase):
         """
         feed = self.feed.format(self.summary, self.updated)
         self.assertEqual(extract_CLB_drained_at(feed),
-                         calendar.timegm(from_timestamp(self.updated).utctimetuple()))
+                         calendar.timegm(
+                             from_timestamp(self.updated).utctimetuple()))
 
     def test_invalid_first_entry(self):
         """
         Raises error if first entry is not DRAINING entry
         """
-        feed = self.feed.format("Node successfully updated with ENABLED", self.updated)
+        feed = self.feed.format("Node successfully updated with ENABLED",
+                                self.updated)
         self.assertRaises(ValueError, extract_CLB_drained_at, feed)
 
 
-class GetLBContentsTests(SynchronousTestCase):
+class GetCLBContentsTests(SynchronousTestCase):
     """
     Tests for :func:`otter.convergence.get_clb_contents`
     """
@@ -355,197 +368,124 @@ class GetLBContentsTests(SynchronousTestCase):
                      description=make_desc(lb_id='2'))])
 
 
-class ToNovaServerTests(SynchronousTestCase):
+class GetRCv3ContentsTests(SynchronousTestCase):
     """
-    Tests for :func:`to_nova_server`
+    Tests for :func:`otter.convergence.get_rcv3_contents`
     """
-    def setUp(self):
+    def get_dispatcher(self, service_request_mappings):
         """
-        Sample servers
+        Set up an empty dictionary of intents to fake responses, and set up
+        the dispatcher.
         """
-        self.createds = [('2020-10-10T10:00:00Z', 1602324000),
-                         ('2020-10-20T11:30:00Z', 1603193400)]
-        self.links = [
-            [{'href': 'link1', 'rel': 'self'},
-             {'href': 'otherlink1', 'rel': 'bookmark'}],
-            [{'href': 'link2', 'rel': 'self'},
-             {'href': 'otherlink2', 'rel': 'bookmark'}]
-        ]
-        self.servers = [{'id': 'a',
-                         'status': 'ACTIVE',
-                         'created': self.createds[0][0],
-                         'image': {'id': 'valid_image'},
-                         'flavor': {'id': 'valid_flavor'},
-                         'links': self.links[0]},
-                        {'id': 'b',
-                         'status': 'BUILD',
-                         'image': {'id': 'valid_image'},
-                         'flavor': {'id': 'valid_flavor'},
-                         'created': self.createds[1][0],
-                         'addresses': {'private': [{'addr': u'10.0.0.1',
-                                                    'version': 4}]},
-                         'links': self.links[1]}]
-
-    def test_without_address(self):
-        """
-        Handles server json that does not have "addresses" in it.
-        """
-        self.assertEqual(
-            to_nova_server(self.servers[0]),
-            NovaServer(id='a',
-                       state=ServerState.ACTIVE,
-                       image_id='valid_image',
-                       flavor_id='valid_flavor',
-                       created=self.createds[0][1],
-                       servicenet_address='',
-                       links=freeze(self.links[0])))
-
-    def test_without_private(self):
-        """
-        Creates server that does not have private/servicenet IP in it.
-        """
-        self.servers[0]['addresses'] = {'public': 'p'}
-        self.assertEqual(
-            to_nova_server(self.servers[0]),
-            NovaServer(id='a',
-                       state=ServerState.ACTIVE,
-                       image_id='valid_image',
-                       flavor_id='valid_flavor',
-                       created=self.createds[0][1],
-                       servicenet_address='',
-                       links=freeze(self.links[0])))
-
-    def test_with_servicenet(self):
-        """
-        Create server that has servicenet IP in it.
-        """
-        self.assertEqual(
-            to_nova_server(self.servers[1]),
-            NovaServer(id='b',
-                       state=ServerState.BUILD,
-                       image_id='valid_image',
-                       flavor_id='valid_flavor',
-                       created=self.createds[1][1],
-                       servicenet_address='10.0.0.1',
-                       links=freeze(self.links[1])))
-
-    def test_without_image_id(self):
-        """
-        Create server that has missing image in it in various ways.
-        (for the case of BFV)
-        """
-        for image in ({}, {'id': None}):
-            self.servers[0]['image'] = image
+        @sync_performer
+        def unwrap_retry(_, retry_intent):
             self.assertEqual(
-                to_nova_server(self.servers[0]),
-                NovaServer(id='a',
-                           state=ServerState.ACTIVE,
-                           image_id=None,
-                           flavor_id='valid_flavor',
-                           created=self.createds[0][1],
-                           servicenet_address='',
-                           links=freeze(self.links[0])))
-        del self.servers[0]['image']
+                retry_intent.should_retry,
+                ShouldDelayAndRetry(
+                    can_retry=retry_times(5),
+                    next_interval=exponential_backoff_interval(2)))
+            return retry_intent.effect
+
+        eq_dispatcher = EQDispatcher
+        if callable(service_request_mappings[0][-1]):
+            eq_dispatcher = EQFDispatcher
+
+        return ComposedDispatcher([
+            TypeDispatcher({
+                Retry: unwrap_retry,
+                ParallelEffects: perform_parallel_async
+            }),
+            eq_dispatcher(service_request_mappings)
+        ])
+
+    def test_returns_flat_list_of_rcv3nodes(self):
+        """
+        All the nodes returned are in a flat list.
+        """
+        dispatcher = self.get_dispatcher([
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools').intent,
+             (None, [{'id': str(i)} for i in range(2)])),
+
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools/0/nodes').intent,
+             (None,
+              [{'id': "0node{0}".format(i),
+                'cloud_server': {'id': '0server{0}'.format(i)}}
+               for i in range(2)])),
+
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools/1/nodes').intent,
+             (None,
+              [{'id': "1node{0}".format(i),
+                'cloud_server': {'id': '1server{0}'.format(i)}}
+               for i in range(2)])),
+        ])
+
         self.assertEqual(
-            to_nova_server(self.servers[0]),
-            NovaServer(id='a',
-                       state=ServerState.ACTIVE,
-                       image_id=None,
-                       flavor_id='valid_flavor',
-                       created=self.createds[0][1],
-                       servicenet_address='',
-                       links=freeze(self.links[0])))
+            sorted(sync_perform(dispatcher, get_rcv3_contents())),
+            sorted(
+                [RCv3Node(node_id='0node0', cloud_server_id='0server0',
+                          description=RCv3Description(lb_id='0')),
+                 RCv3Node(node_id='0node1', cloud_server_id='0server1',
+                          description=RCv3Description(lb_id='0')),
+                 RCv3Node(node_id='1node0', cloud_server_id='1server0',
+                          description=RCv3Description(lb_id='1')),
+                 RCv3Node(node_id='1node1', cloud_server_id='1server1',
+                          description=RCv3Description(lb_id='1'))]))
 
-    def test_with_lb_metadata(self):
+    def test_no_lb_pools_returns_no_nodes(self):
         """
-        Create a server that has load balancer config metadata in it.
-        The only desired load balancers created are the ones with valid
-        data.
+        If there are no load balancer pools, there are no nodes.
         """
-        self.servers[0]['metadata'] = {
-            # correct lb config
-            'rax:autoscale:lb:CloudLoadBalancer:01234':
-            '[{"port":80},{"port":90}]',
-            # two correct lbconfigs and one incorrect one
-            'rax:autoscale:lb:CloudLoadBalancer:12345':
-            '[{"port":80},{"bad":"1"},{"port":90}]',
-            # a dictionary instead of a list
-            'rax:autoscale:lb:CloudLoadBalancer:23456': '{"port": 80}',
-            # not even valid json
-            'rax:autoscale:lb:CloudLoadBalancer:34567': 'invalid json string'
-        }
+        dispatcher = self.get_dispatcher([(
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            'load_balancer_pools').intent,
+            (None, [])
+        )])
         self.assertEqual(
-            to_nova_server(self.servers[0]),
-            NovaServer(id='a',
-                       state=ServerState.ACTIVE,
-                       image_id='valid_image',
-                       flavor_id='valid_flavor',
-                       created=self.createds[0][1],
-                       desired_lbs=pset([
-                           CLBDescription(lb_id='01234', port=80),
-                           CLBDescription(lb_id='01234', port=90)]),
-                       servicenet_address='',
-                       links=freeze(self.links[0])))
+            sync_perform(dispatcher, get_rcv3_contents()), [])
+
+    def test_no_nodes_on_lbs_no_nodes(self):
+        """
+        If there are no nodes on each of the load balancer pools, there are no
+        nodes returned overall.
+        """
+        dispatcher = self.get_dispatcher([
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools').intent,
+             (None, [{'id': str(i)} for i in range(2)])),
+
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools/0/nodes').intent,
+             (None, [])),
+
+            (service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                             'load_balancer_pools/1/nodes').intent,
+             (None, []))
+        ])
+
+        self.assertEqual(
+            sync_perform(dispatcher, get_rcv3_contents()), [])
+
+    def test_rackconnect_not_supported_on_tenant(self):
+        """
+        If RackConnectV3 is not supported, return no nodes.
+        """
+        def no_endpoint(intent):
+            raise NoSuchEndpoint(service_name='RackConnect', region='DFW')
+
+        dispatcher = self.get_dispatcher([(
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            'load_balancer_pools').intent,
+            no_endpoint
+        )])
+        self.assertEqual(
+            sync_perform(dispatcher, get_rcv3_contents()), [])
 
 
-class IPAddressTests(SynchronousTestCase):
-    """
-    Tests for utility functions that extract IP addresses from server
-    dicts.
-    """
-    def setUp(self):
-        """
-        Set up a bunch of addresses and a server dict.
-        """
-        self.addresses = {
-            'private': [
-                {'addr': '192.168.1.1', 'version': 4},
-                {'addr': '10.0.0.1', 'version': 4},
-                {'addr': '10.0.0.2', 'version': 4},
-                {'addr': '::1', 'version': 6}
-            ],
-            'public': [
-                {'addr': '50.50.50.50', 'version': 4},
-                {'addr': '::::', 'version': 6}
-            ]}
-        self.server_dict = {'addresses': self.addresses}
-
-    def test_private_ipv4_addresses(self):
-        """
-        :func:`_private_ipv4_addresses` returns all private IPv4 addresses
-        from a complete server body.
-        """
-        result = _private_ipv4_addresses(self.server_dict)
-        self.assertEqual(result, ['192.168.1.1', '10.0.0.1', '10.0.0.2'])
-
-    def test_no_private_ip_addresses(self):
-        """
-        :func:`_private_ipv4_addresses` returns an empty list if the given
-        server has no private IPv4 addresses.
-        """
-        del self.addresses["private"]
-        result = _private_ipv4_addresses(self.server_dict)
-        self.assertEqual(result, [])
-
-    def test_servicenet_address(self):
-        """
-        :func:`_servicenet_address` returns the correct ServiceNet
-        address, which is the first IPv4 address in the ``private``
-        group in the 10.x.x.x range.
-
-        It even does this when there are other addresses in the
-        ``private`` group. This happens when the tenant specifies
-        their own network named ``private``.
-        """
-        self.assertEqual(_servicenet_address(self.server_dict), "10.0.0.1")
-
-    def test_no_servicenet_address(self):
-        """
-        :func:`_servicenet_address` returns :data:`None` if the server has no
-        ServiceNet address.
-        """
-        del self.addresses["private"]
-        self.assertEqual(_servicenet_address(self.server_dict), "")
+def _constant_as_eff(constant):
+    return lambda: Effect(Stub(Constant(constant)))
 
 
 class GetAllConvergenceDataTests(SynchronousTestCase):
@@ -573,17 +513,19 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         ]
 
     def test_success(self):
-        """The data is returned as a tuple of ([NovaServer], [CLBNode])."""
-        lb_nodes = [CLBNode(node_id='node1', address='ip1',
-                            description=CLBDescription(lb_id='lb1', port=80))]
-
-        get_servers = lambda: Effect(Stub(Constant({'gid': self.servers})))
-        get_lb = lambda: Effect(Stub(Constant(lb_nodes)))
+        """
+        The data is returned as a tuple of ([NovaServer], [CLBNode/RCv3Node]).
+        """
+        clb_nodes = [CLBNode(node_id='node1', address='ip1',
+                             description=CLBDescription(lb_id='lb1', port=80))]
+        rcv3_nodes = [RCv3Node(node_id='node2', cloud_server_id='a',
+                               description=RCv3Description(lb_id='lb2'))]
 
         eff = get_all_convergence_data(
             'gid',
-            get_scaling_group_servers=get_servers,
-            get_clb_contents=get_lb)
+            get_scaling_group_servers=_constant_as_eff({'gid': self.servers}),
+            get_clb_contents=_constant_as_eff(clb_nodes),
+            get_rcv3_contents=_constant_as_eff(rcv3_nodes))
 
         expected_servers = [
             NovaServer(id='a',
@@ -601,19 +543,18 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                        servicenet_address='10.0.0.2',
                        links=freeze([{'href': 'link2', 'rel': 'self'}]))
         ]
-        self.assertEqual(resolve_stubs(eff), (expected_servers, lb_nodes))
+        self.assertEqual(resolve_stubs(eff),
+                         (expected_servers, clb_nodes + rcv3_nodes))
 
     def test_no_group_servers(self):
         """
         If there are no servers in a group, get_all_convergence_data includes
         an empty list.
         """
-        get_servers = lambda: Effect(Stub(Constant({})))
-        get_lb = lambda: Effect(Stub(Constant([])))
-
         eff = get_all_convergence_data(
             'gid',
-            get_scaling_group_servers=get_servers,
-            get_clb_contents=get_lb)
+            get_scaling_group_servers=_constant_as_eff({}),
+            get_clb_contents=_constant_as_eff([]),
+            get_rcv3_contents=_constant_as_eff([]))
 
         self.assertEqual(resolve_stubs(eff), ([], []))

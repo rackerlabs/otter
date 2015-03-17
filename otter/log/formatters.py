@@ -5,7 +5,25 @@ import json
 import time
 from datetime import datetime
 
+from pyrsistent import pmap
+
 from twisted.python.failure import Failure
+
+
+THROTTLED_MESSAGES = [
+    pmap({'system': 'kazoo', 'message': ('Received Ping',)}),
+    pmap({'system': 'kazoo',
+          'message': ('Sending request(xid=-2): Ping()',)}),
+    pmap({
+        'system': 'otter.silverberg',
+        'message': ('CQL query executed successfully',),
+        'query': (
+            'SELECT "tenantId", "groupId", "policyId", "trigger", '
+            'cron, version FROM scaling_schedule_v2 '
+            'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')}),
+]
+
+THROTTLE_COUNT = 50
 
 
 class LoggingEncoder(json.JSONEncoder):
@@ -42,7 +60,10 @@ def JSONObserverWrapper(observer, **kwargs):
     :rtype: :class:`ILogObserver`
     """
     def JSONObserver(eventDict):
-        observer({'message': (json.dumps(eventDict, cls=LoggingEncoder, **kwargs),)})
+        if 'message' in eventDict:
+            eventDict['message'] = ''.join(eventDict['message'])
+        observer({'message': (json.dumps(eventDict,
+                                         cls=LoggingEncoder, **kwargs),)})
 
     return JSONObserver
 
@@ -123,8 +144,9 @@ def PEP3101FormattingWrapper(observer):
     return PEP3101FormattingObserver
 
 
-IGNORE_FIELDS = set(["message", "time", "isError", "system", "id", "failure",
-                     "why", "audit_log"])
+ERROR_FIELDS = {"isError", "failure", "why"}
+
+PRIMITIVE_FIELDS = {"time", "system", "id", "audit_log", "message"}
 
 AUDIT_LOG_FIELDS = {
     "audit_log": bool,
@@ -215,6 +237,48 @@ def audit_log_formatter(eventDict, timestamp, hostname):
     return audit_log_params
 
 
+def ErrorFormattingWrapper(observer):
+    """
+    Return log observer that will format error if any and delegate it to
+    given `observer`.
+
+    If the event contains error, the formatter forms a decent message from
+    "failure" and "why" and replaces that as message if the event does not
+    already contain one. It also adds traceback and exception_type and removes
+    existing error fields: "isError", "why" and "failure". "level" is also
+    updated if not already found.
+    """
+
+    def error_formatting_observer(event):
+
+        message = ""
+
+        if event.get("isError", False):
+            level = 3
+
+            if 'failure' in event:
+                excp = event['failure'].value
+                message = repr(excp)
+                event['traceback'] = event['failure'].getTraceback()
+                event['exception_type'] = excp.__class__.__name__
+
+            if 'why' in event and event['why']:
+                message = '{0}: {1}'.format(event['why'], message)
+
+        else:
+            level = 6
+
+        event.update({
+            "message": (''.join(event.get("message", '')) or message, ),
+            "level": event.get("level", level)
+        })
+        [event.pop(k, None) for k in ERROR_FIELDS]
+
+        observer(event)
+
+    return error_formatting_observer
+
+
 def ObserverWrapper(observer, hostname, seconds=None):
     """
     Create a log observer that will format messages and delegate to
@@ -232,7 +296,6 @@ def ObserverWrapper(observer, hostname, seconds=None):
         seconds = time.time
 
     def Observer(eventDict):
-        message = None
 
         log_params = {
             "@version": 1,
@@ -240,37 +303,12 @@ def ObserverWrapper(observer, hostname, seconds=None):
             "@timestamp": datetime.fromtimestamp(
                 eventDict.get("time", seconds())).isoformat(),
             "otter_facility": eventDict.get("system", "otter"),
+            "message": eventDict["message"]
         }
 
-        if eventDict.get("isError", False):
-            level = 3
-
-            if 'failure' in eventDict:
-                message = repr(eventDict['failure'].value)
-                log_params['traceback'] = eventDict['failure'].getTraceback()
-
-            if 'why' in eventDict and eventDict['why']:
-                message = '{0}: {1}'.format(eventDict['why'], message)
-
-        else:
-            level = 6
-
-        if not message:
-            message = eventDict["message"][0] if eventDict["message"] else ""
-
-        log_params.update({
-            "message": message,
-            "level": eventDict.get("level", level),
-        })
-
-        if "file" in eventDict:
-            log_params["file"] = eventDict["file"]
-        if "line" in eventDict:
-            log_params["line"] = eventDict["line"]
-
         for key, value in eventDict.iteritems():
-            if key not in IGNORE_FIELDS:
-                log_params["%s" % (key, )] = value
+            if key not in PRIMITIVE_FIELDS:
+                log_params[key] = value
 
         # emit an audit log entry also, if it's an audit log
         if 'audit_log' in eventDict:
@@ -281,3 +319,38 @@ def ObserverWrapper(observer, hostname, seconds=None):
         observer(log_params)
 
     return Observer
+
+
+def throttling_wrapper(observer):
+    """
+    An observer that throttles specific messages so they don't spam the logs.
+    """
+    event_counts = {template: 0 for template in THROTTLED_MESSAGES}
+    observer = observer
+
+    def _get_matching_template(event):
+        for template in THROTTLED_MESSAGES:
+            if _match(event, template):
+                return template
+
+    def _match(event, template):
+        """See if a log event matches a throttled message template."""
+        for k, v in template.items():
+            if (k not in event) or (event[k] != template[k]):
+                return False
+        return True
+
+    def emit(event):
+        event = event.copy()
+        template = _get_matching_template(event)
+        if template is not None:
+            event_counts[template] += 1
+            if event_counts[template] >= THROTTLE_COUNT:
+                event['num_duplicate_throttled'] = (
+                    event_counts[template])
+                event_counts[template] = 0
+                return observer(event)
+        else:
+            return observer(event)
+
+    return emit

@@ -32,8 +32,8 @@ from twisted.internet.task import deferLater
 from twisted.python.failure import Failure
 
 from otter.auth import public_endpoint_url
-from otter.convergence.gathering import _servicenet_address
-from otter.convergence.steps import set_server_name
+from otter.convergence.model import _servicenet_address
+from otter.convergence.steps import UnexpectedServerStatus, set_server_name
 from otter.util import logging_treq as treq
 from otter.util.config import config_value
 from otter.util.deferredutils import log_with_time, retry_and_timeout
@@ -52,22 +52,6 @@ LB_MAX_RETRIES = 10
 
 # Range from which random retry interval is got
 LB_RETRY_INTERVAL_RANGE = [10, 15]
-
-
-class UnexpectedServerStatus(Exception):
-    """
-    An exception to be raised when a server is found in an unexpected state.
-    """
-    def __init__(self, server_id, status, expected_status):
-        super(UnexpectedServerStatus, self).__init__(
-            'Expected {server_id} to have {expected_status}, '
-            'has {status}'.format(server_id=server_id,
-                                  status=status,
-                                  expected_status=expected_status)
-        )
-        self.server_id = server_id
-        self.status = status
-        self.expected_status = expected_status
 
 
 class ServerDeleted(Exception):

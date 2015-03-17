@@ -3,17 +3,17 @@ Mixins and utilities to be used for testing.
 """
 import json
 import os
-from functools import partial
+from functools import partial, wraps
 from inspect import getargspec
 
-from effect import base_dispatcher
+from effect import base_dispatcher, sync_performer
 from effect.testing import (
     resolve_effect as eff_resolve_effect,
     resolve_stubs as eff_resolve_stubs)
 
 import mock
 
-from pyrsistent import freeze
+from pyrsistent import freeze, pmap
 
 from testtools.matchers import MatchesException, Mismatch
 
@@ -24,9 +24,10 @@ from twisted.internet import defer
 from twisted.internet.defer import Deferred, maybeDeferred, succeed
 from twisted.python.failure import Failure
 
-from zope.interface import directlyProvides, implementer
+from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
 
+from otter.cloud_client import concretize_service_request
 from otter.log.bound import BoundLog
 from otter.models.interface import IScalingGroup
 from otter.supervisor import ISupervisor
@@ -147,6 +148,9 @@ class CheckFailure(object):
         return isinstance(other, Failure) and other.check(
             self.exception_type)
 
+    def __ne__(self, other):
+        return not self == other
+
 
 class CheckFailureValue(object):
     """
@@ -161,9 +165,13 @@ class CheckFailureValue(object):
 
     def __eq__(self, other):
         matcher = MatchesException(self.exception)
-        return (isinstance(other, Failure)
-                and other.check(type(self.exception)) is not None
-                and matcher.match((type(other.value), other.value, None)) is None)
+        return (
+            isinstance(other, Failure) and
+            other.check(type(self.exception)) is not None and
+            matcher.match((type(other.value), other.value, None)) is None)
+
+    def __ne__(self, other):
+        return not self == other
 
 
 class IsCallable(object):
@@ -199,13 +207,43 @@ def iMock(*ifaces, **kwargs):
         as a provider of the interface
     :rtype: :class:``mock.MagicMock``
     """
-    if 'spec' in kwargs:
-        del kwargs['spec']
-
     all_names = [name for iface in ifaces for name in iface.names()]
+
+    attribute_kwargs = pmap()
+    for k, v in list(kwargs.iteritems()):
+        result = k.split('.', 1)
+        if result[0] in all_names:
+            attribute_kwargs = attribute_kwargs.set_in(result, v)
+            kwargs.pop(k)
+
+    kwargs.pop('spec', None)
 
     imock = mock.MagicMock(spec=all_names, **kwargs)
     directlyProvides(imock, *ifaces)
+
+    # autospec all the methods on the interface, and set attributes to None
+    # (just something not callable)
+    for iface in ifaces:
+        for attr in iface:
+            if isinstance(iface[attr], interface.Method):
+                # We need to create a fake function for mock to autospec,
+                # since mock does some magic with introspecting function
+                # signatures - can't a full function signature to a  mock
+                # constructor (eg. positional args, defaults, etc.) - so
+                # just using a lambda here.  So sorry.
+                fake_func = eval("lambda {0}: None".format(
+                    iface[attr].getSignatureString().strip('()')))
+                wraps(iface[attr])(fake_func)
+
+                fmock = mock.create_autospec(
+                    fake_func,
+                    **dict(attribute_kwargs.get(attr, {})))
+
+                setattr(imock, attr, fmock)
+
+            elif isinstance(iface[attr], interface.Attribute):
+                setattr(imock, attr, attribute_kwargs.get(attr, None))
+
     return imock
 
 
@@ -312,7 +350,11 @@ def mock_log(*args, **kwargs):
     Since in all likelyhood, testing that certain values are bound would be
     more important than testing the exact logged message.
     """
-    return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
+    msg = mock.Mock(spec=[])
+    msg.return_value = None
+    err = mock.Mock(spec=[])
+    err.return_value = None
+    return BoundLog(msg, err)
 
 
 class StubResponse(object):
@@ -636,3 +678,75 @@ def defaults_by_name(fn):
     """Returns a mapping of args of fn to their default values."""
     args, _, _, defaults = getargspec(fn)
     return dict(zip(reversed(args), reversed(defaults)))
+
+
+class FakePartitioner(Service):
+    """A fake version of a :obj:`Partitioner`."""
+    def __init__(self, log, callback):
+        self.log = log
+        self.got_buckets = callback
+        self.health = (True, {'buckets': []})
+
+    def reset_path(self, new_path):
+        return 'partitioner reset to {}'.format(new_path)
+
+    def health_check(self):
+        return defer.succeed(self.health)
+
+
+def transform_eq(transformer, rhs):
+    """
+    Return an object that can be compared to another object after transforming
+    that other object.
+
+    :param transformer: a function that takes the compared objects and returns
+        a transformed version
+    :param rhs: the actual data that should be compared with the result of
+        transforming the compared object
+    """
+    class Foo(object):
+        def __eq__(self, other):
+            return transformer(other) == rhs
+
+        def __ne__(self, other):
+            return not self == other
+
+    return Foo()
+
+
+def get_fake_service_request_performer(stub_response):
+    """
+    For sanity's sake, attempt to fake performing a service request, including
+    predicate handlers, so we can also test the predicate handlers.
+
+    :param service_request: the :class:`ServiceRequest` to "perform"
+    :param stub_response: a tuple of (:class:`StubResponse`, string body),
+        supposedly the "response" of an http request
+    """
+    if not isinstance(stub_response, basestring):
+        try:
+            stub_response = (stub_response[0], json.dumps(stub_response[-1]))
+        except TypeError:
+            stub_response = (stub_response[0], str(stub_response[-1]))
+
+    @sync_performer
+    def the_performer(_, service_request_intent):
+        service_configs = mock.MagicMock()
+        service_configs.__getitem__.return_value = {
+            'name': 'service_name',
+            'region': 'region',
+            'url': 'http://url'
+        }
+        eff = concretize_service_request(
+            authenticator=mock.MagicMock(),
+            log=mock.MagicMock(),
+            service_configs=service_configs,
+            tenant_id='000000',
+            service_request=service_request_intent)
+
+        # "authenticate"
+        eff = resolve_effect(eff, ('token', []))
+        # make request
+        return resolve_effect(eff, stub_response)
+
+    return the_performer
