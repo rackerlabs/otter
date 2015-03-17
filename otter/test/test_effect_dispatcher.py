@@ -10,10 +10,10 @@ from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import Authenticate, InvalidateToken
+from otter.cloud_client import TenantScope
 from otter.effect_dispatcher import (
     get_cql_dispatcher, get_full_dispatcher, get_legacy_dispatcher,
     get_simple_dispatcher)
-from otter.http import TenantScope
 from otter.models.cass import CQLQueryExecute
 from otter.models.intents import GetScalingGroupInfo
 from otter.util.pure_http import Request

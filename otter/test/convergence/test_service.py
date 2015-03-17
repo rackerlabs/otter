@@ -14,6 +14,7 @@ from pyrsistent import freeze, pmap, pset, s
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.cloud_client import TenantScope, service_request
 from otter.constants import CONVERGENCE_DIRTY_DIR, ServiceType
 from otter.convergence.model import (
     CLBDescription, CLBNode, NovaServer, ServerState, StepResult)
@@ -26,7 +27,6 @@ from otter.convergence.service import (
     determine_active, execute_convergence, get_my_divergent_groups,
     make_lock_set,
     non_concurrently)
-from otter.http import TenantScope, service_request
 from otter.models.intents import (
     GetScalingGroupInfo, ModifyGroupState, perform_modify_group_state)
 from otter.models.interface import GroupState, NoSuchScalingGroupError

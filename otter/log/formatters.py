@@ -5,7 +5,25 @@ import json
 import time
 from datetime import datetime
 
+from pyrsistent import pmap
+
 from twisted.python.failure import Failure
+
+
+THROTTLED_MESSAGES = [
+    pmap({'system': 'kazoo', 'message': ('Received Ping',)}),
+    pmap({'system': 'kazoo',
+          'message': ('Sending request(xid=-2): Ping()',)}),
+    pmap({
+        'system': 'otter.silverberg',
+        'message': ('CQL query executed successfully',),
+        'query': (
+            'SELECT "tenantId", "groupId", "policyId", "trigger", '
+            'cron, version FROM scaling_schedule_v2 '
+            'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')}),
+]
+
+THROTTLE_COUNT = 50
 
 
 class LoggingEncoder(json.JSONEncoder):
@@ -301,3 +319,38 @@ def ObserverWrapper(observer, hostname, seconds=None):
         observer(log_params)
 
     return Observer
+
+
+def throttling_wrapper(observer):
+    """
+    An observer that throttles specific messages so they don't spam the logs.
+    """
+    event_counts = {template: 0 for template in THROTTLED_MESSAGES}
+    observer = observer
+
+    def _get_matching_template(event):
+        for template in THROTTLED_MESSAGES:
+            if _match(event, template):
+                return template
+
+    def _match(event, template):
+        """See if a log event matches a throttled message template."""
+        for k, v in template.items():
+            if (k not in event) or (event[k] != template[k]):
+                return False
+        return True
+
+    def emit(event):
+        event = event.copy()
+        template = _get_matching_template(event)
+        if template is not None:
+            event_counts[template] += 1
+            if event_counts[template] >= THROTTLE_COUNT:
+                event['num_duplicate_throttled'] = (
+                    event_counts[template])
+                event_counts[template] = 0
+                return observer(event)
+        else:
+            return observer(event)
+
+    return emit

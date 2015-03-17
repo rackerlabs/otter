@@ -45,6 +45,7 @@ class Partitioner(MultiService):
         ts = TimerService(interval, self.check_partition)
         ts.setServiceParent(self)
         ts.clock = clock
+        self._old_buckets = []
 
     def _new_partitioner(self):
         return self.kz_client.SetPartitioner(
@@ -103,12 +104,12 @@ class Partitioner(MultiService):
             return
 
         buckets = self._get_current_buckets()
-        # TODO: This log might feel like spam since it'll occur on every
-        # tick. But it'll be useful to debug partitioning problems (at least in
-        # initial deployment)
-        self.log.msg('Got buckets {buckets}', buckets=buckets,
-                     path=self.partitioner_path,
-                     otter_msg_type='partition-acquired')
+        if buckets != self._old_buckets:
+            self.log.msg('Got buckets {buckets}', buckets=buckets,
+                         path=self.partitioner_path,
+                         old_buckets=self._old_buckets,
+                         otter_msg_type='partition-acquired')
+            self._old_buckets = buckets
         self.got_buckets(buckets)
 
     def health_check(self):

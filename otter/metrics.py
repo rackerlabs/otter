@@ -28,10 +28,10 @@ from twisted.internet.endpoints import clientFromString
 from twisted.python import usage
 
 from otter.auth import generate_authenticator
+from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType, get_service_configs
 from otter.convergence.gathering import get_scaling_group_servers
 from otter.effect_dispatcher import get_full_dispatcher
-from otter.http import TenantScope, service_request
 from otter.log import log as otter_log
 from otter.util.fp import predicate_all
 

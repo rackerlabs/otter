@@ -16,13 +16,13 @@ import six
 
 from twisted.application.service import MultiService, Service
 
+from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState
 from otter.convergence.planning import plan
-from otter.http import TenantScope
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
 from otter.models.interface import NoSuchScalingGroupError
 from otter.util.fp import assoc_obj
