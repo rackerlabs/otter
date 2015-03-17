@@ -110,7 +110,7 @@ def perform_delete_node(kz_client, dispatcher, intent):
     :param dispatcher: dispatcher, supplied by perform
     :param DeleteNode intent: the intent
     """
-    kz_client.delete(intent.path, version=intent.version)
+    return kz_client.delete(intent.path, version=intent.version)
 
 
 def get_zk_dispatcher(kz_client):
