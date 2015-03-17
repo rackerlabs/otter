@@ -7,6 +7,8 @@ from effect.async import perform_parallel_async
 from effect.ref import Reference, reference_dispatcher
 from effect.testing import EQDispatcher, EQFDispatcher
 
+from kazoo.exceptions import BadVersionError
+
 import mock
 
 from pyrsistent import freeze, pmap, pset, s
@@ -236,6 +238,35 @@ class ConvergeOneTests(SynchronousTestCase):
             'converge-non-fatal-error',
             tenant_id=self.tenant_id, group_id=self.group_id)
         self.assertEqual(self.deletions, [])
+
+    def test_delete_node_version_mismatch(self):
+        """
+        When the version of the dirty flag changes during a call to
+        converge_one_group, and DeleteNode raises a BadVersionError, the error
+        is logged and nothing else is cleaned up.
+        """
+        dispatcher = ComposedDispatcher([
+            EQFDispatcher([
+                (DeleteNode(path='/groups/divergent/tenant-id_g1',
+                            version=self.version),
+                 lambda i: raise_(BadVersionError()))
+            ]),
+            _get_dispatcher(),
+            ])
+
+        def execute_convergence(tenant_id, group_id, log):
+            return Effect(Constant('foo'))
+
+        eff = converge_one_group(
+            self.log, make_lock_set(), self.tenant_id, self.group_id,
+            self.version,
+            execute_convergence=execute_convergence)
+        result = sync_perform(dispatcher, eff)
+        self.assertEqual(result, None)
+        self.log.err.assert_any_call(
+            CheckFailureValue(BadVersionError()),
+            'mark-clean-failure',
+            tenant_id=self.tenant_id, group_id=self.group_id)
 
 
 class ConvergeAllTests(SynchronousTestCase):
