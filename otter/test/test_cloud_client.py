@@ -1,4 +1,4 @@
-"""Tests for otter.http."""
+"""Tests for otter.cloud_client"""
 
 import json
 from functools import partial
