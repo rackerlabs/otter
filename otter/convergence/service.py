@@ -293,6 +293,8 @@ def get_my_divergent_groups(my_buckets, all_buckets):
             if _stable_hash(info['tenant_id']) % num_buckets in my_buckets)
         return list(converging)
 
+    # This is inefficient since we're getting stat information about nodes that
+    # we don't necessarily care about, but this is convenient for now.
     eff = Effect(GetChildrenWithStats(CONVERGENCE_DIRTY_DIR))
     return eff.on(got_children_with_stats)
 
