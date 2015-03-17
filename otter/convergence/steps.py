@@ -1,5 +1,4 @@
 """Steps for convergence."""
-import json
 import re
 
 from functools import partial
@@ -22,9 +21,11 @@ from otter.constants import ServiceType
 from otter.convergence.model import StepResult
 from otter.util.fp import predicate_any
 from otter.util.hashkey import generate_server_name
-from otter.util.http import APIError, append_segments
+from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.retry import (
-    exponential_backoff_interval, retry_effect, retry_times)
+    exponential_backoff_interval,
+    retry_effect,
+    retry_times)
 
 
 class IStep(Interface):
@@ -54,20 +55,6 @@ def set_server_name(server_config_args, name_suffix):
     return server_config_args.set_in(('server', 'name'), name)
 
 
-def _try_json_message(maybe_json_error, keys):
-    """
-    Attemp to grab the message body from possibly a JSON error body.  If
-    invalid JSON, or if the JSON is of an unexpected format (keys are not
-    found), `None` is returned.
-    """
-    try:
-        error_body = json.loads(maybe_json_error)
-    except (ValueError, TypeError):
-        return None
-    else:
-        return get_in(keys, error_body, None)
-
-
 def _forbidden_plaintext(message):
     return re.compile(
         "^403 Forbidden\n\nAccess was denied to this resource\.\n\n ({0})$"
@@ -94,14 +81,14 @@ def _parse_nova_user_error(api_error):
     :rtype: `str` or `None`
     """
     if api_error.code == 400:
-        message = _try_json_message(api_error.body,
-                                    ("badRequest", "message"))
+        message = try_json_with_keys(api_error.body,
+                                     ("badRequest", "message"))
         if message:
             return message
 
     elif api_error.code == 403:
-        message = _try_json_message(api_error.body,
-                                    ("forbidden", "message"))
+        message = try_json_with_keys(api_error.body,
+                                     ("forbidden", "message"))
         if message:
             return message
 

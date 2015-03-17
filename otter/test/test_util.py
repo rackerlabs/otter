@@ -11,17 +11,23 @@ from twisted.internet.task import Clock
 from twisted.python.failure import Failure
 from twisted.web.http_headers import Headers
 
-from otter.util.http import (
-    append_segments, APIError, check_success, headers,
-    raise_error_on_code, wrap_request_error, RequestError, UpstreamError,
-    retry_on_unauth)
-from otter.util.hashkey import generate_capability
-from otter.util import timestamp, config
-from otter.util.deferredutils import with_lock, delay, TimedOutError
-
-from otter.test.utils import (
-    patch, LockMixin, mock_log, DummyException, IsBoundWith, matches)
 from otter.log.bound import BoundLog
+from otter.test.utils import (
+    DummyException, IsBoundWith, LockMixin, matches, mock_log, patch)
+from otter.util import config, timestamp
+from otter.util.deferredutils import TimedOutError, delay, with_lock
+from otter.util.hashkey import generate_capability
+from otter.util.http import (
+    APIError,
+    RequestError,
+    UpstreamError,
+    append_segments,
+    check_success,
+    headers,
+    raise_error_on_code,
+    retry_on_unauth,
+    try_json_with_keys,
+    wrap_request_error)
 
 
 class HTTPUtilityTests(SynchronousTestCase):
@@ -219,6 +225,32 @@ class HTTPUtilityTests(SynchronousTestCase):
         failure = Failure(Exception())
         self.assertRaises(RequestError, wrap_request_error,
                           failure, 'url')
+
+    def test_try_json_with_keys_success(self):
+        """
+        ``try_json_with_keys`` will attempt to load some JSON, and pull
+        the value at the given key set out.
+        """
+        json_blob = {'this': {'is': {'a': {'deeply': {'nested': 'dict'}}}}}
+        message = try_json_with_keys(json.dumps(json_blob),
+                                     ('this', 'is', 'a', 'deeply', 'nested'))
+        self.assertEqual(message, 'dict')
+
+    def test_try_json_with_keys_invalid_json(self):
+        """
+        ``try_json_with_keys``, if given invalid JSON, will return None as a
+        message
+        """
+        self.assertIsNone(try_json_with_keys('s', ('s',)))
+
+    def test_try_json_with_keys_no_such_key(self):
+        """
+        ``try_json_with_keys``, if given valid JSON, but keys that are not
+        present in the loaded JSON, will return None as a message
+        """
+        self.assertIsNone(try_json_with_keys(json.dumps([1, 2, 3]), ('a',)))
+        self.assertIsNone(
+            try_json_with_keys(json.dumps({'a': [1, 2, 3]}), ('a', 4)))
 
 
 class UpstreamErrorTests(SynchronousTestCase):
