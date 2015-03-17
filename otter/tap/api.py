@@ -276,10 +276,9 @@ def makeService(config):
                 stop=partial(call_after_supervisor,
                              kz_client.stop, supervisor)))
 
-            # setup ConvergenceStarter service
-            converger_service = ConvergenceStarter(dispatcher)
-            s.addService(converger_service)
-            set_convergence_starter(converger_service)
+            # set up ConvergenceStarter object
+            starter = ConvergenceStarter(dispatcher)
+            set_convergence_starter(starter)
 
             setup_converger(s, kz_client, dispatcher)
 

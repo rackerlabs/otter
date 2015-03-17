@@ -201,7 +201,7 @@ def delete_divergent_flag(log, tenant_id, group_id, version):
         error=lambda e: log.err(exc_info_to_failure(e), 'mark-clean-failure'))
 
 
-class ConvergenceStarter(Service, object):
+class ConvergenceStarter(object):
     """
     A service that allows indicating that a group has diverged and needs
     convergence, but does not do the converging itself (see :obj:`Converger`
