@@ -340,23 +340,22 @@ class AddNodesToCLB(object):
         def report_success(result):
             return StepResult.SUCCESS, []
 
-        def report_failure(result):
+        def report_api_failure(result):
             """
-            If the error is a 422 - PENDING UPDATE, retry.  Otherwise, fail.
+            If the error is a 404 or 422 PENDING_DELETE then fail.
+            Otherwise, retry.
             """
             err_type, error, traceback = result
-            if err_type == APIError and error.code == 413:
-                # over-limit, retry
-                return StepResult.RETRY, [error]
-            if err_type == APIError and error.code == 422:
-                # body has already become JSON
-                message = error.body.get("message", None)
-                if message and _CLB_PENDING_UPDATE_PATTERN.search(message):
-                    return StepResult.RETRY, [error]
+            if error.code == 404:
+                return StepResult.FAILURE, [error]
+            if error.code == 422:
+                message = error.body.get('message')
+                if message and _CLB_DELETED_PATTERN.search(message):
+                    return StepResult.FAILURE, [error]
+            return StepResult.RETRY, [error]
 
-            return StepResult.FAILURE, [error]
-
-        return eff.on(success=report_success, error=report_failure)
+        return eff.on(success=report_success,
+                      error=catch(APIError, report_api_failure))
 
 
 @implementer(IStep)
