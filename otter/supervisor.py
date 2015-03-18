@@ -108,21 +108,25 @@ class SupervisorService(object, Service):
                                            self.service_configs)
         lb_region = config_value('regionOverrides.cloudLoadBalancers')
 
-        log.msg("Authenticating for tenant")
-        d = self.authenticator.authenticate_tenant(tenant_id, log=log)
+        def authenticate():
+            log.msg("Authenticating for tenant")
+            d = self.authenticator.authenticate_tenant(tenant_id, log=log)
 
-        def when_authenticated((auth_token, service_catalog)):
-            bag = RequestBag(
-                lb_region=lb_region or self.region,
-                region=self.region,
-                dispatcher=dispatcher,
-                tenant_id=tenant_id,
-                auth_token=auth_token,
-                service_catalog=service_catalog
-            )
-            return bag
+            def when_authenticated((auth_token, service_catalog)):
+                bag = RequestBag(
+                    lb_region=lb_region or self.region,
+                    region=self.region,
+                    dispatcher=dispatcher,
+                    tenant_id=tenant_id,
+                    auth_token=auth_token,
+                    service_catalog=service_catalog
+                )
+                bag.re_auth = authenticate
+                return bag
 
-        return d.addCallback(when_authenticated)
+            return d.addCallback(when_authenticated)
+
+        return authenticate()
 
     def execute_config(self, log, transaction_id, scaling_group, launch_config):
         """

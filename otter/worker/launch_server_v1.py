@@ -655,7 +655,6 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
                                           cloudServersOpenStack,
                                           request_func.region)
 
-    auth_token = request_func.auth_token
     lb_config = launch_config.get('loadBalancers', [])
     server_config = launch_config['server']
 
@@ -675,7 +674,7 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
                         nova_metadata=result)
         return server
 
-    def wait_for_server(server):
+    def wait_for_server(server, auth_token):
         server_id = server['server']['id']
 
         # NOTE: If server create is retried, each server delete will be pushed
@@ -691,20 +690,24 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
             auth_token,
             server_id).addCallback(check_metadata)
 
-    def add_lb(server):
+    def add_lb(server, new_request_func):
         if lb_config:
             lbd = add_to_load_balancers(
-                ilog[0], request_func, lb_config, server, undo)
+                ilog[0], new_request_func, lb_config, server, undo)
             lbd.addCallback(lambda lb_response: (server, lb_response))
             return lbd
 
         return (server, [])
 
-    def _create_server():
+    def _real_create_server(new_request_func):
+        auth_token = new_request_func.auth_token
         d = create_server(server_endpoint, auth_token, server_config, log=log)
-        d.addCallback(wait_for_server)
-        d.addCallback(add_lb)
+        d.addCallback(wait_for_server, auth_token)
+        d.addCallback(add_lb, new_request_func)
         return d
+
+    def create_server():
+        return request_func.re_auth().addCallback(_real_create_server)
 
     def check_error(f):
         f.trap(UnexpectedServerStatus)
@@ -712,12 +715,12 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
             log.msg('{server_id} errored, deleting and creating new server instead',
                     server_id=f.value.server_id)
             # trigger server delete and return True to allow retry
-            verified_delete(log, server_endpoint, auth_token, f.value.server_id)
+            verified_delete(log, server_endpoint, request_func, f.value.server_id)
             return True
         else:
             return False
 
-    d = retry(_create_server, can_retry=compose_retries(retry_times(3), check_error),
+    d = retry(create_server, can_retry=compose_retries(retry_times(3), check_error),
               next_interval=repeating_interval(15), clock=clock)
 
     return d
@@ -887,7 +890,7 @@ def _as_new_style_instance_details(maybe_old_style):
     return server_id, updated_lb_specs
 
 
-def delete_and_verify(log, server_endpoint, auth_token, server_id):
+def delete_and_verify(log, server_endpoint, request_bag, server_id):
     """
     Check the status of the server to see if it's actually been deleted.
     Succeeds only if it has been either deleted (404) or acknowledged by Nova
@@ -899,11 +902,12 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
     """
     path = append_segments(server_endpoint, 'servers', server_id)
 
-    def delete():
-        del_d = treq.delete(path, headers=headers(auth_token), log=log)
+    def delete(request_bag):
+        del_d = treq.delete(path, headers=headers(request_bag.auth_token),
+                            log=log)
         del_d.addCallback(check_success, [404])
         del_d.addCallback(treq.content)
-        return del_d
+        return del_d.addErrback(verify, request_bag.auth_token)
 
     def check_task_state(json_blob):
         server_details = json_blob['server']
@@ -911,7 +915,7 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
         if is_deleting.strip().lower() != "deleting":
             raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
 
-    def verify(f):
+    def verify(f, auth_token):
         f.trap(APIError)
         if f.value.code != 204:
             return wrap_request_error(f, path, 'delete_server')
@@ -921,12 +925,12 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
         ver_d.addErrback(lambda f: f.trap(ServerDeleted))
         return ver_d
 
-    return delete().addErrback(verify)
+    return request_bag.re_auth().addCallback(delete)
 
 
 def verified_delete(log,
                     server_endpoint,
-                    auth_token,
+                    request_bag,
                     server_id,
                     exp_start=2,
                     max_retries=10,
@@ -958,7 +962,7 @@ def verified_delete(log,
         clock = reactor
 
     d = retry(
-        partial(delete_and_verify, serv_log, server_endpoint, auth_token, server_id),
+        partial(delete_and_verify, serv_log, server_endpoint, request_bag, server_id),
         can_retry=retry_times(max_retries),
         next_interval=exponential_backoff_interval(exp_start),
         clock=clock)
