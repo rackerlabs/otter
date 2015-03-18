@@ -7,7 +7,6 @@ This launch config worker is responsible for:
 2) Adding the server to a load balancer.
 
 On delete, this worker:
-0) (TODO) Puts the server into draining mode on the load balancer
 1) Removes the the server from the load balancer(s)
 2) Deletes the server
 
@@ -413,13 +412,13 @@ def check_deleted_clb(f, clb_id, node_id=None):
     return f
 
 
-def add_to_load_balancer(log, request_func, lb_config, server_details, undo,
+def add_to_load_balancer(log, request_bag, lb_config, server_details, undo,
                          clock=None):
     """
     Adds a given server to a given load balancer.
 
     :param log: A bound logger.
-    :param callable request_func: A request function.
+    :param callable request_bag: A request function.
     :param str lb_config: An ``lb_config`` dictionary specifying which load
         balancer to add the server to.
     :param dict server_details: The server details, as returned by Nova.
@@ -429,17 +428,17 @@ def add_to_load_balancer(log, request_func, lb_config, server_details, undo,
     lb_type = lb_config.get("type", "CloudLoadBalancer")
     if lb_type == "CloudLoadBalancer":
         cloudLoadBalancers = config_value('cloudLoadBalancers')
-        endpoint = public_endpoint_url(request_func.service_catalog,
+        endpoint = public_endpoint_url(request_bag.service_catalog,
                                        cloudLoadBalancers,
-                                       request_func.lb_region)
-        auth_token = request_func.auth_token
+                                       request_bag.lb_region)
+        auth_token = request_bag.auth_token
         ip_address = _servicenet_address(server_details["server"])
         return add_to_clb(log, endpoint, auth_token, lb_config, ip_address,
                           undo, clock)
     elif lb_type == "RackConnectV3":
         lb_id = lb_config["loadBalancerId"]
         server_id = server_details["server"]["id"]
-        return add_to_rcv3(request_func, lb_id, server_id)
+        return add_to_rcv3(request_bag, lb_id, server_id)
     else:
         raise RuntimeError("Unknown cloud load balancer type! config: {}"
                            .format(lb_config))
@@ -499,12 +498,12 @@ def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=Non
     return d.addCallback(treq.json_content).addCallback(when_done)
 
 
-def add_to_load_balancers(log, request_func, lb_configs, server, undo):
+def add_to_load_balancers(log, request_bag, lb_configs, server, undo):
     """
     Add the given server to the load balancers specified by ``lb_configs``.
 
     :param log: A bound logger.
-    :param callable request_func: A request function.
+    :param callable request_bag: A request function.
     :param list lb_configs: List of lb_config dictionaries.
     :param dict server: Server dict of the server to add, as per server details
         response from Nova.
@@ -513,7 +512,7 @@ def add_to_load_balancers(log, request_func, lb_configs, server, undo):
     :return: Deferred that fires with a list of 2-tuples of the load
         balancer configuration, and that load balancer's respective response.
     """
-    _add = partial(add_to_load_balancer, log, request_func,
+    _add = partial(add_to_load_balancer, log, request_bag,
                    server_details=server, undo=undo)
 
     dl = DeferredLock()
@@ -632,13 +631,14 @@ def scrub_otter_metadata(log, auth_token, service_catalog, region, server_id,
             .addCallback(_treq.content))
 
 
-def launch_server(log, request_func, scaling_group, launch_config, undo, clock=None):
+def launch_server(log, request_bag, scaling_group, launch_config, undo, clock=None):
     """
     Launch a new server given the launch config auth tokens and service catalog.
     Possibly adding the newly launched server to a load balancer.
 
     :param BoundLog log: A bound logger.
-    :param callable request_func: A request function.
+    :param request_bag: An object with a bunch of useful data on it, including
+        a callable to re-auth and get a new token.
     :param IScalingGroup scaling_group: The scaling group to add the launched
         server to.
     :param dict launch_config: A launch_config args structure as defined for
@@ -651,9 +651,9 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
     cloudServersOpenStack = config_value('cloudServersOpenStack')
-    server_endpoint = public_endpoint_url(request_func.service_catalog,
+    server_endpoint = public_endpoint_url(request_bag.service_catalog,
                                           cloudServersOpenStack,
-                                          request_func.region)
+                                          request_bag.region)
 
     lb_config = launch_config.get('loadBalancers', [])
     server_config = launch_config['server']
@@ -690,24 +690,24 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
             auth_token,
             server_id).addCallback(check_metadata)
 
-    def add_lb(server, new_request_func):
+    def add_lb(server, new_request_bag):
         if lb_config:
             lbd = add_to_load_balancers(
-                ilog[0], new_request_func, lb_config, server, undo)
+                ilog[0], new_request_bag, lb_config, server, undo)
             lbd.addCallback(lambda lb_response: (server, lb_response))
             return lbd
 
         return (server, [])
 
-    def _real_create_server(new_request_func):
-        auth_token = new_request_func.auth_token
+    def _real_create_server(new_request_bag):
+        auth_token = new_request_bag.auth_token
         d = create_server(server_endpoint, auth_token, server_config, log=log)
         d.addCallback(wait_for_server, auth_token)
-        d.addCallback(add_lb, new_request_func)
+        d.addCallback(add_lb, new_request_bag)
         return d
 
     def create_server():
-        return request_func.re_auth().addCallback(_real_create_server)
+        return request_bag.re_auth().addCallback(_real_create_server)
 
     def check_error(f):
         f.trap(UnexpectedServerStatus)
@@ -715,7 +715,7 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
             log.msg('{server_id} errored, deleting and creating new server instead',
                     server_id=f.value.server_id)
             # trigger server delete and return True to allow retry
-            verified_delete(log, server_endpoint, request_func, f.value.server_id)
+            verified_delete(log, server_endpoint, request_bag, f.value.server_id)
             return True
         else:
             return False
@@ -726,13 +726,13 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
     return d
 
 
-def remove_from_load_balancer(log, request_func, lb_config, lb_response,
+def remove_from_load_balancer(log, request_bag, lb_config, lb_response,
                               clock=None):
     """
     Remove a node from a load balancer.
 
     :param BoundLog log: A bound logger.
-    :param callable request_func: A request function.
+    :param request_bag: A request function.
     :param dict lb_config: An ``lb_config`` dictionary.
     :param lb_response: The response the load balancer provided when the server
         being removed was added. Type and shape is dependant on type of load
@@ -746,10 +746,10 @@ def remove_from_load_balancer(log, request_func, lb_config, lb_response,
     lb_type = lb_config.get("type", "CloudLoadBalancer")
     if lb_type == "CloudLoadBalancer":
         cloudLoadBalancers = config_value('cloudLoadBalancers')
-        endpoint = public_endpoint_url(request_func.service_catalog,
+        endpoint = public_endpoint_url(request_bag.service_catalog,
                                        cloudLoadBalancers,
-                                       request_func.lb_region)
-        auth_token = request_func.auth_token
+                                       request_bag.lb_region)
+        auth_token = request_bag.auth_token
         loadbalancer_id = lb_config["loadBalancerId"]
         node_id = next(node_info["id"] for node_info in lb_response["nodes"])
         return _remove_from_clb(log, endpoint, auth_token, loadbalancer_id,
@@ -757,7 +757,7 @@ def remove_from_load_balancer(log, request_func, lb_config, lb_response,
     elif lb_type == "RackConnectV3":
         lb_id = lb_config["loadBalancerId"]
         node_id = next(pair["cloud_server"]["id"] for pair in lb_response)
-        return remove_from_rcv3(request_func, lb_id, node_id)
+        return remove_from_rcv3(request_bag, lb_id, node_id)
     else:
         raise RuntimeError("Unknown cloud load balancer type! config: {}"
                            .format(lb_config))
@@ -804,14 +804,14 @@ def _remove_from_clb(log, endpoint, auth_token, loadbalancer_id, node_id, clock=
     return d
 
 
-def delete_server(log, request_func, instance_details):
+def delete_server(log, request_bag, instance_details):
     """
     Delete the server specified by instance_details.
 
     TODO: Load balancer draining.
 
     :param BoundLog log: A bound logger.
-    :param callable request_func: A request function.
+    :param callable request_bag: A request function.
     :param tuple instance_details: A 2-tuple of the server_id and a list of
         2-tuples of load balancer configurations and respective load balancer
         responses. Example for some CLB load balancers::
@@ -834,7 +834,7 @@ def delete_server(log, request_func, instance_details):
     :return: TODO
 
     """
-    _remove_from_lb = partial(remove_from_load_balancer, log, request_func)
+    _remove_from_lb = partial(remove_from_load_balancer, log, request_bag)
     server_id, lb_details = _as_new_style_instance_details(instance_details)
     d = gatherResults([_remove_from_lb(lb_config, lb_response)
                        for (lb_config, lb_response) in lb_details],
@@ -842,10 +842,10 @@ def delete_server(log, request_func, instance_details):
 
     def when_removed_from_loadbalancers(_ignore):
         cloudServersOpenStack = config_value('cloudServersOpenStack')
-        server_endpoint = public_endpoint_url(request_func.service_catalog,
+        server_endpoint = public_endpoint_url(request_bag.service_catalog,
                                               cloudServersOpenStack,
-                                              request_func.region)
-        auth_token = request_func.auth_token
+                                              request_bag.region)
+        auth_token = request_bag.auth_token
         return verified_delete(log, server_endpoint, auth_token, server_id)
 
     d.addCallback(when_removed_from_loadbalancers)
