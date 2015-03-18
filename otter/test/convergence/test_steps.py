@@ -513,7 +513,7 @@ class StepAsEffectTests(SynchronousTestCase):
 
     def test_add_nodes_to_clb_success_response_codes(self):
         """
-        :obj:`AddNodesToCLB` only accepts 202, 413, and some 422 responses.
+        :obj:`AddNodesToCLB` succeeds on 202 or if duplicate nodes are detected
         """
         lb_id = "12345"
         lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
@@ -544,8 +544,8 @@ class StepAsEffectTests(SynchronousTestCase):
 
     def test_add_nodes_to_clb_failure_response_codes(self):
         """
-        :obj:`AddNodesToCLB` retries on 422 Pending Update responses, and
-        fails on non-202, non-413 errors, non-422 recognized responses.
+        :obj:`AddNodesToCLB` returns FAILURE on 404 or 422 PENDING_DELETE and
+        returns RETRY on any other error.
         """
         lb_id = "12345"
         lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
@@ -560,27 +560,18 @@ class StepAsEffectTests(SynchronousTestCase):
                 }),
                 request)
 
-        # Retry on pending update or on over-limit
+        # Fail on 404 or 422 PENDING_DELETE
+        self.assertEqual(get_result(StubResponse(404, {}), ''),
+                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
         self.assertEqual(
             get_result(
                 StubResponse(422, {}),
                 {
                     "message": "Load Balancer '12345' has a status of "
-                               "'PENDING_UPDATE' and is considered immutable.",
+                               "'PENDING_DELETE' and is considered immutable.",
                     "code": 422
                 }),
-            (StepResult.RETRY, [matches(IsInstance(APIError))]))
-
-        self.assertEqual(get_result(StubResponse(413, {}), ''),
-                         (StepResult.RETRY, [matches(IsInstance(APIError))]))
-
-        # Fail on everything else
-        self.assertEqual(get_result(StubResponse(404, {}), ''),
-                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
-
-        self.assertEqual(get_result(StubResponse(400, {}), ''),
-                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
-
+            (StepResult.FAILURE, [matches(IsInstance(APIError))]))
         self.assertEqual(
             get_result(
                 StubResponse(422, {}),
@@ -591,15 +582,25 @@ class StepAsEffectTests(SynchronousTestCase):
                 }),
             (StepResult.FAILURE, [matches(IsInstance(APIError))]))
 
+        # Retry on everything else
         self.assertEqual(
             get_result(
                 StubResponse(422, {}),
                 {
                     "message": "Load Balancer '12345' has a status of "
-                               "'PENDING_DELETE' and is considered immutable.",
+                               "'PENDING_UPDATE' and is considered immutable.",
                     "code": 422
                 }),
-            (StepResult.FAILURE, [matches(IsInstance(APIError))]))
+            (StepResult.RETRY, [matches(IsInstance(APIError))]))
+        self.assertEqual(get_result(StubResponse(413, {}), ''),
+                         (StepResult.RETRY, [matches(IsInstance(APIError))]))
+        self.assertEqual(get_result(StubResponse(500, {}), ''),
+                         (StepResult.RETRY, [matches(IsInstance(APIError))]))
+        self.assertEqual(
+            resolve_effect(
+                request, service_request_error_response(ValueError('no')),
+                is_error=True),
+            (StepResult.RETRY, [matches(IsInstance(ValueError))]))
 
     def test_remove_nodes_from_clb(self):
         """
