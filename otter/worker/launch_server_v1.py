@@ -845,8 +845,7 @@ def delete_server(log, request_bag, instance_details):
         server_endpoint = public_endpoint_url(request_bag.service_catalog,
                                               cloudServersOpenStack,
                                               request_bag.region)
-        auth_token = request_bag.auth_token
-        return verified_delete(log, server_endpoint, auth_token, server_id)
+        return verified_delete(log, server_endpoint, request_bag, server_id)
 
     d.addCallback(when_removed_from_loadbalancers)
     return d
