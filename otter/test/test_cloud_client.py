@@ -275,6 +275,19 @@ class PerformServiceRequestTests(SynchronousTestCase):
                 (Exception, Exception("Cannot make request!"), None),
                 is_error=True)
 
+    def test_raises_original_error_if_error_parser_doesnt_raise(self):
+        """
+        If the error parser provided does not raise an error, the original
+        error is raised.
+        """
+        parsers = {ServiceType.CLOUD_SERVERS: lambda *a: None}
+
+        eff = self._concrete(self.svcreq, service_error_parsers=parsers)
+        next_eff = resolve_authenticate(eff)
+        with self.assertRaises(APIError):
+            resolve_effect(
+                next_eff, stub_pure_response("FOO", 400))
+
 
 class PerformTenantScopeTests(SynchronousTestCase):
     """Tests for :func:`perform_tenant_scope`."""

@@ -13,6 +13,8 @@ from effect import (
     perform,
     sync_performer)
 
+import six
+
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.util.http import APIError
 from otter.util.http import headers as otter_headers
@@ -154,9 +156,16 @@ def _add_service_error_parsing(parser, request_func):
     if parser is None:
         return request_func
 
+    def call_parser(excinfo):
+        # ensures that if the parser doesn't raise another exception,
+        # the original exception is raised
+        parser(excinfo)
+        six.reraise(*excinfo)
+
     @wraps(request_func)
     def request(*args, **kwargs):
-        return request_func(*args, **kwargs).on(error=catch(APIError, parser))
+        return request_func(*args, **kwargs).on(
+            error=catch(APIError, call_parser))
 
     return request
 
@@ -176,6 +185,10 @@ def concretize_service_request(
     :param BoundLog log: info about requests will be logged to this.
     :param dict service_configs: As returned by
         :func:`otter.constants.get_service_configs`.
+    :param dict service_error_parsers: A mapping of service types to error
+        parsers, which should accept the excinfo tuple, and raise another
+        error (or the original) in its place.  If it doesn't raise an
+        error, the original error is re-raised.
     """
     if service_error_parsers is None:
         service_error_parsers = {}
