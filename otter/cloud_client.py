@@ -169,10 +169,10 @@ def concretize_service_request(
         else:
             request_ = add_bind_service(
                 catalog, service_name, region, log, request_)
-        if service_request.json_response:
-            request_ = add_json_response(request_)
         request_ = add_error_handling(
             service_request.success_pred, request_)
+        if service_request.json_response:
+            request_ = add_json_response(request_)
         return request_(
             service_request.method,
             service_request.url,

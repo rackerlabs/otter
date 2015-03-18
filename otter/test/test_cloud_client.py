@@ -177,6 +177,23 @@ class PerformServiceRequestTests(SynchronousTestCase):
         result = resolve_effect(next_eff, stub_response)
         self.assertEqual(result, stub_response)
 
+    def test_no_json_parsing_on_error(self):
+        """
+        Whatever ``json_response`` is set to, it is ignored, if the response
+        does not pass the success predicate (because errors may just be
+        HTML or otherwise not JSON parsable, even if the success response
+        would have been).
+        """
+        svcreq = service_request(ServiceType.CLOUD_SERVERS, "GET", "servers",
+                                 json_response=True).intent
+        eff = self._concrete(svcreq)
+        next_eff = resolve_authenticate(eff)
+        stub_response = stub_pure_response("THIS IS A FAILURE", 500)
+        with self.assertRaises(APIError) as cm:
+            resolve_effect(next_eff, stub_response)
+
+        self.assertEqual(cm.exception.body, "THIS IS A FAILURE")
+
 
 class PerformTenantScopeTests(SynchronousTestCase):
     """Tests for :func:`perform_tenant_scope`."""
