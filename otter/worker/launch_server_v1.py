@@ -674,20 +674,20 @@ def launch_server(log, request_bag, scaling_group, launch_config, undo, clock=No
                         nova_metadata=result)
         return server
 
-    def wait_for_server(server, auth_token):
+    def wait_for_server(server, new_request_bag):
         server_id = server['server']['id']
 
         # NOTE: If server create is retried, each server delete will be pushed
         # to undo stack even after it will be deleted in check_error which is fine
         # since verified_delete succeeds on deleted server
         undo.push(
-            verified_delete, log, server_endpoint, auth_token, server_id)
+            verified_delete, log, server_endpoint, new_request_bag, server_id)
 
         ilog[0] = log.bind(server_id=server_id)
         return wait_for_active(
             ilog[0],
             server_endpoint,
-            auth_token,
+            new_request_bag.auth_token,
             server_id).addCallback(check_metadata)
 
     def add_lb(server, new_request_bag):
@@ -702,11 +702,11 @@ def launch_server(log, request_bag, scaling_group, launch_config, undo, clock=No
     def _real_create_server(new_request_bag):
         auth_token = new_request_bag.auth_token
         d = create_server(server_endpoint, auth_token, server_config, log=log)
-        d.addCallback(wait_for_server, auth_token)
+        d.addCallback(wait_for_server, new_request_bag)
         d.addCallback(add_lb, new_request_bag)
         return d
 
-    def create_server():
+    def _create_server():
         return request_bag.re_auth().addCallback(_real_create_server)
 
     def check_error(f):
@@ -720,7 +720,7 @@ def launch_server(log, request_bag, scaling_group, launch_config, undo, clock=No
         else:
             return False
 
-    d = retry(create_server, can_retry=compose_retries(retry_times(3), check_error),
+    d = retry(_create_server, can_retry=compose_retries(retry_times(3), check_error),
               next_interval=repeating_interval(15), clock=clock)
 
     return d
