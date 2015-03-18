@@ -289,8 +289,9 @@ def _check_clb_422(*regex_matches):
         which it should be by default.
         """
         if response.code == 422:
-            message = content.get('message', '')
-            return any([regex.search(message) for regex in regex_matches])
+            message = try_json_with_keys(content, ('message',))
+            return any([regex.search(message or '')
+                        for regex in regex_matches])
         return False
 
     return check_response
@@ -349,8 +350,7 @@ class AddNodesToCLB(object):
                 # over-limit, retry
                 return StepResult.RETRY, [error]
             if err_type == APIError and error.code == 422:
-                # body has already become JSON
-                message = error.body.get("message", None)
+                message = try_json_with_keys(error.body, ("message",))
                 if message and _CLB_PENDING_UPDATE_PATTERN.search(message):
                     return StepResult.RETRY, [error]
 

@@ -640,42 +640,42 @@ class StepAsEffectTests(SynchronousTestCase):
         self.assertTrue(predicate(StubResponse(413, {}), None))
         self.assertTrue(predicate(
             StubResponse(422, {}),
-            {
+            json.dumps({
                 "message": "The load balancer is deleted and considered "
                            "immutable.",
                 "code": 422
-            }))
+            })))
         self.assertTrue(predicate(
             StubResponse(422, {}),
-            {
+            json.dumps({
                 "message": "Load Balancer '12345' has a status of "
                            "'PENDING_UPDATE' and is considered immutable.",
                 "code": 422
-            }))
+            })))
         self.assertTrue(predicate(
             StubResponse(422, {}),
-            {
+            json.dumps({
                 "message": "Load Balancer '12345' has a status of "
                            "'PENDING_DELETE' and is considered immutable.",
                 "code": 422
-            }))
+            })))
 
         self.assertFalse(predicate(StubResponse(404, {}), None))
         self.assertFalse(predicate(
             StubResponse(422, {}),
-            {
+            json.dumps({
                 "message": "Duplicate nodes detected. One or more "
                            "nodes already configured on load "
                            "balancer.",
                 "code": 422
-            }))
+            })))
         # This one is just malformed but similar to a good message.
         self.assertFalse(predicate(
             StubResponse(422, {}),
-            {
+            json.dumps({
                 "message": "The load balancer is considered immutable.",
                 "code": 422
-            }))
+            })))
 
     def test_remove_nodes_from_clb_retry(self):
         """
