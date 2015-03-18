@@ -5,8 +5,13 @@ from functools import wraps
 
 from characteristic import attributes
 
-from effect import (ComposedDispatcher, Effect, TypeDispatcher, perform,
-                    sync_performer)
+from effect import (
+    ComposedDispatcher,
+    Effect,
+    TypeDispatcher,
+    catch,
+    perform,
+    sync_performer)
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.util.http import headers as otter_headers
@@ -135,10 +140,29 @@ class TenantScope(object):
         self.tenant_id = tenant_id
 
 
+def _add_service_error_parsing(parser, request_func):
+    """
+    If a parser for API errors is found, use it to parse service API errors.
+
+    :param callable parser: A function which takes a tuple of exc info, to
+        be called when the request function raises an :class:`APIError`.
+    :param callable request_func: The request function to decorate
+
+    If there is no parser, does nothing.
+    """
+    if parser is None:
+        return request_func
+
+    request = lambda *args, **kwargs: request_func(*args, **kwargs).on(
+        error=catch(APIError, parser))
+    return wraps(request_func)(request)
+
+
 def concretize_service_request(
         authenticator, log, service_configs,
         tenant_id,
-        service_request):
+        service_request,
+        service_error_parsers=None):
     """
     Translate a high-level :obj:`ServiceRequest` into a low-level :obj:`Effect`
     of :obj:`pure_http.Request`. This doesn't directly conform to the Intent
@@ -150,6 +174,9 @@ def concretize_service_request(
     :param dict service_configs: As returned by
         :func:`otter.constants.get_service_configs`.
     """
+    if service_error_parsers is None:
+        service_error_parsers = {}
+
     auth_eff = Effect(Authenticate(authenticator, tenant_id, log))
     invalidate_eff = Effect(InvalidateToken(authenticator, tenant_id))
     if service_request.log is not None:
@@ -173,6 +200,8 @@ def concretize_service_request(
             service_request.success_pred, request_)
         if service_request.json_response:
             request_ = add_json_response(request_)
+        request_ = _add_service_error_parsing(
+            service_error_parsers.get(service_request.service_type), request_)
         return request_(
             service_request.method,
             service_request.url,
