@@ -196,6 +196,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         Mock treq.post for adding nodes
         """
         super(AddToCLBTests, self).setUp()
+        self.auth_token = self.request_bag.auth_token
         self.json_content = {'nodes': [{'id': 1}]}
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
                           new=mock_treq(code=200, json_content=self.json_content,
@@ -374,7 +375,7 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.successResultOf(d)
         self.undo.push.assert_called_once_with(
             _remove_from_clb, matches(IsInstance(self.log.__class__)),
-            'http://dfw.lbaas/', 'my-auth-token',
+            'http://dfw.lbaas/', self.auth_token,
             self.lb_config["loadBalancerId"], 1)
 
     def test_doesnt_push_onto_undo_stack_on_failure(self):
@@ -400,6 +401,7 @@ class AddToLoadBalancerTests(LoadBalancersTestsMixin, SynchronousTestCase):
         Set up :class:`AddToLoadBalancerTests`.
         """
         super(AddToLoadBalancerTests, self).setUp()
+        self.auth_token = self.request_bag.auth_token
         self.lb_config = None
         self.patch(launch_server_v1, "add_to_rcv3", self._fake_add_to_rcv3)
         self.patch(launch_server_v1, "add_to_clb", self._fake_add_to_clb)
@@ -2397,8 +2399,9 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         code is a 404.
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
-        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
                               'serverId')
+        self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 0)
         self.successResultOf(d)
@@ -2411,8 +2414,9 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.delete.return_value = succeed(mock.Mock(code=204))
         self.treq.get.return_value = succeed(mock.Mock(code=404))
 
-        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
                               'serverId')
+        self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
         self.successResultOf(d)
@@ -2427,8 +2431,9 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.json_content.return_value = succeed(
             {'server': {'OS-EXT-STS:task_state': 'deleting'}})
 
-        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
                               'serverId')
+        self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
         self.successResultOf(d)
@@ -2443,8 +2448,9 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.json_content.return_value = succeed(
             {'server': {'OS-EXT-STS:task_state': 'build'}})
 
-        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
                               'serverId')
+        self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
         self.failureResultOf(d, UnexpectedServerStatus)
@@ -2458,8 +2464,9 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({'server': {}})
 
-        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
                               'serverId')
+        self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
         self.failureResultOf(d, UnexpectedServerStatus)
@@ -2471,8 +2478,9 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=500))
 
-        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
                               'serverId')
+        self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 0)
         self.failureResultOf(d, RequestError)
@@ -2485,8 +2493,9 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.delete.return_value = succeed(mock.Mock(code=204))
         self.treq.get.return_value = succeed(mock.Mock(code=500))
 
-        d = delete_and_verify(self.log, 'http://url/', 'my-auth-token',
+        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
                               'serverId')
+        self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
         self.failureResultOf(d, RequestError)
@@ -2503,8 +2512,9 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
             self, 'otter.worker.launch_server_v1.delete_and_verify')
         delete_and_verify.side_effect = lambda *a, **kw: fail(Exception("bad"))
 
-        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', exp_start=2, max_retries=2, clock=self.clock)
+        d = verified_delete(self.log, 'http://url/', self.request_bag,
+                            'serverId', exp_start=2, max_retries=2,
+                            clock=self.clock)
         self.assertEqual(delete_and_verify.call_count, 1)
         self.assertNoResult(d)
 
@@ -2514,7 +2524,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.assertEqual(
             delete_and_verify.mock_calls,
             [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
-                       'my-auth-token', 'serverId')] * 2)
+                       self.request_bag, 'serverId')] * 2)
         self.successResultOf(d)
 
         # the loop has stopped
@@ -2535,8 +2545,9 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
             self, 'otter.worker.launch_server_v1.delete_and_verify')
         delete_and_verify.side_effect = lambda *a, **kw: fail(DummyException("bad"))
 
-        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', exp_start=2, max_retries=2, clock=self.clock)
+        d = verified_delete(self.log, 'http://url/', self.request_bag,
+                            'serverId', exp_start=2, max_retries=2,
+                            clock=self.clock)
         self.assertNoResult(d)
 
         self.clock.advance(2)
@@ -2547,8 +2558,8 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.failureResultOf(d, DummyException)
         self.assertEqual(
             delete_and_verify.mock_calls,
-            [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
-                       'my-auth-token', 'serverId')] * 3)
+            [mock.call(matches(IsBoundWith(server_id='serverId')),
+                       'http://url/', self.request_bag, 'serverId')] * 3)
 
         # the loop has stopped
         self.clock.pump([16, 32])

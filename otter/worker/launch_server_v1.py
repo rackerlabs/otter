@@ -961,7 +961,8 @@ def verified_delete(log,
         clock = reactor
 
     d = retry(
-        partial(delete_and_verify, serv_log, server_endpoint, request_bag, server_id),
+        partial(delete_and_verify, serv_log, server_endpoint, request_bag,
+                server_id),
         can_retry=retry_times(max_retries),
         next_interval=exponential_backoff_interval(exp_start),
         clock=clock)
