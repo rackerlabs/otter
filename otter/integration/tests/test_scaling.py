@@ -202,7 +202,7 @@ class TestScaling(unittest.TestCase):
         """
         rcs = TestResources()
 
-        def create_1st_load_balancer(self):
+        def create_1st_load_balancer():
             """First, we authenticate and create a single load balancer."""
             self.clb1 = cloud_load_balancer.CloudLoadBalancer(pool=self.pool)
 
