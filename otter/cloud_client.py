@@ -154,9 +154,11 @@ def _add_service_error_parsing(parser, request_func):
     if parser is None:
         return request_func
 
-    request = lambda *args, **kwargs: request_func(*args, **kwargs).on(
-        error=catch(APIError, parser))
-    return wraps(request_func)(request)
+    @wraps(request_func)
+    def request(*args, **kwargs):
+        return request_func(*args, **kwargs).on(error=catch(APIError, parser))
+
+    return request
 
 
 def concretize_service_request(
