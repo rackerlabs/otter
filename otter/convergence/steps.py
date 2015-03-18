@@ -367,13 +367,8 @@ class AddNodesToCLB(object):
                     return StepResult.FAILURE, [error]
             return StepResult.RETRY, [error]
 
-        def report_retry((_t, error, tr)):
-            return StepResult.RETRY, [error]
-
-        return eff.on(
-            success=report_success,
-            error=catch(APIError, report_api_failure)).on(
-                error=report_retry)
+        return eff.on(success=report_success,
+                      error=catch(APIError, report_api_failure))
 
 
 @implementer(IStep)

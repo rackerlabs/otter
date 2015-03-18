@@ -582,7 +582,7 @@ class StepAsEffectTests(SynchronousTestCase):
                 }),
             (StepResult.FAILURE, [matches(IsInstance(APIError))]))
 
-        # Retry on everything else
+        # Retry on other API errors
         self.assertEqual(
             get_result(
                 StubResponse(422, {}),
@@ -596,11 +596,14 @@ class StepAsEffectTests(SynchronousTestCase):
                          (StepResult.RETRY, [matches(IsInstance(APIError))]))
         self.assertEqual(get_result(StubResponse(500, {}), ''),
                          (StepResult.RETRY, [matches(IsInstance(APIError))]))
-        self.assertEqual(
-            resolve_effect(
-                request, service_request_error_response(ValueError('no')),
-                is_error=True),
-            (StepResult.RETRY, [matches(IsInstance(ValueError))]))
+
+        # Any unknown errors are propogated
+        self.assertRaises(
+            ValueError,
+            resolve_effect,
+            request,
+            service_request_error_response(ValueError('no')),
+            is_error=True)
 
     def test_remove_nodes_from_clb(self):
         """
