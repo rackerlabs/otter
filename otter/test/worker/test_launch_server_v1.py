@@ -199,8 +199,10 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
         self.auth_token = self.request_bag.auth_token
         self.json_content = {'nodes': [{'id': 1}]}
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
-                          new=mock_treq(code=200, json_content=self.json_content,
-                                        content='{"message": "bad"}', method='post'))
+                          new=mock_treq(code=200,
+                                        json_content=self.json_content,
+                                        content='{"message": "bad"}',
+                                        method='post'))
         patch(self, 'otter.util.http.treq', new=self.treq)
         self.lb_config = {'loadBalancerId': 12345, 'port': 80}
 
@@ -310,8 +312,8 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
             [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes',
                        headers=expected_headers(self.auth_token),
                        data=mock.ANY,
-                       log=matches(IsInstance(self.log.__class__)))]
-            * (LB_MAX_RETRIES + 1))
+                       log=matches(IsInstance(self.log.__class__)))] *
+            (LB_MAX_RETRIES + 1))
         self.rand_interval.assert_called_once_with(*LB_RETRY_INTERVAL_RANGE)
 
     def failed_add_to_clb(self, code=500):
@@ -338,8 +340,8 @@ class AddToCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
             [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes',
                        headers=expected_headers(self.auth_token),
                        data=mock.ANY,
-                       log=matches(IsInstance(self.log.__class__)))]
-            * (self.max_retries + 1))
+                       log=matches(IsInstance(self.log.__class__)))] *
+            (self.max_retries + 1))
 
     def test_retries_log_unexpected_failure(self):
         """
@@ -755,8 +757,8 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
             self.treq.delete.mock_calls,
             [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/a',
                        headers=expected_headers(self.request_bag.auth_token),
-                       log=matches(IsInstance(self.log.__class__)))]
-            * (self.max_retries + 1))
+                       log=matches(IsInstance(self.log.__class__)))] *
+            (self.max_retries + 1))
         # Expected logs?
         self.assertEqual(self.log.msg.mock_calls[0],
                          mock.call('Removing from load balancer',
@@ -787,8 +789,8 @@ class RemoveFromCLBTests(LoadBalancersTestsMixin, SynchronousTestCase):
             self.treq.delete.mock_calls,
             [mock.call('http://dfw.lbaas/loadbalancers/12345/nodes/a',
                        headers=expected_headers(self.request_bag.auth_token),
-                       log=matches(IsInstance(self.log.__class__)))]
-            * (LB_MAX_RETRIES + 1))
+                       log=matches(IsInstance(self.log.__class__)))] *
+            (LB_MAX_RETRIES + 1))
         # Expected logs?
         self.assertEqual(self.log.msg.mock_calls[0],
                          mock.call('Removing from load balancer',
@@ -1619,8 +1621,14 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         log.bind.assert_called_once_with(server_id='1')
         add_to_load_balancers.assert_called_once_with(
             log.bind.return_value, self.bags[-1], prepared_load_balancers,
-            {'server': {'id': '1',
-                        'addresses': {'private': [{'version': 4, 'addr': '10.0.0.1'}]}}},
+            {
+                'server': {
+                    'id': '1',
+                    'addresses': {
+                        'private': [{'version': 4, 'addr': '10.0.0.1'}]
+                    }
+                }
+            },
             self.undo)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
@@ -1901,11 +1909,13 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.assertEqual(
             mock_vd.mock_calls,
             # the undo stack is not re-wound, so original request bag is used
-            [mock.call(matches(IsInstance(self.log.__class__)), 'http://dfw.openstack/',
+            [mock.call(matches(IsInstance(self.log.__class__)),
+                       'http://dfw.openstack/',
                        self.request_bag, '1')] * 2)
         self.assertEqual(
             self.log.msg.mock_calls,
-            [mock.call('{server_id} errored, deleting and creating new server instead',
+            [mock.call('{server_id} errored, deleting and creating '
+                       'new server instead',
                        server_name='as000000', server_id='1')] * 2)
         self.assertFalse(mock_addlb.called)
 
@@ -2523,7 +2533,8 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.clock.advance(2)
         self.assertEqual(
             delete_and_verify.mock_calls,
-            [mock.call(matches(IsBoundWith(server_id='serverId')), 'http://url/',
+            [mock.call(matches(IsBoundWith(server_id='serverId')),
+                       'http://url/',
                        self.request_bag, 'serverId')] * 2)
         self.successResultOf(d)
 
@@ -2543,7 +2554,8 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         """
         delete_and_verify = patch(
             self, 'otter.worker.launch_server_v1.delete_and_verify')
-        delete_and_verify.side_effect = lambda *a, **kw: fail(DummyException("bad"))
+        delete_and_verify.side_effect = (
+            lambda *a, **kw: fail(DummyException("bad")))
 
         d = verified_delete(self.log, 'http://url/', self.request_bag,
                             'serverId', exp_start=2, max_retries=2,

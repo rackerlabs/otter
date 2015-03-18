@@ -631,10 +631,11 @@ def scrub_otter_metadata(log, auth_token, service_catalog, region, server_id,
             .addCallback(_treq.content))
 
 
-def launch_server(log, request_bag, scaling_group, launch_config, undo, clock=None):
+def launch_server(log, request_bag, scaling_group, launch_config, undo,
+                  clock=None):
     """
-    Launch a new server given the launch config auth tokens and service catalog.
-    Possibly adding the newly launched server to a load balancer.
+    Launch a new server given the launch config auth tokens and service
+    catalog. Possibly adding the newly launched server to a load balancer.
 
     :param BoundLog log: A bound logger.
     :param request_bag: An object with a bunch of useful data on it, including
@@ -678,8 +679,8 @@ def launch_server(log, request_bag, scaling_group, launch_config, undo, clock=No
         server_id = server['server']['id']
 
         # NOTE: If server create is retried, each server delete will be pushed
-        # to undo stack even after it will be deleted in check_error which is fine
-        # since verified_delete succeeds on deleted server
+        # to undo stack even after it will be deleted in check_error which is
+        # fine since verified_delete succeeds on deleted server
         undo.push(
             verified_delete, log, server_endpoint, new_request_bag, server_id)
 
@@ -712,15 +713,17 @@ def launch_server(log, request_bag, scaling_group, launch_config, undo, clock=No
     def check_error(f):
         f.trap(UnexpectedServerStatus)
         if f.value.status == 'ERROR':
-            log.msg('{server_id} errored, deleting and creating new server instead',
-                    server_id=f.value.server_id)
+            log.msg('{server_id} errored, deleting and creating new '
+                    'server instead', server_id=f.value.server_id)
             # trigger server delete and return True to allow retry
-            verified_delete(log, server_endpoint, request_bag, f.value.server_id)
+            verified_delete(log, server_endpoint, request_bag,
+                            f.value.server_id)
             return True
         else:
             return False
 
-    d = retry(_create_server, can_retry=compose_retries(retry_times(3), check_error),
+    d = retry(_create_server,
+              can_retry=compose_retries(retry_times(3), check_error),
               next_interval=repeating_interval(15), clock=clock)
 
     return d
