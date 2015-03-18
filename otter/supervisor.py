@@ -128,7 +128,8 @@ class SupervisorService(object, Service):
 
         return authenticate()
 
-    def execute_config(self, log, transaction_id, scaling_group, launch_config):
+    def execute_config(self, log, transaction_id, scaling_group,
+                       launch_config):
         """
         see :meth:`ISupervisor.execute_config`
         """
