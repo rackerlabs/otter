@@ -14,6 +14,7 @@ from effect import (
     sync_performer)
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
+from otter.util.http import APIError
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
     add_bind_root,
