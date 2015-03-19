@@ -28,7 +28,7 @@ import json
 from twisted.internet import defer
 
 from otter.convergence.composition import tenant_is_enabled
-from otter.convergence.service import get_converger
+from otter.convergence.service import get_convergence_starter
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
 from otter.supervisor import exec_scale_down, execute_launch_config
@@ -148,21 +148,23 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
         are to be made to the group, None will synchronously be returned.
     """
     if tenant_is_enabled(scaling_group.tenant_id, config_value):
-        delta = apply_delta(log, state.desired, state, config, policy)
-        get_converger().start_convergence(log, scaling_group, state,
-                                          launch_config)
-        # Convergence must be run whether or not delta is 0, because delta will
-        # be zero when a group is created initially created with a non-zero
+        # Note that convergence must be run whether or not delta is 0, because
+        # delta will be zero when a group is initially created with a non-zero
         # min-entities (desired=min entities, so there is technically no
         # change).
 
         # For non-convergence tenants, the value used for desired-capacity is
         # the sum of active+pending, which is 0, so the delta ends up being
         # the min entities due to constraint calculation.
-        if delta == 0:
-            return None
-        else:
-            return defer.succeed(None)
+
+        apply_delta(log, state.desired, state, config, policy)
+        d = get_convergence_starter().start_convergence(
+            log, scaling_group.tenant_id, scaling_group.uuid)
+
+        # We honor start_convergence's deferred here so that we can communicate
+        # back a strong acknowledgement that a group has been marked dirty for
+        # convergence.
+        return d.addCallback(lambda _: state)
 
     delta = calculate_delta(log, state, config, policy)
     execute_log = log.bind(server_delta=delta)

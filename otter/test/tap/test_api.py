@@ -16,6 +16,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import CachingAuthenticator, SingleTenantAuthenticator
 from otter.constants import ServiceType, get_service_configs
+from otter.convergence.service import Converger
 from otter.log.cloudfeeds import CloudFeedsObserver
 from otter.models.cass import CassScalingGroupCollection as OriginalStore
 from otter.supervisor import SupervisorService, get_supervisor, set_supervisor
@@ -24,12 +25,14 @@ from otter.tap.api import (
     Options,
     call_after_supervisor,
     makeService,
+    setup_converger,
     setup_scheduler
 )
 from otter.test.test_auth import identity_config
 from otter.test.utils import CheckFailure, matches, patch
 from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
+from otter.util.zkpartitioner import Partitioner
 
 
 test_config = {
@@ -568,7 +571,11 @@ class APIMakeServiceTests(SynchronousTestCase):
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
-    def test_kazoo_client_stops(self, mock_txkz, mock_setup_scheduler):
+    @mock.patch('otter.tap.api.setup_converger')
+    def test_kazoo_client_stops(self,
+                                mock_setup_converger,
+                                mock_txkz,
+                                mock_setup_scheduler):
         """
         TxKazooClient is stopped when parent service stops
         """
@@ -590,7 +597,10 @@ class APIMakeServiceTests(SynchronousTestCase):
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
-    def test_kazoo_client_stops_after_supervisor(self, mock_txkz,
+    @mock.patch('otter.tap.api.setup_converger')
+    def test_kazoo_client_stops_after_supervisor(self,
+                                                 mock_setup_converger,
+                                                 mock_txkz,
                                                  mock_setup_scheduler):
         """
         Kazoo is stopped after supervisor stops
@@ -613,6 +623,27 @@ class APIMakeServiceTests(SynchronousTestCase):
         sd.callback(None)
         self.successResultOf(d)
         self.assertTrue(kz_client.stop.called)
+
+
+class ConvergerSetupTests(SynchronousTestCase):
+    """Tests for :func:`setup_converger`."""
+
+    def test_setup_converger(self):
+        """
+        Puts a :obj:`Converger` with a :obj:`Partitioner` in the given parent
+        service.
+        """
+        ms = MultiService()
+        kz_client = object()
+        dispatcher = object()
+        setup_converger(ms, kz_client, dispatcher)
+        [converger] = ms.services
+        self.assertIs(converger.__class__, Converger)
+        self.assertEqual(converger._dispatcher, dispatcher)
+        [partitioner] = converger.services
+        self.assertIs(partitioner.__class__, Partitioner)
+        self.assertIs(partitioner, converger.partitioner)
+        self.assertIs(partitioner.kz_client, kz_client)
 
 
 class SchedulerSetupTests(SynchronousTestCase):
