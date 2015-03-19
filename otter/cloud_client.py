@@ -16,6 +16,7 @@ from effect import (
 import six
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
+from otter.constants import ServiceType
 from otter.util.http import APIError
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
@@ -54,7 +55,7 @@ def service_request(
         params=None, log=None,
         reauth_codes=(401, 403),
         success_pred=has_code(200),
-        json_response=True):
+        json_response=True, parse_errors=False):
     """
     Make an HTTP request to a Rackspace service, with a bunch of awesome
     behavior!
@@ -74,6 +75,7 @@ def service_request(
         auth cache.
     :param bool json_response: Specifies whether the response should be
         parsed as JSON.
+    :param bool parse_errors: Whether to parse :class:`APIError`
 
     :raise APIError: Raised asynchronously when the response HTTP code is not
         in success_codes.
@@ -90,11 +92,13 @@ def service_request(
         log=log,
         reauth_codes=reauth_codes,
         success_pred=success_pred,
-        json_response=json_response))
+        json_response=json_response,
+        parse_errors=parse_errors))
 
 
 @attributes(["service_type", "method", "url", "headers", "data", "params",
-             "log", "reauth_codes", "success_pred", "json_response"])
+             "log", "reauth_codes", "success_pred", "json_response",
+             "parse_errors"])
 class ServiceRequest(object):
     """
     A request to a Rackspace/OpenStack service.
@@ -145,17 +149,12 @@ class TenantScope(object):
 
 def _add_service_error_parsing(parser, request_func):
     """
-    If a parser for API errors is found, use it to parse service API errors.
+    Use the given parser to parse service API errors.
 
     :param callable parser: A function which takes a tuple of exc info, to
         be called when the request function raises an :class:`APIError`.
     :param callable request_func: The request function to decorate
-
-    If there is no parser, does nothing.
     """
-    if parser is None:
-        return request_func
-
     def call_parser(excinfo):
         # ensures that if the parser doesn't raise another exception,
         # the original exception is raised
@@ -173,8 +172,7 @@ def _add_service_error_parsing(parser, request_func):
 def concretize_service_request(
         authenticator, log, service_configs,
         tenant_id,
-        service_request,
-        service_error_parsers=None):
+        service_request):
     """
     Translate a high-level :obj:`ServiceRequest` into a low-level :obj:`Effect`
     of :obj:`pure_http.Request`. This doesn't directly conform to the Intent
@@ -185,14 +183,7 @@ def concretize_service_request(
     :param BoundLog log: info about requests will be logged to this.
     :param dict service_configs: As returned by
         :func:`otter.constants.get_service_configs`.
-    :param dict service_error_parsers: A mapping of service types to error
-        parsers, which should accept the excinfo tuple, and raise another
-        error (or the original) in its place.  If it doesn't raise an
-        error, the original error is re-raised.
     """
-    if service_error_parsers is None:
-        service_error_parsers = {}
-
     auth_eff = Effect(Authenticate(authenticator, tenant_id, log))
     invalidate_eff = Effect(InvalidateToken(authenticator, tenant_id))
     if service_request.log is not None:
@@ -201,6 +192,10 @@ def concretize_service_request(
     service_config = service_configs[service_request.service_type]
     region = service_config['region']
     service_name = service_config['name']
+
+    service_error_parsers = {
+        ServiceType.CLOUD_LOAD_BALANCERS: parse_clb_errors
+    }
 
     def got_auth((token, catalog)):
         request_ = add_headers(otter_headers(token), request)
@@ -216,8 +211,11 @@ def concretize_service_request(
             service_request.success_pred, request_)
         if service_request.json_response:
             request_ = add_json_response(request_)
-        request_ = _add_service_error_parsing(
-            service_error_parsers.get(service_request.service_type), request_)
+
+        parser = service_error_parsers.get(service_request.service_type)
+        if service_request.parse_errors and parser is not None:
+            request_ = _add_service_error_parsing(parser, request_)
+
         return request_(
             service_request.method,
             service_request.url,
@@ -250,3 +248,11 @@ def perform_tenant_scope(
         TypeDispatcher({ServiceRequest: scoped_performer}),
         dispatcher])
     perform(new_disp, tenant_scope.effect.on(box.succeed, box.fail))
+
+
+def parse_clb_errors(*excinfo):
+    """
+    Fake stub currently that just raises a ValueError, to be used for testing.
+    This should be completed in the next PR.
+    """
+    raise ValueError("Fake!")

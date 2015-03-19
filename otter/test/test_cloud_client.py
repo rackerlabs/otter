@@ -28,25 +28,6 @@ from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
 
 
-class _NovaError(Exception):
-    """Fake Nova error to be raised"""
-
-
-class _CLBError(Exception):
-    """Fake CLB error to be raised"""
-
-
-def raise_callback(exception_class):
-    """
-    Take an exception class and return a error callback that raises the
-    provided exception.
-    """
-    def do_the_raise(*excinfo):
-        raise exception_class()
-
-    return do_the_raise
-
-
 def resolve_authenticate(eff, token='token'):
     """Resolve an Authenticate effect with test data."""
     return resolve_effect(eff, (token, fake_service_catalog))
@@ -97,6 +78,7 @@ class ServiceRequestTests(SynchronousTestCase):
                     reauth_codes=(401, 403),
                     success_pred=has_code(200),
                     json_response=True,
+                    parse_errors=False
                 )
             )
         )
@@ -217,76 +199,54 @@ class PerformServiceRequestTests(SynchronousTestCase):
 
         self.assertEqual(cm.exception.body, "THIS IS A FAILURE")
 
-    def test_error_parsing_chosen_per_service_type(self):
+    def test_chosen_per_service_type_if_parse_errors_true(self):
         """
-        If error parsers per service are provided, the right parser will
-        be called per service type, even if the same error response is returned
-        from the service.
+        If `parse_errors` is True and there is a parser for that service, the
+        parser will be invoked on that ServiceRequest.  If there is no parser
+        for that service, even if `parse_errors` is True, no error will be
+        parsed.
         """
-        parsers = {
-            ServiceType.CLOUD_SERVERS: raise_callback(_NovaError),
-            ServiceType.CLOUD_LOAD_BALANCERS: raise_callback(_CLBError)}
-
         def resolve_svcreq_of_type(service_type):
-            svc_req = service_request(service_type, "GET", "athing").intent
-            eff = self._concrete(svc_req, service_error_parsers=parsers)
+            svc_req = service_request(
+                service_type, "GET", "athing", parse_errors=True).intent
+            eff = self._concrete(svc_req)
             next_eff = resolve_authenticate(eff)
             stub_response = stub_pure_response("FOO", code=400)
             resolve_effect(next_eff, stub_response)
-
-        self.assertRaises(_NovaError, resolve_svcreq_of_type,
-                          ServiceType.CLOUD_SERVERS)
-
-        self.assertRaises(_CLBError, resolve_svcreq_of_type,
-                          ServiceType.CLOUD_LOAD_BALANCERS)
-
-    def test_error_parsing_no_service_raises_api_error(self):
-        """
-        If there is no error parser provided for a particular service,
-        :class:`APIError` will be returned.
-        """
-        parsers = {ServiceType.CLOUD_SERVERS: raise_callback(_NovaError)}
-
-        def resolve_svcreq_of_type(service_type):
-            svc_req = service_request(service_type, "GET", "athing").intent
-            eff = self._concrete(svc_req, service_error_parsers=parsers)
-            next_eff = resolve_authenticate(eff)
-            stub_response = stub_pure_response("FOO", code=400)
-            resolve_effect(next_eff, stub_response)
-
-        self.assertRaises(_NovaError, resolve_svcreq_of_type,
-                          ServiceType.CLOUD_SERVERS)
 
         self.assertRaises(APIError, resolve_svcreq_of_type,
+                          ServiceType.CLOUD_SERVERS)
+
+        self.assertRaises(ValueError, resolve_svcreq_of_type,
                           ServiceType.CLOUD_LOAD_BALANCERS)
+
+    def test_no_error_parsing_if_parse_errors_false(self):
+        """
+        If the ServiceRequest has specified that ``parse_error`` is False, then
+        there will be no error parsing even if there is a parser.
+        """
+        svc_req = service_request(ServiceType.CLOUD_LOAD_BALANCERS,
+                                  "GET", "athing").intent
+        eff = self._concrete(svc_req)
+        next_eff = resolve_authenticate(eff)
+        stub_response = stub_pure_response("FOO", code=400)
+
+        self.assertRaises(APIError, resolve_effect, next_eff, stub_response)
 
     def test_error_parsing_only_applies_to_apierrors(self):
         """
         If the request results in a non-:class:`APIError`, the error parsing
         is not called at all.
         """
-        parsers = {ServiceType.CLOUD_SERVERS: raise_callback(_NovaError)}
-
-        eff = self._concrete(self.svcreq, service_error_parsers=parsers)
+        svc_req = service_request(ServiceType.CLOUD_LOAD_BALANCERS,
+                                  "GET", "athing").intent
+        eff = self._concrete(svc_req)
         next_eff = resolve_authenticate(eff)
         with self.assertRaises(Exception):
             resolve_effect(
                 next_eff,
                 (Exception, Exception("Cannot make request!"), None),
                 is_error=True)
-
-    def test_raises_original_error_if_error_parser_doesnt_raise(self):
-        """
-        If the error parser provided does not raise an error, the original
-        error is raised.
-        """
-        parsers = {ServiceType.CLOUD_SERVERS: lambda *a: None}
-
-        eff = self._concrete(self.svcreq, service_error_parsers=parsers)
-        next_eff = resolve_authenticate(eff)
-        with self.assertRaises(APIError):
-            resolve_effect(
-                next_eff, stub_pure_response("FOO", 400))
 
 
 class PerformTenantScopeTests(SynchronousTestCase):
