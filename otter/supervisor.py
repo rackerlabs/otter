@@ -71,7 +71,7 @@ class ISupervisor(Interface):
 
 
 @attributes(['lb_region', 'region', 'dispatcher', 'tenant_id',
-             'auth_token', 'service_catalog'])
+             'auth_token', 'service_catalog', 're_auth'])
 class RequestBag(object):
     """A bag of data useful for making HTTP requests."""
 
@@ -119,9 +119,9 @@ class SupervisorService(object, Service):
                     dispatcher=dispatcher,
                     tenant_id=tenant_id,
                     auth_token=auth_token,
-                    service_catalog=service_catalog
+                    service_catalog=service_catalog,
+                    re_auth=authenticate,
                 )
-                bag.re_auth = authenticate
                 return bag
 
             return d.addCallback(when_authenticated)

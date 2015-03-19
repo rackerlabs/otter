@@ -122,9 +122,9 @@ class RequestBagTestMixin(object):
                 dispatcher=mock.Mock(),
                 tenant_id=self.tenant_id,
                 auth_token="my-auth-token{0}".format(counter),
-                service_catalog=fake_service_catalog
+                service_catalog=fake_service_catalog,
+                re_auth=partial(new_bag, counter + 1),
             )
-            bag.re_auth = partial(new_bag, counter + 1)
             self.bags.append(bag)
             return succeed(bag)
 
