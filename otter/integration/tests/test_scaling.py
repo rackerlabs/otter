@@ -202,9 +202,23 @@ class TestScaling(unittest.TestCase):
         """
         rcs = TestResources()
 
-        self.clb1 = cloud_load_balancer.CloudLoadBalancer(pool=self.pool)
+        def create_1st_load_balancer():
+            """First, we authenticate and create a single load balancer."""
+            self.clb1 = cloud_load_balancer.CloudLoadBalancer(pool=self.pool)
 
-        def finish_setup(x, self):
+            return (
+                self.identity.authenticate_user(rcs)
+                .addCallback(find_end_point)
+                .addCallback(self.clb1.start, self)
+                .addCallback(self.clb1.wait_for_state, "ACTIVE", 600)
+            ).addCallback(add_2nd_load_balancer, self)
+
+        def add_2nd_load_balancer(_, self):
+            """After that, we scale up to two servers, then create the second
+            load balancer.
+            """
+            self.clb2 = cloud_load_balancer.CloudLoadBalancer(pool=self.pool)
+
             scaling_group_body = {
                 "launchConfiguration": {
                     "type": "launch_server",
@@ -246,15 +260,42 @@ class TestScaling(unittest.TestCase):
                 self.scaling_group.start(rcs, self)
                 .addCallback(self.scale_up_policy.start, self)
                 .addCallback(self.scale_down_policy.start, self)
+                .addCallback(self.scale_up_policy.execute)
+                .addCallback(self.scaling_group.wait_for_N_servers, 2,
+                             timeout=1800)
+                .addCallback(self.clb2.start, self)
+                .addCallback(self.clb2.wait_for_state, "ACTIVE", 600)
+            ).addCallback(scale_after_lc_changed, self)
+            return d
+
+        def scale_after_lc_changed(_, self):
+            """After that, we attempt to execute a scaling policy (doesn't
+            matter which one).  According to the bug report, this yields an
+            error.
+            """
+            lc_alt = {
+                "type": "launch_server",
+                "args": {
+                    "loadBalancers": [{
+                        "port": 80,
+                        "loadBalancerId": self.clb1.clb_id,
+                    }, {
+                        "port": 80,
+                        "loadBalancerId": self.clb2.clb_id,
+                    }],
+                    "server": {
+                        "flavorRef": flavor_ref,
+                        "imageRef": image_ref,
+                    }
+                }
+            }
+            d = (
+                self.scaling_group.set_launch_config(rcs, lc_alt)
+                .addCallback(self.scale_down_policy.execute)
+                .addCallback(self.scaling_group.wait_for_N_servers, 0,
+                             timeout=1800)
             )
             return d
 
-        d = (
-            self.identity.authenticate_user(rcs)
-            .addCallback(find_end_point)
-            .addCallback(self.clb1.start, self)
-            .addCallback(self.clb1.wait_for_state, "ACTIVE", 600)
-        ).addCallback(finish_setup, self)
-        return d
-
+        return create_1st_load_balancer()
     test_policy_execution_after_adding_clb.timeout = 1800
