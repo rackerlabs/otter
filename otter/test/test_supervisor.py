@@ -57,13 +57,13 @@ class SupervisorTests(SynchronousTestCase):
         self.group.uuid = 'group-id'
         self.region = "ORD"
 
-        self.auth_token = ('auth-token1', 'auth-token2', 'auth-token3')
-        self._auth_token = list(self.auth_token)
+        self.auth_tokens = ('auth-token1', 'auth-token2', 'auth-token3')
+        self._auth_token_queue = list(self.auth_tokens)
         self.service_catalog = {}
         self.authenticator = iMock(IAuthenticator)
         self.auth_function = self.authenticator.authenticate_tenant
         self.auth_function.side_effect = lambda *a, **kw: succeed(
-            (self._auth_token.pop(0), self.service_catalog))
+            (self._auth_token_queue.pop(0), self.service_catalog))
 
         self.fake_server_details = {
             'server': {'id': 'server_id', 'links': ['links'], 'name': 'meh',
@@ -97,7 +97,7 @@ class SupervisorTests(SynchronousTestCase):
 
         :param request_bag: The :obj:`otter.supervisor.RequestBag` to check.
         """
-        self.assertIn(request_bag.auth_token, self.auth_token)
+        self.assertIn(request_bag.auth_token, self.auth_tokens)
         self.assertEqual(request_bag.service_catalog, self.service_catalog)
         self.assertEqual(request_bag.region, "ORD")
         self.assertEqual(request_bag.lb_region, "ORD")
@@ -356,7 +356,7 @@ class ScrubMetadataTests(SupervisorTests):
             "tenant-id", log=smells_like_log)
         self.scrub_otter_metadata.assert_called_once_with(
             smells_like_log,
-            self.auth_token[0],
+            self.auth_tokens[0],
             self.service_catalog,
             self.supervisor.region,
             "server-id")
@@ -389,7 +389,7 @@ class ValidateLaunchConfigTests(SupervisorTests):
             self.group.tenant_id, log=self.log.bind.return_value)
         self.validate_launch_server_config.assert_called_once_with(
             self.log.bind.return_value, 'ORD', self.service_catalog,
-            self.auth_token[0], 'launch_args')
+            self.auth_tokens[0], 'launch_args')
 
     def test_invalid_config_error_propagates(self):
         """
