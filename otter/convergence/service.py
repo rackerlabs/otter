@@ -81,6 +81,7 @@ def _update_active(scaling_group, active):
                                    modifier=update_group_state))
 
 
+@do
 def execute_convergence(tenant_id, group_id, log,
                         get_all_convergence_data=get_all_convergence_data,
                         plan=plan):
@@ -101,47 +102,37 @@ def execute_convergence(tenant_id, group_id, log,
     sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
                                         group_id=group_id))
     gather_eff = get_all_convergence_data(group_id)
+    try:
+        data = yield Effect(TenantScope(parallel([sg_eff, gather_eff]),
+                                        tenant_id))
+    except FirstError as fe:
+        six.reraise(*fe.exc_info)
+    [(scaling_group, manifest), (servers, lb_nodes)] = data
 
-    def got_all_data(((scaling_group, manifest), (servers, lb_nodes))):
-        group_state = manifest['state']
-        launch_config = manifest['launchConfiguration']
-        time_eff = Effect(Func(time.time))
+    group_state = manifest['state']
+    launch_config = manifest['launchConfiguration']
+    now = yield Effect(Func(time.time))
 
-        def got_time(now):
-            desired_group_state = get_desired_group_state(
-                group_id, launch_config, group_state.desired)
-            steps = plan(desired_group_state, servers, lb_nodes, now)
-            active = determine_active(servers, lb_nodes)
-            log.msg('execute-convergence',
-                    servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
-                    desired=desired_group_state, active=active)
-            eff = _update_active(scaling_group, active)
+    desired_group_state = get_desired_group_state(
+        group_id, launch_config, group_state.desired)
+    steps = plan(desired_group_state, servers, lb_nodes, now)
+    active = determine_active(servers, lb_nodes)
+    log.msg('execute-convergence',
+            servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
+            desired=desired_group_state, active=active)
+    yield _update_active(scaling_group, active)
+    if len(steps) == 0:
+        yield do_return(StepResult.SUCCESS)
+    results = yield steps_to_effect(steps)
 
-            def done_updating_active(_):
-                if len(steps) == 0:
-                    return StepResult.SUCCESS
-                return steps_to_effect(steps).on(
-                    partial(got_step_results, steps))
-            return eff.on(done_updating_active)
-
-        return time_eff.on(got_time)
-
-    def got_step_results(steps, results):
-        order = [StepResult.FAILURE, StepResult.RETRY, StepResult.SUCCESS]
-        priority = sorted(results,
-                          key=lambda (status, reasons): order.index(status))
-        worst_status = priority[0][0]
-        log.msg('execute-convergence-results',
-                results=zip(steps, results),
-                worst_status=worst_status)
-        return worst_status
-
-    return Effect(TenantScope(
-        parallel([sg_eff, gather_eff]).on(
-            success=got_all_data,
-            error=catch(FirstError, lambda fe: six.reraise(*fe[1].exc_info))),
-        tenant_id
-    ))
+    order = [StepResult.FAILURE, StepResult.RETRY, StepResult.SUCCESS]
+    priority = sorted(results,
+                      key=lambda (status, reasons): order.index(status))
+    worst_status = priority[0][0]
+    log.msg('execute-convergence-results',
+            results=zip(steps, results),
+            worst_status=worst_status)
+    yield do_return(worst_status)
 
 
 def format_dirty_flag(tenant_id, group_id):

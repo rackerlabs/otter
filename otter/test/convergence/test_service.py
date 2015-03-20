@@ -575,8 +575,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         for srv in self.servers:
             srv.desired_lbs = pmap()
 
-        tscope_eff = execute_convergence(self.tenant_id, self.group_id, log,
-                                         get_all_convergence_data=gacd)
+        eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                  get_all_convergence_data=gacd)
 
         # Perform the GetScalingGroupInfo by raising an exception
         dispatcher = ComposedDispatcher([
@@ -588,9 +588,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             self._get_dispatcher()])
 
         # And make sure that exception isn't wrapped in FirstError.
-        e = self.assertRaises(
-            RuntimeError,
-            sync_perform, dispatcher, tscope_eff.intent.effect)
+        e = self.assertRaises(RuntimeError, sync_perform, dispatcher, eff)
         self.assertEqual(str(e), 'foo')
 
     def test_returns_retry(self):
@@ -607,14 +605,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 ConvergeLater(),
                 TestStep(Effect(Constant((StepResult.SUCCESS, []))))])
 
-        tscope_eff = execute_convergence(
-            self.tenant_id, self.group_id, log,
-            plan=plan,
-            get_all_convergence_data=gacd)
+        eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                  plan=plan,
+                                  get_all_convergence_data=gacd)
         dispatcher = self._get_dispatcher()
-        self.assertEqual(
-            sync_perform(dispatcher, tscope_eff.intent.effect),
-            StepResult.RETRY)
+        self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
 
     def test_returns_failure(self):
         """
@@ -634,14 +629,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
             ])
 
-        tscope_eff = execute_convergence(
-            self.tenant_id, self.group_id, log,
-            plan=plan,
-            get_all_convergence_data=gacd)
+        eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                  plan=plan,
+                                  get_all_convergence_data=gacd)
         dispatcher = self._get_dispatcher()
-        self.assertEqual(
-            sync_perform(dispatcher, tscope_eff.intent.effect),
-            StepResult.FAILURE)
+        self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
 
 
 class DetermineActiveTests(SynchronousTestCase):
