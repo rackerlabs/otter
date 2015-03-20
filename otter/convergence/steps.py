@@ -289,8 +289,9 @@ def _check_clb_422(*regex_matches):
         which it should be by default.
         """
         if response.code == 422:
-            message = content.get('message', '')
-            return any([regex.search(message) for regex in regex_matches])
+            message = try_json_with_keys(content, ('message',))
+            return any([regex.search(message or '')
+                        for regex in regex_matches])
         return False
 
     return check_response
@@ -349,7 +350,7 @@ class AddNodesToCLB(object):
             if error.code == 404:
                 return StepResult.FAILURE, [error]
             if error.code == 422:
-                message = error.body.get('message')
+                message = try_json_with_keys(error.body, ("message",))
                 if message and _CLB_DELETED_PATTERN.search(message):
                     return StepResult.FAILURE, [error]
             return StepResult.RETRY, [error]
