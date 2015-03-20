@@ -1,10 +1,11 @@
 """
 Tests for `/groups/<groupId>/servers/` endpoint
 """
-from cafe.drivers.unittest.decorators import tags
-from test_repo.autoscale.fixtures import AutoscaleFixture
-
 import time
+
+from cafe.drivers.unittest.decorators import tags
+
+from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
 class ServersTests(AutoscaleFixture):
@@ -25,7 +26,8 @@ class ServersTests(AutoscaleFixture):
         """
         self.autoscale_client.delete_scaling_group(self.groupid, force='true')
         if hasattr(self, 'groupid2'):
-            self.autoscale_client.delete_scaling_group(self.groupid2, force='true')
+            self.autoscale_client.delete_scaling_group(self.groupid2,
+                                                       force='true')
 
     def assert_server_deleted(self, server_id):
         """
@@ -34,26 +36,31 @@ class ServersTests(AutoscaleFixture):
         tries = 10
         interval = 15
         while tries > 0:
-            servers = self.get_servers_containing_given_name_on_tenant(group_id=self.groupid)
+            servers = self.get_servers_containing_given_name_on_tenant(
+                group_id=self.groupid)
             if server_id in servers:
                 tries -= 1
                 time.sleep(interval)
             else:
                 return
-        self.fail('Server {} in group {} not deleted'.format(server_id, self.groupid))
+        self.fail('Server {} in group {} not deleted'.format(server_id,
+                                                             self.groupid))
 
     @tags(speed='slow')
     def test_delete_removes_and_replaces(self, replace=None):
         """
-        `DELETE serverId` actually deletes the server and replaces with new server. This
-        tests with optional replace argument as the same behavior can be tested with it.
-        By default, replace is not provided. This test also shows that server can be
-        deleted with min servers
+        `DELETE serverId` actually deletes the server and replaces with new
+        server. This tests with optional replace argument as the same behavior
+        can be tested with it.  By default, replace is not provided. This test
+        also shows that server can be deleted with min servers
         """
-        server_id = self.wait_for_expected_number_of_active_servers(self.groupid, 1)[0]
-        resp = self.autoscale_client.delete_server(self.groupid, server_id, replace)
+        server_id = self.wait_for_expected_number_of_active_servers(
+            self.groupid, 1)[0]
+        resp = self.autoscale_client.delete_server(self.groupid, server_id,
+                                                   replace)
         self.assertEqual(resp.status_code, 202,
-                         'Delete server status is {}. Expected 202'.format(resp.status_code))
+                         'Delete server status is {}. Expected 202'.format(
+                             resp.status_code))
         # Is server really deleted?
         self.assert_server_deleted(server_id)
         # New server replaced?
@@ -70,16 +77,21 @@ class ServersTests(AutoscaleFixture):
     @tags(speed='slow')
     def test_delete_removed_not_replaced(self):
         """
-        `DELETE serverId?replace=false` removes the sever and does not replace it
+        `DELETE serverId?replace=false` removes the sever and does not replace
+        it
         """
         # Spin 1 more server
-        policyid = self.autoscale_behaviors.create_policy_min(self.groupid, sp_change=1)['id']
+        policyid = self.autoscale_behaviors.create_policy_min(
+            self.groupid, sp_change=1)['id']
         self.autoscale_client.execute_policy(self.groupid, policyid)
         # Delete 2nd server to check that any server can be deleted
-        server_id = self.wait_for_expected_number_of_active_servers(self.groupid, 2)[1]
-        resp = self.autoscale_client.delete_server(self.groupid, server_id, replace='false')
+        server_id = self.wait_for_expected_number_of_active_servers(
+            self.groupid, 2)[1]
+        resp = self.autoscale_client.delete_server(self.groupid, server_id,
+                                                   replace='false')
         self.assertEqual(resp.status_code, 202,
-                         'Delete server status is {}. Expected 202'.format(resp.status_code))
+                         'Delete server status is {}. Expected 202'.format(
+                             resp.status_code))
         # Is server really deleted?
         self.assert_server_deleted(server_id)
         # New server not replaced?
@@ -92,29 +104,38 @@ class ServersTests(AutoscaleFixture):
         # TODO: This may need to goto functional
         resp = self.autoscale_client.delete_server(self.groupid, 'junk')
         self.assertEqual(resp.status_code, 404,
-                         'Delete server status is {}. Expected 404'.format(resp.status_code))
+                         'Delete server status is {}. Expected 404'.format(
+                             resp.status_code))
 
     def test_delete_server_not_found_in_diff_group(self):
         """
-        `DELETE serverId` on server in same tenant but different group returns 404
+        `DELETE serverId` on server in same tenant but different group returns
+        404
         """
         # Create another group and get server from there
-        self.groupid2 = self.autoscale_behaviors.create_scaling_group_min(gc_min_entities=1).entity.id
-        server_id = self.wait_for_expected_number_of_active_servers(self.groupid2, 1)[0]
+        self.groupid2 = self.autoscale_behaviors.create_scaling_group_min(
+            gc_min_entities=1).entity.id
+        server_id = self.wait_for_expected_number_of_active_servers(
+            self.groupid2, 1)[0]
         # Delete that server from first group
         resp = self.autoscale_client.delete_server(self.groupid, server_id)
         self.assertEqual(resp.status_code, 404,
-                         'Delete server status is {}. Expected 404'.format(resp.status_code))
+                         'Delete server status is {}. Expected 404'.format(
+                             resp.status_code))
 
     @tags(speed='slow')
     def test_delete_below_min(self):
         """
-        Calling `DELETE serverId` when number of servers are at minimum returns 403
+        Calling `DELETE serverId` when number of servers are at minimum returns
+        403
         """
-        server_id = self.wait_for_expected_number_of_active_servers(self.groupid, 1)[0]
-        resp = self.autoscale_client.delete_server(self.groupid, server_id, replace='false')
+        server_id = self.wait_for_expected_number_of_active_servers(
+            self.groupid, 1)[0]
+        resp = self.autoscale_client.delete_server(self.groupid, server_id,
+                                                   replace='false')
         self.assertEqual(resp.status_code, 403,
-                         'Delete server status is {}. Expected 403'.format(resp.status_code))
+                         'Delete server status is {}. Expected 403'.format(
+                             resp.status_code))
         self.assertIn('CannotDeleteServerBelowMinError', resp.content)
 
     @tags(speed='slow')
@@ -122,8 +143,11 @@ class ServersTests(AutoscaleFixture):
         """
         `DELETE serverId?replace=bad` returns 400 with InvalidQueryArgument
         """
-        server_id = self.wait_for_expected_number_of_active_servers(self.groupid, 1)[0]
-        resp = self.autoscale_client.delete_server(self.groupid, server_id, 'bad')
+        server_id = self.wait_for_expected_number_of_active_servers(
+            self.groupid, 1)[0]
+        resp = self.autoscale_client.delete_server(self.groupid, server_id,
+                                                   'bad')
         self.assertEqual(resp.status_code, 400,
-                         'Delete server status is {}. Expected 400'.format(resp.status_code))
+                         'Delete server status is {}. Expected 400'.format(
+                             resp.status_code))
         self.assertIn('InvalidQueryArgument', resp.content)
