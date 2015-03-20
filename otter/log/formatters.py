@@ -261,7 +261,7 @@ def ErrorFormattingWrapper(observer):
                 message = repr(excp)
                 event['traceback'] = event['failure'].getTraceback()
                 event['exception_type'] = excp.__class__.__name__
-                details = getattr(excp, 'details', None)
+                details = serialize_exception(excp)
                 if details is not None:
                     event['error_details'] = details
 
