@@ -1,10 +1,15 @@
-"""Converger service"""
+"""
+Converger service
+
+The top-level entry-points into this module are :obj:`ConvergenceStarter` and
+:obj:`Converger`.
+"""
 
 import time
 from functools import partial
 from hashlib import sha1
 
-from effect import Effect, FirstError, Func, catch, parallel
+from effect import Effect, FirstError, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
 from effect.twisted import exc_info_to_failure, perform
@@ -21,7 +26,7 @@ from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
-from otter.convergence.model import ServerState
+from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
 from otter.models.interface import NoSuchScalingGroupError
@@ -76,8 +81,10 @@ def _update_active(scaling_group, active):
                                    modifier=update_group_state))
 
 
+@do
 def execute_convergence(tenant_id, group_id, log,
-                        get_all_convergence_data=get_all_convergence_data):
+                        get_all_convergence_data=get_all_convergence_data,
+                        plan=plan):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
@@ -95,31 +102,37 @@ def execute_convergence(tenant_id, group_id, log,
     sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
                                         group_id=group_id))
     gather_eff = get_all_convergence_data(group_id)
+    try:
+        data = yield Effect(TenantScope(parallel([sg_eff, gather_eff]),
+                                        tenant_id))
+    except FirstError as fe:
+        six.reraise(*fe.exc_info)
+    [(scaling_group, manifest), (servers, lb_nodes)] = data
 
-    def got_all_data(((scaling_group, manifest), (servers, lb_nodes))):
-        group_state = manifest['state']
-        launch_config = manifest['launchConfiguration']
-        time_eff = Effect(Func(time.time))
+    group_state = manifest['state']
+    launch_config = manifest['launchConfiguration']
+    now = yield Effect(Func(time.time))
 
-        def got_time(now):
-            desired_group_state = get_desired_group_state(
-                group_id, launch_config, group_state.desired)
-            steps = plan(desired_group_state, servers, lb_nodes, now)
-            active = determine_active(servers, lb_nodes)
-            log.msg('execute-convergence',
-                    servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
-                    desired=desired_group_state, active=active)
-            eff = _update_active(scaling_group, active)
-            eff = eff.on(lambda _: steps_to_effect(steps))
-            return eff
-        return time_eff.on(got_time)
+    desired_group_state = get_desired_group_state(
+        group_id, launch_config, group_state.desired)
+    steps = plan(desired_group_state, servers, lb_nodes, now)
+    active = determine_active(servers, lb_nodes)
+    log.msg('execute-convergence',
+            servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
+            desired=desired_group_state, active=active)
+    yield _update_active(scaling_group, active)
+    if len(steps) == 0:
+        yield do_return(StepResult.SUCCESS)
+    results = yield steps_to_effect(steps)
 
-    return Effect(TenantScope(
-        parallel([sg_eff, gather_eff]).on(
-            success=got_all_data,
-            error=catch(FirstError, lambda fe: six.reraise(*fe[1].exc_info))),
-        tenant_id
-    ))
+    order = [StepResult.FAILURE, StepResult.RETRY, StepResult.SUCCESS]
+    priority = sorted(results,
+                      key=lambda (status, reasons): order.index(status))
+    worst_status = priority[0][0]
+    log.msg('execute-convergence-results',
+            results=zip(steps, results),
+            worst_status=worst_status)
+    yield do_return(worst_status)
 
 
 def format_dirty_flag(tenant_id, group_id):
@@ -299,6 +312,7 @@ def get_my_divergent_groups(my_buckets, all_buckets):
     return eff.on(got_children_with_stats)
 
 
+@do
 def converge_one_group(log, group_locks, tenant_id, group_id, version,
                        execute_convergence=execute_convergence):
     """
@@ -310,11 +324,24 @@ def converge_one_group(log, group_locks, tenant_id, group_id, version,
     """
     log = log.bind(tenant_id=tenant_id, group_id=group_id)
     eff = execute_convergence(tenant_id, group_id, log)
-    return group_locks(group_id, eff).on(
-        success=lambda r: delete_divergent_flag(log, tenant_id,
-                                                group_id, version),
-        error=partial(_cleanup_convergence_error, log, tenant_id,
-                      group_id, version))
+    try:
+        result = yield group_locks(group_id, eff)
+    except ConcurrentError:
+        # We don't need to spam the logs about this, it's to be expected
+        return
+    except NoSuchScalingGroupError:
+        log.err(None, 'converge-fatal-error')
+        yield delete_divergent_flag(log, tenant_id, group_id, version)
+        return
+    except Exception:
+        # We specifically don't clean up the dirty flag in the case of
+        # unexpected errors, so convergence will be retried.
+        log.err(None, 'converge-non-fatal-error')
+    else:
+        if result in (StepResult.FAILURE, StepResult.SUCCESS):
+            yield delete_divergent_flag(log, tenant_id, group_id, version)
+        # TODO: if result is FAILURE, put the group into ERROR state.
+        # https://github.com/rackerlabs/otter/issues/885
 
 
 @do
@@ -325,28 +352,20 @@ def converge_all_groups(log, group_locks, my_buckets, all_buckets,
     Check for groups that need convergence and which match up to the
     buckets we've been allocated.
     """
+    # TODO: If we find that there's a group in `group_locks` that's *not* found
+    # in the divergent list in ZK, we should stop retrying convergence for that
+    # group.  This gives us a mechanism to stop convergence manually when it's
+    # spiraling out of control.
+    # https://github.com/rackerlabs/otter/issues/1215
     group_infos = yield get_my_divergent_groups(my_buckets, all_buckets)
     log.msg('converge-all-groups', group_infos=group_infos)
+    # TODO: Log currently converging
+    # https://github.com/rackerlabs/otter/issues/1216
     effs = [converge_one_group(log, group_locks,
                                info['tenant_id'], info['group_id'],
                                info['version'])
             for info in group_infos]
     yield do_return(parallel(effs))
-
-
-def _cleanup_convergence_error(log, tenant_id, group_id, version, exc_info):
-    failure = exc_info_to_failure(exc_info)
-    if failure.check(ConcurrentError):
-        # We don't need to spam the logs about this, it's to be expected
-        return
-    if failure.check(NoSuchScalingGroupError):
-        log.err(failure, 'converge-fatal-error')
-        return delete_divergent_flag(log, tenant_id, group_id, version)
-
-    # TODO: Check for other fatal errors, and put the group into ERROR state.
-    log.err(failure, 'converge-non-fatal-error')
-    # We specifically don't clean up the dirty flag in this case, so
-    # convergence will be retried.
 
 
 def _stable_hash(s):
