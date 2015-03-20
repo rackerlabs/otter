@@ -317,7 +317,7 @@
                 type="object" path="$.launchConfiguration.args">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The configuration used to create new servers in the scaling group.
-                        You must specify <parameter>server</parameter> and/or <parameter>loadBalancers</parameter> as attributes. Most
+                        You must specify the <parameter>server</parameter> attribute, and can also specify the optional <parameter>loadBalancers</parameter> attribute. Most
                         launch configurations have both a server and a
                         cloud load balancer or RackConnectV3 load balancer pool configured.</para></wadl:doc>
             </param>
@@ -525,8 +525,7 @@
                 <param style="plain" name="args" required="true" type="object" path="$.launchConfiguration.args">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >The configuration used to create new servers in the scaling group. You must specify
-                        <parameter>server</parameter> and/or
-                        <parameter>loadBalancers</parameter> as attributes. Most launch
+                        <parameter>server</parameter> attribute, and can also specify the optional <parameter>loadBalancers</parameter> attribute. Most launch
                         configurations have both a server and a
                         load balancer or RackConnectV3 load balancer pool.</wadl:doc>
                 </param>
@@ -1221,7 +1220,7 @@
                 type="object" path="$.args">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The configuration used to create new servers in the scaling group.
-                        You must specify <parameter>server</parameter> and/or <parameter>loadBalancers</parameter> as attributes. Most
+                        You must specify <parameter>server</parameter> attribute, and can also specify the optional <parameter>loadBalancers</parameter> attribute. Most
                         launch configurations have both a server and a
                         cloud load balancer or RackConnectV3 load balancer pool configured.</para></wadl:doc>
             </param>
@@ -1314,7 +1313,7 @@
                     type="object" path="$.args">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >The configuration used to create new servers in the scaling group. You must specify
-                        <parameter>server</parameter> and/or <parameter>loadBalancers</parameter> as attributes. Most launch
+                        <parameter>server</parameter> attribute, and can also specify the optional <parameter>loadBalancers</parameter> attribute. Most launch
                         configurations have both a server and a
                         load balancer configured.</wadl:doc>
                 </param>
