@@ -9,7 +9,7 @@ import time
 from functools import partial
 from hashlib import sha1
 
-from effect import Effect, FirstError, Func, catch, parallel
+from effect import Effect, FirstError, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
 from effect.twisted import exc_info_to_failure, perform
