@@ -358,6 +358,8 @@ def converge_all_groups(log, group_locks, my_buckets, all_buckets,
     # spiraling out of control.
     # https://github.com/rackerlabs/otter/issues/1215
     group_infos = yield get_my_divergent_groups(my_buckets, all_buckets)
+    if not group_infos:
+        return
     log.msg('converge-all-groups', group_infos=group_infos)
     # TODO: Log currently converging
     # https://github.com/rackerlabs/otter/issues/1216
@@ -418,7 +420,6 @@ class Converger(MultiService):
 
         This is used as the partitioner callback.
         """
-        self.log.msg('buckets-acquired', my_buckets=my_buckets)
         eff = self._converge_all_groups(self.log, self.group_locks,
                                         my_buckets, self._buckets)
         result = perform(self._dispatcher, eff).addErrback(

@@ -109,8 +109,6 @@ class ConvergerTests(SynchronousTestCase):
 
         result = self.fake_partitioner.got_buckets(my_buckets)
         self.assertEqual(self.successResultOf(result), 'foo')
-        self.log.msg.assert_called_once_with(
-            'buckets-acquired', my_buckets=[0, 5], system='converger')
 
     def test_buckets_acquired_errors(self):
         """
@@ -303,7 +301,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         self.assertEqual(self.deletions, [True])
 
 
-class ConvergeAllTests(SynchronousTestCase):
+class ConvergeAllGroupsTests(SynchronousTestCase):
     """Tests for :func:`converge_all_groups`."""
 
     def test_converge_all_groups(self):
@@ -339,6 +337,25 @@ class ConvergeAllTests(SynchronousTestCase):
             'converge-all-groups',
             group_infos=[{'tenant_id': '00', 'group_id': 'g1', 'version': 1},
                          {'tenant_id': '01', 'group_id': 'g2', 'version': 5}])
+
+    def test_no_log_on_no_groups(self):
+        """When there's no work, no log message is emitted."""
+        def get_my_divergent_groups(_my_buckets, _all_buckets):
+            return Effect(Constant([]))
+
+        def converge_one_group(log, lock_set, tenant_id, group_id, version):
+            1 / 0
+
+        log = mock_log()
+        lock_set = make_lock_set()
+        my_buckets = [0, 5]
+        all_buckets = range(10)
+        result = converge_all_groups(
+            log, lock_set, my_buckets, all_buckets,
+            get_my_divergent_groups=get_my_divergent_groups,
+            converge_one_group=converge_one_group)
+        self.assertEqual(sync_perform(_get_dispatcher(), result), None)
+        self.assertEqual(log.msg.mock_calls, [])
 
 
 class GetMyDivergentGroupsTests(SynchronousTestCase):
