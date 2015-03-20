@@ -117,8 +117,10 @@ def get_clb_contents():
         _response, body = result
         lbs = body['loadBalancers']
         lb_ids = [lb['id'] for lb in lbs]
-        lb_reqs = [lb_req('GET', _lb_path(lb_id)).on(_discard_response)
-                   for lb_id in lb_ids]
+        lb_reqs = [
+            lb_req('GET', _lb_path(lb_id)).on(
+                lambda (response, body): body['nodes'])
+            for lb_id in lb_ids]
         return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
