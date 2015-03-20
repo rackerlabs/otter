@@ -11,7 +11,7 @@ from kazoo.exceptions import BadVersionError
 
 import mock
 
-from pyrsistent import freeze, pmap, pset, s
+from pyrsistent import freeze, pbag, pmap, pset, s
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
@@ -29,6 +29,7 @@ from otter.convergence.service import (
     determine_active, execute_convergence, get_my_divergent_groups,
     make_lock_set,
     non_concurrently)
+from otter.convergence.steps import ConvergeLater
 from otter.models.intents import (
     GetScalingGroupInfo, ModifyGroupState, perform_modify_group_state)
 from otter.models.interface import GroupState, NoSuchScalingGroupError
@@ -36,8 +37,10 @@ from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
     CheckFailureValue, FakePartitioner, IsBoundWith,
+    TestStep,
     matches,
     mock_group, mock_log,
+    raise_,
     transform_eq)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildrenWithStats
 
@@ -128,7 +131,7 @@ class ConvergerTests(SynchronousTestCase):
             'converge-all-groups-error', system='converger')
 
 
-class ConvergeOneTests(SynchronousTestCase):
+class ConvergeOneGroupTests(SynchronousTestCase):
     """Tests for :func:`converge_one_group`."""
 
     def setUp(self):
@@ -153,8 +156,10 @@ class ConvergeOneTests(SynchronousTestCase):
         calls = []
 
         def execute_convergence(tenant_id, group_id, log):
-            return Effect(Func(
-                lambda: calls.append((tenant_id, group_id, log))))
+            def p():
+                calls.append((tenant_id, group_id, log))
+                return StepResult.SUCCESS
+            return Effect(Func(p))
 
         eff = converge_one_group(
             self.log, make_lock_set(), self.tenant_id, self.group_id,
@@ -209,8 +214,7 @@ class ConvergeOneTests(SynchronousTestCase):
         self.assertEqual(result, None)
 
         self.log.err.assert_any_call(
-            CheckFailureValue(NoSuchScalingGroupError(self.tenant_id,
-                                                      self.group_id)),
+            None,
             'converge-fatal-error',
             tenant_id=self.tenant_id, group_id=self.group_id)
 
@@ -234,7 +238,7 @@ class ConvergeOneTests(SynchronousTestCase):
         result = sync_perform(self.dispatcher, eff)
         self.assertEqual(result, None)
         self.log.err.assert_any_call(
-            CheckFailureValue(RuntimeError('uh oh!')),
+            None,
             'converge-non-fatal-error',
             tenant_id=self.tenant_id, group_id=self.group_id)
         self.assertEqual(self.deletions, [])
@@ -255,7 +259,7 @@ class ConvergeOneTests(SynchronousTestCase):
             ])
 
         def execute_convergence(tenant_id, group_id, log):
-            return Effect(Constant('foo'))
+            return Effect(Constant(StepResult.SUCCESS))
 
         eff = converge_one_group(
             self.log, make_lock_set(), self.tenant_id, self.group_id,
@@ -267,6 +271,36 @@ class ConvergeOneTests(SynchronousTestCase):
             CheckFailureValue(BadVersionError()),
             'mark-clean-failure',
             tenant_id=self.tenant_id, group_id=self.group_id)
+
+    def test_retry(self):
+        """
+        When execute_convergence returns RETRY, the divergent flag is not
+        deleted.
+        """
+        def execute_convergence(tenant_id, group_id, log):
+            return Effect(Constant(StepResult.RETRY))
+        eff = converge_one_group(
+            self.log, make_lock_set(), self.tenant_id, self.group_id,
+            self.version,
+            execute_convergence=execute_convergence)
+        result = sync_perform(self.dispatcher, eff)
+        self.assertEqual(result, None)
+        self.assertEqual(self.deletions, [])
+
+    def test_failure(self):
+        """
+        When execute_convergence returns FAILURE, the divergent flag is
+        deleted.
+        """
+        def execute_convergence(tenant_id, group_id, log):
+            return Effect(Constant(StepResult.FAILURE))
+        eff = converge_one_group(
+            self.log, make_lock_set(), self.tenant_id, self.group_id,
+            self.version,
+            execute_convergence=execute_convergence)
+        result = sync_perform(self.dispatcher, eff)
+        self.assertEqual(result, None)
+        self.assertEqual(self.deletions, [True])
 
 
 class ConvergeAllTests(SynchronousTestCase):
@@ -479,7 +513,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
     def test_no_steps(self):
         """
         If state of world matches desired, no steps are executed, but the
-        `active` servers are still updated.
+        `active` servers are still updated, and SUCCESS is the return value.
         """
         log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
@@ -494,7 +528,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         result = sync_perform(self._get_dispatcher(), eff)
         self.assertEqual(self.group.modify_state_values[-1].active,
                          expected_active)
-        self.assertEqual(result, [])
+        self.assertEqual(result, StepResult.SUCCESS)
 
     def test_success(self):
         """
@@ -529,7 +563,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (expected_req.intent, 'successful response')]
         result = sync_perform(self._get_dispatcher(expected_intents), eff)
         self.assertEqual(self.group.modify_state_values[-1].active, {})
-        self.assertEqual(result, [(StepResult.SUCCESS, [])])
+        self.assertEqual(result, StepResult.SUCCESS)
 
     def test_first_error_extraction(self):
         """
@@ -559,9 +593,55 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             sync_perform, dispatcher, tscope_eff.intent.effect)
         self.assertEqual(str(e), 'foo')
 
+    def test_returns_retry(self):
+        """
+        If a step that results in RETRY is returned, and there are no FAILUREs,
+        then the ultimate result of executing convergence will be a RETRY.
+        """
+        log = mock_log()
+        gacd = self._get_gacd_func(self.group.uuid)
 
-def raise_(e):
-    raise e
+        def plan(*args, **kwargs):
+            return pbag([
+                TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
+                ConvergeLater(),
+                TestStep(Effect(Constant((StepResult.SUCCESS, []))))])
+
+        tscope_eff = execute_convergence(
+            self.tenant_id, self.group_id, log,
+            plan=plan,
+            get_all_convergence_data=gacd)
+        dispatcher = self._get_dispatcher()
+        self.assertEqual(
+            sync_perform(dispatcher, tscope_eff.intent.effect),
+            StepResult.RETRY)
+
+    def test_returns_failure(self):
+        """
+        If a step that results in FAILURE is returned, then the ultimate result
+        of executing convergence will be a FAILURE, regardless of the other
+        step results.
+        """
+        log = mock_log()
+        gacd = self._get_gacd_func(self.group.uuid)
+
+        def plan(*args, **kwargs):
+            return pbag([
+                TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
+                ConvergeLater(),
+                TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
+                TestStep(Effect(Constant((StepResult.FAILURE, [])))),
+                TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
+            ])
+
+        tscope_eff = execute_convergence(
+            self.tenant_id, self.group_id, log,
+            plan=plan,
+            get_all_convergence_data=gacd)
+        dispatcher = self._get_dispatcher()
+        self.assertEqual(
+            sync_perform(dispatcher, tscope_eff.intent.effect),
+            StepResult.FAILURE)
 
 
 class DetermineActiveTests(SynchronousTestCase):

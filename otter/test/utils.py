@@ -760,3 +760,17 @@ def get_fake_service_request_performer(stub_response):
         return resolve_effect(eff, stub_response)
 
     return the_performer
+
+
+def raise_(e):
+    """Raise the exception. Useful for lambdas."""
+    raise e
+
+
+class TestStep(object):
+    """A fake step that returns a canned Effect."""
+    def __init__(self, effect):
+        self.effect = effect
+
+    def as_effect(self):
+        return self.effect
