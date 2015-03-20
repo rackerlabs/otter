@@ -35,7 +35,7 @@ from otter.convergence.model import _servicenet_address
 from otter.convergence.steps import UnexpectedServerStatus, set_server_name
 from otter.util import logging_treq as treq
 from otter.util.config import config_value
-from otter.util.deferredutils import log_with_time, retry_and_timeout
+from otter.util.deferredutils import delay, log_with_time, retry_and_timeout
 from otter.util.hashkey import generate_server_name
 from otter.util.http import (
     APIError, RequestError, append_segments, check_success, headers,
@@ -150,8 +150,8 @@ def wait_for_active(log,
         deferred_description=timeout_description)
 
 
-# limit on 2 servers to be created simultaneously
-MAX_CREATE_SERVER = 2
+# limit on 1 servers to be created simultaneously
+MAX_CREATE_SERVER = 1
 create_server_sem = DeferredSemaphore(MAX_CREATE_SERVER)
 
 
@@ -308,6 +308,13 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
         d.addBoth(_check_results, f)
         return d
 
+    def _create_with_delay():
+        d = _treq.post(path, headers=headers(auth_token),
+                       data=json.dumps({'server': server_config}), log=log)
+        # Add 1 second delay to space 1 second between server creations
+        d.addCallback(delay, clock, 1)
+        return d
+
     def _create_server():
         """
         Attempt to create a server, handling spurious non-400 errors from Nova
@@ -316,9 +323,7 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
 
         If not, and if no further errors occur, server creation can be retried.
         """
-        d = create_server_sem.run(_treq.post, path, headers=headers(auth_token),
-                                  data=json.dumps({'server': server_config}),
-                                  log=log)
+        d = create_server_sem.run(_create_with_delay)
         d.addCallback(check_success, [202], _treq=_treq)
         d.addCallback(_treq.json_content)
         d.addErrback(_check_server_created)

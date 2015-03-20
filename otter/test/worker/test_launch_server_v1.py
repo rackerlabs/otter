@@ -896,6 +896,7 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         """
         super(ServerTests, self).setUp()
         self.log = mock_log()
+        self.clock = Clock()
         set_config_data(fake_config)
         self.addCleanup(set_config_data, {})
 
@@ -1136,7 +1137,12 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         _treq = StubTreq([(req, resp)], [(resp, '{"server": "created"}')])
 
         d = create_server('http://url/', 'my-auth-token', {'some': 'stuff'},
-                          _treq=_treq)
+                          _treq=_treq, clock=self.clock)
+
+        # No result initially. Will be avail after 1 second due to
+        # injected delay
+        self.assertNoResult(d)
+        self.clock.advance(1)
 
         result = self.successResultOf(d)
         self.assertEqual(result, {"server": "created"})
@@ -1144,7 +1150,8 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
 
     def test_create_server_limits(self):
         """
-        create_server when called many times will post only 2 requests at a time
+        create_server when called many times will post only 1 request at
+        a time
         """
         deferreds = [Deferred() for i in range(3)]
         post_ds = deferreds[:]
@@ -1156,23 +1163,36 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
             'flavorRef': '3'
         }
 
-        ret_ds = [create_server('http://url/', 'my-auth-token', server_config)
+        ret_ds = [create_server('http://url/', 'my-auth-token',
+                                server_config, clock=self.clock)
                   for i in range(3)]
 
-        # no result in any of them and only first 2 treq.post is called
+        # no result in any of them and only 1 treq.post is called
         [self.assertNoResult(d) for d in ret_ds]
-        self.assertTrue(self.treq.post.call_count, 2)
+        self.assertEqual(self.treq.post.call_count, 1)
 
-        # fire one deferred and notice that 3rd treq.post is called
+        # fire first deferred and notice that next treq.post is still not
+        # called due to delay
         post_ds[0].callback(mock.Mock(code=202))
-        self.assertTrue(self.treq.post.call_count, 3)
+        self.assertEqual(self.treq.post.call_count, 1)
+
+        # advance clock and notice next post called
+        self.clock.advance(1)
+        self.assertEqual(self.treq.post.call_count, 2)
         self.successResultOf(ret_ds[0])
 
         # fire others
         post_ds[1].callback(mock.Mock(code=202))
+        self.clock.advance(1)
         post_ds[2].callback(mock.Mock(code=202))
+        self.clock.advance(1)
         self.successResultOf(ret_ds[1])
         self.successResultOf(ret_ds[2])
+
+    def _create_server(self, url, token, conf, **kwargs):
+        d = create_server(url, token, conf, clock=self.clock, **kwargs)
+        self.clock.advance(1)
+        return d
 
     @mock.patch('otter.worker.launch_server_v1.find_server')
     def test_create_server_propagates_api_failure_from_create(self, fs):
@@ -1188,15 +1208,14 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
                {'log': mock.ANY})
         resp = StubResponse(500, {})
 
-        clock = Clock()
         _treq = StubTreq([(req, resp)], [(resp, 'failure')])
 
         fs.return_value = fail(APIError(401, '', {}))
 
-        d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
-                          retries=0, _treq=_treq, clock=clock,
-                          create_failure_delay=5)
-        clock.advance(5)
+        d = self._create_server(
+            'http://url/', 'my-auth-token', {}, log=self.log, retries=0,
+            _treq=_treq, create_failure_delay=5)
+        self.clock.advance(5)
 
         failure = self.failureResultOf(d, RequestError)
         real_failure = failure.value.reason
@@ -1220,16 +1239,16 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
                {'log': mock.ANY})
         resp = StubResponse(500, {})
 
-        clock = Clock()
         _treq = StubTreq([(req, resp)], [(resp, 'failure')])
 
         fs.return_value = succeed("I'm a server!")
 
-        d = create_server('http://url/', 'my-auth-token', {'some': 'stuff'},
-                          _treq=_treq, create_failure_delay=5, clock=clock)
+        d = self._create_server(
+            'http://url/', 'my-auth-token', {'some': 'stuff'}, _treq=_treq,
+            create_failure_delay=5)
         self.assertNoResult(d)
 
-        clock.advance(5)
+        self.clock.advance(5)
 
         result = self.successResultOf(d)
         self.assertEqual(result, "I'm a server!")
@@ -1248,16 +1267,15 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
                {'log': mock.ANY})
         resp = StubResponse(500, {})
 
-        clock = Clock()
         _treq = StubTreq([(req, resp)], [(resp, 'failure')])
 
         fs.return_value = succeed(None)
 
-        d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
-                          retries=0, _treq=_treq, clock=clock,
-                          create_failure_delay=5)
+        d = self._create_server(
+            'http://url/', 'my-auth-token', {}, log=self.log, retries=0,
+            _treq=_treq, create_failure_delay=5)
         self.assertNoResult(d)
-        clock.advance(5)
+        self.clock.advance(5)
 
         failure = self.failureResultOf(d, RequestError)
         real_failure = failure.value.reason
@@ -1287,14 +1305,14 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
 
         fs.side_effect = lambda *a, **kw: succeed(None)
 
-        clock = Clock()
         d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
-                          clock=clock, _treq=_treq, create_failure_delay=5)
-        clock.advance(5)
+                          _treq=_treq, create_failure_delay=5,
+                          clock=self.clock)
+        self.clock.pump([1, 5])
 
         for i in range(3):
             self.assertEqual(len(fs.mock_calls), i + 1)
-            clock.pump([15, 5])
+            self.clock.pump([15, 1, 5])
 
         self.failureResultOf(d)
         self.assertEqual(len(fs.mock_calls), 4)
@@ -1314,10 +1332,9 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
 
         _treq = StubTreq([(req, resp)], [(resp, "User error!")])
 
-        clock = Clock()
-        d = create_server('http://url/', 'my-auth-token', {}, log=self.log,
-                          clock=clock, _treq=_treq)
-        clock.advance(15)
+        d = self._create_server(
+            'http://url/', 'my-auth-token', {}, log=self.log, _treq=_treq)
+        self.clock.advance(15)
 
         failure = self.failureResultOf(d, RequestError)
         self.assertTrue(failure.value.reason.check(APIError))
