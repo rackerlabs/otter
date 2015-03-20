@@ -27,8 +27,8 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             group_id=self.group.id,
             policy_data=self.policy_up,
             execute_webhook=True)
-        self.servers_before_scaledown = (self.gc_min_entities_alt
-                                         + self.policy_up['change'])
+        self.servers_before_scaledown = (self.gc_min_entities_alt +
+                                         self.policy_up['change'])
         self.resources.add(self.group, self.empty_scaling_group)
 
     @tags(speed='slow')
