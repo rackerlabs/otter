@@ -6,7 +6,10 @@ import os
 from functools import partial, wraps
 from inspect import getargspec
 
-from effect import base_dispatcher, sync_performer
+from effect import (
+    ComposedDispatcher, ParallelEffects, TypeDispatcher,
+    base_dispatcher, sync_performer)
+from effect.async import perform_parallel_async
 from effect.testing import (
     resolve_effect as eff_resolve_effect,
     resolve_stubs as eff_resolve_stubs)
@@ -672,6 +675,13 @@ def resolve_stubs(eff):
     dispatchers from Effect.
     """
     return eff_resolve_stubs(base_dispatcher, eff)
+
+
+def test_dispatcher():
+    return ComposedDispatcher([
+        base_dispatcher,
+        TypeDispatcher({ParallelEffects: perform_parallel_async}),
+    ])
 
 
 def defaults_by_name(fn):
