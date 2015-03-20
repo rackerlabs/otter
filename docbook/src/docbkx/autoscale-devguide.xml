@@ -57,7 +57,7 @@
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2015-01-30</pubdate>
+        <pubdate>2015-03-17</pubdate>
         <copyright>
             <year>2015</year>
             <holder>Rackspace US, Inc.</holder>
@@ -69,6 +69,16 @@
             </annotation>
         </legalnotice>
         <revhistory>
+            <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <date>2015-03-17</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Updated <link linkend="identityEndpoints">Identity endpoints </link>section. Changed launchConfiguration loadBalancerId attribute type to "String."</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
             <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
                 <date>2015-01-30</date>
                 <revdescription>
@@ -482,6 +492,45 @@
                 obtain this token by first using the Rackspace Cloud
                 Identity service and supplying a valid user name and
                 API access key.</para>
+            
+            <section xml:id="identityEndpoints">
+                <title>Identity endpoints</title>
+                <para>You can use the Rackspace Cloud Identity authentication endpoints from version 1.1 or version 2.0. 
+                    The legacy v1.1 API endpoint only supports authentication services, but you can use tokens from version 1.1 in version 2.0 API calls.</para>
+                <note><para>If your Rackspace Cloud account requires multi-factor authentication, you can only authenticate with Identity API version 2.0 or later.</para></note>
+                <informaltable rules="all">
+                    <col width="14%"/>
+                    <col width="42%"/>
+                    <col width="44%"/>
+                    <thead>
+                        <tr>
+                            <th>Resource</th>
+                            <th>V2.0</th>
+                            <th>V1.0</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Global endpoint</td>
+                            <td><link xlink:href="https://identity.api.rackspacecloud.com/v2.0">https://identity.api.rackspacecloud.com/v2.0</link></td>
+                            <td><link xlink:href="https://identity.api.rackspacecloud.com/v1.1">https://identity.api.rackspacecloud.com/v1.1</link></td>
+                        </tr>
+                        <tr>
+                            <td>Documentation</td>
+                            <td><link xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/QuickStart-000.html">Cloud Identity Client Developer Guide - API v2.0</link></td>
+                            <td><link xlink:href="http://docs.rackspace.com/auth/api/v1.1/auth-client-devguide/content/index.html">Cloud Authentication Client Developer Guide - API v1.1</link></td>
+                        </tr>
+                    </tbody>
+                </informaltable>
+                <para>In response to valid credentials, an authentication request
+                    to the Cloud Identity Service returns an authentication token and a service
+                    catalog that contains a list of all services and endpoints
+                    available for this token. Because the authentication token
+                    expires after 24 hours, you must generate a new token once a
+                    day. </para>
+            </section>
+            
+                
             <section xml:id="Retrieving_Auth_Token">
                 <title>Retrieving the authentication token</title>
                 <para>The authenticate operation provides users with

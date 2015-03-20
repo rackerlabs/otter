@@ -169,7 +169,8 @@
                 the created group in JSON format. The response
                 includes an ID and links for the group.</para>
             <para>The number of resources entities that are specified in <parameter>minEntities</parameter> and <parameter>maxEntities</parameter> overrides the
-                amount of resources that can be specified in a policy. See also <link linkend="Min_and_Max_Policies">Using the min and max values with policies</link>.</para>
+                amount of resources that can be specified in a policy. See also <link xlink:href="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/Min_and_Max_Policies.html">
+                    Using the min and max values with policies</link>.</para>
             <para>You can specify custom metadata for your group
                 configuration using the optional <parameter>metadata</parameter>parameter.</para>
             <para>
@@ -195,7 +196,8 @@
                         RackConnectV3 load balancer pool to
                         which to connect. You must set the
                         <parameter>type</parameter> parameter to <parameter>launch_server</parameter>.
-                        For more details, see <link linkend="Launch_Configuration">Launch configurations</link>.</para></wadl:doc>
+                        For more details, see <link xlink:href="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/Configurations.html">
+                            Launch configurations</link>.</para></wadl:doc>
             </param>
             <param style="plain" name="loadBalancers" required="false"
                 type="array"
@@ -205,7 +207,7 @@
                     <para>One or more cloud load balancers or RackConnectV3 load balancer pools to which to add
                         new servers. For background
                         information and an example
-                        configuration, see <link linkend="RCv3">Cloud Bursting with
+                        configuration, see <link xlink:href="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/RCv3.html">Cloud Bursting with
                             RackConnect v3</link>. All servers are added to these
                         load balancers with the IP addresses of their
                         ServiceNet network. All servers are enabled
@@ -260,11 +262,7 @@
                         image. Specifies the flavor ID for the
                         server.</para><para>A flavor is a resource
                         configuration for a server. For more
-                        information, see <olink
-                            targetdoc="autoscale-devguide"
-                            targetptr="server-flavors">“Server
-                            Flavors”</olink>
-                    section.</para></wadl:doc>
+                        information, see <link xlink:href="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/server-flavors.html">Server flavors</link>.</para></wadl:doc>
             </param>
             <param style="plain" name="imageRef" required="true"
                 type="string"
@@ -318,8 +316,8 @@
             <param style="plain" name="args" required="true"
                 type="object" path="$.launchConfiguration.args">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN"><para>The item to be configured.
-                        Must be <parameter>server</parameter> or <parameter>loadBalancers</parameter>. Most
+                    xml:lang="EN"><para>The configuration used to create new servers in the scaling group.
+                        You must specify the <parameter>server</parameter> attribute, and can also specify the optional <parameter>loadBalancers</parameter> attribute. Most
                         launch configurations have both a server and a
                         cloud load balancer or RackConnectV3 load balancer pool configured.</para></wadl:doc>
             </param>
@@ -523,6 +521,15 @@
                         <parameter>type</parameter> parameter for <parameter>launchConfiguration</parameter> must be
                         set to <parameter>launch_server</parameter>.</wadl:doc>
                 </param>
+                
+                <param style="plain" name="args" required="true" type="object" path="$.launchConfiguration.args">
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                        >The configuration used to create new servers in the scaling group. You must specify
+                        <parameter>server</parameter> attribute, and can also specify the optional <parameter>loadBalancers</parameter> attribute. Most launch
+                        configurations have both a server and a
+                        load balancer or RackConnectV3 load balancer pool.</wadl:doc>
+                </param>
+                
                 <param style="plain" name="loadBalancers"
                     required="false" type="array"
                     path="$.launchConfiguration.args.loadBalancers">
@@ -545,7 +552,7 @@
                         80. NOTE that when using RackConnectV3, instead of a cloud load balancer, leave this parameter empty.</wadl:doc>
                 </param>
                 <param style="plain" name="loadBalancerId"
-                    required="true" type="UUID"
+                    required="true" type="string"
                     path="$.launchConfiguration.args.loadBalancers.[*].loadBalancerId">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook">The ID of the cloud load balancer, or RackConnectV3 load balancer pool, to which new
                         servers are added. For cloud load balancers set the <emphasis>ID as an integer</emphasis>, 
@@ -572,9 +579,7 @@
                         >The flavor ID for the server. A flavor is a
                         resource configuration for a server. For more
                         information on available flavors, see the
-                        <olink targetdoc="autoscale-devguide" targetptr="server-flavors">“Server
-                            Flavors”</olink>
-                        section.</wadl:doc>
+                        <link xlink:href="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/server-flavors.html">Server flavors</link> section.</wadl:doc>
                 </param>
                 <param style="plain" name="imageRef" required="true"
                     type="string"
@@ -601,31 +606,22 @@
                         is injected into the file system of the new
                         cloud server image.</wadl:doc>
                 </param>
-                <param style="plain" name="contents" required="true"
-                    type="string"
-                    path="$.launchConfiguration.args.server.personality.[*].contents">
+                <param style="plain" name="contents" required="true" type="string" path="$.launchConfiguration.args.server.personality.[*].contents">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >The content items that are injected into the
                         file system of the new cloud server image.
                     </wadl:doc>
                 </param>
-                <param style="plain" name="args" required="true"
-                    type="object" path="$.launchConfiguration.args">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                        >The item to be configured. Must be
-                        <parameter>server</parameter> or
-                        <parameter>loadBalancers</parameter>. Most launch
-                        configurations have both a server and a
-                        load balancer or RackConnectV3 load balancer pool.</wadl:doc>
-                </param>
+
+
                 <param style="plain" name="user_data"
                     required="false" type="string"
                     path="$.launchConfiguration.args.server.user_data">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
                         >The base64 encoded string containing your create server template. 
                         You can create this template to install packages and run commands via cloud init. You use this for boot from volume. 
-                        For an example create server template, see <link linkend="Configurations">Edit the launch configuration 
-                            for your scaling group</link>. </wadl:doc>
+                        For an example create server template, see <link xlink:href="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/Configurations.html">
+                            Launch configurations</link>. </wadl:doc>
                 </param>
                 <param style="plain" name="type" required="true"
                     type="string" path="$.launchConfiguration.type">
@@ -755,14 +751,14 @@
                         parameter is set to a negative number, the
                         number of servers decreases by the given
                         percentage. The absolute change in the number
-                        of servers is rounded to the nearest
-                        integer. This means that if -X% of the current
+                        of servers is rounded up (away from zero). 
+                        This means that if -X% of the current
                         number of servers translates to -0.5 or -0.25
                         or -0.75 servers, the actual number of servers
                         that are shut down is 1. If X% of the
                         current number of servers translates to 1.2 or
                         1.5 or 1.7 servers, the actual number of
-                        servers that are launched is 2</wadl:doc>
+                        servers that are launched is 2.</wadl:doc>
                 </param>
                 <param style="plain" name="cooldown" required="true"
                     type="number"
@@ -1216,14 +1212,15 @@
                 are accepted and overwrite previously specified parameters. New parameters can be specified. 
                 All create (<methodname>POST</methodname>) parameters, even optional ones, 
                 are required for the update operation. 
-                For more details, see <link linkend="Launch_Configuration">Launch configurations</link>.</para></note>
+                For more details, see <link xlink:href="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/Configurations.html">
+                    Launch configurations</link>.</para></note>
         </wadl:doc>
         <request>
             <param style="plain" name="args" required="false"
                 type="object" path="$.args">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN"><para>The item to be configured.
-                        Must be <parameter>server</parameter> or <parameter>loadBalancers</parameter>. Most
+                    xml:lang="EN"><para>The configuration used to create new servers in the scaling group.
+                        You must specify <parameter>server</parameter> attribute, and can also specify the optional <parameter>loadBalancers</parameter> attribute. Most
                         launch configurations have both a server and a
                         cloud load balancer or RackConnectV3 load balancer pool configured.</para></wadl:doc>
             </param>
@@ -1248,7 +1245,7 @@
                         port number is 80. NOTE that when using RackConnectV3, instead of a cloud load balancer, leave this parameter empty.</para></wadl:doc>
             </param>
             <param style="plain" name="loadBalancerId" required="true"
-                type="integer"
+                type="string"
                 path="$.args.loadBalancers.[*].loadBalancerId">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The ID of the cloud load balancer, or RackConnectV3 load balancer pool, to which new
@@ -1276,8 +1273,7 @@
                         image. Specifies the flavor Id for the server.
                         A flavor is a resource configuration for a
                         server. For more information on available
-                        flavors, see the <olink targetdoc="autoscale-devguide" targetptr="server-flavors">“Server
-                            Flavors”</olink>
+                        flavors, see the <link xlink:href="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/server-flavors.html">Server flavors</link>
                     section.</para></wadl:doc>
             </param>
             <param style="plain" name="imageRef" required="true"
@@ -1316,8 +1312,8 @@
                 <param style="plain" name="args" required="false"
                     type="object" path="$.args">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                        >The item to be configured. Must be
-                        <parameter>server</parameter> or <parameter>loadBalancers</parameter>. Most launch
+                        >The configuration used to create new servers in the scaling group. You must specify
+                        <parameter>server</parameter> attribute, and can also specify the optional <parameter>loadBalancers</parameter> attribute. Most launch
                         configurations have both a server and a
                         load balancer configured.</wadl:doc>
                 </param>
@@ -1344,7 +1340,7 @@
                         80. NOTE that when using RackConnectV3, instead of a cloud load balancer, leave this parameter empty.</wadl:doc>
                 </param>
                 <param style="plain" name="loadBalancerId"
-                    required="true" type="integer"
+                    required="true" type="string"
                     path="$.args.loadBalancers.[*].loadBalancerId">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook">The ID of the cloud load balancer, or RackConnectV3 load balancer pool, to which new
                         servers are added. For cloud load balancers set the <emphasis>ID as an integer</emphasis>, 
@@ -1371,8 +1367,7 @@
                         flavor Id for the server. A flavor is a
                         resource configuration for a server. For more
                         information on available flavors, see the
-                        <olink targetdoc="autoscale-devguide" targetptr="server-flavors">“Server
-                            Flavors”</olink>
+                        <link xlink:href="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/server-flavors.html">Server flavors</link>
                         section.</wadl:doc>
                 </param>
                 <param style="plain" name="imageRef" required="true"
