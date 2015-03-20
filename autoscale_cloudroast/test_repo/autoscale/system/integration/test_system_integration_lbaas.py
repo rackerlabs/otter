@@ -130,9 +130,9 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
     @tags(speed='slow', type='lbaas')
     def test_update_launch_config_to_include_multiple_lbaas(self):
         """
-        Updating the launch config to add multiple load balancer to a group that had
-        only one load balancer, results in the new servers of that group to be added
-        as nodes to all the load balancers
+        Updating the launch config to add multiple load balancer to a group
+        that had only one load balancer, results in the new servers of that
+        group to be added as nodes to all the load balancers
         """
         policy_data = {'change': self.sp_change}
         group = self._create_group_given_lbaas_id(self.load_balancer_1)
@@ -160,8 +160,8 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
     def test_update_launch_config_to_include_lbaas(self):
         """
         Update the launch config to add a load balancer to a group that did not
-        have a load balancer, results in the new servers of that group to be added
-        as nodes to the load balancers
+        have a load balancer, results in the new servers of that group to be
+        added as nodes to the load balancers
         """
         policy_data = {'change': self.sp_change}
         group = (self.autoscale_behaviors.create_scaling_group_given(
@@ -470,9 +470,10 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             disk_config=None,
             networks=None,
             load_balancers=lbaas_list)
-        self.assertEquals(update_lc_response.status_code, 204,
-                          msg='Update launch config with load balancer failed for group '
-                          '{0} with {1}'.format(group.id, update_lc_response.status_code))
+        self.assertEquals(
+            update_lc_response.status_code, 204,
+            msg='Update launch config with load balancer failed for group '
+            '{0} with {1}'.format(group.id, update_lc_response.status_code))
 
     def _create_lbaas_list(self, *lbaas_ids):
         """
@@ -492,26 +493,28 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         """
         return self.lbaas_client.list_nodes(load_balancer_id).entity
 
-    def _assert_lb_nodes_before_scale_persists_after_scale(self, lb_node_list_before_any_operation,
-                                                           load_balancer_id):
+    def _assert_lb_nodes_before_scale_persists_after_scale(
+            self, lb_node_list_before_any_operation, load_balancer_id):
         """
-        Gets the current list of lb nodes address and asserts that provided node
-        address list (which is before any scale operation) still exists within the
-        current list of lb node addresses
+        Gets the current list of lb nodes address and asserts that provided
+        node address list (which is before any scale operation) still exists
+        within the current list of lb node addresses
         """
         current_lb_node_list = [each_node.address for each_node in
                                 self._get_node_list_from_lb(load_balancer_id)]
-        self.assertTrue(set(lb_node_list_before_any_operation).issubset(set(current_lb_node_list)),
-                        msg='nodes {0} is not a subset of {1}'.format(set(
-                            lb_node_list_before_any_operation),
-                            set(current_lb_node_list)))
+        self.assertTrue(
+            set(lb_node_list_before_any_operation).issubset(
+                set(current_lb_node_list)),
+            msg='nodes {0} is not a subset of {1}'.format(
+                set(lb_node_list_before_any_operation),
+                set(current_lb_node_list)))
 
-    def _wait_for_servers_to_be_deleted_when_lb_invalid(self, group_id,
-                                                        servers_before_lb, server_after_lb=0):
+    def _wait_for_servers_to_be_deleted_when_lb_invalid(
+            self, group_id, servers_before_lb, server_after_lb=0):
         """
-        waits for servers_before_lb number of servers to be the desired capacity,
-        then waits for the desired capacity to be server_after_lb when a group with an
-        invalid load balancer is created.
+        waits for servers_before_lb number of servers to be the desired
+        capacity, then waits for the desired capacity to be server_after_lb
+        when a group with an invalid load balancer is created.
         """
         end_time = time.time() + 600
         group_state = (self.autoscale_client.list_status_entities_sgroups(
@@ -519,12 +522,14 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         if group_state.desiredCapacity is servers_before_lb:
             while time.time() < end_time:
                 time.sleep(10)
-                group_state = (self.autoscale_client.list_status_entities_sgroups(
-                    group_id)).entity
+                group_state = (
+                    self.autoscale_client.list_status_entities_sgroups(
+                        group_id)).entity
                 if group_state.desiredCapacity is server_after_lb:
                     return
             else:
-                self.fail('Servers not deleted from group even when group has invalid'
-                          ' load balancers!')
+                self.fail('Servers not deleted from group even when group has '
+                          'invalid load balancers!')
         else:
-            self.fail('Number of servers building on the group are not as expected')
+            self.fail(
+                'Number of servers building on the group are not as expected')
