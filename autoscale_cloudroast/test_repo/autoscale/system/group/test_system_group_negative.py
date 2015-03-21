@@ -97,7 +97,7 @@ class NegativeGroupFixture(AutoscaleFixture):
             group_state.desiredCapacity, 0,
             msg='Desired capacity is not equal to expected number of servers')
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='impatient-timeout')
     def test_user_delete_some_servers_out_of_band(self):
         """
         Create a group with 4 minentities and verify the group state when user

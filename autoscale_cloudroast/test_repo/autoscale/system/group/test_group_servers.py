@@ -46,7 +46,7 @@ class ServersTests(AutoscaleFixture):
         self.fail('Server {} in group {} not deleted'.format(server_id,
                                                              self.groupid))
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='error')
     def test_delete_removes_and_replaces(self, replace=None):
         """
         `DELETE serverId` actually deletes the server and replaces with new
@@ -66,7 +66,7 @@ class ServersTests(AutoscaleFixture):
         # New server replaced?
         self.verify_group_state(self.groupid, 1)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='error')
     def test_delete_removed_replaced_arg(self):
         """
         `DELETE serverId?replace=true` actually deletes the server and
@@ -74,7 +74,7 @@ class ServersTests(AutoscaleFixture):
         """
         self.test_delete_removes_and_replaces('true')
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='error')
     def test_delete_removed_not_replaced(self):
         """
         `DELETE serverId?replace=false` removes the sever and does not replace
@@ -97,6 +97,7 @@ class ServersTests(AutoscaleFixture):
         # New server not replaced?
         self.verify_group_state(self.groupid, 1)
 
+    @tags(convergence='yes')
     def test_delete_server_not_found(self):
         """
         `DELETE invalid_serverId` returns 404
@@ -107,6 +108,7 @@ class ServersTests(AutoscaleFixture):
                          'Delete server status is {}. Expected 404'.format(
                              resp.status_code))
 
+    @tags(convergence='yes')
     def test_delete_server_not_found_in_diff_group(self):
         """
         `DELETE serverId` on server in same tenant but different group returns
@@ -123,22 +125,27 @@ class ServersTests(AutoscaleFixture):
                          'Delete server status is {}. Expected 404'.format(
                              resp.status_code))
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_delete_below_min(self):
         """
         Calling `DELETE serverId` when number of servers are at minimum returns
         403
         """
+        print "\nhere we go."
+        print ""
         server_id = self.wait_for_expected_number_of_active_servers(
             self.groupid, 1)[0]
+        print "got a server_id", server_id
+        print "'bout to delete it through otter-api"
         resp = self.autoscale_client.delete_server(self.groupid, server_id,
                                                    replace='false')
+        print "resp was", resp
         self.assertEqual(resp.status_code, 403,
                          'Delete server status is {}. Expected 403'.format(
                              resp.status_code))
         self.assertIn('CannotDeleteServerBelowMinError', resp.content)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_delete_server_invalid_replace_args(self):
         """
         `DELETE serverId?replace=bad` returns 400 with InvalidQueryArgument

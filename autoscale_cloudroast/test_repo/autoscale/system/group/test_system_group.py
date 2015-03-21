@@ -14,7 +14,7 @@ class GroupFixture(AutoscaleFixture):
     System tests to verify scaling group scenarios
     """
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_update_minentities_to_scaleup(self):
         """
         The scaling group scales up when the minentities are updated,
@@ -27,7 +27,7 @@ class GroupFixture(AutoscaleFixture):
         self._update_group(group=group, minentities=upd_minentities)
         self.verify_group_state(group.id, upd_minentities)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_update_minentities_to_be_lesser_than_during_create_group(self):
         """
         The scaling group does not scale down when the minenetities are
@@ -40,7 +40,7 @@ class GroupFixture(AutoscaleFixture):
         self._update_group(group=group, minentities=upd_minentities)
         self.verify_group_state(group.id, minentities)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_update_maxentities_less_than_desiredcapacity(self):
         """
         Create a scaling group and execute a policy to be within maxentities,
@@ -71,7 +71,7 @@ class GroupFixture(AutoscaleFixture):
             group.launchConfiguration.server.name,
             count=upd_maxentities)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_update_maxentities_and_execute_policy(self):
         """
         Execute policy on scaling group such that the maxentities are met,
@@ -99,7 +99,7 @@ class GroupFixture(AutoscaleFixture):
         total_servers = maxentities + policy['change']
         self.verify_group_state(group.id, total_servers)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_group_cooldown_enforced_when_reexecuting_same_policy(self):
         """
         The group cooldown is enforced when executing a scaling policy
@@ -123,7 +123,7 @@ class GroupFixture(AutoscaleFixture):
             .format(reexecute_policy_response.status_code, group.id))
         self.verify_group_state(group.id, policy['change'])
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_group_cooldown_enforced_when_executing_different_policies(self):
         """
         The group cooldown is enforced when executing different scaling
@@ -148,7 +148,7 @@ class GroupFixture(AutoscaleFixture):
             .format(execute_policy2_response.status_code, group.id))
         self.verify_group_state(group.id, policy['change'])
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_update_group_cooldown_and_execute_policy(self):
         """
         Different scaling policies can be executed when the group cooldown
@@ -190,7 +190,7 @@ class GroupFixture(AutoscaleFixture):
             'change'] + group.groupConfiguration.minEntities + policy['change']
         self.verify_group_state(group.id, total_servers)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='error')
     def test_execute_policy_beyond_maxentities(self):
         """
         Scaling policy is executed when change + minentities > maxentities,
@@ -227,7 +227,7 @@ class GroupFixture(AutoscaleFixture):
         total_servers = maxentities + policy['change']
         self.verify_group_state(group.id, total_servers)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='error')
     def test_execute_policy_beyond_maxentities_when_min_equals_max(self):
         """
         Scaling group with minentities = maxentities cannot execute scale up
@@ -261,7 +261,7 @@ class GroupFixture(AutoscaleFixture):
         total_servers = maxentities + policy['change']
         self.verify_group_state(group.id, total_servers)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_create_scaling_group_with_same_attributes(self):
         """
         Scaling groups can be created with the exact same attributes
