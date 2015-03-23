@@ -122,7 +122,7 @@ class CreateServerTests(SynchronousTestCase):
 
         self.assertEqual(
             resolve_effect(eff, (StubResponse(202, {}), {"server": {}})),
-            (StepResult.RETRY, []))
+            (StepResult.RETRY, ['waiting for server to become active']))
 
     def test_create_server_400_parseable_failures(self):
         """
@@ -184,7 +184,7 @@ class CreateServerTests(SynchronousTestCase):
             self.assertEqual(
                 resolve_effect(eff, service_request_error_response(api_error),
                                is_error=True),
-                (StepResult.RETRY, []))
+                (StepResult.RETRY, [api_error]))
 
     def test_create_server_403_json_parseable_failures(self):
         """
@@ -277,7 +277,7 @@ class CreateServerTests(SynchronousTestCase):
             self.assertEqual(
                 resolve_effect(eff, service_request_error_response(api_error),
                                is_error=True),
-                (StepResult.RETRY, []))
+                (StepResult.RETRY, [api_error]))
 
     def test_create_server_non_400_or_403_failures(self):
         """
@@ -293,7 +293,7 @@ class CreateServerTests(SynchronousTestCase):
         self.assertEqual(
             resolve_effect(eff, service_request_error_response(api_error),
                            is_error=True),
-            (StepResult.RETRY, []))
+            (StepResult.RETRY, [api_error]))
 
 
 class DeleteServerTests(SynchronousTestCase):
@@ -319,12 +319,6 @@ class DeleteServerTests(SynchronousTestCase):
         self.assertEqual(
             resolve_effect(eff, (None, {})),
             (StepResult.SUCCESS, []))
-
-        self.assertEqual(
-            resolve_effect(eff,
-                           (APIError, APIError(500, None, None), None),
-                           is_error=True),
-            (StepResult.RETRY, []))
 
     def test_delete_and_verify_del_404(self):
         """
@@ -438,13 +432,6 @@ class StepAsEffectTests(SynchronousTestCase):
         self.assertEqual(
             resolve_effect(eff, (None, {})),
             (StepResult.SUCCESS, []))
-
-        err = APIError(500, None, None)
-        self.assertEqual(
-            resolve_effect(eff,
-                           (APIError, err, None),
-                           is_error=True),
-            (StepResult.RETRY, [err]))
 
     def test_change_load_balancer_node(self):
         """

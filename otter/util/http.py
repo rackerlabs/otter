@@ -6,6 +6,8 @@ from itertools import chain
 from urllib import quote, urlencode
 from urlparse import parse_qs, urlsplit, urlunsplit
 
+from characteristic import Attribute, attributes
+
 from toolz.dicttoolz import get_in
 
 import treq
@@ -159,6 +161,8 @@ def append_segments(uri, *segments):
     return uri
 
 
+@attributes(['code', 'body',
+             Attribute('headers', default_value=None)], apply_with_init=False)
 class APIError(Exception):
     """
     An error raised when a non-success response is returned by the API.

@@ -129,7 +129,7 @@ class CreateServer(object):
             a while, and we need to retry convergence to ensure it goes into
             active.
             """
-            return StepResult.RETRY, []
+            return StepResult.RETRY, ['waiting for server to become active']
 
         def report_failure(result):
             """
@@ -144,7 +144,7 @@ class CreateServer(object):
                 if message is not None:
                     return StepResult.FAILURE, [message]
 
-            return StepResult.RETRY, []
+            return StepResult.RETRY, [error]
 
         return eff.on(got_name).on(success=report_success,
                                    error=report_failure)
@@ -219,10 +219,7 @@ class DeleteServer(object):
         def report_success(result):
             return StepResult.SUCCESS, []
 
-        def report_failure(result):
-            return StepResult.RETRY, []
-
-        return eff.on(success=report_success, error=report_failure)
+        return eff.on(success=report_success)
 
 
 @implementer(IStep)
@@ -252,10 +249,7 @@ class SetMetadataItemOnServer(object):
         def report_success(result):
             return StepResult.SUCCESS, []
 
-        def report_failure(result):
-            return StepResult.RETRY, [result[1]]
-
-        return eff.on(success=report_success, error=report_failure)
+        return eff.on(success=report_success)
 
 
 _CLB_DUPLICATE_NODES_PATTERN = re.compile(
