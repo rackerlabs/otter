@@ -17,7 +17,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
     invalid_params = [0, '', '$%^#', 'false', 'False', False, 'anything',
                       'truee']
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_minentities_over_zero(self):
         """
         Force deleting a scaling group with active servers, updates the desired
@@ -39,7 +39,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
             self.assert_servers_deleted_successfully(
                 group.launchConfiguration.server.name)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_force_as_true_with_0_minentities(self):
         """
         Force deleting a scaling group with no active servers with force set to
@@ -60,7 +60,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
             self.assert_servers_deleted_successfully(
                 group.launchConfiguration.server.name)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_invalid_force_attribute_with_0_minentities(self):
         """
         Force deleting a scaling group with no active servers with force set to
@@ -76,7 +76,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
                 msg='Force deleted group {0} when active servers existed '
                 'on it and force was set to invalid option'.format(group.id))
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_invalid_force_attribute(self):
         """
         Force deleting a scaling group with active servers with force set to

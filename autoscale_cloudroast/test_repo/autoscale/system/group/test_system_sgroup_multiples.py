@@ -36,7 +36,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         self.first_scaling_group = first_group.entity
         self.resources.add(self.first_scaling_group, self.empty_scaling_group)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_create_group_with_multiple_policies(self):
         """
         Scaling group can have multiple policies and can be executed
@@ -69,7 +69,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         sp3 = self.autoscale_behaviors.calculate_servers(sp2, percentage)
         self.verify_group_state(self.first_scaling_group.id, sp3)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_create_policy_with_multiple_webhooks(self):
         """
         Scaling policy in a group can have multiple webhooks and they can be
@@ -139,7 +139,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             msg='{0} groups exist on the tenant'.format(
                 self.get_total_num_groups()))
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_max_webhook_policies_on_a_scaling_group(self):
         """
         Verify maximum scaling policies are allowed on a scaling group.
@@ -159,7 +159,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
                           'group'.format(self.get_total_num_policies(
                                          self.first_scaling_group.id)))
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_max_scheduler_policies_on_a_scaling_group(self):
         """
         Verify maximum scaling policies are allowed on a scaling group.
@@ -183,7 +183,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
                           'group'.format(self.get_total_num_policies(
                                          self.first_scaling_group.id)))
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_max_webhooks_on_a_scaling_policy(self):
         """
         Verify the maximum scaling policies are allowed on a scaling policy.
