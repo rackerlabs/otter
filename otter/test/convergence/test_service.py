@@ -325,12 +325,26 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         lock_set = make_lock_set()
         my_buckets = [0, 5]
         all_buckets = range(10)
-        result = converge_all_groups(
+        eff = converge_all_groups(
             log, lock_set, my_buckets, all_buckets,
             get_my_divergent_groups=get_my_divergent_groups,
             converge_one_group=converge_one_group)
+
+        expected_tscope_1 = TenantScope(
+            Effect(Constant(('00', 'g1', 1, 'converge!'))),
+            '00')
+        expected_tscope_2 = TenantScope(
+            Effect(Constant(('01', 'g2', 5, 'converge!'))),
+            '01')
+        dispatcher = ComposedDispatcher([
+            EQFDispatcher([
+                (expected_tscope_1, lambda tscope: tscope.effect),
+                (expected_tscope_2, lambda tscope: tscope.effect),
+            ]),
+            _get_dispatcher()])
+
         self.assertEqual(
-            sync_perform(_get_dispatcher(), result),
+            sync_perform(dispatcher, eff),
             [('00', 'g1', 1, 'converge!'),
              ('01', 'g2', 5, 'converge!')])
         log.msg.assert_called_once_with(
@@ -512,8 +526,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             expected_intents = self.expected_intents
         return ComposedDispatcher([
             EQDispatcher(expected_intents),
-            EQFDispatcher([(TenantScope(mock.ANY, self.tenant_id),
-                            lambda tscope: tscope.effect)]),
             TypeDispatcher({
                 ParallelEffects: perform_parallel_async,
                 ModifyGroupState: perform_modify_group_state,
