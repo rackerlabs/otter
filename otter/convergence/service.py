@@ -103,8 +103,7 @@ def execute_convergence(tenant_id, group_id, log,
                                         group_id=group_id))
     gather_eff = get_all_convergence_data(group_id)
     try:
-        data = yield Effect(TenantScope(parallel([sg_eff, gather_eff]),
-                                        tenant_id))
+        data = yield parallel([sg_eff, gather_eff])
     except FirstError as fe:
         six.reraise(*fe.exc_info)
     [(scaling_group, manifest), (servers, lb_nodes)] = data
@@ -363,10 +362,14 @@ def converge_all_groups(log, group_locks, my_buckets, all_buckets,
     log.msg('converge-all-groups', group_infos=group_infos)
     # TODO: Log currently converging
     # https://github.com/rackerlabs/otter/issues/1216
-    effs = [converge_one_group(log, group_locks,
-                               info['tenant_id'], info['group_id'],
-                               info['version'])
-            for info in group_infos]
+    effs = [
+        Effect(TenantScope(
+            converge_one_group(log, group_locks,
+                               info['tenant_id'],
+                               info['group_id'],
+                               info['version']),
+            info['tenant_id']))
+        for info in group_infos]
     yield do_return(parallel(effs))
 
 
