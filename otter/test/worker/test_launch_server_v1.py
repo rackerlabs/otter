@@ -1168,7 +1168,8 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
                   for i in range(3)]
 
         # no result in any of them and only 1 treq.post is called
-        [self.assertNoResult(d) for d in ret_ds]
+        for d in ret_ds:
+            self.assertNoResult(d)
         self.assertEqual(self.treq.post.call_count, 1)
 
         # fire first deferred and notice that next treq.post is still not
