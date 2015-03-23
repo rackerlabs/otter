@@ -131,15 +131,10 @@ class ServersTests(AutoscaleFixture):
         Calling `DELETE serverId` when number of servers are at minimum returns
         403
         """
-        print "\nhere we go."
-        print ""
         server_id = self.wait_for_expected_number_of_active_servers(
             self.groupid, 1)[0]
-        print "got a server_id", server_id
-        print "'bout to delete it through otter-api"
         resp = self.autoscale_client.delete_server(self.groupid, server_id,
                                                    replace='false')
-        print "resp was", resp
         self.assertEqual(resp.status_code, 403,
                          'Delete server status is {}. Expected 403'.format(
                              resp.status_code))
