@@ -347,7 +347,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         self.assertTrue(all([server_ip not in node_list_on_lb for server_ip
                              in server_ip_list]))
 
-    @tags(speed='slow', type='lbaas', convergence='impatient-timeout')
+    @tags(speed='slow', type='lbaas', convergence='error')
     def test_negative_create_group_with_invalid_load_balancer(self):
         """
         Create group with a random number/lb from a differnt region as the load
@@ -363,7 +363,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             self.assert_servers_deleted_successfully(
                 group.launchConfiguration.server.name)
 
-    @tags(speed='slow', type='lbaas', convergence='impatient-timeout')
+    @tags(speed='slow', type='lbaas', convergence='error')
     def test_load_balancer_pending_update_or_error_state(self):
         """
         Ensure all the servers are created and added to the load balancer and
@@ -402,7 +402,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             group.launchConfiguration.server.name,
             self.gc_min_entities_alt)
 
-    @tags(speed='slow', type='lbaas', convergence='impatient-timeout')
+    @tags(speed='slow', type='lbaas', convergence='error')
     def test_group_with_invalid_load_balancer_among_multiple_load_balancers(
             self):
         """

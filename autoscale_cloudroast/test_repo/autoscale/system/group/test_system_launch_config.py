@@ -50,7 +50,7 @@ class LaunchConfigTest(AutoscaleFixture):
             active_list, self.upd_server_name,
             self.upd_image_ref, self.upd_flavor_ref)
 
-    @tags(speed='slow', convergence='timeout')
+    @tags(speed='slow', convergence='error')
     def test_update_launchconfig_scale_down(self):
         """
         Create a scaling group with a scale up and scale down policy. Execute
@@ -92,7 +92,7 @@ class LaunchConfigTest(AutoscaleFixture):
             group.launchConfiguration.server.name,
             server_after_down)
 
-    @tags(speed='slow', convergence='timeout')
+    @tags(speed='slow', convergence='error')
     def test_update_launchconfig_scale_up_down(self):
         """
         Create a scaling group with a scale up and scale down policy. Execute
@@ -215,7 +215,7 @@ class LaunchConfigTest(AutoscaleFixture):
         self.assertEquals(1, len(servers))
         self.assertEquals("", servers[0].image.id)
 
-    @tags(speed='quick', convergence='timeout')
+    @tags(speed='quick', convergence='error')
     def test_update_launchconfig_while_group_building(self):
         """
         Updates to the launch config do not apply to the servers building,
@@ -236,7 +236,7 @@ class LaunchConfigTest(AutoscaleFixture):
             group.launchConfiguration.server.imageRef,
             group.launchConfiguration.server.flavorRef)
 
-    @tags(speed='slow', convergence='impatient-timeout')
+    @tags(speed='slow', convergence='error')
     def test_update_launchconfig_while_group_building_and_scale_down(self):
         """
         Create a scaling group and scale up. While servers are building, update
@@ -317,7 +317,7 @@ class LaunchConfigTest(AutoscaleFixture):
             servers_list_on_upd, self.upd_server_name, self.upd_image_ref,
             self.upd_flavor_ref)
 
-    @tags(speed='slow', convergence='impatient-timeout')
+    @tags(speed='slow', convergence='error')
     def test_update_launchconfig_group_maxentities(self):
         """
         Create a scaling group with scaling policy and with
@@ -371,7 +371,7 @@ class LaunchConfigTest(AutoscaleFixture):
         self.assert_servers_deleted_successfully(
             group.launchConfiguration.server.name)
 
-    @tags(speed='slow', convergence='impatient-timeout')
+    @tags(speed='slow', convergence='error')
     def test_scale_down_oldest_on_active_servers(self):
         """
         Create a scaling group with minentities=scale up=scale_down=sp_change
