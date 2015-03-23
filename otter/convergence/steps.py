@@ -144,7 +144,7 @@ class CreateServer(object):
                 if message is not None:
                     return StepResult.FAILURE, [message]
 
-            return StepResult.RETRY, [result[1]]
+            return StepResult.RETRY, [error]
 
         return eff.on(got_name).on(success=report_success,
                                    error=report_failure)
