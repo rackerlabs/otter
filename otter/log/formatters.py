@@ -7,6 +7,8 @@ from datetime import datetime
 
 from pyrsistent import pmap
 
+from singledispatch import singledispatch
+
 from twisted.python.failure import Failure
 
 
@@ -237,6 +239,22 @@ def audit_log_formatter(eventDict, timestamp, hostname):
     return audit_log_params
 
 
+@singledispatch
+def serialize_to_jsonable(obj):
+    """
+    Serialize any object to a JSONable form
+    """
+    return None
+
+
+@serialize_to_jsonable.register(basestring)
+def serialize_str(s):
+    """
+    Serialize string
+    """
+    return s
+
+
 def ErrorFormattingWrapper(observer):
     """
     Return log observer that will format error if any and delegate it to
@@ -261,7 +279,7 @@ def ErrorFormattingWrapper(observer):
                 message = repr(excp)
                 event['traceback'] = event['failure'].getTraceback()
                 event['exception_type'] = excp.__class__.__name__
-                details = serialize_exception(excp)
+                details = serialize_to_jsonable(excp)
                 if details is not None:
                     event['error_details'] = details
 

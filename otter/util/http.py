@@ -9,6 +9,7 @@ from urlparse import urlsplit, urlunsplit, parse_qs
 
 import treq
 
+from otter.log.formatters import serialize_to_jsonable
 from otter.util.config import config_value
 
 
@@ -110,6 +111,14 @@ class UpstreamError(Exception):
             d.update({'code': e.code, 'message': self.apierr_message, 'body': e.body,
                       'headers': e.headers})
         return d
+
+
+@serialize_to_jsonable.register(UpstreamError)
+def serialize_upstream_exception(upstream_error):
+    """
+    Serialize UpstreamError
+    """
+    return upstream_error.details
 
 
 def wrap_upstream_error(f, system, operation, url=None):
