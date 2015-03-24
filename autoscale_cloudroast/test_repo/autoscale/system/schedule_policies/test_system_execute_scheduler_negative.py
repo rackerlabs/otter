@@ -164,7 +164,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         at_style_policies_list = []
         for policy in (1, 2, 3):
             policy = {
-                'args': {'at': self.autoscale_behaviors.get_time_in_utc(1)},
+                'args': {'at': self.autoscale_behaviors.get_time_in_utc(5)},
                 'cooldown': 0,
                 'type': 'schedule',
                 'name': 'multi_at_style{0}'.format(policy),
