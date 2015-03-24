@@ -132,13 +132,14 @@ def execute_convergence(tenant_id, group_id, log,
             results=zip(steps, results),
             worst_status=worst_status)
 
-    if worst_status in (StepResult.SUCCESS, StepResult.FAILURE):
+    if worst_status == StepResult.SUCCESS:
         # Do one last gathering + writing to `active` so we get updated
         # based on any DELETEs or other stuff that happened.
-        gather_eff = get_all_convergence_data(group_id)
         (servers, lb_nodes) = yield gather_eff
         active = determine_active(servers, lb_nodes)
         yield _update_active(scaling_group, active)
+        # given that we're gathering in this case, wouldn't it make sense to
+        # also plan, and then to execute that plan if something is found...?
 
     yield do_return(worst_status)
 
