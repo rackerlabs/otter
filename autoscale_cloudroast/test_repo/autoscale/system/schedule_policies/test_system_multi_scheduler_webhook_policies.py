@@ -131,21 +131,22 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
     @tags(speed='quick')
     def test_system_webhook_and_scheduler_policies_many_different_groups(self):
         """
-        Create many groups each with the same type of scheduler and webhook policies and
-        verify the servers after each of their executions
+        Create many groups each with the same type of scheduler and webhook
+        policies and verify the servers after each of their executions
         """
-        at_style_policy = dict(
-            args=dict(at=self.autoscale_behaviors.get_time_in_utc(30)),
-            cooldown=self.gc_cooldown, type='schedule', name='multi_at_style',
-            change=self.change)
-        group_list = []
-        for each in range(4):
-            group = self._create_multi_policy_group(1, 201, at_style_policy)
-            group_list.append(group.id)
+        group_ids = []
+        for _ in range(4):
+            policy = dict(
+                args=dict(at=self.autoscale_behaviors.get_time_in_utc(30)),
+                cooldown=self.gc_cooldown, type='schedule',
+                name='multi_at_style', change=self.change)
+            group = self._create_multi_policy_group(1, 201, policy)
+            group_ids.append(group.id)
         sleep(self.scheduler_interval + 30)
-        for each_group in group_list:
-            self.verify_group_state(each_group, self.change)
-            self.verify_server_count_using_server_metadata(each_group, self.change)
+        for group_id in group_ids:
+            self.verify_group_state(group_id, self.change)
+            self.verify_server_count_using_server_metadata(group_id,
+                                                           self.change)
 
     def _unchanged_policy(self, policy_list):
         return {i: policy_list[i] for i in policy_list if i != 'change'}
