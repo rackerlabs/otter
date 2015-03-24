@@ -25,8 +25,8 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
                               change=self.change)
         self.cron_style_policy = dict(
             args=dict(cron='* * * * *'),
-            cooldown=self.gc_cooldown, type='schedule', name='multi_cron_style',
-            change=self.change)
+            cooldown=self.gc_cooldown, type='schedule',
+            name='multi_cron_style', change=self.change)
 
     @property
     def at_style_policy(self):
@@ -36,10 +36,10 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             change=self.change)
 
     @tags(speed='quick')
-    def test_system_create_group_with_multiple_webhook_policies_with_same_attributes(self):
+    def test_group_multiple_webhook_policies_with_same_attributes(self):
         """
-        Creating a group with a list of multiple webhook policies, with the same
-        attributes, is succcessful
+        Creating a group with a list of multiple webhook policies,
+        with the same attributes, is succcessful
         """
         self._create_multi_policy_group(2, 201, self.wb_policy)
 
