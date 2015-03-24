@@ -134,14 +134,10 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         Create many groups each with the same type of scheduler and webhook
         policies and verify the servers after each of their executions
         """
-        group_ids = []
-        for _ in range(4):
-            policy = dict(
-                args=dict(at=self.autoscale_behaviors.get_time_in_utc(30)),
-                cooldown=self.gc_cooldown, type='schedule',
-                name='multi_at_style', change=self.change)
-            group = self._create_multi_policy_group(1, 201, policy)
-            group_ids.append(group.id)
+        self.delta = 30
+        group_ids = [
+            self._create_multi_policy_group(1, 201, self.at_style_policy).id
+            for _ in range(4)]
         sleep(self.scheduler_interval + 30)
         for group_id in group_ids:
             self.verify_group_state(group_id, self.change)
