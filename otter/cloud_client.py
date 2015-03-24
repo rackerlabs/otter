@@ -55,7 +55,7 @@ def service_request(
         params=None, log=None,
         reauth_codes=(401, 403),
         success_pred=has_code(200),
-        json_response=True, parse_errors=False):
+        json_response=True):
     """
     Make an HTTP request to a Rackspace service, with a bunch of awesome
     behavior!
@@ -92,13 +92,11 @@ def service_request(
         log=log,
         reauth_codes=reauth_codes,
         success_pred=success_pred,
-        json_response=json_response,
-        parse_errors=parse_errors))
+        json_response=json_response))
 
 
 @attributes(["service_type", "method", "url", "headers", "data", "params",
-             "log", "reauth_codes", "success_pred", "json_response",
-             "parse_errors"])
+             "log", "reauth_codes", "success_pred", "json_response"])
 class ServiceRequest(object):
     """
     A request to a Rackspace/OpenStack service.
@@ -147,28 +145,6 @@ class TenantScope(object):
         self.tenant_id = tenant_id
 
 
-def _add_service_error_parsing(parser, request_func):
-    """
-    Use the given parser to parse service API errors.
-
-    :param callable parser: A function which takes a tuple of exc info, to
-        be called when the request function raises an :class:`APIError`.
-    :param callable request_func: The request function to decorate
-    """
-    def call_parser(excinfo):
-        # ensures that if the parser doesn't raise another exception,
-        # the original exception is raised
-        parser(excinfo)
-        six.reraise(*excinfo)
-
-    @wraps(request_func)
-    def request(*args, **kwargs):
-        return request_func(*args, **kwargs).on(
-            error=catch(APIError, call_parser))
-
-    return request
-
-
 def concretize_service_request(
         authenticator, log, service_configs,
         tenant_id,
@@ -193,10 +169,6 @@ def concretize_service_request(
     region = service_config['region']
     service_name = service_config['name']
 
-    service_error_parsers = {
-        ServiceType.CLOUD_LOAD_BALANCERS: parse_clb_errors
-    }
-
     def got_auth((token, catalog)):
         request_ = add_headers(otter_headers(token), request)
         request_ = add_effect_on_response(
@@ -211,10 +183,6 @@ def concretize_service_request(
             service_request.success_pred, request_)
         if service_request.json_response:
             request_ = add_json_response(request_)
-
-        parser = service_error_parsers.get(service_request.service_type)
-        if service_request.parse_errors and parser is not None:
-            request_ = _add_service_error_parsing(parser, request_)
 
         return request_(
             service_request.method,

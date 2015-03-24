@@ -77,8 +77,7 @@ class ServiceRequestTests(SynchronousTestCase):
                     log=None,
                     reauth_codes=(401, 403),
                     success_pred=has_code(200),
-                    json_response=True,
-                    parse_errors=False
+                    json_response=True
                 )
             )
         )
@@ -198,55 +197,6 @@ class PerformServiceRequestTests(SynchronousTestCase):
             resolve_effect(next_eff, stub_response)
 
         self.assertEqual(cm.exception.body, "THIS IS A FAILURE")
-
-    def test_chosen_per_service_type_if_parse_errors_true(self):
-        """
-        If `parse_errors` is True and there is a parser for that service, the
-        parser will be invoked on that ServiceRequest.  If there is no parser
-        for that service, even if `parse_errors` is True, no error will be
-        parsed.
-        """
-        def resolve_svcreq_of_type(service_type):
-            svc_req = service_request(
-                service_type, "GET", "athing", parse_errors=True).intent
-            eff = self._concrete(svc_req)
-            next_eff = resolve_authenticate(eff)
-            stub_response = stub_pure_response("FOO", code=400)
-            resolve_effect(next_eff, stub_response)
-
-        self.assertRaises(APIError, resolve_svcreq_of_type,
-                          ServiceType.CLOUD_SERVERS)
-
-        self.assertRaises(ValueError, resolve_svcreq_of_type,
-                          ServiceType.CLOUD_LOAD_BALANCERS)
-
-    def test_no_error_parsing_if_parse_errors_false(self):
-        """
-        If the ServiceRequest has specified that ``parse_error`` is False, then
-        there will be no error parsing even if there is a parser.
-        """
-        svc_req = service_request(ServiceType.CLOUD_LOAD_BALANCERS,
-                                  "GET", "athing").intent
-        eff = self._concrete(svc_req)
-        next_eff = resolve_authenticate(eff)
-        stub_response = stub_pure_response("FOO", code=400)
-
-        self.assertRaises(APIError, resolve_effect, next_eff, stub_response)
-
-    def test_error_parsing_only_applies_to_apierrors(self):
-        """
-        If the request results in a non-:class:`APIError`, the error parsing
-        is not called at all.
-        """
-        svc_req = service_request(ServiceType.CLOUD_LOAD_BALANCERS,
-                                  "GET", "athing").intent
-        eff = self._concrete(svc_req)
-        next_eff = resolve_authenticate(eff)
-        with self.assertRaises(Exception):
-            resolve_effect(
-                next_eff,
-                (Exception, Exception("Cannot make request!"), None),
-                is_error=True)
 
 
 class PerformTenantScopeTests(SynchronousTestCase):
