@@ -23,13 +23,16 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         self.wb_policy = dict(cooldown=self.gc_cooldown,
                               type='webhook', name='multiple_wb_policies',
                               change=self.change)
-        self.at_style_policy = dict(
-            args=dict(at=self.autoscale_behaviors.get_time_in_utc(self.delta)),
-            cooldown=self.gc_cooldown, type='schedule', name='multi_at_style',
-            change=self.change)
         self.cron_style_policy = dict(
             args=dict(cron='* * * * *'),
             cooldown=self.gc_cooldown, type='schedule', name='multi_cron_style',
+            change=self.change)
+
+    @property
+    def at_style_policy(self):
+        return dict(
+            args=dict(at=self.autoscale_behaviors.get_time_in_utc(self.delta)),
+            cooldown=self.gc_cooldown, type='schedule', name='multi_at_style',
             change=self.change)
 
     @tags(speed='quick')
