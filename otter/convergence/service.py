@@ -338,6 +338,19 @@ def converge_one_group(log, group_locks, tenant_id, group_id, version,
         log.err(None, 'converge-non-fatal-error')
     else:
         if result in (StepResult.FAILURE, StepResult.SUCCESS):
+            # Do one last gathering + writing to `active` so we get updated
+            # based on any DELETEs or other stuff that happened.
+
+            sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
+                                                group_id=group_id))
+            gather_eff = get_all_convergence_data(group_id)
+            try:
+                data = yield parallel([sg_eff, gather_eff])
+            except FirstError as fe:
+                six.reraise(*fe.exc_info)
+            [(scaling_group, manifest), (servers, lb_nodes)] = data
+            active = determine_active(servers, lb_nodes)
+            yield _update_active(scaling_group, active)
             yield delete_divergent_flag(log, tenant_id, group_id, version)
         # TODO: if result is FAILURE, put the group into ERROR state.
         # https://github.com/rackerlabs/otter/issues/885
