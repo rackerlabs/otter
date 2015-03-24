@@ -47,6 +47,9 @@ class ServersTests(AutoscaleFixture):
                                                              self.groupid))
 
     @tags(speed='slow', convergence='error')
+    # TODO: https://github.com/rackerlabs/otter/issues/1238
+    # DELETE doesn't work on servers created with convergence.
+    # This affects a lot of tests in this module!
     def test_delete_removes_and_replaces(self, replace=None):
         """
         `DELETE serverId` actually deletes the server and replaces with new
