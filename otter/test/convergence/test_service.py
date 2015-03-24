@@ -673,10 +673,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         log = mock_log()
 
+        def get_all_convergence_data(group_id):
+            return Effect('get-all-data')
+
         def plan(*args, **kwargs):
-            return pbag([
-                TestStep(Effect('some-boring-step')),
-            ])
+            return pbag([TestStep(Effect('some-boring-step'))])
 
         def results_in_active(active):
             return transform_eq(
@@ -693,7 +694,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              lambda i: (self.group, self.manifest)),
 
             # gather convergence data
-            ('get-all', lambda i: ([server1], [])),
+            ('get-all-data', lambda i: ([server1], [])),
 
             # update active based on that data
             (ModifyGroupState(
@@ -706,7 +707,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             ('some-boring-step', lambda i: (StepResult.SUCCESS, [])),
 
             # gather convergence data again, since everything was SUCCESS
-            ('get-all', lambda i: ([server1, server2], [])),
+            ('get-all-data', lambda i: ([server1, server2], [])),
 
             # update active on the group with the new results
             (ModifyGroupState(
@@ -722,7 +723,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         eff = execute_convergence(
             self.tenant_id, self.group_id, log,
             plan=plan,
-            get_all_convergence_data=lambda gid: Effect('get-all'))
+            get_all_convergence_data=get_all_convergence_data)
         self.assertEqual(sync_perform(dispatcher, eff), StepResult.SUCCESS)
 
 
