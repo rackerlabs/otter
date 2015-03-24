@@ -674,7 +674,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         log = mock_log()
 
         def get_all_convergence_data(group_id):
-            return Effect('get-all-data')
+            return Effect(('get-all-data', group_id))
 
         def plan(*args, **kwargs):
             return pbag([TestStep(Effect('some-boring-step'))])
@@ -694,7 +694,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              lambda i: (self.group, self.manifest)),
 
             # gather convergence data
-            ('get-all-data', lambda i: ([server1], [])),
+            (('get-all-data', 'group-id'), lambda i: ([server1], [])),
 
             # update active based on that data
             (ModifyGroupState(
@@ -707,7 +707,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             ('some-boring-step', lambda i: (StepResult.SUCCESS, [])),
 
             # gather convergence data again, since everything was SUCCESS
-            ('get-all-data', lambda i: ([server1, server2], [])),
+            (('get-all-data', 'group-id'), lambda i: ([server1, server2], [])),
 
             # update active on the group with the new results
             (ModifyGroupState(
