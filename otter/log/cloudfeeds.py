@@ -13,9 +13,9 @@ from effect.twisted import perform
 
 from toolz.dicttoolz import keyfilter
 
+from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType
 from otter.effect_dispatcher import get_full_dispatcher
-from otter.http import TenantScope, service_request
 from otter.log import log as otter_log
 from otter.log.formatters import PEP3101FormattingWrapper
 from otter.util.http import append_segments

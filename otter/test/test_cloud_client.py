@@ -1,4 +1,4 @@
-"""Tests for otter.http."""
+"""Tests for otter.cloud_client"""
 
 import json
 from functools import partial
@@ -14,14 +14,14 @@ from effect import (
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import Authenticate, InvalidateToken
-from otter.constants import ServiceType
-from otter.http import (
+from otter.cloud_client import (
     ServiceRequest,
     TenantScope,
     add_bind_service,
     concretize_service_request,
     perform_tenant_scope,
     service_request)
+from otter.constants import ServiceType
 from otter.test.utils import resolve_effect, stub_pure_response
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.http import APIError, headers
@@ -78,6 +78,7 @@ class ServiceRequestTests(SynchronousTestCase):
                     reauth_codes=(401, 403),
                     success_pred=has_code(200),
                     json_response=True,
+                    parse_errors=False
                 )
             )
         )
@@ -92,17 +93,21 @@ class PerformServiceRequestTests(SynchronousTestCase):
         self.service_configs = {
             ServiceType.CLOUD_SERVERS: {
                 'name': 'cloudServersOpenStack',
+                'region': 'DFW'},
+            ServiceType.CLOUD_LOAD_BALANCERS: {
+                'name': 'cloudLoadBalancers',
                 'region': 'DFW'}
         }
         eff = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
         self.svcreq = eff.intent
 
-    def _concrete(self, svcreq):
+    def _concrete(self, svcreq, **kwargs):
         """
         Call :func:`concretize_service_request` with premade test objects.
         """
         return concretize_service_request(
-            self.authenticator, self.log, self.service_configs, 1, svcreq)
+            self.authenticator, self.log, self.service_configs, 1, svcreq,
+            **kwargs)
 
     def test_authenticates(self):
         """Auth is done before making the request."""
@@ -176,6 +181,72 @@ class PerformServiceRequestTests(SynchronousTestCase):
         stub_response = stub_pure_response("foo")
         result = resolve_effect(next_eff, stub_response)
         self.assertEqual(result, stub_response)
+
+    def test_no_json_parsing_on_error(self):
+        """
+        Whatever ``json_response`` is set to, it is ignored, if the response
+        does not pass the success predicate (because errors may just be
+        HTML or otherwise not JSON parsable, even if the success response
+        would have been).
+        """
+        svcreq = service_request(ServiceType.CLOUD_SERVERS, "GET", "servers",
+                                 json_response=True).intent
+        eff = self._concrete(svcreq)
+        next_eff = resolve_authenticate(eff)
+        stub_response = stub_pure_response("THIS IS A FAILURE", 500)
+        with self.assertRaises(APIError) as cm:
+            resolve_effect(next_eff, stub_response)
+
+        self.assertEqual(cm.exception.body, "THIS IS A FAILURE")
+
+    def test_chosen_per_service_type_if_parse_errors_true(self):
+        """
+        If `parse_errors` is True and there is a parser for that service, the
+        parser will be invoked on that ServiceRequest.  If there is no parser
+        for that service, even if `parse_errors` is True, no error will be
+        parsed.
+        """
+        def resolve_svcreq_of_type(service_type):
+            svc_req = service_request(
+                service_type, "GET", "athing", parse_errors=True).intent
+            eff = self._concrete(svc_req)
+            next_eff = resolve_authenticate(eff)
+            stub_response = stub_pure_response("FOO", code=400)
+            resolve_effect(next_eff, stub_response)
+
+        self.assertRaises(APIError, resolve_svcreq_of_type,
+                          ServiceType.CLOUD_SERVERS)
+
+        self.assertRaises(ValueError, resolve_svcreq_of_type,
+                          ServiceType.CLOUD_LOAD_BALANCERS)
+
+    def test_no_error_parsing_if_parse_errors_false(self):
+        """
+        If the ServiceRequest has specified that ``parse_error`` is False, then
+        there will be no error parsing even if there is a parser.
+        """
+        svc_req = service_request(ServiceType.CLOUD_LOAD_BALANCERS,
+                                  "GET", "athing").intent
+        eff = self._concrete(svc_req)
+        next_eff = resolve_authenticate(eff)
+        stub_response = stub_pure_response("FOO", code=400)
+
+        self.assertRaises(APIError, resolve_effect, next_eff, stub_response)
+
+    def test_error_parsing_only_applies_to_apierrors(self):
+        """
+        If the request results in a non-:class:`APIError`, the error parsing
+        is not called at all.
+        """
+        svc_req = service_request(ServiceType.CLOUD_LOAD_BALANCERS,
+                                  "GET", "athing").intent
+        eff = self._concrete(svc_req)
+        next_eff = resolve_authenticate(eff)
+        with self.assertRaises(Exception):
+            resolve_effect(
+                next_eff,
+                (Exception, Exception("Cannot make request!"), None),
+                is_error=True)
 
 
 class PerformTenantScopeTests(SynchronousTestCase):

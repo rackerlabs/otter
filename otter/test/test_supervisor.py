@@ -15,8 +15,9 @@ from twisted.internet.task import Cooperator
 from zope.interface.verify import verifyObject
 
 from otter import supervisor
+from otter.auth import IAuthenticator
+from otter.cloud_client import TenantScope
 from otter.constants import ServiceType
-from otter.http import TenantScope
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchScalingGroupError)
 from otter.supervisor import (
@@ -56,12 +57,13 @@ class SupervisorTests(SynchronousTestCase):
         self.group.uuid = 'group-id'
         self.region = "ORD"
 
-        self.auth_token = 'auth-token'
+        self.auth_tokens = ('auth-token1', 'auth-token2', 'auth-token3')
+        self._auth_token_queue = list(self.auth_tokens)
         self.service_catalog = {}
-        self.authenticator = mock.Mock()
+        self.authenticator = iMock(IAuthenticator)
         self.auth_function = self.authenticator.authenticate_tenant
-        self.auth_function.return_value = succeed((self.auth_token,
-                                                   self.service_catalog))
+        self.auth_function.side_effect = lambda *a, **kw: succeed(
+            (self._auth_token_queue.pop(0), self.service_catalog))
 
         self.fake_server_details = {
             'server': {'id': 'server_id', 'links': ['links'], 'name': 'meh',
@@ -89,13 +91,13 @@ class SupervisorTests(SynchronousTestCase):
         """
         verifyObject(ISupervisor, self.supervisor)
 
-    def assertCorrectRequestFunc(self, request_bag):
+    def assertCorrectRequestBag(self, request_bag, test_reauth=True):
         """
         Asserts that the given request bag has all necessary data.
 
         :param request_bag: The :obj:`otter.supervisor.RequestBag` to check.
         """
-        self.assertEqual(request_bag.auth_token, self.auth_token)
+        self.assertIn(request_bag.auth_token, self.auth_tokens)
         self.assertEqual(request_bag.service_catalog, self.service_catalog)
         self.assertEqual(request_bag.region, "ORD")
         self.assertEqual(request_bag.lb_region, "ORD")
@@ -104,6 +106,14 @@ class SupervisorTests(SynchronousTestCase):
         # only provided by the full dispatcher
         tscope = TenantScope(Effect(Constant(1)), 'tenant_id')
         self.assertIsNot(request_bag.dispatcher(tscope), None)
+
+        if test_reauth:
+            # ensures that there is a re-auth callable that produces a new
+            # request bag exactly like this one, except the auth token is
+            # different
+            new_bag = self.successResultOf(request_bag.re_auth())
+            self.assertCorrectRequestBag(new_bag, test_reauth=False)
+            self.assertNotEqual(request_bag.auth_token, new_bag.auth_token)
 
 
 class HealthCheckTests(SupervisorTests):
@@ -181,7 +191,7 @@ class LaunchConfigTests(SupervisorTests):
         function.
         """
         expected = ValueError('auth failure')
-        self.auth_function.return_value = fail(expected)
+        self.auth_function.side_effect = lambda *a, **kw: fail(expected)
 
         d = self.supervisor.execute_config(self.log, 'transaction-id',
                                            self.group, self.launch_config)
@@ -206,7 +216,7 @@ class LaunchConfigTests(SupervisorTests):
         log, request_bag, scaling_group, launch_config, undo = args
         self.assertEqual(log, matches(IsBoundWith(tenant_id=11111,
                                                   worker='launch_server')))
-        self.assertCorrectRequestFunc(request_bag)
+        self.assertCorrectRequestBag(request_bag)
         self.assertEqual(scaling_group, self.group)
         self.assertEqual(launch_config, {'server': {}})
         self.assertEqual(undo, self.undo)
@@ -217,7 +227,7 @@ class LaunchConfigTests(SupervisorTests):
         when launch_server fails.
         """
         expected = ValueError('auth failure')
-        self.auth_function.return_value = fail(expected)
+        self.auth_function.side_effect = lambda *a, **kw: fail(expected)
 
         d = self.supervisor.execute_config(self.log, 'transaction-id',
                                            self.group, self.launch_config)
@@ -289,7 +299,7 @@ class DeleteServerTests(SupervisorTests):
         log, request_bag, instance_details = args
         self.assertEqual(log, matches(IsBoundWith(tenant_id=11111,
                                                   server_id='server_id')))
-        self.assertCorrectRequestFunc(request_bag)
+        self.assertCorrectRequestBag(request_bag)
         expected_details = self.fake_server['id'], self.fake_server['lb_info']
         self.assertEqual(instance_details, expected_details)
 
@@ -310,7 +320,7 @@ class DeleteServerTests(SupervisorTests):
         authentication function.
         """
         expected = ValueError('auth failure')
-        self.auth_function.return_value = fail(expected)
+        self.auth_function.side_effect = lambda *a, **kw: fail(expected)
 
         d = self.supervisor.execute_delete_server(
             self.log, 'transaction-id', self.group, self.fake_server)
@@ -346,7 +356,7 @@ class ScrubMetadataTests(SupervisorTests):
             "tenant-id", log=smells_like_log)
         self.scrub_otter_metadata.assert_called_once_with(
             smells_like_log,
-            self.auth_token,
+            self.auth_tokens[0],
             self.service_catalog,
             self.supervisor.region,
             "server-id")
@@ -379,7 +389,7 @@ class ValidateLaunchConfigTests(SupervisorTests):
             self.group.tenant_id, log=self.log.bind.return_value)
         self.validate_launch_server_config.assert_called_once_with(
             self.log.bind.return_value, 'ORD', self.service_catalog,
-            self.auth_token, 'launch_args')
+            self.auth_tokens[0], 'launch_args')
 
     def test_invalid_config_error_propagates(self):
         """

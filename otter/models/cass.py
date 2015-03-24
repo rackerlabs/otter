@@ -1215,7 +1215,12 @@ class CassScalingGroup(object):
         def _delete_lock_znode(result):
             d = self.kz_client.delete(LOCK_PATH + '/' + self.uuid,
                                       recursive=True)
-            d.addCallback(lambda _: result)
+
+            d.addErrback(
+                lambda f: self.log.msg(
+                    "Error cleaning up lock path (when deleting group)",
+                    exc=f.value,
+                    otter_msg_type="ignore-delete-lock-error"))
             return d
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
@@ -1226,6 +1231,7 @@ class CassScalingGroup(object):
                       release_timeout=30)
         # Cleanup /locks/<groupID> znode as it will not be required anymore
         d.addCallback(_delete_lock_znode)
+        d.addCallback(lambda _: None)
         return d
 
 

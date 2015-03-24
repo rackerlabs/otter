@@ -13,8 +13,8 @@ import mock
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.cloud_client import TenantScope, has_code, service_request
 from otter.constants import ServiceType
-from otter.http import TenantScope, has_code, service_request
 from otter.log.cloudfeeds import (
     CloudFeedsObserver,
     UnsuitableMessage,

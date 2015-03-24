@@ -20,6 +20,7 @@ from pyrsistent import freeze
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
+from otter.cloud_client import service_request
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
     extract_CLB_drained_at,
@@ -37,7 +38,6 @@ from otter.convergence.model import (
     RCv3Description,
     RCv3Node,
     ServerState)
-from otter.http import service_request
 from otter.test.utils import (
     patch,
     resolve_effect,
@@ -235,16 +235,16 @@ class GetCLBContentsTests(SynchronousTestCase):
         self.reqs = {
             ('GET', 'loadbalancers', True): {'loadBalancers':
                                              [{'id': 1}, {'id': 2}]},
-            ('GET', 'loadbalancers/1/nodes', True): [
+            ('GET', 'loadbalancers/1/nodes', True): {'nodes': [
                 {'id': '11', 'port': 20, 'address': 'a11',
                  'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
                 {'id': '12', 'port': 20, 'address': 'a12',
-                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}],
-            ('GET', 'loadbalancers/2/nodes', True): [
+                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}]},
+            ('GET', 'loadbalancers/2/nodes', True): {'nodes': [
                 {'id': '21', 'port': 20, 'address': 'a21',
                  'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
                 {'id': '22', 'port': 20, 'address': 'a22',
-                 'weight': 3, 'condition': 'DRAINING', 'type': 'PRIMARY'}],
+                 'weight': 3, 'condition': 'DRAINING', 'type': 'PRIMARY'}]},
             ('GET', 'loadbalancers/1/nodes/11.atom', False): '11feed',
             ('GET', 'loadbalancers/2/nodes/22.atom', False): '22feed'
         }
@@ -334,8 +334,8 @@ class GetCLBContentsTests(SynchronousTestCase):
         self.reqs = {
             ('GET', 'loadbalancers', True): {'loadBalancers':
                                              [{'id': 1}, {'id': 2}]},
-            ('GET', 'loadbalancers/1/nodes', True): [],
-            ('GET', 'loadbalancers/2/nodes', True): []
+            ('GET', 'loadbalancers/1/nodes', True): {'nodes': []},
+            ('GET', 'loadbalancers/2/nodes', True): {'nodes': []},
         }
         eff = get_clb_contents()
         self.assertEqual(self._resolve_lb(eff), [])
@@ -347,14 +347,14 @@ class GetCLBContentsTests(SynchronousTestCase):
         self.reqs = {
             ('GET', 'loadbalancers', True): {'loadBalancers':
                                              [{'id': 1}, {'id': 2}]},
-            ('GET', 'loadbalancers/1/nodes', True): [
+            ('GET', 'loadbalancers/1/nodes', True): {'nodes': [
                 {'id': '11', 'port': 20, 'address': 'a11',
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
-            ],
-            ('GET', 'loadbalancers/2/nodes', True): [
+            ]},
+            ('GET', 'loadbalancers/2/nodes', True): {'nodes': [
                 {'id': '21', 'port': 20, 'address': 'a21',
                  'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
-            ]
+            ]},
         }
         make_desc = partial(CLBDescription, port=20, weight=2,
                             condition=CLBNodeCondition.ENABLED,

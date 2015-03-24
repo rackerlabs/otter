@@ -10,6 +10,7 @@ from toolz.functoolz import compose, identity
 from toolz.itertoolz import concat
 
 from otter.auth import NoSuchEndpoint
+from otter.cloud_client import service_request
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
@@ -20,7 +21,6 @@ from otter.convergence.model import (
     RCv3Description,
     RCv3Node,
     group_id_from_metadata)
-from otter.http import service_request
 from otter.indexer import atom
 from otter.util.http import append_segments
 from otter.util.retry import (
@@ -117,8 +117,10 @@ def get_clb_contents():
         _response, body = result
         lbs = body['loadBalancers']
         lb_ids = [lb['id'] for lb in lbs]
-        lb_reqs = [lb_req('GET', _lb_path(lb_id)).on(_discard_response)
-                   for lb_id in lb_ids]
+        lb_reqs = [
+            lb_req('GET', _lb_path(lb_id)).on(
+                lambda (response, body): body['nodes'])
+            for lb_id in lb_ids]
         return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):

@@ -1,12 +1,11 @@
 """Steps for convergence."""
-import json
 import re
 
 from functools import partial
 
 from characteristic import Attribute, attributes
 
-from effect import Constant, Effect, Func
+from effect import Constant, Effect, Func, catch
 
 from pyrsistent import PMap, PSet, pset, thaw
 
@@ -17,12 +16,16 @@ from twisted.python.constants import NamedConstant
 
 from zope.interface import Interface, implementer
 
+from otter.cloud_client import has_code, service_request
 from otter.constants import ServiceType
 from otter.convergence.model import StepResult
-from otter.http import has_code, service_request
 from otter.util.fp import predicate_any
 from otter.util.hashkey import generate_server_name
-from otter.util.http import APIError, append_segments
+from otter.util.http import APIError, append_segments, try_json_with_keys
+from otter.util.retry import (
+    exponential_backoff_interval,
+    retry_effect,
+    retry_times)
 
 
 class IStep(Interface):
@@ -52,20 +55,6 @@ def set_server_name(server_config_args, name_suffix):
     return server_config_args.set_in(('server', 'name'), name)
 
 
-def _try_json_message(maybe_json_error, keys):
-    """
-    Attemp to grab the message body from possibly a JSON error body.  If
-    invalid JSON, or if the JSON is of an unexpected format (keys are not
-    found), `None` is returned.
-    """
-    try:
-        error_body = json.loads(maybe_json_error)
-    except (ValueError, TypeError):
-        return None
-    else:
-        return get_in(keys, error_body, None)
-
-
 def _forbidden_plaintext(message):
     return re.compile(
         "^403 Forbidden\n\nAccess was denied to this resource\.\n\n ({0})$"
@@ -92,14 +81,14 @@ def _parse_nova_user_error(api_error):
     :rtype: `str` or `None`
     """
     if api_error.code == 400:
-        message = _try_json_message(api_error.body,
-                                    ("badRequest", "message"))
+        message = try_json_with_keys(api_error.body,
+                                     ("badRequest", "message"))
         if message:
             return message
 
     elif api_error.code == 403:
-        message = _try_json_message(api_error.body,
-                                    ("forbidden", "message"))
+        message = try_json_with_keys(api_error.body,
+                                     ("forbidden", "message"))
         if message:
             return message
 
@@ -140,7 +129,7 @@ class CreateServer(object):
             a while, and we need to retry convergence to ensure it goes into
             active.
             """
-            return StepResult.RETRY, []
+            return StepResult.RETRY, ['waiting for server to become active']
 
         def report_failure(result):
             """
@@ -155,10 +144,60 @@ class CreateServer(object):
                 if message is not None:
                     return StepResult.FAILURE, [message]
 
-            return StepResult.RETRY, []
+            return StepResult.RETRY, [error]
 
         return eff.on(got_name).on(success=report_success,
                                    error=report_failure)
+
+
+class UnexpectedServerStatus(Exception):
+    """
+    An exception to be raised when a server is found in an unexpected state.
+    """
+    def __init__(self, server_id, status, expected_status):
+        super(UnexpectedServerStatus, self).__init__(
+            'Expected {server_id} to have {expected_status}, '
+            'has {status}'.format(server_id=server_id,
+                                  status=status,
+                                  expected_status=expected_status)
+        )
+        self.server_id = server_id
+        self.status = status
+        self.expected_status = expected_status
+
+
+def delete_and_verify(server_id):
+    """
+    Check the status of the server to see if it's actually been deleted.
+    Succeeds only if it has been either deleted (404) or acknowledged by Nova
+    to be deleted (task_state = "deleted").
+
+    Note that ``task_state`` is in the server details key
+    ``OS-EXT-STS:task_state``, which is supported by Openstack but available
+    only when looking at the extended status of a server.
+    """
+
+    def check_task_state((resp, json_blob)):
+        if resp.code == 404:
+            return
+        server_details = json_blob['server']
+        is_deleting = server_details.get("OS-EXT-STS:task_state", "")
+        if is_deleting.strip().lower() != "deleting":
+            raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
+
+    def verify((_type, error, traceback)):
+        if error.code != 204:
+            raise _type, error, traceback
+        ver_eff = service_request(
+            ServiceType.CLOUD_SERVERS, 'GET',
+            append_segments('servers', server_id, 'details'),
+            success_pred=has_code(200, 404))
+        return ver_eff.on(check_task_state)
+
+    return service_request(
+        ServiceType.CLOUD_SERVERS, 'DELETE',
+        append_segments('servers', server_id),
+        success_pred=has_code(404)).on(error=catch(APIError, verify))
 
 
 @implementer(IStep)
@@ -172,19 +211,15 @@ class DeleteServer(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to delete a server."""
-        eff = service_request(
-            ServiceType.CLOUD_SERVERS,
-            'DELETE',
-            append_segments('servers', self.server_id),
-            success_pred=has_code(204, 404))
+
+        eff = retry_effect(
+            delete_and_verify(self.server_id), can_retry=retry_times(10),
+            next_interval=exponential_backoff_interval(2))
 
         def report_success(result):
             return StepResult.SUCCESS, []
 
-        def report_failure(result):
-            return StepResult.RETRY, []
-
-        return eff.on(success=report_success, error=report_failure)
+        return eff.on(success=report_success)
 
 
 @implementer(IStep)
@@ -214,10 +249,7 @@ class SetMetadataItemOnServer(object):
         def report_success(result):
             return StepResult.SUCCESS, []
 
-        def report_failure(result):
-            return StepResult.RETRY, [result[1]]
-
-        return eff.on(success=report_success, error=report_failure)
+        return eff.on(success=report_success)
 
 
 _CLB_DUPLICATE_NODES_PATTERN = re.compile(
@@ -251,8 +283,9 @@ def _check_clb_422(*regex_matches):
         which it should be by default.
         """
         if response.code == 422:
-            message = content.get('message', '')
-            return any([regex.search(message) for regex in regex_matches])
+            message = try_json_with_keys(content, ('message',))
+            return any([regex.search(message or '')
+                        for regex in regex_matches])
         return False
 
     return check_response
@@ -302,23 +335,22 @@ class AddNodesToCLB(object):
         def report_success(result):
             return StepResult.SUCCESS, []
 
-        def report_failure(result):
+        def report_api_failure(result):
             """
-            If the error is a 422 - PENDING UPDATE, retry.  Otherwise, fail.
+            If the error is a 404 or 422 PENDING_DELETE then fail.
+            Otherwise, retry.
             """
             err_type, error, traceback = result
-            if err_type == APIError and error.code == 413:
-                # over-limit, retry
-                return StepResult.RETRY, [error]
-            if err_type == APIError and error.code == 422:
-                # body has already become JSON
-                message = error.body.get("message", None)
-                if message and _CLB_PENDING_UPDATE_PATTERN.search(message):
-                    return StepResult.RETRY, [error]
+            if error.code == 404:
+                return StepResult.FAILURE, [error]
+            if error.code == 422:
+                message = try_json_with_keys(error.body, ("message",))
+                if message and _CLB_DELETED_PATTERN.search(message):
+                    return StepResult.FAILURE, [error]
+            return StepResult.RETRY, [error]
 
-            return StepResult.FAILURE, [error]
-
-        return eff.on(success=report_success, error=report_failure)
+        return eff.on(success=report_success,
+                      error=catch(APIError, report_api_failure))
 
 
 @implementer(IStep)

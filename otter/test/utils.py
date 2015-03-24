@@ -6,7 +6,10 @@ import os
 from functools import partial, wraps
 from inspect import getargspec
 
-from effect import base_dispatcher, sync_performer
+from effect import (
+    ComposedDispatcher, ParallelEffects, TypeDispatcher,
+    base_dispatcher, sync_performer)
+from effect.async import perform_parallel_async
 from effect.testing import (
     resolve_effect as eff_resolve_effect,
     resolve_stubs as eff_resolve_stubs)
@@ -27,7 +30,7 @@ from twisted.python.failure import Failure
 from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
 
-from otter.http import concretize_service_request
+from otter.cloud_client import concretize_service_request
 from otter.log.bound import BoundLog
 from otter.models.interface import IScalingGroup
 from otter.supervisor import ISupervisor
@@ -674,6 +677,13 @@ def resolve_stubs(eff):
     return eff_resolve_stubs(base_dispatcher, eff)
 
 
+def test_dispatcher():
+    return ComposedDispatcher([
+        base_dispatcher,
+        TypeDispatcher({ParallelEffects: perform_parallel_async}),
+    ])
+
+
 def defaults_by_name(fn):
     """Returns a mapping of args of fn to their default values."""
     args, _, _, defaults = getargspec(fn)
@@ -750,3 +760,17 @@ def get_fake_service_request_performer(stub_response):
         return resolve_effect(eff, stub_response)
 
     return the_performer
+
+
+def raise_(e):
+    """Raise the exception. Useful for lambdas."""
+    raise e
+
+
+class TestStep(object):
+    """A fake step that returns a canned Effect."""
+    def __init__(self, effect):
+        self.effect = effect
+
+    def as_effect(self):
+        return self.effect

@@ -11,8 +11,8 @@ from effect.twisted import perform
 
 from pyrsistent import s
 
+from otter.cloud_client import TenantScope
 from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3
-from otter.http import TenantScope
 from otter.util.pure_http import has_code
 
 
@@ -21,8 +21,7 @@ def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
     Perform a generic RCv3 bulk step on a single (lb, server) pair.
 
     :param IStep step_class: The step class to perform the action.
-    :param request_bag: An object with a bunch of useful data on it. Called
-        a ``request_func`` by other worker/supervisor code.
+    :param request_bag: An object with a bunch of useful data on it.
     :param str lb_id: The id of the RCv3 load balancer to act on.
     :param str server_id: The Nova server id to act on.
     :return: A deferred that will fire when the request has been performed,
