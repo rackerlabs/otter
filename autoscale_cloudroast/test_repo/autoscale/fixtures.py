@@ -446,28 +446,34 @@ class AutoscaleFixture(BaseTestFixture):
         """
         end_time = time.time() + 120
         desired_capacity = desired_capacity or expected_servers
+
+        def get_server_list():
+            if server_name:
+                return self.get_servers_containing_given_name_on_tenant(
+                    server_name=server_name)
+            else:
+                return self.get_servers_containing_given_name_on_tenant(
+                    group_id=group_id)
+
         while time.time() < end_time:
             group_state = self.autoscale_client.list_status_entities_sgroups(
                 group_id).entity
             if group_state.desiredCapacity == desired_capacity:
-                if server_name:
-                    server_list = self.get_servers_containing_given_name_on_tenant(
-                        server_name=server_name)
-                else:
-                    server_list = self.get_servers_containing_given_name_on_tenant(
-                        group_id=group_id)
+                server_list = get_server_list()
                 if (len(server_list) == expected_servers):
                         return server_list
             time.sleep(5)
         else:
-            server_list = self.get_servers_containing_given_name_on_tenant(
-                group_id=group_id)
+            server_list = get_server_list()
             self.fail(
-                'Waited 2 mins for desired capacity/active server list to reach the'
-                ' server count of {0}. Has desired capacity {1} on the group {2}'
-                ' and {3} servers on the account' .format(desired_capacity,
-                                                          group_state.desiredCapacity, group_id,
-                                                          len(server_list)))
+                'Waited 2 mins for desired capacity/active server list to '
+                'reach the server count of {0}. Has desired capacity {1} on '
+                'the group {2} and {3} servers on the account. '
+                'Filtering by server_name={server_name}'.format(
+                    desired_capacity,
+                    group_state.desiredCapacity, group_id,
+                    len(server_list),
+                    server_name=server_name))
 
     def assert_servers_deleted_successfully(self, server_name, count=0):
         """
