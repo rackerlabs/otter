@@ -124,13 +124,22 @@ def execute_convergence(tenant_id, group_id, log,
         yield do_return(StepResult.SUCCESS)
     results = yield steps_to_effect(steps)
 
-    order = [StepResult.FAILURE, StepResult.RETRY, StepResult.SUCCESS]
+    severity = [StepResult.FAILURE, StepResult.RETRY, StepResult.SUCCESS]
     priority = sorted(results,
-                      key=lambda (status, reasons): order.index(status))
+                      key=lambda (status, reasons): severity.index(status))
     worst_status = priority[0][0]
     log.msg('execute-convergence-results',
             results=zip(steps, results),
             worst_status=worst_status)
+
+    if worst_status in (StepResult.SUCCESS, StepResult.FAILURE):
+        # Do one last gathering + writing to `active` so we get updated
+        # based on any DELETEs or other stuff that happened.
+        gather_eff = get_all_convergence_data(group_id)
+        (servers, lb_nodes) = yield gather_eff
+        active = determine_active(servers, lb_nodes)
+        yield _update_active(scaling_group, active)
+
     yield do_return(worst_status)
 
 
@@ -338,19 +347,6 @@ def converge_one_group(log, group_locks, tenant_id, group_id, version,
         log.err(None, 'converge-non-fatal-error')
     else:
         if result in (StepResult.FAILURE, StepResult.SUCCESS):
-            # Do one last gathering + writing to `active` so we get updated
-            # based on any DELETEs or other stuff that happened.
-
-            sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
-                                                group_id=group_id))
-            gather_eff = get_all_convergence_data(group_id)
-            try:
-                data = yield parallel([sg_eff, gather_eff])
-            except FirstError as fe:
-                six.reraise(*fe.exc_info)
-            [(scaling_group, manifest), (servers, lb_nodes)] = data
-            active = determine_active(servers, lb_nodes)
-            yield _update_active(scaling_group, active)
             yield delete_divergent_flag(log, tenant_id, group_id, version)
         # TODO: if result is FAILURE, put the group into ERROR state.
         # https://github.com/rackerlabs/otter/issues/885
