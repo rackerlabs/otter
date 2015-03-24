@@ -665,6 +665,16 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         dispatcher = self._get_dispatcher()
         self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
 
+    def _results_in_active(self, active):
+        """
+        Return a "transformer" that compares equal to a ``modifier`` function
+        as given to :obj:`ModifyGroupState` when modifying ``self.group`` and
+        ``self.state`` returns new state with the given ``active`` servers.
+        """
+        return transform_eq(
+            lambda modifier: modifier(self.group, self.state).active,
+            active)
+
     def test_update_active_after_success(self):
         """
         When all steps are successful, one last gathering is performed and the
@@ -678,11 +688,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         def plan(*args, **kwargs):
             return pbag([TestStep(Effect('some-boring-step'))])
-
-        def results_in_active(active):
-            return transform_eq(
-                lambda modifier: modifier(self.group, self.state).active,
-                active)
 
         server1 = server('id1', ServerState.ACTIVE)
         server2 = server('id2', ServerState.ACTIVE)
@@ -699,7 +704,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             # update active based on that data
             (ModifyGroupState(
                 scaling_group=self.group,
-                modifier=results_in_active(
+                modifier=self._results_in_active(
                     {'id1': {'id': 'id1', 'links': []}})),
              lambda i: None),
 
@@ -712,7 +717,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             # update active on the group with the new results
             (ModifyGroupState(
                 scaling_group=self.group,
-                modifier=results_in_active(
+                modifier=self._results_in_active(
                     {'id1': {'id': 'id1', 'links': []},
                      'id2': {'id': 'id2', 'links': []}})),
              lambda i: None),
