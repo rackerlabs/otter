@@ -805,7 +805,7 @@ class CLBCheckChangeNodeTests(SynchronousTestCase):
         """
         response = StubResponse(202, {})
         body = None
-        result = _clb_check_change_node((response, body))
+        result = _clb_check_change_node(self.example_step, (response, body))
         self.assertEqual(result, (StepResult.SUCCESS, []))
 
     def test_disappearing_server(self):
