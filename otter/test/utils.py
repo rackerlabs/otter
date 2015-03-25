@@ -370,6 +370,16 @@ class StubResponse(object):
         # Data is not part of twisted response object
         self._data = data
 
+    def __eq__(self, other):
+        return (
+            isinstance(other, self.__class__) and
+            self.code == other.code and
+            self.headers == other.headers and
+            self._data == other._data)
+
+    def __neq__(self, other):
+        return self != other
+
 
 def stub_pure_response(body, code=200, response_headers=None):
     """
@@ -732,6 +742,9 @@ def get_fake_service_request_performer(stub_response):
     :param service_request: the :class:`ServiceRequest` to "perform"
     :param stub_response: a tuple of (:class:`StubResponse`, string body),
         supposedly the "response" of an http request
+
+    TODO: hopefully once all service requests are made by the cloud client,
+    this can be moved into the client's test module instead.
     """
     if not isinstance(stub_response, basestring):
         try:

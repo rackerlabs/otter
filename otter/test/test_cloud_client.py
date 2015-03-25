@@ -10,27 +10,67 @@ from effect import (
     TypeDispatcher,
     base_dispatcher,
     sync_perform)
+from effect.testing import EQFDispatcher
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import Authenticate, InvalidateToken
 from otter.cloud_client import (
+    CLBDeletedError,
+    CLBPendingUpdateError,
+    CLBRateLimitError,
+    NoSuchCLBError,
+    NoSuchCLBNodeError,
     ServiceRequest,
     TenantScope,
     add_bind_service,
+    change_clb_node,
     concretize_service_request,
     perform_tenant_scope,
     service_request)
 from otter.constants import ServiceType
-from otter.test.utils import resolve_effect, stub_pure_response
+from otter.test.utils import (
+    resolve_effect,
+    stub_pure_response)
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
 
 
+fake_service_configs = {
+    ServiceType.CLOUD_SERVERS: {
+        'name': 'cloudServersOpenStack',
+        'region': 'DFW'},
+    ServiceType.CLOUD_LOAD_BALANCERS: {
+        'name': 'cloudLoadBalancers',
+        'region': 'DFW'}
+}
+
+
 def resolve_authenticate(eff, token='token'):
     """Resolve an Authenticate effect with test data."""
     return resolve_effect(eff, (token, fake_service_catalog))
+
+
+def service_request_eqf(stub_response):
+    """
+    Return a function to be used as the value matching a ServiceRequest in
+    :class:`EQFDispatcher`.
+    """
+    def resolve_service_request(service_request_intent):
+        eff = concretize_service_request(
+            authenticator=object(),
+            log=object(),
+            service_configs=fake_service_configs,
+            tenant_id='000000',
+            service_request=service_request_intent)
+
+        # "authenticate"
+        eff = resolve_authenticate(eff)
+        # make request
+        return resolve_effect(eff, stub_response)
+
+    return resolve_service_request
 
 
 class BindServiceTests(SynchronousTestCase):
@@ -254,3 +294,113 @@ class PerformTenantScopeTests(SynchronousTestCase):
             sync_perform(self.dispatcher, Effect(tscope)),
             ('concretized', self.authenticator, self.log, self.service_configs,
              1, ereq.intent))
+
+
+class CLBClientTests(SynchronousTestCase):
+    """
+    """
+    @property
+    def lb_id(self):
+        """What is my LB ID"""
+        return u"123456"
+
+    def assert_parses_common_clb_errors(self, intent, eff):
+        """
+        Assert that the effect produced performs the common CLB error parsing:
+        :class:`CLBPendingUpdateError`, :class:`CLBDescription`,
+        :class:`NoSuchCLBError`, :class:`CLBRateLimitError`,
+        :class:`APIError`
+        """
+        json_responses_and_errs = [
+            ("Load Balancer '{0}' has a status of 'PENDING_UPDATE' and is "
+             "considered immutable.", 422, CLBPendingUpdateError),
+            ("Load Balancer '{0}' has a status of 'PENDING_DELETE' and is "
+             "considered immutable.", 422, CLBDeletedError),
+            ("The load balancer is deleted and considered immutable.",
+             422, CLBDeletedError),
+            ("Load balancer not found.", 404, NoSuchCLBError),
+            ("OverLimit Retry...", 413, CLBRateLimitError)
+        ]
+
+        for msg, code, err in json_responses_and_errs:
+            msg = msg.format(self.lb_id)
+            resp = stub_pure_response(
+                json.dumps({'message': msg, 'code': code, 'details': ''}),
+                code)
+            with self.assertRaises(err) as cm:
+                sync_perform(
+                    EQFDispatcher([(intent, service_request_eqf(resp))]),
+                    eff)
+            self.assertEqual(cm.exception, err(msg, lb_id=self.lb_id))
+
+        bad_resps = [
+            stub_pure_response(
+                json.dumps({
+                    'message': ("Load Balancer '{0}' has a status of 'BROKEN' "
+                                "and is considered immutable."),
+                    'code': 422}),
+                422),
+            stub_pure_response(
+                json.dumps({
+                    'message': ("The load balancer is deleted and considered "
+                                "immutable"),
+                    'code': 404}),
+                404),
+            stub_pure_response(
+                json.dumps({
+                    'message': "Cloud load balancers is down",
+                    'code': 500}),
+                500),
+            stub_pure_response("random repose error message", 404),
+            stub_pure_response("random repose error message", 413)
+        ]
+
+        for resp in bad_resps:
+            with self.assertRaises(APIError) as cm:
+                sync_perform(
+                    EQFDispatcher([(intent, service_request_eqf(resp))]),
+                    eff)
+            self.assertEqual(
+                cm.exception,
+                APIError(headers={}, code=resp[0].code, body=resp[1]))
+
+    def test_change_clb_node(self):
+        """
+        Produce a request for modifying a load balancer, which returns a
+        successful result on 202.
+
+        Parse the common CLB errors, and :class:`NoSuchCLBNodeError`.
+        """
+        eff = change_clb_node(lb_id=self.lb_id, node_id=u'1234',
+                              condition="DRAINING", weight=50)
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'PUT',
+            'loadbalancers/{0}/nodes/1234'.format(self.lb_id),
+            data={'condition': 'DRAINING',
+                  'weight': 50},
+            success_pred=has_code(202))
+
+        # success
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(stub_pure_response('', 202)))])
+        self.assertEqual(sync_perform(dispatcher, eff),
+                         stub_pure_response(None, 202))
+
+        # NoSuchCLBNode failure
+        msg = "Node with id #1234 not found for loadbalancer #{0}".format(
+            self.lb_id)
+        no_such_node = stub_pure_response(
+            json.dumps({'message': msg, 'code': 404}), 404)
+        dispatcher = EQFDispatcher([(
+            expected.intent, service_request_eqf(no_such_node))])
+
+        with self.assertRaises(NoSuchCLBNodeError) as cm:
+            sync_perform(dispatcher, eff)
+        self.assertEqual(
+            cm.exception,
+            NoSuchCLBNodeError(msg, lb_id=self.lb_id, node_id=u'1234'))
+
+        # all the common failures
+        self.assert_parses_common_clb_errors(expected.intent, eff)
