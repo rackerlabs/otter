@@ -460,7 +460,9 @@ def _clb_check_change_node(step, result):
     if response.code == 202:
         return StepResult.SUCCESS, []
     else:
-        return StepResult.RETRY, []
+        return StepResult.RETRY, [{'reason': 'CLB node not found',
+                                   'lb': step.lb_id,
+                                   'node': step.node_id}]
 
 
 def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
