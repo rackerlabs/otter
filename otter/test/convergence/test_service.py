@@ -322,13 +322,13 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             self.assertEqual(_my_buckets, my_buckets)
             self.assertEqual(_all_buckets, all_buckets)
             return Effect(Constant([
-                {'tenant_id': '00', 'group_id': 'g1', 'version': 1},
-                {'tenant_id': '01', 'group_id': 'g2', 'version': 5}
+                {'tenant_id': '00', 'group_id': 'g1', 'random': 'rand1'},
+                {'tenant_id': '01', 'group_id': 'g2', 'random': 'rand5'}
             ]))
 
-        def converge_one_group(log, lock_set, tenant_id, group_id, version):
+        def converge_one_group(log, lock_set, tenant_id, group_id, rand):
             return Effect(Constant(
-                (tenant_id, group_id, version, 'converge!')))
+                (tenant_id, group_id, rand, 'converge!')))
 
         log = mock_log()
         lock_set = make_lock_set()
@@ -340,10 +340,10 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             converge_one_group=converge_one_group)
 
         expected_tscope_1 = TenantScope(
-            Effect(Constant(('00', 'g1', 1, 'converge!'))),
+            Effect(Constant(('00', 'g1', 'rand1', 'converge!'))),
             '00')
         expected_tscope_2 = TenantScope(
-            Effect(Constant(('01', 'g2', 5, 'converge!'))),
+            Effect(Constant(('01', 'g2', 'rand5', 'converge!'))),
             '01')
         dispatcher = ComposedDispatcher([
             EQFDispatcher([
@@ -354,19 +354,19 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
         self.assertEqual(
             sync_perform(dispatcher, eff),
-            [('00', 'g1', 1, 'converge!'),
-             ('01', 'g2', 5, 'converge!')])
+            [('00', 'g1', 'rand1', 'converge!'),
+             ('01', 'g2', 'rand5', 'converge!')])
         log.msg.assert_called_once_with(
             'converge-all-groups',
-            group_infos=[{'tenant_id': '00', 'group_id': 'g1', 'version': 1},
-                         {'tenant_id': '01', 'group_id': 'g2', 'version': 5}])
+            group_infos=[{'tenant_id': '00', 'group_id': 'g1', 'random': 'rand1'},
+                         {'tenant_id': '01', 'group_id': 'g2', 'random': 'rand5'}])
 
     def test_no_log_on_no_groups(self):
         """When there's no work, no log message is emitted."""
         def get_my_divergent_groups(_my_buckets, _all_buckets):
             return Effect(Constant([]))
 
-        def converge_one_group(log, lock_set, tenant_id, group_id, version):
+        def converge_one_group(log, lock_set, tenant_id, group_id, rand):
             1 / 0
 
         log = mock_log()
