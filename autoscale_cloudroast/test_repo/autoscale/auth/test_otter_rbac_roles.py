@@ -340,7 +340,8 @@ class OtterRbacTests(AutoscaleFixture):
             '{1}'.format(update_webhook_response.status_code, self.group.id))
 
         # execute webhook
-        execute_webhook_response = user_client.execute_webhook(self.policy_webhook['webhook_url'])
+        execute_webhook_response = user_client.execute_webhook(
+            self.policy_webhook['webhook_url'])
         self.assertEquals(
             execute_webhook_response.status_code, 202,
             msg='Execute webhook returned response code {0} on group '
