@@ -65,7 +65,8 @@ class AutoscaleReposeTests(AutoscaleFixture):
         repose, using the limits api with a trailing slash, returns
         reponse code 200 and the relative and absolute limits.
         """
-        limits_response = self.autoscale_client.view_limits(self.url + '/limits/')
+        limits_response = self.autoscale_client.view_limits(
+            self.url + '/limits/')
         self.assertEquals(limits_response.status_code, 200,
                           msg='Limits returned response code {0}'
                           .format(limits_response.status_code))
