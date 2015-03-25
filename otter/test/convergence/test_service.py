@@ -1,4 +1,5 @@
 from functools import partial
+import uuid
 
 from effect import (
     ComposedDispatcher, Constant, Effect, Error, Func, ParallelEffects,
@@ -51,28 +52,35 @@ class ConvergenceStarterTests(SynchronousTestCase):
 
     def test_start_convergence(self):
         """Starting convergence marks dirty and logs a message."""
-        svc = ConvergenceStarter('my-dispatcher')
+        sequence = SequenceDispatcher([
+            (Func(uuid.uuid4), lambda i: 'randnum1'),
+            (CreateOrSet(path='/groups/divergent/tenant_group_randnum1',
+                         content='dirty'),
+             lambda i: None),
+        ])
+        dispatcher = ComposedDispatcher([sequence, base_dispatcher])
+        svc = ConvergenceStarter(dispatcher)
         log = mock_log()
-
-        def perform(dispatcher, eff):
-            return succeed((dispatcher, eff))
-        d = svc.start_convergence(log, 'tenant', 'group', perform=perform)
+        d = svc.start_convergence(log, 'tenant', 'group')
         self.assertEqual(
             self.successResultOf(d),
-            ('my-dispatcher',
-             Effect(CreateOrSet(path='/groups/divergent/tenant_group',
-                                content='dirty'))))
+            None)
+        self.assertEqual(log.err.mock_calls, [])
         log.msg.assert_called_once_with(
             'mark-dirty-success', tenant_id='tenant', group_id='group')
 
     def test_error_marking_dirty(self):
         """An error is logged when marking dirty fails."""
-        svc = ConvergenceStarter('my-dispatcher')
+        sequence = SequenceDispatcher([
+            (Func(uuid.uuid4), lambda i: 'randnum1'),
+            (CreateOrSet(path='/groups/divergent/tenant_group_randnum1',
+                         content='dirty'),
+             lambda i: raise_(RuntimeError('oh no'))),
+        ])
+        dispatcher = ComposedDispatcher([sequence, base_dispatcher])
+        svc = ConvergenceStarter(dispatcher)
         log = mock_log()
-
-        def perform(dispatcher, eff):
-            return fail(RuntimeError('oh no'))
-        d = svc.start_convergence(log, 'tenant', 'group', perform=perform)
+        d = svc.start_convergence(log, 'tenant', 'group')
         self.assertEqual(self.successResultOf(d), None)
         log.err.assert_called_once_with(
             CheckFailureValue(RuntimeError('oh no')),
@@ -374,19 +382,20 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
 
 class GetMyDivergentGroupsTests(SynchronousTestCase):
+    """Tests for :func:`get_my_divergent_groups`."""
 
     def test_get_my_divergent_groups(self):
         """
-        :func:`get_my_divergent_groups` gets information about divergent groups
-        that are associated with the given buckets.
+        Gets information about divergent groups that are associated with the
+        given buckets.
         """
         # sha1('00') % 10 is 6, sha1('01') % 10 is 1.
         dispatcher = ComposedDispatcher([
             EQDispatcher([
                 (GetChildrenWithStats(CONVERGENCE_DIRTY_DIR),
-                 [('00_gr1', ZNodeStatStub(version=0)),
-                  ('00_gr2', ZNodeStatStub(version=3)),
-                  ('01_gr3', ZNodeStatStub(version=5))]),
+                 [('00_gr1_rand1', ZNodeStatStub(version=0)),
+                  ('00_gr2_rand2', ZNodeStatStub(version=3)),
+                  ('01_gr3_rand3', ZNodeStatStub(version=5))]),
             ]),
             _get_dispatcher()
         ])
@@ -394,8 +403,29 @@ class GetMyDivergentGroupsTests(SynchronousTestCase):
             dispatcher, get_my_divergent_groups([6], range(10)))
         self.assertEqual(
             result,
-            [{'tenant_id': '00', 'group_id': 'gr1', 'version': 0},
-             {'tenant_id': '00', 'group_id': 'gr2', 'version': 3}])
+            [{'tenant_id': '00', 'group_id': 'gr1', 'random': 'rand1'},
+             {'tenant_id': '00', 'group_id': 'gr2', 'random': 'rand2'}])
+
+    def test_uniquify_by_group(self):
+        """
+        Only returns one item per tenant/group.
+        """
+        # sha1('00') % 10 is 6, sha1('01') % 10 is 1.
+        dispatcher = ComposedDispatcher([
+            EQDispatcher([
+                (GetChildrenWithStats(CONVERGENCE_DIRTY_DIR),
+                 [('00_gr1_rand1', ZNodeStatStub(version=0)),
+                  ('00_gr1_rand2', ZNodeStatStub(version=3)),
+                  ('01_gr1_rand3', ZNodeStatStub(version=5))]),
+            ]),
+            _get_dispatcher()
+        ])
+        result = sync_perform(
+            dispatcher, get_my_divergent_groups([0], [0]))
+        self.assertEqual(
+            result,
+            [{'tenant_id': '00', 'group_id': 'gr1', 'random': 'rand1'},
+             {'tenant_id': '01', 'group_id': 'gr1', 'random': 'rand3'}])
 
 
 def _get_dispatcher():

@@ -311,8 +311,13 @@ def get_my_divergent_groups(my_buckets, all_buckets):
     def got_children_with_stats(children_with_stats):
         dirty_info = map(structure_info, children_with_stats)
         # Uniquify by group
-        groups = {x['group_id']: x for x in dirty_info}
-        dirty_info = groups.values()
+        seen_groups = []
+        groups = []
+        for x in dirty_info:
+            if (x['tenant_id'], x['group_id']) not in seen_groups:
+                seen_groups.append((x['tenant_id'], x['group_id']))
+                groups.append(x)
+        dirty_info = groups
         num_buckets = len(all_buckets)
         converging = (
             info for info in dirty_info
@@ -418,7 +423,7 @@ class Converger(MultiService):
         :param buckets: collection of logical `buckets` which are shared
             between all Otter nodes running this service. Will be partitioned
             up between nodes to detirmine which nodes should work on which
-            groups.
+            groups. This *must* be a list of integers starting from 0.
         :param partitioner_factory: Callable of (log, callback) which should
             create an :obj:`Partitioner` to distribute the buckets.
         """
