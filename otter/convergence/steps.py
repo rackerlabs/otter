@@ -451,11 +451,16 @@ class ChangeCLBNode(object):
         return eff.on(_clb_check_change_node)
 
 
-def _clb_check_change_node(result):
+def _clb_check_change_node(step, result):
     """
     Check to what extent a :class:`ChangeCLBNode` response was successful.
     """
-    return StepResult.SUCCESS, []
+    response, body = result
+
+    if response.code == 202:
+        return StepResult.SUCCESS, []
+    else:
+        return StepResult.RETRY, []
 
 
 def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
