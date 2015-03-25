@@ -145,12 +145,12 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         self.log = mock_log()
         self.tenant_id = 'tenant-id'
         self.group_id = 'g1'
-        self.version = 5
+        self.rand = 'rand5'
         self.deletions = []
         self.dispatcher = ComposedDispatcher([
             EQFDispatcher([
-                (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                            version=self.version),
+                (DeleteNode(path='/groups/divergent/tenant-id_g1_rand5',
+                            version=-1),
                  lambda i: self.deletions.append(True))
             ]),
             _get_dispatcher(),
@@ -170,7 +170,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
 
         eff = converge_one_group(
             self.log, make_lock_set(), self.tenant_id, self.group_id,
-            self.version,
+            self.rand,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
         self.assertEqual(result, None)
@@ -197,7 +197,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         lock_set = partial(non_concurrently, Reference(pset([self.group_id])))
         eff = converge_one_group(
             self.log, lock_set, self.tenant_id,
-            self.group_id, self.version,
+            self.group_id, self.rand,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
         self.assertEqual(result, None)
@@ -215,7 +215,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
 
         eff = converge_one_group(
             self.log, make_lock_set(), self.tenant_id, self.group_id,
-            self.version,
+            self.rand,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
         self.assertEqual(result, None)
@@ -240,7 +240,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
 
         eff = converge_one_group(
             self.log, make_lock_set(), self.tenant_id, self.group_id,
-            self.version,
+            self.rand,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
         self.assertEqual(result, None)
@@ -249,35 +249,6 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             'converge-non-fatal-error',
             tenant_id=self.tenant_id, group_id=self.group_id)
         self.assertEqual(self.deletions, [])
-
-    def test_delete_node_version_mismatch(self):
-        """
-        When the version of the dirty flag changes during a call to
-        converge_one_group, and DeleteNode raises a BadVersionError, the error
-        is logged and nothing else is cleaned up.
-        """
-        dispatcher = ComposedDispatcher([
-            EQFDispatcher([
-                (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                            version=self.version),
-                 lambda i: raise_(BadVersionError()))
-            ]),
-            _get_dispatcher(),
-            ])
-
-        def execute_convergence(tenant_id, group_id, log):
-            return Effect(Constant(StepResult.SUCCESS))
-
-        eff = converge_one_group(
-            self.log, make_lock_set(), self.tenant_id, self.group_id,
-            self.version,
-            execute_convergence=execute_convergence)
-        result = sync_perform(dispatcher, eff)
-        self.assertEqual(result, None)
-        self.log.err.assert_any_call(
-            CheckFailureValue(BadVersionError()),
-            'mark-clean-failure',
-            tenant_id=self.tenant_id, group_id=self.group_id)
 
     def test_retry(self):
         """
@@ -288,7 +259,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             return Effect(Constant(StepResult.RETRY))
         eff = converge_one_group(
             self.log, make_lock_set(), self.tenant_id, self.group_id,
-            self.version,
+            self.rand,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
         self.assertEqual(result, None)
@@ -303,7 +274,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             return Effect(Constant(StepResult.FAILURE))
         eff = converge_one_group(
             self.log, make_lock_set(), self.tenant_id, self.group_id,
-            self.version,
+            self.rand,
             execute_convergence=execute_convergence)
         result = sync_perform(self.dispatcher, eff)
         self.assertEqual(result, None)
