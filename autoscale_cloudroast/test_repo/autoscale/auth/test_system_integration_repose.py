@@ -84,7 +84,8 @@ class AutoscaleReposeTests(AutoscaleFixture):
                                 .format(each_rate.regex))
                 for limits in each_rate.limit:
                     self.assertEquals(limits.unit, self.limit_unit_all,
-                                      msg='The limits unit for tenant is {0}'.format(limits.unit))
+                                      msg='The limits unit for tenant is {0}'
+                                      .format(limits.unit))
                     self.assertEquals(limits.value, self.limit_value_all,
                                       msg='The limits value for tenant is {0}'.format(limits.value))
                     self.assertEquals(limits.verb, 'ALL',
