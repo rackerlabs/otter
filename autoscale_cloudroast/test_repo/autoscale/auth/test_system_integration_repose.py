@@ -114,7 +114,8 @@ class AutoscaleReposeTests(AutoscaleFixture):
         Verify list scaling groups for a tenant through repose without a
         trailing slash, returns response code 200.
         """
-        list_response = self.autoscale_client.list_scaling_groups(self.url + '/groups')
+        list_response = self.autoscale_client.list_scaling_groups(
+            self.url + '/groups')
         self.assertEquals(list_response.status_code, 200,
                           msg='List scaling group returned response code '
                           '{0}'.format(list_response.status_code))
