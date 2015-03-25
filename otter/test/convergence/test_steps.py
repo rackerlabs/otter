@@ -793,6 +793,12 @@ class CLBCheckChangeNodeTests(SynchronousTestCase):
     """
     Tests for :func:`_clb_check_change_node`.
     """
+    example_step = ChangeCLBNode(lb_id="lb_id",
+                                 node_id="node_id",
+                                 condition=CLBNodeCondition.ENABLED,
+                                 weight=10,
+                                 type=CLBNodeType.PRIMARY)
+
     def test_good_response(self):
         """
         If the response code indicates success, the response was successful.
@@ -801,6 +807,19 @@ class CLBCheckChangeNodeTests(SynchronousTestCase):
         body = None
         result = _clb_check_change_node((response, body))
         self.assertEqual(result, (StepResult.SUCCESS, []))
+
+    def test_disappearing_server(self):
+        """
+        If the node we're trying to update has vanished, retry convergence.
+        """
+        response = StubResponse(404, {})
+        body = None
+        result = _clb_check_change_node(self.example_step, (response, body))
+        self.assertEqual(
+            result,
+            (StepResult.RETRY, [{"reason": "CLB node not found",
+                                 "node": self.example_step.node_id
+                                 "lb": self.example_step.lb_id}]))
 
 
 _RCV3_TEST_DATA = {
