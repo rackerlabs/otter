@@ -211,7 +211,12 @@ class OtterRbacTests(AutoscaleFixture):
         verify all the otter api calls except for all the GET calls, as
         _verify_otter_observer_role covers them already.
         """
-        response_codes = {'create': 201, 'upd-del': 204, 'execute': 202, 'get': 200}
+        response_codes = {
+            'create': 201,
+            'upd-del': 204,
+            'execute': 202,
+            'get': 200
+        }
         if expected_response_code:
             response_codes.update(dict.fromkeys(['create', 'upd-del', 'execute', 'get'],
                                                 expected_response_code))
