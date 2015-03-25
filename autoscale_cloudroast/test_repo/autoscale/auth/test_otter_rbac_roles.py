@@ -261,7 +261,8 @@ class OtterRbacTests(AutoscaleFixture):
             update_launch_config_response.status_code,
             response_codes['upd-del'],
             msg='Update launch config returned response code {0} on group '
-            '{1}'.format(update_launch_config_response.status_code, self.group.id))
+            '{1}'.format(update_launch_config_response.status_code,
+                         self.group.id))
 
         # create policy
         create_policy_response = user_client.create_policy(group_id=self.group.id,
