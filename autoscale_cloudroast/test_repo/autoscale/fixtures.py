@@ -461,7 +461,7 @@ class AutoscaleFixture(BaseTestFixture):
             if group_state.desiredCapacity == desired_capacity:
                 server_list = get_server_list()
                 if (len(server_list) == expected_servers):
-                        return server_list
+                    return server_list
             time.sleep(5)
         else:
             server_list = get_server_list()
