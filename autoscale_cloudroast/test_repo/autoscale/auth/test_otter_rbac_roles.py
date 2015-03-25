@@ -248,7 +248,8 @@ class OtterRbacTests(AutoscaleFixture):
             update_group_config_response.status_code,
             response_codes['upd-del'],
             msg='Update group config returned response code {0} on group '
-            '{1}'.format(update_group_config_response.status_code, self.group.id))
+            '{1}'.format(update_group_config_response.status_code,
+                         self.group.id))
 
         # update launch config
         update_launch_config_response = user_client.update_launch_config(
