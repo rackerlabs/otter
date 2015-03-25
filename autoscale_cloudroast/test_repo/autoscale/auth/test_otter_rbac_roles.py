@@ -348,9 +348,10 @@ class OtterRbacTests(AutoscaleFixture):
             '{1}'.format(execute_webhook_response.status_code, self.group.id))
 
         # delete webhook
-        delete_webhook_response = user_client.delete_webhook(self.group.id,
-                                                             self.policy_webhook['policy_id'],
-                                                             self.policy_webhook['webhook_id'])
+        delete_webhook_response = user_client.delete_webhook(
+            self.group.id,
+            self.policy_webhook['policy_id'],
+            self.policy_webhook['webhook_id'])
         self.assertEquals(
             delete_webhook_response.status_code, response_codes['upd-del'],
             msg='Delete webhook returned response code {0} on group '
