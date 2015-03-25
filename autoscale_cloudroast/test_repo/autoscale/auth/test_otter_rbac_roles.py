@@ -290,8 +290,9 @@ class OtterRbacTests(AutoscaleFixture):
             '{1}'.format(update_policy_response.status_code, self.group.id))
 
         # execute_policy
-        execute_policy_response = user_client.execute_policy(self.group.id,
-                                                             self.policy_webhook['policy_id'])
+        execute_policy_response = user_client.execute_policy(
+            self.group.id,
+            self.policy_webhook['policy_id'])
         self.assertEquals(
             execute_policy_response.status_code, response_codes['execute'],
             msg='Execute policy returned response code {0} on group '
