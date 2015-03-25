@@ -440,7 +440,7 @@ class ChangeCLBNode(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to modify a load balancer node."""
-        return service_request(
+        eff = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'PUT',
             append_segments('loadbalancers', self.lb_id,
@@ -448,6 +448,14 @@ class ChangeCLBNode(object):
             data={'condition': self.condition.name,
                   'weight': self.weight},
             success_pred=has_code(202))
+        return eff.on(_clb_check_change_node)
+
+
+def _clb_check_change_node(result):
+    """
+    Check to what extent a :class:`ChangeCLBNode` response was successful.
+    """
+    return StepResult.SUCCESS, []
 
 
 def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
