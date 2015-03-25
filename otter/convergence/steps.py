@@ -440,6 +440,7 @@ class ChangeCLBNode(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to modify a load balancer node."""
+        handled_codes = _clb_check_change_node_handlers.keys()
         eff = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'PUT',
@@ -447,7 +448,7 @@ class ChangeCLBNode(object):
                             'nodes', self.node_id),
             data={'condition': self.condition.name,
                   'weight': self.weight},
-            success_pred=has_code(202))
+            success_pred=has_code(*handled_codes))
         return eff.on(partial(_clb_check_change_node, self))
 
 
