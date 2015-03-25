@@ -785,8 +785,7 @@ class StepAsEffectTests(SynchronousTestCase):
         for removing any combination of nodes from any combination of RCv3
         load balancers.
         """
-        self._generic_bulk_rcv3_step_test(
-            BulkRemoveFromRCv3, "DELETE")
+        self._generic_bulk_rcv3_step_test(BulkRemoveFromRCv3, "DELETE")
 
 
 class CLBCheckChangeNodeTests(SynchronousTestCase):
