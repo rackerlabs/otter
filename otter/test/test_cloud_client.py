@@ -298,6 +298,7 @@ class PerformTenantScopeTests(SynchronousTestCase):
 
 class CLBClientTests(SynchronousTestCase):
     """
+    Tests for CLB client functions, such as :obj:`change_clb_node`.
     """
     @property
     def lb_id(self):
