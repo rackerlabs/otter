@@ -22,3 +22,30 @@ def audit(log):
 
 
 __all__ = ['observer_factory', 'observer_factory_debug', 'log']
+
+
+class Log(object):
+    def __init__(self, msg, **fields):
+        self.msg = msg
+        self.fields = feilds
+
+
+@attributes(['bound_log', 'effect'])
+class BoundLogIntent(object):
+    pass
+
+
+def perform_bound_logging(bound_intent, box):
+
+    @sync_performer
+    def scoped_performer(dispatcher, log_intent):
+        bound_intent.bound_log.msg(log_intent.message, **log_intent.fields)
+
+    new_disp = ComposedDispatcher([
+        TypeDispatcher({Log: scoped_performer}),
+        dispatcher])
+    perform(new_disp, bound_intent.effect.on(box.succeed, box.fail))
+
+
+def get_log_dispatcher():
+    return TypeDispatcher({LogScope: perform_bound_logging})
