@@ -115,6 +115,7 @@ def execute_convergence(tenant_id, group_id, log,
     desired_group_state = get_desired_group_state(
         group_id, launch_config, group_state.desired)
     steps = plan(desired_group_state, servers, lb_nodes, now)
+    yield Effect(BoundLogIntent(log, log_plan(steps)))
     active = determine_active(servers, lb_nodes)
     log.msg('execute-convergence',
             servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
@@ -132,6 +133,11 @@ def execute_convergence(tenant_id, group_id, log,
             results=zip(steps, results),
             worst_status=worst_status)
     yield do_return(worst_status)
+
+
+def log_plan(steps):
+    kind = groupby(type, steps)
+    return Effect(Log('launch-servers', num_servers=len(kind[CreateServer])))
 
 
 def format_dirty_flag(tenant_id, group_id):
