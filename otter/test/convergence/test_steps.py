@@ -451,14 +451,13 @@ class StepAsEffectTests(SynchronousTestCase):
         :obj:`ChangeCLBNode.as_effect` produces a request for
         modifying a load balancer node.
         """
-        changenode = ChangeCLBNode(
+        change_node = ChangeCLBNode(
             lb_id='abc123',
             node_id='node1',
             condition=CLBNodeCondition.DRAINING,
             weight=50,
             type=CLBNodeType.PRIMARY)
         self.assertEqual(
-            changenode.as_effect(),
             service_request(
                 ServiceType.CLOUD_LOAD_BALANCERS,
                 'PUT',
@@ -466,6 +465,7 @@ class StepAsEffectTests(SynchronousTestCase):
                 data={'condition': 'DRAINING',
                       'weight': 50},
                 success_pred=has_code(202)))
+            change_node.as_effect(),
 
     def test_add_nodes_to_clb(self):
         """
