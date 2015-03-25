@@ -1,5 +1,5 @@
-from functools import partial
 import uuid
+from functools import partial
 
 from effect import (
     ComposedDispatcher, Constant, Effect, Error, Func, ParallelEffects,
@@ -8,13 +8,10 @@ from effect.async import perform_parallel_async
 from effect.ref import Reference, reference_dispatcher
 from effect.testing import EQDispatcher, EQFDispatcher, SequenceDispatcher
 
-from kazoo.exceptions import BadVersionError
-
 import mock
 
 from pyrsistent import freeze, pbag, pmap, pset, s
 
-from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import TenantScope, service_request
@@ -35,7 +32,6 @@ from otter.models.intents import (
     GetScalingGroupInfo, ModifyGroupState, perform_modify_group_state)
 from otter.models.interface import GroupState, NoSuchScalingGroupError
 from otter.test.convergence.test_planning import server
-from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
     CheckFailureValue, FakePartitioner, IsBoundWith,
     TestStep,
@@ -44,7 +40,7 @@ from otter.test.utils import (
     raise_,
     test_dispatcher,
     transform_eq)
-from otter.util.zk import CreateOrSet, DeleteNode, GetChildrenWithStats
+from otter.util.zk import Create, DeleteNode, GetChildren
 
 
 class ConvergenceStarterTests(SynchronousTestCase):
@@ -54,8 +50,7 @@ class ConvergenceStarterTests(SynchronousTestCase):
         """Starting convergence marks dirty and logs a message."""
         sequence = SequenceDispatcher([
             (Func(uuid.uuid4), lambda i: 'randnum1'),
-            (CreateOrSet(path='/groups/divergent/tenant_group_randnum1',
-                         content='dirty'),
+            (Create('/groups/divergent/tenant_group_randnum1'),
              lambda i: None),
         ])
         dispatcher = ComposedDispatcher([sequence, base_dispatcher])
@@ -73,8 +68,7 @@ class ConvergenceStarterTests(SynchronousTestCase):
         """An error is logged when marking dirty fails."""
         sequence = SequenceDispatcher([
             (Func(uuid.uuid4), lambda i: 'randnum1'),
-            (CreateOrSet(path='/groups/divergent/tenant_group_randnum1',
-                         content='dirty'),
+            (Create('/groups/divergent/tenant_group_randnum1'),
              lambda i: raise_(RuntimeError('oh no'))),
         ])
         dispatcher = ComposedDispatcher([sequence, base_dispatcher])
@@ -329,8 +323,9 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
              ('01', 'g2', 'rand5', 'converge!')])
         log.msg.assert_called_once_with(
             'converge-all-groups',
-            group_infos=[{'tenant_id': '00', 'group_id': 'g1', 'random': 'rand1'},
-                         {'tenant_id': '01', 'group_id': 'g2', 'random': 'rand5'}])
+            group_infos=[
+                {'tenant_id': '00', 'group_id': 'g1', 'random': 'rand1'},
+                {'tenant_id': '01', 'group_id': 'g2', 'random': 'rand5'}])
 
     def test_no_log_on_no_groups(self):
         """When there's no work, no log message is emitted."""
@@ -363,10 +358,10 @@ class GetMyDivergentGroupsTests(SynchronousTestCase):
         # sha1('00') % 10 is 6, sha1('01') % 10 is 1.
         dispatcher = ComposedDispatcher([
             EQDispatcher([
-                (GetChildrenWithStats(CONVERGENCE_DIRTY_DIR),
-                 [('00_gr1_rand1', ZNodeStatStub(version=0)),
-                  ('00_gr2_rand2', ZNodeStatStub(version=3)),
-                  ('01_gr3_rand3', ZNodeStatStub(version=5))]),
+                (GetChildren(CONVERGENCE_DIRTY_DIR),
+                 ['00_gr1_rand1',
+                  '00_gr2_rand2',
+                  '01_gr3_rand3']),
             ]),
             _get_dispatcher()
         ])
@@ -384,10 +379,10 @@ class GetMyDivergentGroupsTests(SynchronousTestCase):
         # sha1('00') % 10 is 6, sha1('01') % 10 is 1.
         dispatcher = ComposedDispatcher([
             EQDispatcher([
-                (GetChildrenWithStats(CONVERGENCE_DIRTY_DIR),
-                 [('00_gr1_rand1', ZNodeStatStub(version=0)),
-                  ('00_gr1_rand2', ZNodeStatStub(version=3)),
-                  ('01_gr1_rand3', ZNodeStatStub(version=5))]),
+                (GetChildren(CONVERGENCE_DIRTY_DIR),
+                 ['00_gr1_rand1',
+                  '00_gr1_rand2',
+                  '01_gr1_rand3']),
             ]),
             _get_dispatcher()
         ])

@@ -13,10 +13,10 @@ from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.util.zk import (
-    CreateOrSet, CreateOrSetLoopLimitReachedError,
-    DeleteNode, GetChildrenWithStats,
-    perform_create_or_set, perform_delete_node,
-    perform_get_children_with_stats)
+    Create,
+    DeleteNode, GetChildren,
+    perform_create, perform_delete_node,
+    perform_get_children)
 
 
 @attributes(['version'])
@@ -36,7 +36,7 @@ class ZKCrudModel(object):
     def __init__(self):
         self.nodes = {}
 
-    def create(self, path, content, makepath=False):
+    def create(self, path, content='', makepath=False):
         """Create a node."""
         assert makepath is True, "makepath must be True"
         if path in self.nodes:
@@ -81,71 +81,26 @@ class ZKCrudModel(object):
         return succeed('delete return value')
 
 
-class CreateOrSetTests(SynchronousTestCase):
+class CreateTests(SynchronousTestCase):
     """Tests for :func:`create_or_set`."""
     def setUp(self):
         self.model = ZKCrudModel()
 
-    def _cos(self, path, content):
-        eff = Effect(CreateOrSet(path=path, content=content))
-        performer = partial(perform_create_or_set, self.model)
-        dispatcher = TypeDispatcher({CreateOrSet: performer})
+    def _cos(self, path):
+        eff = Effect(Create(path))
+        performer = partial(perform_create, self.model)
+        dispatcher = TypeDispatcher({Create: performer})
         return perform(dispatcher, eff)
 
     def test_create(self):
         """Creates a node when it doesn't exist."""
-        d = self._cos('/foo', 'bar')
+        d = self._cos('/foo')
         self.assertEqual(self.successResultOf(d), '/foo')
-        self.assertEqual(self.model.nodes, {'/foo': ('bar', 0)})
-
-    def test_update(self):
-        """Uses `set` to update the node when it does exist."""
-        self.model.create('/foo', 'initial', makepath=True)
-        d = self._cos('/foo', 'bar')
-        self.assertEqual(self.successResultOf(d), '/foo')
-        self.assertEqual(self.model.nodes, {'/foo': ('bar', 1)})
-
-    def test_node_disappears_during_update(self):
-        """
-        If `set` can't find the node (because it was unexpectedly deleted
-        between the `create` and `set` calls), creation will be retried.
-        """
-        def hacked_set(path, value):
-            self.model.delete('/foo')
-            del self.model.set  # Only let this behavior run once
-            return self.model.set(path, value)
-        self.model.set = hacked_set
-
-        self.model.create('/foo', 'initial', makepath=True)
-        d = self._cos('/foo', 'bar')
-        self.assertEqual(self.successResultOf(d), '/foo')
-        # It must be at version 0 because it's a creation, whereas normally if
-        # the node were being updated it'd be at version 1.
-        self.assertEqual(self.model.nodes, {'/foo': ('bar', 0)})
-
-    def test_loop_limit(self):
-        """
-        performing a :obj:`CreateOrSet` will avoid infinitely looping in
-        pathological cases, and eventually blow up with a
-        :obj:`CreateOrSetLoopLimitReachedError`.
-        """
-        def hacked_set(path, value):
-            return fail(NoNodeError())
-
-        def hacked_create(path, content, makepath):
-            return fail(NodeExistsError())
-
-        self.model.set = hacked_set
-        self.model.create = hacked_create
-
-        d = self._cos('/foo', 'bar')
-        failure = self.failureResultOf(d)
-        self.assertEqual(failure.type, CreateOrSetLoopLimitReachedError)
-        self.assertEqual(failure.getErrorMessage(), '/foo')
+        self.assertEqual(self.model.nodes, {'/foo': ('', 0)})
 
 
-class GetChildrenWithStatsTests(SynchronousTestCase):
-    """Tests for :func:`get_children_with_stats`."""
+class GetChildrenTests(SynchronousTestCase):
+    """Tests for :obj:`GetChildren`."""
     def setUp(self):
         # It'd be nice if we used the standard ZK CRUD model, but implementing
         # a tree of nodes supporting get_children is a pain
@@ -154,9 +109,9 @@ class GetChildrenWithStatsTests(SynchronousTestCase):
         self.model = Model()
 
     def _gcws(self, path):
-        eff = Effect(GetChildrenWithStats(path))
-        performer = partial(perform_get_children_with_stats, self.model)
-        dispatcher = TypeDispatcher({GetChildrenWithStats: performer})
+        eff = Effect(GetChildren(path))
+        performer = partial(perform_get_children, self.model)
+        dispatcher = TypeDispatcher({GetChildren: performer})
         return perform(dispatcher, eff)
 
     def test_get_children_with_stats(self):
@@ -165,20 +120,9 @@ class GetChildrenWithStatsTests(SynchronousTestCase):
         ZnodeStat objects. Any children that disappear between ``get_children``
         and ``exists`` are not returned.
         """
-        def exists(p):
-            if p == '/path/foo':
-                return succeed(ZNodeStatStub(version=0))
-            if p == '/path/bar':
-                return succeed(ZNodeStatStub(version=1))
-            if p == '/path/baz':
-                return succeed(None)
         self.model.get_children = {'/path': succeed(['foo', 'bar', 'baz'])}.get
-        self.model.exists = exists
-
         d = self._gcws('/path')
-        self.assertEqual(self.successResultOf(d),
-                         [('foo', ZNodeStatStub(version=0)),
-                          ('bar', ZNodeStatStub(version=1))])
+        self.assertEqual(self.successResultOf(d), ['foo', 'bar', 'baz'])
 
 
 class DeleteTests(SynchronousTestCase):

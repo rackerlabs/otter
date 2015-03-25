@@ -20,6 +20,8 @@ from pyrsistent import thaw
 
 import six
 
+from toolz.itertoolz import unique
+
 from twisted.application.service import MultiService
 
 from otter.cloud_client import TenantScope
@@ -32,7 +34,7 @@ from otter.convergence.planning import plan
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
 from otter.models.interface import NoSuchScalingGroupError
 from otter.util.fp import assoc_obj
-from otter.util.zk import CreateOrSet, DeleteNode, GetChildrenWithStats
+from otter.util.zk import Create, DeleteNode, GetChildren
 
 
 def server_to_json(server):
@@ -208,7 +210,7 @@ def mark_divergent(tenant_id, group_id):
     rand = yield Effect(Func(uuid.uuid4)).on(str)
     flag = format_dirty_flag(tenant_id, group_id, rand)
     path = CONVERGENCE_DIRTY_DIR + '/' + flag
-    yield do_return(Effect(CreateOrSet(path=path, content='dirty')))
+    yield do_return(Effect(Create(path)))
 
 
 def delete_divergent_flag(log, tenant_id, group_id, rand):
@@ -302,23 +304,17 @@ def get_my_divergent_groups(my_buckets, all_buckets):
     :returns: list of dicts, where each dict has ``tenant_id``,
         ``group_id``, and ``random`` keys.
     """
-    def structure_info(x):
-        # Names of the dirty flags are {tenant_id}_{group_id}.
-        path, stat = x
-        tenant, group, rand = parse_dirty_flag(x[0])
+    num_buckets = len(all_buckets)
+
+    def structure_info(path):
+        # Names of the dirty flags are {tenant_id}_{group_id}_{random}.
+        tenant, group, rand = parse_dirty_flag(path)
         return {'tenant_id': tenant, 'group_id': group, 'random': rand}
 
-    def got_children_with_stats(children_with_stats):
-        dirty_info = map(structure_info, children_with_stats)
-        # Uniquify by group
-        seen_groups = []
-        groups = []
-        for x in dirty_info:
-            if (x['tenant_id'], x['group_id']) not in seen_groups:
-                seen_groups.append((x['tenant_id'], x['group_id']))
-                groups.append(x)
-        dirty_info = groups
-        num_buckets = len(all_buckets)
+    def got_children(children):
+        dirty_info = map(structure_info, children)
+        dirty_info = unique(dirty_info,
+                            lambda x: (x['tenant_id'], x['group_id']))
         converging = (
             info for info in dirty_info
             if _stable_hash(info['tenant_id']) % num_buckets in my_buckets)
@@ -326,8 +322,8 @@ def get_my_divergent_groups(my_buckets, all_buckets):
 
     # This is inefficient since we're getting stat information about nodes that
     # we don't necessarily care about, but this is convenient for now.
-    eff = Effect(GetChildrenWithStats(CONVERGENCE_DIRTY_DIR))
-    return eff.on(got_children_with_stats)
+    eff = Effect(GetChildren(CONVERGENCE_DIRTY_DIR))
+    return eff.on(got_children)
 
 
 @do

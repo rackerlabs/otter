@@ -18,7 +18,7 @@ from otter.models.cass import CQLQueryExecute
 from otter.models.intents import GetScalingGroupInfo
 from otter.util.pure_http import Request
 from otter.util.retry import Retry
-from otter.util.zk import CreateOrSet
+from otter.util.zk import Create
 
 
 def simple_intents():
@@ -41,7 +41,7 @@ def legacy_intents():
 
 def full_intents():
     return legacy_intents() + [
-        CreateOrSet(path='foo', content='bar'),
+        Create('foo'),
         GetScalingGroupInfo(tenant_id='foo', group_id='bar')
     ]
 
