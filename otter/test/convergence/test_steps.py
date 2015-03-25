@@ -30,6 +30,7 @@ from otter.convergence.steps import (
     SetMetadataItemOnServer,
     UnexpectedServerStatus,
     _clb_check_change_node,
+    _clb_check_change_node_retry_handlers,
     _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_ALREADY_A_MEMBER_PATTERN,
@@ -460,13 +461,14 @@ class StepAsEffectTests(SynchronousTestCase):
             type=CLBNodeType.PRIMARY)
         eff = change_node.as_effect()
 
+        handled_codes = _clb_check_change_node_retry_handlers.keys()
         expected_intent = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'PUT',
             'loadbalancers/abc123/nodes/node1',
             data={'condition': 'DRAINING',
                   'weight': 50},
-            success_pred=has_code(202)).intent
+            success_pred=has_code(*handled_codes)).intent
         self.assertEqual(eff.intent, expected_intent)
 
         (on_success, on_error), = eff.callbacks
