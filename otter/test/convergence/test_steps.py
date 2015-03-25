@@ -791,6 +791,12 @@ class StepAsEffectTests(SynchronousTestCase):
             BulkRemoveFromRCv3, "DELETE")
 
 
+class CLBCheckChangeNodeTests(SynchronousTestCase):
+    """
+    Tests for :func:`_clb_check_change_node`.
+    """
+
+
 _RCV3_TEST_DATA = {
     _RCV3_NODE_NOT_A_MEMBER_PATTERN: [
         ('Node d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is not a member of '
