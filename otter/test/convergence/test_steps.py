@@ -29,6 +29,7 @@ from otter.convergence.steps import (
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
     UnexpectedServerStatus,
+    _clb_check_change_node,
     _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_ALREADY_A_MEMBER_PATTERN,
