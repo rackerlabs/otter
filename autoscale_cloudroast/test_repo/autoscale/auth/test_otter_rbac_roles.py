@@ -277,12 +277,13 @@ class OtterRbacTests(AutoscaleFixture):
             '{1}'.format(create_policy_response.status_code, self.group.id))
 
         # update_policy
-        update_policy_response = user_client.update_policy(group_id=self.group.id,
-                                                           policy_id=self.policy_webhook['policy_id'],
-                                                           name='upd_name',
-                                                           cooldown=0,
-                                                           change=1,
-                                                           policy_type='webhook')
+        update_policy_response = user_client.update_policy(
+            group_id=self.group.id,
+            policy_id=self.policy_webhook['policy_id'],
+            name='upd_name',
+            cooldown=0,
+            change=1,
+            policy_type='webhook')
         self.assertEquals(
             update_policy_response.status_code, response_codes['upd-del'],
             msg='Update policy returned response code {0} on group '
