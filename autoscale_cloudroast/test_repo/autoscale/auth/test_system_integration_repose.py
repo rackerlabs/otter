@@ -55,7 +55,8 @@ class AutoscaleReposeTests(AutoscaleFixture):
                                       msg='The limits value for tenant is {0}'
                                       .format(limits.value))
                     self.assertEquals(limits.verb, 'ALL',
-                                      msg='The verb for tenant is {0}'.format(limits.verb))
+                                      msg='The verb for tenant is {0}'
+                                      .format(limits.verb))
 
     @tags(type='repose')
     def test_system_repose_rate_limits_with_trailing_slash(self):
