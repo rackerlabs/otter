@@ -6,7 +6,6 @@ from cafe.drivers.unittest.decorators import tags
 
 
 class AutoscaleReposeTests(AutoscaleFixture):
-
     """
     System tests to verify repose integration with autoscale
     """
