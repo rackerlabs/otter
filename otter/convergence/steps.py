@@ -448,7 +448,7 @@ class ChangeCLBNode(object):
             data={'condition': self.condition.name,
                   'weight': self.weight},
             success_pred=has_code(202))
-        return eff.on(_clb_check_change_node)
+        return eff.on(partial(_clb_check_change_node, self))
 
 
 def _clb_check_change_node(step, result):
