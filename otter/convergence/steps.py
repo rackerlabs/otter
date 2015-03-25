@@ -456,13 +456,20 @@ def _clb_check_change_node(step, result):
     Check to what extent a :class:`ChangeCLBNode` response was successful.
     """
     response, body = result
+    handler = _clb_check_change_node_handlers[response.code]
+    return handler(step, result)
 
-    if response.code == 202:
-        return StepResult.SUCCESS, []
-    else:
-        return StepResult.RETRY, [{'reason': 'CLB node not found',
-                                   'lb': step.lb_id,
-                                   'node': step.node_id}]
+
+def _clb_check_change_node_retry_on_404(step, result):
+    return StepResult.RETRY, [{'reason': 'CLB node not found',
+                               'lb': step.lb_id,
+                               'node': step.node_id}]
+
+
+_clb_check_change_node_handlers = {
+    202: lambda _step, _result: (StepResult.SUCCESS, []),
+    404: _clb_check_change_node_retry_on_404
+}
 
 
 def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
