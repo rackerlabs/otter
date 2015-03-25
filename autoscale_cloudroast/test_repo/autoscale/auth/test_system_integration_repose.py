@@ -59,10 +59,12 @@ class AutoscaleReposeTests(AutoscaleFixture):
                           msg='Limits returned response code {0}'.format(limits_response.status_code))
         limits = limits_response.entity
         self.assertEquals(limits.absolute.maxGroups, self.max_groups)
-        self.assertEquals(limits.absolute.maxWebhooksPerPolicy, self.max_webhooks)
         self.assertEquals(
             limits.absolute.maxPoliciesPerGroup,
             self.max_policies)
+        self.assertEquals(
+            limits.absolute.maxWebhooksPerPolicy,
+            self.max_webhooks)
         for each_rate in limits.rate:
             if 'tenantId' in each_rate.uri:
                 self.assertTrue('/v1\.0/([A-Za-z0-9:]+)/.+' in each_rate.regex,
