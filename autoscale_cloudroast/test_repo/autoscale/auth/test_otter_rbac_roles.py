@@ -358,8 +358,9 @@ class OtterRbacTests(AutoscaleFixture):
             '{1}'.format(delete_webhook_response.status_code, self.group.id))
 
         # delete policy
-        delete_policy_response = user_client.delete_scaling_policy(self.group.id,
-                                                                   self.policy_webhook['policy_id'])
+        delete_policy_response = user_client.delete_scaling_policy(
+            self.group.id,
+            self.policy_webhook['policy_id'])
         self.assertEquals(
             delete_policy_response.status_code, response_codes['upd-del'],
             msg='Delete policy returned response code {0} on group '
