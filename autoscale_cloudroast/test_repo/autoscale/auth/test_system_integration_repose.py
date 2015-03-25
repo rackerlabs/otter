@@ -90,7 +90,8 @@ class AutoscaleReposeTests(AutoscaleFixture):
                                       msg='The limits value for tenant is {0}'
                                       .format(limits.value))
                     self.assertEquals(limits.verb, 'ALL',
-                                      msg='The verb for tenant is {0}'.format(limits.verb))
+                                      msg='The verb for tenant is {0}'
+                                      .format(limits.verb))
             if 'execute' in each_rate.uri:
                 self.assertTrue('/v1\.0/execute/(.*)'in each_rate.regex,
                                 msg='the regex in the tenant rate limit is {0}'.format(each_rate.regex))
