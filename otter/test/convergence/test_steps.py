@@ -818,7 +818,7 @@ class CLBCheckChangeNodeTests(SynchronousTestCase):
         self.assertEqual(
             result,
             (StepResult.RETRY, [{"reason": "CLB node not found",
-                                 "node": self.example_step.node_id
+                                 "node": self.example_step.node_id,
                                  "lb": self.example_step.lb_id}]))
 
 
