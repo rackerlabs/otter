@@ -458,15 +458,21 @@ class StepAsEffectTests(SynchronousTestCase):
             condition=CLBNodeCondition.DRAINING,
             weight=50,
             type=CLBNodeType.PRIMARY)
-        expected_eff = service_request(
+        eff = change_node.as_effect()
+
+        expected_intent = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'PUT',
             'loadbalancers/abc123/nodes/node1',
             data={'condition': 'DRAINING',
                   'weight': 50},
-            success_pred=has_code(202)).on(_clb_check_change_node)
+            success_pred=has_code(202)).intent
+        self.assertEqual(eff.intent, expected_intent)
 
-        self.assertEqual(change_node.as_effect(), expected_eff)
+        (on_success, on_error), = eff.callbacks
+        self.assertIdentical(on_error, None)
+        self.assertIdentical(on_success.func, _clb_check_change_node)
+        self.assertEqual(on_success.args, (change_node,))
 
     def test_add_nodes_to_clb(self):
         """
