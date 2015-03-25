@@ -265,11 +265,12 @@ class OtterRbacTests(AutoscaleFixture):
                          self.group.id))
 
         # create policy
-        create_policy_response = user_client.create_policy(group_id=self.group.id,
-                                                           name='test-policy',
-                                                           cooldown=1,
-                                                           change=1,
-                                                           policy_type='webhook')
+        create_policy_response = user_client.create_policy(
+            group_id=self.group.id,
+            name='test-policy',
+            cooldown=1,
+            change=1,
+            policy_type='webhook')
         self.assertEquals(
             create_policy_response.status_code, response_codes['create'],
             msg='Create policy returned response code {0} on group '
