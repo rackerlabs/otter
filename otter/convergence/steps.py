@@ -461,6 +461,9 @@ def _clb_check_change_node(step, result):
 
 
 def _clb_check_change_node_retry_on_404(step, result):
+    """
+    When updating a node results in a 404, convergence should be retried.
+    """
     return StepResult.RETRY, [{'reason': 'CLB node not found',
                                'lb': step.lb_id,
                                'node': step.node_id}]
