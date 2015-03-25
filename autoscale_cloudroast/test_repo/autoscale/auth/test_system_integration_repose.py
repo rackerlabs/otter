@@ -53,9 +53,9 @@ class AutoscaleReposeTests(AutoscaleFixture):
     @tags(type='repose')
     def test_system_repose_rate_limits_with_trailing_slash(self):
         """
-        Verify the relative and absolute rate limits set by autoscale in repose, using the limits
-        api with a trailing slash, returns reponse code 200 and the relative and
-        absolute limits
+        Verify the relative and absolute rate limits set by autoscale in
+        repose, using the limits api with a trailing slash, returns
+        reponse code 200 and the relative and absolute limits.
         """
         limits_response = self.autoscale_client.view_limits(self.url + '/limits/')
         self.assertEquals(limits_response.status_code, 200,
