@@ -166,5 +166,5 @@ class AutoscaleReposeTests(AutoscaleFixture):
         policy = self.autoscale_behaviors.create_policy_webhook(
             group.id, {'change': 1})
         self.assertEquals(execute_wb_response.status_code, 202,
-                          msg='List scaling group returned response code '
-                          '{0}'.format(execute_wb_response.status_code))
+                          msg='List scaling group returned response code {0}'
+                          .format(execute_wb_response.status_code))
