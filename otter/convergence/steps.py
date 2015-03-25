@@ -455,7 +455,7 @@ def _clb_check_change_node(result):
     """
     Check to what extent a :class:`ChangeCLBNode` response was successful.
     """
-    return StepResult.SUCCESS, []
+    return None
 
 
 def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
