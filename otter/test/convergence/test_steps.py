@@ -793,6 +793,14 @@ class CLBCheckChangeNodeTests(SynchronousTestCase):
     """
     Tests for :func:`_clb_check_change_node`.
     """
+    def test_good_response(self):
+        """
+        If the response code indicates success, the response was successful.
+        """
+        response = StubResponse(202, {})
+        body = None
+        result = _clb_check_change_node((response, body))
+        self.assertEqual(result, (StepResult.SUCCESS, []))
 
 
 _RCV3_TEST_DATA = {
