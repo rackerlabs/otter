@@ -231,7 +231,8 @@ class OtterRbacTests(AutoscaleFixture):
             lc_name='test-grp-srv',
             lc_load_balancers=lc_load_balancers)
         self.assertEquals(
-            create_scaling_group_response.status_code, response_codes['create'],
+            create_scaling_group_response.status_code,
+            response_codes['create'],
             msg='Create group returned response code {0}'.format(
                 create_scaling_group_response.status_code))
 
