@@ -153,8 +153,8 @@ class AutoscaleReposeTests(AutoscaleFixture):
         list_response = self.autoscale_client.list_scaling_groups(
             self.url + '/groups/76765/')
         self.assertEquals(list_response.status_code, 404,
-                          msg='List scaling group returned response code '
-                          '{0}'.format(list_response.status_code))
+                          msg='List scaling group returned response code {0}'
+                          .format(list_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_execute_webhook(self):

@@ -1,20 +1,14 @@
-"""
-Test to launch config of a group.
-"""
+"""Test to launch config of a group."""
 from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
 class ListLaunchConfigTest(AutoscaleFixture):
 
-    """
-    Verify launch config.
-    """
+    """Verify launch config."""
 
     @classmethod
     def setUpClass(cls):
-        """
-        Creates a scaling group.
-        """
+        """Creates a scaling group."""
         super(ListLaunchConfigTest, cls).setUpClass()
         cls.lc_disk_config = 'AUTO'
         cls.lc_personality = [{'path': '/root/.ssh/authorized_keys',
@@ -43,9 +37,7 @@ class ListLaunchConfigTest(AutoscaleFixture):
         cls.launch_config = cls.launch_config_response.entity
 
     def test_list_launch_config_response(self):
-        """
-        Verify the list config call for response code, headers and data.
-        """
+        """Verify the list config call for response code, headers and data."""
         self.assertEquals(self.launch_config_response.status_code, 200,
                           msg='List launch config failed with {0} for group '
                           '{1} '.format(self.launch_config_response.status_code, self.group.id))
