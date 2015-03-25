@@ -9,6 +9,8 @@ from pyrsistent import pmap
 
 from singledispatch import singledispatch
 
+from toolz.functoolz import identity
+
 from twisted.python.failure import Failure
 
 
@@ -247,12 +249,9 @@ def serialize_to_jsonable(obj):
     return None
 
 
-@serialize_to_jsonable.register(basestring)
-def serialize_str(s):
-    """
-    Serialize string
-    """
-    return s
+# serialize base types
+for t in (list, tuple, basestring, int, float, long):
+    serialize_to_jsonable.register(t, identity)
 
 
 def ErrorFormattingWrapper(observer):
