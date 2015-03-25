@@ -6,6 +6,7 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 """
 
 import time
+import uuid
 from functools import partial
 from hashlib import sha1
 
@@ -144,16 +145,19 @@ def execute_convergence(tenant_id, group_id, log,
     yield do_return(worst_status)
 
 
-def format_dirty_flag(tenant_id, group_id):
+def format_dirty_flag(tenant_id, group_id, rand):
     """Format a dirty flag ZooKeeper node name."""
-    return tenant_id + '_' + group_id
+    return '_'.join((tenant_id, group_id, rand))
 
 
 def parse_dirty_flag(flag):
-    """Parse a dirty flag ZooKeeper node name into (tenant_id, group_id)."""
-    return flag.split('_', 1)
+    """
+    Parse a dirty flag ZooKeeper node name into (tenant_id, group_id, rand).
+    """
+    return flag.split('_', 2)
 
 
+@do
 def mark_divergent(tenant_id, group_id):
     """
     Indicate that a group should be converged.
@@ -185,40 +189,38 @@ def mark_divergent(tenant_id, group_id):
     # group is marked clean, then the changes desired by the second policy
     # execution will not happen.
 
-    # So instead of just a boolean flag, we'll take advantage of ZK node
-    # versioning. When we mark a group as dirty, we'll create a node for it
-    # if it doesn't exist, and if it does exist, we'll write to it with
-    # `set`. The content doesn't matter - the only thing that does matter
-    # is the version, which will be incremented on every `set`
-    # operation. On the converger side, when it searches for dirty groups
-    # to converge, it will remember the version of the node. When
-    # convergence completes, it will delete the node ONLY if the version
-    # hasn't changed, with a `delete(path, version)` call.
+    # So instead of just a boolean flag, we'll add a random UUID. When we mark
+    # a group as dirty, we'll create a node named with the group ID and a
+    # random suffix. On the converger side, when it searches for dirty groups
+    # to converge, it will take only one of the dirty flags for a group, and
+    # when convergence completes, it will delete only that one node.
 
-    # The effect of this is that if any process updates the dirty flag
-    # after it's already been created, the node won't be deleted, so
-    # convergence will pick up that group again. We don't need to keep
-    # track of exactly how many times a group has been marked dirty
-    # (i.e. how many times a policy has been executed or config has
-    # changed), only if there are _any_ outstanding requests for
-    # convergence, since convergence always uses the most recent data.
+    # The effect of this is that if any process creates a new dirty flag while
+    # another already exists, the new one won't be deleted, so convergence will
+    # pick up that group again.
 
-    flag = format_dirty_flag(tenant_id, group_id)
+    # However, this is somewhat inefficient, since if five policy executions
+    # happen instantaneously, we don't really need to run convergence 5 times -
+    # we just need to make sure we run convergence at least once after all
+    # outstanding requests have been recorded. It would be nice to figure out a
+    # way to avoid this inefficiency.
+
+    rand = yield Effect(Func(uuid.uuid4)).on(str)
+    flag = format_dirty_flag(tenant_id, group_id, rand)
     path = CONVERGENCE_DIRTY_DIR + '/' + flag
-    eff = Effect(CreateOrSet(path=path, content='dirty'))
-    return eff
+    yield do_return(Effect(CreateOrSet(path=path, content='dirty')))
 
 
-def delete_divergent_flag(log, tenant_id, group_id, version):
+def delete_divergent_flag(log, tenant_id, group_id, rand):
     """
     Delete the dirty flag, if its version hasn't changed. See comment in
     :func:`mark_divergent` for more info.
 
     :return: Effect of None.
     """
-    flag = format_dirty_flag(tenant_id, group_id)
+    flag = format_dirty_flag(tenant_id, group_id, rand)
     path = CONVERGENCE_DIRTY_DIR + '/' + flag
-    return Effect(DeleteNode(path=path, version=version)).on(
+    return Effect(DeleteNode(path=path, version=-1)).on(
         success=lambda r: log.msg('mark-clean-success'),
         error=lambda e: log.err(exc_info_to_failure(e), 'mark-clean-failure'))
 
@@ -298,17 +300,19 @@ def get_my_divergent_groups(my_buckets, all_buckets):
     :param all_buckets: collection of all buckets
 
     :returns: list of dicts, where each dict has ``tenant_id``,
-        ``group_id``, and ``version`` keys.
+        ``group_id``, and ``random`` keys.
     """
     def structure_info(x):
         # Names of the dirty flags are {tenant_id}_{group_id}.
         path, stat = x
-        tenant, group = parse_dirty_flag(x[0])
-        return {'tenant_id': tenant, 'group_id': group,
-                'version': stat.version}
+        tenant, group, rand = parse_dirty_flag(x[0])
+        return {'tenant_id': tenant, 'group_id': group, 'random': rand}
 
     def got_children_with_stats(children_with_stats):
         dirty_info = map(structure_info, children_with_stats)
+        # Uniquify by group
+        groups = {x['group_id']: x for x in dirty_info}
+        dirty_info = groups.values()
         num_buckets = len(all_buckets)
         converging = (
             info for info in dirty_info
@@ -322,14 +326,14 @@ def get_my_divergent_groups(my_buckets, all_buckets):
 
 
 @do
-def converge_one_group(log, group_locks, tenant_id, group_id, version,
+def converge_one_group(log, group_locks, tenant_id, group_id, rand,
                        execute_convergence=execute_convergence):
     """
     Converge one group, non-concurrently, and clean up the dirty flag when
     done.
 
     :param group_locks: A lock function, produced from :func:`make_lock_set`.
-    :param version: version number of ZNode of the group's dirty flag
+    :param rand: random string uniquely identifying this convergence request
     """
     log = log.bind(tenant_id=tenant_id, group_id=group_id)
     eff = execute_convergence(tenant_id, group_id, log)
@@ -340,7 +344,7 @@ def converge_one_group(log, group_locks, tenant_id, group_id, version,
         return
     except NoSuchScalingGroupError:
         log.err(None, 'converge-fatal-error')
-        yield delete_divergent_flag(log, tenant_id, group_id, version)
+        yield delete_divergent_flag(log, tenant_id, group_id, rand)
         return
     except Exception:
         # We specifically don't clean up the dirty flag in the case of
@@ -348,7 +352,7 @@ def converge_one_group(log, group_locks, tenant_id, group_id, version,
         log.err(None, 'converge-non-fatal-error')
     else:
         if result in (StepResult.FAILURE, StepResult.SUCCESS):
-            yield delete_divergent_flag(log, tenant_id, group_id, version)
+            yield delete_divergent_flag(log, tenant_id, group_id, rand)
         # TODO: if result is FAILURE, put the group into ERROR state.
         # https://github.com/rackerlabs/otter/issues/885
 
@@ -377,7 +381,7 @@ def converge_all_groups(log, group_locks, my_buckets, all_buckets,
             converge_one_group(log, group_locks,
                                info['tenant_id'],
                                info['group_id'],
-                               info['version']),
+                               info['random']),
             info['tenant_id']))
         for info in group_infos]
     yield do_return(parallel(effs))
