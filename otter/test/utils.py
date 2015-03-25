@@ -377,8 +377,8 @@ class StubResponse(object):
             self.headers == other.headers and
             self._data == other._data)
 
-    def __neq__(self, other):
-        return self != other
+    def __ne__(self, other):
+        return not self == other
 
 
 def stub_pure_response(body, code=200, response_headers=None):
