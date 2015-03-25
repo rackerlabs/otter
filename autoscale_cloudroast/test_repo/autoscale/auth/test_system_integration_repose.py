@@ -134,8 +134,8 @@ class AutoscaleReposeTests(AutoscaleFixture):
     @tags(type='repose')
     def test_system_repose_get_non_existant_group_without_trailing_slash(self):
         """
-        Verify get scaling groups for an invalid group id through repose without a trailing slash,
-        returns response code 404
+        Verify get scaling groups for an invalid group id through repose
+        without a trailing slash, returns response code 404.
         """
         list_response = self.autoscale_client.list_scaling_groups(self.url + '/groups/76765')
         self.assertEquals(list_response.status_code, 404,
