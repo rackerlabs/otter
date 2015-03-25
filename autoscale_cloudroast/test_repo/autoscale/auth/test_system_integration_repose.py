@@ -123,8 +123,8 @@ class AutoscaleReposeTests(AutoscaleFixture):
     @tags(type='repose')
     def test_system_repose_list_groups_on_account_with_trailing_slash(self):
         """
-        Verify list scaling groups for a tenant through repose with a trailing slash,
-        returns response code 200
+        Verify list scaling groups for a tenant through repose with a
+        trailing slash, returns response code 200.
         """
         list_response = self.autoscale_client.list_scaling_groups(self.url + '/groups/')
         self.assertEquals(list_response.status_code, 200,
