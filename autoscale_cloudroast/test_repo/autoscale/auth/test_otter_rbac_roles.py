@@ -257,7 +257,8 @@ class OtterRbacTests(AutoscaleFixture):
             image_ref=self.group.launchConfiguration.server.imageRef,
             flavor_ref=self.group.launchConfiguration.server.flavorRef)
         self.assertEquals(
-            update_launch_config_response.status_code, response_codes['upd-del'],
+            update_launch_config_response.status_code,
+            response_codes['upd-del'],
             msg='Update launch config returned response code {0} on group '
             '{1}'.format(update_launch_config_response.status_code, self.group.id))
 
