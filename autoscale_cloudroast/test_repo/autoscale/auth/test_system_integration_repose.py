@@ -80,7 +80,8 @@ class AutoscaleReposeTests(AutoscaleFixture):
         for each_rate in limits.rate:
             if 'tenantId' in each_rate.uri:
                 self.assertTrue('/v1\.0/([A-Za-z0-9:]+)/.+' in each_rate.regex,
-                                msg='the regex in the tenant rate limit is {0}'.format(each_rate.regex))
+                                msg='the regex in the tenant rate limit is {0}'
+                                .format(each_rate.regex))
                 for limits in each_rate.limit:
                     self.assertEquals(limits.unit, self.limit_unit_all,
                                       msg='The limits unit for tenant is {0}'.format(limits.unit))
