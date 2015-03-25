@@ -423,7 +423,7 @@ class Converger(MultiService):
         :param buckets: collection of logical `buckets` which are shared
             between all Otter nodes running this service. Will be partitioned
             up between nodes to detirmine which nodes should work on which
-            groups. This *must* be a list of integers starting from 0.
+            groups. This *must* contain consecutive integers starting from 0.
         :param partitioner_factory: Callable of (log, callback) which should
             create an :obj:`Partitioner` to distribute the buckets.
         """
