@@ -5,7 +5,7 @@ from effect import (
     TypeDispatcher, base_dispatcher, sync_perform)
 from effect.async import perform_parallel_async
 from effect.ref import Reference, reference_dispatcher
-from effect.testing import EQDispatcher, EQFDispatcher
+from effect.testing import EQDispatcher, EQFDispatcher, SequenceDispatcher
 
 from kazoo.exceptions import BadVersionError
 
@@ -41,6 +41,7 @@ from otter.test.utils import (
     matches,
     mock_group, mock_log,
     raise_,
+    test_dispatcher,
     transform_eq)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildrenWithStats
 
@@ -514,11 +515,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
         gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
                                    group_id='group-id')
-        manifest = {  # Many details elided!
+        self.manifest = {  # Many details elided!
             'state': self.state,
             'launchConfiguration': self.lc,
         }
-        gsgi_result = (self.group, manifest)
+        gsgi_result = (self.group, self.manifest)
         self.expected_intents = [(gsgi, gsgi_result)]
 
     def _get_dispatcher(self, expected_intents=None):
@@ -663,6 +664,72 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                   get_all_convergence_data=gacd)
         dispatcher = self._get_dispatcher()
         self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
+
+    def _results_in_active(self, active):
+        """
+        Return a "transformer" that compares equal to a ``modifier`` function
+        as given to :obj:`ModifyGroupState` when modifying ``self.group`` and
+        ``self.state`` returns new state with the given ``active`` servers.
+        """
+        return transform_eq(
+            lambda modifier: modifier(self.group, self.state).active,
+            active)
+
+    def test_update_active_after_success(self):
+        """
+        When all steps are successful, one last gathering is performed and the
+        group's ``active`` servers are updated based on it, so that things like
+        successful server deletion get reflected in the active servers list.
+        """
+        log = mock_log()
+
+        def get_all_convergence_data(group_id):
+            return Effect(('get-all-data', group_id))
+
+        def plan(*args, **kwargs):
+            return pbag([TestStep(Effect('some-boring-step'))])
+
+        server1 = server('id1', ServerState.ACTIVE)
+        server2 = server('id2', ServerState.ACTIVE)
+
+        sequence = SequenceDispatcher([
+
+            # Look up group in Cass
+            (GetScalingGroupInfo(tenant_id='tenant-id', group_id='group-id'),
+             lambda i: (self.group, self.manifest)),
+
+            # gather convergence data
+            (('get-all-data', 'group-id'), lambda i: ([server1], [])),
+
+            # update active based on that data
+            (ModifyGroupState(
+                scaling_group=self.group,
+                modifier=self._results_in_active(
+                    {'id1': {'id': 'id1', 'links': []}})),
+             lambda i: None),
+
+            # run the steps
+            ('some-boring-step', lambda i: (StepResult.SUCCESS, [])),
+
+            # gather convergence data again, since everything was SUCCESS
+            (('get-all-data', 'group-id'), lambda i: ([server1, server2], [])),
+
+            # update active on the group with the new results
+            (ModifyGroupState(
+                scaling_group=self.group,
+                modifier=self._results_in_active(
+                    {'id1': {'id': 'id1', 'links': []},
+                     'id2': {'id': 'id2', 'links': []}})),
+             lambda i: None),
+        ])
+
+        dispatcher = ComposedDispatcher([test_dispatcher(), sequence])
+
+        eff = execute_convergence(
+            self.tenant_id, self.group_id, log,
+            plan=plan,
+            get_all_convergence_data=get_all_convergence_data)
+        self.assertEqual(sync_perform(dispatcher, eff), StepResult.SUCCESS)
 
 
 class DetermineActiveTests(SynchronousTestCase):
