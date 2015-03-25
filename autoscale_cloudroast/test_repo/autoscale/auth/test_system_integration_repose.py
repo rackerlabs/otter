@@ -148,7 +148,8 @@ class AutoscaleReposeTests(AutoscaleFixture):
         Verify get scaling groups for an invalid group id through repose with
         a trailing slash, returns response code 404.
         """
-        list_response = self.autoscale_client.list_scaling_groups(self.url + '/groups/76765/')
+        list_response = self.autoscale_client.list_scaling_groups(
+            self.url + '/groups/76765/')
         self.assertEquals(list_response.status_code, 404,
                           msg='List scaling group returned response code '
                           '{0}'.format(list_response.status_code))
