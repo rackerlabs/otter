@@ -102,15 +102,17 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         requested.
         """
         group = self._create_group()
-        self.assertEquals(update_launch_config_response.status_code, 400,
-                          msg='Updating group with invalid flavor id "1" was successsful with'
-                          ' response {0}'.format(update_launch_config_response.status_code))
         update_launch_config_response = (
             self.autoscale_client.update_launch_config(
                 group_id=group.id,
                 name=self.lc_name,
                 image_ref=self.lc_image_ref,
                 flavor_ref='1'))
+        self.assertEquals(
+            update_launch_config_response.status_code, 400,
+            msg='Updating group with invalid flavor id "1" was successsful '
+            'with response {0}'
+            .format(update_launch_config_response.status_code))
 
     def test_create_scaling_group_invalid_imageid(self):
         """
