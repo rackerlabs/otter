@@ -35,7 +35,7 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
         fails with an error 400
         """
         personalities = ['abc', 0, {'path': '/abc'}, {'contents': 'test'},
-                        [{'path': self.path}], [{'content': 'test'}]]
+                         [{'path': self.path}], [{'content': 'test'}]]
         for personality in personalities:
             self._assert_create_group(personality)
 
