@@ -82,7 +82,7 @@ def _update_active(scaling_group, active):
 
 
 @do
-def execute_convergence(tenant_id, group_id, log,
+def execute_convergence(tenant_id, group_id,
                         get_all_convergence_data=get_all_convergence_data,
                         plan=plan):
     """
@@ -115,11 +115,12 @@ def execute_convergence(tenant_id, group_id, log,
     desired_group_state = get_desired_group_state(
         group_id, launch_config, group_state.desired)
     steps = plan(desired_group_state, servers, lb_nodes, now)
-    yield Effect(BoundLogIntent(log, log_plan(steps)))
+    yield log_plan(steps)
     active = determine_active(servers, lb_nodes)
-    log.msg('execute-convergence',
+    yield Effect(
+        Log('execute-convergence',
             servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
-            desired=desired_group_state, active=active)
+            desired=desired_group_state, active=active))
     yield _update_active(scaling_group, active)
     if len(steps) == 0:
         yield do_return(StepResult.SUCCESS)
@@ -129,9 +130,10 @@ def execute_convergence(tenant_id, group_id, log,
     priority = sorted(results,
                       key=lambda (status, reasons): order.index(status))
     worst_status = priority[0][0]
-    log.msg('execute-convergence-results',
+    yield Effect(
+        Log('execute-convergence-results',
             results=zip(steps, results),
-            worst_status=worst_status)
+            worst_status=worst_status))
     yield do_return(worst_status)
 
 
@@ -327,8 +329,9 @@ def converge_one_group(log, group_locks, tenant_id, group_id, version,
     :param group_locks: A lock function, produced from :func:`make_lock_set`.
     :param version: version number of ZNode of the group's dirty flag
     """
-    log = log.bind(tenant_id=tenant_id, group_id=group_id)
-    eff = execute_convergence(tenant_id, group_id, log)
+    log_fields = dict(tenant_id=tenant_id, group_id=group_id)
+    eff = execute_convergence(tenant_id, group_id)
+    eff = BoundLog(eff, **log_fields)
     try:
         result = yield group_locks(group_id, eff)
     except ConcurrentError:
