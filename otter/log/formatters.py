@@ -9,8 +9,6 @@ from pyrsistent import pmap
 
 from singledispatch import singledispatch
 
-from toolz.functoolz import identity
-
 from twisted.python.failure import Failure
 
 
@@ -246,12 +244,7 @@ def serialize_to_jsonable(obj):
     """
     Serialize any object to a JSONable form
     """
-    return None
-
-
-# serialize base types
-for t in (list, tuple, basestring, int, float, long):
-    serialize_to_jsonable.register(t, identity)
+    return repr(obj)
 
 
 def ErrorFormattingWrapper(observer):
@@ -279,7 +272,7 @@ def ErrorFormattingWrapper(observer):
                 event['traceback'] = event['failure'].getTraceback()
                 event['exception_type'] = excp.__class__.__name__
                 details = serialize_to_jsonable(excp)
-                if details is not None:
+                if details != repr(excp):
                     event['error_details'] = details
 
             if 'why' in event and event['why']:
