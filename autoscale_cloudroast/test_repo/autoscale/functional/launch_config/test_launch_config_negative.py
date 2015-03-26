@@ -127,9 +127,11 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
                 lc_name=self.lc_name,
                 lc_image_ref=each_invalid_id,
                 lc_flavor_ref=self.lc_flavor_ref)
-            self.assertEquals(create_group_response.status_code, 400,
-                              msg='Create group with invalid server image id was successsful with'
-                              ' response {0}'.format(create_group_response.status_code))
+            self.assertEquals(
+                create_group_response.status_code, 400,
+                msg='Create group with invalid server image id was '
+                'successsful with response {0}'
+                .format(create_group_response.status_code))
 
     def test_create_scaling_group_no_imageid_no_bfv(self):
         """
