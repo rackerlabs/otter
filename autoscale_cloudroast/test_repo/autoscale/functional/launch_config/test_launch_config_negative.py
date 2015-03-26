@@ -155,8 +155,8 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
 
     def test_create_scaling_group_with_CLBs_but_no_ServiceNet(self):
         """
-        Scaling group creation fails with a 400 when a launch config has one or
-        more CLBs configured, but no ServiceNet configured.
+        Scaling group creation fails with a 400 when a launch config has one
+        or more CLBs configured, but no ServiceNet configured.
         """
         create_group_response = self.autoscale_client.create_scaling_group(
             gc_name='test_no_servicenet',
