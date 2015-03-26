@@ -15,6 +15,7 @@ from otter.convergence.steps import (
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
+    ConvergeLater,
     CreateServer,
     DeleteServer,
     RemoveNodesFromCLB,
@@ -246,12 +247,18 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
             [node for node in load_balancer_contents if node.matches(server)])
         ]
 
+    # if there are any building servers left, also return a ConvergeLater step.
+    converge_later = []
+    if any((s not in servers_to_delete for s in waiting_for_build)):
+        converge_later = [ConvergeLater()]
+
     return pbag(create_steps +
                 scale_down_steps +
                 delete_error_steps +
                 cleanup_errored_and_deleted_steps +
                 delete_timeout_steps +
-                lb_converge_steps)
+                lb_converge_steps +
+                converge_later)
 
 
 _optimizers = {}

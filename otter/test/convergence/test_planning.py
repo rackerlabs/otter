@@ -27,6 +27,7 @@ from otter.convergence.steps import (
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
+    ConvergeLater,
     CreateServer,
     DeleteServer,
     RemoveNodesFromCLB,
@@ -782,7 +783,8 @@ class ConvergeTests(SynchronousTestCase):
     def test_count_building_as_meeting_capacity(self):
         """
         No servers are created if there are building servers that sum with
-        active servers to meet capacity.
+        active servers to meet capacity.  :class:`ConvergeLater` is returned
+        as a step if the building servers are not being deleted.
         """
         self.assertEqual(
             converge(
@@ -790,7 +792,7 @@ class ConvergeTests(SynchronousTestCase):
                 set([server('abc', ServerState.BUILD)]),
                 set(),
                 0),
-            pbag([]))
+            pbag([ConvergeLater()]))
 
     def test_delete_nodes_in_error_state(self):
         """
@@ -899,7 +901,9 @@ class ConvergeTests(SynchronousTestCase):
     def test_scale_down_building_first(self):
         """
         When scaling down, first we delete building servers, in preference
-        to older server.
+        to older server.  :class:`ConvergeLater` does not get returned, even
+        though there is a building server, because the building server gets
+        deleted.
         """
         self.assertEqual(
             converge(
@@ -914,7 +918,9 @@ class ConvergeTests(SynchronousTestCase):
     def test_timeout_building(self):
         """
         Servers that have been building for too long will be deleted and
-        replaced.
+        replaced. :class:`ConvergeLater` does not get returned, even
+        though there is a building server, because the building server gets
+        deleted.
         """
         self.assertEqual(
             converge(
@@ -930,7 +936,9 @@ class ConvergeTests(SynchronousTestCase):
     def test_timeout_replace_only_when_necessary(self):
         """
         If a server is timing out *and* we're over capacity, it will be
-        deleted without replacement.
+        deleted without replacement.  :class:`ConvergeLater` does not get
+        returned, even though there is a building server, because the building
+        server gets deleted.
         """
         self.assertEqual(
             converge(
