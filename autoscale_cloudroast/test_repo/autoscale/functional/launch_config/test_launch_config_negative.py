@@ -53,8 +53,9 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
 
     def test_update_scaling_group_launch_config_to_no_imageid_no_bfv(self):
         """
-        Verify update launch config fails with a 400 when the new launch config
-        has no ``imageRef``, and also does not have ``block_device_mapping``.
+        Verify update launch config fails with a 400 when the new launch
+        config has no ``imageRef``, and also does not have
+        ``block_device_mapping``.
         """
         group = self._create_group()
         update_launch_config_response = self.autoscale_client.update_launch_config(
