@@ -681,7 +681,10 @@ class ScalingGroupPolicyFixture(ScalingGroupFixture):
             change = cls.sp_change
             cls.create_policy_response = cls.autoscale_client.create_policy(
                 group_id=cls.group.id,
-                name=name, cooldown=cooldown, change=change, policy_type=policy_type)
+                name=name,
+                cooldown=cooldown,
+                change=change,
+                policy_type=policy_type)
         cls.create_policy = cls.create_policy_response.entity
         cls.policy = cls.autoscale_behaviors.get_policy_properties(
             cls.create_policy)
