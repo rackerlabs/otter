@@ -37,13 +37,14 @@ class AuditLogBasicsTest(AutoscaleFixture):
         """
         # Confirm that the request response is 200
         history_response = self.autoscale_client.get_history()
-        self.assertEquals(history_response.status_code, 200,
-                          msg='The history request failed with {0} for tenant '
-                          '{1}'.format(history_response.status_code, self.tenant_id))
         self.assertTrue(
             history_response.ok,
             msg='The history query failed with: API Response {0} for '
             'tenant {1}'.format(history_response.content, self.tenant_id))
+        self.assertEquals(
+            history_response.status_code, 200,
+            msg='The history request failed with {0} for tenant '
+            '{1}'.format(history_response.status_code, self.tenant_id))
         # Extract the list of events
         latest_event = (history_response.entity).events[0]
         # Confirm that the basic fiels are present for the most recent events
