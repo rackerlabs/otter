@@ -51,7 +51,8 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     def test_webhook_capability_link(self):
         """
-        Verify that webhooks capability link is a full url with a version
+        Verify that webhooks capability link is a full url with a
+        version.
         """
         endpoint = self.url.strip(str(self.tenant_id)) + 'execute/'
         self.assertTrue(endpoint in self.webhook['links'].capability,
