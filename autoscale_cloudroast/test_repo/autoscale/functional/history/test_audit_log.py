@@ -32,7 +32,8 @@ class AuditLogBasicsTest(AutoscaleFixture):
     @unittest.skip("Skipping until audit log population is merged")
     def test_history_resource_response(self):
         """
-        Verify that querying the history API returns the expected response.
+        Verify that querying the history API returns the expected
+        response.
         """
         # Confirm that the request response is 200
         history_response = self.autoscale_client.get_history()
