@@ -71,11 +71,12 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
     def _validate_links(self, self_link, item_id):
         """
         """
-        self.assertTrue(self.url in self_link,
-                        msg='The url used to create the group doesnt match'
-                        ' the url in self link for id {0}'.format(item_id))
         self.assertTrue(
             item_id in self_link,
             msg='The ID does not exist in self links for item_id {0}'
             .format(item_id))
+        self.assertTrue(
+            self.url in self_link,
+            msg='The url used to create the group doesnt match the '
+            'url in self link for id {0}'.format(item_id))
         self.assertTrue(self._has_version(self_link))
