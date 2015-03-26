@@ -1,6 +1,7 @@
 """
 System integration tests for Auto Scale and Repose.
 """
+
 from cafe.drivers.unittest.decorators import tags
 
 from cloudcafe.identity.v2_0.tokens_api.behaviors import \
