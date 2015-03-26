@@ -82,7 +82,7 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
                           .format(list_response.status_code))
 
     @tags(type='repose')
-    def test_system_repose_unauthenticated_execute_webhook(self):
+    def test_execute_webhook(self):
         """
         Verify execute webhook through repose returns response code 202,
         even when unauthenticated.
