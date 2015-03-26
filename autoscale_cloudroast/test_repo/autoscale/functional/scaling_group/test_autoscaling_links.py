@@ -80,6 +80,6 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
             .format(item_id))
         self.assertTrue(
             self.url in self_link,
-            msg='The url used to create the group doesnt match the '
+            msg='The URL used to create the group doesnt match the '
             'url in self link for id {0}'.format(item_id))
         self.assertTrue(self._has_version(self_link))
