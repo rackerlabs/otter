@@ -71,6 +71,8 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     def _validate_links(self, self_link, item_id):
         """
+        Verify that the link to the webhook includes the URL used to
+        create the group, as well as the item id.
         """
         self.assertTrue(
             item_id in self_link,
