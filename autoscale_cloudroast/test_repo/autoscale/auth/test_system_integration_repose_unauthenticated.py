@@ -64,7 +64,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         Verify list scaling groups for a tenant through repose with a
         trailing slash, when unauthenticated, returns response code 401.
         """
-        list_response = self.autoscale_temp_client.list_scaling_groups(self.url + '/groups/')
+        list_response = self.autoscale_temp_client.list_scaling_groups(
+            self.url + '/groups/')
         self.assertEquals(list_response.status_code, 401,
                           msg='List scaling group returned response code {0}'
                           .format(list_response.status_code))
