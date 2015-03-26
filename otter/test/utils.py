@@ -742,9 +742,6 @@ def get_fake_service_request_performer(stub_response):
     :param service_request: the :class:`ServiceRequest` to "perform"
     :param stub_response: a tuple of (:class:`StubResponse`, string body),
         supposedly the "response" of an http request
-
-    TODO: hopefully once all service requests are made by the cloud client,
-    this can be moved into the client's test module instead.
     """
     if not isinstance(stub_response, basestring):
         try:
