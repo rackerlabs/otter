@@ -24,7 +24,8 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
 
     def test_update_launch_config_response(self):
         """
-        Verify the update launch config call for response code, headers and data.
+        Verify the update launch config call for response code, headers and
+        data.
         """
         lc_name = rand_name('upd_server_name')
         lc_image_ref = self.lc_image_ref_alt
