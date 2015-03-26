@@ -57,12 +57,13 @@ class ListLaunchConfigTest(AutoscaleFixture):
             self.launch_config.server.imageRef, self.lc_image_ref,
             msg='Server ImageRef in the launch config did not match'
                 ' for group {0}'.format(self.group.id))
-        self.assertEquals(self.autoscale_behaviors.personality_list(
-                          self.launch_config.server.personality),
-                          self.autoscale_behaviors.personality_list(
-                              self.lc_personality),
-                          msg='Server personality in the launch config did not match'
-                          ' for group {0}'.format(self.group.id))
+        self.assertEquals(
+            self.autoscale_behaviors.personality_list(
+                self.launch_config.server.personality),
+            self.autoscale_behaviors.personality_list(
+                self.lc_personality),
+            msg='Server personality in the launch config did not match'
+            ' for group {0}'.format(self.group.id))
         self.assertEquals(
             self.autoscale_behaviors.to_data(
                 self.launch_config.server.metadata),
