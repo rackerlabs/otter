@@ -707,7 +707,7 @@ class ScalingGroupWebhookFixture(ScalingGroupPolicyFixture):
     @classmethod
     def setUpClass(cls, webhook=None, metadata=None):
         """
-        Create a webhook
+        Create a webhook.
         """
         super(ScalingGroupWebhookFixture, cls).setUpClass()
         if webhook is None:
