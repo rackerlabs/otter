@@ -28,20 +28,23 @@ from otter.util.retry import (
 from otter.util.timestamp import timestamp_to_epoch
 
 
-def get_all_server_details(batch_size=100):
+def get_all_server_details(changes_since=None, batch_size=100):
     """
     Return all servers of a tenant.
 
-    :param batch_size: number of servers to fetch *per batch*.
+    :param datetime changes_since: Get changes since this time. Must be UTC
+    :param int batch_size: number of servers to fetch *per batch*.
     :return: list of server objects as returned by Nova.
 
     NOTE: This really screams to be a independent fxcloud-type API
     """
     url = append_segments('servers', 'detail')
+    query = {'limit': batch_size}
+    if changes_since is not None:
+        query['changes_since'] = '{}Z'.format(changes_since.isoformat())
 
     def get_server_details(marker):
         # sort based on query name to make the tests predictable
-        query = {'limit': batch_size}
         if marker is not None:
             query.update({'marker': marker})
         urlparams = sorted(query.items())

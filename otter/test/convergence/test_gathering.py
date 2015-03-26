@@ -1,7 +1,9 @@
 """Tests for convergence gathering."""
 
 import calendar
+from datetime import datetime
 from functools import partial
+from urllib import urlencode
 
 from effect import (
     ComposedDispatcher,
@@ -109,6 +111,23 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         body = {'servers': servers[10:]}
         result = resolve_svcreq(next_req, (fake_response, body), *req2)
         self.assertEqual(result, servers)
+
+    def test_with_changes_since(self):
+        """
+        `get_all_server_details` will request for servers based on
+        changes_since time
+        """
+        fake_response = object()
+        params = urlencode([('changes_since', '2010-10-10T10:10:00Z'),
+                            ('limit', 10)])
+        self.req = (ServiceType.CLOUD_SERVERS, 'GET',
+                    'servers/detail?{}'.format(params))
+        body = {'servers': self.servers}
+        eff = get_all_server_details(
+            changes_since=datetime(2010, 10, 10, 10, 10, 0), batch_size=10)
+        svcreq = resolve_retry_stubs(eff)
+        result = resolve_svcreq(svcreq, (fake_response, body), *self.req)
+        self.assertEqual(result, self.servers)
 
     def test_retry(self):
         """The HTTP requests are retried with some appropriate policy."""
