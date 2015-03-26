@@ -552,8 +552,8 @@ class AutoscaleFixture(BaseTestFixture):
 
     def successfully_delete_given_loadbalancer(self, lb_id):
         """
-        Given the load balancer Id, tries to delete the load balancer for 15 minutes,
-        until a 204 is received
+        Given the load balancer id, tries to delete the load balancer for 15
+        minutes, until a 204 is received.
         """
         endtime = time.time() + 900
         while time.time() < endtime:
