@@ -41,8 +41,8 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
 
     def test_launch_config_personality_with_max_path_size(self):
         """
-        Create a scaling group with path over 255 characters and verify the creation
-        fails with an error 400
+        Create a scaling group with path over 255 characters and verify the
+        creation fails with an error 400.
         """
         long_path = 'z' * (self.personality_maxlength + 1)
         personality = [{'path': '/root/{0}.txt'.format(long_path),
