@@ -123,9 +123,11 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
             disk_config=lc_disk_config,
             networks=lc_networks,
             load_balancers=lc_load_balancers)
-        self.assertEquals(update_lc_response.status_code, 204,
-                          msg='Update launch config failed with {0} as against a 204, success for'
-                          ' group {1}'.format(update_lc_response.status_code, self.group.id))
+        self.assertEquals(
+            update_lc_response.status_code, 204,
+            msg='Update launch config failed with {0} as against a '
+            '204, success for group {1}'
+            .format(update_lc_response.status_code, self.group.id))
         lc_name = 'test_upd_lc'
         image_ref = self.lc_image_ref
         flavor_ref = '8'
