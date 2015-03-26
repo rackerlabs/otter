@@ -37,8 +37,8 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
 
     def test_update_scaling_group_launch_config_to_invalid_imageid(self):
         """
-        Verify update launch config fails with a 400 when the new launch config
-        has an invalid imageId.
+        Verify update launch config fails with a 400 when the new launch
+        config has an invalid image id.
         """
         group = self._create_group()
         for each_invalid_id in self.invalid_image_ids:
