@@ -13,7 +13,7 @@ class AuditLogBasicsTest(AutoscaleFixture):
     @classmethod
     def setUpClass(cls):
         """
-        Create scaling groups to populate the history log
+        Create scaling groups to populate the history log.
         """
         super(AuditLogBasicsTest, cls).setUpClass()
         first_group = cls.autoscale_behaviors.create_scaling_group_min()
