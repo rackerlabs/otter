@@ -1,13 +1,16 @@
 """
 System integration tests for Auto Scale and Repose.
 """
-from test_repo.autoscale.fixtures import AutoscaleFixture
+from cafe.drivers.unittest.decorators import tags
+
 from cloudcafe.identity.v2_0.tokens_api.behaviors import \
     TokenAPI_Behaviors as OSTokenAPI_Behaviors
 from cloudcafe.identity.v2_0.tokens_api.client import \
     TokenAPI_Client as OSTokenAPI_Client
+
 from autoscale.client import AutoscalingAPIClient
-from cafe.drivers.unittest.decorators import tags
+
+from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
 class AutoscaleReposeUnauthTests(AutoscaleFixture):
