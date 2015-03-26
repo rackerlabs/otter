@@ -139,7 +139,7 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
     def test_create_scaling_group_invalid_flavorid(self):
         """
         Verify scaling group creation fails with a 400 when launch config
-        has an invalid flavorid.
+        has an invalid flavor id.
         """
         for each_invalid_id in self.invalid_flavor_ids:
             create_group_response = self.autoscale_client.create_scaling_group(
