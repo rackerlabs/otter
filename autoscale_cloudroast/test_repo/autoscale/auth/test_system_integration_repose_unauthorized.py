@@ -18,8 +18,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
     @classmethod
     def setUpClass(cls):
         """
-        Create a client for a test account that does not have the autoscale endpoint
-        in its service catalog
+        Create a client for a test account that does not have the Auto Scale
+        endpoint in its service catalog.
         """
         super(AutoscaleReposeUnauthTests, cls).setUpClass()
         cls.url = cls.url.replace(cls.tenant_id, cls.non_autoscale_tenant)
