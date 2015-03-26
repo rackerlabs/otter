@@ -51,8 +51,8 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
 
     def test_launch_config_personality_with_max_file_content_size(self):
         """
-        Create a scaling group with file contents over 1000 characters and verify the creation
-        fails with an error 400
+        Create a scaling group with file contents over 1000 characters and
+        verify the creation fails with an error 400.
         """
         file_content = 'z' * (self.personality_max_file_size + 1)
         personality = [{'path': self.path,
