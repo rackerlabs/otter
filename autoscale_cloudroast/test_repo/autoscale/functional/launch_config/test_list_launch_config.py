@@ -11,8 +11,10 @@ class ListLaunchConfigTest(AutoscaleFixture):
         """Creates a scaling group."""
         super(ListLaunchConfigTest, cls).setUpClass()
         cls.lc_disk_config = 'AUTO'
-        cls.lc_personality = [{'path': '/root/.ssh/authorized_keys',
-                               'contents': ('DQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp')}]
+        cls.lc_personality = [
+            {'path': '/root/.ssh/authorized_keys',
+             'contents': ('DQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp')}
+        ]
         cls.lc_metadata = {'lc_meta_key_1': 'lc_meta_value_1',
                            'lc_meta_key_2': 'lc_meta_value_2'}
         cls.lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'}]
