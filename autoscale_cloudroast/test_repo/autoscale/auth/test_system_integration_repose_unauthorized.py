@@ -32,7 +32,9 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
             cls.non_autoscale_password,
             cls.non_autoscale_tenant)
         cls.autoscale_temp_client = AutoscalingAPIClient(
-            url=cls.url, auth_token=access_data.token.id_, serialize_format='json',
+            url=cls.url,
+            auth_token=access_data.token.id_,
+            serialize_format='json',
             deserialize_format='json')
 
     @tags(type='repose')
