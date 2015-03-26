@@ -186,17 +186,18 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         or more CLBs configured, but no ServiceNet configured.
         """
         group = self._create_group()
-        update_launch_config_response = self.autoscale_client.update_launch_config(
-            group_id=group.id,
-            name=self.lc_name,
-            image_ref=self.lc_image_ref,
-            flavor_ref=self.lc_flavor_ref,
-            networks=[
-                {"uuid": "4ebd35cf-bfe7-4d93-b0d8-eb468ce2245a"},
-                {"uuid": "00000000-0000-0000-0000-000000000000"}
-            ],
-            load_balancers=[{'loadBalancerId': '1234', 'port': 80,
-                             'type': 'CloudLoadBalancer'}])
+        update_launch_config_response = (
+            self.autoscale_client.update_launch_config(
+                group_id=group.id,
+                name=self.lc_name,
+                image_ref=self.lc_image_ref,
+                flavor_ref=self.lc_flavor_ref,
+                networks=[
+                    {"uuid": "4ebd35cf-bfe7-4d93-b0d8-eb468ce2245a"},
+                    {"uuid": "00000000-0000-0000-0000-000000000000"}
+                ],
+                load_balancers=[{'loadBalancerId': '1234', 'port': 80,
+                                 'type': 'CloudLoadBalancer'}]))
 
         status = update_launch_config_response.status_code
         self.assertEquals(
