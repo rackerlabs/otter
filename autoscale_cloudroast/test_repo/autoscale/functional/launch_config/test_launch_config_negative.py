@@ -9,11 +9,9 @@ from cloudcafe.common.tools.datagen import rand_name
 
 
 class LaunchConfigNegtaiveTest(AutoscaleFixture):
-
     """
     Verify launch config.
     """
-
     def setUp(self):
         """
         Create a scaling group.
