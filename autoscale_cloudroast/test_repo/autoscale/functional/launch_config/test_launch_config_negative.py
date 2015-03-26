@@ -69,8 +69,8 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
 
     def test_update_scaling_group_launch_config_to_invalid_flavorid(self):
         """
-        Verify update launch config fails with a 400 when the new launch config
-        has an invalid flavorId.
+        Verify update launch config fails with a 400 when the new launch
+        config has an invalid flavor id.
         """
         group = self._create_group()
         for each_invalid_id in self.invalid_flavor_ids:
