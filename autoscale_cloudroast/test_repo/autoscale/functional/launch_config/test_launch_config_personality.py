@@ -61,8 +61,8 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
 
     def test_launch_config_personality_with_max_personalities(self):
         """
-        Create a scaling group with over max personalities allowed and verify the creation
-        fails with an error 400
+        Create a scaling group with over max personalities allowed and
+        verify the creation fails with an error 400.
         """
         personality_content = {'path': self.path,
                                'contents': base64.b64encode('tests')}
