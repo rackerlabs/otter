@@ -537,9 +537,7 @@ class AutoscaleFixture(BaseTestFixture):
 
     def get_total_num_webhooks(self, group_id, policy_id):
         """
-        Returns the total number of webhooks on a given policy.  Note:
-        This will work only after the test webhook pagination branch
-        is merged.
+        Returns the total number of webhooks on a given policy.
         """
         list_webhooks = self.autoscale_client.list_webhooks(
             group_id,
