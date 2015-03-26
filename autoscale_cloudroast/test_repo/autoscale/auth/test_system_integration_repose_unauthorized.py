@@ -42,7 +42,7 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
             deserialize_format='json')
 
     @tags(type='repose')
-    def test_system_repose_unauthorized_rate_limits_without_trailing_slash(self):
+    def test_rate_limits_without_trailing_slash(self):
         """
         Verify the relative rate limit API without a trailing slash
         returns reponse code 403 when unauthorized.
