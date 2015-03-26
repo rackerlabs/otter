@@ -86,9 +86,12 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
     @unittest.skip('AUTO-622')
     def test_update_scaling_group_launch_config_to_invalid_flavorid_1(self):
         """
-        Verify update launch config fails with a 400 when the new launch config
-        has an flavorId of "1". This is special case where '1' flavor existed in Rackspace
-        and has been taken out. But it still returns valid flavor when requested.
+        Verify update launch config fails with a 400 when the new launch
+        config has an flavorId of "1".
+
+        This is special case where '1' flavor existed in Rackspace and
+        has been taken out. But it still returns valid flavor when
+        requested.
         """
         group = self._create_group()
         update_launch_config_response = self.autoscale_client.update_launch_config(
