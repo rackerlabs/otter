@@ -59,14 +59,15 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         ``block_device_mapping``.
         """
         group = self._create_group()
-        update_launch_config_response = self.autoscale_client.update_launch_config(
-            group_id=group.id,
-            name=self.lc_name,
-            image_ref=null,
-            flavor_ref=self.lc_flavor_ref)
         self.assertEquals(update_launch_config_response.status_code, 400,
                           msg='Updating group with no server image id was successsful with'
                           ' response {0}'.format(update_launch_config_response.status_code))
+        update_launch_config_response = (
+            self.autoscale_client.update_launch_config(
+                group_id=group.id,
+                name=self.lc_name,
+                image_ref=null,
+                flavor_ref=self.lc_flavor_ref))
 
     def test_update_scaling_group_launch_config_to_invalid_flavorid(self):
         """
