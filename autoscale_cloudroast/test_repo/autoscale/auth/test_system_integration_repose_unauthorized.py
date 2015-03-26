@@ -92,7 +92,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
     @tags(type='repose')
     def test_system_repose_unauthorized_execute_webhook(self):
         """
-        Verify execute webhook of a tenant by another tenant returns response code 202
+        Verify execute webhook of a tenant by another tenant returns
+        response code 202.
         """
         group = self.autoscale_behaviors.create_scaling_group_min().entity
         policy = self.autoscale_behaviors.create_policy_webhook(group.id, {'change': 1})
