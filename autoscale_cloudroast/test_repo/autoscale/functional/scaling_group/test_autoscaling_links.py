@@ -55,10 +55,11 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
         version.
         """
         endpoint = self.url.strip(str(self.tenant_id)) + 'execute/'
-        self.assertTrue(endpoint in self.webhook['links'].capability,
-                        msg='The url used to create the group {0} doesnt match'
-                        ' the url in self link{1}'.format(endpoint,
-                            self.webhook['links'].capability))
+        self.assertTrue(
+            endpoint in self.webhook['links'].capability,
+            msg='The url used to create the group {0} doesnt match'
+            ' the url in self link{1}'
+            .format(endpoint, self.webhook['links'].capability))
 
     def _has_version(self, link):
         """
