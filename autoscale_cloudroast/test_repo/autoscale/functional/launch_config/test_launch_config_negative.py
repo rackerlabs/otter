@@ -163,9 +163,10 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
                 lc_name=self.lc_name,
                 lc_image_ref=self.lc_image_ref,
                 lc_flavor_ref=each_invalid_id)
-            self.assertEquals(create_group_response.status_code, 400,
-                              msg='Create group with invalid flavor id was successsful with'
-                              ' response {0}'.format(create_group_response.status_code))
+            self.assertEquals(
+                create_group_response.status_code, 400,
+                msg='Create group with invalid flavor id was successsful with'
+                ' response {0}'.format(create_group_response.status_code))
 
     def test_create_scaling_group_with_CLBs_but_no_ServiceNet(self):
         """
