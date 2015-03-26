@@ -551,7 +551,6 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 0),
             pbag([DeleteServer(server_id='abc')]))
 
-
     def test_active_server_can_be_deleted_if_all_lbs_can_be_removed(self):
         """
         If an active server to be scaled down can be removed from all the load
