@@ -27,7 +27,7 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     def test_scaling_policy_links(self):
         """
-        Verify that scaling policy has links for self
+        Verify that scaling policy has links for self.
         """
         self.assertTrue(self.policy['links'] is not None,
                         msg='No links returned upon scaling policy creation'
