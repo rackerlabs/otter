@@ -673,7 +673,9 @@ class ScalingGroupPolicyFixture(ScalingGroupFixture):
         elif desired_capacity:
             cls.create_policy_response = cls.autoscale_client.create_policy(
                 group_id=cls.group.id,
-                name=name, cooldown=cooldown, desired_capacity=desired_capacity,
+                name=name,
+                cooldown=cooldown,
+                desired_capacity=desired_capacity,
                 policy_type=policy_type)
         else:
             change = cls.sp_change
