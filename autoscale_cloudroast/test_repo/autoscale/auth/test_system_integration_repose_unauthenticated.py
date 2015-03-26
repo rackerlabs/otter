@@ -9,7 +9,8 @@ from cafe.drivers.unittest.decorators import tags
 class AutoscaleReposeUnauthTests(AutoscaleFixture):
 
     """
-    System tests to verify repose integration with autoscale when unauthenticated
+    System tests to verify repose integration with autoscale when
+    unauthenticated.
     """
 
     @classmethod
