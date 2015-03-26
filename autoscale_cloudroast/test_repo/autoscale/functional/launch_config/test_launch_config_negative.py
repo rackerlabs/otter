@@ -18,10 +18,6 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         """
         super(LaunchConfigNegtaiveTest, self).setUp()
         self.lc_name = rand_name('negative_launch_config')
-        self.invalid_image_ids = ['INVALID-IMAGE-ID', '1111',
-                                  self.lc_image_ref + 'Z', '  ',
-                                  '', None  # these are invalid without block_device_mapping
-                                  ]
         self.invalid_flavor_ids = [
             'INVALID-FLAVOR-ID',
             '8888',
@@ -29,6 +25,14 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
             None,
             '',
             '  '
+        ]
+        self.invalid_image_ids = [
+            'INVALID-IMAGE-ID',
+            '1111',
+            self.lc_image_ref + 'Z', '  ',
+            # these are invalid without block_device_mapping
+            '',
+            None
         ]
 
     def test_update_scaling_group_launch_config_to_invalid_imageid(self):
