@@ -19,7 +19,8 @@ class AutoscaleReposeTests(AutoscaleFixture):
         """
         limits_response = self.autoscale_client.view_limits()
         self.assertEquals(limits_response.status_code, 200,
-                          msg='Limits returned response code {0}'.format(limits_response.status_code))
+                          msg='Limits returned response code {0}'
+                          .format(limits_response.status_code))
         limits = limits_response.entity
         self.assertEquals(limits.absolute.maxGroups, self.max_groups)
         self.assertEquals(
