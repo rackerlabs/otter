@@ -58,9 +58,10 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
             msg='Update launch config failed with {0} as against a 204 for '
             'group {1}'.format(update_lc_response.status_code, self.group.id))
         self.validate_headers(update_lc_response.headers)
-        self.assertEquals(updated_launchconfig.server.name, lc_name,
-                          msg='Prefix/Suffix server name in the launch config did not update '
-                          'for group {0}'.format(self.group.id))
+        self.assertEquals(
+            updated_launchconfig.server.name, lc_name,
+            msg='Prefix/Suffix server name in the launch config did not '
+            'update for group {0}'.format(self.group.id))
         self.assertEquals(
             updated_launchconfig.server.flavorRef, lc_flavor_ref,
             msg='Server flavor in the launch config did not update '
