@@ -6,6 +6,7 @@ import json
 from cafe.drivers.unittest.decorators import tags
 from test_repo.autoscale.fixtures import AutoscaleFixture
 
+
 class DeleteAll(AutoscaleFixture):
     """
     Get list of groups/servers on account and delete them.
