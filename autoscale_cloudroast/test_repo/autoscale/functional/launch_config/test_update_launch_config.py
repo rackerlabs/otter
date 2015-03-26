@@ -160,9 +160,11 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
                 "delete_on_termination": False
             }])
 
-        self.assertEquals(update_lc_response.status_code, 204,
-                          msg='Update launch config failed with {0} as against a 204, success for'
-                          ' group {1}'.format(update_lc_response.status_code, self.group.id))
+        self.assertEquals(
+            update_lc_response.status_code, 204,
+            msg='Update launch config failed with {0} as against a 204, '
+            'success for group {1}'
+            .format(update_lc_response.status_code, self.group.id))
         self.validate_headers(update_lc_response.headers)
 
         launchconfig_response = self.autoscale_client.view_launch_config(
