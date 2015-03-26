@@ -131,9 +131,14 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
     """
     If server is not already in draining state, put it into draining state.
     If the server is free of load balancers, just delete it.
+
+    If a server is in building, it can just be deleted, along with any
+    load balancer nodes associated with it, regardless of timeouts.
     """
     lb_draining_steps = _remove_from_lb_with_draining(
-        timeout, current_lb_nodes, now)
+        timeout if server.state != ServerState.BUILD else 0,
+        current_lb_nodes,
+        now)
 
     # if there are no load balancers that are waiting on draining timeouts or
     # connections, just delete the server too

@@ -509,6 +509,31 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
     clb_desc = CLBDescription(lb_id='1', port=80)
     rcv3_desc = RCv3Description(lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
 
+    def test_building_servers_are_deleted(self):
+        """
+        A building server to be scaled down is just deleted and removed from
+        any load balancers.  It is not put into a draining state, nor are the
+        load balancers nodes drained, even if the timeout is greater than zero.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.BUILD,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
+                set([CLBNode(node_id='1', address='1.1.1.1',
+                             description=self.clb_desc),
+                     RCv3Node(node_id='2', cloud_server_id='abc',
+                              description=self.rcv3_desc)]),
+                0),
+            pbag([
+                DeleteServer(server_id='abc'),
+                RemoveNodesFromCLB(lb_id='1', node_ids=s('1')),
+                BulkRemoveFromRCv3(lb_node_pairs=s(
+                    (self.rcv3_desc.lb_id, 'abc')))
+            ]))
+
     def test_active_server_without_load_balancers_can_be_deleted(self):
         """
         If an active server to be scaled down is not attached to any load
@@ -524,6 +549,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 set(),
                 0),
             pbag([DeleteServer(server_id='abc')]))
+
 
     def test_active_server_can_be_deleted_if_all_lbs_can_be_removed(self):
         """
