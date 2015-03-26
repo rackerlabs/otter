@@ -218,8 +218,9 @@ class OtterRbacTests(AutoscaleFixture):
             'get': 200
         }
         if expected_response_code:
-            response_codes.update(dict.fromkeys(['create', 'upd-del', 'execute', 'get'],
-                                                expected_response_code))
+            response_codes.update(dict.fromkeys(
+                ['create', 'upd-del', 'execute', 'get'],
+                expected_response_code))
 
         # create group
         create_scaling_group_response = user_client.create_scaling_group(
