@@ -40,9 +40,10 @@ class ListLaunchConfigTest(AutoscaleFixture):
 
     def test_list_launch_config_response(self):
         """Verify the list config call for response code, headers and data."""
-        self.assertEquals(self.launch_config_response.status_code, 200,
-                          msg='List launch config failed with {0} for group '
-                          '{1} '.format(self.launch_config_response.status_code, self.group.id))
+        self.assertEquals(
+            self.launch_config_response.status_code, 200,
+            msg='List launch config failed with {0} for group {1} '
+            .format(self.launch_config_response.status_code, self.group.id))
         self.validate_headers(self.launch_config_response.headers)
         self.assertEquals(
             self.launch_config.server.name, self.lc_name,
