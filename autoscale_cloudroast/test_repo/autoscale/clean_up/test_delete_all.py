@@ -8,9 +8,8 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
 class DeleteAll(AutoscaleFixture):
-
     """
-    Get list of groups/servers on account and delete them
+    Get list of groups/servers on account and delete them.
     """
 
     @tags(type='group')
