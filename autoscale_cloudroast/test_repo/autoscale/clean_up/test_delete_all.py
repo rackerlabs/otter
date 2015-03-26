@@ -42,8 +42,12 @@ class DeleteAll(AutoscaleFixture):
         for each_server_id in server_id_list:
             self.server_client.delete_server(each_server_id)
         list_servers = (self.server_client.list_servers()).entity
-        print 'Deleting {0} servers, {1} still exist'.format(len(all_servers), len(list_servers))\
-            if len(list_servers) is not 0 else "Deleted {0} servers".format(len(all_servers))
+
+        if len(list_servers) is not 0:
+            print ('Deleting {0} servers, {1} still exist'
+                   .format(len(all_servers), len(list_servers)))
+        else:
+            print 'Deleted {0} servers'.format(len(all_servers))
 
     @tags(type='loadbalancers')
     def test_delete_all_test_loadbalancers(self):
