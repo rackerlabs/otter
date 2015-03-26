@@ -15,7 +15,7 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
     @classmethod
     def setUpClass(cls):
         """
-        Create an autoscale api client for requests, unauthenticated
+        Create an autoscale api client for requests, unauthenticated.
         """
         super(AutoscaleReposeUnauthTests, cls).setUpClass()
         cls.autoscale_temp_client = AutoscalingAPIClient(
