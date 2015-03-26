@@ -198,7 +198,7 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
 
     def _create_group(self):
         """
-        Create a group
+        Create a group.
         """
         group_response = self.autoscale_behaviors.create_scaling_group_min()
         group = group_response.entity
