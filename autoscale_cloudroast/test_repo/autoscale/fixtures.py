@@ -659,7 +659,10 @@ class ScalingGroupPolicyFixture(ScalingGroupFixture):
         if change:
             cls.create_policy_response = cls.autoscale_client.create_policy(
                 group_id=cls.group.id,
-                name=name, cooldown=cooldown, change=change, policy_type=policy_type)
+                name=name,
+                cooldown=cooldown,
+                change=change,
+                policy_type=policy_type)
         elif change_percent:
             cls.create_policy_response = cls.autoscale_client.create_policy(
                 group_id=cls.group.id,
