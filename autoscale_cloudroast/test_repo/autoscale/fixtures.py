@@ -724,6 +724,6 @@ class ScalingGroupWebhookFixture(ScalingGroupPolicyFixture):
     @classmethod
     def tearDownClass(cls):
         """
-        Delete the webhook
+        Delete the webhook.
         """
         super(ScalingGroupWebhookFixture, cls).tearDownClass()
