@@ -54,11 +54,12 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         Verify the relative rate limit API with a trailing slash returns
         reponse code 403 when unauthorized.
         """
-        self.assertEquals(limits_response.status_code, 403,
-                          msg='Limits returned response code {0}'.format(
-                          limits_response.status_code))
         limits_response = self.autoscale_temp_client.view_limits(
             self.url + '/limits/')
+        self.assertEquals(
+            limits_response.status_code, 403,
+            msg='Limits returned response code {0}'
+            .format(limits_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthorized_list_groups_on_account_without_trailing_slash(self):
