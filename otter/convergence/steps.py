@@ -631,6 +631,7 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
 
 
 @implementer(IStep)
+@attributes(['reasons'])
 class ConvergeLater(object):
     """
     Converge later in some time
@@ -640,4 +641,4 @@ class ConvergeLater(object):
         """
         Return an effect that always results in retry
         """
-        return Effect(Constant((StepResult.RETRY, [])))
+        return Effect(Constant((StepResult.RETRY, self.reasons)))
