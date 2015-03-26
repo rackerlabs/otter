@@ -93,11 +93,12 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         Verify GET non existing scaling groups through repose without a
         trailing slash, when unauthorized, returns response code 403.
         """
-        self.assertEquals(list_response.status_code, 403,
-                          msg='List scaling group returned response code {0}'.format(
-                          list_response.status_code))
         list_response = self.autoscale_temp_client.list_scaling_groups(
             self.url + '/groups/76765')
+        self.assertEquals(
+            list_response.status_code, 403,
+            msg='List scaling group returned response code {0}'
+            .format(list_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthorized_execute_webhook(self):
