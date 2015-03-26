@@ -7,9 +7,8 @@ import unittest
 
 class AuditLogBasicsTest(AutoscaleFixture):
     """
-    Verify the following basic audit log behaviors:
-        1.) Using GET on /tenantid/history returns 200 and result OK
-        2.) Each entry has the following fields: timestamp, message, event_type, scaling_group_id
+    The audit log works, and each entry has the following fields:
+    timestamp, message, event_type, scaling_group_id.
     """
 
     @classmethod
