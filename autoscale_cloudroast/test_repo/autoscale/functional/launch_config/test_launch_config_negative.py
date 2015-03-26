@@ -202,8 +202,8 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         status = update_launch_config_response.status_code
         self.assertEquals(
             status, 400,
-            msg=('Updating a group to have CLBs but no ServiceNet was successsful '
-                 'with response {0}'.format(status)))
+            msg='Updating a group to have CLBs but no ServiceNet was '
+            'successsful with response {0}'.format(status))
 
     def _create_group(self):
         """
