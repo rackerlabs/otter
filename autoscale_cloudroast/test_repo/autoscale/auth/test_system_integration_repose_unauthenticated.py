@@ -64,8 +64,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         """
         list_response = self.autoscale_temp_client.list_scaling_groups(self.url + '/groups/')
         self.assertEquals(list_response.status_code, 401,
-                          msg='List scaling group returned response code '
-                          '{0}'.format(list_response.status_code))
+                          msg='List scaling group returned response code {0}'
+                          .format(list_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthenticated_list_groups_on_account_with_non_existant_group(self):
