@@ -27,9 +27,10 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         token_client = OSTokenAPI_Client(
             endpoint, 'json', 'json')
         token_behaviors = OSTokenAPI_Behaviors(token_client)
-        access_data = token_behaviors.get_access_data(cls.non_autoscale_username,
-                                                      cls.non_autoscale_password,
-                                                      cls.non_autoscale_tenant)
+        access_data = token_behaviors.get_access_data(
+            cls.non_autoscale_username,
+            cls.non_autoscale_password,
+            cls.non_autoscale_tenant)
         cls.autoscale_temp_client = AutoscalingAPIClient(
             url=cls.url, auth_token=access_data.token.id_, serialize_format='json',
             deserialize_format='json')
