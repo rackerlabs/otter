@@ -199,8 +199,9 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
 
     def test_update_launch_config_with_boot_from_volume_null_image(self):
         """
-        Update a scaling group's launch config with a null image ID.  Request
-        succeeds, overwriting previous launch config.
+        Update a scaling group's launch config with a null image ID.
+
+        Request succeeds, overwriting previous launch config.
         """
         self._test_boot_from_volume(null)
 
