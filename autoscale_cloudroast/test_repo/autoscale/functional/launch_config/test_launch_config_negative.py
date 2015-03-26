@@ -42,14 +42,15 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         """
         group = self._create_group()
         for each_invalid_id in self.invalid_image_ids:
-            update_launch_config_response = self.autoscale_client.update_launch_config(
-                group_id=group.id,
-                name=self.lc_name,
-                image_ref=each_invalid_id,
-                flavor_ref=self.lc_flavor_ref)
             self.assertEquals(update_launch_config_response.status_code, 400,
                               msg='Updating group with invalid server image id was successsful with'
                               ' response {0}'.format(update_launch_config_response.status_code))
+            update_launch_config_response = (
+                self.autoscale_client.update_launch_config(
+                    group_id=group.id,
+                    name=self.lc_name,
+                    image_ref=each_invalid_id,
+                    flavor_ref=self.lc_flavor_ref))
 
     def test_update_scaling_group_launch_config_to_no_imageid_no_bfv(self):
         """
