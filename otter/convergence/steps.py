@@ -641,4 +641,4 @@ class ConvergeLater(object):
         """
         Return an effect that always results in retry
         """
-        return Effect(Constant((StepResult.RETRY, self.reasons)))
+        return Effect(Constant((StepResult.RETRY, list(self.reasons))))

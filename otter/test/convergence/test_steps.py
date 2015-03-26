@@ -1207,7 +1207,7 @@ class ConvergeLaterTests(SynchronousTestCase):
         """
         `ConvergeLater.as_effect` returns effect with RETRY
         """
-        eff = ConvergeLater(reasons=['building']).as_effect()
+        eff = ConvergeLater(reasons=freeze(['building'])).as_effect()
         self.assertEqual(
             sync_perform(base_dispatcher, eff),
             (StepResult.RETRY, ['building']))
