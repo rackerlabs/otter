@@ -10,7 +10,6 @@ class AuditLogBasicsTest(AutoscaleFixture):
     The audit log works, and each entry has the following fields:
     timestamp, message, event_type, scaling_group_id.
     """
-
     @classmethod
     def setUpClass(cls):
         """
