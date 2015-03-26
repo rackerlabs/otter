@@ -32,7 +32,7 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
     def test_launch_config_personality_with_invalid_personality(self):
         """
         Create a scaling group with invalid personality and verify the creation
-        fails with an error 400
+        fails with an error 400.
         """
         personalities = ['abc', 0, {'path': '/abc'}, {'contents': 'test'},
                          [{'path': self.path}], [{'content': 'test'}]]
