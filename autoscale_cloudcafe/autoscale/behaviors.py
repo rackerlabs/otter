@@ -482,13 +482,13 @@ class AutoscaleBehaviors(BaseBehavior):
 
         if time_scale:
             # scale time down if using mimic - no shorter than 1 second, though
-            time_scaling_factor = 0.1 if self.autoscale_config.mimic else 1
+            time_scaling_factor = 0.25 if self.autoscale_config.mimic else 1
             timeout, interval_time = [
                 max(val * time_scaling_factor, 1)
                 for val in (timeout, interval_time)
             ]
-            # max out mimic waiting to 15 seconds, no matter what the timeout
-            timeout = min(timeout, 15)
+            # max out mimic waiting to 60 seconds, no matter what the timeout
+            timeout = min(timeout, 60)
 
         # retry uses millseconds, not seconds
         @retry(wait_fixed=interval_time * 1000, stop_max_delay=timeout * 1000)

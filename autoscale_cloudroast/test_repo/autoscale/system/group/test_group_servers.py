@@ -1,8 +1,6 @@
 """
 Tests for `/groups/<groupId>/servers/` endpoint
 """
-import time
-
 from cafe.drivers.unittest.decorators import tags
 
 from test_repo.autoscale.fixtures import AutoscaleFixture
