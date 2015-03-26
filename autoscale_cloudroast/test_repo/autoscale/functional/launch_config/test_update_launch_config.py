@@ -108,8 +108,10 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
         lc_flavor_ref = '4'
         lc_load_balancers = [{'loadBalancerId': 1234, 'port': 8181}]
         lc_disk_config = 'AUTO'
-        lc_personality = [{'path': '/root/.ssh/authorized_keys',
-                           'contents': ('DQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp')}]
+        lc_personality = [
+            {'path': '/root/.ssh/authorized_keys',
+             'contents': ('DQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp')}
+        ]
         lc_metadata = {'lc_meta_key_1': 'lc_meta_value_1',
                        'lc_meta_key_2': 'lc_meta_value_2'}
         lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'}]
