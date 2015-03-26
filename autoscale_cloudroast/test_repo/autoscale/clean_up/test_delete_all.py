@@ -30,7 +30,7 @@ class DeleteAll(AutoscaleFixture):
     @tags(type='servers')
     def test_delete_all_servers_on_account(self):
         """
-        Deletes all servers on the account
+        Deletes all servers on the account.
         """
         all_servers = (self.server_client.list_servers()).entity
         server_id_list = []
