@@ -58,7 +58,7 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
                           '{0}'.format(list_response.status_code))
 
     @tags(type='repose')
-    def test_system_repose_unauthenticated_list_groups_on_account_with_trailing_slash(self):
+    def test_list_groups_on_account_with_trailing_slash(self):
         """
         Verify list scaling groups for a tenant through repose with a
         trailing slash, when unauthenticated, returns response code 401.
