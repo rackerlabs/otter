@@ -31,8 +31,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         """
         limits_response = self.autoscale_temp_client.view_limits()
         self.assertEquals(limits_response.status_code, 401,
-                          msg='Get Limits returned response code '
-                          '{0}'.format(limits_response.status_code))
+                          msg='Get Limits returned response code {0}'
+                          .format(limits_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthenticated_rate_limits_with_trailing_slash(self):
