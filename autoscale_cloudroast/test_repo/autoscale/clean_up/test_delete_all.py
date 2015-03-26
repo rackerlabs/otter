@@ -22,10 +22,13 @@ class DeleteAll(AutoscaleFixture):
         for each_group in list_groups:
             self.empty_scaling_group(each_group)
             self.autoscale_client.delete_scaling_group(each_group.id)
-        print 'Deleting {0} groups, {1} still exist'.format(len(list_groups), len(list_groups_again))\
-            if len(list_groups_again) is not 0 else "Deleted {0} groups".format(len(list_groups))
         list_groups_again = (
             (self.autoscale_client.list_scaling_groups()).entity).groups
+        if len(list_groups_again) is not 0:
+            print ('Deleting {0} groups, {1} still exist'
+                   .format(len(list_groups), len(list_groups_again)))
+        else:
+            print 'Deleted {0} groups'.format(len(list_groups))
 
     @tags(type='servers')
     def test_delete_all_servers_on_account(self):
