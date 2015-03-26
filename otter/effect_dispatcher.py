@@ -56,7 +56,7 @@ def get_full_dispatcher(reactor, authenticator, log, service_configs,
         get_legacy_dispatcher(reactor, authenticator, log, service_configs),
         get_zk_dispatcher(kz_client),
         get_model_dispatcher(log, store),
-        get_log_dispatcher()
+        get_log_dispatcher(log, {})
     ])
 
 
