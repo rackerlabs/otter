@@ -15,7 +15,7 @@ class DeleteAll(AutoscaleFixture):
     @tags(type='group')
     def test_delete_all_groups_on_account(self):
         """
-        Delete all groups on the account
+        Delete all groups on the account.
         """
         list_groups_response = self.autoscale_client.list_scaling_groups()
         list_groups = (list_groups_response.entity).groups
