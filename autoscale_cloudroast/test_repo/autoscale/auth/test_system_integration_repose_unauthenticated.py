@@ -37,8 +37,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
     @tags(type='repose')
     def test_system_repose_unauthenticated_rate_limits_with_trailing_slash(self):
         """
-        Verify the relative rate limit api with a trailing slash, when unauthenticated,
-        returns reponse code 401
+        Verify the relative rate limit api with a trailing slash, when
+        unauthenticated, returns reponse code 401.
         """
         limits_response = self.autoscale_temp_client.view_limits(self.url + '/limits/')
         self.assertEquals(limits_response.status_code, 401,
