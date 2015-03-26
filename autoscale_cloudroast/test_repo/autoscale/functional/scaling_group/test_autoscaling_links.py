@@ -9,7 +9,7 @@ from test_repo.autoscale.fixtures import ScalingGroupWebhookFixture
 class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     """
-    Verify links on the autoscaling api response calls
+    Verify links on the autoscaling api response calls.
     """
     # Issue AUTO-209 - no bookmark link
 
