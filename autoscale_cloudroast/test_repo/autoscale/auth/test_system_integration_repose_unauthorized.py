@@ -1,5 +1,5 @@
 """
-System Integration tests autoscaling with repose
+System integration tests for Auto Scale and Repose.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cloudcafe.identity.v2_0.tokens_api.behaviors import \
