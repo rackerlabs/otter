@@ -8,10 +8,13 @@ import unittest
 
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
+from functools import wraps
 
 from cafe.engine.behaviors import BaseBehavior
 
 from cloudcafe.common.tools.datagen import rand_name
+
+from retrying import retry
 
 from autoscale.models.servers import Metadata
 
@@ -460,9 +463,44 @@ class AutoscaleBehaviors(BaseBehavior):
             webhook['count'] = len(webhook_list)
             return webhook
 
+    def retry(self, callable, timeout=None, interval_time=None,
+              time_scale=True):
+        """
+        Generic method to retry a function every ``interval`` seconds, timing
+        out at ``timeout`` seconds.  The function takes a callable which
+        accepts a single argument: time_elapsed, for reporting purposes.
+
+        This function scales the timeout and interval time down if mimic is
+        being used.
+        """
+        start_time = time.time()
+
+        if timeout is None:
+            timeout = self.autoscale_config.timeout
+        if interval_time is None:
+            interval_time = self.autoscale_config.interval_time
+
+        if time_scale:
+            # scale time down if using mimic - no shorter than 1 second, though
+            time_scaling_factor = 0.1 if self.autoscale_config.mimic else 1
+            timeout, interval_time = [
+                max(val * time_scaling_factor, 1)
+                for val in (timeout, interval_time)
+            ]
+            # max out mimic waiting to 15 seconds, no matter what the timeout
+            timeout = min(timeout, 15)
+
+        # retry uses millseconds, not seconds
+        @retry(wait_fixed=interval_time * 1000, stop_max_delay=timeout * 1000)
+        @wraps(callable)
+        def callable_with_elapsed_time():
+            return callable(time.time() - start_time)
+
+        return callable_with_elapsed_time()
+
     def wait_for_expected_number_of_active_servers(
             self, group_id, expected_servers, interval_time=None, timeout=None,
-            api="Autoscale", asserter=None
+            api="Autoscale", asserter=None, time_scale=True
     ):
         """
         Wait for the expected_servers to arrive in either Autoscale or
@@ -485,18 +523,12 @@ class AutoscaleBehaviors(BaseBehavior):
 
         :return: returns the list of active servers in the group
         """
-
-        interval_time = interval_time or int(
-            self.autoscale_config.interval_time)
-        timeout = timeout or int(self.autoscale_config.timeout)
-        start_time = time.time()
-        end_time = start_time + timeout
-
-        # If we didn't receive an asserter, let's assume a do-nothing asserter.
+        # If we didn't receive an asserter, let's assume a do-nothing
+        # asserter.
         if asserter is None:
             asserter = DefaultAsserter()
 
-        while time.time() < end_time:
+        def do_polling(time_elapsed):
             if api == 'Autoscale':
                 resp = (self.autoscale_client
                         .list_status_entities_sgroups(group_id))
@@ -529,14 +561,14 @@ class AutoscaleBehaviors(BaseBehavior):
                 if len(server_list) == expected_servers:
                     return [n.id for n in server_list]
 
-            time.sleep(interval_time)
-        else:
             asserter.fail(
                 "wait_for_active_list_in_group_state ran for {0} seconds "
                 "for group/pool ID {1} and did not observe the active "
                 "server list achieving the expected servers count: {2}."
-                .format(timeout, group_id, expected_servers)
+                .format(time_elapsed, group_id, expected_servers)
             )
+
+        return self.retry(do_polling, timeout, interval_time, time_scale)
 
 
 def safe_hasattr(obj, key):
