@@ -461,7 +461,7 @@ class AutoscaleFixture(BaseTestFixture):
             if group_state.desiredCapacity == desired_capacity:
                 server_list = get_server_list()
                 if (len(server_list) == expected_servers):
-                        return server_list
+                    return server_list
             time.sleep(5)
         else:
             server_list = get_server_list()
@@ -500,7 +500,9 @@ class AutoscaleFixture(BaseTestFixture):
         for each_node_id in node_id_list:
             end_time = time.time() + 120
             while time.time() < end_time:
-                delete_response = self.lbaas_client.delete_node(load_balancer, each_node_id)
+                delete_response = self.lbaas_client.delete_node(
+                    load_balancer,
+                    each_node_id)
                 if 'PENDING_UPDATE' in delete_response.text:
                     time.sleep(2)
                 else:
@@ -529,16 +531,18 @@ class AutoscaleFixture(BaseTestFixture):
         policies_num = len(list_policies.policies)
         while (hasattr(list_policies.policies_links, 'next')):
             list_policies = self.autoscale_client.list_policies(
-                url=list_policies.policies_links.next, group_id=group_id).entity
+                url=list_policies.policies_links.next,
+                group_id=group_id).entity
             policies_num += len(list_policies.policies)
         return policies_num
 
     def get_total_num_webhooks(self, group_id, policy_id):
         """
         Returns the total number of webhooks on a given policy.
-        Note: This will work only after the test webhook pagination branch is merged
         """
-        list_webhooks = self.autoscale_client.list_webhooks(group_id, policy_id).entity
+        list_webhooks = self.autoscale_client.list_webhooks(
+            group_id,
+            policy_id).entity
         webhooks_num = len(list_webhooks.webhooks)
         while (hasattr(list_webhooks.webhooks_links, 'next')):
             list_webhooks = self.autoscale_client.list_webhooks(
@@ -548,8 +552,8 @@ class AutoscaleFixture(BaseTestFixture):
 
     def successfully_delete_given_loadbalancer(self, lb_id):
         """
-        Given the load balancer Id, tries to delete the load balancer for 15 minutes,
-        until a 204 is received
+        Given the load balancer id, tries to delete the load balancer for 15
+        minutes, until a 204 is received.
         """
         endtime = time.time() + 900
         while time.time() < endtime:
@@ -619,7 +623,8 @@ class ScalingGroupFixture(AutoscaleFixture):
                 lc_load_balancers=lc_load_balancers)
         cls.group = cls.create_group_response.entity
         cls.resources.add(cls.group.id,
-                          partial(cls.autoscale_client.delete_scaling_group, force='true'))
+                          partial(cls.autoscale_client.delete_scaling_group,
+                                  force='true'))
 
     @classmethod
     def tearDownClass(cls):
@@ -654,22 +659,32 @@ class ScalingGroupPolicyFixture(ScalingGroupFixture):
         if change:
             cls.create_policy_response = cls.autoscale_client.create_policy(
                 group_id=cls.group.id,
-                name=name, cooldown=cooldown, change=change, policy_type=policy_type)
+                name=name,
+                cooldown=cooldown,
+                change=change,
+                policy_type=policy_type)
         elif change_percent:
             cls.create_policy_response = cls.autoscale_client.create_policy(
                 group_id=cls.group.id,
-                name=name, cooldown=cooldown, change_percent=change_percent,
+                name=name,
+                cooldown=cooldown,
+                change_percent=change_percent,
                 policy_type=policy_type)
         elif desired_capacity:
             cls.create_policy_response = cls.autoscale_client.create_policy(
                 group_id=cls.group.id,
-                name=name, cooldown=cooldown, desired_capacity=desired_capacity,
+                name=name,
+                cooldown=cooldown,
+                desired_capacity=desired_capacity,
                 policy_type=policy_type)
         else:
             change = cls.sp_change
             cls.create_policy_response = cls.autoscale_client.create_policy(
                 group_id=cls.group.id,
-                name=name, cooldown=cooldown, change=change, policy_type=policy_type)
+                name=name,
+                cooldown=cooldown,
+                change=change,
+                policy_type=policy_type)
         cls.create_policy = cls.create_policy_response.entity
         cls.policy = cls.autoscale_behaviors.get_policy_properties(
             cls.create_policy)
@@ -692,7 +707,7 @@ class ScalingGroupWebhookFixture(ScalingGroupPolicyFixture):
     @classmethod
     def setUpClass(cls, webhook=None, metadata=None):
         """
-        Create a webhook
+        Create a webhook.
         """
         super(ScalingGroupWebhookFixture, cls).setUpClass()
         if webhook is None:
@@ -709,6 +724,6 @@ class ScalingGroupWebhookFixture(ScalingGroupPolicyFixture):
     @classmethod
     def tearDownClass(cls):
         """
-        Delete the webhook
+        Delete the webhook.
         """
         super(ScalingGroupWebhookFixture, cls).tearDownClass()

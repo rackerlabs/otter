@@ -211,10 +211,16 @@ class OtterRbacTests(AutoscaleFixture):
         verify all the otter api calls except for all the GET calls, as
         _verify_otter_observer_role covers them already.
         """
-        response_codes = {'create': 201, 'upd-del': 204, 'execute': 202, 'get': 200}
+        response_codes = {
+            'create': 201,
+            'upd-del': 204,
+            'execute': 202,
+            'get': 200
+        }
         if expected_response_code:
-            response_codes.update(dict.fromkeys(['create', 'upd-del', 'execute', 'get'],
-                                                expected_response_code))
+            response_codes.update(dict.fromkeys(
+                ['create', 'upd-del', 'execute', 'get'],
+                expected_response_code))
 
         # create group
         create_scaling_group_response = user_client.create_scaling_group(
@@ -226,7 +232,8 @@ class OtterRbacTests(AutoscaleFixture):
             lc_name='test-grp-srv',
             lc_load_balancers=lc_load_balancers)
         self.assertEquals(
-            create_scaling_group_response.status_code, response_codes['create'],
+            create_scaling_group_response.status_code,
+            response_codes['create'],
             msg='Create group returned response code {0}'.format(
                 create_scaling_group_response.status_code))
 
@@ -239,9 +246,11 @@ class OtterRbacTests(AutoscaleFixture):
             max_entities=self.group.groupConfiguration.maxEntities,
             metadata={})
         self.assertEquals(
-            update_group_config_response.status_code, response_codes['upd-del'],
+            update_group_config_response.status_code,
+            response_codes['upd-del'],
             msg='Update group config returned response code {0} on group '
-            '{1}'.format(update_group_config_response.status_code, self.group.id))
+            '{1}'.format(update_group_config_response.status_code,
+                         self.group.id))
 
         # update launch config
         update_launch_config_response = user_client.update_launch_config(
@@ -250,97 +259,109 @@ class OtterRbacTests(AutoscaleFixture):
             image_ref=self.group.launchConfiguration.server.imageRef,
             flavor_ref=self.group.launchConfiguration.server.flavorRef)
         self.assertEquals(
-            update_launch_config_response.status_code, response_codes['upd-del'],
+            update_launch_config_response.status_code,
+            response_codes['upd-del'],
             msg='Update launch config returned response code {0} on group '
-            '{1}'.format(update_launch_config_response.status_code, self.group.id))
+            '{1}'.format(update_launch_config_response.status_code,
+                         self.group.id))
 
         # create policy
-        create_policy_response = user_client.create_policy(group_id=self.group.id,
-                                                           name='test-policy',
-                                                           cooldown=1,
-                                                           change=1,
-                                                           policy_type='webhook')
+        create_policy_response = user_client.create_policy(
+            group_id=self.group.id,
+            name='test-policy',
+            cooldown=1,
+            change=1,
+            policy_type='webhook')
         self.assertEquals(
             create_policy_response.status_code, response_codes['create'],
             msg='Create policy returned response code {0} on group '
             '{1}'.format(create_policy_response.status_code, self.group.id))
 
         # update_policy
-        update_policy_response = user_client.update_policy(group_id=self.group.id,
-                                                           policy_id=self.policy_webhook['policy_id'],
-                                                           name='upd_name',
-                                                           cooldown=0,
-                                                           change=1,
-                                                           policy_type='webhook')
+        update_policy_response = user_client.update_policy(
+            group_id=self.group.id,
+            policy_id=self.policy_webhook['policy_id'],
+            name='upd_name',
+            cooldown=0,
+            change=1,
+            policy_type='webhook')
         self.assertEquals(
             update_policy_response.status_code, response_codes['upd-del'],
             msg='Update policy returned response code {0} on group '
             '{1}'.format(update_policy_response.status_code, self.group.id))
 
         # execute_policy
-        execute_policy_response = user_client.execute_policy(self.group.id,
-                                                             self.policy_webhook['policy_id'])
+        execute_policy_response = user_client.execute_policy(
+            self.group.id,
+            self.policy_webhook['policy_id'])
         self.assertEquals(
             execute_policy_response.status_code, response_codes['execute'],
             msg='Execute policy returned response code {0} on group '
             '{1}'.format(execute_policy_response.status_code, self.group.id))
 
         # create_webhook
-        create_webhook_response = user_client.create_webhook(self.group.id,
-                                                             self.policy_webhook['policy_id'],
-                                                             'test-wb')
+        create_webhook_response = user_client.create_webhook(
+            self.group.id,
+            self.policy_webhook['policy_id'],
+            'test-wb')
         self.assertEquals(
             create_webhook_response.status_code, response_codes['create'],
             msg='Create webhook returned response code {0} on group '
             '{1}'.format(create_webhook_response.status_code, self.group.id))
 
         # list webhooks
-        list_webhook_response = user_client.list_webhooks(self.group.id,
-                                                          self.policy_webhook['policy_id'])
+        list_webhook_response = user_client.list_webhooks(
+            self.group.id,
+            self.policy_webhook['policy_id'])
         self.assertEquals(
             list_webhook_response.status_code, response_codes['get'],
             msg='List webhooks returned response code {0} on group '
             '{1}'.format(list_webhook_response.status_code, self.group.id))
 
         # get webhook
-        get_webhook_response = user_client.get_webhook(self.group.id,
-                                                       self.policy_webhook['policy_id'],
-                                                       self.policy_webhook['webhook_id'])
+        get_webhook_response = user_client.get_webhook(
+            self.group.id,
+            self.policy_webhook['policy_id'],
+            self.policy_webhook['webhook_id'])
         self.assertEquals(
             get_webhook_response.status_code, response_codes['get'],
             msg='List webhooks returned response code {0} on group '
             '{1}'.format(get_webhook_response.status_code, self.group.id))
 
         # update webhook
-        update_webhook_response = user_client.update_webhook(self.group.id,
-                                                             self.policy_webhook['policy_id'],
-                                                             self.policy_webhook['webhook_id'],
-                                                             name='upd-wb',
-                                                             metadata={})
+        update_webhook_response = user_client.update_webhook(
+            self.group.id,
+            self.policy_webhook['policy_id'],
+            self.policy_webhook['webhook_id'],
+            name='upd-wb',
+            metadata={})
         self.assertEquals(
             update_webhook_response.status_code, response_codes['upd-del'],
             msg='Update webhook returned response code {0} on group '
             '{1}'.format(update_webhook_response.status_code, self.group.id))
 
         # execute webhook
-        execute_webhook_response = user_client.execute_webhook(self.policy_webhook['webhook_url'])
+        execute_webhook_response = user_client.execute_webhook(
+            self.policy_webhook['webhook_url'])
         self.assertEquals(
             execute_webhook_response.status_code, 202,
             msg='Execute webhook returned response code {0} on group '
             '{1}'.format(execute_webhook_response.status_code, self.group.id))
 
         # delete webhook
-        delete_webhook_response = user_client.delete_webhook(self.group.id,
-                                                             self.policy_webhook['policy_id'],
-                                                             self.policy_webhook['webhook_id'])
+        delete_webhook_response = user_client.delete_webhook(
+            self.group.id,
+            self.policy_webhook['policy_id'],
+            self.policy_webhook['webhook_id'])
         self.assertEquals(
             delete_webhook_response.status_code, response_codes['upd-del'],
             msg='Delete webhook returned response code {0} on group '
             '{1}'.format(delete_webhook_response.status_code, self.group.id))
 
         # delete policy
-        delete_policy_response = user_client.delete_scaling_policy(self.group.id,
-                                                                   self.policy_webhook['policy_id'])
+        delete_policy_response = user_client.delete_scaling_policy(
+            self.group.id,
+            self.policy_webhook['policy_id'])
         self.assertEquals(
             delete_policy_response.status_code, response_codes['upd-del'],
             msg='Delete policy returned response code {0} on group '
