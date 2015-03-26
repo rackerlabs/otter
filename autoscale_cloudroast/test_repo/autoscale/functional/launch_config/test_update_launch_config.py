@@ -144,7 +144,7 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
 
     def _test_boot_from_volume(self, lc_image_ref):
         """
-        Helper to assert that updating boot from volume works
+        Helper to assert that updating boot from volume works.
         """
         lc_name = rand_name('boot_from_volume')
         lc_flavor_ref = self.lc_flavor_ref
