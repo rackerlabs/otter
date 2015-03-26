@@ -623,7 +623,8 @@ class ScalingGroupFixture(AutoscaleFixture):
                 lc_load_balancers=lc_load_balancers)
         cls.group = cls.create_group_response.entity
         cls.resources.add(cls.group.id,
-                          partial(cls.autoscale_client.delete_scaling_group, force='true'))
+                          partial(cls.autoscale_client.delete_scaling_group,
+                                  force='true'))
 
     @classmethod
     def tearDownClass(cls):
