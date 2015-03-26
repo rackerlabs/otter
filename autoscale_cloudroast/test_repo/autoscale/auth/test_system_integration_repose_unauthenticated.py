@@ -82,7 +82,7 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
     def test_system_repose_unauthenticated_execute_webhook(self):
         """
         Verify execute webhook through repose returns response code 202,
-        even when unauthenticated
+        even when unauthenticated.
         """
         group = self.autoscale_behaviors.create_scaling_group_min().entity
         policy = self.autoscale_behaviors.create_policy_webhook(group.id, {'change': 1})
