@@ -63,7 +63,8 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     def _has_version(self, link):
         """
-        check url has version
+        Check if the URL has a version in it.
+
         @return True if it has version
         """
         return re.search('^/v+\d', urlparse(link).path) is not None
