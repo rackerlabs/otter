@@ -105,7 +105,7 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
             .format(list_response.status_code))
 
     @tags(type='repose')
-    def test_system_repose_unauthorized_execute_webhook(self):
+    def test_execute_webhook(self):
         """
         Verify execute webhook of a tenant by another tenant returns
         response code 202.
