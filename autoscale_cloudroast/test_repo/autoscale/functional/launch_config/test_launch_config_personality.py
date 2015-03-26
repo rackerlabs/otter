@@ -66,7 +66,8 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
         """
         personality_content = {'path': self.path,
                                'contents': base64.b64encode('tests')}
-        personality = [personality_content for _ in range(self.max_personalities + 1)]
+        personality = [personality_content
+                       for _ in range(self.max_personalities + 1)]
         self._assert_create_group(personality)
 
     def _assert_create_group(self, personality, response=400):
