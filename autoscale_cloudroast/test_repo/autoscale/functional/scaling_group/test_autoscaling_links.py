@@ -39,7 +39,7 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     def test_webhook_links(self):
         """
-        Verify that webhook has links for self
+        Verify that webhook has links for self.
         """
         self.assertTrue(self.webhook['links'] is not None,
                         msg='No links returned upon webhook creation'
