@@ -81,8 +81,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
     @tags(type='repose')
     def test_system_repose_unauthorized_list_groups_on_account_with_non_existant_group(self):
         """
-        Verify GET non existing scaling groups through repose without a trailing slash,
-        when unauthorized, returns response code 403
+        Verify GET non existing scaling groups through repose without a
+        trailing slash, when unauthorized, returns response code 403.
         """
         list_response = self.autoscale_temp_client.list_scaling_groups(self.url + '/groups/76765')
         self.assertEquals(list_response.status_code, 403,
