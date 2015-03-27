@@ -126,38 +126,49 @@ class GroupPaginationTest(AutoscaleFixture):
         """
         params = [1, 'invalid']
         for each_param in params:
-            self.assertEquals(groups_response.status_code, 200, msg='list group failed'
-                              ' with {0}'.format(groups_response.status_code))
             groups_response = self.autoscale_client.list_scaling_groups(
                 marker=each_param)
+            self.assertEquals(
+                groups_response.status_code, 200,
+                msg='list group failed with {0}'
+                .format(groups_response.status_code))
 
     def _list_group_with_given_limit(self, param, response=200):
         """
-        Lists groups with given limit and verifies they are successful
+        Lists groups with given limit and verifies they are successful.
         """
         groups_response = self.autoscale_client.list_scaling_groups(
             limit=param)
-        self.assertEquals(groups_response.status_code, response, msg='list group failed'
-                          ' with {0}'.format(groups_response.status_code))
+        self.assertEquals(
+            groups_response.status_code, response,
+            msg='list group failed with {0}'
+            .format(groups_response.status_code))
         return groups_response.entity
 
-    def _assert_list_groups_with_limits_and_next_link(self, group_len, list_group, next_link=True):
-        """
-        Asserts the length of the list group returned and its groups links.
-        If next_link is False, asserts that the group_links is empty and does not have a next link
+    def _assert_list_groups_with_limits_and_next_link(
+            self, group_len, list_group, next_link=True):
+        """Asserts the length of the list group returned and its groups links.
+
+        If next_link is False, asserts that the group_links is empty and
+        does not have a next link
+
         """
         self.assertGreaterEqual(len(list_group.groups), group_len)
         if next_link:
             self.assertTrue(hasattr(list_group.groups_links, 'next'))
         else:
-            self.assertDictEqual(list_group.groups_links.links, {}, msg='Links to next provided'
-                                 ' even when there are no more groups to list')
+            self.assertDictEqual(
+                list_group.groups_links.links, {},
+                msg='Links to next provided even when there are no more '
+                'groups to list')
 
     def _create_multiple_groups(self, num):
         """
         Creates 'num' number of groups.
         """
         for _ in range(num):
-            group_response = self.autoscale_behaviors.create_scaling_group_min()
+            group_response = (self.autoscale_behaviors
+                              .create_scaling_group_min())
             self.group = group_response.entity
-            self.resources.add(self.group.id, self.autoscale_client.delete_scaling_group)
+            self.resources.add(
+                self.group.id, self.autoscale_client.delete_scaling_group)
