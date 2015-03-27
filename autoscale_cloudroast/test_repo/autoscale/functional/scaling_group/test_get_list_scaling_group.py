@@ -69,7 +69,8 @@ class ScalingGroupListTest(AutoscaleFixture):
         Verify the default max entities set on a group when max enetities are
         not specified by the user, when creating group.
         """
-        for each_group in [self.first_scaling_group, self.second_scaling_group]:
+        for each_group in [self.first_scaling_group,
+                           self.second_scaling_group]:
             group_info = self.autoscale_client.\
                 view_manifest_config_for_scaling_group(
                     group_id=each_group.id).entity
