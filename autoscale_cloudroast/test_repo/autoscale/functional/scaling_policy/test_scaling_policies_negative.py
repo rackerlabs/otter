@@ -108,7 +108,8 @@ class ScalingPolicyNegative(AutoscaleFixture):
 
     def test_scaling_policy_change_lessthan_zero(self):
         """
-        Negative Test: Scaling policy should not get created with change less than zero
+        Negative Test: Scaling policy should not get created with change
+        less than zero.
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
         error_create_resp = self.autoscale_client.create_policy(
