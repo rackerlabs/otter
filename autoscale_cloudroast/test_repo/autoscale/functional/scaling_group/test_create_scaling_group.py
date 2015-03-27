@@ -135,10 +135,11 @@ class CreateScalingGroupTest(AutoscaleFixture):
                 hasattr(self.scaling_group.launchConfiguration.server,
                         'imageRef'))
         elif self.lc_image_ref is null:
-            self.assertEqual(None,
-                             self.scaling_group.launchConfiguration.server.imageRef,
-                             msg='Image id did not match'
-                             ' for group {0}'.format(self.scaling_group.id))
+            self.assertEqual(
+                None,
+                self.scaling_group.launchConfiguration.server.imageRef,
+                msg='Image id did not match for group {0}'
+                .format(self.scaling_group.id))
         else:
             self.assertEqual(self.lc_image_ref,
                              self.scaling_group.launchConfiguration.server.imageRef,
