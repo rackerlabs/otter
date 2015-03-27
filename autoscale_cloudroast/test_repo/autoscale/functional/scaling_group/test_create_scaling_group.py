@@ -147,10 +147,11 @@ class CreateScalingGroupTest(AutoscaleFixture):
                 msg='Image id did not match for group {0}'
                 .format(self.scaling_group.id))
 
-        self.assertEqual(self.lc_flavor_ref,
-                         self.scaling_group.launchConfiguration.server.flavorRef,
-                         msg='Flavor id did not match'
-                         ' for group {0}'.format(self.scaling_group.id))
+        self.assertEqual(
+            self.lc_flavor_ref,
+            self.scaling_group.launchConfiguration.server.flavorRef,
+            msg='Flavor id did not match for group {0}'
+            .format(self.scaling_group.id))
         self.assertEquals(
             self.autoscale_behaviors.network_uuid_list(self.lc_networks),
             self.autoscale_behaviors.network_uuid_list(
