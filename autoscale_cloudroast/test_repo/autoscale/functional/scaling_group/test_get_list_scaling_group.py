@@ -108,8 +108,9 @@ class ScalingGroupListTest(AutoscaleFixture):
         self.assertIn(
             (self.third_scaling_group.id,
              self.third_scaling_group.groupConfiguration.name),
-            group_id_list, msg='Group with id {0} was not found in the list '
-            '{1}'.format(self.third_scaling_group.id, group_id_list))
+            group_id_list,
+            msg='Group with id {0} was not found in the list {1}'
+            .format(self.third_scaling_group.id, group_id_list))
 
     def test_list_scaling_group_in_sorted_order(self):
         """
