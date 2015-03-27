@@ -143,9 +143,10 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             min_entities=self.group.groupConfiguration.minEntities,
             max_entities=self.group.groupConfiguration.maxEntities,
             metadata=upd_metadata)
-        self.assertEquals(upd_group_resp.status_code, 204,
-                          msg='Update failed with {0} for group'
-                          ' {1}'.format(upd_group_resp.status_code, self.group.id))
+        self.assertEquals(
+            upd_group_resp.status_code, 204,
+            msg='Update failed with {0} for group {1}'
+            .format(upd_group_resp.status_code, self.group.id))
         get_upd_group = self.autoscale_client.\
             view_scaling_group_config(group_id=self.group.id)
         self.assertEquals(get_upd_group.status_code, 200)
