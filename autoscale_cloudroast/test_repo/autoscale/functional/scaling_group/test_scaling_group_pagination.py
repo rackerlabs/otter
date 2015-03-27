@@ -61,9 +61,9 @@ class GroupPaginationTest(AutoscaleFixture):
     @unittest.skip('AUTO-711')
     def test_list_groups_with_limit_equal_to_number_of_groups(self):
         """
-        List the scaling groups with the limit set to be equal to the number of groups
-        on the tenant and verify all the groups are listed without a link for the next
-        few groups.
+        List the scaling groups with the limit set to be equal to the number
+        of groups on the tenant and verify all the groups are listed without a
+        link for the next few groups.
         """
         param = self.get_total_num_groups()
         list_groups = self._list_group_with_given_limit(param)
