@@ -124,8 +124,7 @@ class CreateScalingGroupTest(AutoscaleFixture):
         server = self.scaling_group.launchConfiguration.server
 
         self.assertEqual(
-            self.lc_name,
-            server.name,
+            self.lc_name, server.name,
             msg='Server name provided in the launch config did not match'
             ' for group {0}'.format(self.scaling_group.id))
 
