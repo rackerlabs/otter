@@ -28,20 +28,23 @@ from otter.util.retry import (
 from otter.util.timestamp import timestamp_to_epoch
 
 
-def get_all_server_details(batch_size=100):
+def get_all_server_details(changes_since=None, batch_size=100):
     """
     Return all servers of a tenant.
 
-    :param batch_size: number of servers to fetch *per batch*.
+    :param datetime changes_since: Get changes since this time. Must be UTC
+    :param int batch_size: number of servers to fetch *per batch*.
     :return: list of server objects as returned by Nova.
 
     NOTE: This really screams to be a independent fxcloud-type API
     """
     url = append_segments('servers', 'detail')
+    query = {'limit': batch_size}
+    if changes_since is not None:
+        query['changes_since'] = '{}Z'.format(changes_since.isoformat())
 
     def get_server_details(marker):
         # sort based on query name to make the tests predictable
-        query = {'limit': batch_size}
         if marker is not None:
             query.update({'marker': marker})
         urlparams = sorted(query.items())
@@ -71,11 +74,12 @@ def _discard_response((response, body)):
     return body
 
 
-def get_scaling_group_servers(server_predicate=identity):
+def get_scaling_group_servers(changes_since=None, server_predicate=identity):
     """
     Return tenant's servers that belong to a scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
 
+    :param datetime changes_since: Get server since this time. Must be UTC
     :param server_predicate: function of server -> bool that determines whether
         the server should be included in the result.
     :return: dict mapping group IDs to lists of Nova servers.
@@ -92,7 +96,7 @@ def get_scaling_group_servers(server_predicate=identity):
                             filter(server_predicate),
                             filter(has_group_id))
 
-    eff = get_all_server_details()
+    eff = get_all_server_details(changes_since)
     return eff.on(servers_apply)
 
 
