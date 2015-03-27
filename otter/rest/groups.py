@@ -556,39 +556,9 @@ class OtterGroup(object):
         """
         group = self.store.get_scaling_group(self.log, self.tenant_id,
                                              self.group_id)
-        force = False
-        try:
-            force_arg = request.args.get('force')[0].lower()
-            if force_arg == 'true':
-                force = True
-            else:
-                return defer.fail(InvalidQueryArgument(
-                    'Invalid query argument for "limit"'))
-        except (IndexError, TypeError):
-            # There is no argument
-            pass
+        force = extract_bool_arg(request, 'force', False)
         if force:
-            d = group.view_manifest(with_policies=False)
-
-            def update_config(group_info):
-                group_info['groupConfiguration']['minEntities'] = 0
-                group_info['groupConfiguration']['maxEntities'] = 0
-                du = group.update_config(group_info['groupConfiguration'])
-                return du.addCallback(lambda _: group_info)
-
-            d.addCallback(update_config)
-
-            def modify_state(group_info):
-                d = group.modify_state(
-                    partial(
-                        controller.obey_config_change,
-                        self.log,
-                        transaction_id(request),
-                        group_info['groupConfiguration'],
-                        launch_config=group_info['launchConfiguration']))
-                return d
-            d.addCallback(modify_state)
-
+            d = controller.empty_group(log, transaction_id(request), group)
             return d.addCallback(lambda _: group.delete_group())
         else:
             return group.delete_group()
