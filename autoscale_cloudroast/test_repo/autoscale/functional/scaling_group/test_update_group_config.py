@@ -38,9 +38,10 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             name=self.group.groupConfiguration.name,
             cooldown=self.group.groupConfiguration.cooldown,
             min_entities=self.group.groupConfiguration.minEntities)
-        self.assertEquals(upd_group_resp.status_code, 400,
-                          msg='Update failed with {0} as it does not include full request'
-                          ' for group {1}'.format(upd_group_resp.status_code, self.group.id))
+        self.assertEquals(
+            upd_group_resp.status_code, 400,
+            msg='Update failed with {0} as it does not include full request'
+            ' for group {1}'.format(upd_group_resp.status_code, self.group.id))
 
     def test_update_minentities_only(self):
         """
