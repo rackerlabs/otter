@@ -60,10 +60,13 @@ class PolicyPaginationTest(AutoscaleFixture):
                                                                  list_policies)
 
     def test_list_policies_with_specified_limit_less_than_number_of_policies(self):
-        """
-        List the scaling policies with the limit set to be less than the number of groups
-        on the tenant and verify groups are listed in batches of the limit specified.
-        Verify the presence of a link to the next batch of scaling policies.
+        """List the scaling policies with the limit set to be less than the
+        number of groups on the tenant and verify groups are listed in batches
+        of the limit specified.
+
+        Verify the presence of a link to the next batch of scaling
+        policies.
+
         """
         # Specify the limit to be one less than the current number of policies
         param = self.get_total_num_policies(self.group.id) - 1
