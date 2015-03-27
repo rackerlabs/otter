@@ -112,7 +112,7 @@ _cql_create_group = (
 _cql_view_manifest = (
     'SELECT "tenantId", "groupId", group_config, '
     'launch_config, active, pending, "groupTouched", '
-    '"policyTouched", paused, desired, created_at '
+    '"policyTouched", paused, desired, created_at, status '
     'FROM {cf} '
     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
@@ -641,7 +641,8 @@ class CassScalingGroup(object):
             return d
         return wrapper
 
-    def view_manifest(self, with_policies=True, with_webhooks=False):
+    def view_manifest(self, with_policies=True, with_webhooks=False,
+                      with_status=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
@@ -666,12 +667,15 @@ class CassScalingGroup(object):
                 group)
 
         def _generate_manifest_group_part(group):
-            return {
+            m = {
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'id': self.uuid,
                 'state': _unmarshal_state(group)
             }
+            if with_status:
+                m['status'] = group['status']
+            return m
 
         view_query = _cql_view_manifest.format(
             cf=self.group_table)

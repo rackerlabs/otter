@@ -1898,7 +1898,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         view_cql = (
             'SELECT "tenantId", "groupId", group_config, launch_config, '
             'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at '
+            'desired, created_at, status '
             'FROM scaling_group '
             'WHERE "tenantId" = :tenantId '
             'AND "groupId" = :groupId')
@@ -2047,6 +2047,52 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.assertFalse(self.group._naive_list_policies.called)
         self.assertFalse(self.group._naive_list_all_webhooks.called)
 
+    @mock.patch('otter.models.cass.assemble_webhooks_in_policies')
+    @mock.patch('otter.models.cass.verified_view')
+    def test_view_manifest_with_status(self, verified_view, mock_awip):
+        """
+        Viewing manifest ``with_status=True`` returns a manifest view with
+        group status in it.
+        """
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id,
+            "groupId": self.group_id,
+            'id': "12345678g",
+            'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}',
+            'pending': '{"P":"R"}',
+            'groupTouched': '2014-01-01T00:00:05Z.1234',
+            'policyTouched': '{"PT":"R"}',
+            'paused': '\x00',
+            'desired': 0,
+            'created_at': 23,
+            'status': 'DELETED'
+        })
+
+        self.group._naive_list_policies = mock.Mock()
+        self.group._naive_list_all_webhooks = mock.Mock()
+
+        # Getting the result and comparing
+        d = self.group.view_manifest(with_policies=False, with_status=True)
+        resp = self.successResultOf(d)
+        self.assertEqual(resp, {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch_config,
+            'id': "12345678g",
+            'state': GroupState(
+                self.tenant_id,
+                self.group_id,
+                'a', {'A': 'R'},
+                {'P': 'R'}, '2014-01-01T00:00:05Z.1234',
+                {'PT': 'R'}, False),
+            'status': 'DELETED'
+        })
+
+        self.assertFalse(mock_awip.called)
+        self.assertFalse(self.group._naive_list_policies.called)
+        self.assertFalse(self.group._naive_list_all_webhooks.called)
+
     @mock.patch('otter.models.cass.verified_view',
                 return_value=defer.fail(NoSuchScalingGroupError(2, 3)))
     def test_view_manifest_no_such_group(self, verified_view):
@@ -2082,7 +2128,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         view_cql = (
             'SELECT "tenantId", "groupId", group_config, launch_config, '
             'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at '
+            'desired, created_at, status '
             'FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = ('DELETE FROM scaling_group '
