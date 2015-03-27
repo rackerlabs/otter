@@ -116,7 +116,8 @@ class ScalingGroupListTest(AutoscaleFixture):
 
     def test_list_scaling_group_in_sorted_order(self):
         """
-        Verify the list group returns entities in sorted order by group ID
+        Verify the list group returns entities in sorted order by group
+        ID.
         """
         list_groups_response = self.autoscale_client.list_scaling_groups()
         list_groups = (list_groups_response.entity).groups
