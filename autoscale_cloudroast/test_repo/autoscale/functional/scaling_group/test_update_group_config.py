@@ -95,8 +95,8 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_maxentities_only(self):
         """
-        Verify update with an incomplete request containing maxentities only,
-        fails with 400
+        Verify update with an incomplete request containing maxentities
+        only, fails with 400.
         """
         upd_max_entities = 5
         upd_group_resp = self.autoscale_client.update_group_config(
