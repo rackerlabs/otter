@@ -20,9 +20,6 @@ class CreateScalingPolicy(ScalingGroupPolicyFixture):
             msg='Create scaling policy failed with {0} for group {1}'
             .format(self.group.id, self.create_policy_response.status_code))
         self.validate_headers(self.create_policy_response.headers)
-        self.assertTrue(self.policy['links'] is not None,
-                        msg="Newly created scaling policy's links are null for group"
-                        " {0}".format(self.group.id))
         self.assertEquals(self.policy['cooldown'], self.sp_cooldown,
                           msg="scaling policy's cooldown time does not match for group"
                           " {0}".format(self.group.id))
@@ -38,4 +35,8 @@ class CreateScalingPolicy(ScalingGroupPolicyFixture):
         self.assertTrue(
             self.policy['id'] is not None,
             msg='Scaling policy id is None for group {0}'
+            .format(self.group.id))
+        self.assertTrue(
+            self.policy['links'] is not None,
+            msg="Newly created scaling policy's links are null for group {0}"
             .format(self.group.id))
