@@ -249,12 +249,13 @@ class ScalingPolicyNegative(AutoscaleFixture):
             change=change,
             policy_type=self.sp_policy_type)
         policy = create_resp.entity
-        self.assertEquals(create_resp.status_code, 201,
-                          msg='Create scaling policy failed with maxint as change: {0}'
-                          'for group {1}'.format(create_resp.status_code, self.group.id))
         self.assertTrue(policy is not None,
                         msg='Create scaling policy failed: {0} for group'
                         ' {1}'.format(policy, self.group.id))
+        self.assertEquals(
+            create_resp.status_code, 201,
+            msg='Create scaling policy failed with maxint as change: {0}'
+            'for group {1}'.format(create_resp.status_code, self.group.id))
 
     def test_scaling_policy_max_cooldown(self):
         """
