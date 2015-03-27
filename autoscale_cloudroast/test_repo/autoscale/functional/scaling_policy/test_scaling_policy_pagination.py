@@ -68,7 +68,6 @@ class PolicyPaginationTest(AutoscaleFixture):
 
         Verify the presence of a link to the next batch of scaling
         policies.
-
         """
         # Specify the limit to be one less than the current number of policies
         param = self.get_total_num_policies(self.group.id) - 1
