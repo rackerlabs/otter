@@ -13,7 +13,7 @@ class GetScalingPolicy(ScalingGroupPolicyFixture):
     @classmethod
     def setUpClass(cls):
         """
-        Creates a scaling group with policy with type change percent
+        Creates a scaling group with policy with type change percent.
         """
         super(GetScalingPolicy, cls).setUpClass(change_percent=100)
         cls.get_policy_response = cls.autoscale_client.get_policy_details(
