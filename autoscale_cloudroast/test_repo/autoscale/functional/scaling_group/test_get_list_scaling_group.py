@@ -43,10 +43,6 @@ class ScalingGroupListTest(AutoscaleFixture):
             .format(group_info_response.status_code,
                     self.first_scaling_group.id))
         self.validate_headers(group_info_response.headers)
-        self.assertEqual(group_info.groupConfiguration.name,
-                         self.first_scaling_group.groupConfiguration.name,
-                         msg='Group name did not match for group '
-                         '{0}'.format(self.first_scaling_group.id))
         self.assertEqual(group_info.groupConfiguration.minEntities,
                          self.first_scaling_group.groupConfiguration.minEntities,
                          msg="Group's minimum entities did not match for group "
@@ -58,6 +54,11 @@ class ScalingGroupListTest(AutoscaleFixture):
         self.assertEqual(
             group_info.id, self.first_scaling_group.id,
             msg='Group id did not match for group {0}'
+            .format(self.first_scaling_group.id))
+        self.assertEqual(
+            group_info.groupConfiguration.name,
+            self.first_scaling_group.groupConfiguration.name,
+            msg='Group name did not match for group {0}'
             .format(self.first_scaling_group.id))
         self.assert_group_state(group_info.state)
 
