@@ -30,8 +30,8 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_minentities_to_be_the_same(self):
         """
-        Verify update with an incomplete request containing minentities to be the same,
-        fails with 400
+        Verify update with an incomplete request containing minentities to
+        be the same, fails with 400.
         """
         upd_group_resp = self.autoscale_client.update_group_config(
             self.group.id,
