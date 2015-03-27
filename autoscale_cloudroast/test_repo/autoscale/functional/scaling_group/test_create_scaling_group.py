@@ -156,8 +156,7 @@ class CreateScalingGroupTest(AutoscaleFixture):
             ' for group {0}'.format(self.scaling_group.id))
         self.assertEquals(
             self.autoscale_behaviors.personality_list(self.lc_personality),
-            self.autoscale_behaviors.personality_list(
-                server.personality),
+            self.autoscale_behaviors.personality_list(server.personality),
             msg='Personality within the launch config did not match'
             ' for group {0}'.format(self.scaling_group.id))
         self.assertEqual(
