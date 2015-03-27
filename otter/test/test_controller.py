@@ -729,6 +729,68 @@ class ObeyConfigChangeTestCase(SynchronousTestCase):
             webhook_id=None)
 
 
+class ForceDeleteGroupTests(SynchronousTestCase):
+    """
+    Tests for `force_delete_group`
+    """
+
+    def setUp(self):
+        """
+        Sample convergence starter
+        """
+        self.group = util_mock_group(object(), 'tid', 'gid')
+        self.log = object()
+        self.cs = mock.Mock(spec=ConvergenceStarter)
+        self.cs.start_convergence.return_value = defer.succeed('sc')
+        set_convergence_starter(self.cs)
+        self.addCleanup(set_convergence_starter, None)
+
+    def test_worker_tenant(self):
+        """
+        First empties and then deletes the group for worker tenant
+        """
+        egd = defer.Deferred()
+        mock_eg = patch(self, 'otter.controller.empty_group',
+                        return_value=egd)
+        self.group.delete_group.return_value = defer.succeed(None)
+        d = controller.force_delete_group(self.log, 'transid', self.group)
+
+        # First empty_group is called
+        self.assertNoResult(d)
+        mock_eg.assert_called_once_with(self.log, 'transid', self.group)
+
+        # Then delete_group
+        egd.callback(None)
+        self.assertIsNone(self.successResultOf(d))
+        self.group.delete_group.assert_called_once_with()
+
+        # converger is not called
+        self.assertFalse(self.cs.start_convergence.called)
+
+    def test_convergence_tenant(self):
+        """
+        Updates DELETED status for convergence tenant and starts convergence
+        """
+        set_config_data({'convergence-tenants': ['tid']})
+        self.addCleanup(set_config_data, {})
+
+        upd = defer.Deferred()
+        self.group.update_status.return_value = upd
+
+        d = controller.force_delete_group(self.log, 'transid', self.group)
+
+        # First DELETING status is set
+        self.assertNoResult(d)
+        self.group.update_status.assert_called_once_with(
+            ScalingGroupStatus.DELETING)
+
+        # Then start_convergence
+        upd.callback(None)
+        self.assertEqual(self.successResultOf(d), 'sc')
+        self.cs.start_convergence.assert_called_once_with(
+            self.log, 'tid', 'gid')
+
+
 class EmptyGroupTests(SynchronousTestCase):
     """
     Tests for `empty_group`
@@ -742,11 +804,6 @@ class EmptyGroupTests(SynchronousTestCase):
         self.log = mock_log()
         self.state = GroupState('tid', 'gid', 'g', {}, {}, False, None, {})
         self.group = util_mock_group(self.state, 'tid', 'gid')
-        # Convergence
-        self.cs = mock.Mock(spec=ConvergenceStarter)
-        self.cs.start_convergence.return_value = defer.succeed('sc')
-        set_convergence_starter(self.cs)
-        self.addCleanup(set_convergence_starter, None)
 
     def test_updates_modifies(self):
         """
@@ -772,8 +829,6 @@ class EmptyGroupTests(SynchronousTestCase):
         self.mock_occ.assert_called_once_with(
             self.log, "transid", expected_config, self.group,
             self.state, launch_config={'this': 'is_a_launch_config'})
-        # converger is not called
-        self.assertFalse(self.cs.start_convergence.called)
 
     def test_no_group(self):
         """
@@ -786,25 +841,6 @@ class EmptyGroupTests(SynchronousTestCase):
         # group config is not updated nor its state modified
         self.assertFalse(self.group.update_config.called)
         self.assertFalse(self.group.modify_state.called)
-        # converger is not called
-        self.assertFalse(self.cs.start_convergence.called)
-
-    def test_convergence_tenant(self):
-        """
-        Updates DELETED status for convergence tenant and starts convergence
-        """
-        set_config_data({'convergence-tenants': ['tid']})
-        self.addCleanup(set_config_data, {})
-
-        self.group.update_status.return_value = defer.succeed(None)
-
-        d = controller.empty_group(self.log, 'transid', self.group)
-
-        self.assertEqual(self.successResultOf(d), 'sc')
-        self.group.update_status.assert_called_once_with(
-            ScalingGroupStatus.DELETING)
-        self.cs.start_convergence.assert_called_once_with(
-            self.log, 'tid', 'gid')
 
 
 def mock_controller_utilities(test_case):

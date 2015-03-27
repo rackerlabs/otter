@@ -128,9 +128,9 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
     return d
 
 
-def empty_group(log, trans_id, group):
+def force_delete_group(log, trans_id, group):
     """
-    Empty a scaling group by deleting or triggering deletion on its resources
+    Delete group even if it has resources by also deleting resources
 
     :param log: Bound logger
     :param str trans_id: Transaction ID of request doing this
@@ -148,7 +148,22 @@ def empty_group(log, trans_id, group):
         d.addCallback(
             lambda _: cs.start_convergence(log, group.tenant_id, group.uuid))
         return d
+    else:
+        d = empty_group(log, trans_id, group)
+        return d.addCallback(lambda _: group.delete_group())
 
+
+def empty_group(log, trans_id, group):
+    """
+    Empty a scaling group by deleting all its resources (Servers/CLB)
+
+    :param log: Bound logger
+    :param str trans_id: Transaction ID of request doing this
+    :param otter.models.interface.IScalingGroup scaling_group: the scaling
+        group object
+
+    :return: Deferred that fires with None
+    """
     d = group.view_manifest(with_policies=False)
 
     def update_config(group_info):
