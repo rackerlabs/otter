@@ -121,9 +121,11 @@ class CreateScalingGroupTest(AutoscaleFixture):
         """
         Verify the launch configuration on the group is as expected.
         """
+        server = self.scaling_group.launchConfiguration.server
+
         self.assertEqual(
             self.lc_name,
-            self.scaling_group.launchConfiguration.server.name,
+            server.name,
             msg='Server name provided in the launch config did not match'
             ' for group {0}'.format(self.scaling_group.id))
 
@@ -132,36 +134,36 @@ class CreateScalingGroupTest(AutoscaleFixture):
         # So a null value was hacked in to be 'null'
         if self.lc_image_ref is None:
             self.assertFalse(
-                hasattr(self.scaling_group.launchConfiguration.server,
+                hasattr(server,
                         'imageRef'))
         elif self.lc_image_ref is null:
             self.assertEqual(
                 None,
-                self.scaling_group.launchConfiguration.server.imageRef,
+                server.imageRef,
                 msg='Image id did not match for group {0}'
                 .format(self.scaling_group.id))
         else:
             self.assertEqual(
                 self.lc_image_ref,
-                self.scaling_group.launchConfiguration.server.imageRef,
+                server.imageRef,
                 msg='Image id did not match for group {0}'
                 .format(self.scaling_group.id))
 
         self.assertEqual(
             self.lc_flavor_ref,
-            self.scaling_group.launchConfiguration.server.flavorRef,
+            server.flavorRef,
             msg='Flavor id did not match for group {0}'
             .format(self.scaling_group.id))
         self.assertEquals(
             self.autoscale_behaviors.network_uuid_list(self.lc_networks),
             self.autoscale_behaviors.network_uuid_list(
-                self.scaling_group.launchConfiguration.server.networks),
+                server.networks),
             msg='Networks within the launch config did not match'
             ' for group {0}'.format(self.scaling_group.id))
         self.assertEquals(
             self.autoscale_behaviors.personality_list(self.lc_personality),
             self.autoscale_behaviors.personality_list(
-                self.scaling_group.launchConfiguration.server.personality),
+                server.personality),
             msg='Personality within the launch config did not match'
             ' for group {0}'.format(self.scaling_group.id))
         self.assertEqual(
@@ -180,7 +182,7 @@ class CreateScalingGroupTest(AutoscaleFixture):
         if self.lc_block_device_mapping is not None:
             self.assertEqual(
                 self.lc_block_device_mapping,
-                self.scaling_group.launchConfiguration.server.block_device_mapping,
+                server.block_device_mapping,
                 msg='Block device mapping within the launch config did not '
                 'match group {0}'.format(self.scaling_group.id))
 
