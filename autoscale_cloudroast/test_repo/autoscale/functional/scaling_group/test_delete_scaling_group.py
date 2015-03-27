@@ -12,7 +12,7 @@ class DeleteScalingGroupTest(AutoscaleFixture):
 
     def setUp(self):
         """
-        create a scaling group
+        Create a scaling group.
         """
         super(DeleteScalingGroupTest, self).setUp()
         create_resp = self.autoscale_behaviors.create_scaling_group_min()
