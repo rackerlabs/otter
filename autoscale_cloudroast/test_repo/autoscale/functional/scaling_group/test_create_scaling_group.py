@@ -132,9 +132,7 @@ class CreateScalingGroupTest(AutoscaleFixture):
         # Cloudcafe removes arguments from the json if the value is None.
         # So a null value was hacked in to be 'null'
         if self.lc_image_ref is None:
-            self.assertFalse(
-                hasattr(server,
-                        'imageRef'))
+            self.assertFalse( hasattr(server, 'imageRef'))
         elif self.lc_image_ref is null:
             self.assertEqual(
                 None,
