@@ -37,7 +37,8 @@ class GetMaxManifest(ScalingGroupFixture):
                                                                     "hook_{0}".format(w))
                 hook_obj = webhook_resp.entity[0]
                 webhook_ids.append(hook_obj.id)
-            manifest_dict[p_id] = sorted(webhook_ids)  # Sort webhooks to verify against rx'd manifest
+            # Sort webhooks to verify against rx'd manifest
+            manifest_dict[p_id] = sorted(webhook_ids)
         # Issue the manifest query, capture resluts, and compare
         list_manifest_resp = \
             self.autoscale_client.view_manifest_config_for_scaling_group(
