@@ -80,14 +80,15 @@ class CreateScalingGroupTest(AutoscaleFixture):
 
     def _test_create_scaling_group_fields(self):
         """
-        Verify the scaling group id and links exist in the response
+        Verify the scaling group id and links exist in the response.
         """
-        self.assertTrue(self.scaling_group.id is not None,
-                        msg='Scaling Group id was not set in the response'
-                        ' for group {0}'.format(self.scaling_group.id))
         self.assertTrue(self.scaling_group.links is not None,
                         msg='Scaling Group links were not set in the response'
                         ' for group {0}'.format(self.scaling_group.id))
+        self.assertTrue(
+            self.scaling_group.id is not None,
+            msg='Scaling Group id was not set in the response for group {0}'
+            .format(self.scaling_group.id))
 
     def _test_created_scaling_group_groupconfig_fields(self):
         """
