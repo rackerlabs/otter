@@ -5,8 +5,9 @@ from test_repo.autoscale.fixtures import ScalingGroupPolicyFixture
 
 
 class ListScalingPolicies(ScalingGroupPolicyFixture):
+
     """
-    Verify list policies
+    Verify list policies.
     """
 
     @classmethod
