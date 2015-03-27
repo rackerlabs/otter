@@ -954,20 +954,20 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
 
     def test_group_delete_force(self):
         """
-        Deleting a group with force will call controller.empty_group
-        before deleting the group
+        Force deleting a group will be delegated to
+        `controller.force_delete_group`
         """
-        self.mock_controller.empty_group.return_value = defer.succeed(None)
+        self.mock_controller.force_delete_group.return_value = defer.succeed(
+            None)
         self.mock_group.delete_group.return_value = defer.succeed(None)
 
         self.assert_status_code(
             204, endpoint="{0}?force=true".format(self.endpoint),
             method="DELETE")
 
-        # empty_group and delete_group called
-        self.mock_controller.empty_group.assert_called_once_with(
+        # force_delete_group called
+        self.mock_controller.force_delete_group.assert_called_once_with(
             mock.ANY, "transaction-id", self.mock_group)
-        self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_404(self):
         """

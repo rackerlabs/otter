@@ -9,7 +9,6 @@ from functools import partial
 from twisted.internet import defer
 
 from otter import controller
-from otter.convergence.composition import tenant_is_enabled
 from otter.json_schema.group_schemas import (
     MAX_ENTITIES,
     validate_launch_config_servicenet,
@@ -558,17 +557,9 @@ class OtterGroup(object):
         group = self.store.get_scaling_group(self.log, self.tenant_id,
                                              self.group_id)
         force = extract_bool_arg(request, 'force', False)
-
-        def delete(_):
-            # Only delete if tenant is non-convergence
-            # TODO: I was hoping to not have convergence check in rest/* but
-            # couldn't avoid this
-            if not tenant_is_enabled(self.tenant_id, config_value):
-                return group.delete_group()
-
         if force:
-            d = controller.empty_group(log, transaction_id(request), group)
-            return d.addCallback(delete)
+            return controller.force_delete_group(
+                log, transaction_id(request), group)
         else:
             return group.delete_group()
 
