@@ -169,7 +169,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_group_config_response(self):
         """
-        Verify update for response code 204, header and data
+        Verify update for response code 204, header and data.
         """
         update_group_response = self.autoscale_client.update_group_config(
             group_id=self.group.id,
