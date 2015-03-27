@@ -44,8 +44,8 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_minentities_only(self):
         """
-        Verify update with an incomplete request containing minentities only,
-        fails with 400
+        Verify update with an incomplete request containing minentities
+        only, fails with 400.
         """
         upd_min_entities = 3
         upd_group_resp = self.autoscale_client.update_group_config(
