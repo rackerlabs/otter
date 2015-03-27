@@ -28,8 +28,8 @@ class GetMaxManifest(ScalingGroupFixture):
         # Create and record ids for the maximum number of policies and webhooks
         manifest_dict = {}
         for p in range(0, self.max_policies):
-            policy_resp = self.autoscale_behaviors.create_policy_min(self.group.id,
-                                                                     sp_name=("policy_{0}".format(p)))
+            policy_resp = self.autoscale_behaviors.create_policy_min(
+                self.group.id, sp_name=('policy_{0}'.format(p)))
             p_id = policy_resp['id']
             webhook_ids = []
             for w in range(0, self.max_webhooks):
