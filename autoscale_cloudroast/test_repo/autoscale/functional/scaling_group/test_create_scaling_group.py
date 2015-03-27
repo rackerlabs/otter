@@ -181,8 +181,8 @@ class CreateScalingGroupTest(AutoscaleFixture):
             self.assertEqual(
                 self.lc_block_device_mapping,
                 self.scaling_group.launchConfiguration.server.block_device_mapping,
-                msg=('Block device mapping within the launch config did not '
-                     'match group {0}'.format(self.scaling_group.id)))
+                msg='Block device mapping within the launch config did not '
+                'match group {0}'.format(self.scaling_group.id))
 
     def _test_created_scaling_group_state_fields(self):
         """
