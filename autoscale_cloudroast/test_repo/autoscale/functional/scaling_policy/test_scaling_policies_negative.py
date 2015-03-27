@@ -260,7 +260,8 @@ class ScalingPolicyNegative(AutoscaleFixture):
 
     def test_scaling_policy_invalid_type(self):
         """
-        Negative Test: Create scaling policy with invalid type will result in response code 400
+        Negative test: Create scaling policy with invalid type will result
+        in response code 400.
         """
         create_resp = self.autoscale_client.create_policy(
             group_id=self.group.id,
