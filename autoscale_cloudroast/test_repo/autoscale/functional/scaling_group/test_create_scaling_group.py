@@ -151,8 +151,7 @@ class CreateScalingGroupTest(AutoscaleFixture):
             .format(self.scaling_group.id))
         self.assertEquals(
             self.autoscale_behaviors.network_uuid_list(self.lc_networks),
-            self.autoscale_behaviors.network_uuid_list(
-                server.networks),
+            self.autoscale_behaviors.network_uuid_list(server.networks),
             msg='Networks within the launch config did not match'
             ' for group {0}'.format(self.scaling_group.id))
         self.assertEquals(
