@@ -57,8 +57,8 @@ class PolicyPaginationTest(AutoscaleFixture):
         params = [None, 100000]
         for each_param in params:
             list_policies = self._list_policies_with_given_limit(params)
-            self._assert_list_policies_with_limits_and_next_link(self.pagination_limit,
-                                                                 list_policies)
+            self._assert_list_policies_with_limits_and_next_link(
+                self.pagination_limit, list_policies)
 
     def test_list_policies_with_specified_limit_less_than_number_of_policies(self):
         """List the scaling policies with the limit set to be less than the
