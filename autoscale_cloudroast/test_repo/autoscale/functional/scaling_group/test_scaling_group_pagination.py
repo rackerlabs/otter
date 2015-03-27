@@ -120,8 +120,10 @@ class GroupPaginationTest(AutoscaleFixture):
         """
         group = (self.autoscale_behaviors.create_scaling_group_min()).entity
         groups_response = self.autoscale_client.list_scaling_groups(marker=group.id)
-        self.assertEquals(groups_response.status_code, 200, msg='list group failed'
-                          ' with {0}'.format(groups_response.status_code))
+        self.assertEquals(
+            groups_response.status_code, 200,
+            msg='list group failed with {0}'
+            .format(groups_response.status_code))
 
     def test_list_groups_with_invalid_marker(self):
         """
