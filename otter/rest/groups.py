@@ -6,14 +6,12 @@ import json
 
 from functools import partial
 
-from twisted.internet import defer
-
 from otter import controller
+from otter.convergence.composition import tenant_is_enabled
 from otter.json_schema.group_schemas import (
     MAX_ENTITIES,
     validate_launch_config_servicenet,
 )
-from otter.convergence.composition import tenant_is_enabled
 from otter.json_schema.rest_schemas import create_group_request
 from otter.log import log
 from otter.rest.bobby import get_bobby
