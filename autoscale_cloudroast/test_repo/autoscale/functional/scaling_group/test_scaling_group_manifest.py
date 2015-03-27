@@ -37,7 +37,8 @@ class ListWebhookManifest(ScalingGroupPolicyFixture):
             webhook2_response)
         webhook3_response = cls.autoscale_client.create_webhook(
             cls.group.id, cls.policy['id'], 'webhook3').entity
-        cls.webhook3 = cls.autoscale_behaviors.get_webhooks_properties(webhook3_response)
+        cls.webhook3 = cls.autoscale_behaviors.get_webhooks_properties(
+            webhook3_response)
 
     def test_manifest_webhooks(self):
         """
