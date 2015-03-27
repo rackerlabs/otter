@@ -186,8 +186,8 @@ class ScalingPolicyNegative(AutoscaleFixture):
             group_id=self.group.id,
             policy_id=policy['id'])
         self.assertEquals(
-            del_resp.status_code, 204, msg='Delete policy failed for group '
-            '{0}'.format(self.group.id))
+            del_resp.status_code, 204,
+            msg='Delete policy failed for group {0}'.format(self.group.id))
         expected_status_code = HttpStatusCodes.NOT_FOUND
         error_create_resp = self.autoscale_client.get_policy_details(
             group_id=self.group.id,
