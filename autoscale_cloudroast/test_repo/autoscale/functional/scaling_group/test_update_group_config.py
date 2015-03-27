@@ -181,9 +181,10 @@ class UpdateGroupConfigTest(AutoscaleFixture):
         group_config_response = self.autoscale_client.view_scaling_group_config(
             self.group.id)
         updated_config = group_config_response.entity
-        self.assertEquals(update_group_response.status_code, 204,
-                          msg='Update group config failed with {0} for group '
-                          '{1}'.format(update_group_response.status_code, self.group.id))
+        self.assertEquals(
+            update_group_response.status_code, 204,
+            msg='Update group config failed with {0} for group {1}'
+            .format(update_group_response.status_code, self.group.id))
         self.validate_headers(update_group_response.headers)
         self.assertEquals(updated_config.minEntities, self.gc_min_entities,
                           msg='Min entities in the Group config did not update'
