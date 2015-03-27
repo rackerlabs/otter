@@ -86,8 +86,8 @@ class CreateScalingGroupTest(AutoscaleFixture):
             self.scaling_group.id, None,
             msg='Scaling Group id was not set in the response for group {0}'
             .format(self.scaling_group.id))
-        self.assertTrue(
-            self.scaling_group.links is not None,
+        self.assertNotIdentical(
+            self.scaling_group.links, None,
             msg='Scaling Group links not set in the response for group {0}'
             .format(self.scaling_group.id))
 
