@@ -286,6 +286,7 @@ class ScalingPolicyNegative(AutoscaleFixture):
             cooldown=self.sp_cooldown,
             change=self.sp_change,
             policy_type='myowntype')
-        self.assertEquals(create_resp.status_code, 400,
-                          msg='Created scaling policy with invalid type with response code: {0}'
-                          ' for group {1}'.format(create_resp.status_code, self.group.id))
+        self.assertEquals(
+            create_resp.status_code, 400,
+            msg='Created scaling policy with invalid type with response code: '
+            '{0} for group {1}'.format(create_resp.status_code, self.group.id))
