@@ -15,10 +15,10 @@ class CreateScalingPolicy(ScalingGroupPolicyFixture):
         Verify the create policy call for response code 201, headers and
         data.
         """
-        self.assertEquals(self.create_policy_response.status_code, 201,
-                          msg='Create scaling policy failed with {0} for group'
-                          ' {1}'.format(self.group.id,
-                                        self.create_policy_response.status_code))
+        self.assertEquals(
+            self.create_policy_response.status_code, 201,
+            msg='Create scaling policy failed with {0} for group {1}'
+            .format(self.group.id, self.create_policy_response.status_code))
         self.validate_headers(self.create_policy_response.headers)
         self.assertTrue(self.policy['id'] is not None,
                         msg='Scaling policy id is None for group'
