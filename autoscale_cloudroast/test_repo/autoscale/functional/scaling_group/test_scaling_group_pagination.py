@@ -153,7 +153,7 @@ class GroupPaginationTest(AutoscaleFixture):
 
     def _create_multiple_groups(self, num):
         """
-        Creates 'num' number of groups
+        Creates 'num' number of groups.
         """
         for _ in range(num):
             group_response = self.autoscale_behaviors.create_scaling_group_min()
