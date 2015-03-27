@@ -186,7 +186,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             active_servers_from_scale, self.load_balancer_1,
             self.load_balancer_2, self.load_balancer_3)
 
-    @tags(speed='slow', type='lbaas', convergence='error')
+    @tags(speed='slow', type='lbaas', convergence='yes')
     def test_update_existing_lbaas_in_launch_config(self):
         """
         Create a scaling group with a given load balancer and verify the
@@ -259,7 +259,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         lb_node_after_del = self._get_node_list_from_lb(load_balancer)
         self.assertEquals(len(lb_node_after_del), 0)
 
-    @tags(speed='slow', type='lbaas', convergence='error')
+    @tags(speed='slow', type='lbaas', convergence='yes')
     def test_existing_nodes_on_lb_unaffected_by_scaling(self):
         """
         Get load balancer node id list before anyscale operation, create a
