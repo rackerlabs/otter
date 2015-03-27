@@ -56,12 +56,13 @@ class ListWebhookManifest(ScalingGroupPolicyFixture):
                 msg='List scaling group manifest returned {0} for group {1}'
                 .format(list_manifest_resp.status_code, self.group.id))
             self.validate_headers(list_manifest_resp.headers)
-            self.assertEqual(list_manifest.id, self.group.id,
-                             msg='Group id did not match for group '
-                             '{0}'.format(self.group.id))
             self.assertEqual(list_manifest.scalingPolicies[0].id, self.policy['id'],
                              msg='Policy id in manifest did not match expected policy '
                              '{0}'.format(self.policy['id']))
+            self.assertEqual(
+                list_manifest.id, self.group.id,
+                msg='Group id did not match for group {0}'
+                .format(self.group.id))
             self.assert_group_state(list_manifest.state)
             webhook_id_list = [webhook.id for webhook in list_manifest.scalingPolicies[0].webhooks]
             self.assertTrue(self.webhook1['id'] in webhook_id_list)
