@@ -92,9 +92,10 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             min_entities=self.group.groupConfiguration.maxEntities,
             max_entities=upd_max_entities,
             metadata={})
-        self.assertEquals(upd_group_resp.status_code, 400,
-                          msg='Update failed with {0} as it does not include full request'
-                          .format(upd_group_resp.status_code))
+        self.assertEquals(
+            upd_group_resp.status_code, 400,
+            msg='Update failed with {0} as it does not include full request'
+            .format(upd_group_resp.status_code))
 
     def test_update_maxentities_only(self):
         """
