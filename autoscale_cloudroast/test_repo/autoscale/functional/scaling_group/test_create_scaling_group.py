@@ -121,10 +121,11 @@ class CreateScalingGroupTest(AutoscaleFixture):
         """
         Verify the launch configuration on the group is as expected.
         """
-        self.assertEqual(self.lc_name,
-                         self.scaling_group.launchConfiguration.server.name,
-                         msg='Server name provided in the launch config did not match'
-                         ' for group {0}'.format(self.scaling_group.id))
+        self.assertEqual(
+            self.lc_name,
+            self.scaling_group.launchConfiguration.server.name,
+            msg='Server name provided in the launch config did not match'
+            ' for group {0}'.format(self.scaling_group.id))
 
         # None is no argument, null is null.  Yes this is terrible.
         # Cloudcafe removes arguments from the json if the value is None.
