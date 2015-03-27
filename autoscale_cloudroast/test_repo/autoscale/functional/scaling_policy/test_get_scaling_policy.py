@@ -7,7 +7,7 @@ from test_repo.autoscale.fixtures import ScalingGroupPolicyFixture
 class GetScalingPolicy(ScalingGroupPolicyFixture):
 
     """
-    Verify get policy
+    Verify get policy.
     """
 
     @classmethod
