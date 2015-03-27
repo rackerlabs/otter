@@ -178,8 +178,8 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             min_entities=self.gc_min_entities,
             max_entities=self.gc_max_entities,
             metadata=self.gc_metadata)
-        group_config_response = self.autoscale_client.view_scaling_group_config(
-            self.group.id)
+        group_config_response = (self.autoscale_client
+                                 .view_scaling_group_config(self.group.id))
         updated_config = group_config_response.entity
         self.assertEquals(
             update_group_response.status_code, 204,
