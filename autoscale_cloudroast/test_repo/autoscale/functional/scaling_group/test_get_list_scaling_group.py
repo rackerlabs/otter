@@ -96,8 +96,9 @@ class ScalingGroupListTest(AutoscaleFixture):
         self.assertIn(
             (self.first_scaling_group.id,
              self.first_scaling_group.groupConfiguration.name),
-            group_id_list, msg='Group with id {0} was not found in the list '
-            '{1}'.format(self.first_scaling_group.id, group_id_list))
+            group_id_list,
+            msg='Group with id {0} was not found in the list {1}'
+            .format(self.first_scaling_group.id, group_id_list))
         self.assertIn(
             (self.second_scaling_group.id,
              self.second_scaling_group.groupConfiguration.name),
