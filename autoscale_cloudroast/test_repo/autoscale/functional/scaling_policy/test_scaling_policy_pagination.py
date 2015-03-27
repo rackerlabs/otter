@@ -30,7 +30,8 @@ class PolicyPaginationTest(AutoscaleFixture):
         super(PolicyPaginationTest, self).setUp()
         create_resp = self.autoscale_behaviors.create_scaling_group_min()
         self.group = create_resp.entity
-        self.resources.add(self.group.id, self.autoscale_client.delete_scaling_group)
+        self.resources.add(
+            self.group.id, self.autoscale_client.delete_scaling_group)
         self._create_multiple_scaling_policies(3)
 
     def test_list_policies_when_list_greater_than_default_limit(self):
