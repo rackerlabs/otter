@@ -64,7 +64,8 @@ class ScalingPolicyNegative(AutoscaleFixture):
 
     def test_scaling_policy_name_whitespace(self):
         """
-        Negative Test: Scaling policy should not get created with name as whitespace.
+        Negative test: Scaling policy should not get created with name as
+        whitespace.
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
         error_create_resp = self.autoscale_client.create_policy(
