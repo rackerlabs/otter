@@ -74,10 +74,10 @@ class GetMaxManifest(ScalingGroupFixture):
             webhook_req_list = []
             for w in range(self.max_webhooks):
                 w_name_num = p['name'] + '_hook_{0}'.format(w)
-            web_resp = self.autoscale_client.create_webhooks_multiple(self.group.id, p_id,
-                                                                      webhook_req_list)
                 webhook_req_list.append(
                     {'name': w_name_num, 'metadata': {'notes': str(w)}})
+            web_resp = self.autoscale_client.create_webhooks_multiple(
+                self.group.id, p_id, webhook_req_list)
             webhook_ids = []
             for wr in web_resp.entity:
                 webhook_ids.append(wr.id)
