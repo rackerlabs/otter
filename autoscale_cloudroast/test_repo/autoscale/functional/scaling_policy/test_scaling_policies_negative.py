@@ -193,13 +193,14 @@ class ScalingPolicyNegative(AutoscaleFixture):
             group_id=self.group.id,
             policy_id=policy['id'])
         create_error = error_create_resp.entity
-        self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Get policies succeeded for deleted policy request: {0}'
-                          ' for group {1}'.format(error_create_resp.status_code,
-                                                  self.group.id))
         self.assertTrue(create_error is None,
                         msg='Create policies with invalid request returned: {0}'
                         ' for group {1}'.format(create_error, self.group.id))
+        self.assertEquals(
+            error_create_resp.status_code, expected_status_code,
+            msg='Get policies succeeded for deleted policy request: {0}'
+            ' for group {1}'.format(error_create_resp.status_code,
+                                    self.group.id))
 
     def test_update_policy_after_deletion(self):
         """
