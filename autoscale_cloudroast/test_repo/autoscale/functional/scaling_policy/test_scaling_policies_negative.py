@@ -269,9 +269,11 @@ class ScalingPolicyNegative(AutoscaleFixture):
             cooldown=self.max_cooldown + 1,
             change=self.sp_change,
             policy_type=self.sp_policy_type)
-        self.assertEquals(create_resp.status_code, 400,
-                          msg='Created scaling policy with cooldown over 24 hrs with response code: '
-                          '{0} for group {1}'.format(create_resp.status_code, self.group.id))
+        self.assertEquals(
+            create_resp.status_code, 400,
+            msg='Created scaling policy with cooldown over 24 hrs '
+            'with response code: {0} for group {1}'
+            .format(create_resp.status_code, self.group.id))
 
     def test_scaling_policy_invalid_type(self):
         """
