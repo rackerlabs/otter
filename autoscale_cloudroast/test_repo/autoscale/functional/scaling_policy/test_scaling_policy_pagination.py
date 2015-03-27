@@ -81,9 +81,9 @@ class PolicyPaginationTest(AutoscaleFixture):
     @unittest.skip('AUTO-711')
     def test_list_policies_with_limit_equal_to_number_of_policies(self):
         """
-        List the scaling policies with the limit set equal to the number of policies
-        on the group, and verify all the policies are listed without a link for the
-        next few policies.
+        List the scaling policies with the limit set equal to the number of
+        policies on the group, and verify all the policies are listed without a
+        link for the next few policies.
         """
         param = self.get_total_num_policies(self.group.id)
         list_policies = self._list_policies_with_given_limit(param)
