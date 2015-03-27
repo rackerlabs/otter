@@ -154,12 +154,13 @@ class PolicyPaginationTest(AutoscaleFixture):
 
     def _create_multiple_scaling_policies(self, num):
         """
-        Creates 'num' number of scaling policies
+        Creates 'num' number of scaling policies.
 
-        Note: For robust testing, polices should be a variety
-        of types (webhook, schedule, etc.)
+        Note: For robust testing, polices should be a variety of types
+        (webhook, schedule, etc.)
 
-        Is there any reason the pagination could be different for different types?
+        Is there any reason the pagination could be different for
+        different types?
         """
         for n in range(num):
             self.autoscale_behaviors.create_policy_given(self.group.id, sp_change=1)
