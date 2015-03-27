@@ -167,9 +167,10 @@ class PolicyPaginationTest(AutoscaleFixture):
 
     def _list_policies_with_given_limit(self, param, response=200):
         """
-        Lists policies with the given limit and verifies that the response status_code
-        was as expected.
-        Note: Only the first page of results is returned
+        Lists policies with the given limit and verifies that the response
+        status_code was as expected.
+
+        Note: Only the first page of results is returned.
         """
         policies_response = self.autoscale_client.list_policies(self.group.id, limit=param)
         self.assertEquals(policies_response.status_code, response, msg='list policies failed'
