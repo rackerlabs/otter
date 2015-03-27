@@ -205,5 +205,5 @@ class UpdateGroupConfigTest(AutoscaleFixture):
         self.assertEquals(
             self.autoscale_behaviors.to_data(updated_config.metadata),
             self.gc_metadata,
-            msg='Metadata in the Group config did not update'
-            ' for group {0}'.format(self.group.id))
+            msg='Metadata in the Group config did not update for group {0}'
+            .format(self.group.id))
