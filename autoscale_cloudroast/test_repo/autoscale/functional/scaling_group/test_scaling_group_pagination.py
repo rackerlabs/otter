@@ -79,7 +79,8 @@ class GroupPaginationTest(AutoscaleFixture):
         total_groups = self.get_total_num_groups()
         param = total_groups + 2
         list_groups = self._list_group_with_given_limit(param)
-        self._assert_list_groups_with_limits_and_next_link(total_groups, list_groups, False)
+        self._assert_list_groups_with_limits_and_next_link(
+            total_groups, list_groups, False)
 
     def test_list_groups_with_invalid_limits(self):
         """
