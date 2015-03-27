@@ -126,9 +126,10 @@ class GroupPaginationTest(AutoscaleFixture):
         """
         params = [1, 'invalid']
         for each_param in params:
-            groups_response = self.autoscale_client.list_scaling_groups(marker=each_param)
             self.assertEquals(groups_response.status_code, 200, msg='list group failed'
                               ' with {0}'.format(groups_response.status_code))
+            groups_response = self.autoscale_client.list_scaling_groups(
+                marker=each_param)
 
     def _list_group_with_given_limit(self, param, response=200):
         """
