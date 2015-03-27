@@ -250,7 +250,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # if there are any building servers left, also return a ConvergeLater step.
     converge_later = []
     if any((s not in servers_to_delete for s in waiting_for_build)):
-        converge_later = [ConvergeLater()]
+        converge_later = [ConvergeLater(reasons=['building servers'])]
 
     return pbag(create_steps +
                 scale_down_steps +

@@ -7,7 +7,7 @@ from characteristic import Attribute, attributes
 
 from effect import Constant, Effect, Func, catch
 
-from pyrsistent import PMap, PSet, pset, thaw
+from pyrsistent import PMap, PSet, freeze, pset, thaw
 
 from toolz.dicttoolz import get_in
 from toolz.itertoolz import concat
@@ -657,14 +657,17 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
 
 
 @implementer(IStep)
-@attributes([])
+@attributes(['reasons'], apply_with_init=False)
 class ConvergeLater(object):
     """
     Converge later in some time
     """
 
+    def __init__(self, reasons):
+        self.reasons = freeze(reasons)
+
     def as_effect(self):
         """
         Return an effect that always results in retry
         """
-        return Effect(Constant((StepResult.RETRY, [])))
+        return Effect(Constant((StepResult.RETRY, list(self.reasons))))
