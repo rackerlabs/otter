@@ -41,7 +41,8 @@ class GroupPaginationTest(AutoscaleFixture):
                 self.pagination_limit, list_groups)
             rem_list_group = self.autoscale_client.list_scaling_groups(
                 list_groups.groups_links.next).entity
-            self._assert_list_groups_with_limits_and_next_link(1, rem_list_group, False)
+            self._assert_list_groups_with_limits_and_next_link(
+                1, rem_list_group, False)
 
     def test_list_groups_with_limit_less_than_number_of_groups(self):
         """
