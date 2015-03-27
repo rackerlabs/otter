@@ -141,10 +141,11 @@ class CreateScalingGroupTest(AutoscaleFixture):
                 msg='Image id did not match for group {0}'
                 .format(self.scaling_group.id))
         else:
-            self.assertEqual(self.lc_image_ref,
-                             self.scaling_group.launchConfiguration.server.imageRef,
-                             msg='Image id did not match'
-                             ' for group {0}'.format(self.scaling_group.id))
+            self.assertEqual(
+                self.lc_image_ref,
+                self.scaling_group.launchConfiguration.server.imageRef,
+                msg='Image id did not match for group {0}'
+                .format(self.scaling_group.id))
 
         self.assertEqual(self.lc_flavor_ref,
                          self.scaling_group.launchConfiguration.server.flavorRef,
