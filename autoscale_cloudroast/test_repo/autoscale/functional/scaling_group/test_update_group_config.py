@@ -127,7 +127,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_metadata_to_be_none(self):
         """
-        Verify update with request containing null metadata
+        Verify update with request containing null metadata.
         """
         upd_metadata = {}
         upd_group_resp = self.autoscale_client.update_group_config(
