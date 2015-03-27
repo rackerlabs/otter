@@ -791,7 +791,7 @@ class ConvergeTests(SynchronousTestCase):
                 set([server('abc', ServerState.BUILD)]),
                 set(),
                 0),
-            pbag([ConvergeLater()]))
+            pbag([ConvergeLater(reasons=['building servers'])]))
 
     def test_delete_nodes_in_error_state(self):
         """
