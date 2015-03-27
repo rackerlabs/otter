@@ -217,7 +217,8 @@ class ScalingPolicyNegative(AutoscaleFixture):
 
     def test_scaling_policy_maxint_change(self):
         """
-        Negative Test: Test scaling policy when change is maxint does not fail with 400
+        Negative test: Test scaling policy when change is maxint does not
+        fail with 400.
         """
         change = sys.maxint
         create_resp = self.autoscale_client.create_policy(
