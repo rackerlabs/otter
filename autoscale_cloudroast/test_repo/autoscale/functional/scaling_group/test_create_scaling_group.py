@@ -23,8 +23,10 @@ class CreateScalingGroupTest(AutoscaleFixture):
         self.gc_metadata = {'gc_meta_key_1': 'gc_meta_value_1',
                             'gc_meta_key_2': 'gc_meta_value_2'}
         self.file_contents = 'This is a test file.'
-        self.lc_personality = [{'path': '/root/.csivh',
-                                'contents': base64.b64encode(self.file_contents)}]
+        self.lc_personality = [
+            {'path': '/root/.csivh',
+             'contents': base64.b64encode(self.file_contents)}
+        ]
         self.lc_metadata = {'meta_key_1': 'meta_value_1',
                             'meta_key_2': 'meta_value_2'}
         self.lc_disk_config = 'AUTO'
