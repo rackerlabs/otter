@@ -119,7 +119,8 @@ class GroupPaginationTest(AutoscaleFixture):
         tenant and verify.
         """
         group = (self.autoscale_behaviors.create_scaling_group_min()).entity
-        groups_response = self.autoscale_client.list_scaling_groups(marker=group.id)
+        groups_response = self.autoscale_client.list_scaling_groups(
+            marker=group.id)
         self.assertEquals(
             groups_response.status_code, 200,
             msg='list group failed with {0}'
