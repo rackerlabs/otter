@@ -33,8 +33,8 @@ class GetMaxManifest(ScalingGroupFixture):
             p_id = policy_resp['id']
             webhook_ids = []
             for w in range(0, self.max_webhooks):
-                webhook_resp = self.autoscale_client.create_webhook(self.group.id, p_id,
-                                                                    "hook_{0}".format(w))
+                webhook_resp = self.autoscale_client.create_webhook(
+                    self.group.id, p_id, 'hook_{0}'.format(w))
                 hook_obj = webhook_resp.entity[0]
                 webhook_ids.append(hook_obj.id)
             # Sort webhooks to verify against rx'd manifest
