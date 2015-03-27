@@ -13,11 +13,13 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter import controller
 
 from otter.convergence.service import (
-    get_convergence_starter, set_convergence_starter)
+    ConvergenceStarter, get_convergence_starter, set_convergence_starter)
 from otter.models.interface import (
-    GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
+    GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError,
+    ScalingGroupStatus)
 from otter.test.utils import (
     iMock, matches, mock_group as util_mock_group, mock_log, patch)
+from otter.util.config import set_config_data
 from otter.util.timestamp import MIN
 
 
@@ -740,6 +742,11 @@ class EmptyGroupTests(SynchronousTestCase):
         self.log = mock_log()
         self.state = GroupState('tid', 'gid', 'g', {}, {}, False, None, {})
         self.group = util_mock_group(self.state, 'tid', 'gid')
+        # Convergence
+        self.cs = mock.Mock(spec=ConvergenceStarter)
+        self.cs.start_convergence.return_value = defer.succeed('sc')
+        set_convergence_starter(self.cs)
+        self.addCleanup(set_convergence_starter, None)
 
     def test_updates_modifies(self):
         """
@@ -754,7 +761,7 @@ class EmptyGroupTests(SynchronousTestCase):
         self.group.update_config.return_value = defer.succeed(None)
         self.mock_occ.return_value = defer.succeed(None)
 
-        d = controller.empty_group(self.log, 'tid', self.group)
+        d = controller.empty_group(self.log, 'transid', self.group)
 
         self.assertIsNone(self.successResultOf(d))
         expected_config = {'maxEntities': 0,
@@ -763,8 +770,10 @@ class EmptyGroupTests(SynchronousTestCase):
         self.group.view_manifest.assert_called_once_with(with_policies=False)
         self.group.update_config.assert_called_once_with(expected_config)
         self.mock_occ.assert_called_once_with(
-            self.log, "tid", expected_config, self.group,
+            self.log, "transid", expected_config, self.group,
             self.state, launch_config={'this': 'is_a_launch_config'})
+        # converger is not called
+        self.assertFalse(self.cs.start_convergence.called)
 
     def test_no_group(self):
         """
@@ -774,6 +783,28 @@ class EmptyGroupTests(SynchronousTestCase):
             NoSuchScalingGroupError('tid', 'gid'))
         d = controller.empty_group(self.log, 'tid', self.group)
         self.failureResultOf(d, NoSuchScalingGroupError)
+        # group config is not updated nor its state modified
+        self.assertFalse(self.group.update_config.called)
+        self.assertFalse(self.group.modify_state.called)
+        # converger is not called
+        self.assertFalse(self.cs.start_convergence.called)
+
+    def test_convergence_tenant(self):
+        """
+        Updates DELETED status for convergence tenant and starts convergence
+        """
+        set_config_data({'convergence-tenants': ['tid']})
+        self.addCleanup(set_config_data, {})
+
+        self.group.update_status.return_value = defer.succeed(None)
+
+        d = controller.empty_group(self.log, 'transid', self.group)
+
+        self.assertEqual(self.successResultOf(d), 'sc')
+        self.group.update_status.assert_called_once_with(
+            ScalingGroupStatus.DELETING)
+        self.cs.start_convergence.assert_called_once_with(
+            self.log, 'tid', 'gid')
 
 
 def mock_controller_utilities(test_case):
