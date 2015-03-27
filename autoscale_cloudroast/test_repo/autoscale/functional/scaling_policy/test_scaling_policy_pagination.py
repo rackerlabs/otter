@@ -39,7 +39,8 @@ class PolicyPaginationTest(AutoscaleFixture):
         Verify the default/max limit for listing scaling policies.
 
         Preconditions:
-        A scaling group to which policies can be added. (Provided by ScalingGroupPolicyFixture)
+        A scaling group to which policies can be added. (Provided by
+        ScalingGroupPolicyFixture)
 
         Steps:
         For a group with a number of scaling policies greater than the
