@@ -88,7 +88,7 @@ class ListWebhookManifest(ScalingGroupPolicyFixture):
                 list_manifest_resp.status_code, 200,
                 msg='List scaling group manifest returns {0} for group {1}'
                 .format(list_manifest_resp.status_code, self.group.id))
-            self.assertFalse(
-                hasattr(list_manifest.scalingPolicies, 'webhooks'))
-            self.assertFalse(
-                hasattr(list_manifest.scalingPolicies, 'webhook_links'))
+
+            scaling_policies = list_manifest.scalingPolicies
+            self.assertFalse(hasattr(scaling_policies, 'webhooks'))
+            self.assertFalse(hasattr(scaling_policies, 'webhook_links'))
