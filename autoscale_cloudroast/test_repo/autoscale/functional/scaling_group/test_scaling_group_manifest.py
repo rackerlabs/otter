@@ -33,7 +33,8 @@ class ListWebhookManifest(ScalingGroupPolicyFixture):
             webhook1_response)
         webhook2_response = cls.autoscale_client.create_webhook(
             cls.group.id, cls.policy['id'], 'webhook2').entity
-        cls.webhook2 = cls.autoscale_behaviors.get_webhooks_properties(webhook2_response)
+        cls.webhook2 = cls.autoscale_behaviors.get_webhooks_properties(
+            webhook2_response)
         webhook3_response = cls.autoscale_client.create_webhook(
             cls.group.id, cls.policy['id'], 'webhook3').entity
         cls.webhook3 = cls.autoscale_behaviors.get_webhooks_properties(webhook3_response)
