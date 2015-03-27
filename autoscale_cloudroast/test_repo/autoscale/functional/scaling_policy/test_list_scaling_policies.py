@@ -13,7 +13,7 @@ class ListScalingPolicies(ScalingGroupPolicyFixture):
     @classmethod
     def setUpClass(cls):
         """
-        Creates a scaling group with 4 policies
+        Creates a scaling group with 4 policies.
         """
         super(ListScalingPolicies, cls).setUpClass()
         cls.policy1 = cls.policy
