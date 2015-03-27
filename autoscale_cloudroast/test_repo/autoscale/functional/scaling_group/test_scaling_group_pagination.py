@@ -152,11 +152,11 @@ class GroupPaginationTest(AutoscaleFixture):
 
     def _assert_list_groups_with_limits_and_next_link(
             self, group_len, list_group, next_link=True):
-        """Asserts the length of the list group returned and its groups links.
+        """
+        Asserts the length of the list group returned and its groups links.
 
         If next_link is False, asserts that the group_links is empty and
         does not have a next link
-
         """
         self.assertGreaterEqual(len(list_group.groups), group_len)
         if next_link:
