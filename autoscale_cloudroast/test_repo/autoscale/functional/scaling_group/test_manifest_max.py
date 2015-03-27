@@ -8,9 +8,9 @@ import unittest
 
 class GetMaxManifest(ScalingGroupFixture):
     """
-    Verify that the webhook manifest is provided when using /groups/[group_id]?webhooks=True
-    on a group with the maximum number of policies and the maximum number of webhooks.
-
+    Verify that the webhook manifest is provided when using
+    /groups/[group_id]?webhooks=True on a group with the maximum
+    number of policies and the maximum number of webhooks.
     """
 
     @unittest.skip("Reserved for stress testing due to API call volume")
