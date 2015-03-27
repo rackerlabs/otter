@@ -93,6 +93,7 @@ class GetMaxManifest(ScalingGroupFixture):
             rx_webhook_ids = []
             for hook in policy.webhooks:
                 rx_webhook_ids.append(hook.id)
-            actual_ids[sp_id] = rx_webhook_ids  # Unsorted to verify that the order is correct
+            # Unsorted to verify that the order is correct
+            actual_ids[sp_id] = rx_webhook_ids
         self.assertTrue(manifest_dict == actual_ids,
                         "Recieved manifest did not match expected")
