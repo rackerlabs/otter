@@ -186,9 +186,6 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             msg='Update group config failed with {0} for group {1}'
             .format(update_group_response.status_code, self.group.id))
         self.validate_headers(update_group_response.headers)
-        self.assertEquals(updated_config.maxEntities, self.gc_max_entities,
-                          msg='Max entities in the Group config did not update'
-                          ' for group {0}'.format(self.group.id))
         self.assertEquals(
             updated_config.minEntities, self.gc_min_entities,
             msg='Min entities in the Group config did not update for group {0}'
@@ -201,6 +198,11 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             updated_config.name, self.gc_name,
             msg='Name in the Group config did not update for group {0}'
             .format(self.group.id))
+        self.assertEquals(
+            updated_config.maxEntities, self.gc_max_entities,
+            msg='Max entities in the Group config did not update for group {0}'
+            .format(self.group.id))
+        self.assertEquals(
             self.autoscale_behaviors.to_data(updated_config.metadata),
             self.gc_metadata,
             msg='Metadata in the Group config did not update'
