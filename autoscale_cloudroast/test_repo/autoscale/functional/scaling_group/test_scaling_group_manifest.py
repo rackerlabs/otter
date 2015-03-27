@@ -42,7 +42,7 @@ class ListWebhookManifest(ScalingGroupPolicyFixture):
 
     def test_manifest_webhooks(self):
         """
-        Verify the manifest call for response code 200, headers and data
+        Verify the manifest call for response code 200, headers and data.
         """
         params = ["true", "tRuE", True]
         for param in params:
