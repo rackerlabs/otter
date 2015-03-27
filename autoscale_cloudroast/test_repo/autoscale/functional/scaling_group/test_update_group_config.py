@@ -192,7 +192,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             .format(self.group.id))
         self.assertEquals(
             updated_config.cooldown, self.gc_cooldown,
-            msg='Cooldown time in the Group config did not update for group {0}'
+            msg='Group cooldown time did not update for group {0}'
             .format(self.group.id))
         self.assertEquals(
             updated_config.name, self.gc_name,
