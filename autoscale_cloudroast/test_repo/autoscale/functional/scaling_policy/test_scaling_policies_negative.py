@@ -25,8 +25,8 @@ class ScalingPolicyNegative(AutoscaleFixture):
 
     def test_scaling_policy_nonexistant(self):
         """
-        Negative Test: A newly created scaling group does not contain a scaling policy,
-        by default
+        Negative test: A newly created scaling group does not contain a
+        scaling policy, by default.
         """
         list_policy_resp = self.autoscale_client.list_policies(self.group.id)
         list_policy = (list_policy_resp.entity).policies
