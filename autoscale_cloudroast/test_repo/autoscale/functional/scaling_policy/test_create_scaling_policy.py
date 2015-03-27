@@ -20,9 +20,6 @@ class CreateScalingPolicy(ScalingGroupPolicyFixture):
             msg='Create scaling policy failed with {0} for group {1}'
             .format(self.group.id, self.create_policy_response.status_code))
         self.validate_headers(self.create_policy_response.headers)
-        self.assertEquals(self.policy['name'], self.sp_name,
-                          msg="Scaling policy's name does not match for group"
-                          " {0}".format(self.group.id))
         self.assertEquals(self.policy['count'], 1,
                           msg='More scaling policies listed than created for group'
                           ' {0}'.format(self.group.id))
@@ -41,4 +38,8 @@ class CreateScalingPolicy(ScalingGroupPolicyFixture):
         self.assertEquals(
             self.policy['change'], self.sp_change,
             msg="Scaling policy's change does not match for group {0}"
+            .format(self.group.id))
+        self.assertEquals(
+            self.policy['name'], self.sp_name,
+            msg="Scaling policy's name does not match for group {0}"
             .format(self.group.id))
