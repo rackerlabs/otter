@@ -14,6 +14,7 @@ from otter.json_schema.group_schemas import (
     MAX_ENTITIES,
     validate_launch_config_servicenet,
 )
+from otter.convergence.composition import tenant_is_enabled
 from otter.json_schema.rest_schemas import create_group_request
 from otter.log import log
 from otter.rest.bobby import get_bobby
@@ -557,9 +558,17 @@ class OtterGroup(object):
         group = self.store.get_scaling_group(self.log, self.tenant_id,
                                              self.group_id)
         force = extract_bool_arg(request, 'force', False)
+
+        def delete(_):
+            # Only delete if tenant is non-convergence
+            # TODO: I was hoping to not have convergence check in rest/* but
+            # couldn't avoid this
+            if not tenant_is_enabled(self.tenant_id, config_value):
+                return group.delete_group()
+
         if force:
             d = controller.empty_group(log, transaction_id(request), group)
-            return d.addCallback(lambda _: group.delete_group())
+            return d.addCallback(delete)
         else:
             return group.delete_group()
 
