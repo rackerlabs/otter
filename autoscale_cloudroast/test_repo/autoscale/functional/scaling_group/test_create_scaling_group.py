@@ -169,8 +169,8 @@ class CreateScalingGroupTest(AutoscaleFixture):
             self.autoscale_behaviors.policy_details_list(self.sp_list),
             self.autoscale_behaviors.policy_details_list(
                 self.scaling_group.scalingPolicies),
-            msg='Scaling policies of the scaling group did not match'
-            ' for group {0}'.format(self.scaling_group.id))
+            msg='Scaling policies of the scaling group did not match '
+            'for group {0}'.format(self.scaling_group.id))
 
         if self.lc_block_device_mapping is not None:
             self.assertEqual(
