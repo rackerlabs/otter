@@ -99,12 +99,15 @@ class PolicyPaginationTest(AutoscaleFixture):
             self._list_policies_with_given_limit(each_param, 400)
 
     def test_list_policies_with_limits_above_set_limit(self):
-        """
-        Verify that when the limit is set over the set limit (100), all policies
-        up to 100 are returned with a link to the next page.
-        Note Only 3 scaling policies are listed since the purpose of this test case is to ensure that
-        the invalid limit does not produce an error The case to verify limiting of results to the
-        maximum is handled in test_list_policies_when_list_greater_than_default_limit.
+        """Verify that when the limit is set over the set limit (100), all
+        policies up to 100 are returned with a link to the next page.
+
+        Note Only 3 scaling policies are listed since the purpose of
+        this test case is to ensure that the invalid limit does not
+        produce an error The case to verify limiting of results to the
+        maximum is handled in
+        test_list_policies_when_list_greater_than_default_limit.
+
         """
         params = [101, 1000]
         num_policies = self.get_total_num_policies(self.group.id)
