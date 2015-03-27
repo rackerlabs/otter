@@ -82,7 +82,8 @@ class GroupPaginationTest(AutoscaleFixture):
 
     def test_list_groups_with_invalid_limits(self):
         """
-        List scaling groups with limit set to invalid values and verify the message returned
+        List scaling groups with limit set to invalid values and verify the
+        message returned.
         """
         params = ['ab', '&']
         for each_param in params:
