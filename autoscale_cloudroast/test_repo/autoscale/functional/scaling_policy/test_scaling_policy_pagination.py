@@ -91,8 +91,8 @@ class PolicyPaginationTest(AutoscaleFixture):
 
     def test_list_policies_with_invalid_limit(self):
         """
-        List scaling policies with the limit set to invalid values and verify
-        the message returned.
+        List scaling policies with the limit set to invalid values and
+        verify the message returned.
         """
         params = ['ab', '&', '3.0']
         for each_param in params:
