@@ -100,8 +100,8 @@ class GroupPaginationTest(AutoscaleFixture):
 
     def test_list_groups_with_limits_above_set_limit(self):
         """
-        Verify when the limit is over the set limit(100), all groups upto a 100
-        are returned
+        Verify when the limit is over the set limit(100), all groups upto a
+        100 are returned.
         """
         total_groups = self.get_total_num_groups()
         params = [101, 1000]
