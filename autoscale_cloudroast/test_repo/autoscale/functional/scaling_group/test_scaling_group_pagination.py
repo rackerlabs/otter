@@ -121,6 +121,7 @@ class GroupPaginationTest(AutoscaleFixture):
     def test_list_groups_with_invalid_marker(self):
         """
         List the scaling groups with invalid markers and verify.
+
         (Currently Otter is not checking the validity of the marker)
         """
         params = [1, 'invalid']
