@@ -35,9 +35,10 @@ class ScalingPolicyNegative(AutoscaleFixture):
             msg='List scaling policies for group {0} failed with {0}'
             .format(self.group.id, list_policy_resp.status_code))
         self.validate_headers(list_policy_resp.headers)
-        self.assertEquals(list_policy, [],
-                          msg='Some scaling policies exist on the scaling group'
-                          ' {0}'.format(self.group.id))
+        self.assertEquals(
+            list_policy, [],
+            msg='Some scaling policies exist on the scaling group {0}'
+            .format(self.group.id))
 
     def test_scaling_policy_name_blank(self):
         """
