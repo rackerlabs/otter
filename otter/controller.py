@@ -20,10 +20,12 @@ Storage model for state information:
  * last touched information for group
  * last touched information for policy
 """
+import json
 from datetime import datetime
 from decimal import Decimal, ROUND_UP
+from functools import partial
+
 import iso8601
-import json
 
 from twisted.internet import defer
 
@@ -31,6 +33,7 @@ from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.service import get_convergence_starter
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
+from otter.models.interface import ScalingGroupStatus
 from otter.supervisor import exec_scale_down, execute_launch_config
 from otter.util.config import config_value
 from otter.util.deferredutils import unwrap_first_error
@@ -122,6 +125,49 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
                  launch_config, {'change': 0})
     if d is None:
         return defer.succeed(state)
+    return d
+
+
+def empty_group(log, trans_id, group):
+    """
+    Empty a scaling group by deleting or triggering deletion on its resources
+
+    :param log: Bound logger
+    :param str trans_id: Transaction ID of request doing this
+    :param otter.models.interface.IScalingGroup scaling_group: the scaling
+        group object
+
+    :return: Deferred that fires with None
+    """
+    if tenant_is_enabled(group.tenant_id, config_value):
+        # For convergence tenants update group status and trigger convergence
+        d = group.update_status(ScalingGroupStatus.DELETING)
+        cs = get_convergence_starter()
+        d.addCallback(
+            lambda _: cs.start_convergence(log, group.tenant_id, group.uuid))
+        return d
+
+    d = group.view_manifest(with_policies=False)
+
+    def update_config(group_info):
+        group_info['groupConfiguration']['minEntities'] = 0
+        group_info['groupConfiguration']['maxEntities'] = 0
+        du = group.update_config(group_info['groupConfiguration'])
+        return du.addCallback(lambda _: group_info)
+
+    d.addCallback(update_config)
+
+    def modify_state(group_info):
+        d = group.modify_state(
+            partial(
+                obey_config_change,
+                log,
+                trans_id,
+                group_info['groupConfiguration'],
+                launch_config=group_info['launchConfiguration']))
+        return d
+
+    d.addCallback(modify_state)
     return d
 
 

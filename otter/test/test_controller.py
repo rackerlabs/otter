@@ -15,9 +15,10 @@ from otter import controller
 from otter.convergence.service import (
     get_convergence_starter, set_convergence_starter)
 from otter.models.interface import (
-    GroupState, IScalingGroup, NoSuchPolicyError)
+    GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
+from otter.test.utils import (
+    iMock, matches, mock_group as util_mock_group, mock_log, patch)
 from otter.util.timestamp import MIN
-from otter.test.utils import iMock, matches, patch, mock_log
 
 
 class CalculateDeltaTestCase(SynchronousTestCase):
@@ -726,10 +727,59 @@ class ObeyConfigChangeTestCase(SynchronousTestCase):
             webhook_id=None)
 
 
+class EmptyGroupTests(SynchronousTestCase):
+    """
+    Tests for `empty_group`
+    """
+
+    def setUp(self):
+        """
+        Mock relevant controller methods.
+        """
+        self.mock_occ = patch(self, 'otter.controller.obey_config_change')
+        self.log = mock_log()
+        self.state = GroupState('tid', 'gid', 'g', {}, {}, False, None, {})
+        self.group = util_mock_group(self.state, 'tid', 'gid')
+
+    def test_updates_modifies(self):
+        """
+        updates group config with 0 min/max and calls `obey_config_change`
+        """
+        self.group.view_manifest.return_value = defer.succeed(
+            {'groupConfiguration':
+                {'name': 'group1', 'minEntities': '10', 'maxEntities': '1000'},
+             'launchConfiguration':
+                {'this': 'is_a_launch_config'},
+             'id': 'one'})
+        self.group.update_config.return_value = defer.succeed(None)
+        self.mock_occ.return_value = defer.succeed(None)
+
+        d = controller.empty_group(self.log, 'tid', self.group)
+
+        self.assertIsNone(self.successResultOf(d))
+        expected_config = {'maxEntities': 0,
+                           'minEntities': 0,
+                           'name': 'group1'}
+        self.group.view_manifest.assert_called_once_with(with_policies=False)
+        self.group.update_config.assert_called_once_with(expected_config)
+        self.mock_occ.assert_called_once_with(
+            self.log, "tid", expected_config, self.group,
+            self.state, launch_config={'this': 'is_a_launch_config'})
+
+    def test_no_group(self):
+        """
+        Raises `NoSuchScalingGroupError` if group does not exist
+        """
+        self.group.view_manifest.return_value = defer.fail(
+            NoSuchScalingGroupError('tid', 'gid'))
+        d = controller.empty_group(self.log, 'tid', self.group)
+        self.failureResultOf(d, NoSuchScalingGroupError)
+
+
 def mock_controller_utilities(test_case):
     """
-    Mock out the following functions in the controller module, in order to simplify
-    testing of scaling up and down.
+    Mock out the following functions in the controller module, in order
+    to simplify testing of scaling up and down.
 
         - check_cooldowns (returns True)
         - calculate_delta (return 1)
