@@ -12,7 +12,7 @@ class DeleteScalingGroupTest(AutoscaleFixture):
 
     def setUp(self):
         """
-        create a scaling group
+        Create a scaling group.
         """
         super(DeleteScalingGroupTest, self).setUp()
         create_resp = self.autoscale_behaviors.create_scaling_group_min()
@@ -23,7 +23,8 @@ class DeleteScalingGroupTest(AutoscaleFixture):
 
     def test_delete_group_with_0_minentities(self):
         """
-        Verify delete group returns response code 204 when group has 0 min entities.
+        Verify delete group returns response code 204 when group has 0 min
+        entities.
         """
         delete_resp = self.autoscale_client.delete_scaling_group(self.group.id)
         self.assertEquals(delete_resp.status_code, 204,
