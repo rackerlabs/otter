@@ -16,7 +16,7 @@ class PolicyPaginationTest(AutoscaleFixture):
     @classmethod
     def setUpClass(cls):
         """
-        Initialize autoscale configs, behaviors and client
+        Initialize autoscale configs, behaviors and client.
         """
         super(PolicyPaginationTest, cls).setUpClass()
         cls.limits_response = cls.autoscale_client.view_limits().entity
