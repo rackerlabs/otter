@@ -93,7 +93,8 @@ class ScalingGroupListTest(AutoscaleFixture):
             msg='The list scaling group call failed with: {0}'
             .format(list_groups_response.content))
         self.validate_headers(list_groups_response.headers)
-        group_id_list = [(group.id, group.state['name']) for group in list_groups]
+        group_id_list = [(group.id, group.state['name'])
+                         for group in list_groups]
         self.assertIn(
             (self.first_scaling_group.id,
              self.first_scaling_group.groupConfiguration.name),
