@@ -113,8 +113,8 @@ class GroupPaginationTest(AutoscaleFixture):
 
     def test_list_groups_with_marker(self):
         """
-        List the scaling groups with the marker set to be a group ID
-        on the tenant and verify.
+        List the scaling groups with the marker set to be a group ID on the
+        tenant and verify.
         """
         group = (self.autoscale_behaviors.create_scaling_group_min()).entity
         groups_response = self.autoscale_client.list_scaling_groups(marker=group.id)
