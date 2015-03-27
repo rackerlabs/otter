@@ -118,9 +118,10 @@ class ScalingGroupListTest(AutoscaleFixture):
         """
         list_groups_response = self.autoscale_client.list_scaling_groups()
         list_groups = (list_groups_response.entity).groups
-        self.assertEqual(200, list_groups_response.status_code,
-                         msg='The list scaling group call failed with: '
-                         '{0}'.format(list_groups_response.content))
+        self.assertEqual(
+            200, list_groups_response.status_code,
+            msg='The list scaling group call failed with: {0}'
+            .format(list_groups_response.content))
         self.validate_headers(list_groups_response.headers)
         group_id_list = [group.id for group in list_groups]
         sorted_group_id_list = sorted(group_id_list)
