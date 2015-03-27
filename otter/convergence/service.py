@@ -94,7 +94,7 @@ def execute_convergence(tenant_id, group_id, log,
     :param get_all_convergence_data: like :func`get_all_convergence_data`, used
         for testing.
 
-    :return: An Effect of a list containing the individual step results.
+    :return: Effect of StepResult based on order of severity
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
     # Huh! It turns out we can parallelize the gathering of data with the
@@ -112,6 +112,8 @@ def execute_convergence(tenant_id, group_id, log,
     launch_config = manifest['launchConfiguration']
     now = yield Effect(Func(time.time))
 
+    if scaling_group['status'] == ScalingGroupStatus.DELETED:
+        group_state.desired = 0
     desired_group_state = get_desired_group_state(
         group_id, launch_config, group_state.desired)
     steps = plan(desired_group_state, servers, lb_nodes, now)
@@ -133,13 +135,18 @@ def execute_convergence(tenant_id, group_id, log,
             worst_status=worst_status)
 
     if worst_status == StepResult.SUCCESS:
-        # Do one last gathering + writing to `active` so we get updated
-        # based on any DELETEs or other stuff that happened.
-        (servers, lb_nodes) = yield gather_eff
-        active = determine_active(servers, lb_nodes)
-        yield _update_active(scaling_group, active)
-        # given that we're gathering in this case, wouldn't it make sense to
-        # also plan, and then to execute that plan if something is found...?
+        if scaling_group['status'] == ScalingGroupStatus.DELETING:
+            # servers have been delete. Delete the group for real
+            yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
+        else:
+            # Do one last gathering + writing to `active` so we get updated
+            # based on any DELETEs or other stuff that happened.
+            (servers, lb_nodes) = yield gather_eff
+            active = determine_active(servers, lb_nodes)
+            yield _update_active(scaling_group, active)
+            # given that we're gathering in this case, wouldn't it make sense
+            # to also plan, and then to execute that plan if something
+            # is found...?
 
     yield do_return(worst_status)
 
