@@ -59,8 +59,8 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_minentities_over_maxentities(self):
         """
-        Verify update with an incomplete request containing minentities over maxentities,
-        fails with 400
+        Verify update with an incomplete request containing minentities over
+        maxentities, fails with 400.
         """
         # AUTO-302
         upd_min_entities = self.max_maxentities + 1
