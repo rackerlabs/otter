@@ -241,9 +241,9 @@ class CreateScalingGroupTest(AutoscaleFixture):
 
     def test_create_scaling_group_with_boot_from_volume_no_image(self):
         """
-        Create a scaling group with no image ID, and test that the
-        response is successful and that all the launch config fields match
-        what was created.
+        Create a scaling group with no image ID, and test that the response
+        is successful and that all the launch config fields match what was
+        created.
         """
         device = {
             "boot_index": "0",
