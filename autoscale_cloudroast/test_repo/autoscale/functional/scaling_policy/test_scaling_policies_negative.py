@@ -9,7 +9,7 @@ import sys
 class ScalingPolicyNegative(AutoscaleFixture):
 
     """
-    Verify negative scenarios for a scaling policy
+    Verify negative scenarios for a scaling policy.
     """
 
     def setUp(self):
