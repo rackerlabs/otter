@@ -111,7 +111,8 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_metadata_only(self):
         """
-        Verify update with an incomplete request containing metadata only, fails with 400
+        Verify update with an incomplete request containing metadata only,
+        fails with 400.
         """
         upd_metadata = {'does this': 'work'}
         upd_group_resp = self.autoscale_client.update_group_config(
