@@ -50,9 +50,9 @@ class PolicyPaginationTest(AutoscaleFixture):
         in batches of 'default limit' with a link to the next batch.
         Note: This test only checks for the first batch.
         """
-
         # There are already 3 policies from setUp
-        to_build = self.max_policies - self.get_total_num_policies(self.group.id)
+        to_build = self.max_policies - \
+            self.get_total_num_policies(self.group.id)
         self._create_multiple_scaling_policies(to_build)
         params = [None, 100000]
         for each_param in params:
