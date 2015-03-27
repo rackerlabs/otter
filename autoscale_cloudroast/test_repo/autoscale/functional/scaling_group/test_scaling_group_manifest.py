@@ -74,9 +74,11 @@ class ListWebhookManifest(ScalingGroupPolicyFixture):
     def test_manifest_webhooks_invalid(self):
         """
         Verify that the manifest is not displayed in the following scenarios:
-            1.) List group request (/groups/<group_id) is made without the query parameter webhooks=True
-            2.) Query parameter "webhooks" uses incorrect case
-            3.) Query parameter "webhooks" is provided an invalid value
+
+        1. List group request (/groups/<group_id) is made without the
+        query parameter webhooks=True
+        2. Query parameter "webhooks" uses incorrect case
+        3. Query parameter "webhooks" is provided an invalid value
         """
         params = [None, "False", 15, "Tr@%"]
         for param in params:
