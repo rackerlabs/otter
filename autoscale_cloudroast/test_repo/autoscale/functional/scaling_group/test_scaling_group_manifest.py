@@ -6,13 +6,18 @@ from test_repo.autoscale.fixtures import ScalingGroupPolicyFixture
 
 class ListWebhookManifest(ScalingGroupPolicyFixture):
     """
-    Verify that the webhook manifest is provided when using /groups/[group_id]?webhooks=True
-    Note: Should "webhooks" be case sensitive (currently it is)
-    Note: Should "True" be case sensitive (currently it is not)
-    (Assume that pagination of policies is the same)
-    What is the pagination behavior?
-    Test - add a second policy with no webhooks, verify empty list in webhooks, and
+    Verify that the webhook manifest is provided when using
+    /groups/[group_id]?webhooks=True
 
+    Note: Should "webhooks" be case sensitive (currently it is)
+
+    Note: Should "True" be case sensitive (currently it is not)
+
+    (Assume that pagination of policies is the same) What is the
+    pagination behavior?
+
+    Test - add a second policy with no webhooks, verify empty list in
+    webhooks, and
     """
 
     @classmethod
