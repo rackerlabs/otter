@@ -23,7 +23,8 @@ class ListWebhookManifest(ScalingGroupPolicyFixture):
     @classmethod
     def setUpClass(cls):
         """
-        Creates a scaling group with a policy and 3 webhooks on the policy
+        Creates a scaling group with a policy and 3 webhooks on the
+        policy.
         """
         super(ListWebhookManifest, cls).setUpClass()
         webhook1_response = cls.autoscale_client.create_webhook(
