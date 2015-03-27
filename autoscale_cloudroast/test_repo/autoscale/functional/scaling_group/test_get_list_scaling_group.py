@@ -74,10 +74,12 @@ class ScalingGroupListTest(AutoscaleFixture):
                 view_manifest_config_for_scaling_group(
                     group_id=each_group.id).entity
             self.assertEquals(
-                group_info.groupConfiguration.maxEntities, self.max_maxentities,
-                msg='The maxentities set by default on the group {0} should be {1} '
-                ' but is {2}'.format(each_group.id, self.max_maxentities,
-                                     group_info.groupConfiguration.maxEntities))
+                group_info.groupConfiguration.maxEntities,
+                self.max_maxentities,
+                msg='The maxentities set by default on the group {0} should '
+                'be {1}  but is {2}'
+                .format(each_group.id, self.max_maxentities,
+                        group_info.groupConfiguration.maxEntities))
 
     def test_list_scaling_group(self):
         """
