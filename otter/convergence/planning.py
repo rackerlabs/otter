@@ -2,7 +2,7 @@
 
 from functools import partial
 
-from pyrsistent import freeze, pbag, pmap, pset
+from pyrsistent import pbag, pmap, pset
 
 from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
