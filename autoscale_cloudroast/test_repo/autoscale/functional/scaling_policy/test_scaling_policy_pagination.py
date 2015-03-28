@@ -72,13 +72,13 @@ class PolicyPaginationTest(AutoscaleFixture):
         # Specify the limit to be one less than the current number of policies
         param = self.get_total_num_policies(self.group.id) - 1
         list_policies = self._list_policies_with_given_limit(param)
-        rem_list_policy =\
-            self.autoscale_client.list_policies(self.group.id,
-                                                url=list_policies.policies_links.next).entity
         # Verify there is at least one item in the second batch, and no next link
         self._assert_list_policies_with_limits_and_next_link(1, rem_list_policy, False)
         self._assert_list_policies_with_limits_and_next_link(
             param, list_policies)
+        rem_list_policy = (self.autoscale_client.list_policies(
+                self.group.id, url=list_policies.policies_links.next)
+                           .entity)
 
     @unittest.skip('AUTO-711')
     def test_list_policies_with_limit_equal_to_number_of_policies(self):
