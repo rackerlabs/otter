@@ -189,9 +189,11 @@ class PolicyPaginationTest(AutoscaleFixture):
 
         Note: Only the first page of results is returned.
         """
-        self.assertEquals(policies_response.status_code, response, msg='list policies failed'
-                          'with {0}'.format(policies_response.status_code))
         policies_response = self.autoscale_client.list_policies(
             self.group.id,
             limit=param)
+        self.assertEquals(
+            policies_response.status_code, response,
+            msg='list policies failed with {0}'
+            .format(policies_response.status_code))
         return policies_response.entity
