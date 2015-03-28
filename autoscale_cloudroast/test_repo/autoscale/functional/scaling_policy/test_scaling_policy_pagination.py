@@ -89,7 +89,8 @@ class PolicyPaginationTest(AutoscaleFixture):
         """
         param = self.get_total_num_policies(self.group.id)
         list_policies = self._list_policies_with_given_limit(param)
-        self._assert_list_policies_with_limits_and_next_link(param, list_policies, False)
+        self._assert_list_policies_with_limits_and_next_link(
+            param, list_policies, False)
 
     def test_list_policies_with_invalid_limit(self):
         """
