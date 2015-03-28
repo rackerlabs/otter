@@ -60,7 +60,8 @@ class PolicyPaginationTest(AutoscaleFixture):
             self._assert_list_policies_with_limits_and_next_link(
                 self.pagination_limit, list_policies)
 
-    def test_list_policies_with_specified_limit_less_than_number_of_policies(self):
+    def test_list_policies_with_specified_limit_less_than_number_of_policies(
+            self):
         """
         List the scaling policies with the limit set to be less than the
         number of groups on the tenant and verify groups are listed in batches
