@@ -179,7 +179,8 @@ class PolicyPaginationTest(AutoscaleFixture):
         different types?
         """
         for n in range(num):
-            self.autoscale_behaviors.create_policy_given(self.group.id, sp_change=1)
+            self.autoscale_behaviors.create_policy_given(
+                self.group.id, sp_change=1)
 
     def _list_policies_with_given_limit(self, param, response=200):
         """
