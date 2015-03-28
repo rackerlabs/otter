@@ -151,11 +151,13 @@ class PolicyPaginationTest(AutoscaleFixture):
     def _assert_list_policies_with_limits_and_next_link(self, policy_len, list_policies,
                                                         next_link=True):
         """
-        Asserts the length of the policies list, and whether the next link is present.
-        Note: Given the current list_policies function, (which only lists the first page,
-            there should be no way that the list is greater than the limit)
-        If next_link is False, asserts that the policies_link is empty and does not have a
-        next link.
+        Asserts the length of the policies list, and whether the next link
+        is present.
+
+        Note: Given the current list_policies function, (which only
+        lists the first page, there should be no way that the list is
+        greater than the limit) If next_link is False, asserts that
+        the policies_link is empty and does not have a next link.
         """
         self.assertGreaterEqual(len(list_policies.policies), policy_len)
         if next_link:
