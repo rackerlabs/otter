@@ -141,10 +141,12 @@ class PolicyPaginationTest(AutoscaleFixture):
         """
         params = [1, 'invalid', -13]
         for each_param in params:
-            self.assertEquals(policies_response.status_code, 200, msg='list policies failed'
-                              ' with {0}'.format(policies_response.status_code))
             policies_response = self.autoscale_client.list_policies(
                 self.group.id, marker=each_param)
+            self.assertEquals(
+                policies_response.status_code, 200,
+                msg='list policies failed with {0}'
+                .format(policies_response.status_code))
 
     def _assert_list_policies_with_limits_and_next_link(self, policy_len, list_policies,
                                                         next_link=True):
