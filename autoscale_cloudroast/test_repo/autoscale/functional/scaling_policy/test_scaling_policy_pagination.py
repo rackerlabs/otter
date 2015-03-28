@@ -118,16 +118,22 @@ class PolicyPaginationTest(AutoscaleFixture):
         num_policies = self.get_total_num_policies(self.group.id)
         for each_param in params:
             list_policies = self._list_policies_with_given_limit(each_param)
-            self._assert_list_policies_with_limits_and_next_link(num_policies, list_policies, False)
+            self._assert_list_policies_with_limits_and_next_link(
+                num_policies, list_policies, False)
 
     def test_list_policies_with_marker(self):
-        """ List the scaling polices with the marker set to be a scaling policy id
-        and verify.
+        """
+        List the scaling polices with the marker set to be a scaling policy
+        id and verify.
         """
         policy = (self.autoscale_behaviors.create_policy_min(self.group.id))
-        policies_response = self.autoscale_client.list_policies(self.group.id, marker=policy['id'])
-        self.assertEquals(policies_response.status_code, 200, msg='list policies failed'
-                          ' with {0}'.format(policies_response.status_code))
+        policies_response = self.autoscale_client.list_policies(
+            self.group.id,
+            marker=policy['id'])
+        self.assertEquals(
+            policies_response.status_code, 200,
+            msg='list policies failed with {0}'
+            .format(policies_response.status_code))
 
     def test_list_policies_with_invalid_marker(self):
         """
