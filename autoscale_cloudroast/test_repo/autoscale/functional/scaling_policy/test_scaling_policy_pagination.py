@@ -149,8 +149,8 @@ class PolicyPaginationTest(AutoscaleFixture):
                 msg='list policies failed with {0}'
                 .format(policies_response.status_code))
 
-    def _assert_list_policies_with_limits_and_next_link(self, policy_len, list_policies,
-                                                        next_link=True):
+    def _assert_list_policies_with_limits_and_next_link(
+            self, policy_len, list_policies, next_link=True):
         """
         Asserts the length of the policies list, and whether the next link
         is present.
