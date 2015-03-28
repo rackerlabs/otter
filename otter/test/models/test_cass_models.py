@@ -255,14 +255,13 @@ class VerifiedViewTests(SynchronousTestCase):
         """
         Returns a verified view, with some test arguments.
         """
-        view = verified_view(connection=self.connection,
+        return verified_view(connection=self.connection,
                              view_query='vq',
                              del_query='dq',
                              data={'d': 2},
                              consistency=ConsistencyLevel.TWO,
                              exception_if_empty=ValueError,
                              log=self.log)
-        return view
 
     def test_valid_view(self):
         """
@@ -272,6 +271,32 @@ class VerifiedViewTests(SynchronousTestCase):
             [{'c1': 2, 'created_at': 23}])
         r = self._verified_view()
         self.assertEqual(self.successResultOf(r), {'c1': 2, 'created_at': 23})
+        self.connection.execute.assert_called_once_with(
+            'vq', {'d': 2}, ConsistencyLevel.TWO)
+        self.assertFalse(self.log.msg.called)
+
+    def test_valid_status(self):
+        """
+        Returns row if status is not DELETED
+        """
+        self.connection.execute.return_value = defer.succeed(
+            [{'c1': 2, 'created_at': 23, 'status': 'ACTIVE'}])
+        r = self._verified_view()
+        self.assertEqual(
+            self.successResultOf(r),
+            {'c1': 2, 'created_at': 23, 'status': 'ACTIVE'})
+        self.connection.execute.assert_called_once_with(
+            'vq', {'d': 2}, ConsistencyLevel.TWO)
+        self.assertFalse(self.log.msg.called)
+
+    def test_deleting_status(self):
+        """
+        Raises empty exception if its status is DELETING
+        """
+        self.connection.execute.return_value = defer.succeed(
+            [{'c1': 2, 'created_at': 23, 'status': 'DELETING'}])
+        r = self._verified_view()
+        self.failureResultOf(r, ValueError)
         self.connection.execute.assert_called_once_with(
             'vq', {'d': 2}, ConsistencyLevel.TWO)
         self.assertFalse(self.log.msg.called)

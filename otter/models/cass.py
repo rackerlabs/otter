@@ -42,6 +42,7 @@ from otter.models.interface import (
     NoSuchWebhookError,
     PoliciesOverLimitError,
     ScalingGroupOverLimitError,
+    ScalingGroupStatus,
     UnrecognizedCapabilityError,
     WebhooksOverLimitError,
     next_cron_occurrence)
@@ -495,9 +496,11 @@ def assemble_webhooks_in_policies(policies, webhooks):
 def verified_view(connection, view_query, del_query, data, consistency,
                   exception_if_empty, log):
     """
-    Ensures the view query does not get resurrected row, i.e. one that does
-    not have "created_at" in it.  Any resurrected entry is deleted and
-    `exception_if_empty` is raised.
+    Ensures the view query on the group does not get resurrected row,
+    i.e. one that does not have "created_at" in it.  Any resurrected entry is
+    deleted and `exception_if_empty` is raised. Also raises
+    `exception_if_empty` if group's status is DELETING
+
 
     TODO: Should there be seperate argument for view_consistency and
     del_consistency.
@@ -505,13 +508,16 @@ def verified_view(connection, view_query, del_query, data, consistency,
     def _check_resurrection(result):
         if len(result) == 0:
             raise exception_if_empty
-        if result[0].get('created_at'):
-            return result[0]
-        else:
+        group = result[0]
+        if group.get('created_at') is None:
             # resurrected row, trigger its deletion and raise empty exception
             log.msg('Resurrected row', row=result[0], row_params=data)
             connection.execute(del_query, data, consistency)
             raise exception_if_empty
+        elif group.get('status') == ScalingGroupStatus.DELETING.name:
+            # DELETING group, raise empty exception
+            raise exception_if_empty
+        return group
 
     d = connection.execute(view_query, data, consistency)
     return d.addCallback(_check_resurrection)
