@@ -28,8 +28,9 @@ from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
-from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
-from otter.models.interface import NoSuchScalingGroupError
+from otter.models.intents import (
+    DeleteGroup, GetScalingGroupInfo, ModifyGroupState)
+from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.fp import assoc_obj
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildrenWithStats
 
@@ -94,7 +95,7 @@ def execute_convergence(tenant_id, group_id, log,
     :param get_all_convergence_data: like :func`get_all_convergence_data`, used
         for testing.
 
-    :return: Effect of StepResult based on order of severity
+    :return: Effect of most severe StepResult
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
     # Huh! It turns out we can parallelize the gathering of data with the
@@ -112,8 +113,10 @@ def execute_convergence(tenant_id, group_id, log,
     launch_config = manifest['launchConfiguration']
     now = yield Effect(Func(time.time))
 
-    if scaling_group['status'] == ScalingGroupStatus.DELETED:
+    group_status = ScalingGroupStatus.lookupByName(manifest['status'])
+    if group_status == ScalingGroupStatus.DELETING:
         group_state.desired = 0
+
     desired_group_state = get_desired_group_state(
         group_id, launch_config, group_state.desired)
     steps = plan(desired_group_state, servers, lb_nodes, now)
@@ -135,8 +138,8 @@ def execute_convergence(tenant_id, group_id, log,
             worst_status=worst_status)
 
     if worst_status == StepResult.SUCCESS:
-        if scaling_group['status'] == ScalingGroupStatus.DELETING:
-            # servers have been delete. Delete the group for real
+        if group_status == ScalingGroupStatus.DELETING:
+            # servers have been deleted. Delete the group for real
             yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
         else:
             # Do one last gathering + writing to `active` so we get updated

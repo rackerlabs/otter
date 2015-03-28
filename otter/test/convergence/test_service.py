@@ -31,7 +31,10 @@ from otter.convergence.service import (
     non_concurrently)
 from otter.convergence.steps import ConvergeLater
 from otter.models.intents import (
-    GetScalingGroupInfo, ModifyGroupState, perform_modify_group_state)
+    DeleteGroup,
+    GetScalingGroupInfo,
+    ModifyGroupState,
+    perform_modify_group_state)
 from otter.models.interface import GroupState, NoSuchScalingGroupError
 from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
@@ -515,6 +518,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
         gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
                                    group_id='group-id')
+        self.gsgi = gsgi
         self.manifest = {  # Many details elided!
             'state': self.state,
             'launchConfiguration': self.lc,
@@ -620,6 +624,46 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         # And make sure that exception isn't wrapped in FirstError.
         e = self.assertRaises(RuntimeError, sync_perform, dispatcher, eff)
         self.assertEqual(str(e), 'foo')
+
+    def test_deleting_group(self):
+        """
+        If group's status is DELETING, plan will be generated to delete
+        all servers and group is deleted if the steps return SUCCESS. The
+        group is not deleted is the step do not succeed
+        """
+        log = mock_log()
+        gacd = self._get_gacd_func(self.group.uuid)
+
+        def _plan(dsg, *a):
+            self.dsg = dsg
+            return [TestStep(Effect(Constant((StepResult.SUCCESS, []))))]
+
+        eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                  get_all_convergence_data=gacd, plan=_plan)
+
+        # setup intents for DeleteGroup and GetScalingGroupInfo
+        del_group = DeleteGroup(tenant_id=self.tenant_id,
+                                group_id=self.group_id)
+        self.manifest['status'] = 'DELETING'
+        exp_intents = [(del_group, None),
+                       (self.gsgi, (self.group, self.manifest))]
+
+        disp = self._get_dispatcher(exp_intents)
+        self.assertEqual(sync_perform(disp, eff), StepResult.SUCCESS)
+
+        # desired capacity was changed to 0
+        self.assertEqual(self.dsg.capacity, 0)
+
+        # Group is not deleted if step result was not successful
+        def fplan(*a):
+            return [TestStep(Effect(Constant((StepResult.RETRY, []))))]
+
+        eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                  get_all_convergence_data=gacd, plan=fplan)
+        disp = self._get_dispatcher([(self.gsgi, (self.group, self.manifest))])
+        # This succeeded without DeleteGroup performer being there ensuring
+        # that it was not called
+        self.assertEqual(sync_perform(disp, eff), StepResult.RETRY)
 
     def test_returns_retry(self):
         """
