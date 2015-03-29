@@ -26,9 +26,10 @@ class GetScalingGroupInfoTests(SynchronousTestCase):
     """Tests for :obj:`GetScalingGroupInfo`."""
     def test_perform(self):
         """Performing returns the group, the state, and the launch config."""
-        def view_manifest(with_policies, with_webhooks):
+        def view_manifest(with_policies, with_webhooks, with_status):
             self.assertEqual(with_policies, False)
             self.assertEqual(with_webhooks, False)
+            self.assertEqual(with_status, True)
             return succeed(manifest)
 
         def get_scaling_group(log, tenant_id, group_id):
