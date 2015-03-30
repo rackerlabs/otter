@@ -35,7 +35,8 @@ class ListSchedulerScalingPolicy(ScalingGroupPolicyFixture):
 
     def test_list_scheduler_policies(self):
         """
-        Verify list scheduler policies' response code 200, headers and data
+        Verify list scheduler policies' response code 200, headers and
+        data.
         """
         list_policies_resp = self.autoscale_client.list_policies(self.group.id)
         self.assertEquals(list_policies_resp.status_code, 200,
