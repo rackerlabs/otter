@@ -89,9 +89,9 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
         Creating a webhook on a scaling policy of type schedule with (at style)
         results in a 201
         """
-        schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
+        schedule_policy_at_style = (self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
-            sp_change=self.sp_change)
+            sp_change=self.sp_change))
         self.assertEquals(schedule_policy_at_style['status_code'], 201,
                           msg='Create scheduler at style policy with failed'
                           ' with {0} for group {1}'.format(schedule_policy_at_style['status_code'],
