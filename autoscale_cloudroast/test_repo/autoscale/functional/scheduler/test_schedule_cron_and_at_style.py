@@ -145,10 +145,12 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
             group_id=self.group.id,
             sp_change=self.sp_change,
             schedule_cron=schedule_value)
-        self.assertEquals(schedule_policy_cron_style['status_code'], 201,
-                          msg='Create scheduler at style policy with failed'
-                          ' with {0} for group {1}'.format(schedule_policy_cron_style['status_code'],
-                                                           self.group.id))
+        self.assertEquals(
+            schedule_policy_cron_style['status_code'], 201,
+            msg='Create scheduler at style policy with failed  with {0} '
+            'for group {1}'
+            .format(schedule_policy_cron_style['status_code'],
+                    self.group.id))
         create_webhook_response = self.autoscale_client.create_webhook(
             group_id=self.group.id,
             policy_id=schedule_policy_cron_style['id'],
