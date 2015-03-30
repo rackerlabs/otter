@@ -72,7 +72,7 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
             .format(self.group.id))
         self.assertEquals(
             updated_policy.links, self.policy['links'],
-            msg='Links for the scaling policy is none after the update for group {0}'
+            msg="Links for the scaling policy didn't update for group {0}"
             .format(self.group.id))
         self.assertEquals(
             updated_policy.name, self.policy['name'],
