@@ -55,7 +55,7 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
     def _assert_updated_policy(self, update_policy_response,
                                policy_change_type='change'):
         """
-        Assert update policy is as expected
+        Assert update policy is as expected.
         """
         policy_response = self.autoscale_client.get_policy_details(
             self.group.id,
