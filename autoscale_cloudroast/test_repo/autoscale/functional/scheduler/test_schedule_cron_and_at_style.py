@@ -56,8 +56,9 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
     @unittest.skip('AUTO-434')
     def test_schedule_at_style_policy_without_seconds(self):
         """
-        Creating a scaling policy of type schedule with (at style) without seconds
-        results in a 201.
+        Creating a scaling policy of type schedule with (at style) without
+        seconds results in a 201.
+
         ** fails with 400, AUTO-434**
         """
         schedule_value_list = [self.autoscale_behaviors.get_time_in_utc(
