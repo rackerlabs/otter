@@ -24,8 +24,9 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
 
     def test_schedule_cron_style_policy_valid_cron(self):
         """
-        Creating a scaling policy of type schedule with different valid crons results
-        in a 201.
+        Creating a scaling policy of type schedule with different valid
+        crons results in a 201.
+
         * To Do : validate 'trigger' in scaling_schedule, in the database *
         """
         schedule_value_list = [
