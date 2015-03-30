@@ -179,7 +179,8 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
         execute_policy_response = self.autoscale_client.execute_policy(
             group_id=self.group.id,
             policy_id=schedule_policy_cron_style['id'])
-        self.assertEquals(execute_policy_response.status_code, 202,
-                          msg='Able to execute scheduler policy via cron style policy'
-                          ' with {0} for group {1}'.format(execute_policy_response.status_code,
-                                                           self.group.id))
+        self.assertEquals(
+            execute_policy_response.status_code, 202,
+            msg='Able to execute scheduler policy via cron style policy'
+            ' with {0} for group {1}'
+            .format(execute_policy_response.status_code, self.group.id))
