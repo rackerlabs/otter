@@ -155,10 +155,11 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
             group_id=self.group.id,
             policy_id=schedule_policy_cron_style['id'],
             name=self.wb_name)
-        self.assertEquals(create_webhook_response.status_code, 201,
-                          msg='Create webhook on a scheduler cron style policy failed'
-                          ' with {0} for group {1}'.format(create_webhook_response.status_code,
-                                                           self.group.id))
+        self.assertEquals(
+            create_webhook_response.status_code, 201,
+            msg='Create webhook on a scheduler cron style policy failed '
+            'with {0} for group {1}'
+            .format(create_webhook_response.status_code, self.group.id))
 
     def test_schedule_cron_style_policy_execute(self):
         """
