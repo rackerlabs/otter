@@ -78,9 +78,10 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
             updated_policy.name, self.policy['name'],
             msg='Name of the policy is None after update for group {0}'
             .format(self.group.id))
+        self.assertEquals(
             updated_policy.cooldown, self.policy['cooldown'],
-            msg='Cooldown of the policy in null after an update '
-            'for group {0}'.format(self.group.id))
+            msg='Cooldown of the policy in null after an update for group {0}'
+            .format(self.group.id))
         if policy_change_type is 'desired_capacity':
             self.assertEquals(
                 updated_policy.desiredCapacity, self.sp_desired_capacity,
