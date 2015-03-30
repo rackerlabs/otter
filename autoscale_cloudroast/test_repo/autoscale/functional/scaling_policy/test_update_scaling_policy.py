@@ -26,8 +26,8 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
 
     def test_update_to_desiredcapacity_scaling_policy(self):
         """
-        Verify the update policy call by updating change to be desired capacity
-        and verify the response code 204, headers and data
+        Verify the update policy call by updating change to be desired
+        capacity and verify the response code 204, headers and data.
         """
         update_policy_response = self.autoscale_client.update_policy(
             group_id=self.group.id,
