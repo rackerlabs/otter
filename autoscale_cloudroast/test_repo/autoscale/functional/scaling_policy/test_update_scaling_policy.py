@@ -66,9 +66,6 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
                           ' {1}'.format(update_policy_response.status_code,
                                         self.group.id))
         self.validate_headers(update_policy_response.headers)
-        self.assertEquals(updated_policy.links, self.policy['links'],
-                          msg='Links for the scaling policy is none after the update '
-                          'for group {0}'.format(self.group.id))
         self.assertEquals(updated_policy.name, self.policy['name'],
                           msg='Name of the policy is None after update '
                           'for group {0}'.format(self.group.id))
@@ -77,6 +74,9 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
             msg='Policy Id is not as expected after update for group {0}'
             .format(self.group.id))
         self.assertEquals(
+            updated_policy.links, self.policy['links'],
+            msg='Links for the scaling policy is none after the update for group {0}'
+            .format(self.group.id))
             updated_policy.cooldown, self.policy['cooldown'],
             msg='Cooldown of the policy in null after an update '
             'for group {0}'.format(self.group.id))
