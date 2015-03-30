@@ -18,14 +18,15 @@ class DeleteSchedulerPolicy(ScalingGroupFixture):
         super(DeleteSchedulerPolicy, self).setUp()
         self.at_value = self.autoscale_behaviors.get_time_in_utc(600)
         self.cron_value = '0 */10 * * *'
-        self.assertEquals(self.at_style_policy['status_code'], 201,
-                          msg='Create schedule policy (at style) failed with {0} for group '
-                          '{1}'.format(self.at_style_policy['status_code'], self.group.id))
         self.at_style_policy = (self.autoscale_behaviors
                                 .create_schedule_policy_given(
                                     group_id=self.group.id,
                                     sp_change=self.sp_change,
                                     schedule_at=self.at_value))
+        self.assertEquals(
+            self.at_style_policy['status_code'], 201,
+            msg='Create schedule policy (at style) failed with {0} for group {1}'
+            .format(self.at_style_policy['status_code'], self.group.id))
         self.cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             sp_change=self.sp_change,
