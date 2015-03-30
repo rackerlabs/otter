@@ -141,10 +141,11 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
         results in a 201.
         """
         schedule_value = '* * * * *'
-        schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
-            group_id=self.group.id,
-            sp_change=self.sp_change,
-            schedule_cron=schedule_value)
+        schedule_policy_cron_style = (self.autoscale_behaviors
+                                      .create_schedule_policy_given(
+                                          group_id=self.group.id,
+                                          sp_change=self.sp_change,
+                                          schedule_cron=schedule_value))
         self.assertEquals(
             schedule_policy_cron_style['status_code'], 201,
             msg='Create scheduler at style policy with failed  with {0} '
