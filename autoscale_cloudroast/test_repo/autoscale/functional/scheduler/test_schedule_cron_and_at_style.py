@@ -70,10 +70,12 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
                 group_id=self.group.id,
                 sp_change=self.sp_change,
                 schedule_at=each_schedule_value)
-            self.assertEquals(schedule_policy_at_style['status_code'], 201,
-                              msg='Create schedule scaling at style policy without seconds results'
-                              'in {0} for group {1}'.format(schedule_policy_at_style['status_code'],
-                                                            self.group.id))
+            self.assertEquals(
+                schedule_policy_at_style['status_code'], 201,
+                msg='Create schedule scaling at style policy without seconds '
+                'results in {0} for group {1}'
+                .format(schedule_policy_at_style['status_code'],
+                        self.group.id))
             self.assertEquals(
                 schedule_policy_at_style['schedule_type'], 'at',
                 msg="Scaling policy's schedule type does not match")
