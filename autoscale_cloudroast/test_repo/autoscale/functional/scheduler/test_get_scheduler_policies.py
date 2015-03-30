@@ -38,7 +38,8 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
 
     def test_get_at_style_scaling_policy(self):
         """
-        Verify get at style schedule policy's response code 200, headers and data
+        Verify get at style schedule policy's response code 200, headers and
+        data.
         """
         get_at_style_policy_response = self.autoscale_client.get_policy_details(
             self.group.id,
