@@ -44,9 +44,10 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
         Verify get at style schedule policy's response code 200, headers and
         data.
         """
-        get_at_style_policy_response = self.autoscale_client.get_policy_details(
-            self.group.id,
-            self.at_style_policy['id'])
+        get_at_style_policy_response = (
+            self.autoscale_client.get_policy_details(
+                self.group.id,
+                self.at_style_policy['id']))
         self.assertEquals(
             get_at_style_policy_response.status_code, 200,
             msg='Get scaling policy (at style) failed with {0} for group {1}'
