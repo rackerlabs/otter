@@ -33,17 +33,18 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
             '* * * * *', '0-59 0-23 1-31 1-12 0-6', '00 9,16 * * *',
             '00 02-11 * * *', '00 09-18 * * 1-5', '0 0 0 0 0']
         for each_schedule_value in schedule_value_list:
-            self.assertEquals(schedule_policy_cron_style['status_code'], 201,
-                              msg='Create schedule cron style policy with {0} results in {1}'
-                              ' for group {2}'.format(each_schedule_value,
-                                                      schedule_policy_cron_style[
-                                                          'status_code'],
-                                                      self.group.id))
             schedule_policy_cron_style = (
                 self.autoscale_behaviors.create_schedule_policy_given(
                     group_id=self.group.id,
                     sp_change=self.sp_change,
                     schedule_cron=each_schedule_value))
+            self.assertEquals(
+                schedule_policy_cron_style['status_code'], 201,
+                msg='Create schedule cron style policy with {0} results in {1}'
+                ' for group {2}'
+                .format(each_schedule_value,
+                        schedule_policy_cron_style['status_code'],
+                        self.group.id))
             self.assertEquals(
                 schedule_policy_cron_style['schedule_type'], 'cron',
                 msg="Scaling policy's schedule type does not match")
