@@ -7,7 +7,7 @@ from test_repo.autoscale.fixtures import ScalingGroupFixture
 class DeleteSchedulerPolicy(ScalingGroupFixture):
 
     """
-    Verify delete scheduler policy
+    Verify delete scheduler policy.
     """
 
     def setUp(self):
