@@ -63,12 +63,12 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
         get_cron_style_policy_response = self.autoscale_client.get_policy_details(
             self.group.id,
             self.cron_style_policy['id'])
-        self.assertEquals(get_cron_style_policy_response.status_code, 200,
-                          msg='Get scaling policy (cron style) failed with {0} for group '
-                          '{1}'.format(get_cron_style_policy_response.status_code,
-                                       self.group.id))
         self.assertTrue(get_cron_style_policy_response.headers is not None,
                         msg='The headers are not as expected for group {0}'.format(self.group.id))
+        self.assertEquals(
+            get_cron_style_policy_response.status_code, 200,
+            msg='Get scaling policy (cron style) failed with {0} for group {1}'
+            .format(get_cron_style_policy_response.status_code, self.group.id))
         self.validate_headers(get_cron_style_policy_response.headers)
         self.assert_get_policy(self.cron_style_policy,
                                get_cron_style_policy_response.entity,
