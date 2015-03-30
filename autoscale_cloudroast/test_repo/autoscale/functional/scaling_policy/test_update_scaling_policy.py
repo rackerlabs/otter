@@ -7,7 +7,7 @@ from test_repo.autoscale.fixtures import ScalingGroupPolicyFixture
 class UpdateScalingPolicy(ScalingGroupPolicyFixture):
 
     """
-    Verify update policy
+    Verify update policy.
     """
 
     def test_update_change_scaling_policy(self):
