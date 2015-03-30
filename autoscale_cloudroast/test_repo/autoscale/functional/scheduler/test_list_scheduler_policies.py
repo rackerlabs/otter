@@ -7,7 +7,7 @@ from test_repo.autoscale.fixtures import ScalingGroupPolicyFixture
 class ListSchedulerScalingPolicy(ScalingGroupPolicyFixture):
 
     """
-    Verify list scheduler policies
+    Verify list scheduler policies.
     """
 
     def setUp(self):
