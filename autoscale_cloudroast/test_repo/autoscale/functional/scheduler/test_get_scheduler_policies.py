@@ -59,7 +59,8 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
 
     def test_get_cron_style_scaling_policy(self):
         """
-        Verify get cron style schedule policy's response code 200, headers and data
+        Verify get cron style schedule policy's response code 200, headers
+        and data.
         """
         get_cron_style_policy_response = self.autoscale_client.get_policy_details(
             self.group.id,
