@@ -64,9 +64,10 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
         Verify get cron style schedule policy's response code 200, headers
         and data.
         """
-        get_cron_style_policy_response = self.autoscale_client.get_policy_details(
-            self.group.id,
-            self.cron_style_policy['id'])
+        get_cron_style_policy_response = (self.autoscale_client
+                                          .get_policy_details(
+                                              self.group.id,
+                                              self.cron_style_policy['id']))
         self.assertEquals(
             get_cron_style_policy_response.status_code, 200,
             msg='Get scaling policy (cron style) failed with {0} for group {1}'
