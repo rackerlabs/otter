@@ -25,7 +25,8 @@ class DeleteSchedulerPolicy(ScalingGroupFixture):
                                     schedule_at=self.at_value))
         self.assertEquals(
             self.at_style_policy['status_code'], 201,
-            msg='Create schedule policy (at style) failed with {0} for group {1}'
+            msg='Create schedule policy (at style) failed with {0} '
+            'for group {1}'
             .format(self.at_style_policy['status_code'], self.group.id))
         self.cron_style_policy = (self.autoscale_behaviors
                                   .create_schedule_policy_given(
