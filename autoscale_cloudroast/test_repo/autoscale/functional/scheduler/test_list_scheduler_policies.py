@@ -39,9 +39,10 @@ class ListSchedulerScalingPolicy(ScalingGroupPolicyFixture):
         data.
         """
         list_policies_resp = self.autoscale_client.list_policies(self.group.id)
-        self.assertEquals(list_policies_resp.status_code, 200,
-                          msg='List  for a policy failed with {0} for group '
-                          '{1}'.format(list_policies_resp.status_code, self.group.id))
+        self.assertEquals(
+            list_policies_resp.status_code, 200,
+            msg='List  for a policy failed with {0} for group {1}'
+            .format(list_policies_resp.status_code, self.group.id))
         self.validate_headers(list_policies_resp.headers)
         policy_id_list = [each_policy.id for each_policy
                           in list_policies_resp.entity.policies]
