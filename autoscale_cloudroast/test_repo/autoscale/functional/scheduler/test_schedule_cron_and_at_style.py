@@ -119,10 +119,12 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
                                     .create_schedule_policy_given(
                                         group_id=self.group.id,
                                         sp_change=self.sp_change))
-        self.assertEquals(schedule_policy_at_style['status_code'], 201,
-                          msg='Create scheduler at style policy with failed'
-                          ' with {0} for group {1}'.format(schedule_policy_at_style['status_code'],
-                                                           self.group.id))
+        self.assertEquals(
+            schedule_policy_at_style['status_code'], 201,
+            msg='Create scheduler at style policy with failed'
+            ' with {0} for group {1}'
+            .format(schedule_policy_at_style['status_code'],
+                    self.group.id))
         execute_policy_response = self.autoscale_client.execute_policy(
             group_id=self.group.id,
             policy_id=schedule_policy_at_style['id'])
