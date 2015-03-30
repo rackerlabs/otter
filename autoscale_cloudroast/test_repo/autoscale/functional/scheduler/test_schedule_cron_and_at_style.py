@@ -86,8 +86,8 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_webhook(self):
         """
-        Creating a webhook on a scaling policy of type schedule with (at style)
-        results in a 201
+        Creating a webhook on a scaling policy of type schedule with (at
+        style) results in a 201.
         """
         schedule_policy_at_style = (self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
