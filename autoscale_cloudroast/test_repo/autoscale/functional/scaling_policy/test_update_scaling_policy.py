@@ -85,8 +85,8 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
         if policy_change_type is 'desired_capacity':
             self.assertEquals(
                 updated_policy.desiredCapacity, self.sp_desired_capacity,
-                msg='Desired capacity in the policy did not update '
-                'for group {0}'.format(self.group.id))
+                msg='Desired capacity in the policy did not update for group {0}'
+                .format(self.group.id))
         if policy_change_type is 'change_percent':
             self.assertEquals(
                 updated_policy.changePercent, self.sp_change_percent,
