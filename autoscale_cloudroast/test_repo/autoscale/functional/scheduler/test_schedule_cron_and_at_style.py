@@ -66,10 +66,11 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
             '2013-12-05 03:12:09Z',
             '2013-12-05T03:12Z']
         for each_schedule_value in schedule_value_list:
-            schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
-                group_id=self.group.id,
-                sp_change=self.sp_change,
-                schedule_at=each_schedule_value)
+            schedule_policy_at_style = (
+                self.autoscale_behaviors.create_schedule_policy_given(
+                    group_id=self.group.id,
+                    sp_change=self.sp_change,
+                    schedule_at=each_schedule_value))
             self.assertEquals(
                 schedule_policy_at_style['status_code'], 201,
                 msg='Create schedule scaling at style policy without seconds '
