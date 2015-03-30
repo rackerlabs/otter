@@ -499,7 +499,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.returns = [[{'group_config': '{}', 'created_at': 24}]]
         d = self.group.view_config()
         r = self.successResultOf(d)
-        expectedCql = ('SELECT group_config, created_at FROM scaling_group '
+        expectedCql = ('SELECT group_config, created_at, status '
+                       'FROM scaling_group '
                        'WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
@@ -516,7 +517,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.returns = [[{'group_config': '{}', 'created_at': None}], None]
         r = self.group.view_config()
         self.failureResultOf(r, NoSuchScalingGroupError)
-        view_cql = ('SELECT group_config, created_at FROM scaling_group '
+        view_cql = ('SELECT group_config, created_at, status '
+                    'FROM scaling_group '
                     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         del_cql = ('DELETE FROM scaling_group WHERE '
                    '"tenantId" = :tenantId AND "groupId" = :groupId')
@@ -545,8 +547,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         r = self.successResultOf(d)
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
-            'FROM scaling_group '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'status FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.connection.execute.assert_called_once_with(
@@ -644,8 +646,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(d, NoSuchScalingGroupError)
         viewCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
-            'FROM scaling_group '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'status FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         delCql = ('DELETE FROM scaling_group '
                   'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
@@ -925,7 +927,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.view_config()
         self.failureResultOf(d, NoSuchScalingGroupError)
         expectedCql = (
-            'SELECT group_config, created_at FROM scaling_group '
+            'SELECT group_config, created_at, status FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(
@@ -954,7 +956,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.view_launch_config()
         r = self.successResultOf(d)
         expectedCql = (
-            'SELECT launch_config, created_at FROM scaling_group '
+            'SELECT launch_config, created_at, status FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(
@@ -971,7 +973,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.view_launch_config()
         self.failureResultOf(d, NoSuchScalingGroupError)
         expectedCql = (
-            'SELECT launch_config, created_at FROM scaling_group '
+            'SELECT launch_config, created_at, status FROM scaling_group '
             'WHERE "tenantId" = :tenantId '
             'AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
@@ -1001,7 +1003,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             NoSuchScalingGroupError('a', 'b'))
         d = self.group.view_launch_config()
         self.failureResultOf(d, NoSuchScalingGroupError)
-        viewCql = ('SELECT launch_config, created_at FROM scaling_group WHERE '
+        viewCql = ('SELECT launch_config, created_at, status '
+                   'FROM scaling_group WHERE '
                    '"tenantId" = :tenantId AND "groupId" = :groupId;')
         delCql = ('DELETE FROM scaling_group WHERE '
                   '"tenantId" = :tenantId AND "groupId" = :groupId')
@@ -1355,7 +1358,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.update_config({"b": "lah"})
         self.failureResultOf(d, NoSuchScalingGroupError)
         expectedCql = (
-            'SELECT group_config, created_at FROM scaling_group '
+            'SELECT group_config, created_at, status FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(

@@ -90,7 +90,7 @@ def serialize_json_data(data, ver):
 # Otherwise it won't.
 #
 # Thus, selects have a semicolon, everything else doesn't.
-_cql_view = ('SELECT {column}, created_at FROM {cf} '
+_cql_view = ('SELECT {column}, created_at, status FROM {cf} '
              'WHERE "tenantId" = :tenantId AND '
              '"groupId" = :groupId;')
 _cql_view_policy = (
@@ -127,7 +127,7 @@ _cql_insert_group_state = (
     'USING TIMESTAMP :ts')
 _cql_view_group_state = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at '
+    '"groupTouched", "policyTouched", paused, desired, created_at, status '
     'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
 
 # --- Event related queries
