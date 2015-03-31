@@ -49,8 +49,8 @@ class PaginateWebhooks(AutoscaleFixture):
         params = [None, 10000]
         for each_param in params:
             list_webhooks = self._list_webhooks_with_given_limit(each_param)
-            self._assert_list_webhooks_with_limits_next_link(self.max_webhooks,
-                                                             list_webhooks, False)
+            self._assert_list_webhooks_with_limits_next_link(
+                self.max_webhooks, list_webhooks, False)
 
     def test_list_webhooks_with_specified_limit_less_than_number_of_policies(self):
         """
