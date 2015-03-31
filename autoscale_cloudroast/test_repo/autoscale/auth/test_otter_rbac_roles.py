@@ -202,8 +202,9 @@ class OtterRbacTests(AutoscaleFixture):
         self.assertEquals(
             get_launch_config_response.status_code,
             expected_response_code,
-            msg='Get launch config returned response code {0} on group '
-            '{1}'.format(get_launch_config_response.status_code, self.group.id))
+            msg='Get launch config returned response code {0} on group {1}'
+            .format(get_launch_config_response.status_code,
+                    self.group.id))
         list_policies_response = user_client.list_policies(self.group.id)
         self.assertEquals(
             list_policies_response.status_code, expected_response_code,
