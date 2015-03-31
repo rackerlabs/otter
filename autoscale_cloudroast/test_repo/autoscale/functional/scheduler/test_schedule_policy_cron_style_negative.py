@@ -140,11 +140,12 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
                                '2- * * * *', '6-0 * * * *',
                                '-9 * * * *', '$ * * * *']
         for each_schedule_value in schedule_value_list:
-            schedule_policy_cron_style = (self.autoscale_behaviors
-                                          .create_schedule_policy_given(
-                                              group_id=self.group.id,
-                                              sp_change=self.sp_change,
-                                              schedule_cron=each_schedule_value))
+            schedule_policy_cron_style = (
+                self.autoscale_behaviors
+                .create_schedule_policy_given(
+                    group_id=self.group.id,
+                    sp_change=self.sp_change,
+                    schedule_cron=each_schedule_value))
             self.assertEquals(
                 schedule_policy_cron_style['status_code'],
                 400,
