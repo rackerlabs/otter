@@ -568,8 +568,9 @@ class AutoscaleFixture(BaseTestFixture):
                 break
             time.sleep(self.interval_time)
         else:
-            self.fail('Deleting load balancer failed, as load balncer remained in building'
-                      ' after waiting 15 mins'.format(lb_id))
+            self.fail(
+                'Deleting load balancer failed, as load balncer remained in building'
+                ' after waiting 15 mins'.format(lb_id))
 
     @classmethod
     def tearDownClass(cls):
