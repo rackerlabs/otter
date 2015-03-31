@@ -55,9 +55,10 @@ class PaginateWebhooks(AutoscaleFixture):
     def test_list_webhooks_with_specified_limit_less_than_number_of_policies(
             self):
         """
-        List the webhooks with the limit set to be less than the number of webhooks on the policy.
-        Verify that the webhooks are listed in batches of the specifed limit, and that a link to
-        the next batch exists.
+        List the webhooks with the limit set to be less than the number of
+        webhooks on the policy.  Verify that the webhooks are listed
+        in batches of the specifed limit, and that a link to the next
+        batch exists.
         """
         # Specify the limit to be one less than the current number of
         # webhooks (4 were created in setUp)
