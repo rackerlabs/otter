@@ -259,8 +259,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(
             schedule_policy_at_style['status_code'], 400,
-            msg='Create schedule scaling at style policy with invalid month results'
-            ' in {0} for group {1}'.format(
+            msg='Create schedule scaling at style policy with invalid '
+            'month results in {0} for group {1}'.format(
                 schedule_policy_at_style['status_code'],
                 self.group.id))
 
