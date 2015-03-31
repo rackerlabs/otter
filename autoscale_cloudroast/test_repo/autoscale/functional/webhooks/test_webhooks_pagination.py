@@ -86,11 +86,14 @@ class PaginateWebhooks(AutoscaleFixture):
 
     def test_list_webhooks_with_limit_set_above_valid_limit(self):
         """
-        Verify that when the limit is specified over the set limit (100), all webhooks up to 100
-        are returned. There should be no next link since there are less than max limit webhooks.
-        Note that only 4 webhooks are listed since the purpose of this test case is to ensure that
-        the invalid limit does not produce an error. The case to verify limiting of results to the
-        maximum is handled in test_list_webhooks_when_list_webhooks_is_greater_than_default_limit.
+        Verify that when the limit is specified over the set limit (100), all
+        webhooks up to 100 are returned. There should be no next link since
+        there are less than max limit webhooks.  Note that only 4 webhooks are
+        listed since the purpose of this test case is to ensure that the
+        invalid limit does not produce an error. The case to verify limiting
+        of results to the maximum is handled in
+        test_list_webhooks_when_list_webhooks_is_greater_than_default_limit.
+
         """
         params = [101, 1000]
         num_hooks = self.get_total_num_webhooks(self.group.id, self.policy['id'])
