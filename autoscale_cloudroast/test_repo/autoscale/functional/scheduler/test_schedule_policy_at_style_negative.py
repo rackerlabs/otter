@@ -345,10 +345,11 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         invalid second in the date results in a 400.
         """
         schedule_value = '2013-12-31T10:10:80Z'
-        schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
-            group_id=self.group.id,
-            sp_change=self.sp_change,
-            schedule_at=schedule_value)
+        schedule_policy_at_style = (self.autoscale_behaviors
+                                    .create_schedule_policy_given(
+                                        group_id=self.group.id,
+                                        sp_change=self.sp_change,
+                                        schedule_at=schedule_value))
         self.assertEquals(
             schedule_policy_at_style['status_code'], 400,
             msg='Create schedule scaling at style policy with invalid second '
