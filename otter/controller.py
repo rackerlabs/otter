@@ -401,7 +401,7 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
         if state.desired == config['minEntities']:
             raise CannotDeleteServerBelowMinError(
                 group.tenant_id, group.uuid, server_id, config['minEntities'])
-
+        state.desired -= 1
         try:
             state.remove_active(server_id)
         except AssertionError:
