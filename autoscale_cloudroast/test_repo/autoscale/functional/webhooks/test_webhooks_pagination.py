@@ -171,10 +171,12 @@ class PaginateWebhooks(AutoscaleFixture):
         Lists webhooks with the limit given in param and verifies the expected
         response code.
         """
-        self.assertEquals(webhook_response.status_code, response, msg='List webhooks returned'
-                          'with unexpected response: {0}'.format(webhook_response.status_code))
         webhook_response = self.autoscale_client.list_webhooks(
             self.group.id, self.policy['id'], limit=param)
+        self.assertEquals(
+            webhook_response.status_code, response,
+            msg='List webhooks returned with unexpected response: {0}'
+            .format(webhook_response.status_code))
         return webhook_response.entity
 
     def _create_multiple_webhooks(self, num_hooks):
