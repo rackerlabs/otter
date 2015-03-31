@@ -117,15 +117,18 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         schedule_value_list = [
             '@yearly', '@daily', '@hourly', '@reboot', '@weekly', '@monthly']
         for each_schedule_value in schedule_value_list:
-            self.assertEquals(schedule_policy_cron_style['status_code'], 400,
-                              msg='Create schedule policy with invalid cron style results in{0}'
-                              ' for group {1}'.format(schedule_policy_cron_style['status_code'],
-                                                      self.group.id))
             schedule_policy_cron_style = (self.autoscale_behaviors
                                           .create_schedule_policy_given(
                                               group_id=self.group.id,
                                               sp_change=self.sp_change,
                                               schedule_cron=each_schedule_value))
+            self.assertEquals(
+                schedule_policy_cron_style['status_code'],
+                400,
+                msg='Create schedule policy with invalid cron style results in{0}'
+                ' for group {1}'.format(
+                    schedule_policy_cron_style['status_code'],
+                    self.group.id))
 
     def test_schedule_cron_style_policy_with_invalid_cron_minute(self):
         """
