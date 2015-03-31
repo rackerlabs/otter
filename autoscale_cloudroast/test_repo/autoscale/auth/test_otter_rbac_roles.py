@@ -33,10 +33,11 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_admin_autoscale_observer(self):
         """
-        Given a user with the observer role for Autoscale and admin role for nova
-        and lbaas, verify the user has permissions to GET groups, GET a group,
-        GET the group state for a group, GET the configs of a group, GET the launch
-        configs of a group, LIST policies and GET a policy
+        Given a user with the observer role for Autoscale and admin role
+        for nova and lbaas, verify the user has permissions to GET
+        groups, GET a group, GET the group state for a group, GET the
+        configs of a group, GET the launch configs of a group, LIST
+        policies and GET a policy
         """
         autoscale_na_la_ao = self.autoscale_config.autoscale_na_la_ao
         user_client = self._create_client(autoscale_na_la_ao, self.password)
