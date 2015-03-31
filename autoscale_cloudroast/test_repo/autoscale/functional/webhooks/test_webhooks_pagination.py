@@ -132,10 +132,10 @@ class PaginateWebhooks(AutoscaleFixture):
 
     def _assert_list_webhooks_with_limits_next_link(self, expect_len, list_webhooks, next_link=True):
         """
-        Asserts that the length of the webhooks list is greater than or equal to the exptected length,
-        and the existence of its next link.
-        If next_link is expected to be False, asserts that webhooks_links is empty and does not
-        have a next link.
+        Asserts that the length of the webhooks list is greater than or equal to
+        the exptected length, and the existence of its next link.  If
+        next_link is expected to be False, asserts that webhooks_links is
+        empty and does not have a next link.
         """
         self.assertGreaterEqual(len(list_webhooks.webhooks), expect_len)
         if next_link:
