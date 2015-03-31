@@ -192,11 +192,14 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
                 group_id=self.group.id,
                 sp_change=self.sp_change,
                 schedule_cron=each_schedule_value)
-            self.assertEquals(schedule_policy_cron_style['status_code'], 400,
-                              msg='Create schedule cron style policy with {0} results in {1}'
-                              ' for group {2}'.format(each_schedule_value,
-                                                      schedule_policy_cron_style['status_code'],
-                                                      self.group.id))
+            self.assertEquals(
+                schedule_policy_cron_style['status_code'],
+                400,
+                msg='Create schedule cron style policy with {0} results in {1}'
+                ' for group {2}'.format(
+                    each_schedule_value,
+                    schedule_policy_cron_style['status_code'],
+                    self.group.id))
 
     def test_schedule_cron_style_policy_with_invalid_cron_week(self):
         """
