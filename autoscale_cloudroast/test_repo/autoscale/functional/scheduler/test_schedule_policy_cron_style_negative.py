@@ -50,10 +50,6 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         results in a 400.
         """
         args = {'cron': ''}
-        create_schedule_at_style_response = self.autoscale_client.create_policy(
-            group_id=self.group.id,
-            name=self.sp_name, cooldown=self.sp_cooldown,
-            change=self.sp_change, policy_type='schedule', args=args)
         self.assertEquals(create_schedule_at_style_response.status_code, 400,
                           msg='Create schedule scaling policy passed given an invalid date'
                           ' with {0} for group {1}'.format(
@@ -62,8 +58,8 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
 
     def test_schedule_cron_style_policy_as_whitespace(self):
         """
-        Creating a scaling policy of type schedule with (cron style) as whitespace
-        results in a 400.
+        Creating a scaling policy of type schedule with (cron style) as
+        whitespace results in a 400.
         """
         args = {'cron': '  '}
         create_schedule_at_style_response = self.autoscale_client.create_policy(
