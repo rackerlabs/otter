@@ -130,8 +130,9 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_no_access_autoscale_observer(self):
         """
-        Given a user with an observer role for Autoscale, and no access to nova and lbaas,
-        ensure the user can still perform all observer operations on Otter.
+        Given a user with an observer role for Autoscale, and no access to
+        nova and lbaas, ensure the user can still perform all observer
+        operations on Otter.
         """
         autoscale_nno_lno_ao = self.autoscale_config.autoscale_nno_lno_ao
         user_client = self._create_client(autoscale_nno_lno_ao, self.password)
