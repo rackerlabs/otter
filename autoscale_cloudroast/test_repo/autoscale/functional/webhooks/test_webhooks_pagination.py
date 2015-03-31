@@ -104,7 +104,8 @@ class PaginateWebhooks(AutoscaleFixture):
 
         """
         params = [101, 1000]
-        num_hooks = self.get_total_num_webhooks(self.group.id, self.policy['id'])
+        num_hooks = self.get_total_num_webhooks(
+            self.group.id, self.policy['id'])
         for each_param in params:
             list_webhooks = self._list_webhooks_with_given_limit(each_param)
             self._assert_list_webhooks_with_limits_next_link(num_hooks, list_webhooks, False)
