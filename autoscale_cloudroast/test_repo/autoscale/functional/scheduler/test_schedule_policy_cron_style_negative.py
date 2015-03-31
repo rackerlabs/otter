@@ -205,8 +205,8 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
 
     def test_schedule_cron_style_policy_with_invalid_cron_month(self):
         """
-        Creating a scaling policy of type schedule via cron style with invalid month value in
-        cron results in a 400.
+        Creating a scaling policy of type schedule via cron style with
+        invalid month value in cron results in a 400.
         """
         schedule_value_list = ['* * * -30 *', '* * * 13 *', '* * * 2- *',
                                '* * * 6-0 *', '* * * -9 *', '* * * $ *']
