@@ -270,6 +270,9 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
             change=-00.01,
             policy_type='schedule',
             args={'cron': '* * * * *'})
-        self.assertEquals(error_create_resp.status_code, 400,
-                          msg='Create scaling policy succeeded with invalid request: '
-                          '{0}'.format(error_create_resp.status_code))
+        self.assertEquals(
+            error_create_resp.status_code,
+            400,
+            msg='Create scaling policy succeeded with invalid request: '
+            '{0}'.format(
+                error_create_resp.status_code))
