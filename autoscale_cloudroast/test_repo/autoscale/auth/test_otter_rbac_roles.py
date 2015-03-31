@@ -181,8 +181,9 @@ class OtterRbacTests(AutoscaleFixture):
             expected_response_code,
             msg='List groups returned response code {0}'.format(
                 list_groups_response.status_code))
-        get_group_response = user_client.view_manifest_config_for_scaling_group(
-            self.group.id)
+        get_group_response = (user_client
+                              .view_manifest_config_for_scaling_group(
+                                  self.group.id))
         self.assertEquals(
             get_group_response.status_code, expected_response_code,
             msg='Get group returned response code {0} on group '
