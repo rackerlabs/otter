@@ -143,8 +143,8 @@ class PaginateWebhooks(AutoscaleFixture):
         """
         params = [1, 'invalid']
         for each_param in params:
-            webhook_response = self.autoscale_client.list_webhooks(self.group.id, self.policy['id'],
-                                                                   marker=each_param)
+            webhook_response = self.autoscale_client.list_webhooks(
+                self.group.id, self.policy['id'], marker=each_param)
             self.assertEquals(
                 webhook_response.status_code, 200,
                 msg='list webhooks failed with {0}'
