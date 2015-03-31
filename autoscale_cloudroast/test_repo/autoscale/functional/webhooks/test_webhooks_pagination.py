@@ -43,7 +43,8 @@ class PaginateWebhooks(AutoscaleFixture):
         greater than the maximum of 100. Verify that the webhooks are listed
         in batches of the maximum limit (100) with a next link.
         """
-        to_build = self.max_policies - self.get_total_num_webhooks(self.group.id, self.policy['id'])
+        to_build = self.max_policies - self.get_total_num_webhooks(
+            self.group.id, self.policy['id'])
         self._create_multiple_webhooks(to_build)
         params = [None, 10000]
         for each_param in params:
