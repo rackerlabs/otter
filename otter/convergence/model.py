@@ -221,14 +221,21 @@ class NovaServer(object):
 
         :return: :obj:`NovaServer` instance
         """
+        server_state = ServerState.lookupByName(server_json['status'])
+        metadata = server_json.get('metadata', {})
+
+        if (server_state in (ServerState.ACTIVE, ServerState.BUILD) and
+                metadata.get(DRAINING_METADATA[0]) == DRAINING_METADATA[1]):
+            server_state = ServerState.DRAINING
+
         return cls(
             id=server_json['id'],
-            state=ServerState.lookupByName(server_json['status']),
+            state=server_state,
             created=timestamp_to_epoch(server_json['created']),
             image_id=server_json.get('image', {}).get('id'),
             flavor_id=server_json['flavor']['id'],
             links=freeze(server_json['links']),
-            desired_lbs=_lbs_from_metadata(server_json.get('metadata')),
+            desired_lbs=_lbs_from_metadata(metadata),
             servicenet_address=_servicenet_address(server_json))
 
 
@@ -272,7 +279,7 @@ def generate_metadata(group_id, lb_descriptions):
     return metadata
 
 
-DRAINING_METADATA = ('rax:autoscale:server:state', 'draining')
+DRAINING_METADATA = ('rax:autoscale:server:state', 'DRAINING')
 
 
 @attributes(['server_config', 'capacity',
