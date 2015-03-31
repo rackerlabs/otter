@@ -319,8 +319,9 @@ class AutoscaleFixture(BaseTestFixture):
         """
         self.assertEquals(len(group_state.active), group_state.activeCapacity)
         self.assertGreaterEqual(group_state.pendingCapacity, 0)
-        self.assertEquals(group_state.desiredCapacity,
-                          group_state.activeCapacity + group_state.pendingCapacity)
+        self.assertEquals(
+            group_state.desiredCapacity,
+            group_state.activeCapacity + group_state.pendingCapacity)
         self.assertFalse(group_state.paused)
 
     def create_default_at_style_policy_wait_for_execution(
