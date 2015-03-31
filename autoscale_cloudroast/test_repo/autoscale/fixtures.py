@@ -215,8 +215,10 @@ class AutoscaleFixture(BaseTestFixture):
         self.assertTrue(headers is not None,
                         msg='No headers returned')
         if headers.get('transfer-encoding'):
-            self.assertEqual(headers['transfer-encoding'], 'chunked',
-                             msg='Response header transfer-encoding is not chunked')
+            self.assertEqual(
+                headers['transfer-encoding'],
+                'chunked',
+                msg='Response header transfer-encoding is not chunked')
         self.assertTrue(headers['server'] is not None,
                         msg='Response header server is not available')
         self.assertEquals(headers['content-type'], 'application/json',
