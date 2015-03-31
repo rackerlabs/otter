@@ -170,8 +170,8 @@ class OtterRbacTests(AutoscaleFixture):
 
     def _verify_otter_observer_role(self, user_client, expected_response_code=200):
         """
-        verify all the GET calls on a group and policy. Uses the group, policy and webhook
-        created as part of the setUp.
+        verify all the GET calls on a group and policy. Uses the group,
+        policy and webhook created as part of the setUp.
         """
         list_groups_response = user_client.list_scaling_groups()
         self.assertEquals(
