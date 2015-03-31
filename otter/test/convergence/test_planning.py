@@ -12,6 +12,7 @@ from otter.convergence.model import (
     CLBNodeCondition,
     CLBNodeType,
     DesiredGroupState,
+    DRAINING_METADATA,
     NovaServer,
     RCv3Description,
     RCv3Node,
@@ -699,8 +700,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                               condition=CLBNodeCondition.DRAINING,
                               type=CLBNodeType.PRIMARY),
                 SetMetadataItemOnServer(server_id='abc',
-                                        key='rax:auto_scaling_draining',
-                                        value='draining'),
+                                        key=DRAINING_METADATA[0],
+                                        value=DRAINING_METADATA[1]),
                 BulkRemoveFromRCv3(lb_node_pairs=s(
                     (self.rcv3_desc.lb_id, 'abc')))
             ]))
@@ -731,8 +732,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 1),
             pbag([
                 SetMetadataItemOnServer(server_id='abc',
-                                        key='rax:auto_scaling_draining',
-                                        value='draining')
+                                        key=DRAINING_METADATA[0],
+                                        value=DRAINING_METADATA[1])
             ]))
 
     def test_draining_server_has_all_enabled_lb_set_to_draining(self):

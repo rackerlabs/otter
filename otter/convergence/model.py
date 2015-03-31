@@ -272,6 +272,9 @@ def generate_metadata(group_id, lb_descriptions):
     return metadata
 
 
+DRAINING_METADATA = ('rax:autoscale:server:state', 'draining')
+
+
 @attributes(['server_config', 'capacity',
              Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
              Attribute('draining_timeout', default_value=0.0,
