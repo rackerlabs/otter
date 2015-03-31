@@ -256,7 +256,8 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
 
     def test_scaling_policy_change_as_float(self):
         """
-        Negative Test: Scheduler policy should not get created with change as a float
+        Negative Test: Scheduler policy should not get created with change
+        as a float.
         """
         error_create_resp = self.autoscale_client.create_policy(
             group_id=self.group.id,
