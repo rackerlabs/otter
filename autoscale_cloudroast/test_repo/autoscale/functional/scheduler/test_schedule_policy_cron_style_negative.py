@@ -125,8 +125,8 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
 
     def test_schedule_cron_style_policy_with_invalid_cron_minute(self):
         """
-        Creating a scaling policy of type schedule via cron style with invalid minute value in
-        cron results in a 400.
+        Creating a scaling policy of type schedule via cron style with
+        invalid minute value in cron results in a 400.
         """
         schedule_value_list = ['60 * * * *', '-090 * * * *',
                                '2- * * * *', '6-0 * * * *',
