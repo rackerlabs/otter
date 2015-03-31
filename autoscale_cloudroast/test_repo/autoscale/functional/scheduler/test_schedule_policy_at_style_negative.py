@@ -23,8 +23,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_different_date_format_1(self):
         """
-        Creating a scaling policy of type schedule with (at style) with non iso8601 date
-        format results in a 400.
+        Creating a scaling policy of type schedule with (at style) with
+        non iso8601 date format results in a 400.
         """
         schedule_value = '05-12-2013T03:12:09Z'
         schedule_policy_at_style = (self.autoscale_behaviors
