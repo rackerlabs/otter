@@ -52,11 +52,13 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         results in a 400.
         """
         args = {'cron': ''}
-        self.assertEquals(create_schedule_at_style_response.status_code, 400,
-                          msg='Create schedule scaling policy passed given an invalid date'
-                          ' with {0} for group {1}'.format(
-                              create_schedule_at_style_response.status_code,
-                              self.group.id))
+        self.assertEquals(
+            create_schedule_at_style_response.status_code,
+            400,
+            msg='Create schedule scaling policy passed given an invalid date'
+            ' with {0} for group {1}'.format(
+                create_schedule_at_style_response.status_code,
+                self.group.id))
 
     def test_schedule_cron_style_policy_as_whitespace(self):
         """
