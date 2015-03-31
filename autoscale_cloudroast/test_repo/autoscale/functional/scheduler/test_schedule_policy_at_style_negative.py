@@ -27,10 +27,11 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         format results in a 400.
         """
         schedule_value = '05-12-2013T03:12:09Z'
-        schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
-            group_id=self.group.id,
-            sp_change=self.sp_change,
-            schedule_at=schedule_value)
+        schedule_policy_at_style = (self.autoscale_behaviors
+                                    .create_schedule_policy_given(
+                                        group_id=self.group.id,
+                                        sp_change=self.sp_change,
+                                        schedule_at=schedule_value))
         self.assertEquals(
             schedule_policy_at_style['status_code'],
             400,
