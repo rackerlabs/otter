@@ -67,8 +67,9 @@ class PaginateWebhooks(AutoscaleFixture):
     @unittest.skip('AUTO-711')
     def test_list_webhooks_with_limit_equal_to_number_of_webhooks(self):
         """
-        List the webhooks with the limit set equal to the number of existing webhooks.
-        Verify all the webhooks are listed and there is no next link to a second page.
+        List the webhooks with the limit set equal to the number of existing
+        webhooks.  Verify all the webhooks are listed and there is no next
+        link to a second page.
         """
         param = self.get_total_num_webhooks(self.group.id, self.policy['id'])
         list_webhooks = self._list_webhooks_with_given_limit(param)
