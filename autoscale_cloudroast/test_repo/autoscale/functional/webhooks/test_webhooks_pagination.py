@@ -149,7 +149,8 @@ class PaginateWebhooks(AutoscaleFixture):
                 msg='list webhooks failed with {0}'
                 .format(webhook_response.status_code))
 
-    def _assert_list_webhooks_with_limits_next_link(self, expect_len, list_webhooks, next_link=True):
+    def _assert_list_webhooks_with_limits_next_link(
+            self, expect_len, list_webhooks, next_link=True):
         """
         Asserts that the length of the webhooks list is greater than or equal to
         the exptected length, and the existence of its next link.  If
