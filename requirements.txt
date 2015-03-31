@@ -5,7 +5,7 @@ jsonschema==2.4.0
 iso8601==0.1.8
 lxml==3.4.1
 treq==0.2.1
-silverberg==0.1.9
+silverberg==0.1.11
 pyOpenSSL==0.14
 jsonfig==0.1.1
 testtools==0.9.32

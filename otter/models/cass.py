@@ -42,6 +42,7 @@ from otter.models.interface import (
     NoSuchWebhookError,
     PoliciesOverLimitError,
     ScalingGroupOverLimitError,
+    ScalingGroupStatus,
     UnrecognizedCapabilityError,
     WebhooksOverLimitError,
     next_cron_occurrence)
@@ -808,7 +809,24 @@ class CassScalingGroup(object):
                  'status': status.name},
                 DEFAULT_CONSISTENCY)
 
-        return self.view_config().addCallback(_do_update)
+        @self.with_timestamp
+        def set_deleting(ts, _):
+            return self.connection.execute(
+                _cql_update.format(cf=self.group_table,
+                                   column='deleting',
+                                   name=':deleting'),
+                {'tenantId': self.tenant_id,
+                 'groupId': self.uuid,
+                 'ts': ts,
+                 'deleting': True},
+                DEFAULT_CONSISTENCY)
+
+        d = self.view_config()
+        if status == ScalingGroupStatus.DELETING:
+            d.addCallback(set_deleting)
+        else:
+            d.addCallback(_do_update)
+        return d
 
     def update_config(self, data):
         """

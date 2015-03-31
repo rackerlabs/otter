@@ -876,7 +876,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         expectedData = {"status": 'ERROR',
                         "groupId": '12345678g',
                         "tenantId": '11111', 'ts': 10345000}
-        self.connection.execute.assert_called_with(
+        self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
@@ -890,6 +890,24 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.update_status(ScalingGroupStatus.ACTIVE)
         self.failureResultOf(d, NoSuchScalingGroupError)
         self.assertFalse(self.connection.execute.called)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.succeed({}))
+    def test_update_status_deleting(self, mock_vc):
+        """
+        Sets "deleting" column to true when status set is DELETING
+        """
+        self.clock.advance(10.345)
+        d = self.group.update_status(ScalingGroupStatus.DELETING)
+        self.assertIsNone(self.successResultOf(d))  # update returns None
+        expectedCql = (
+            'INSERT INTO scaling_group("tenantId", "groupId", deleting) '
+            'VALUES (:tenantId, :groupId, :deleting) USING TIMESTAMP :ts')
+        expectedData = {"deleting": True,
+                        "groupId": '12345678g',
+                        "tenantId": '11111', 'ts': 10345000}
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     def test_view_config_no_such_group(self):
         """
