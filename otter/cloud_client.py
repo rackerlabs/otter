@@ -409,10 +409,8 @@ def set_nova_metadata_item(server_id, key, value):
             if api_error.code == code:
                 message = try_json_with_keys(api_error.body, keys)
                 if message and (not pattern or pattern.match(message)):
-                    kwargs = {}
-                    if exc_class != NovaRateLimitError:
-                        kwargs = {'server_id': six.text_type(server_id)}
-                    raise exc_class(message, **kwargs)
+                    raise exc_class(message,
+                                    server_id=six.text_type(server_id))
 
         six.reraise(*exc_info)
 
