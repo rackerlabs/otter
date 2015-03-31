@@ -203,8 +203,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             policy_type='schedule',
             args=args)
         self.assertEquals(
-            create_schedule_at_style_response.status_code,
-            400,
+            create_schedule_at_style_response.status_code, 400,
             msg='Create schedule policy passed given whitespace as date'
             ' with {0} for group {1} (at style)'.format(
                 create_schedule_at_style_response.status_code,
