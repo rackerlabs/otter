@@ -358,9 +358,9 @@ class AutoscaleFixture(BaseTestFixture):
     def get_servers_containing_given_name_on_tenant(
             self, group_id=None, server_name=None):
         """
-        Get a list of server IDs not marked pending deletion from Nova based on the
-        given server_name. If the group_id is given, use the server_name extracted
-        from the launch config instead
+        Get a list of server IDs not marked pending deletion from Nova
+        based on the given server_name. If the group_id is given, use
+        the server_name extracted from the launch config instead
         """
         if group_id:
             launch_config = self.autoscale_client.view_launch_config(
