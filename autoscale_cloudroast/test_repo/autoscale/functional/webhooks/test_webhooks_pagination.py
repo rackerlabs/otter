@@ -59,7 +59,8 @@ class PaginateWebhooks(AutoscaleFixture):
         the next batch exists.
         """
         # Specify the limit to be one less than the current number of webhooks (4 were created in setUp)
-        total_webhooks = self.get_total_num_webhooks(self.group.id, self.policy['id'])
+        total_webhooks = self.get_total_num_webhooks(
+            self.group.id, self.policy['id'])
         param = total_webhooks - 1
         list_webhooks = self._list_webhooks_with_given_limit(param)
         self._assert_list_webhooks_with_limits_next_link(param, list_webhooks)
