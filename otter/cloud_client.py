@@ -364,6 +364,7 @@ class ServerMetadataOverLimitError(Exception):
     """
 
 
+@attributes([])
 class NovaRateLimitError(Exception):
     """
     Exception to be raised when Nova has rate-limited requests.

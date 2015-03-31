@@ -515,7 +515,7 @@ class NovaClientTests(SynchronousTestCase):
             service_request_eqf(
                 stub_pure_response(json.dumps(failure_body), 413)))])
 
-        with self.assertRaises(NoSuchServerError) as cm:
+        with self.assertRaises(NovaRateLimitError) as cm:
             sync_perform(dispatcher, real)
 
         self.assertEqual(cm.exception,
