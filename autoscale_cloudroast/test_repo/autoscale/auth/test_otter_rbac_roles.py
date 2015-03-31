@@ -218,9 +218,11 @@ class OtterRbacTests(AutoscaleFixture):
             msg='Get group returned response code {0} on group '
             '{1}'.format(get_policy_response.status_code, self.group.id))
 
-    def _verify_otter_admin_roles_other_than_GET_calls(self, user_client,
-                                                       expected_response_code=None,
-                                                       lc_load_balancers=None):
+    def _verify_otter_admin_roles_other_than_GET_calls(
+            self,
+            user_client,
+            expected_response_code=None,
+            lc_load_balancers=None):
         """
         verify all the otter api calls except for all the GET calls, as
         _verify_otter_observer_role covers them already.
