@@ -7,6 +7,7 @@ from __future__ import print_function
 import json
 import time
 from functools import partial
+from unittest import skip
 
 from cafe.drivers.unittest.fixtures import BaseTestFixture
 
@@ -132,6 +133,17 @@ except Exception:
 _rcv3_cloud_network = autoscale_config.rcv3_cloud_network
 
 autoscale_client, server_client, lbaas_client, rcv3_client = _set_up_clients()
+
+
+def skip_if_mimic_is(boolean):
+    """
+    Decorator that skips a test if mimic is equal to the given boolean.
+    """
+    def actual_decorator(f):
+        if autoscale_config.mimic == boolean:
+            return skip(f)
+        return f
+    return actual_decorator
 
 
 class AutoscaleFixture(BaseTestFixture):
