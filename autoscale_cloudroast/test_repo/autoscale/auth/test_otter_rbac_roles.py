@@ -152,10 +152,11 @@ class OtterRbacTests(AutoscaleFixture):
         access_data = token_behaviors.get_access_data(username,
                                                       password,
                                                       self.tenant_id)
-        autoscale_temp_client = AutoscalingAPIClient(url=self.url,
-                                                     auth_token=access_data.token.id_,
-                                                     serialize_format='json',
-                                                     deserialize_format='json')
+        autoscale_temp_client = AutoscalingAPIClient(
+            url=self.url,
+            auth_token=access_data.token.id_,
+            serialize_format='json',
+            deserialize_format='json')
         return autoscale_temp_client
 
     def _verify_otter_observer_role(self, user_client, expected_response_code=200):
