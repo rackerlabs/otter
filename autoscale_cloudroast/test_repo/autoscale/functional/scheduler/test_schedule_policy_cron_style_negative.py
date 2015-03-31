@@ -74,11 +74,6 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         whitespace results in a 400.
         """
         args = {'cron': '  '}
-        self.assertEquals(create_schedule_at_style_response.status_code, 400,
-                          msg='Create schedule scaling policy passed given an invalid date'
-                          ' with {0} for group {1}'.format(
-                              create_schedule_at_style_response.status_code,
-                              self.group.id))
         create_schedule_at_style_response = (
             self.autoscale_client.create_policy(
                 group_id=self.group.id,
@@ -87,6 +82,13 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
                 change=self.sp_change,
                 policy_type='schedule',
                 args=args))
+        self.assertEquals(
+            create_schedule_at_style_response.status_code,
+            400,
+            msg='Create schedule scaling policy passed given an invalid date'
+            ' with {0} for group {1}'.format(
+                create_schedule_at_style_response.status_code,
+                self.group.id))
 
     def test_schedule_cron_style_policy_with_date(self):
         """
