@@ -2,8 +2,10 @@
 Test for negative scenarios to a scaling policy of type schedule
 with cron style.
 """
-from test_repo.autoscale.fixtures import AutoscaleFixture
+
 import unittest
+
+from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
 class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
