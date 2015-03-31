@@ -196,8 +196,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
                     sp_change=self.sp_change,
                     schedule_cron=each_schedule_value))
             self.assertEquals(
-                schedule_policy_cron_style['status_code'],
-                400,
+                schedule_policy_cron_style['status_code'], 400,
                 msg='Create schedule cron style policy with {0} results in {1}'
                 ' for group {2}'.format(
                     each_schedule_value,
