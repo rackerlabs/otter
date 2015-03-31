@@ -59,8 +59,9 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_no_z_in_date(self):
         """
-        Creating a scaling policy of type schedule with (at style) with no Z in date
-        format results in a 400.
+        Creating a scaling policy of type schedule with (at style) with no
+        Z in date format results in a 400.
+
         ** AUTO-405, fails with 201**
         """
         schedule_value = '2013-12-05T03:12:09'
@@ -79,8 +80,9 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_no_z_or_t_in_date(self):
         """
-        Creating a scaling policy of type schedule with (at style) with no Z or T in date
-        format results in a 400.
+        Creating a scaling policy of type schedule with (at style) with no
+        Z or T in date format results in a 400.
+
         ** AUTO-405, fails with 201**
         """
         schedule_value = '2013-12-05 03:12:09'
