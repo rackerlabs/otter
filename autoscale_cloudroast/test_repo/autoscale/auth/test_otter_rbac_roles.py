@@ -26,9 +26,8 @@ class OtterRbacTests(AutoscaleFixture):
         create_group = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=0)
         self.group = create_group.entity
-        self.policy_webhook = self.autoscale_behaviors.create_policy_webhook(self.group.id,
-                                                                             {'change': 1,
-                                                                              'cooldown': 0})
+        self.policy_webhook = self.autoscale_behaviors.create_policy_webhook(
+            self.group.id, {'change': 1, 'cooldown': 0})
         self.resources.add(self.group, self.empty_scaling_group)
 
     @tags(type='rbac', speed='quick')
