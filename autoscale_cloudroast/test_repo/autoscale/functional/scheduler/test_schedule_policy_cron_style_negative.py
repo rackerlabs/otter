@@ -251,10 +251,11 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         invalid_crons = ['* * 0 * *', '* * 0-0 * *',
                          '* * * 0-0 *', '* * * * 7', '* * * * 0-0']
         for invalid_cron in invalid_crons:
-            schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
-                group_id=self.group.id,
-                sp_change=self.sp_change,
-                schedule_cron=invalid_cron)
+            schedule_policy_cron_style = (self.autoscale_behaviors
+                                          .create_schedule_policy_given(
+                                              group_id=self.group.id,
+                                              sp_change=self.sp_change,
+                                              schedule_cron=invalid_cron))
             self.assertEquals(
                 schedule_policy_cron_style['status_code'], 400,
                 msg='Create schedule cron style policy with {0} results in {1}'
