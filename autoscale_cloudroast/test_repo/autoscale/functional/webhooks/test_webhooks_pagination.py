@@ -52,7 +52,8 @@ class PaginateWebhooks(AutoscaleFixture):
             self._assert_list_webhooks_with_limits_next_link(
                 self.max_webhooks, list_webhooks, False)
 
-    def test_list_webhooks_with_specified_limit_less_than_number_of_policies(self):
+    def test_list_webhooks_with_specified_limit_less_than_number_of_policies(
+            self):
         """
         List the webhooks with the limit set to be less than the number of webhooks on the policy.
         Verify that the webhooks are listed in batches of the specifed limit, and that a link to
