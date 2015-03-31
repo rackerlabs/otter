@@ -36,9 +36,9 @@ class PaginateWebhooks(AutoscaleFixture):
 
     def test_list_webhooks_when_list_webhooks_is_greater_than_default_limit(self):
         """
-        List the webhooks without a specified limit, and with a specified limit greater
-        than the maximum of 100. Verify that the webhooks are listed in batches of the
-        maximum limit (100) with a next link.
+        List the webhooks without a specified limit, and with a specified limit
+        greater than the maximum of 100. Verify that the webhooks are listed
+        in batches of the maximum limit (100) with a next link.
         """
         to_build = self.max_policies - self.get_total_num_webhooks(self.group.id, self.policy['id'])
         self._create_multiple_webhooks(to_build)
