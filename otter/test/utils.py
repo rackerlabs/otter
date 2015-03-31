@@ -370,6 +370,16 @@ class StubResponse(object):
         # Data is not part of twisted response object
         self._data = data
 
+    def __eq__(self, other):
+        return (
+            isinstance(other, self.__class__) and
+            self.code == other.code and
+            self.headers == other.headers and
+            self._data == other._data)
+
+    def __ne__(self, other):
+        return not self == other
+
 
 def stub_pure_response(body, code=200, response_headers=None):
     """

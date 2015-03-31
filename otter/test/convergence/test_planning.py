@@ -27,6 +27,7 @@ from otter.convergence.steps import (
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
+    ConvergeLater,
     CreateServer,
     DeleteServer,
     RemoveNodesFromCLB,
@@ -509,6 +510,31 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
     clb_desc = CLBDescription(lb_id='1', port=80)
     rcv3_desc = RCv3Description(lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
 
+    def test_building_servers_are_deleted(self):
+        """
+        A building server to be scaled down is just deleted and removed from
+        any load balancers.  It is not put into a draining state, nor are the
+        load balancers nodes drained, even if the timeout is greater than zero.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.BUILD,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
+                set([CLBNode(node_id='1', address='1.1.1.1',
+                             description=self.clb_desc),
+                     RCv3Node(node_id='2', cloud_server_id='abc',
+                              description=self.rcv3_desc)]),
+                0),
+            pbag([
+                DeleteServer(server_id='abc'),
+                RemoveNodesFromCLB(lb_id='1', node_ids=s('1')),
+                BulkRemoveFromRCv3(lb_node_pairs=s(
+                    (self.rcv3_desc.lb_id, 'abc')))
+            ]))
+
     def test_active_server_without_load_balancers_can_be_deleted(self):
         """
         If an active server to be scaled down is not attached to any load
@@ -520,6 +546,22 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
+                            desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
+                set(),
+                0),
+            pbag([DeleteServer(server_id='abc')]))
+
+    def test_draing_server_without_load_balancers_can_be_deleted(self):
+        """
+        If a draining server is not attached to any load balancers, even if
+        it should be, it can be deleted.  "Draining" is not re-set on its
+        metadata.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.DRAINING,
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set(),
                 0),
@@ -665,9 +707,10 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
 
     def test_active_server_is_drained_even_if_all_already_in_draining(self):
         """
-        If an active server already has all of its load balancers in draining,
-        but it cannot be removed from all of them yet, it is set to draining
-        state even though no load balancer actions need to be performed.
+        If an active server is attached to load balancers, and all those load
+        balancer nodes are already in draining but it cannot be removed yet,
+        the server is set to draining state even though no load balancer
+        actions need to be performed.
 
         This can happen for instance if the server was supposed to be deleted
         in a previous convergence run, and the load balancers were set to
@@ -694,13 +737,15 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
 
     def test_draining_server_has_all_enabled_lb_set_to_draining(self):
         """
-        If a draining server is enabled on any load balancers, it is set to
-        draining on those load balancers and it is not deleted.  The metadata
-        is not re-set to draining.
+        If a draining server is associated with any load balancers, those
+        load balancer nodes will be set to draining and the server is not
+        deleted.  The metadata on the server is not re-set to draining.
 
         This can happen for instance if the server was supposed to be deleted
         in a previous convergence run, and the server metadata was set but
         the load balancers update failed.
+
+        Or if the server is set to be manually deleted via the API.
         """
         self.assertEqual(
             converge(
@@ -756,7 +801,8 @@ class ConvergeTests(SynchronousTestCase):
     def test_count_building_as_meeting_capacity(self):
         """
         No servers are created if there are building servers that sum with
-        active servers to meet capacity.
+        active servers to meet capacity.  :class:`ConvergeLater` is returned
+        as a step if the building servers are not being deleted.
         """
         self.assertEqual(
             converge(
@@ -764,7 +810,7 @@ class ConvergeTests(SynchronousTestCase):
                 set([server('abc', ServerState.BUILD)]),
                 set(),
                 0),
-            pbag([]))
+            pbag([ConvergeLater(reasons=['building servers'])]))
 
     def test_delete_nodes_in_error_state(self):
         """
@@ -873,7 +919,9 @@ class ConvergeTests(SynchronousTestCase):
     def test_scale_down_building_first(self):
         """
         When scaling down, first we delete building servers, in preference
-        to older server.
+        to older server.  :class:`ConvergeLater` does not get returned, even
+        though there is a building server, because the building server gets
+        deleted.
         """
         self.assertEqual(
             converge(
@@ -888,7 +936,9 @@ class ConvergeTests(SynchronousTestCase):
     def test_timeout_building(self):
         """
         Servers that have been building for too long will be deleted and
-        replaced.
+        replaced. :class:`ConvergeLater` does not get returned, even
+        though there is a building server, because the building server gets
+        deleted.
         """
         self.assertEqual(
             converge(
@@ -904,7 +954,9 @@ class ConvergeTests(SynchronousTestCase):
     def test_timeout_replace_only_when_necessary(self):
         """
         If a server is timing out *and* we're over capacity, it will be
-        deleted without replacement.
+        deleted without replacement.  :class:`ConvergeLater` does not get
+        returned, even though there is a building server, because the building
+        server gets deleted.
         """
         self.assertEqual(
             converge(

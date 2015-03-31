@@ -29,6 +29,8 @@ from otter.convergence.steps import (
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
     UnexpectedServerStatus,
+    _clb_check_change_node,
+    _clb_check_change_node_handlers,
     _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_ALREADY_A_MEMBER_PATTERN,
@@ -438,21 +440,28 @@ class StepAsEffectTests(SynchronousTestCase):
         :obj:`ChangeCLBNode.as_effect` produces a request for
         modifying a load balancer node.
         """
-        changenode = ChangeCLBNode(
+        change_node = ChangeCLBNode(
             lb_id='abc123',
             node_id='node1',
             condition=CLBNodeCondition.DRAINING,
             weight=50,
             type=CLBNodeType.PRIMARY)
-        self.assertEqual(
-            changenode.as_effect(),
-            service_request(
-                ServiceType.CLOUD_LOAD_BALANCERS,
-                'PUT',
-                'loadbalancers/abc123/nodes/node1',
-                data={'condition': 'DRAINING',
-                      'weight': 50},
-                success_pred=has_code(202)))
+        eff = change_node.as_effect()
+
+        handled_codes = _clb_check_change_node_handlers.keys()
+        expected_intent = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'PUT',
+            'loadbalancers/abc123/nodes/node1',
+            data={'condition': 'DRAINING',
+                  'weight': 50},
+            success_pred=has_code(*handled_codes)).intent
+        self.assertEqual(eff.intent, expected_intent)
+
+        (on_success, on_error), = eff.callbacks
+        self.assertIdentical(on_error, None)
+        self.assertIdentical(on_success.func, _clb_check_change_node)
+        self.assertEqual(on_success.args, (change_node,))
 
     def test_add_nodes_to_clb(self):
         """
@@ -771,8 +780,40 @@ class StepAsEffectTests(SynchronousTestCase):
         for removing any combination of nodes from any combination of RCv3
         load balancers.
         """
-        self._generic_bulk_rcv3_step_test(
-            BulkRemoveFromRCv3, "DELETE")
+        self._generic_bulk_rcv3_step_test(BulkRemoveFromRCv3, "DELETE")
+
+
+class CLBCheckChangeNodeTests(SynchronousTestCase):
+    """
+    Tests for :func:`_clb_check_change_node`.
+    """
+    example_step = ChangeCLBNode(lb_id="lb_id",
+                                 node_id="node_id",
+                                 condition=CLBNodeCondition.ENABLED,
+                                 weight=10,
+                                 type=CLBNodeType.PRIMARY)
+
+    def test_good_response(self):
+        """
+        If the response code indicates success, the response was successful.
+        """
+        response = StubResponse(202, {})
+        body = None
+        result = _clb_check_change_node(self.example_step, (response, body))
+        self.assertEqual(result, (StepResult.SUCCESS, []))
+
+    def test_disappearing_server(self):
+        """
+        If the node we're trying to update has vanished, retry convergence.
+        """
+        response = StubResponse(404, {})
+        body = None
+        result = _clb_check_change_node(self.example_step, (response, body))
+        self.assertEqual(
+            result,
+            (StepResult.RETRY, [{"reason": "CLB node not found",
+                                 "node": self.example_step.node_id,
+                                 "lb": self.example_step.lb_id}]))
 
 
 _RCV3_TEST_DATA = {
@@ -1207,6 +1248,7 @@ class ConvergeLaterTests(SynchronousTestCase):
         """
         `ConvergeLater.as_effect` returns effect with RETRY
         """
-        eff = ConvergeLater().as_effect()
+        eff = ConvergeLater(reasons=['building']).as_effect()
         self.assertEqual(
-            sync_perform(base_dispatcher, eff), (StepResult.RETRY, []))
+            sync_perform(base_dispatcher, eff),
+            (StepResult.RETRY, ['building']))

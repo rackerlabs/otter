@@ -1,7 +1,9 @@
 """Tests for convergence gathering."""
 
 import calendar
+from datetime import datetime
 from functools import partial
+from urllib import urlencode
 
 from effect import (
     ComposedDispatcher,
@@ -68,6 +70,16 @@ def resolve_svcreq(eff, result, service_type,
     return resolve_effect(eff, result)
 
 
+def svc_request_args(changes_since, limit):
+    """
+    Return service request args with formatted changes_since argument in it
+    """
+    params = urlencode([('changes_since', changes_since.isoformat() + 'Z'),
+                        ('limit', limit)])
+    return (ServiceType.CLOUD_SERVERS, 'GET',
+            'servers/detail?{}'.format(params))
+
+
 class GetAllServerDetailsTests(SynchronousTestCase):
     """
     Tests for :func:`get_all_server_details`
@@ -110,6 +122,20 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         result = resolve_svcreq(next_req, (fake_response, body), *req2)
         self.assertEqual(result, servers)
 
+    def test_with_changes_since(self):
+        """
+        `get_all_server_details` will request for servers based on
+        changes_since time
+        """
+        fake_response = object()
+        body = {'servers': self.servers}
+        since = datetime(2010, 10, 10, 10, 10, 0)
+        eff = get_all_server_details(changes_since=since, batch_size=10)
+        svcreq = resolve_retry_stubs(eff)
+        result = resolve_svcreq(
+            svcreq, (fake_response, body), *svc_request_args(since, 10))
+        self.assertEqual(result, self.servers)
+
     def test_retry(self):
         """The HTTP requests are retried with some appropriate policy."""
         eff = get_all_server_details(batch_size=10)
@@ -128,6 +154,19 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         """Save basic reused data."""
         self.req = (ServiceType.CLOUD_SERVERS, 'GET',
                     'servers/detail?limit=100')
+
+    def test_with_changes_since(self):
+        """
+        If given, servers are fetched based on changes_since
+        """
+        since = datetime(2010, 10, 10, 10, 10, 0)
+        eff = resolve_retry_stubs(
+            get_scaling_group_servers(changes_since=since))
+        fake_response = object()
+        body = {'servers': []}
+        result = resolve_svcreq(
+            eff, (fake_response, body), *svc_request_args(since, 100))
+        self.assertEqual(result, {})
 
     def test_filters_no_metadata(self):
         """

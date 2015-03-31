@@ -250,6 +250,7 @@ class ScalingGroupStatus(Names):
     """
     Status of scaling group
     """
+
     ACTIVE = NamedConstant()
     "Group is active and executing policies/converging"
 
@@ -257,6 +258,12 @@ class ScalingGroupStatus(Names):
     """
     Group has errored due to (mostly) invalid launch configuration and has
     stopped executing policies/converging
+    """
+
+    DELETING = NamedConstant()
+    """
+    Group is getting deleted and all it's resources servers/CLBs
+    are getting deleted
     """
 
 
