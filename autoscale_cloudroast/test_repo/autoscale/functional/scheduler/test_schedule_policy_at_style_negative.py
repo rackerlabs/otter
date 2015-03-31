@@ -196,11 +196,6 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             group_id=self.group.id,
             name=self.sp_name, cooldown=self.sp_cooldown,
             change=self.sp_change, policy_type='schedule', args=args)
-        self.assertEquals(create_schedule_at_style_response.status_code, 400,
-                          msg='Create schedule policy passed given whitespace as date'
-                          ' with {0} for group {1} (at style)'.format(
-                              create_schedule_at_style_response.status_code,
-                              self.group.id))
 
     def test_schedule_at_style_policy_with_cron_value(self):
         """
