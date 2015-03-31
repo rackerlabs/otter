@@ -251,9 +251,12 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
             change=self.sp_change,
             policy_type='schedule',
             args={'at': '2013-12-23T11:11:11Z'})
-        self.assertEquals(error_create_resp.status_code, 400,
-                          msg='Create scaling policy succeeded with invalid request: '
-                          '{0}'.format(error_create_resp.status_code))
+        self.assertEquals(
+            error_create_resp.status_code,
+            400,
+            msg='Create scaling policy succeeded with invalid request: '
+            '{0}'.format(
+                error_create_resp.status_code))
 
     def test_scaling_policy_change_as_float(self):
         """
