@@ -494,8 +494,9 @@ class AutoscaleFixture(BaseTestFixture):
                 return server_list
             time.sleep(self.interval_time)
         else:
-            self.fail('Servers on the tenant with name {0} were not deleted even'
-                      ' after waiting 15 mins'.format(server_name))
+            self.fail(
+                'Servers on the tenant with name {0} were not deleted even'
+                ' after waiting 15 mins'.format(server_name))
 
     def delete_nodes_in_loadbalancer(self, node_id_list, load_balancer):
         """
