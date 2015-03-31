@@ -199,13 +199,14 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         whitespace results in a 400.
         """
         args = {'at': '  '}
-        create_schedule_at_style_response = self.autoscale_client.create_policy(
-            group_id=self.group.id,
-            name=self.sp_name,
-            cooldown=self.sp_cooldown,
-            change=self.sp_change,
-            policy_type='schedule',
-            args=args)
+        create_schedule_at_style_response = (self.autoscale_client
+                                             .create_policy(
+                                                 group_id=self.group.id,
+                                                 name=self.sp_name,
+                                                 cooldown=self.sp_cooldown,
+                                                 change=self.sp_change,
+                                                 policy_type='schedule',
+                                                 args=args))
         self.assertEquals(
             create_schedule_at_style_response.status_code, 400,
             msg='Create schedule policy passed given whitespace as date'
