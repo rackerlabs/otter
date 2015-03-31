@@ -116,10 +116,11 @@ class PaginateWebhooks(AutoscaleFixture):
         verify that the correct response (200) is recieved.
         """
         # Create a webhook in order to use the id as a marker
-        create_webhook = self.autoscale_client.create_webhook(group_id=self.group.id,
-                                                              policy_id=self.policy['id'],
-                                                              name="Marker test").entity
         webhook = self.autoscale_behaviors.get_webhooks_properties(create_webhook)
+        create_webhook = self.autoscale_client.create_webhook(
+            group_id=self.group.id,
+            policy_id=self.policy['id'],
+            name="Marker test").entity
         # List the webhooks with a specified marker
         webhook_response = self.autoscale_client.list_webhooks(self.group.id, self.policy['id'],
                                                                marker=webhook['id'])
