@@ -175,7 +175,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             sp_list=at_style_policies_list)
         group = create_group_reponse.entity
         self.resources.add(group, self.empty_scaling_group)
-        sleep(self.scheduler_interval)
+        sleep(5 + self.scheduler_interval)
         self.verify_group_state(group.id, 1 + 2 + 3)
 
     @tags(speed='quick')

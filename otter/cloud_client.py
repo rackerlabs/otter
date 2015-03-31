@@ -1,9 +1,10 @@
 """
 Integration point for HTTP clients in otter.
 """
-from functools import wraps
+import re
+from functools import partial, wraps
 
-from characteristic import attributes
+from characteristic import Attribute, attributes
 
 from effect import (
     ComposedDispatcher,
@@ -17,7 +18,7 @@ import six
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
-from otter.util.http import APIError
+from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
     add_bind_root,
@@ -55,7 +56,7 @@ def service_request(
         params=None, log=None,
         reauth_codes=(401, 403),
         success_pred=has_code(200),
-        json_response=True, parse_errors=False):
+        json_response=True):
     """
     Make an HTTP request to a Rackspace service, with a bunch of awesome
     behavior!
@@ -92,13 +93,11 @@ def service_request(
         log=log,
         reauth_codes=reauth_codes,
         success_pred=success_pred,
-        json_response=json_response,
-        parse_errors=parse_errors))
+        json_response=json_response))
 
 
 @attributes(["service_type", "method", "url", "headers", "data", "params",
-             "log", "reauth_codes", "success_pred", "json_response",
-             "parse_errors"])
+             "log", "reauth_codes", "success_pred", "json_response"])
 class ServiceRequest(object):
     """
     A request to a Rackspace/OpenStack service.
@@ -147,28 +146,6 @@ class TenantScope(object):
         self.tenant_id = tenant_id
 
 
-def _add_service_error_parsing(parser, request_func):
-    """
-    Use the given parser to parse service API errors.
-
-    :param callable parser: A function which takes a tuple of exc info, to
-        be called when the request function raises an :class:`APIError`.
-    :param callable request_func: The request function to decorate
-    """
-    def call_parser(excinfo):
-        # ensures that if the parser doesn't raise another exception,
-        # the original exception is raised
-        parser(excinfo)
-        six.reraise(*excinfo)
-
-    @wraps(request_func)
-    def request(*args, **kwargs):
-        return request_func(*args, **kwargs).on(
-            error=catch(APIError, call_parser))
-
-    return request
-
-
 def concretize_service_request(
         authenticator, log, service_configs,
         tenant_id,
@@ -193,10 +170,6 @@ def concretize_service_request(
     region = service_config['region']
     service_name = service_config['name']
 
-    service_error_parsers = {
-        ServiceType.CLOUD_LOAD_BALANCERS: parse_clb_errors
-    }
-
     def got_auth((token, catalog)):
         request_ = add_headers(otter_headers(token), request)
         request_ = add_effect_on_response(
@@ -211,10 +184,6 @@ def concretize_service_request(
             service_request.success_pred, request_)
         if service_request.json_response:
             request_ = add_json_response(request_)
-
-        parser = service_error_parsers.get(service_request.service_type)
-        if service_request.parse_errors and parser is not None:
-            request_ = _add_service_error_parsing(parser, request_)
 
         return request_(
             service_request.method,
@@ -250,9 +219,129 @@ def perform_tenant_scope(
     perform(new_disp, tenant_scope.effect.on(box.succeed, box.fail))
 
 
-def parse_clb_errors(*excinfo):
+# ----- CLB requests and error parsing -----
+
+_CLB_PENDING_UPDATE_PATTERN = re.compile(
+    "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
+    "immutable.$")
+_CLB_DELETED_PATTERN = re.compile(
+    "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
+    "The load balancer is deleted and) considered immutable.$")
+_CLB_NO_SUCH_NODE_PATTERN = re.compile(
+    "^Node with id #\d+ not found for loadbalancer #\d+$")
+_CLB_NO_SUCH_LB_PATTERN = re.compile(
+    "^Load balancer not found.$")
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBPendingUpdateError(Exception):
     """
-    Fake stub currently that just raises a ValueError, to be used for testing.
-    This should be completed in the next PR.
+    Error to be raised when the CLB is in PENDING_UPDATE status and is
+    immutable (temporarily).
     """
-    raise ValueError("Fake!")
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBDeletedError(Exception):
+    """
+    Error to be raised when the CLB has been deleted or is being deleted.
+    This is distinct from it not existing.
+    """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class NoSuchCLBError(Exception):
+    """
+    Error to be raised when the CLB never existed in the first place (or it
+    has been deleted so long that there is no longer a record of it).
+    """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type),
+             Attribute('node_id', instance_of=six.text_type)])
+class NoSuchCLBNodeError(Exception):
+    """
+    Error to be raised when attempting to modify a CLB node that no longer
+    exists.
+    """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBRateLimitError(Exception):
+    """
+    Error to be raised when CLB returns 413 (rate limiting).
+    """
+
+
+def change_clb_node(lb_id, node_id, condition, weight):
+    """
+    Generate effect to change a node on a load balancer.
+
+    :param str lb_id: The load balancer ID to add the nodes to
+    :param str node_id: The node id to change.
+    :param str condition: The condition to change to: one of "ENABLED",
+        "DRAINING", or "DISABLED"
+    :param int weight: The weight to change to.
+
+    Note: this does not support "type" yet, since it doesn't make sense to add
+    autoscaled servers as secondary.
+
+    :return: :class:`ServiceRequest` effect
+
+    :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
+        :class:`NoSuchCLBError`, :class:`NoSuchCLBNodeError`, :class:`APIError`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'PUT',
+        append_segments('loadbalancers', lb_id, 'nodes', node_id),
+        data={'condition': condition, 'weight': weight},
+        success_pred=has_code(202))
+
+    def _check_no_such_node(api_error_code, json_body):
+        if (api_error_code == 404 and _CLB_NO_SUCH_NODE_PATTERN.match(
+                json_body.get('message', ''))):
+            raise NoSuchCLBNodeError(lb_id=lb_id, node_id=node_id)
+
+    parse_err = partial(_process_clb_api_error, lb_id=lb_id,
+                        extra_parsing=_check_no_such_node)
+
+    return eff.on(error=catch(APIError, parse_err))
+
+
+def _process_clb_api_error(exc_info, lb_id, extra_parsing):
+    """
+    Attempt to parse generic CLB API error messages, and raise recognized
+    exceptions in their place.  If that doesn't work, calls the
+    ``extra_parsing`` callable with the HTTP status code, and parsed JSON body.
+
+    If that still doesn't cut it, re-raise the original exception.
+
+    :param string lb_id: The load balancer ID
+    :param int api_error_code: The status code from the HTTP request
+    :param dict error_json: The error message, parsed as a JSON dict.
+
+    :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
+        :class:`NoSuchCLBError`, :class:`APIError` by itself
+    """
+    api_error = exc_info[1]
+    message = try_json_with_keys(api_error.body, ['message'])
+
+    if message:
+        if api_error.code == 413:
+            raise CLBRateLimitError(message, lb_id=lb_id)
+
+        generic_mappings = [
+            (422, _CLB_DELETED_PATTERN, CLBDeletedError),
+            (422, _CLB_PENDING_UPDATE_PATTERN, CLBPendingUpdateError),
+            (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)
+        ]
+        for status, pattern, exc_type in generic_mappings:
+            if status == api_error.code and pattern.match(message):
+                raise exc_type(message, lb_id=lb_id)
+
+        # No generic exceptions were raised - try the extra_parsing.
+        extra_parsing(api_error.code, try_json_with_keys(api_error.body, []))
+
+    # No? Re-raise, then
+    six.reraise(*exc_info)

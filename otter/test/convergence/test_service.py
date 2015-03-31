@@ -632,7 +632,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         def plan(*args, **kwargs):
             return pbag([
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                ConvergeLater(),
+                ConvergeLater(reasons=['mywish']),
                 TestStep(Effect(Constant((StepResult.SUCCESS, []))))])
 
         eff = execute_convergence(self.tenant_id, self.group_id, log,
@@ -653,7 +653,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         def plan(*args, **kwargs):
             return pbag([
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                ConvergeLater(),
+                ConvergeLater(reasons=['mywish']),
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
                 TestStep(Effect(Constant((StepResult.FAILURE, [])))),
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),

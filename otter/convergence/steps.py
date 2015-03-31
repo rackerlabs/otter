@@ -7,7 +7,7 @@ from characteristic import Attribute, attributes
 
 from effect import Constant, Effect, Func, catch
 
-from pyrsistent import PMap, PSet, pset, thaw
+from pyrsistent import PMap, PSet, freeze, pset, thaw
 
 from toolz.dicttoolz import get_in
 from toolz.itertoolz import concat
@@ -434,14 +434,40 @@ class ChangeCLBNode(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to modify a load balancer node."""
-        return service_request(
+        handled_codes = _clb_check_change_node_handlers.keys()
+        eff = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'PUT',
             append_segments('loadbalancers', self.lb_id,
                             'nodes', self.node_id),
             data={'condition': self.condition.name,
                   'weight': self.weight},
-            success_pred=has_code(202))
+            success_pred=has_code(*handled_codes))
+        return eff.on(partial(_clb_check_change_node, self))
+
+
+def _clb_check_change_node(step, result):
+    """
+    Check to what extent a :class:`ChangeCLBNode` response was successful.
+    """
+    response, body = result
+    handler = _clb_check_change_node_handlers[response.code]
+    return handler(step, result)
+
+
+def _clb_check_change_node_retry_on_404(step, result):
+    """
+    When updating a node results in a 404, convergence should be retried.
+    """
+    return StepResult.RETRY, [{'reason': 'CLB node not found',
+                               'lb': step.lb_id,
+                               'node': step.node_id}]
+
+
+_clb_check_change_node_handlers = {
+    202: lambda _step, _result: (StepResult.SUCCESS, []),
+    404: _clb_check_change_node_retry_on_404
+}
 
 
 def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
@@ -631,13 +657,17 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
 
 
 @implementer(IStep)
+@attributes(['reasons'], apply_with_init=False)
 class ConvergeLater(object):
     """
     Converge later in some time
     """
 
+    def __init__(self, reasons):
+        self.reasons = freeze(reasons)
+
     def as_effect(self):
         """
         Return an effect that always results in retry
         """
-        return Effect(Constant((StepResult.RETRY, [])))
+        return Effect(Constant((StepResult.RETRY, list(self.reasons))))

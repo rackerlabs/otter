@@ -23,8 +23,10 @@ class CreateScalingGroupTest(AutoscaleFixture):
         self.gc_metadata = {'gc_meta_key_1': 'gc_meta_value_1',
                             'gc_meta_key_2': 'gc_meta_value_2'}
         self.file_contents = 'This is a test file.'
-        self.lc_personality = [{'path': '/root/.csivh',
-                                'contents': base64.b64encode(self.file_contents)}]
+        self.lc_personality = [
+            {'path': '/root/.csivh',
+             'contents': base64.b64encode(self.file_contents)}
+        ]
         self.lc_metadata = {'meta_key_1': 'meta_value_1',
                             'meta_key_2': 'meta_value_2'}
         self.lc_disk_config = 'AUTO'
@@ -63,26 +65,31 @@ class CreateScalingGroupTest(AutoscaleFixture):
 
     def _test_create_scaling_group_response(self):
         """
-        Verify the response code for the create scaling group is 201
+        Verify the response code for the create scaling group is 201.
         """
-        self.assertTrue(self.create_resp.ok,
-                        msg='Create scaling group call failed with API Response: {0} for '
-                        'group {1}'.format(self.create_resp.content, self.scaling_group.id))
-        self.assertEquals(self.create_resp.status_code, 201,
-                          msg='The create failed with {0} for group '
-                          '{1}'.format(self.create_resp.status_code, self.scaling_group.id))
+        self.assertTrue(
+            self.create_resp.ok,
+            msg='Create scaling group call failed with API Response: {0} for '
+            'group {1}'
+            .format(self.create_resp.content, self.scaling_group.id))
+        self.assertEquals(
+            self.create_resp.status_code, 201,
+            msg='The create failed with {0} for group {1}'
+            .format(self.create_resp.status_code, self.scaling_group.id))
         self.validate_headers(self.create_resp.headers)
 
     def _test_create_scaling_group_fields(self):
         """
-        Verify the scaling group id and links exist in the response
+        Verify the scaling group id and links exist in the response.
         """
-        self.assertTrue(self.scaling_group.id is not None,
-                        msg='Scaling Group id was not set in the response'
-                        ' for group {0}'.format(self.scaling_group.id))
-        self.assertTrue(self.scaling_group.links is not None,
-                        msg='Scaling Group links were not set in the response'
-                        ' for group {0}'.format(self.scaling_group.id))
+        self.assertIsNotNone(
+            self.scaling_group.id,
+            msg='Scaling Group id was not set in the response for group {0}'
+            .format(self.scaling_group.id))
+        self.assertIsNotNone(
+            self.scaling_group.links,
+            msg='Scaling Group links not set in the response for group {0}'
+            .format(self.scaling_group.id))
 
     def _test_created_scaling_group_groupconfig_fields(self):
         """
@@ -114,42 +121,42 @@ class CreateScalingGroupTest(AutoscaleFixture):
         """
         Verify the launch configuration on the group is as expected.
         """
-        self.assertEqual(self.lc_name,
-                         self.scaling_group.launchConfiguration.server.name,
-                         msg='Server name provided in the launch config did not match'
-                         ' for group {0}'.format(self.scaling_group.id))
+        server = self.scaling_group.launchConfiguration.server
+
+        self.assertEqual(
+            self.lc_name, server.name,
+            msg='Server name provided in the launch config did not match'
+            ' for group {0}'.format(self.scaling_group.id))
 
         # None is no argument, null is null.  Yes this is terrible.
         # Cloudcafe removes arguments from the json if the value is None.
         # So a null value was hacked in to be 'null'
         if self.lc_image_ref is None:
-            self.assertFalse(hasattr(self.scaling_group.launchConfiguration.server,
-                                     'imageRef'))
+            self.assertFalse(hasattr(server, 'imageRef'))
         elif self.lc_image_ref is null:
-            self.assertEqual(None,
-                             self.scaling_group.launchConfiguration.server.imageRef,
-                             msg='Image id did not match'
-                             ' for group {0}'.format(self.scaling_group.id))
+            self.assertEqual(
+                None, server.imageRef,
+                msg='Image id did not match for group {0}'
+                .format(self.scaling_group.id))
         else:
-            self.assertEqual(self.lc_image_ref,
-                             self.scaling_group.launchConfiguration.server.imageRef,
-                             msg='Image id did not match'
-                             ' for group {0}'.format(self.scaling_group.id))
+            self.assertEqual(
+                self.lc_image_ref, server.imageRef,
+                msg='Image id did not match for group {0}'
+                .format(self.scaling_group.id))
 
-        self.assertEqual(self.lc_flavor_ref,
-                         self.scaling_group.launchConfiguration.server.flavorRef,
-                         msg='Flavor id did not match'
-                         ' for group {0}'.format(self.scaling_group.id))
+        self.assertEqual(
+            self.lc_flavor_ref,
+            server.flavorRef,
+            msg='Flavor id did not match for group {0}'
+            .format(self.scaling_group.id))
         self.assertEquals(
             self.autoscale_behaviors.network_uuid_list(self.lc_networks),
-            self.autoscale_behaviors.network_uuid_list(
-                self.scaling_group.launchConfiguration.server.networks),
+            self.autoscale_behaviors.network_uuid_list(server.networks),
             msg='Networks within the launch config did not match'
             ' for group {0}'.format(self.scaling_group.id))
         self.assertEquals(
             self.autoscale_behaviors.personality_list(self.lc_personality),
-            self.autoscale_behaviors.personality_list(
-                self.scaling_group.launchConfiguration.server.personality),
+            self.autoscale_behaviors.personality_list(server.personality),
             msg='Personality within the launch config did not match'
             ' for group {0}'.format(self.scaling_group.id))
         self.assertEqual(
@@ -162,15 +169,15 @@ class CreateScalingGroupTest(AutoscaleFixture):
             self.autoscale_behaviors.policy_details_list(self.sp_list),
             self.autoscale_behaviors.policy_details_list(
                 self.scaling_group.scalingPolicies),
-            msg='Scaling policies of the scaling group did not match'
-            ' for group {0}'.format(self.scaling_group.id))
+            msg='Scaling policies of the scaling group did not match '
+            'for group {0}'.format(self.scaling_group.id))
 
         if self.lc_block_device_mapping is not None:
             self.assertEqual(
                 self.lc_block_device_mapping,
-                self.scaling_group.launchConfiguration.server.block_device_mapping,
-                msg=('Block device mapping within the launch config did not '
-                     'match group {0}'.format(self.scaling_group.id)))
+                server.block_device_mapping,
+                msg='Block device mapping within the launch config did not '
+                'match group {0}'.format(self.scaling_group.id))
 
     def _test_created_scaling_group_state_fields(self):
         """
@@ -192,8 +199,8 @@ class CreateScalingGroupTest(AutoscaleFixture):
     def test_create_scaling_group_with_boot_from_volume_empty_image(self):
         """
         Create a scaling group with an empty image ID, and test that the
-        response is successful and that all the launch config fields match
-        what was created.
+        response is successful and that all the launch config fields match what
+        was created.
         """
         device = {
             "boot_index": "0",
@@ -211,8 +218,8 @@ class CreateScalingGroupTest(AutoscaleFixture):
     def test_create_scaling_group_with_boot_from_volume_null_image(self):
         """
         Create a scaling group with a None image ID, and test that the
-        response is successful and that all the launch config fields match
-        what was created.
+        response is successful and that all the launch config fields match what
+        was created.
         """
         device = {
             "boot_index": "0",
@@ -229,9 +236,9 @@ class CreateScalingGroupTest(AutoscaleFixture):
 
     def test_create_scaling_group_with_boot_from_volume_no_image(self):
         """
-        Create a scaling group with no image ID, and test that the
-        response is successful and that all the launch config fields match
-        what was created.
+        Create a scaling group with no image ID, and test that the response
+        is successful and that all the launch config fields match what was
+        created.
         """
         device = {
             "boot_index": "0",

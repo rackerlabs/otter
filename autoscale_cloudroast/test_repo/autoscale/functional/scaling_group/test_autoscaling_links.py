@@ -2,21 +2,22 @@
 Test to verify the links on the autoscaling api responses.
 """
 import re
+
 from urlparse import urlparse
+
 from test_repo.autoscale.fixtures import ScalingGroupWebhookFixture
 
 
 class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     """
-    Verify links on the autoscaling api response calls
+    Verify links on the autoscaling api response calls.
     """
     # Issue AUTO-209 - no bookmark link
 
     def test_scaling_group_links(self):
         """
-        Verify that scaling groups has links for self
-        (no bookmark link)
+        Verify that scaling groups has links for self (no bookmark link).
         """
         self.assertTrue(self.group.links is not None,
                         msg='No links returned upon scaling group creation'
@@ -28,7 +29,7 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     def test_scaling_policy_links(self):
         """
-        Verify that scaling policy has links for self
+        Verify that scaling policy has links for self.
         """
         self.assertTrue(self.policy['links'] is not None,
                         msg='No links returned upon scaling policy creation'
@@ -40,7 +41,7 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     def test_webhook_links(self):
         """
-        Verify that webhook has links for self
+        Verify that webhook has links for self.
         """
         self.assertTrue(self.webhook['links'] is not None,
                         msg='No links returned upon webhook creation'
@@ -52,28 +53,35 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     def test_webhook_capability_link(self):
         """
-        Verify that webhooks capability link is a full url with a version
+        Verify that webhooks capability link is a full url with a
+        version.
         """
         endpoint = self.url.strip(str(self.tenant_id)) + 'execute/'
-        self.assertTrue(endpoint in self.webhook['links'].capability,
-                        msg='The url used to create the group {0} doesnt match'
-                        ' the url in self link{1}'.format(endpoint,
-                            self.webhook['links'].capability))
+        self.assertTrue(
+            endpoint in self.webhook['links'].capability,
+            msg='The url used to create the group {0} doesnt match'
+            ' the url in self link{1}'
+            .format(endpoint, self.webhook['links'].capability))
 
     def _has_version(self, link):
         """
-        check url has version
+        Check if the URL has a version in it.
+
         @return True if it has version
         """
         return re.search('^/v+\d', urlparse(link).path) is not None
 
     def _validate_links(self, self_link, item_id):
         """
+        Verify that the link to the webhook includes the URL used to
+        create the group, as well as the item id.
         """
-        self.assertTrue(item_id in self_link,
-                        msg='The ID does not exist in self links'
-                        ' for item_id {0}'.format(item_id))
-        self.assertTrue(self.url in self_link,
-                        msg='The url used to create the group doesnt match'
-                        ' the url in self link for id {0}'.format(item_id))
+        self.assertTrue(
+            item_id in self_link,
+            msg='The ID does not exist in self links for item_id {0}'
+            .format(item_id))
+        self.assertTrue(
+            self.url in self_link,
+            msg='The URL used to create the group doesnt match the '
+            'url in self link for id {0}'.format(item_id))
         self.assertTrue(self._has_version(self_link))
