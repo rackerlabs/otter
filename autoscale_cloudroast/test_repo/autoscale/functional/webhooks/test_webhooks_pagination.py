@@ -65,7 +65,8 @@ class PaginateWebhooks(AutoscaleFixture):
         list_webhooks = self._list_webhooks_with_given_limit(param)
         self._assert_list_webhooks_with_limits_next_link(param, list_webhooks)
         rem_list_webhooks = self.autoscale_client.list_webhooks(
-            self.group.id, self.policy['id'], url=list_webhooks.webhooks_links.next).entity
+            self.group.id, self.policy['id'],
+            url=list_webhooks.webhooks_links.next).entity
         #Verify that there is at least one webhook in the second batch and there is no next link
         self._assert_list_webhooks_with_limits_next_link(1, rem_list_webhooks, False)
 
