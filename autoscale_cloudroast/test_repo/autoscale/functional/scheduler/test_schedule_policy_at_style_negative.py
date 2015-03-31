@@ -320,8 +320,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_invalid_minute(self):
         """
-        Creating a scaling policy of type schedule with (at style) with invalid minute in the date
-        results in a 400.
+        Creating a scaling policy of type schedule with (at style) with
+        invalid minute in the date results in a 400.
         """
         schedule_value = '2013-12-31T10:70:00Z'
         schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
