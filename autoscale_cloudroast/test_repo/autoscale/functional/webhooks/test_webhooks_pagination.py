@@ -161,8 +161,9 @@ class PaginateWebhooks(AutoscaleFixture):
         if next_link:
             self.assertTrue(list_webhooks.webhooks_links.next)
         else:
-            self.assertDictEqual(list_webhooks.webhooks_links.links, {}, msg='Links to next provided'
-                                 ' when not expected')
+            self.assertDictEqual(
+                list_webhooks.webhooks_links.links, {},
+                msg='Links to next provided when not expected')
 
     def _list_webhooks_with_given_limit(self, param, response=200):
         """
