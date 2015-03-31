@@ -103,8 +103,8 @@ class PaginateWebhooks(AutoscaleFixture):
 
     def test_list_webhooks_with_marker(self):
         """
-        List the webhooks with the marker set to be an existing webhook id and verify that the correct
-        response (200) is recieved.
+        List the webhooks with the marker set to be an existing webhook id and
+        verify that the correct response (200) is recieved.
         """
         # Create a webhook in order to use the id as a marker
         create_webhook = self.autoscale_client.create_webhook(group_id=self.group.id,
