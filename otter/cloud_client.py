@@ -348,11 +348,13 @@ def _process_clb_api_error(exc_info, lb_id, extra_parsing):
 
 
 # ----- Nova requests and error parsing -----
+
 @attributes([Attribute('server_id', instance_of=six.text_type)])
 class NoSuchServerError(Exception):
     """
     Exception to be raised when there is no such server in Nova.
     """
+
 
 @attributes([Attribute('server_id', instance_of=six.text_type)])
 class ServerMetadataOverLimitError(Exception):
@@ -360,6 +362,7 @@ class ServerMetadataOverLimitError(Exception):
     Exception to be raised when there are too many metadata items on the
     server already.
     """
+
 
 class NovaRateLimitError(Exception):
     """
@@ -423,4 +426,3 @@ def _check_nova_rate_limit(api_error):
         message = try_json_with_keys(api_error.body, ('overLimit', 'message'))
         if message:
             raise NovaRateLimitError(message)
-

@@ -503,11 +503,11 @@ class NovaClientTests(SynchronousTestCase):
         server_id, expected, real = self._setup_for_set_nova_metadata_item()
 
         failure_body = {
-            "overLimit" : {
-                "code" : 413,
-                "message" : "OverLimit Retry...",
-                "details" : "Error Details...",
-                "retryAfter" : "2015-02-27T23:42:27Z"
+            "overLimit": {
+                "code": 413,
+                "message": "OverLimit Retry...",
+                "details": "Error Details...",
+                "retryAfter": "2015-02-27T23:42:27Z"
             }
         }
         dispatcher = EQFDispatcher([(
@@ -518,4 +518,5 @@ class NovaClientTests(SynchronousTestCase):
         with self.assertRaises(NoSuchServerError) as cm:
             sync_perform(dispatcher, real)
 
-        self.assertEqual(cm.exception, NovaRateLimitError("OverLimit Retry..."))
+        self.assertEqual(cm.exception,
+                         NovaRateLimitError("OverLimit Retry..."))
