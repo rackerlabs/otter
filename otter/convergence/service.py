@@ -440,6 +440,14 @@ class Converger(MultiService):
         # the return value is ignored, but we return this for testing
         return result
 
+    def divergent_changed(self, children):
+        self.log.msg('convergence-zk-watch')
+        if self.partitioner.partitioner.acquired:
+            # TODO: don't use private stuff :(
+            # TODO: only call buckets_acquired if we own some of the children
+            # TODO: maybe don't do so much work?
+            my_buckets = self.partitioner._get_current_buckets()
+            self.buckets_acquired(my_buckets)
 
 # We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this

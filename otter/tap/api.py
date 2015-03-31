@@ -25,10 +25,14 @@ from twisted.web.server import Site
 
 from txkazoo import TxKazooClient
 from txkazoo.log import TxLogger
+from txkazoo.recipe.watchers import watch_children
 
 from otter.auth import generate_authenticator
 from otter.bobby import BobbyClient
-from otter.constants import CONVERGENCE_PARTITIONER_PATH, get_service_configs
+from otter.constants import (
+    CONVERGENCE_DIRTY_DIR,
+    CONVERGENCE_PARTITIONER_PATH,
+    get_service_configs)
 from otter.convergence.service import (
     ConvergenceStarter, Converger, set_convergence_starter)
 from otter.effect_dispatcher import get_full_dispatcher
@@ -310,6 +314,7 @@ def setup_converger(parent, kz_client, dispatcher):
     )
     cvg = Converger(log, dispatcher, converger_buckets, partitioner_factory)
     cvg.setServiceParent(parent)
+    watch_children(kz_client, CONVERGENCE_DIRTY_DIR, cvg.divergent_changed)
 
 
 def setup_scheduler(parent, store, kz_client):
