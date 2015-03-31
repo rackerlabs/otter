@@ -197,8 +197,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_date_as_whitespace(self):
         """
-        Creating a scaling policy of type schedule with (at style) date as whitespace
-        results in a 400.
+        Creating a scaling policy of type schedule with (at style) date as
+        whitespace results in a 400.
         """
         args = {'at': '  '}
         create_schedule_at_style_response = self.autoscale_client.create_policy(
