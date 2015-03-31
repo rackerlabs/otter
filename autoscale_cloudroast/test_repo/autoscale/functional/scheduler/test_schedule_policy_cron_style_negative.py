@@ -127,10 +127,10 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
             self.assertEquals(
                 schedule_policy_cron_style['status_code'],
                 400,
-                msg='Create schedule policy with invalid cron style results in{0}'
-                ' for group {1}'.format(
-                    schedule_policy_cron_style['status_code'],
-                    self.group.id))
+                msg='Create schedule policy with invalid cron style results '
+                'in {0} for group {1}'
+                .format(schedule_policy_cron_style['status_code'],
+                        self.group.id))
 
     def test_schedule_cron_style_policy_with_invalid_cron_minute(self):
         """
