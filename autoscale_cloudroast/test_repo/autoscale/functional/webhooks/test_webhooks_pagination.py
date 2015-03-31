@@ -123,10 +123,10 @@ class PaginateWebhooks(AutoscaleFixture):
         webhook = self.autoscale_behaviors.get_webhooks_properties(
             create_webhook)
         # List the webhooks with a specified marker
-        webhook_response = self.autoscale_client.list_webhooks(self.group.id, self.policy['id'],
-                                                               marker=webhook['id'])
         self.assertEquals(webhook_response.status_code, 200,
                           msg='list webhooks failed with {0}'.format(webhook_response.status_code))
+        webhook_response = self.autoscale_client.list_webhooks(
+            self.group.id, self.policy['id'], marker=webhook['id'])
 
     def test_list_webhooks_with_invalid_marker(self):
         """
