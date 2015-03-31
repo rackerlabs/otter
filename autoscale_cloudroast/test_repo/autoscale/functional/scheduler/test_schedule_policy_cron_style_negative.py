@@ -92,8 +92,8 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
 
     def test_schedule_cron_style_policy_with_date(self):
         """
-        Creating a scaling policy of type schedule via cron style but time as value
-        results in a 400.
+        Creating a scaling policy of type schedule via cron style but time
+        as value results in a 400.
         """
         schedule_value = self.autoscale_behaviors.get_time_in_utc(60)
         self.assertEquals(schedule_policy_cron_style['status_code'], 400,
