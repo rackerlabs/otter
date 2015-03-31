@@ -234,7 +234,8 @@ class AutoscaleFixture(BaseTestFixture):
         If delete is set to True, the scaling group is deleted.
         """
         servers_on_group = (
-            self.autoscale_client.list_status_entities_sgroups(group.id)).entity
+            self.autoscale_client.list_status_entities_sgroups(
+                group.id)).entity
         if servers_on_group.desiredCapacity is not 0:
             self.autoscale_client.update_group_config(
                 group_id=group.id,
