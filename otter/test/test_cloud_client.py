@@ -32,6 +32,7 @@ from otter.cloud_client import (
     add_bind_service,
     change_clb_node,
     concretize_service_request,
+    get_server_details,
     perform_tenant_scope,
     service_request,
     set_nova_metadata_item)
@@ -424,7 +425,7 @@ class NovaClientTests(SynchronousTestCase):
         Produce the data needed to test :obj:`set_nova_metadata_item`: a tuple
         of (server_id, expected_effect, real_effect)
         """
-        server_id = str(uuid4())
+        server_id = unicode(uuid4())
         real = set_nova_metadata_item(server_id=server_id, key='k', value='v')
         expected = service_request(
             ServiceType.CLOUD_SERVERS,
@@ -434,6 +435,52 @@ class NovaClientTests(SynchronousTestCase):
             reauth_codes=(401,),
             success_pred=has_code(200))
         return (server_id, expected, real)
+
+    def assert_handles_no_such_server(self, intent, effect, server_id):
+        """
+        If the provided intent returns a response consistent with a server not
+        existing, then performing the effect will return a
+        :class:`NoSuchServerError`.
+        """
+        message = "Server does not exist"
+        failure_body = {"itemNotFound": {"message": message, "code": 404}}
+
+        dispatcher = EQFDispatcher([(
+            intent,
+            service_request_eqf(
+                stub_pure_response(json.dumps(failure_body), 404)))])
+
+        with self.assertRaises(NoSuchServerError) as cm:
+            sync_perform(dispatcher, effect)
+
+        self.assertEqual(
+            cm.exception,
+            NoSuchServerError(message, server_id=six.text_type(server_id)))
+
+    def assert_handles_nova_rate_limiting(self, intent, effect):
+        """
+        If the provided intent returns a response consistent with Nova
+        rate-limiting requests, then performing the effect will return a
+        :class:`NovaRateLimitError`.
+        """
+        failure_body = {
+            "overLimit": {
+                "code": 413,
+                "message": "OverLimit Retry...",
+                "details": "Error Details...",
+                "retryAfter": "2015-02-27T23:42:27Z"
+            }
+        }
+        dispatcher = EQFDispatcher([(
+            intent,
+            service_request_eqf(
+                stub_pure_response(json.dumps(failure_body), 413)))])
+
+        with self.assertRaises(NovaRateLimitError) as cm:
+            sync_perform(dispatcher, effect)
+
+        self.assertEqual(cm.exception,
+                         NovaRateLimitError("OverLimit Retry..."))
 
     def test_set_nova_metadata_item_success(self):
         """
@@ -478,45 +525,51 @@ class NovaClientTests(SynchronousTestCase):
         """
         Return a :class:`NoSuchServerError` if the server doesn't exist.
         """
-        server_id, expected, real = self._setup_for_set_nova_metadata_item()
-
-        message = "Server does not exist"
-        failure_body = {"itemNotFound": {"message": message, "code": 404}}
-
-        dispatcher = EQFDispatcher([(
-            expected.intent,
-            service_request_eqf(
-                stub_pure_response(json.dumps(failure_body), 404)))])
-
-        with self.assertRaises(NoSuchServerError) as cm:
-            sync_perform(dispatcher, real)
-
-        self.assertEqual(
-            cm.exception,
-            NoSuchServerError(message, server_id=six.text_type(server_id)))
+        server_id, expected, eff = self._setup_for_set_nova_metadata_item()
+        self.assert_handles_no_such_server(expected.intent, eff, server_id)
 
     def test_set_nova_metadata_rate_limiting(self):
         """
         Return a :class:`NovaRateLimitError` if Nova starts rate-limiting
         requests.
         """
-        server_id, expected, real = self._setup_for_set_nova_metadata_item()
+        server_id, expected, eff = self._setup_for_set_nova_metadata_item()
+        self.assert_handles_nova_rate_limiting(expected.intent, eff)
 
-        failure_body = {
-            "overLimit": {
-                "code": 413,
-                "message": "OverLimit Retry...",
-                "details": "Error Details...",
-                "retryAfter": "2015-02-27T23:42:27Z"
-            }
-        }
+    def _setup_for_get_server_details(self):
+        """
+        Produce the data needed to test :obj:`get_server_details`: a tuple
+        of (server_id, expected_effect, real_effect)
+        """
+        server_id = unicode(uuid4())
+        real = get_server_details(server_id=server_id)
+        expected = service_request(
+            ServiceType.CLOUD_SERVERS,
+            'GET',
+            'servers/{0}'.format(server_id),
+            success_pred=has_code(200))
+        return (server_id, expected, real)
+
+    def test_get_server_details_success(self):
+        """
+        Produce a request getting a Nova server's details, which
+        returns a successful result on 200.
+        """
+        server_id, expected, real = self._setup_for_get_server_details()
+
+        success_body = {"so much": "data"}
         dispatcher = EQFDispatcher([(
             expected.intent,
             service_request_eqf(
-                stub_pure_response(json.dumps(failure_body), 413)))])
+                stub_pure_response(json.dumps(success_body), 200)))])
 
-        with self.assertRaises(NovaRateLimitError) as cm:
-            sync_perform(dispatcher, real)
+        self.assertEqual(sync_perform(dispatcher, real),
+                         (StubResponse(200, {}), success_body))
 
-        self.assertEqual(cm.exception,
-                         NovaRateLimitError("OverLimit Retry..."))
+    def test_get_server_details_errors(self):
+        """
+        Correctly parses nova rate limiting errors and no such server errors.
+        """
+        server_id, expected, eff = self._setup_for_get_server_details()
+        self.assert_handles_no_such_server(expected.intent, eff, server_id)
+        self.assert_handles_nova_rate_limiting(expected.intent, eff)

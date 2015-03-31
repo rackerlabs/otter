@@ -385,7 +385,7 @@ def set_nova_metadata_item(server_id, key, value):
     Succeed on 200.
 
     :raise: :class:`NoSuchServer`, :class:`MetadataOverLimit`,
-        :class:`APIError`
+        :class:`NovaRateLimitError`, :class:`APIError`
     """
     eff = service_request(
         ServiceType.CLOUD_SERVERS,
@@ -413,6 +413,38 @@ def set_nova_metadata_item(server_id, key, value):
                     if exc_class != NovaRateLimitError:
                         kwargs = {'server_id': six.text_type(server_id)}
                     raise exc_class(message, **kwargs)
+
+        six.reraise(*exc_info)
+
+    return eff.on(error=catch(APIError, _parse_err))
+
+
+def get_server_details(server_id):
+    """
+    Get details for one particular server.
+
+    :ivar str server_id: a Nova server ID.
+
+    Succeed on 200.
+
+    :raise: :class:`NoSuchServer`, :class:`NovaRateLimitError`,
+        :class:`APIError`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_SERVERS,
+        'GET',
+        append_segments('servers', server_id),
+        success_pred=has_code(200))
+
+    def _parse_err(exc_info):
+        api_error = exc_info[1]
+        _check_nova_rate_limit(api_error)
+
+        if api_error.code == 404:
+            message = try_json_with_keys(api_error.body,
+                                         ('itemNotFound', 'message'))
+            if message:
+                raise NoSuchServerError(message, server_id=server_id)
 
         six.reraise(*exc_info)
 
