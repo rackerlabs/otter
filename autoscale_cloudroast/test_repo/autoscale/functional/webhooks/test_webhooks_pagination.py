@@ -31,9 +31,10 @@ class PaginateWebhooks(AutoscaleFixture):
         super(PaginateWebhooks, self).setUp()
         group_response = self.autoscale_behaviors.create_scaling_group_min()
         self.group = group_response.entity
-        self.policy = self.autoscale_behaviors.create_policy_given(self.group.id, sp_change=1)
         self.resources.add(
             self.group.id, self.autoscale_client.delete_scaling_group)
+        self.policy = self.autoscale_behaviors.create_policy_given(
+            self.group.id, sp_change=1)
         self._create_multiple_webhooks(4)
 
     def test_list_webhooks_when_list_webhooks_is_greater_than_default_limit(self):
