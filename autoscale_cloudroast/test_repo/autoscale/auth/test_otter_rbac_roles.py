@@ -168,7 +168,8 @@ class OtterRbacTests(AutoscaleFixture):
             deserialize_format='json')
         return autoscale_temp_client
 
-    def _verify_otter_observer_role(self, user_client, expected_response_code=200):
+    def _verify_otter_observer_role(
+            self, user_client, expected_response_code=200):
         """
         verify all the GET calls on a group and policy. Uses the group,
         policy and webhook created as part of the setUp.
