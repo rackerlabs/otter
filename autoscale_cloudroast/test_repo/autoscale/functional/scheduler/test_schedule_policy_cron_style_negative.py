@@ -108,7 +108,8 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
 
     def test_schedule_cron_style_policy_special_cron_keywords(self):
         """
-        Creating a scaling policy of type schedule with special cron keywords
+        Creating a scaling policy of type schedule with special cron
+        keywords.
         """
         schedule_value_list = [
             '@yearly', '@daily', '@hourly', '@reboot', '@weekly', '@monthly']
