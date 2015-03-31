@@ -347,10 +347,13 @@ class AutoscaleFixture(BaseTestFixture):
 
         :param name: if given, return servers with this name
         """
-        return filter(lambda s: s.task_state != 'deleting' and s.status != 'DELETED',
-                      self.server_client.list_servers_with_detail(name=name).entity)
+        return filter(
+            lambda s: s.task_state != 'deleting' and s.status != 'DELETED',
+            self.server_client.list_servers_with_detail(
+                name=name).entity)
 
-    def get_servers_containing_given_name_on_tenant(self, group_id=None, server_name=None):
+    def get_servers_containing_given_name_on_tenant(
+            self, group_id=None, server_name=None):
         """
         Get a list of server IDs not marked pending deletion from Nova based on the
         given server_name. If the group_id is given, use the server_name extracted
