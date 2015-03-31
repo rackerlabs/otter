@@ -52,6 +52,14 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         results in a 400.
         """
         args = {'cron': ''}
+        create_schedule_at_style_response = (
+            self.autoscale_client.create_policy(
+                group_id=self.group.id,
+                name=self.sp_name,
+                cooldown=self.sp_cooldown,
+                change=self.sp_change,
+                policy_type='schedule',
+                args=args))
         self.assertEquals(
             create_schedule_at_style_response.status_code,
             400,
