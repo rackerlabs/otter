@@ -70,8 +70,9 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_observer_autoscale_admin(self):
         """
-        Given a user with an admin role for Autoscale, and observer role for nova and lbaas,
-        ensure the user can still perform all admin operations on Otter.
+        Given a user with an admin role for Autoscale, and observer role
+        for nova and lbaas, ensure the user can still perform all
+        admin operations on Otter.
         """
         autoscale_no_lo_aa = self.autoscale_config.autoscale_no_lo_aa
         user_client = self._create_client(autoscale_no_lo_aa, self.password)
