@@ -218,10 +218,12 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
     @unittest.skip('AUTO-475')
     def test_schedule_cron_style_policy_with_invalid_cron_values(self):
         """
-        Creating a scaling policy of type schedule via cron style with invalid values in
-        cron results in a 400.
-        Note: This is collection of certain failed cases in above tests since they occur due to issues
-        in croniter which is being tracked in AUTO-475
+        Creating a scaling policy of type schedule via cron style with
+        invalid values in cron results in a 400.
+
+        Note: This is collection of certain failed cases in above
+        tests since they occur due to issues in croniter which is
+        being tracked in AUTO-475
         """
         invalid_crons = ['* * 0 * *', '* * 0-0 * *',
                          '* * * 0-0 *', '* * * * 7', '* * * * 0-0']
