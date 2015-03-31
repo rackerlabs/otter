@@ -182,6 +182,7 @@ class PaginateWebhooks(AutoscaleFixture):
         """
         for _ in range(num_hooks):
             hook_name = "Webhook " + str(_)
-            self.autoscale_client.create_webhook(group_id=self.group.id,
-                                                 policy_id=self.policy['id'],
-                                                 name=hook_name)
+            self.autoscale_client.create_webhook(
+                group_id=self.group.id,
+                policy_id=self.policy['id'],
+                name=hook_name)
