@@ -269,8 +269,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_invalid_year(self):
         """
-        Creating a scaling policy of type schedule with (at style) with invalid year in the date
-        results in a 400.
+        Creating a scaling policy of type schedule with (at style) with
+        invalid year in the date results in a 400.
         """
         schedule_value = '0000-12-05T03:12:00Z'
         schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
