@@ -119,9 +119,9 @@ class PaginateWebhooks(AutoscaleFixture):
 
     def test_list_webhooks_with_invalid_marker(self):
         """
-        List the webhooks with invalid markers and verify that the marker is ignored.
-        Currently Otter is not checking the validity of a marker, so the expected behavior is
-        that the invalid marker is ignored.
+        List the webhooks with invalid markers and verify that the marker is
+        ignored.  Currently Otter is not checking the validity of a marker, so
+        the expected behavior is that the invalid marker is ignored.
         """
         params = [1, 'invalid']
         for each_param in params:
