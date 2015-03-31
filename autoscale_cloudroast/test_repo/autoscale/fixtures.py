@@ -329,8 +329,9 @@ class AutoscaleFixture(BaseTestFixture):
         self, group_id, delay=3,
             change=None, scale_down=None):
         """
-        Creates an at style scale up/scale down policy to execute at utcnow() + delay and waits
-        the scheduler config seconds + delay, so that the policy is picked
+        Creates an at style scale up/scale down policy to execute at
+        utcnow() + delay and waits the scheduler config seconds +
+        delay, so that the policy is picked
         """
         if change is None:
             change = self.sp_change
