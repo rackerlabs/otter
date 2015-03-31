@@ -98,8 +98,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_date_in_the_past(self):
         """
-        Creating a scaling policy of type schedule with (at style) date in the past
-        results in a 400.
+        Creating a scaling policy of type schedule with (at style) date in
+        the past results in a 400.
         ** Auto 404, fails with 201 **
         """
         schedule_value = self.autoscale_behaviors.get_time_in_utc(-172800)
