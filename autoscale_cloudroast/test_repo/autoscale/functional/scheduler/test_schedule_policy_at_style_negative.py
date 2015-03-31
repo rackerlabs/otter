@@ -33,10 +33,9 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                                         sp_change=self.sp_change,
                                         schedule_at=schedule_value))
         self.assertEquals(
-            schedule_policy_at_style['status_code'],
-            400,
-            msg='Create schedule policy via at style with a different date format'
-            'results in {0} for group {1}'.format(
+            schedule_policy_at_style['status_code'], 400,
+            msg='Create schedule policy via at style with a different date '
+            'format results in {0} for group {1}'.format(
                 schedule_policy_at_style['status_code'],
                 self.group.id))
 
