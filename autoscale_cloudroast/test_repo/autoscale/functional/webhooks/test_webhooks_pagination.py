@@ -22,10 +22,11 @@ class PaginateWebhooks(AutoscaleFixture):
 
     def setUp(self):
         """
-        Create a group, a scaling policy, and four webhooks for testing since no
-        webhook is supplied by the fixture. A new group is created for each
-        test case, and the group is deleted upon test completion, which will
-        also delete the associated policy and webhooks.
+        Create a group, a scaling policy, and four webhooks for testing
+        since no webhook is supplied by the fixture. A new group is
+        created for each test case, and the group is deleted upon test
+        completion, which will also delete the associated policy and
+        webhooks.
         """
         super(PaginateWebhooks, self).setUp()
         group_response = self.autoscale_behaviors.create_scaling_group_min()
