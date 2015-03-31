@@ -46,8 +46,9 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_autoscale_admin(self):
         """
-        Given a user with an admin role for Autscale, nova and lbaas, verify the user
-        has permissions to perform all CRUD operations in otter.
+        Given a user with an admin role for Autscale, nova and lbaas,
+        verify the user has permissions to perform all CRUD operations
+        in otter.
         """
         autoscale_na_la_aa = self.autoscale_config.autoscale_na_la_aa
         user_client = self._create_client(autoscale_na_la_aa, self.password)
