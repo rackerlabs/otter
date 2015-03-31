@@ -96,14 +96,15 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         results in a 400.
         """
         schedule_value = self.autoscale_behaviors.get_time_in_utc(60)
-        schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
-            group_id=self.group.id,
-            sp_change=self.sp_change,
-            schedule_cron=schedule_value)
         self.assertEquals(schedule_policy_cron_style['status_code'], 400,
                           msg='Create schedule scaling cron style policy with time as value passed {0}'
                           ' for group {1}'.format(schedule_policy_cron_style['status_code'],
                                                   self.group.id))
+        schedule_policy_cron_style = (
+            self.autoscale_behaviors.create_schedule_policy_given(
+                group_id=self.group.id,
+                sp_change=self.sp_change,
+                schedule_cron=schedule_value))
 
     def test_schedule_cron_style_policy_special_cron_keywords(self):
         """
