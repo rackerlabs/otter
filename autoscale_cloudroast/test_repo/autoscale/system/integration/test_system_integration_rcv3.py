@@ -291,7 +291,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         # This sleep is necessary because other tests have just completed, but
         # their resources haven't yet been completely freed up.  TODO(sfalvo):
         # See Github issue #855.
-        time.sleep(15 if self.autoscale_behaviors.mimic else 120)
+        time.sleep(15 if autoscale_config.mimic else 120)
 
         # Capture the initial number of cloud servers on the node.
         # This is our baseline number of servers.
