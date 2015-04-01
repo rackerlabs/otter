@@ -518,26 +518,23 @@ class AutoscaleFixture(BaseTestFixture):
     def delete_nodes_in_loadbalancer(self, node_id_list, load_balancer):
         """
         Given the node id list and load balancer id, check for lb status
-        'PENDING UPDATE' and delete node when lb is ACTIVE
+        'PENDING UPDATE' and try to delete all the nodes when lb is ACTIVE.
         """
-        class _TimeoutError(Exception):
-            def __init__(elapsed):
-                self.elapsed = elapsed
-
         for each_node_id in node_id_list:
             def check_deleted(elapsed_time):
                 delete_response = self.lbaas_client.delete_node(
                     load_balancer,
                     each_node_id)
                 if 'PENDING_UPDATE' in delete_response.text:
-                    raise _TimeoutError(elapsed_time)
+                    self.fail(
+                      'Tried deleting node for {0} secs but lb {1} remained '
+                      'in PENDING_UPDATE state'.format(
+                          elapsed_time, load_balancer))
             try:
                 self.autoscale_behaviors.retry(
                     check_deleted, timeout=120, interval_time=2)
-            except _TimeoutError as e:
-                print('Tried deleting node for {0} secs but lb {1} remained '
-                      'in PENDING_UPDATE state'.format(e.elapsed,
-                                                       load_balancer))
+            except AssertionError as e:
+                print(e.message)
 
     def get_total_num_groups(self):
         """
