@@ -87,6 +87,13 @@ class ConvergerTests(SynchronousTestCase):
         self.log = mock_log()
         self.buckets = range(10)
 
+    def _converger(self, converge_all_groups, dispatcher=None):
+        if dispatcher is None:
+            dispatcher = _get_dispatcher()
+        return Converger(
+            self.log, self.dispatcher, self.buckets,
+            self._pfactory, converge_all_groups=converge_all_groups)
+
     def _pfactory(self, log, callable):
         self.fake_partitioner = FakePartitioner(log, callable)
         return self.fake_partitioner
@@ -104,9 +111,7 @@ class ConvergerTests(SynchronousTestCase):
             return Effect(Constant('foo'))
 
         my_buckets = [0, 5]
-        converger = Converger(
-            self.log, self.dispatcher, self.buckets,
-            self._pfactory, converge_all_groups=converge_all_groups)
+        converger = self._converger(converge_all_groups)
 
         result = self.fake_partitioner.got_buckets(my_buckets)
         self.assertEqual(self.successResultOf(result), 'foo')
@@ -119,15 +124,19 @@ class ConvergerTests(SynchronousTestCase):
         def converge_all_groups(log, group_locks, _my_buckets, all_buckets):
             return Effect(Error(RuntimeError('foo')))
 
-        Converger(
-            self.log, self.dispatcher, self.buckets,
-            self._pfactory, converge_all_groups=converge_all_groups)
+        self._converger(converge_all_groups)
 
         result = self.fake_partitioner.got_buckets([0])
         self.assertEqual(self.successResultOf(result), None)
         self.log.err.assert_called_once_with(
             CheckFailureValue(RuntimeError('foo')),
             'converge-all-groups-error', system='converger')
+
+    def test_divergent_changed(self):
+        def converge_all_groups(log, group_locks, _my_buckets, all_buckets):
+            return Effect(Constant('foo'))
+        converger = self._converger(converge_all_groups)
+        converger.divergent_changed([], dispatcher=object())
 
 
 class ConvergeOneGroupTests(SynchronousTestCase):

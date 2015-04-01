@@ -446,6 +446,7 @@ class Converger(MultiService):
             # TODO: don't use private stuff :(
             # TODO: only call buckets_acquired if we own some of the children
             # TODO: maybe don't do so much work?
+            # TODO: nagle?
             my_buckets = self.partitioner._get_current_buckets()
             self.buckets_acquired(my_buckets)
 
