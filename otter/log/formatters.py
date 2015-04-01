@@ -272,7 +272,7 @@ def ErrorFormattingWrapper(observer):
                 event['traceback'] = event['failure'].getTraceback()
                 event['exception_type'] = excp.__class__.__name__
                 details = serialize_to_jsonable(excp)
-                if details != repr(excp):
+                if details != message:
                     event['error_details'] = details
 
             if 'why' in event and event['why']:
