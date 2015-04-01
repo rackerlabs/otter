@@ -80,7 +80,9 @@ class ServerState(Names):
 
     DRAINING = NamedConstant()
     """"
-    Autoscale is deleting the server.
+    Autoscale is deleting the server.  This state is meant to supercede Nova's
+    ``BUILD`` and ``ACTIVE`` states, because this state means that the server
+    is basically functional, but that Autoscale would like to delete it.
     """
 
     DELETED = NamedConstant()
