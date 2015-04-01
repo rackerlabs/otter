@@ -313,7 +313,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         # Wait for rackconnect to reflect number of servers.  This is
         # intentionally not a polling loop since that would prevent overage
         # detection.
-        time.sleep(10 if self.autoscale_behaviors.mimic else 60)
+        time.sleep(10 if autoscale_config.mimic else 60)
 
         # Make sure that we have the correct number of cloud servers in our
         # possession.
