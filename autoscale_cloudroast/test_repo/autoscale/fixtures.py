@@ -397,77 +397,74 @@ class AutoscaleFixture(BaseTestFixture):
         return [s for s in self.get_non_deleting_servers() if is_in_group(s)]
 
     def verify_server_count_using_server_metadata(self, group_id,
-                                                  expected_count):
+                                                  expected_count,
+                                                  time_scale=True):
         """
         Asserts the expected count is the number of servers with the groupid
         in the metadata. Fails if the count is not met in 60 seconds.
         """
-        end_time = time.time() + 60
-        while time.time() < end_time:
+        def verify(elapsed_time):
             actual_count = len(
                 self.get_group_servers_based_on_metadata(group_id)
             )
-            if actual_count is expected_count:
-                break
-            time.sleep(5)
-        else:
-            self.fail('Waited 60 seconds, expecting {0} servers with group id '
-                      ': {1} in the '
-                      'metadata but has {2} servers'.format(
-                          expected_count, group_id, actual_count))
+            if actual_count != expected_count:
+                self.fail(
+                    'Waited {0} seconds, expecting {1} servers with group id '
+                    ': {1} in the metadata but has {2} servers'.format(
+                        elapsed_time, expected_count, group_id, actual_count))
+
+        return self.autoscale_behaviors.retry(
+            verify, timeout=60, interval_time=5, time_scale=time_scale)
 
     def wait_for_expected_number_of_active_servers(self, group_id,
                                                    expected_servers,
                                                    interval_time=None,
                                                    timeout=None,
-                                                   api="Autoscale"):
+                                                   api="Autoscale",
+                                                   time_scale=True):
         """This thunks to its replacement in Behaviors.
         Please refer to Autoscale's behaviors.py for more details.
         """
         return (self.autoscale_behaviors
                 .wait_for_expected_number_of_active_servers(
                     group_id, expected_servers, interval_time, timeout,
-                    api=api, asserter=self))
+                    api=api, asserter=self, time_scale=time_scale))
 
     def wait_for_expected_group_state(self, group_id, expected_servers,
-                                      wait_time=180, interval=None):
+                                      wait_time=180, interval=None,
+                                      time_scale=True):
         """
         :summary: verify the group state reached the expected servers count.
         :param group_id: Group id
         :param expected_servers: Number of servers expected
         """
-        if interval is None:
-            interval = self.interval_time
-
-        end_time = time.time() + wait_time
-        while time.time() < end_time:
+        def check_state(elapsed_time):
             group_state = self.autoscale_client.list_status_entities_sgroups(
                 group_id).entity
-            if group_state.desiredCapacity == expected_servers:
-                return
-            time.sleep(interval)
-        else:
-            self.fail(
-                "wait_for_exepected_group_state ran for {0} seconds for group "
-                "{1} and did not observe the active server list achieving the "
-                "expected servers count: {2}.  Got {3} instead.".format(
-                    interval, group_id, expected_servers,
-                    group_state.desiredCapacity))
+            if group_state.desiredCapacity != expected_servers:
+                self.fail(
+                    "wait_for_exepected_group_state ran for {0} seconds for "
+                    "group {1} and did not observe the active server list "
+                    "achieving the expected servers count: {2}.  "
+                    "Got {3} instead.".format(
+                        elapsed_time, group_id, expected_servers,
+                        group_state.desiredCapacity))
+        return self.autoscale_behaviors.retry(
+            check_state, timeout=wait_time, interval_time=interval,
+            time_scale=time_scale)
 
     def check_for_expected_number_of_building_servers(
         self, group_id, expected_servers,
-            desired_capacity=None, server_name=None):
+            desired_capacity=None, server_name=None, time_scale=True):
         """
-        :summary: verify the desired capacity in group state is equal to expected servers
-         and verifies for the specified number of servers with the name specified in the
+        :summary: verify the desired capacity in group state is equal to
+            expected servers and verifies for the specified number of servers
+            with the name specified in the
          group's current launch config, exist on the tenant
         :param group_id: Group id
         :param expected_servers: Total active servers expected on the group
-        :param interval_time: Time to wait during polling group state
-        :param timeout: Time to wait before exiting this function
         :return: returns the list of active servers in the group
         """
-        end_time = time.time() + 120
         desired_capacity = desired_capacity or expected_servers
 
         def get_server_list():
@@ -478,62 +475,66 @@ class AutoscaleFixture(BaseTestFixture):
                 return self.get_servers_containing_given_name_on_tenant(
                     group_id=group_id)
 
-        while time.time() < end_time:
+        def check_servers(elapsed_time):
             group_state = self.autoscale_client.list_status_entities_sgroups(
                 group_id).entity
             if group_state.desiredCapacity == desired_capacity:
                 server_list = get_server_list()
                 if (len(server_list) == expected_servers):
                     return server_list
-            time.sleep(5)
-        else:
-            server_list = get_server_list()
+
             self.fail(
-                'Waited 2 mins for desired capacity/active server list to '
-                'reach the server count of {0}. Has desired capacity {1} on '
-                'the group {2} and {3} servers on the account. '
+                'Waited {0} secs for desired capacity/active server list to '
+                'reach the server count of {1}. Has desired capacity {2} on '
+                'the group {3} and {4} servers on the account. '
                 'Filtering by server_name={server_name}'.format(
+                    elapsed_time,
                     desired_capacity,
                     group_state.desiredCapacity, group_id,
                     len(server_list),
                     server_name=server_name))
 
-    def assert_servers_deleted_successfully(self, server_name, count=0):
+        return self.autoscale_behaviors.retry(
+            check_servers, timeout=120, interval_time=5, time_scale=time_scale)
+
+    def assert_servers_deleted_successfully(self, server_name, count=0,
+                                            time_scale=True):
         """
-        Given a partial server name, polls for 15 mins to assert that the tenant id
-        has only specified count of servers containing that name, and returns the list
-        of servers.
+        Given a partial server name, polls for 15 mins to assert that the
+        tenant id has only specified count of servers containing that name,
+        and returns the list of servers.
         """
-        endtime = time.time() + 900
-        while time.time() < endtime:
+        def check_deleted(elapsed_time):
             server_list = self.get_servers_containing_given_name_on_tenant(
                 server_name=server_name)
             if len(server_list) == count:
                 return server_list
-            time.sleep(self.interval_time)
-        else:
-            self.fail(
-                'Servers on the tenant with name {0} were not deleted even'
-                ' after waiting 15 mins'.format(server_name))
+            self.fail('Servers on the tenant with name {0} were not deleted '
+                      'even after waiting {1} seconds'.format(
+                          server_name, elapsed_time))
+        return self.autoscale_behaviors.retry(
+            check_deleted,  timeout=900, time_scale=time_scale)
 
     def delete_nodes_in_loadbalancer(self, node_id_list, load_balancer):
         """
         Given the node id list and load balancer id, check for lb status
-        'PENDING UPDATE' and delete node when lb is ACTIVE
+        'PENDING UPDATE' and try to delete all the nodes when lb is ACTIVE.
         """
         for each_node_id in node_id_list:
-            end_time = time.time() + 120
-            while time.time() < end_time:
+            def check_deleted(elapsed_time):
                 delete_response = self.lbaas_client.delete_node(
                     load_balancer,
                     each_node_id)
                 if 'PENDING_UPDATE' in delete_response.text:
-                    time.sleep(2)
-                else:
-                    break
-            else:
-                print('Tried deleting node for 2 mins but lb {0} remained '
-                      'in PENDING_UPDATE state'.format(load_balancer))
+                    self.fail(
+                      'Tried deleting node for {0} secs but lb {1} remained '
+                      'in PENDING_UPDATE state'.format(
+                          elapsed_time, load_balancer))
+            try:
+                self.autoscale_behaviors.retry(
+                    check_deleted, timeout=120, interval_time=2)
+            except AssertionError as e:
+                print(e.message)
 
     def get_total_num_groups(self):
         """
@@ -579,16 +580,14 @@ class AutoscaleFixture(BaseTestFixture):
         Given the load balancer id, tries to delete the load balancer for 15
         minutes, until a 204 is received.
         """
-        endtime = time.time() + 900
-        while time.time() < endtime:
+        def del_lb(elapsed_time):
             del_lb = self.lbaas_client.delete_load_balancer(lb_id)
-            if del_lb.status_code == 202:
-                break
-            time.sleep(self.interval_time)
-        else:
-            self.fail(
-                'Deleting load balancer failed, as load balncer remained '
-                'in building after waiting 15 mins'.format(lb_id))
+            if del_lb.status_code != 202:
+                self.fail(
+                    'Deleting load balancer failed, as load balancer {0} '
+                    'remained in building after waiting {1} seconds'.format(
+                        lb_id, elapsed_time))
+        return self.autoscale_behaviors.retry(del_lb, timeout=900)
 
     @classmethod
     def tearDownClass(cls):

@@ -3,8 +3,6 @@ System Integration tests autoscaling with lbaas
 """
 
 import random
-import time
-
 
 from cafe.drivers.unittest.decorators import tags
 
@@ -440,17 +438,17 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         Waits for nodes in the ip_list to be deleted from the given load
         balancer
         """
-        end_time = time.time() + 600
-        while time.time() < end_time:
+        def verify(elapsed_time):
             lb_node_list = [each_node.address for each_node in
                             self._get_node_list_from_lb(lbaas_id)]
-            if set(lb_node_list).isdisjoint(ip_list):
-                break
-            time.sleep(10)
-        else:
-            self.fail("waited one minute for nodes {0} to be deleted from load"
-                      "balancer {1} but {2} exist".format(ip_list, lbaas_id,
-                                                          lb_node_list))
+            if not set(lb_node_list).isdisjoint(ip_list):
+                self.fail(
+                    "waited {0} seconds for nodes {1} to be deleted from load"
+                    "balancer {2} but {3} exist".format(
+                        elapsed_time, ip_list, lbaas_id, lb_node_list))
+
+        return self.autoscale_behaviors.retry(
+            verify, timeout=600, interval_time=10)
 
     def _update_launch_config(self, group, *lbaas_ids):
         """
@@ -516,20 +514,20 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         capacity, then waits for the desired capacity to be server_after_lb
         when a group with an invalid load balancer is created.
         """
-        end_time = time.time() + 600
         group_state = (self.autoscale_client.list_status_entities_sgroups(
             group_id)).entity
         if group_state.desiredCapacity is servers_before_lb:
-            while time.time() < end_time:
-                time.sleep(10)
+            def wait_for_servers(elapsed_time):
                 group_state = (
                     self.autoscale_client.list_status_entities_sgroups(
                         group_id)).entity
-                if group_state.desiredCapacity is server_after_lb:
-                    return
-            else:
-                self.fail('Servers not deleted from group even when group has '
-                          'invalid load balancers!')
+                if group_state.desiredCapacity != server_after_lb:
+                    self.fail(
+                        'Servers not deleted from group even when group has '
+                        'invalid load balancers!')
+
+            return self.autoscale_behaviors.retry(
+                wait_for_servers, timeout=600, interval_time=10)
         else:
             self.fail(
                 'Number of servers building on the group are not as expected')

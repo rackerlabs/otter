@@ -1,8 +1,6 @@
 """
 Tests for `/groups/<groupId>/servers/` endpoint
 """
-import time
-
 from cafe.drivers.unittest.decorators import tags
 
 from test_repo.autoscale.fixtures import AutoscaleFixture
@@ -33,18 +31,15 @@ class ServersTests(AutoscaleFixture):
         """
         Assert if given server is still in group
         """
-        tries = 10
-        interval = 15
-        while tries > 0:
+        def check_deleted(time_elapsed):
             servers = self.get_servers_containing_given_name_on_tenant(
                 group_id=self.groupid)
             if server_id in servers:
-                tries -= 1
-                time.sleep(interval)
-            else:
-                return
-        self.fail('Server {} in group {} not deleted'.format(server_id,
-                                                             self.groupid))
+                self.fail('Server {} in group {} not deleted after {} seconds'
+                          .format(server_id, self.groupid, time_elapsed))
+
+        return self.autoscale_behaviors.retry(check_deleted, timeout=150,
+                                              interval_time=15)
 
     @tags(speed='slow', convergence='error')
     # TODO: https://github.com/rackerlabs/otter/issues/1238
