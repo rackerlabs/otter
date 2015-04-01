@@ -1139,3 +1139,47 @@ class ConvergeTestCase(SynchronousTestCase):
 
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)
+
+
+class RemoveServerFromGroupTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.controller.remove_server_from_group`
+    """
+    def setUp(self):
+        """
+        Fake supervisor, group and state
+        """
+        self.config_data = {'convergence-tenants': ['tenant_id']}
+
+        self.trans_id = 'trans_id'
+        self.log = mock_log()
+        self.state = GroupState('tenant_id', 'group_id', 'group_name',
+                                active={'s0': {'id': 's0'}},
+                                pending={},
+                                group_touched=None,
+                                policy_touched=None,
+                                paused=None,
+                                desired=1)
+        self.group = iMock(IScalingGroup, tenant_id='tenant_id',
+                           uuid='group_id')
+
+    def test_non_convergence_uses_supervisor_remove(self):
+        """
+        If the tenant is not convergence-enabled, the supervisor's
+        :func:`remove_server_from_group` function is called with the same
+        arguments.
+        """
+        supervisor_remove = patch(
+            self, 'otter.controller.worker_remove_server_from_group',
+            return_value=defer.succeed('worker success'))
+
+        d = controller.remove_server_from_group(
+            self.trans_id, self.log, 'server_id', False, False,
+            self.group, self.state,
+            config_value={'convergence-tenants': []}.get)
+
+        self.assertEqual(self.successResultOf(d), 'worker success')
+
+        supervisor_remove.assert_called_once_with(
+            self.trans_id, self.log, 'server_id', False, False,
+            self.group, self.state)

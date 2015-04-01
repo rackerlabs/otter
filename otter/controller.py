@@ -25,14 +25,24 @@ from decimal import Decimal, ROUND_UP
 import iso8601
 import json
 
+from effect import catch
+
 from twisted.internet import defer
 
+from toolz.dicttoolz import get_in
+
+from otter.cloud_client import (
+    NoSuchServerError,
+    get_server_details,
+    set_nova_metadata_item)
 from otter.convergence.composition import tenant_is_enabled
+from otter.convergence.model import group_id_from_metadata
 from otter.convergence.service import get_convergence_starter
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,
+    ServerNotFoundError,
     exec_scale_down,
     execute_launch_config,
     evict_server_from_group)
@@ -40,6 +50,8 @@ from otter.supervisor import (
     remove_server_from_group as worker_remove_server_from_group)
 from otter.util.config import config_value
 from otter.util.deferredutils import unwrap_first_error
+from otter.util.retry import (
+    exponential_backoff_interval, retry_effect, retry_times)
 from otter.util.timestamp import from_timestamp
 
 
@@ -392,51 +404,64 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
         cannot be done due to min/max constraints, raise
         :class:`CannotDeleteServerBelowMinError`.
 
-        While we're modifying the state anyway, attempt to update the cache of
-        servers by popping the server ID off the active list, if it's there.
-
-        If the server ID is not in the active list, do not raise an exception
-        because possibly the cache is just out of date.
+        Don't bother updating the cached servers because either way, a
+        convergence cycle will have to be kicked off.
         """
-        if state.desired == config['minEntities']:
-            raise CannotDeleteServerBelowMinError(
-                group.tenant_id, group.uuid, server_id, config['minEntities'])
-        state.desired -= 1
-        try:
-            state.remove_active(server_id)
-        except AssertionError:
-            pass
+        if not replace:
+            if state.desired == config['minEntities']:
+                raise CannotDeleteServerBelowMinError(
+                    group.tenant_id, group.uuid, server_id,
+                    config['minEntities'])
+            state.desired -= 1
 
     def raise_if_server_not_in_group(_):
         """
         Check if the server is a member of this scaling group.  If not, raise
         :class:`ServerNotFoundError`
         """
-        # get server details
-        # catch NoSuchServerError and translate to ServerNotFoundError
-        # If successful, and the metadata does not indicate that the server is
-        # a member of the scaling group, raise ServerNotFoundError
+        eff = retry_effect(
+            get_server_details(server_id),
+            retry_times(3),
+            exponential_backoff_interval(2))
 
-    def purge_server(_):
+        def check_metadata(details):
+            group_id = group_id_from_metadata(
+                get_in(('server', 'metadata'), details, {}))
+            if group_id != group.uuid:
+                raise ServerNotFoundError(
+                    group.tenant_id, group.uuid, server_id)
+
+        def translate_error(*exc_info):
+            raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
+
+        return eff.on(success=check_metadata,
+                      error=catch(NoSuchServerError, translate_error))
+
+    def remove_server(_):
         """
         Kick off the process to delete the server by setting it to DRAINING,
         and starting a convergence cycle, which will either drain the server
         from its load balancers and then delete it, or just delete it if there
         are no load balancers.
         """
+        # eff = retry_effect(
+        #     set_nova_metadata_item(server_id, *DRAINING_METADATA),
+        #     retry_times(3),
+        #     exponential_backoff_interval(2))
+
         # set metadata to draining
-        # kick off convergence cycle
 
     # this should be effect-y
     d = group.view_config()
-    d.addCallback(maybe_modify_state)
-    d.addCallback(raise_if_server_not_in_group)
+    # d.addCallback(maybe_modify_state)
+    # d.addCallback(raise_if_server_not_in_group)
 
-    if purge:
-        d.addCallback(purge_server)
-    else:
-        d.addCallback(
-            lambda _: evict_server_from_group(log, trans_id, group, server_id))
+    # if purge:
+    #     d.addCallback(purge_server)
+    # else:
+    #     d.addCallback(
+    #         lambda _: evict_server_from_group(log, trans_id, group, server_id))
 
-    d.addCallback(lambda _: state)
+    # d.addCallback(lambda -: start convergence)
+    # d.addCallback(lambda _: state)
     return d
