@@ -23,6 +23,7 @@ from pyrsistent import freeze
 
 from silverberg.client import ConsistencyLevel
 
+from toolz.curried import filter
 from toolz.dicttoolz import keymap
 
 from twisted.internet import defer
@@ -181,7 +182,7 @@ _cql_delete_one_webhook = (
     '"webhookId" = :webhookId')
 _cql_list_states = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at '
+    '"groupTouched", "policyTouched", paused, desired, created_at, deleting '
     'FROM {cf} WHERE "tenantId" = :tenantId;')
 _cql_list_policy = (
     'SELECT "policyId", data FROM {cf} WHERE '
@@ -1431,6 +1432,7 @@ class CassScalingGroupCollection:
         d = self.connection.execute(cql.format(cf=self.group_table), params,
                                     DEFAULT_CONSISTENCY)
         d.addCallback(_filter_resurrected)
+        d.addCallback(filter(lambda g: not g['deleting']))
         d.addCallback(_build_states)
         return d
 
