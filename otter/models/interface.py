@@ -275,7 +275,7 @@ class IScalingGroup(Interface):
     tenant_id = Attribute("Rackspace Tenant ID of the owner of this group.")
 
     def view_manifest(with_policies=True, with_webhooks=False,
-                      with_status=False):
+                      get_deleting=False):
         """
         The manifest contains everything required to configure this scaling:
         the config, the launch config, and all the scaling policies.
@@ -283,7 +283,9 @@ class IScalingGroup(Interface):
         :param bool with_policies: Should policies information be included?
         :param bool with_webhooks: If policies are included, should webhooks
             information be included?
-        :param bool with_status: Should status be included?
+        :param bool get_deleting: Should group be returned if it is deleting?
+            If True, then returned manifest will contain "status" that will be
+            one of "ACTIVE", "ERROR" or "DELETING"
 
         :return: a dictionary corresponding to the JSON schema at
             :data:`otter.json_schema.model_schemas.manifest`

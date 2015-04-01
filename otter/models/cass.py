@@ -90,7 +90,7 @@ def serialize_json_data(data, ver):
 # Otherwise it won't.
 #
 # Thus, selects have a semicolon, everything else doesn't.
-_cql_view = ('SELECT {column}, created_at, status FROM {cf} '
+_cql_view = ('SELECT {column}, created_at, deleting FROM {cf} '
              'WHERE "tenantId" = :tenantId AND '
              '"groupId" = :groupId;')
 _cql_view_policy = (
@@ -113,7 +113,7 @@ _cql_create_group = (
 _cql_view_manifest = (
     'SELECT "tenantId", "groupId", group_config, '
     'launch_config, active, pending, "groupTouched", '
-    '"policyTouched", paused, desired, created_at, status '
+    '"policyTouched", paused, desired, created_at, status, deleting '
     'FROM {cf} '
     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
@@ -127,7 +127,7 @@ _cql_insert_group_state = (
     'USING TIMESTAMP :ts')
 _cql_view_group_state = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at, status '
+    '"groupTouched", "policyTouched", paused, desired, created_at, deleting '
     'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
 
 # --- Event related queries
@@ -494,13 +494,14 @@ def assemble_webhooks_in_policies(policies, webhooks):
 
 
 def verified_view(connection, view_query, del_query, data, consistency,
-                  exception_if_empty, log):
+                  exception_if_empty, log, get_deleting=False):
     """
     Ensures the view query on the group does not get resurrected row,
     i.e. one that does not have "created_at" in it.  Any resurrected entry is
     deleted and `exception_if_empty` is raised. Also raises
     `exception_if_empty` if group's status is DELETING
 
+    :param bool get_deleting: Should it return deleting group?
 
     TODO: Should there be seperate argument for view_consistency and
     del_consistency.
@@ -514,8 +515,8 @@ def verified_view(connection, view_query, del_query, data, consistency,
             log.msg('Resurrected row', row=result[0], row_params=data)
             connection.execute(del_query, data, consistency)
             raise exception_if_empty
-        elif group.get('status') == ScalingGroupStatus.DELETING.name:
-            # DELETING group, raise empty exception
+        # Do not return group if group is deleting and we are told to do so
+        if not get_deleting and group.get('deleting', False):
             raise exception_if_empty
         return group
 
@@ -647,8 +648,12 @@ class CassScalingGroup(object):
             return d
         return wrapper
 
+    def _group_status(self, status, deleting):
+        return (ScalingGroupStatus.DELETING
+                if deleting else ScalingGroupStatus.lookupByName(status))
+
     def view_manifest(self, with_policies=True, with_webhooks=False,
-                      with_status=False):
+                      get_deleting=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
@@ -679,8 +684,9 @@ class CassScalingGroup(object):
                 'id': self.uuid,
                 'state': _unmarshal_state(group)
             }
-            if with_status:
-                m['status'] = group['status']
+            if get_deleting:
+                status = self._group_status(group['status'], group['deleting'])
+                m['status'] = status.name
             return m
 
         view_query = _cql_view_manifest.format(
@@ -692,7 +698,7 @@ class CassScalingGroup(object):
                            "groupId": self.uuid},
                           DEFAULT_CONSISTENCY,
                           NoSuchScalingGroupError(self.tenant_id, self.uuid),
-                          self.log)
+                          self.log, get_deleting=get_deleting)
         d.addCallback(_generate_manifest_group_part)
 
         if with_policies:
