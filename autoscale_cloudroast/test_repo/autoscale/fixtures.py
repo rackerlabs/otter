@@ -7,6 +7,7 @@ from __future__ import print_function
 import json
 import time
 from functools import partial
+from unittest import skip
 
 from cafe.drivers.unittest.fixtures import BaseTestFixture
 
@@ -134,6 +135,20 @@ _rcv3_cloud_network = autoscale_config.rcv3_cloud_network
 autoscale_client, server_client, lbaas_client, rcv3_client = _set_up_clients()
 
 
+def only_run_if_mimic_is(should_mimic_be_available):
+    """
+    Decorator that only runs a test if mimic is equal to the given boolean
+    ``should_mimic_be_available``.  Otherwise the test is skipped.
+    """
+    def actual_decorator(f):
+        if autoscale_config.mimic != should_mimic_be_available:
+            msg = "Skipping because mimic is {0}".format(
+                "available" if autoscale_config.mimic else "not available")
+            return skip(msg)(f)
+        return f
+    return actual_decorator
+
+
 class AutoscaleFixture(BaseTestFixture):
     """
     :summary: Fixture for an Autoscale test.
@@ -215,8 +230,10 @@ class AutoscaleFixture(BaseTestFixture):
         self.assertTrue(headers is not None,
                         msg='No headers returned')
         if headers.get('transfer-encoding'):
-            self.assertEqual(headers['transfer-encoding'], 'chunked',
-                             msg='Response header transfer-encoding is not chunked')
+            self.assertEqual(
+                headers['transfer-encoding'],
+                'chunked',
+                msg='Response header transfer-encoding is not chunked')
         self.assertTrue(headers['server'] is not None,
                         msg='Response header server is not available')
         self.assertEquals(headers['content-type'], 'application/json',
@@ -232,7 +249,8 @@ class AutoscaleFixture(BaseTestFixture):
         If delete is set to True, the scaling group is deleted.
         """
         servers_on_group = (
-            self.autoscale_client.list_status_entities_sgroups(group.id)).entity
+            self.autoscale_client.list_status_entities_sgroups(
+                group.id)).entity
         if servers_on_group.desiredCapacity is not 0:
             self.autoscale_client.update_group_config(
                 group_id=group.id,
@@ -317,16 +335,18 @@ class AutoscaleFixture(BaseTestFixture):
         """
         self.assertEquals(len(group_state.active), group_state.activeCapacity)
         self.assertGreaterEqual(group_state.pendingCapacity, 0)
-        self.assertEquals(group_state.desiredCapacity,
-                          group_state.activeCapacity + group_state.pendingCapacity)
+        self.assertEquals(
+            group_state.desiredCapacity,
+            group_state.activeCapacity + group_state.pendingCapacity)
         self.assertFalse(group_state.paused)
 
     def create_default_at_style_policy_wait_for_execution(
         self, group_id, delay=3,
             change=None, scale_down=None):
         """
-        Creates an at style scale up/scale down policy to execute at utcnow() + delay and waits
-        the scheduler config seconds + delay, so that the policy is picked
+        Creates an at style scale up/scale down policy to execute at
+        utcnow() + delay and waits the scheduler config seconds +
+        delay, so that the policy is picked
         """
         if change is None:
             change = self.sp_change
@@ -345,14 +365,17 @@ class AutoscaleFixture(BaseTestFixture):
 
         :param name: if given, return servers with this name
         """
-        return filter(lambda s: s.task_state != 'deleting' and s.status != 'DELETED',
-                      self.server_client.list_servers_with_detail(name=name).entity)
+        return filter(
+            lambda s: s.task_state != 'deleting' and s.status != 'DELETED',
+            self.server_client.list_servers_with_detail(
+                name=name).entity)
 
-    def get_servers_containing_given_name_on_tenant(self, group_id=None, server_name=None):
+    def get_servers_containing_given_name_on_tenant(
+            self, group_id=None, server_name=None):
         """
-        Get a list of server IDs not marked pending deletion from Nova based on the
-        given server_name. If the group_id is given, use the server_name extracted
-        from the launch config instead
+        Get a list of server IDs not marked pending deletion from Nova
+        based on the given server_name. If the group_id is given, use
+        the server_name extracted from the launch config instead
         """
         if group_id:
             launch_config = self.autoscale_client.view_launch_config(
