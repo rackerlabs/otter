@@ -512,7 +512,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x00',
+             'paused': False,
              'created_at': 23,
              'desired': 10}]
         self.returns = [cass_response]
@@ -550,7 +550,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x00',
+             'paused': False,
              'created_at': 23,
              'desired': None}]
         self.returns = [cass_response]
@@ -577,7 +577,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x00',
+             'paused': False,
              'desired': 0,
              'created_at': 23}]
         self.returns = [cass_response]
@@ -611,7 +611,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x00',
+             'paused': False,
              'desired': None,
              'created_at': None}]
         self.returns = [cass_response, None]
@@ -642,7 +642,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x01',
+             'paused': True,
              'desired': 0,
              'created_at': 3}])
 
@@ -1873,7 +1873,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'pending': '{"P":"R"}',
             'groupTouched': '2014-01-01T00:00:05Z.1234',
             'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         })
@@ -1928,7 +1928,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'pending': '{"P":"R"}',
             'groupTouched': '2014-01-01T00:00:05Z.1234',
             'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         })
@@ -1966,7 +1966,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'pending': '{"P":"R"}',
             'groupTouched': '2014-01-01T00:00:05Z.1234',
             'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         })
@@ -2018,7 +2018,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'pending': '{"P":"R"}',
             'groupTouched': '2014-01-01T00:00:05Z.1234',
             'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         })
@@ -3141,7 +3141,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         } for i in range(2)]]
@@ -3235,7 +3235,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         }, {
@@ -3246,7 +3246,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': None
         }]
@@ -3288,7 +3288,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         }, {
@@ -3299,7 +3299,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': None
         }, {
@@ -3310,7 +3310,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': None
         }]
