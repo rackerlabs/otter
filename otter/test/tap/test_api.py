@@ -660,14 +660,17 @@ class ConvergerSetupTests(SynchronousTestCase):
         ms = MultiService()
         kz_client = object()
         dispatcher = object()
-        setup_converger(ms, kz_client, dispatcher)
+        interval = 50
+        setup_converger(ms, kz_client, dispatcher, interval)
         [converger] = ms.services
         self.assertIs(converger.__class__, Converger)
         self.assertEqual(converger._dispatcher, dispatcher)
         [partitioner] = converger.services
+        [timer] = partitioner.services
         self.assertIs(partitioner.__class__, Partitioner)
         self.assertIs(partitioner, converger.partitioner)
         self.assertIs(partitioner.kz_client, kz_client)
+        self.assertEqual(timer.step, interval)
 
 
 class SchedulerSetupTests(SynchronousTestCase):
