@@ -40,7 +40,7 @@ def perform_get_scaling_group_info(log, store, dispatcher, intent):
     group = store.get_scaling_group(log, intent.tenant_id, intent.group_id)
     manifest = yield group.view_manifest(with_policies=False,
                                          with_webhooks=False,
-                                         with_status=True)
+                                         get_deleting=True)
     returnValue((group, manifest))
 
 
