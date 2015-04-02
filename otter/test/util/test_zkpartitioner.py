@@ -1,8 +1,8 @@
 """Tests for otter.util.zkpartitioner"""
 
-import mock
-
 from kazoo.recipe.partitioner import PartitionState
+
+import mock
 
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
