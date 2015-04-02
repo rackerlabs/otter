@@ -2111,7 +2111,7 @@ class ViewManifestTests(CassScalingGroupTestCase):
             'pending': '{"P":"R"}',
             'groupTouched': '2014-01-01T00:00:05Z.1234',
             'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         }
