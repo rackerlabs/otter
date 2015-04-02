@@ -48,6 +48,7 @@ class Partitioner(MultiService):
         self._old_buckets = []
 
     def get_current_state(self):
+        """Return the current partitioner state."""
         return self.partitioner.state
 
     def _new_partitioner(self):
