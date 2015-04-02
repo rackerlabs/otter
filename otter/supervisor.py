@@ -6,6 +6,8 @@ This code is specific to the launch_server_v1 worker.
 
 from characteristic import attributes
 
+from effect.twisted import deferred_performer
+
 from twisted.application.service import Service
 from twisted.internet import reactor
 from twisted.internet.defer import succeed
@@ -595,26 +597,6 @@ class CannotDeleteServerBelowMinError(Exception):
                  tenant_id=tenant_id, group_id=group_id))
 
 
-def evict_server_from_group(log, trans_id, group, server_id):
-    """
-    Evict a server from a group by scrubbing otter-specific metadata from the
-    server.
-
-    :param log: A bound logger
-    :param bytes trans_id: The transaction id for this operation.
-
-    :param group: The scaling group to remove a server from.
-    :type group: :class:`~otter.models.interface.IScalingGroup`
-
-    :param bytes server_id: The id of the server to be removed.
-    """
-    supervisor = get_supervisor()
-    job = _ScrubJob(log, trans_id, group.tenant_id, server_id, supervisor)
-    d = job.start()
-    supervisor.deferred_pool.add(d)
-    return d
-
-
 def remove_server_from_group(log, trans_id, server_id, replace, purge, group, state):
     """
     Remove a specific server from the group, optionally replacing it
@@ -676,6 +658,16 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge, group, st
         d = job.start()
         supervisor.deferred_pool.add(d)
 
+    def scrub_otter_metadata(_):
+        """
+        Scrub otter-specific metadata from the server.
+        """
+        supervisor = get_supervisor()
+        job = _ScrubJob(log, trans_id, group.tenant_id, server_id, supervisor)
+        d = job.start()
+        supervisor.deferred_pool.add(d)
+        return d
+
     if server_id not in state.active:
         raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
     elif replace:
@@ -689,8 +681,26 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge, group, st
         server_info = state.active[server_id]
         d.addCallback(remove_server_from_nova)
     else:
-        d.addCallback(
-            lambda _: evict_server_from_group(log, trans_id, group, server_id))
+        d.addCallback(scrub_otter_metadata)
 
     d.addCallback(remove_server_from_state)
     return d
+
+
+@attributes(['scaling_group', 'server_id'])
+class EvictServerFromScalingGroup(object):
+    """
+    An Effect intent which indicates that a server should be evicted from a
+    particular group.
+    """
+
+
+@deferred_performer
+def perform_evict_server(log, transaction_id, dispatcher, intent):
+    """
+    Performs evicting a server from the group.
+    """
+    supervisor = get_supervisor()
+    return supervisor.scrub_otter_metadata(
+            log, transaction_id, intent.scaling_group.tenant_id,
+            intent.server_id)
