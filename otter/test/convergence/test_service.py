@@ -5,7 +5,7 @@ from effect import (
     TypeDispatcher, base_dispatcher, sync_perform)
 from effect.async import perform_parallel_async
 from effect.ref import Reference, reference_dispatcher
-from effect.testing import EQDispatcher, EQFDispatcher
+from effect.testing import EQDispatcher, EQFDispatcher, SequenceDispatcher
 
 from kazoo.exceptions import BadVersionError
 from kazoo.recipe.partitioner import PartitionState
