@@ -326,7 +326,7 @@ class DeleteServerTests(SynchronousTestCase):
 
         self.assertEqual(
             resolve_effect(eff, (None, {})),
-            (StepResult.SUCCESS, []))
+            (StepResult.RETRY, ['must re-gather after deletion']))
 
     def test_delete_and_verify_del_404(self):
         """
