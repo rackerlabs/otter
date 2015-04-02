@@ -120,13 +120,13 @@ class UpdateSchedulerTests(AutoscaleFixture):
             sp_cooldown=0)
         self.wait_for_expected_group_state(
             self.group.id, self.group.groupConfiguration.minEntities + 1,
-            60 + self.scheduler_interval, 2)
+            60 + self.scheduler_interval, 2, time_scale=False)
         self._update_policy(
             self.group.id, cron_style_policy, self.cron_policy_args,
             change_value=2)
         self.wait_for_expected_group_state(
             self.group.id, self.group.groupConfiguration.minEntities + 3,
-            60 + self.scheduler_interval)
+            60 + self.scheduler_interval, time_scale=False)
 
     @tags(speed='slow')
     def test_system_update_name_for_cron_style_scheduled_policy(self):

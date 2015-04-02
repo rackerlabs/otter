@@ -7,6 +7,8 @@ from functools import partial
 
 import jsonfig
 
+from kazoo.client import KazooClient
+
 from silverberg.cluster import RoundRobinCassandraCluster
 from silverberg.logger import LoggingCQLClient
 
@@ -18,9 +20,11 @@ from twisted.internet.endpoints import clientFromString
 from twisted.internet.task import coiterate
 from twisted.python import usage
 from twisted.python.log import addObserver
+from twisted.python.threadpool import ThreadPool
 from twisted.web.server import Site
 
 from txkazoo import TxKazooClient
+from txkazoo.log import TxLogger
 
 from otter.auth import generate_authenticator
 from otter.bobby import BobbyClient
@@ -248,13 +252,15 @@ def makeService(config):
     if config_value('zookeeper'):
         threads = config_value('zookeeper.threads') or 10
         disable_logs = config_value('zookeeper.no_logs')
-        kz_client = TxKazooClient(
+        threadpool = ThreadPool(maxthreads=threads)
+        sync_kz_client = KazooClient(
             hosts=config_value('zookeeper.hosts'),
             # Keep trying to connect until the end of time with
             # max interval of 10 minutes
             connection_retry=dict(max_tries=-1, max_delay=600),
-            threads=threads,
-            txlog=None if disable_logs else log.bind(system='kazoo'))
+            logger=None if disable_logs else TxLogger(log.bind(system='kazoo'))
+        )
+        kz_client = TxKazooClient(reactor, threadpool, sync_kz_client)
         # Don't timeout. Keep trying to connect forever
         d = kz_client.start(timeout=None)
 
@@ -280,7 +286,8 @@ def makeService(config):
             starter = ConvergenceStarter(dispatcher)
             set_convergence_starter(starter)
 
-            setup_converger(s, kz_client, dispatcher)
+            setup_converger(s, kz_client, dispatcher,
+                            config_value('converger.interval') or 10)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
@@ -288,7 +295,7 @@ def makeService(config):
     return s
 
 
-def setup_converger(parent, kz_client, dispatcher):
+def setup_converger(parent, kz_client, dispatcher, interval):
     """
     Create a Converger service, which has a Partitioner as a child service, so
     that if the Converger is stopped, the partitioner is also stopped.
@@ -297,7 +304,7 @@ def setup_converger(parent, kz_client, dispatcher):
     partitioner_factory = partial(
         Partitioner,
         kz_client,
-        10,  # interval
+        interval,
         CONVERGENCE_PARTITIONER_PATH,
         converger_buckets,
         15,  # time boundary

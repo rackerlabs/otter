@@ -25,7 +25,8 @@ from otter.log.formatters import (
     StreamObserverWrapper,
     SystemFilterWrapper,
     throttling_wrapper,
-    audit_log_formatter)
+    audit_log_formatter,
+    serialize_to_jsonable)
 from otter.test.utils import SameJSON, matches
 
 
@@ -441,6 +442,23 @@ class ErrorFormatterTests(SynchronousTestCase):
             {'message': ('mineyours',), 'level': 3,
              'traceback': failure.getTraceback(),
              'exception_type': 'ValueError'})
+
+    def test_details(self):
+        """
+        If exception is serializable, then it is serialized and logged as
+        "error_details"
+        """
+        class MyException(Exception):
+            pass
+
+        @serialize_to_jsonable.register(MyException)
+        def _(excp):
+            return 'mine'
+
+        err = MyException('heh')
+        self.wrapper({'message': (), 'isError': True, 'failure': Failure(err)})
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'error_details': Equals('mine')})))
 
 
 class ObserverWrapperTests(SynchronousTestCase):

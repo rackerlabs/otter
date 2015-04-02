@@ -452,7 +452,7 @@ def _unmarshal_state(state_dict):
         _jsonloads_data(state_dict["pending"]),
         state_dict["groupTouched"],
         _jsonloads_data(state_dict["policyTouched"]),
-        bool(ord(state_dict["paused"])),
+        state_dict["paused"],
         desired=desired_capacity
     )
 

@@ -12,6 +12,7 @@ from otter.convergence.model import (
     CLBNodeCondition,
     CLBNodeType,
     DesiredGroupState,
+    DRAINING_METADATA,
     NovaServer,
     RCv3Description,
     RCv3Node,
@@ -551,6 +552,22 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 0),
             pbag([DeleteServer(server_id='abc')]))
 
+    def test_draing_server_without_load_balancers_can_be_deleted(self):
+        """
+        If a draining server is not attached to any load balancers, even if
+        it should be, it can be deleted.  "Draining" is not re-set on its
+        metadata.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=0,
+                                  draining_timeout=10.0),
+                set([server('abc', state=ServerState.DRAINING,
+                            desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
+                set(),
+                0),
+            pbag([DeleteServer(server_id='abc')]))
+
     def test_active_server_can_be_deleted_if_all_lbs_can_be_removed(self):
         """
         If an active server to be scaled down can be removed from all the load
@@ -683,17 +700,18 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                               condition=CLBNodeCondition.DRAINING,
                               type=CLBNodeType.PRIMARY),
                 SetMetadataItemOnServer(server_id='abc',
-                                        key='rax:auto_scaling_draining',
-                                        value='draining'),
+                                        key=DRAINING_METADATA[0],
+                                        value=DRAINING_METADATA[1]),
                 BulkRemoveFromRCv3(lb_node_pairs=s(
                     (self.rcv3_desc.lb_id, 'abc')))
             ]))
 
     def test_active_server_is_drained_even_if_all_already_in_draining(self):
         """
-        If an active server already has all of its load balancers in draining,
-        but it cannot be removed from all of them yet, it is set to draining
-        state even though no load balancer actions need to be performed.
+        If an active server is attached to load balancers, and all those load
+        balancer nodes are already in draining but it cannot be removed yet,
+        the server is set to draining state even though no load balancer
+        actions need to be performed.
 
         This can happen for instance if the server was supposed to be deleted
         in a previous convergence run, and the load balancers were set to
@@ -714,19 +732,21 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 1),
             pbag([
                 SetMetadataItemOnServer(server_id='abc',
-                                        key='rax:auto_scaling_draining',
-                                        value='draining')
+                                        key=DRAINING_METADATA[0],
+                                        value=DRAINING_METADATA[1])
             ]))
 
     def test_draining_server_has_all_enabled_lb_set_to_draining(self):
         """
-        If a draining server is enabled on any load balancers, it is set to
-        draining on those load balancers and it is not deleted.  The metadata
-        is not re-set to draining.
+        If a draining server is associated with any load balancers, those
+        load balancer nodes will be set to draining and the server is not
+        deleted.  The metadata on the server is not re-set to draining.
 
         This can happen for instance if the server was supposed to be deleted
         in a previous convergence run, and the server metadata was set but
         the load balancers update failed.
+
+        Or if the server is set to be manually deleted via the API.
         """
         self.assertEqual(
             converge(
