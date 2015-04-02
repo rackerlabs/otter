@@ -702,5 +702,6 @@ def perform_evict_server(log, transaction_id, dispatcher, intent):
     """
     supervisor = get_supervisor()
     return supervisor.scrub_otter_metadata(
-            log, transaction_id, intent.scaling_group.tenant_id,
+            log, transaction_id,
+            intent.scaling_group.tenant_id,
             intent.server_id)
