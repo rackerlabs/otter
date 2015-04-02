@@ -3,13 +3,9 @@ Tests for the worker supervisor.
 """
 from functools import partial
 
-from effect import Constant, Effect
+from effect import Constant, Effect, TypeDispatcher, sync_perform
 
 import mock
-
-from effect import Effect, TypeDispatcher, sync_perform
-from effect.testing import resolve_effect
-
 
 from testtools.matchers import ContainsDict, Equals, IsInstance
 
