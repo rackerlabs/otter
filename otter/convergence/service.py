@@ -140,7 +140,7 @@ def execute_convergence(tenant_id, group_id, log,
             worst_status=worst_status)
 
     if (worst_status == StepResult.SUCCESS and
-        group_status == ScalingGroupStatus.DELETING):
+            group_status == ScalingGroupStatus.DELETING):
             # servers have been deleted. Delete the group for real
         yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
 
