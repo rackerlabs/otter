@@ -8,8 +8,14 @@ from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
 
 from otter.convergence.model import (
-    CLBDescription, CLBNode, CLBNodeCondition, IDrainable,
-    RCv3Description, RCv3Node, ServerState)
+    CLBDescription,
+    CLBNode,
+    CLBNodeCondition,
+    DRAINING_METADATA,
+    IDrainable,
+    RCv3Description,
+    RCv3Node,
+    ServerState)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -153,8 +159,8 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
     if server.state != ServerState.DRAINING:
         return lb_draining_steps + [
             SetMetadataItemOnServer(server_id=server.id,
-                                    key='rax:auto_scaling_draining',
-                                    value='draining')]
+                                    key=DRAINING_METADATA[0],
+                                    value=DRAINING_METADATA[1])]
 
     return lb_draining_steps
 
@@ -250,7 +256,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # if there are any building servers left, also return a ConvergeLater step.
     converge_later = []
     if any((s not in servers_to_delete for s in waiting_for_build)):
-        converge_later = [ConvergeLater()]
+        converge_later = [ConvergeLater(reasons=['building servers'])]
 
     return pbag(create_steps +
                 scale_down_steps +
