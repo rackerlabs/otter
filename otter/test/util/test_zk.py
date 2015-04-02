@@ -4,7 +4,7 @@ from functools import partial
 
 from characteristic import attributes
 
-from effect import Effect, TypeDispatcher
+from effect import ComposedDispatcher, Effect, TypeDispatcher
 from effect.twisted import perform
 
 from kazoo.exceptions import BadVersionError, NoNodeError, NodeExistsError
@@ -12,9 +12,11 @@ from kazoo.exceptions import BadVersionError, NoNodeError, NodeExistsError
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.test.utils import test_dispatcher
 from otter.util.zk import (
     CreateOrSet, CreateOrSetLoopLimitReachedError,
     DeleteNode, GetChildrenWithStats,
+    get_zk_dispatcher,
     perform_create_or_set, perform_delete_node,
     perform_get_children_with_stats)
 
@@ -155,8 +157,8 @@ class GetChildrenWithStatsTests(SynchronousTestCase):
 
     def _gcws(self, path):
         eff = Effect(GetChildrenWithStats(path))
-        performer = partial(perform_get_children_with_stats, self.model)
-        dispatcher = TypeDispatcher({GetChildrenWithStats: performer})
+        dispatcher = ComposedDispatcher([test_dispatcher(),
+                                         get_zk_dispatcher(self.model)])
         return perform(dispatcher, eff)
 
     def test_get_children_with_stats(self):

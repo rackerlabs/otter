@@ -2,7 +2,8 @@ from functools import partial
 
 from characteristic import attributes
 
-from effect import TypeDispatcher
+from effect import Effect, TypeDispatcher, parallel, sync_performer
+from effect.do import do, do_return
 from effect.twisted import deferred_performer
 
 from kazoo.exceptions import NoNodeError, NodeExistsError
@@ -73,7 +74,8 @@ class GetChildrenWithStats(object):
         self.path = path
 
 
-@deferred_performer
+@sync_performer
+@do
 def perform_get_children_with_stats(kz_client, dispatcher, intent):
     """
     Perform :obj:`GetChildrenWithStats`. Must be partialed with ``kz_client``.
@@ -83,18 +85,37 @@ def perform_get_children_with_stats(kz_client, dispatcher, intent):
     :param GetChildrenWithStats intent: the intent
     """
     path = intent.path
-    children = kz_client.get_children(path)
+    children = yield Effect(GetChildren(path))
+    stats = yield parallel(Effect(GetStat(path + '/' + p)) for p in children)
+    yield do_return([
+        c_and_s for c_and_s in zip(children, stats)
+        if c_and_s[1] is not None])
 
-    def got_children(children):
-        ds = [
-            kz_client.exists(path + '/' + child).addCallback(
-                lambda r, child=child: (child, r) if r is not None else None)
-            for child in children
-        ]
-        return gatherResults(ds)
-    children.addCallback(got_children)
-    children.addCallback(partial(filter, None))
-    return children
+
+@attributes(['path'], apply_with_init=False)
+class GetChildren(object):
+    """List children."""
+    def __init__(self, path):
+        self.path = path
+
+
+@deferred_performer
+def perform_get_children(kz_client, dispatcher, intent):
+    """Perform a :obj:`GetChildren`."""
+    return kz_client.get_children(intent.path)
+
+
+@attributes(['path'], apply_with_init=False)
+class GetStat(object):
+    """Get the :obj:`ZnodeStat` of a ZK node."""
+    def __init__(self, path):
+        self.path = path
+
+
+@deferred_performer
+def perform_get_stat(kz_client, dispatcher, intent):
+    """Perform a :obj:`GetStat`."""
+    return kz_client.exists(intent.path)
 
 
 @attributes(['path', 'version'])
@@ -122,4 +143,8 @@ def get_zk_dispatcher(kz_client):
             partial(perform_delete_node, kz_client),
         GetChildrenWithStats:
             partial(perform_get_children_with_stats, kz_client),
+        GetChildren:
+            partial(perform_get_children, kz_client),
+        GetStat:
+            partial(perform_get_stat, kz_client)
     })
