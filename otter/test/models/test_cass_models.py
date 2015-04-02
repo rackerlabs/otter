@@ -24,6 +24,8 @@ from silverberg.client import CQLClient, ConsistencyLevel
 
 from testtools.matchers import IsInstance
 
+from toolz.dicttoolz import assoc
+
 from twisted.internet import defer
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
@@ -2891,6 +2893,20 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
                                  side_effect=lambda *args: _S(args[0]))
 
+        self.group = {
+            'tenantId': '123',
+            'groupId': 'group',
+            'group_config': '{"name": "test"}',
+            'active': '{}',
+            'pending': '{}',
+            'groupTouched': None,
+            'policyTouched': '{}',
+            'paused': False,
+            'desired': 0,
+            'created_at': 23,
+            'deleting': False
+        }
+
     @mock.patch('otter.models.cass.WeakLocks', return_value=2)
     def test_locks(self, mock_wl):
         """
@@ -3128,19 +3144,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         ``list_scaling_group_states`` returns a list of :class:`GroupState`
         objects from cassandra
         """
-        self.returns = [[{
-            'tenantId': '123',
-            'groupId': 'group{}'.format(i),
-            'group_config': '{"name": "test"}',
-            'active': '{}',
-            'pending': '{}',
-            'groupTouched': None,
-            'policyTouched': '{}',
-            'paused': False,
-            'desired': 0,
-            'created_at': 23,
-            'deleting': False
-        } for i in range(2)]]
+        self.returns = [[assoc(self.group, 'groupId', 'group{}'.format(i))
+                         for i in range(2)]]
 
         expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = (
@@ -3193,8 +3198,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '123', 'limit': 5}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
-            'FROM scaling_group '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId '
             'LIMIT :limit;')
         self.collection.list_scaling_group_states(
@@ -3210,8 +3215,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '123', 'limit': 100, 'marker': '345'}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
-            'FROM scaling_group '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId '
             'AND "groupId" > :marker LIMIT :limit;')
         self.collection.list_scaling_group_states(self.mock_log, '123',
@@ -3224,36 +3229,19 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         If any of the rows returned is resurrected, i.e. does not contain
         created_at then it is not returned.
         """
-        group_dicts = [{
-            'tenantId': '123',
-            'groupId': 'group123',
-            'group_config': '{"name": "test123"}',
-            'active': '{}',
-            'pending': '{}',
-            'groupTouched': None,
-            'policyTouched': '{}',
-            'paused': False,
-            'desired': 0,
-            'created_at': 23
-        }, {
-            'tenantId': '23',
-            'groupId': 'group23',
-            'group_config': '{"name": "test123"}',
-            'active': '{}',
-            'pending': '{}',
-            'groupTouched': None,
-            'policyTouched': '{}',
-            'paused': False,
-            'desired': 0,
-            'created_at': None
-        }]
-        self.returns = [group_dicts, None]
+        group1 = self.group.copy()
+        group1['groupId'] = 'group123'
+        group2 = self.group.copy()
+        group2['tenantId'] = '23'
+        group2['groupId'] = 'group23'
+        group2['created_at'] = None
+        self.returns = [[group1, group2], None]
 
         expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
-            'FROM scaling_group '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(
@@ -3261,7 +3249,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             mock.call(expectedCql, expectedData, ConsistencyLevel.QUORUM))
         self.assertEqual(r, [GroupState(tenant_id='123',
                                         group_id='group123',
-                                        group_name='test123',
+                                        group_name='test',
                                         active={},
                                         pending={},
                                         group_touched='0001-01-01T00:00:00Z',
@@ -3270,48 +3258,22 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_log.msg.assert_called_once_with(
             'Resurrected rows',
             tenant_id='123',
-            rows=[_de_identify(group_dicts[1])])
+            rows=[_de_identify(group2)])
 
     def test_list_states_deletes_resurrected_groups(self):
         """
         If any of the rows returned is resurrected, i.e. does not contain
         created_at, then it is triggered for deletion.
         """
-        group_dicts = [{
-            'tenantId': '123',
-            'groupId': 'group123',
-            'group_config': '{"name": "test123"}',
-            'active': '{}',
-            'pending': '{}',
-            'groupTouched': None,
-            'policyTouched': '{}',
-            'paused': False,
-            'desired': 0,
-            'created_at': 23
-        }, {
-            'tenantId': '123',
-            'groupId': 'group124',
-            'group_config': '{"name": "test123"}',
-            'active': '{}',
-            'pending': '{}',
-            'groupTouched': None,
-            'policyTouched': '{}',
-            'paused': False,
-            'desired': 0,
-            'created_at': None
-        }, {
-            'tenantId': '123',
-            'groupId': 'group125',
-            'group_config': '{"name": "test123"}',
-            'active': '{}',
-            'pending': '{}',
-            'groupTouched': None,
-            'policyTouched': '{}',
-            'paused': False,
-            'desired': 0,
-            'created_at': None
-        }]
-        self.returns = [group_dicts, None]
+        g1 = self.group.copy()
+        g1['groupId'] = 'group123'
+        groups = [g1]
+        for i in range(4, 6):
+            g = self.group.copy()
+            g['groupId'] = 'group12{}'.format(i)
+            g['created_at'] = None
+            groups.append(g)
+        self.returns = [groups, None]
 
         expectedCql = ('BEGIN BATCH '
 
@@ -3350,7 +3312,28 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             mock.call(expectedCql, expectedData, ConsistencyLevel.QUORUM))
         self.assertEqual(r, [GroupState(tenant_id='123',
                                         group_id='group123',
-                                        group_name='test123',
+                                        group_name='test',
+                                        active={},
+                                        pending={},
+                                        group_touched='0001-01-01T00:00:00Z',
+                                        policy_touched={},
+                                        paused=False)])
+
+    def test_list_states_filters_deleting_groups(self):
+        """
+        Groups that are deleting based on "deleting" column to be true are not
+        returned
+        """
+        g1 = self.group.copy()
+        g1['groupId'] = 'group123'
+        g2 = self.group.copy()
+        g2['groupId'] = 'group124'
+        g2['deleting'] = True
+        self.returns = [[g1, g2], None]
+        r = self.validate_list_states_return_value(self.mock_log, '123')
+        self.assertEqual(r, [GroupState(tenant_id='123',
+                                        group_id='group123',
+                                        group_name='test',
                                         active={},
                                         pending={},
                                         group_touched='0001-01-01T00:00:00Z',
