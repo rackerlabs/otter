@@ -8,6 +8,7 @@ from effect.ref import Reference, reference_dispatcher
 from effect.testing import EQDispatcher, EQFDispatcher
 
 from kazoo.exceptions import BadVersionError
+from kazoo.recipe.partitioner import PartitionState
 
 import mock
 
@@ -82,9 +83,15 @@ class ConvergerTests(SynchronousTestCase):
     """Tests for :obj:`Converger`."""
 
     def setUp(self):
-        self.dispatcher = _get_dispatcher()
         self.log = mock_log()
         self.buckets = range(10)
+
+    def _converger(self, converge_all_groups, dispatcher=None):
+        if dispatcher is None:
+            dispatcher = _get_dispatcher()
+        return Converger(
+            self.log, dispatcher, self.buckets,
+            self._pfactory, converge_all_groups=converge_all_groups)
 
     def _pfactory(self, log, callable):
         self.fake_partitioner = FakePartitioner(log, callable)
@@ -103,9 +110,7 @@ class ConvergerTests(SynchronousTestCase):
             return Effect(Constant('foo'))
 
         my_buckets = [0, 5]
-        converger = Converger(
-            self.log, self.dispatcher, self.buckets,
-            self._pfactory, converge_all_groups=converge_all_groups)
+        converger = self._converger(converge_all_groups)
 
         result = self.fake_partitioner.got_buckets(my_buckets)
         self.assertEqual(self.successResultOf(result), 'foo')
@@ -118,15 +123,51 @@ class ConvergerTests(SynchronousTestCase):
         def converge_all_groups(log, group_locks, _my_buckets, all_buckets):
             return Effect(Error(RuntimeError('foo')))
 
-        Converger(
-            self.log, self.dispatcher, self.buckets,
-            self._pfactory, converge_all_groups=converge_all_groups)
+        self._converger(converge_all_groups)
 
         result = self.fake_partitioner.got_buckets([0])
         self.assertEqual(self.successResultOf(result), None)
         self.log.err.assert_called_once_with(
             CheckFailureValue(RuntimeError('foo')),
             'converge-all-groups-error', system='converger')
+
+    def test_divergent_changed_not_acquired(self):
+        """
+        When notified that divergent groups have changed and we have not
+        acquired our buckets, nothing is done.
+        """
+        dispatcher = SequenceDispatcher([])  # "nothing happens"
+        converger = self._converger(lambda *a, **kw: 1 / 0,
+                                    dispatcher=dispatcher)
+        converger.divergent_changed(['group1', 'group2'])
+
+    def test_divergent_changed_not_ours(self):
+        """
+        When notified that divergent groups have changed but they're not ours,
+        nothing is done.
+        """
+        dispatcher = SequenceDispatcher([])  # "nothing happens"
+        converger = self._converger(lambda *a, **kw: 1 / 0,
+                                    dispatcher=dispatcher)
+        self.fake_partitioner.current_state = PartitionState.ACQUIRED
+        converger.divergent_changed(['group1', 'group2'])
+
+    def test_divergent_changed(self):
+        """
+        When notified that divergent groups have changed, and one of the groups
+        is associated with a bucket assigned to us, convergence is triggered.
+        """
+        def converge_all_groups(log, group_locks, _my_buckets, all_buckets):
+            return Effect('converge-all-groups')
+        dispatcher = SequenceDispatcher([
+            ('converge-all-groups', lambda i: None)
+        ])
+        converger = self._converger(converge_all_groups, dispatcher=dispatcher)
+        # sha1('group1') % 10 == 3
+        self.fake_partitioner.current_state = PartitionState.ACQUIRED
+        self.fake_partitioner.my_buckets = [3]
+        converger.divergent_changed(['group1', 'group2'])
+        self.assertEqual(dispatcher.sequence, [])  # All side-effects performed
 
 
 class ConvergeOneGroupTests(SynchronousTestCase):
