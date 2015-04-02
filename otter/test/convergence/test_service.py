@@ -562,6 +562,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.manifest = {  # Many details elided!
             'state': self.state,
             'launchConfiguration': self.lc,
+            'status': 'ACTIVE'
         }
         gsgi_result = (self.group, self.manifest)
         self.expected_intents = [(gsgi, gsgi_result)]

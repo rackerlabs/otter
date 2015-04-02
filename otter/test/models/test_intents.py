@@ -46,9 +46,10 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         Performing `GetScalingGroupInfo` returns the group,
         the state, and the launch config.
         """
-        def view_manifest(with_policies, with_webhooks):
+        def view_manifest(with_policies, with_webhooks, get_deleting):
             self.assertEqual(with_policies, False)
             self.assertEqual(with_webhooks, False)
+            self.assertEqual(get_deleting, True)
             return succeed(manifest)
 
         manifest = {}
