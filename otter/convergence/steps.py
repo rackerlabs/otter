@@ -220,7 +220,9 @@ class DeleteServer(object):
             next_interval=exponential_backoff_interval(2))
 
         def report_success(result):
-            return StepResult.SUCCESS, []
+            return StepResult.RETRY, [
+                'must re-gather after deletion in order to update the active '
+                'cache']
 
         return eff.on(success=report_success)
 
