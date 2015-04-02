@@ -135,5 +135,10 @@ class Partitioner(MultiService):
         return succeed((True, {'buckets': self.get_current_buckets()}))
 
     def get_current_buckets(self):
-        """Retrieve the current buckets as a list."""
+        """
+        Retrieve the current buckets as a list.
+
+        This should only be relied on when the current partitioner state is
+        ``ACQUIRED``.
+        """
         return list(self.partitioner)
