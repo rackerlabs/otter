@@ -555,11 +555,8 @@ class OtterGroup(object):
         group = self.store.get_scaling_group(self.log, self.tenant_id,
                                              self.group_id)
         force = extract_bool_arg(request, 'force', False)
-        if force:
-            return controller.force_delete_group(
-                log, transaction_id(request), group)
-        else:
-            return group.delete_group()
+        return controller.delete_group(
+                log, transaction_id(request), group, force)
 
     @app.route('/state/', methods=['GET'])
     @with_transaction_id()

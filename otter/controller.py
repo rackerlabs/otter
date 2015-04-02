@@ -128,28 +128,52 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
     return d
 
 
-def force_delete_group(log, trans_id, group):
+def delete_group(log, trans_id, group, force):
     """
-    Delete group even if it has resources by also deleting resources
+    Delete group by based the kind of tenant
 
     :param log: Bound logger
     :param str trans_id: Transaction ID of request doing this
     :param otter.models.interface.IScalingGroup scaling_group: the scaling
         group object
+    :param bool force: Should group be deleted even if it has servers?
 
     :return: Deferred that fires with None
     """
+
+    def check_and_delete(state):
+        if state.desired == 0:
+            d = trigger_convergence_deletion(group)
+            return d.addCallback(lambda _: state)
+        else:
+            raise GroupNotEmptyError(group.tenant_id, group.uuid)
+
     if tenant_is_enabled(group.tenant_id, config_value):
-        # For convergence tenants update group status and trigger convergence
-        # DELETING status will take precedence over other status
-        d = group.update_status(ScalingGroupStatus.DELETING)
-        cs = get_convergence_starter()
-        d.addCallback(
-            lambda _: cs.start_convergence(log, group.tenant_id, group.uuid))
-        return d
+        return (trigger_convergence_deletion(group)
+                if force else group.modify_state(check_and_delete))
     else:
-        d = empty_group(log, trans_id, group)
-        return d.addCallback(lambda _: group.delete_group())
+        if force:
+            d = empty_group(log, trans_id, group)
+            d.addCallback(lambda _: group.delete_group())
+        else:
+            d = group.delete_group()
+        return d
+
+
+def trigger_convergence_deletion(group):
+    """
+    Trigger deletion of group that belongs to convergence tenant
+
+    :param otter.models.interface.IScalingGroup scaling_group: the scaling
+        group object
+    """
+    # Update group status and trigger convergence
+    # DELETING status will take precedence over other status
+    d = group.update_status(ScalingGroupStatus.DELETING)
+    cs = get_convergence_starter()
+    d.addCallback(
+        lambda _: cs.start_convergence(log, group.tenant_id, group.uuid))
+    return d
 
 
 def empty_group(log, trans_id, group):
