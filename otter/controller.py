@@ -25,7 +25,9 @@ from decimal import Decimal, ROUND_UP
 import iso8601
 import json
 
-from effect import catch
+from effect import Effect, catch
+from effect.do import do, do_return
+from effect.twisted import perform
 
 from twisted.internet import defer
 
@@ -36,16 +38,18 @@ from otter.cloud_client import (
     get_server_details,
     set_nova_metadata_item)
 from otter.convergence.composition import tenant_is_enabled
+from otter.convergence.intents import GetScalingGroupInfo
 from otter.convergence.model import group_id_from_metadata
 from otter.convergence.service import get_convergence_starter
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,
+    EvictServerFromScalingGroup,
     ServerNotFoundError,
     exec_scale_down,
     execute_launch_config,
-    evict_server_from_group)
+    perform_evict_server)
 from otter.supervisor import (
     remove_server_from_group as worker_remove_server_from_group)
 from otter.util.config import config_value
@@ -368,6 +372,65 @@ def calculate_delta(log, state, config, policy):
     return apply_delta(log, current, state, config, policy)
 
 
+@do
+def convergence_remove_server_from_group(group, server_id, replace, purge):
+    """
+    Remove a specific server from the group, optionally decrementing the
+    desired capacity.
+
+    The server may just be scheduled for deletion, or it may be evicted from
+    the group by removing otter-specific metdata from the server.
+
+    :param group: The scaling group to remove a server from.
+    :type group: :class:`~otter.models.interface.IScalingGroup`
+    :param bytes server_id: The id of the server to be removed.
+    :param bool replace: Should the server be replaced?
+    :param bool purge: Should the server be deleted from Nova?
+
+    :return: The updated state.
+    :rtype: deferred :class:`~otter.models.interface.GroupState`
+
+    :raise: :class:`CannotDeleteServerBelowMinError` if the server cannot
+        be deleted without replacement, and :class:`ServerNotFoundError` if
+        there is no such server to be deleted.
+    """
+    # Is the server even in the group?
+    try:
+        server = yield retry_effect(get_server_details(server_id),
+                                    retry_times(3),
+                                    exponential_backoff_interval(2))
+    except NoSuchServerError:
+        raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
+
+    else:
+        group_id = group_id_from_metadata(
+            get_in(('server', 'metadata'), details, {}))
+        if group_id != group.uuid:
+            raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
+
+    # Can we scale down without replacing?
+    manifest = yield Effect(GetScalingGroupInfo(
+        tenant_id=group.tenant_id, group_id=group.uuid))
+    min_entities = manifest['groupConfiguration']['minEntities']
+    state = manifest['state']
+
+    if not replace:
+        if state.desired == min_entities:
+            raise CannotDeleteServerBelowMinError(
+                group.tenant_id, group.uuid, server_id, min_entities)
+        state.desired -= 1
+
+    # Remove the server
+    if purge:
+        eff = set_nova_metadata_item(server_id, *DRAINING_METADATA)
+    else:
+        eff = EvictServerFromScalingGroup(scaling_group=group,
+                                          server_id=server_id)
+
+    yield retry_effect(eff, retry_types(3), exponential_backoff_interval(2))
+    yield do_return(state)
+
+
 def remove_server_from_group(log, trans_id, server_id, replace, purge,
                              group, state, config_value=config_value):
     """
@@ -397,71 +460,8 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
             log, trans_id, server_id, replace, purge, group, state)
 
     # convergence case
-
-    def maybe_modify_state(config):
-        """
-        If ``replace`` = False, attempt to decrement desired capacity.  If this
-        cannot be done due to min/max constraints, raise
-        :class:`CannotDeleteServerBelowMinError`.
-
-        Don't bother updating the cached servers because either way, a
-        convergence cycle will have to be kicked off.
-        """
-        if not replace:
-            if state.desired == config['minEntities']:
-                raise CannotDeleteServerBelowMinError(
-                    group.tenant_id, group.uuid, server_id,
-                    config['minEntities'])
-            state.desired -= 1
-
-    def raise_if_server_not_in_group(_):
-        """
-        Check if the server is a member of this scaling group.  If not, raise
-        :class:`ServerNotFoundError`
-        """
-        eff = retry_effect(
-            get_server_details(server_id),
-            retry_times(3),
-            exponential_backoff_interval(2))
-
-        def check_metadata(details):
-            group_id = group_id_from_metadata(
-                get_in(('server', 'metadata'), details, {}))
-            if group_id != group.uuid:
-                raise ServerNotFoundError(
-                    group.tenant_id, group.uuid, server_id)
-
-        def translate_error(*exc_info):
-            raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
-
-        return eff.on(success=check_metadata,
-                      error=catch(NoSuchServerError, translate_error))
-
-    def remove_server(_):
-        """
-        Kick off the process to delete the server by setting it to DRAINING,
-        and starting a convergence cycle, which will either drain the server
-        from its load balancers and then delete it, or just delete it if there
-        are no load balancers.
-        """
-        # eff = retry_effect(
-        #     set_nova_metadata_item(server_id, *DRAINING_METADATA),
-        #     retry_times(3),
-        #     exponential_backoff_interval(2))
-
-        # set metadata to draining
-
-    # this should be effect-y
-    d = group.view_config()
-    # d.addCallback(maybe_modify_state)
-    # d.addCallback(raise_if_server_not_in_group)
-
-    # if purge:
-    #     d.addCallback(purge_server)
-    # else:
-    #     d.addCallback(
-    #         lambda _: evict_server_from_group(log, trans_id, group, server_id))
-
-    # d.addCallback(lambda -: start convergence)
-    # d.addCallback(lambda _: state)
+    d = perform(dispatcher, eff)
+    d.addCallback(lambda _: get_convergence_starter().start_convergence(
+        log, scaling_group.tenant_id, scaling_group.uuid))
+    d.addCallback(lambda _: state)
     return d
