@@ -15,7 +15,8 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import CachingAuthenticator, SingleTenantAuthenticator
-from otter.constants import ServiceType, get_service_configs
+from otter.constants import (
+    CONVERGENCE_DIRTY_DIR, ServiceType, get_service_configs)
 from otter.convergence.service import Converger
 from otter.log.cloudfeeds import CloudFeedsObserver
 from otter.models.cass import CassScalingGroupCollection as OriginalStore
@@ -652,7 +653,8 @@ class APIMakeServiceTests(SynchronousTestCase):
 class ConvergerSetupTests(SynchronousTestCase):
     """Tests for :func:`setup_converger`."""
 
-    def test_setup_converger(self):
+    @mock.patch('otter.tap.api.watch_children')
+    def test_setup_converger(self, mock_watch_children):
         """
         Puts a :obj:`Converger` with a :obj:`Partitioner` in the given parent
         service.
@@ -668,6 +670,9 @@ class ConvergerSetupTests(SynchronousTestCase):
         self.assertIs(partitioner.__class__, Partitioner)
         self.assertIs(partitioner, converger.partitioner)
         self.assertIs(partitioner.kz_client, kz_client)
+        mock_watch_children.assert_called_once_with(
+            kz_client, CONVERGENCE_DIRTY_DIR, converger.divergent_changed)
+        
 
 
 class SchedulerSetupTests(SynchronousTestCase):
