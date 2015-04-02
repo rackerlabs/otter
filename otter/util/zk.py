@@ -8,8 +8,6 @@ from effect.twisted import deferred_performer
 
 from kazoo.exceptions import NoNodeError, NodeExistsError
 
-from twisted.internet.defer import gatherResults
-
 from otter.util.deferredutils import catch_failure
 
 
@@ -107,7 +105,9 @@ def perform_get_children(kz_client, dispatcher, intent):
 
 @attributes(['path'], apply_with_init=False)
 class GetStat(object):
-    """Get the :obj:`ZnodeStat` of a ZK node."""
+    """
+    Get the :obj:`ZnodeStat` of a ZK node, or None if the node does not exist.
+    """
     def __init__(self, path):
         self.path = path
 
