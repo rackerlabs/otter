@@ -141,8 +141,7 @@ def force_delete_group(log, trans_id, group):
     """
     if tenant_is_enabled(group.tenant_id, config_value):
         # For convergence tenants update group status and trigger convergence
-        # TODO: What about status consistency? Will this work if another
-        # process is trying to update status to ERROR at same time?
+        # DELETING status will take precedence over other status
         d = group.update_status(ScalingGroupStatus.DELETING)
         cs = get_convergence_starter()
         d.addCallback(
