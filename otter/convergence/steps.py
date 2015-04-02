@@ -16,7 +16,10 @@ from twisted.python.constants import NamedConstant
 
 from zope.interface import Interface, implementer
 
-from otter.cloud_client import has_code, service_request
+from otter.cloud_client import (
+    has_code,
+    service_request,
+    set_nova_metadata_item)
 from otter.constants import ServiceType
 from otter.convergence.model import StepResult
 from otter.util.fp import predicate_any
@@ -234,22 +237,15 @@ class SetMetadataItemOnServer(object):
     :ivar str key: The metadata key to set (<=256 characters)
     :ivar str value: The value to assign to the metadata key (<=256 characters)
 
-    Succeed unconditionally on 200 (success) or 404 (if the server's gone, no
-    need to retry or fail).
+    Succeed unconditionally on 200 (success).  Everything else can probably
+    be retried, since nothing is a catastrophic group failure.
     """
     def as_effect(self):
         """Produce a :obj:`Effect` to set a metadata item on a server"""
-        eff = service_request(
-            ServiceType.CLOUD_SERVERS,
-            'PUT',
-            append_segments('servers', self.server_id, 'metadata', self.key),
-            data={'meta': {self.key: self.value}},
-            success_pred=has_code(200, 404))
+        eff = set_nova_metadata_item(
+            server_id=self.server_id, key=self.key, value=self.value)
 
-        def report_success(result):
-            return StepResult.SUCCESS, []
-
-        return eff.on(success=report_success)
+        return eff.on(success=lambda _: (StepResult.SUCCESS, []))
 
 
 _CLB_DUPLICATE_NODES_PATTERN = re.compile(

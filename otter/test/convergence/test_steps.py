@@ -11,7 +11,13 @@ from testtools.matchers import IsInstance
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.cloud_client import ServiceRequest, has_code, service_request
+from otter.cloud_client import (
+    NoSuchServerError,
+    NovaRateLimitError,
+    ServerMetadataOverLimitError,
+    ServiceRequest,
+    has_code,
+    service_request)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
@@ -417,23 +423,27 @@ class StepAsEffectTests(SynchronousTestCase):
     def test_set_metadata_item(self):
         """
         :obj:`SetMetadataItemOnServer.as_effect` produces a request for
-        setting a metadata item on a particular server.
+        setting a metadata item on a particular server.  It succeeds if
+        successful, but does not fail for any errors.
         """
-        meta = SetMetadataItemOnServer(server_id='abc123', key='metadata_key',
+        server_id = u'abc123'
+        meta = SetMetadataItemOnServer(server_id=server_id, key='metadata_key',
                                        value='teapot')
         eff = meta.as_effect()
         self.assertEqual(
-            eff.intent,
-            service_request(
-                ServiceType.CLOUD_SERVERS,
-                'PUT',
-                'servers/abc123/metadata/metadata_key',
-                data={'meta': {'metadata_key': 'teapot'}},
-                success_pred=has_code(200, 404)).intent)
-
-        self.assertEqual(
             resolve_effect(eff, (None, {})),
             (StepResult.SUCCESS, []))
+
+        exceptions = (NoSuchServerError("msg", server_id=server_id),
+                      ServerMetadataOverLimitError("msg", server_id=server_id),
+                      NovaRateLimitError("msg"),
+                      APIError(code=500, body="", headers={}))
+        for exception in exceptions:
+            self.assertRaises(
+                type(exception),
+                resolve_effect,
+                eff, (type(exception), exception, None),
+                is_error=True)
 
     def test_change_load_balancer_node(self):
         """
