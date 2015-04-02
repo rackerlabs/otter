@@ -1,10 +1,15 @@
 """
 Tests for the worker supervisor.
 """
+from functools import partial
 
 from effect import Constant, Effect
 
 import mock
+
+from effect import Effect, TypeDispatcher, sync_perform
+from effect.testing import resolve_effect
+
 
 from testtools.matchers import ContainsDict, Equals, IsInstance
 
@@ -21,8 +26,14 @@ from otter.constants import ServiceType
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchScalingGroupError)
 from otter.supervisor import (
-    CannotDeleteServerBelowMinError, ISupervisor, ServerNotFoundError,
-    SupervisorService, execute_launch_config, remove_server_from_group,
+    CannotDeleteServerBelowMinError,
+    EvictServerFromScalingGroup,
+    ISupervisor,
+    ServerNotFoundError,
+    SupervisorService,
+    execute_launch_config,
+    perform_evict_server,
+    remove_server_from_group,
     set_supervisor)
 from otter.test.utils import (
     CheckFailure, DummyException, FakeSupervisor, IsBoundWith, iMock, matches,
@@ -1248,3 +1259,31 @@ class RemoveServerTests(SynchronousTestCase):
         self._assert_create_scheduled(state)
         self._assert_metadata_scrubbing_scheduled()
         self.assertEqual(state.desired, 1)
+
+
+class PerformEvictionTests(SynchronousTestCase):
+    """
+    Tests for :func:`perform_evict_server` function
+    """
+    def test_perform_eviction(self):
+        """
+        Calls supervisor's scrub metadata function.
+        """
+        supervisor = FakeSupervisor()
+        set_supervisor(supervisor)
+        self.addCleanup(set_supervisor, None)
+
+        log, group = (object(), mock_group(None))
+        intent = EvictServerFromScalingGroup(
+            scaling_group=group, server_id='server_id')
+
+        r = sync_perform(
+            TypeDispatcher({
+                EvictServerFromScalingGroup: partial(
+                    perform_evict_server, log, "transaction_id")}),
+            Effect(intent))
+
+        self.assertIsNone(r)
+        self.assertEqual(
+            supervisor.scrub_calls,
+            [(log, "transaction_id", group.tenant_id, 'server_id')])
