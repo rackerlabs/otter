@@ -14,6 +14,8 @@ from effect.do import do, do_return
 from effect.ref import Reference
 from effect.twisted import exc_info_to_failure, perform
 
+from kazoo.recipe.partitioner import PartitionState
+
 from pyrsistent import pset
 from pyrsistent import thaw
 
@@ -312,11 +314,15 @@ def get_my_divergent_groups(my_buckets, all_buckets):
         num_buckets = len(all_buckets)
         converging = (
             info for info in dirty_info
-            if _stable_hash(info['tenant_id']) % num_buckets in my_buckets)
+            if bucket_of_tenant(info['tenant_id'], num_buckets) in my_buckets)
         return list(converging)
 
-    # This is inefficient since we're getting stat information about nodes that
-    # we don't necessarily care about, but this is convenient for now.
+    # TODO: This is inefficient since we're getting stat information about
+    # nodes that we don't necessarily care about, but this is convenient for
+    # now.
+    # - flags of groups that aren't associated with our buckets
+    # - flags of groups that we are already converging
+    # https://github.com/rackerlabs/otter/issues/1288
     eff = Effect(GetChildrenWithStats(CONVERGENCE_DIRTY_DIR))
     return eff.on(got_children_with_stats)
 
@@ -389,6 +395,16 @@ def _stable_hash(s):
     return int(sha1(s).hexdigest(), 16)
 
 
+def bucket_of_tenant(tenant, num_buckets):
+    """
+    Return the bucket associated with the given tenant.
+
+    :param str tenant: tenant ID
+    :param int num_buckets: global number of buckets
+    """
+    return _stable_hash(tenant) % num_buckets
+
+
 class Converger(MultiService):
     """
     A service that searches for groups that need converging and then does the
@@ -441,14 +457,23 @@ class Converger(MultiService):
         return result
 
     def divergent_changed(self, children):
-        self.log.msg('convergence-zk-watch')
-        if self.partitioner.partitioner.acquired:
-            # TODO: don't use private stuff :(
-            # TODO: only call buckets_acquired if we own some of the children
-            # TODO: maybe don't do so much work?
-            # TODO: nagle?
-            my_buckets = self.partitioner._get_current_buckets()
-            self.buckets_acquired(my_buckets)
+        """
+        ZooKeeper children-watch callback that lets this service know when the
+        divergent groups have changed. If any of the divergent flags are for
+        tenants associated with this service's buckets, a convergence will be
+        triggered.
+        """
+        # It'd sure be nice if we could know *exactly which* flag was just
+        # created, but ZK watches simply don't provide that information.
+        # So we must simply converge all groups.
+        my_buckets = self.partitioner.get_current_buckets()
+        changed_buckets = set(
+            bucket_of_tenant(parse_dirty_flag(child)[0], len(self._buckets))
+            for child in children)
+        if (self.partitioner.get_current_state() == PartitionState.ACQUIRED and
+                set(my_buckets).intersection(changed_buckets)):
+            # the return value is ignored, but we return this for testing
+            return self.buckets_acquired(my_buckets)
 
 # We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this

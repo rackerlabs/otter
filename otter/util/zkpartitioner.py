@@ -47,6 +47,9 @@ class Partitioner(MultiService):
         ts.clock = clock
         self._old_buckets = []
 
+    def get_current_state(self):
+        return self.partitioner.state
+
     def _new_partitioner(self):
         return self.kz_client.SetPartitioner(
             self.partitioner_path,
@@ -97,13 +100,13 @@ class Partitioner(MultiService):
         if not self.partitioner.acquired:
             self.log.err(
                 'Unknown state {}. This cannot happen. Starting new'.format(
-                    self.partitioner.state),
+                    self.get_current_state()),
                 otter_msg_type='partition-invalid-state')
             self.partitioner.finish()
             self.partitioner = self._new_partitioner()
             return
 
-        buckets = self._get_current_buckets()
+        buckets = self.get_current_buckets()
         if buckets != self._old_buckets:
             self.log.msg('Got buckets {buckets}', buckets=buckets,
                          path=self.partitioner_path,
@@ -128,8 +131,8 @@ class Partitioner(MultiService):
             # during network issues.
             return succeed((False, {'reason': 'Not acquired'}))
 
-        return succeed((True, {'buckets': self._get_current_buckets()}))
+        return succeed((True, {'buckets': self.get_current_buckets()}))
 
-    def _get_current_buckets(self):
+    def get_current_buckets(self):
         """Retrieve the current buckets as a list."""
         return list(self.partitioner)
