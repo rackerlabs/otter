@@ -672,7 +672,6 @@ class ConvergerSetupTests(SynchronousTestCase):
         self.assertIs(partitioner.kz_client, kz_client)
         mock_watch_children.assert_called_once_with(
             kz_client, CONVERGENCE_DIRTY_DIR, converger.divergent_changed)
-        
 
 
 class SchedulerSetupTests(SynchronousTestCase):
