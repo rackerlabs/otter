@@ -84,7 +84,6 @@ class ConvergerTests(SynchronousTestCase):
     """Tests for :obj:`Converger`."""
 
     def setUp(self):
-        self.dispatcher = _get_dispatcher()
         self.log = mock_log()
         self.buckets = range(10)
 
