@@ -23,15 +23,16 @@ class GroupState(object):
         object represents
     :ivar bytes group_name: the name of the scaling group whose state this
         object represents
-    :ivar int desired: the desired capacity of the scaling group
     :ivar dict active: the mapping of active server ids and their info
     :ivar dict pending: the list of pending job ids and their info
+    :ivar bytes group_touched: timezone-aware ISO860 formatted timestamp
+        that represents when the last time any policy was executed
+        on the group. Could be None.
+    :ivar dict policy_touched: dictionary mapping policy ids to the last time
+        they were executed, if ever. The time is stored as ISO860 format str
     :ivar bool paused: whether the scaling group is paused in
         scaling activities
-    :ivar bytes group_touched: timezone-aware timestamp that represents
-        when the last time any policy was executed on the group. Could be None.
-    :ivar dict policy_touched: dictionary mapping policy ids to the last time
-        they were executed, if ever.
+    :ivar int desired: the desired capacity of the scaling group
     :ivar callable now: callable that returns a :class:`bytes` timestamp
         used for testing purposes. Defaults to :func:`timestamp.now`
 
