@@ -439,14 +439,17 @@ class Converger(MultiService):
         tenants associated with this service's buckets, a convergence will be
         triggered.
         """
+        # It'd sure be nice if we could know *exactly which* flag was just
+        # created, but ZK watches simply don't provide that information.
+        # So we must simply converge all groups.
+        my_buckets = self.partitioner.get_current_buckets()
         changed_buckets = set(
             bucket_of_tenant(parse_dirty_flag(child)[0], len(self._buckets))
             for child in children)
-        if self.partitioner.get_current_state() == PartitionState.ACQUIRED:
-            my_buckets = set(self.partitioner.get_current_buckets())
-            if my_buckets.intersection(changed_buckets):
-                # the return value is ignored, but we return this for testing
-                return self.buckets_acquired(my_buckets)
+        if (self.partitioner.get_current_state() == PartitionState.ACQUIRED and
+                set(my_buckets).intersection(changed_buckets)):
+            # the return value is ignored, but we return this for testing
+            return self.buckets_acquired(my_buckets)
 
 # We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this
