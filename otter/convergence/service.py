@@ -5,6 +5,7 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 :obj:`Converger`.
 """
 
+import sys
 import time
 from functools import partial
 from hashlib import sha1
@@ -33,7 +34,7 @@ from otter.convergence.planning import plan
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
 from otter.models.interface import NoSuchScalingGroupError
 from otter.util.fp import assoc_obj
-from otter.util.zk import CreateOrSet, DeleteNode, GetChildrenWithStats
+from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 
 def server_to_json(server):
@@ -282,6 +283,7 @@ def non_concurrently(locks, key, eff):
     yield do_return(result)
 
 
+@do
 def get_my_divergent_groups(my_buckets, all_buckets):
     """
     Look up groups that are divergent and that are this node's
@@ -290,54 +292,58 @@ def get_my_divergent_groups(my_buckets, all_buckets):
     :param my_buckets: collection of buckets allocated to this node
     :param all_buckets: collection of all buckets
 
-    :returns: list of dicts, where each dict has ``tenant_id``,
-        ``group_id``, and ``version`` keys.
+    :returns: list of (tenant, group, node)
     """
-    def structure_info(x):
-        # Names of the dirty flags are {tenant_id}_{group_id}.
-        path, stat = x
-        tenant, group = parse_dirty_flag(x[0])
-        return {'tenant_id': tenant, 'group_id': group,
-                'version': stat.version}
-
-    def got_children_with_stats(children_with_stats):
-        dirty_info = map(structure_info, children_with_stats)
-        num_buckets = len(all_buckets)
-        converging = (
-            info for info in dirty_info
-            if bucket_of_tenant(info['tenant_id'], num_buckets) in my_buckets)
-        return list(converging)
-
-    # TODO: This is inefficient since we're getting stat information about
-    # nodes that we don't necessarily care about, but this is convenient for
-    # now.
-    # - flags of groups that aren't associated with our buckets
-    # - flags of groups that we are already converging
-    # https://github.com/rackerlabs/otter/issues/1288
-    eff = Effect(GetChildrenWithStats(CONVERGENCE_DIRTY_DIR))
-    return eff.on(got_children_with_stats)
+    num_buckets = len(all_buckets)
+    children = yield Effect(GetChildren(CONVERGENCE_DIRTY_DIR))
+    result = [
+        {'tenant_id': tenant_id, 'group_id': group_id,
+         'dirty_flag': CONVERGENCE_DIRTY_DIR + '/' + child}
+        for ((tenant_id, group_id), child)
+        in zip(map(parse_dirty_flag, children), children)
+        if bucket_of_tenant(tenant_id, num_buckets) in my_buckets]
+    yield do_return(result)
 
 
 @do
-def converge_one_group(log, group_locks, tenant_id, group_id, version,
+def converge_one_group(log, group_locks, tenant_id, group_id, dirty_flag,
                        execute_convergence=execute_convergence):
     """
     Converge one group, non-concurrently, and clean up the dirty flag when
     done.
 
     :param group_locks: A lock function, produced from :func:`make_lock_set`.
-    :param version: version number of ZNode of the group's dirty flag
+    :param dirty_flag: The full path to the ZK node representing the dirty flag
+        for the given group.
     """
     log = log.bind(tenant_id=tenant_id, group_id=group_id)
-    eff = execute_convergence(tenant_id, group_id, log)
+
+    # `eff` here is run inside of the group lock -- so it may not be run if
+    # we're already converging this group. We want to make sure we delay the
+    # `Stat` call until after we've ensured we're not already converging this
+    # group, to avoid too much ZK spam.
+    @do
+    def inner():
+        stat = yield Effect(GetStat(dirty_flag))
+        try:
+            is_error = False
+            result = yield execute_convergence(tenant_id, group_id, log)
+        except:
+            is_error = True
+            result = sys.exc_info()
+        yield do_return((stat, is_error, result))
     try:
-        result = yield group_locks(group_id, eff)
+         stat, is_error, result = yield group_locks(group_id, inner())
     except ConcurrentError:
         # We don't need to spam the logs about this, it's to be expected
         return
+
+    try:
+        if is_error:
+            six.reraise(*result)
     except NoSuchScalingGroupError:
         log.err(None, 'converge-fatal-error')
-        yield delete_divergent_flag(log, tenant_id, group_id, version)
+        yield delete_divergent_flag(log, tenant_id, group_id, stat.version)
         return
     except Exception:
         # We specifically don't clean up the dirty flag in the case of
@@ -345,9 +351,20 @@ def converge_one_group(log, group_locks, tenant_id, group_id, version,
         log.err(None, 'converge-non-fatal-error')
     else:
         if result in (StepResult.FAILURE, StepResult.SUCCESS):
-            yield delete_divergent_flag(log, tenant_id, group_id, version)
+            yield delete_divergent_flag(log, tenant_id, group_id, stat.version)
         # TODO: if result is FAILURE, put the group into ERROR state.
         # https://github.com/rackerlabs/otter/issues/885
+
+
+# REMOVE IN-MEM-LOCK
+# <SOMETHING>
+# REMOVE DIRTY FLAG
+
+# vs
+
+# REMOVE DIRTY FLAG
+# <SOMETHING>
+# REMOVE IN-MEM-LOCK
 
 
 @do
@@ -374,7 +391,7 @@ def converge_all_groups(log, group_locks, my_buckets, all_buckets,
             converge_one_group(log, group_locks,
                                info['tenant_id'],
                                info['group_id'],
-                               info['version']),
+                               info['dirty_flag']),
             info['tenant_id']))
         for info in group_infos]
     yield do_return(parallel(effs))
