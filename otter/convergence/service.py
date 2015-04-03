@@ -223,13 +223,13 @@ class ConvergenceStarter(object):
     for that).
     """
     def __init__(self, dispatcher):
-        self._dispatcher = dispatcher
+        self.dispatcher = dispatcher
 
     def start_convergence(self, log, tenant_id, group_id, perform=perform):
         """Record that a group needs converged by creating a ZooKeeper node."""
         log = log.bind(tenant_id=tenant_id, group_id=group_id)
         eff = mark_divergent(tenant_id, group_id)
-        d = perform(self._dispatcher, eff)
+        d = perform(self.dispatcher, eff)
 
         def success(r):
             log.msg('mark-dirty-success')

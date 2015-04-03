@@ -3,6 +3,13 @@ Tests for :mod:`otter.controller`
 """
 from datetime import timedelta, datetime
 
+from effect import (
+    ComposedDispatcher,
+    TypeDispatcher,
+    sync_perform,
+    sync_performer)
+from effect.testing import SequenceDispatcher
+
 import mock
 
 from testtools.matchers import ContainsDict, Equals
@@ -11,13 +18,24 @@ from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter import controller
-
+from otter.cloud_client import (
+    NoSuchServerError,
+    get_server_details)
 from otter.convergence.service import (
     get_convergence_starter, set_convergence_starter)
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError)
+from otter.supervisor import ServerNotFoundError
+from otter.util.retry import (
+    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN
-from otter.test.utils import iMock, matches, patch, mock_log
+from otter.test.utils import (
+    iMock,
+    matches,
+    patch,
+    mock_log,
+    raise_,
+    test_dispatcher)
 
 
 class CalculateDeltaTestCase(SynchronousTestCase):
@@ -1139,3 +1157,95 @@ class ConvergeTestCase(SynchronousTestCase):
 
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)
+
+
+class ConvergenceRemoveServerTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.controller.convergence_remove_server_from_group`
+    """
+    def setUp(self):
+        """
+        Fake supervisor, group and state
+        """
+        self.config_data = {'convergence-tenants': ['tenant_id']}
+
+        self.trans_id = 'trans_id'
+        self.log = mock_log()
+        self.state = GroupState('tenant_id', 'group_id', 'group_name',
+                                active={'s0': {'id': 's0'}},
+                                pending={},
+                                group_touched=None,
+                                policy_touched=None,
+                                paused=None,
+                                desired=1)
+        self.group = iMock(IScalingGroup, tenant_id='tenant_id',
+                           uuid='group_id')
+
+    def _remove(self, replace, purge, dispatcher):
+        # Retry intents can't really be compared if the effect inside
+        # has callbacks, so just unpack and assert something about the retry
+        # params, and perform the wrapped effect.
+        expected_retry_params = ShouldDelayAndRetry(
+            can_retry=retry_times(3),
+            next_interval=exponential_backoff_interval(2))
+
+        @sync_performer
+        def handle_retry(_disp, retry_intent):
+            self.assertEqual(retry_intent.should_retry, expected_retry_params)
+            return sync_perform(_disp, retry_intent.effect)
+
+        full_dispatcher = ComposedDispatcher([
+            test_dispatcher(),
+            TypeDispatcher({Retry: handle_retry}),
+            dispatcher])
+
+        eff = controller.convergence_remove_server_from_group(
+            self.group, self.state, 'server_id', replace, purge)
+        return sync_perform(full_dispatcher, eff)
+
+    def test_no_such_server_replace_true(self):
+        """
+        If there is no such server at all in Nova, a
+        :class:`ServerNotFoundError` is returned.  No additional checking
+        for config is needed because replace is set True.
+        """
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda i: raise_(NoSuchServerError(server_id=u'server_id')))
+        ])
+        self.assertRaises(
+            ServerNotFoundError, self._remove, True, False, dispatcher)
+
+    def test_server_not_autoscale_server_replace_true(self):
+        """
+        If there is such a server in Nova, but it does not have
+        autoscale-specific metadata, then :class:`ServerNotFoundError` is
+        returned.  No additional checking for config is needed because
+        replace is set True.
+        """
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda i: {'server': {'id': 'server_id'}})
+        ])
+        self.assertRaises(
+            ServerNotFoundError, self._remove, True, False, dispatcher)
+
+    def test_server_in_wrong_group_replace_true(self):
+        """
+        If there is such a server in Nova, but it belongs to a different group,
+        then :class:`ServerNotFoundError` is returned.  No additional checking
+        for config is needed because replace is set True.
+        """
+        server_json = {
+            'id': 'server_id',
+            'metadata': {
+                'rax:autoscale:group:id': 'other_group_id',
+                'rax:auto_scaling_group_id': 'other_group_id'
+            }
+        }
+
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent, lambda i: server_json)
+        ])
+        self.assertRaises(
+            ServerNotFoundError, self._remove, True, False, dispatcher)
