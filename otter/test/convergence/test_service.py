@@ -2,7 +2,7 @@ from effect import (
     ComposedDispatcher, Constant, Effect, Error, Func, ParallelEffects,
     TypeDispatcher, base_dispatcher, sync_perform)
 from effect.async import perform_parallel_async
-from effect.ref import ReadReference, ModifyReference, Reference, reference_dispatcher
+from effect.ref import ReadReference, Reference, reference_dispatcher
 from effect.testing import EQDispatcher, EQFDispatcher, SequenceDispatcher
 
 from kazoo.exceptions import BadVersionError
@@ -360,14 +360,13 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             {'tenant_id': '01', 'group_id': 'g2',
              'dirty-flag': '/groups/divergent/01_g2'}
         ]
+
         def get_my_divergent_groups(_my_buckets, _all_buckets):
-            self.assertEqual(_my_buckets, my_buckets)
-            self.assertEqual(_all_buckets, all_buckets)
-            return Effect(Constant(group_infos))
+            return Effect(('get-divergent-groups', _my_buckets, _all_buckets))
 
         def converge_one_group(log, currently_converging, tenant_id, group_id,
                                version):
-            return Effect((tenant_id, group_id, version, 'converge!'))
+            return Effect(('converge', tenant_id, group_id, version))
 
         log = mock_log()
         currently_converging = Reference(pset())
@@ -379,31 +378,34 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             converge_one_group=converge_one_group)
 
         sequence = SequenceDispatcher([
+            (('get-divergent-groups', my_buckets, all_buckets),
+             lambda i: group_infos),
             (ReadReference(ref=currently_converging),
              lambda i: pset()),
+
             (GetStat(path='/groups/divergent/00_g1'),
              lambda i: ZNodeStatStub(version=1)),
             (TenantScope(
-                Effect(('00', 'g1', 1, 'converge!')),
+                Effect(('converge', '00', 'g1', 1)),
                 '00'),
              lambda tscope: tscope.effect),
-            (('00', 'g1', 1, 'converge!'),
-             lambda i: i),
+            (('converge', '00', 'g1', 1),
+             lambda i: 'converged one!'),
+
             (GetStat(path='/groups/divergent/01_g2'),
              lambda i: ZNodeStatStub(version=5)),
             (TenantScope(
-                Effect(('01', 'g2', 5, 'converge!')),
+                Effect(('converge', '01', 'g2', 5)),
                 '01'),
              lambda tscope: tscope.effect),
-            (('01', 'g2', 5, 'converge!'),
-             lambda i: i),
+            (('converge', '01', 'g2', 5),
+             lambda i: 'converged two!'),
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
 
         self.assertEqual(
             sync_perform(dispatcher, eff),
-            [('00', 'g1', 1, 'converge!'),
-             ('01', 'g2', 5, 'converge!')])
+            ['converged one!', 'converged two!'])
         log.msg.assert_called_once_with(
             'converge-all-groups',
             group_infos=group_infos,
