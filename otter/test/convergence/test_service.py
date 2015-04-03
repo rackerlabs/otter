@@ -349,38 +349,43 @@ class ConvergeOneGroupTests(SynchronousTestCase):
 class ConvergeAllGroupsTests(SynchronousTestCase):
     """Tests for :func:`converge_all_groups`."""
 
-    def test_converge_all_groups(self):
-        """
-        Fetches divergent groups and runs converge_one_group for each one
-        needing convergence.
-        """
-        group_infos = [
+    def setUp(self):
+        self.log = mock_log()
+        self.currently_converging = Reference(pset())
+        self.my_buckets = [0, 5]
+        self.all_buckets = range(10)
+        self.group_infos = [
             {'tenant_id': '00', 'group_id': 'g1',
              'dirty-flag': '/groups/divergent/00_g1'},
             {'tenant_id': '01', 'group_id': 'g2',
              'dirty-flag': '/groups/divergent/01_g2'}
         ]
 
-        def get_my_divergent_groups(_my_buckets, _all_buckets):
-            return Effect(('get-divergent-groups', _my_buckets, _all_buckets))
+    def _converge_all_groups(self):
+        return converge_all_groups(
+            self.log, self.currently_converging, self.my_buckets,
+            self.all_buckets,
+            get_my_divergent_groups=self._get_my_divergent_groups,
+            converge_one_group=self._converge_one_group)
 
-        def converge_one_group(log, currently_converging, tenant_id, group_id,
-                               version):
-            return Effect(('converge', tenant_id, group_id, version))
+    def _get_my_divergent_groups(self, _my_buckets, _all_buckets):
+        return Effect(('get-divergent-groups', _my_buckets, _all_buckets))
 
-        log = mock_log()
-        currently_converging = Reference(pset())
-        my_buckets = [0, 5]
-        all_buckets = range(10)
-        eff = converge_all_groups(
-            log, currently_converging, my_buckets, all_buckets,
-            get_my_divergent_groups=get_my_divergent_groups,
-            converge_one_group=converge_one_group)
+    def _converge_one_group(self, log, currently_converging, tenant_id,
+                            group_id, version):
+        return Effect(('converge', tenant_id, group_id, version))
+
+    def test_converge_all_groups(self):
+        """
+        Fetches divergent groups and runs converge_one_group for each one
+        needing convergence.
+        """
+        eff = self._converge_all_groups()
 
         sequence = SequenceDispatcher([
-            (('get-divergent-groups', my_buckets, all_buckets),
-             lambda i: group_infos),
-            (ReadReference(ref=currently_converging),
+            (('get-divergent-groups', self.my_buckets, self.all_buckets),
+             lambda i: self.group_infos),
+            (ReadReference(ref=self.currently_converging),
              lambda i: pset()),
 
             (GetStat(path='/groups/divergent/00_g1'),
@@ -406,10 +411,40 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         self.assertEqual(
             sync_perform(dispatcher, eff),
             ['converged one!', 'converged two!'])
-        log.msg.assert_called_once_with(
+        self.log.msg.assert_called_once_with(
             'converge-all-groups',
-            group_infos=group_infos,
+            group_infos=self.group_infos,
             currently_converging=[])
+        self.assertEqual(sequence.sequence, [])  # All side-effects performed
+
+    def test_filter_out_currently_converging(self):
+        """
+        If a group is already being converged, its dirty flag is not statted
+        convergence is not run for it.
+        """
+        eff = self._converge_all_groups()
+        sequence = SequenceDispatcher([
+            (('get-divergent-groups', self.my_buckets, self.all_buckets),
+             lambda i: self.group_infos),
+            (ReadReference(ref=self.currently_converging),
+             lambda i: pset(['g1'])),
+
+            (GetStat(path='/groups/divergent/01_g2'),
+             lambda i: ZNodeStatStub(version=5)),
+            (TenantScope(
+                Effect(('converge', '01', 'g2', 5)),
+                '01'),
+             lambda tscope: tscope.effect),
+            (('converge', '01', 'g2', 5),
+             lambda i: 'converged two!'),
+        ])
+        dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
+
+        self.assertEqual(sync_perform(dispatcher, eff), ['converged two!'])
+        self.log.msg.assert_called_once_with(
+            'converge-all-groups',
+            group_infos=[self.group_infos[1]],
+            currently_converging=['g1'])
         self.assertEqual(sequence.sequence, [])  # All side-effects performed
 
     def test_no_log_on_no_groups(self):
@@ -421,16 +456,13 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                                version):
             1 / 0
 
-        log = mock_log()
-        currently_converging = Reference(pset())
-        my_buckets = [0, 5]
-        all_buckets = range(10)
         result = converge_all_groups(
-            log, currently_converging, my_buckets, all_buckets,
+            self.log, self.currently_converging, self.my_buckets,
+            self.all_buckets,
             get_my_divergent_groups=get_my_divergent_groups,
             converge_one_group=converge_one_group)
         self.assertEqual(sync_perform(_get_dispatcher(), result), None)
-        self.assertEqual(log.msg.mock_calls, [])
+        self.assertEqual(self.log.msg.mock_calls, [])
 
 
 class GetMyDivergentGroupsTests(SynchronousTestCase):
