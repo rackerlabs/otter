@@ -698,10 +698,10 @@ class EvictServerFromScalingGroup(object):
 @deferred_performer
 def perform_evict_server(log, transaction_id, dispatcher, intent):
     """
-    Performs evicting a server from the group.
+    Perform evicting a server from the group.
     """
     supervisor = get_supervisor()
     return supervisor.scrub_otter_metadata(
-            log, transaction_id,
-            intent.scaling_group.tenant_id,
-            intent.server_id)
+        log, transaction_id,
+        intent.scaling_group.tenant_id,
+        intent.server_id)

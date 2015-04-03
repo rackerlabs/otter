@@ -32,10 +32,13 @@ from six import reraise
 
 from toolz.dicttoolz import get_in
 
+from twisted.internet import defer
+
 from otter.cloud_client import (
     NoSuchServerError,
     get_server_details,
     set_nova_metadata_item)
+from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.service import get_convergence_starter
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
@@ -443,8 +446,9 @@ def convergence_remove_server_from_group(
     if purge:
         eff = set_nova_metadata_item(server_id, *DRAINING_METADATA)
     else:
-        eff = EvictServerFromScalingGroup(scaling_group=group,
-                                          server_id=server_id)
+        eff = Effect(
+            EvictServerFromScalingGroup(scaling_group=group,
+                                        server_id=server_id))
     yield retry_effect(eff, retry_times(3), exponential_backoff_interval(2))
 
     if not replace:
