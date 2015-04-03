@@ -3,6 +3,13 @@ Tests for :mod:`otter.controller`
 """
 from datetime import timedelta, datetime
 
+from effect import (
+    ComposedDispatcher,
+    TypeDispatcher,
+    sync_perform,
+    sync_performer)
+from effect.testing import SequenceDispatcher
+
 import mock
 
 from testtools.matchers import ContainsDict, Equals
@@ -11,13 +18,24 @@ from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter import controller
-
+from otter.cloud_client import (
+    NoSuchServerError,
+    get_server_details)
 from otter.convergence.service import (
     get_convergence_starter, set_convergence_starter)
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError)
+from otter.supervisor import ServerNotFoundError
+from otter.util.retry import (
+    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN
-from otter.test.utils import iMock, matches, patch, mock_log
+from otter.test.utils import (
+    iMock,
+    matches,
+    patch,
+    mock_log,
+    raise_,
+    test_dispatcher)
 
 
 class CalculateDeltaTestCase(SynchronousTestCase):
