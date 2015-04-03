@@ -20,13 +20,14 @@ Storage model for state information:
  * last touched information for group
  * last touched information for policy
 """
+import json
 from datetime import datetime
 from decimal import Decimal, ROUND_UP
-import iso8601
-import json
 
 from effect import Effect, parallel_all_errors
 from effect.do import do, do_return
+
+import iso8601
 
 from six import reraise
 
@@ -39,10 +40,10 @@ from otter.cloud_client import (
     get_server_details,
     set_nova_metadata_item)
 from otter.convergence.composition import tenant_is_enabled
+from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
 from otter.convergence.service import get_convergence_starter
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
-from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
 from otter.models.intents import GetScalingGroupInfo
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,

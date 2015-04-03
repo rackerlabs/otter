@@ -1,7 +1,7 @@
 """
 Tests for :mod:`otter.controller`
 """
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 
 from effect import (
     ComposedDispatcher,
@@ -32,16 +32,16 @@ from otter.supervisor import (
     CannotDeleteServerBelowMinError,
     EvictServerFromScalingGroup,
     ServerNotFoundError)
-from otter.util.retry import (
-    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
-from otter.util.timestamp import MIN
 from otter.test.utils import (
     iMock,
     matches,
-    patch,
     mock_log,
+    patch,
     raise_,
     test_dispatcher)
+from otter.util.retry import (
+    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
+from otter.util.timestamp import MIN
 
 
 class CalculateDeltaTestCase(SynchronousTestCase):
