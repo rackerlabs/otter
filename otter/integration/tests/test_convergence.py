@@ -2,9 +2,6 @@
 Tests covering self-healing should be placed in a separate test file.
 """
 
-from __future__ import print_function
-
-import json
 import os
 
 import treq
@@ -17,11 +14,21 @@ from twisted.trial import unittest
 from twisted.web.client import HTTPConnectionPool
 
 from otter import auth
-from otter.integration.lib import autoscale
+from otter.integration.lib.autoscale import (
+    BreakLoopException,
+    ScalingGroup,
+    ScalingPolicy,
+)
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
 
+from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
+from otter.util.retry import (
+    TransientRetryError,
+    repeating_interval,
+    transient_errors_except,
+)
 
 
 username = os.environ['AS_USERNAME']
@@ -53,11 +60,6 @@ def find_end_points(rcs):
         sc, "cloudServersOpenStack", region
     )
     return rcs
-
-
-def dbg(x, msg):
-    print(msg)
-    return x
 
 
 class TestConvergence(unittest.TestCase):
@@ -94,32 +96,9 @@ class TestConvergence(unittest.TestCase):
         deleted.
         """
 
-        N_SERVERS = 2
+        N_SERVERS = 4
 
         rcs = TestResources()
-
-        def choose_half_the_servers(t):
-            if t[0] != 200:
-                raise Exception("Got 404; where'd the scaling group go?")
-            ids = map(lambda obj: obj['id'], t[1]['group']['active'])
-            return ids[:(len(ids) / 2)]
-
-        def delete_server_by_id(i):
-            print("{}/servers/{}".format(str(rcs.endpoints["nova"]), i))
-            return (
-                treq.delete(
-                    "{}/servers/{}".format(str(rcs.endpoints["nova"]), i),
-                    headers=headers(str(rcs.token)),
-                    pool=self.pool
-                ).addCallback(check_success, [204])
-                .addCallback(lambda _: rcs)
-            )
-
-        def delete_those_servers(ids):
-            deferreds = map(lambda i: delete_server_by_id(i), ids)
-            # If no error occurs while deleting, all the results will be the
-            # same.  So just return the 1st, which is just our rcs value.
-            return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
 
         scaling_group_body = {
             "launchConfiguration": {
@@ -139,30 +118,111 @@ class TestConvergence(unittest.TestCase):
             "scalingPolicies": [],
         }
 
-        self.scaling_group = autoscale.ScalingGroup(
+        self.scaling_group = ScalingGroup(
             group_config=scaling_group_body,
             pool=self.pool
         )
 
-        d = (
-            self.identity.authenticate_user(rcs)
-            .addCallback(dbg, "find_end_points")
-            .addCallback(find_end_points)
-            .addCallback(dbg, "scaling_group.start")
-            .addCallback(self.scaling_group.start, self)
-            .addCallback(dbg, "wait for N_SERVERS")
-            .addCallback(
-                self.scaling_group.wait_for_N_servers, N_SERVERS, timeout=1800
-            ).addCallback(self.scaling_group.get_scaling_group_state)
-            .addCallback(dbg, "choose_half_the_servers")
-            .addCallback(choose_half_the_servers)
-            .addCallback(dbg, "delete_those_servers")
-            .addCallback(delete_those_servers)
-            .addCallback(dbg, "get_scaling_group_state")
-            .addCallback(self.scaling_group.get_scaling_group_state)
-            .addCallback(dbg, "print")
-            .addCallback(lambda x: print(json.dumps(x, indent=4)))
-            .addCallback(dbg, "done")
+        self.scaling_policy = ScalingPolicy(
+            scale_by=1,
+            scaling_group=self.scaling_group
         )
-        return d
+
+        def exercise_converger():
+            """The test works by spinning up a scaling group with N_SERVERS.
+            After that's done, we delete half the servers created directly via
+            Nova.  We then perform a scaling policy operation to convince the
+            Autoscale Converger to take action on this tenant, and we wait.
+
+            If convergence is doing its job, we should see half the number of
+            servers in the ``active`` list returned by
+            ``get_scaling_group_state``.  If we timeout before this happens,
+            either Autoscale is *really* busy, convergence isn't enabled for
+            this tenant, or it's just not working.  In any of these cases,
+            human intervention should be sought.
+            """
+
+            d = (
+                self.identity.authenticate_user(rcs)
+                .addCallback(find_end_points)
+                .addCallback(self.scaling_group.start, self)
+                .addCallback(
+                    self.scaling_group.wait_for_N_servers,
+                    N_SERVERS, timeout=1800
+                ).addCallback(self.scaling_group.get_scaling_group_state)
+                .addCallback(choose_half_the_servers)
+                .addCallback(delete_those_servers)
+                .addCallback(self.scaling_policy.start, self)
+                .addCallback(self.scaling_policy.execute)
+                .addCallback(wait_for_autoscale_to_catch_up)
+            )
+            return d
+
+        def choose_half_the_servers(t):
+            """Select the first half of the servers returned by the
+            ``get_scaling_group_state`` function.
+            """
+
+            if t[0] != 200:
+                raise Exception("Got 404; where'd the scaling group go?")
+            ids = map(lambda obj: obj['id'], t[1]['group']['active'])
+            self.n_servers = len(ids)
+            self.n_killed = self.n_servers / 2
+            return ids[:self.n_killed]
+
+        def delete_those_servers(ids):
+            """Delete each of the servers selected."""
+
+            def delete_server_by_id(i):
+                return (
+                    treq.delete(
+                        "{}/servers/{}".format(str(rcs.endpoints["nova"]), i),
+                        headers=headers(str(rcs.token)),
+                        pool=self.pool
+                    ).addCallback(check_success, [204])
+                    .addCallback(lambda _: rcs)
+                )
+
+            deferreds = map(lambda i: delete_server_by_id(i), ids)
+            # If no error occurs while deleting, all the results will be the
+            # same.  So just return the 1st, which is just our rcs value.
+            return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
+
+        def check(state):
+            if state[0] != 200:
+                raise BreakLoopException(
+                    "Scaling group appears to have disappeared"
+                )
+
+            # Our scaling policy (see above) is configured to scale up by 1
+            # server.  Thus, we check to see if our server quantity equals the
+            # remaining servers plus 1.
+
+            n_remaining = self.n_servers - self.n_killed + 1
+            if len(state[1]["group"]["active"]) == n_remaining:
+                return rcs
+
+            raise TransientRetryError()
+
+        def wait_for_autoscale_to_catch_up(_, timeout=60, period=1):
+            """Wait for the converger to recognize the reality of this tenant's
+            situation and reflect it in the scaling group state accordingly.
+            """
+
+            def poll():
+                return self.get_scaling_group_state(rcs).addCallback(check)
+
+            return retry_and_timeout(
+                poll, timeout,
+                can_retry=transient_errors_except(BreakLoopException),
+                next_interval=repeating_interval(period),
+                clock=reactor,
+                deferred_description=(
+                    "Waiting for Autoscale to see we killed {} servers of "
+                    "{}.".format(self.n_killed, self.n_servers)
+                )
+            )
+
+        return exercise_converger()
+
     test_reaction_to_oob_server_deletion.timeout = 600
