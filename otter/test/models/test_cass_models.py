@@ -2128,6 +2128,8 @@ class ViewManifestTests(CassScalingGroupTestCase):
                 {'P': 'R'}, '2014-01-01T00:00:05Z.1234',
                 {'PT': 'R'}, False)
         }
+        self.group._naive_list_policies = mock.Mock()
+        self.group._naive_list_all_webhooks = mock.Mock()
 
     def test_success(self):
         """
@@ -2135,8 +2137,7 @@ class ViewManifestTests(CassScalingGroupTestCase):
         config, launch config, and scaling policies is returned.
         """
         self.verified_view.return_value = defer.succeed(self.vv_return)
-        self.group._naive_list_policies = mock.Mock(
-            return_value=defer.succeed([]))
+        self.group._naive_list_policies.return_value = defer.succeed([])
 
         self.manifest['scalingPolicies'] = []
         self.assertEqual(
@@ -2170,8 +2171,7 @@ class ViewManifestTests(CassScalingGroupTestCase):
         # Getting policies
         policies = group_examples.policy()[:3]
         [policy.update({'id': str(i)}) for i, policy in enumerate(policies)]
-        self.group._naive_list_policies = mock.Mock(
-            return_value=defer.succeed(policies))
+        self.group._naive_list_policies.return_value = defer.succeed(policies)
 
         # Getting webhooks
         wh_part = {'data': '{"name": "a", "metadata": {"a": "b"}}',
@@ -2182,8 +2182,8 @@ class ViewManifestTests(CassScalingGroupTestCase):
                     {'policyId': '2', 'webhookId': '22'},
                     {'policyId': '2', 'webhookId': '23'}]
         [webhook.update(wh_part) for webhook in webhooks]
-        self.group._naive_list_all_webhooks = mock.Mock(
-            return_value=defer.succeed(webhooks))
+        self.group._naive_list_all_webhooks.return_value = defer.succeed(
+            webhooks)
 
         # Getting the result and comparing
         resp = self.validate_view_manifest_return_value(with_webhooks=True)
@@ -2206,11 +2206,6 @@ class ViewManifestTests(CassScalingGroupTestCase):
         """
         self.verified_view.return_value = defer.succeed(self.vv_return)
 
-        # Getting policies
-        self.group._naive_list_policies = mock.Mock()
-        # Getting webhooks
-        self.group._naive_list_all_webhooks = mock.Mock()
-
         # Getting the result and comparing
         resp = self.validate_view_manifest_return_value(with_policies=False,
                                                         with_webhooks=True)
@@ -2228,8 +2223,6 @@ class ViewManifestTests(CassScalingGroupTestCase):
         self.vv_return['status'] = 'ERROR'
         self.vv_return['deleting'] = True
         self.verified_view.return_value = defer.succeed(self.vv_return)
-        self.group._naive_list_policies = mock.Mock()
-        self.group._naive_list_all_webhooks = mock.Mock()
 
         # Getting the result and comparing
         resp = self.validate_view_manifest_return_value(with_policies=False,
@@ -2253,6 +2246,21 @@ class ViewManifestTests(CassScalingGroupTestCase):
             exp_data, ConsistencyLevel.QUORUM,
             matches(IsInstance(NoSuchScalingGroupError)),
             self.mock_log, get_deleting=True)
+
+    def test_with_deleting_normal_group(self):
+        """
+        Viewing manifest with `get_deleting=True` returns group manifest
+        including status when group is not deleting
+        """
+        self.vv_return['status'] = 'ACTIVE'
+        self.vv_return['deleting'] = None
+        self.verified_view.return_value = defer.succeed(self.vv_return)
+
+        # Getting the result and comparing
+        resp = self.validate_view_manifest_return_value(with_policies=False,
+                                                        get_deleting=True)
+        self.manifest['status'] = 'ACTIVE'
+        self.assertEqual(resp, self.manifest)
 
     def test_no_such_group(self):
         """
