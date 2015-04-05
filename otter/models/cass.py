@@ -503,9 +503,7 @@ def verified_view(connection, view_query, del_query, data, consistency,
     `exception_if_empty` if group's status is DELETING
 
     :param bool get_deleting: Should it return deleting group?
-
-    TODO: Should there be seperate argument for view_consistency and
-    del_consistency.
+    :return: Deferred that fires with result of executing view query
     """
     def _check_resurrection(result):
         if len(result) == 0:
