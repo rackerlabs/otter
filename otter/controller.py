@@ -33,7 +33,7 @@ from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.service import get_convergence_starter
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
-from otter.models.interface import ScalingGroupStatus
+from otter.models.interface import GroupNotEmptyError, ScalingGroupStatus
 from otter.supervisor import exec_scale_down, execute_launch_config
 from otter.util.config import config_value
 from otter.util.deferredutils import unwrap_first_error
@@ -130,7 +130,7 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
 
 def delete_group(log, trans_id, group, force):
     """
-    Delete group by based the kind of tenant
+    Delete group based on the kind of tenant
 
     :param log: Bound logger
     :param str trans_id: Transaction ID of request doing this
@@ -139,17 +139,18 @@ def delete_group(log, trans_id, group, force):
     :param bool force: Should group be deleted even if it has servers?
 
     :return: Deferred that fires with None
+    :raise: `GroupNotEmptyError` if group is not empty and force=False
     """
 
-    def check_and_delete(state):
+    def check_and_delete(_group, state):
         if state.desired == 0:
-            d = trigger_convergence_deletion(group)
+            d = trigger_convergence_deletion(log, group)
             return d.addCallback(lambda _: state)
         else:
             raise GroupNotEmptyError(group.tenant_id, group.uuid)
 
     if tenant_is_enabled(group.tenant_id, config_value):
-        return (trigger_convergence_deletion(group)
+        return (trigger_convergence_deletion(log, group)
                 if force else group.modify_state(check_and_delete))
     else:
         if force:
@@ -160,10 +161,11 @@ def delete_group(log, trans_id, group, force):
         return d
 
 
-def trigger_convergence_deletion(group):
+def trigger_convergence_deletion(log, group):
     """
     Trigger deletion of group that belongs to convergence tenant
 
+    :param log: Bound logger
     :param otter.models.interface.IScalingGroup scaling_group: the scaling
         group object
     """

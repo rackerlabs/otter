@@ -15,8 +15,8 @@ from otter import controller
 from otter.convergence.service import (
     ConvergenceStarter, get_convergence_starter, set_convergence_starter)
 from otter.models.interface import (
-    GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError,
-    ScalingGroupStatus)
+    GroupNotEmptyError, GroupState, IScalingGroup, NoSuchPolicyError,
+    NoSuchScalingGroupError, ScalingGroupStatus)
 from otter.test.utils import (
     iMock, matches, mock_group as util_mock_group, mock_log, patch)
 from otter.util.config import set_config_data
@@ -729,31 +729,69 @@ class ObeyConfigChangeTestCase(SynchronousTestCase):
             webhook_id=None)
 
 
-class ForceDeleteGroupTests(SynchronousTestCase):
+class TriggerConvergenceDeletionTests(SynchronousTestCase):
     """
-    Tests for `force_delete_group`
+    Tests for `trigger_convergence_deletion`
     """
 
     def setUp(self):
         """
         Sample convergence starter
         """
-        self.group = util_mock_group(object(), 'tid', 'gid')
-        self.log = object()
         self.cs = mock.Mock(spec=ConvergenceStarter)
         self.cs.start_convergence.return_value = defer.succeed('sc')
         set_convergence_starter(self.cs)
         self.addCleanup(set_convergence_starter, None)
 
-    def test_worker_tenant(self):
+    def test_success(self):
+        log = object()
+        group = util_mock_group(log, 'tid', 'gid')
+        upd = defer.Deferred()
+        group.update_status.return_value = upd
+
+        d = controller.trigger_convergence_deletion(log, group)
+
+        # First DELETING status is set
+        self.assertNoResult(d)
+        group.update_status.assert_called_once_with(
+            ScalingGroupStatus.DELETING)
+
+        # Then start_convergence
+        upd.callback(None)
+        self.assertEqual(self.successResultOf(d), 'sc')
+        self.cs.start_convergence.assert_called_once_with(
+            log, 'tid', 'gid')
+
+
+def sample_group_state():
+    """ GroupState object for test """
+    return GroupState('tid', 'gid', 'g', {}, {}, False, None, {})
+
+
+class DeleteGroupTests(SynchronousTestCase):
+    """
+    Tests for `delete_group`
+    """
+
+    def setUp(self):
+        """
+        Sample convergence starter
+        """
+        self.state = sample_group_state()
+        self.group = util_mock_group(self.state, 'tid', 'gid')
+        self.group.delete_group.return_value = defer.succeed(None)
+        self.log = object()
+        self.mock_tcd = patch(
+            self, 'otter.controller.trigger_convergence_deletion')
+
+    def test_worker_tenant_force(self):
         """
         First empties and then deletes the group for worker tenant
         """
         egd = defer.Deferred()
         mock_eg = patch(self, 'otter.controller.empty_group',
                         return_value=egd)
-        self.group.delete_group.return_value = defer.succeed(None)
-        d = controller.force_delete_group(self.log, 'transid', self.group)
+        d = controller.delete_group(self.log, 'transid', self.group, True)
 
         # First empty_group is called
         self.assertNoResult(d)
@@ -765,30 +803,89 @@ class ForceDeleteGroupTests(SynchronousTestCase):
         self.group.delete_group.assert_called_once_with()
 
         # converger is not called
-        self.assertFalse(self.cs.start_convergence.called)
+        self.assertFalse(self.mock_tcd.called)
 
-    def test_convergence_tenant(self):
+    def test_worker_tenant_no_force(self):
+        """
+        Calls group.delete_group() for worker tenant when deleting normally
+        """
+        d = controller.delete_group(self.log, 'transid', self.group, False)
+        self.assertIsNone(self.successResultOf(d))
+        self.group.delete_group.assert_called_once_with()
+        # converger not called
+        self.assertFalse(self.mock_tcd.called)
+
+    def test_convergence_tenant_force(self):
         """
         Updates DELETED status for convergence tenant and starts convergence
         """
         set_config_data({'convergence-tenants': ['tid']})
         self.addCleanup(set_config_data, {})
 
-        upd = defer.Deferred()
-        self.group.update_status.return_value = upd
+        self.mock_tcd.return_value = defer.succeed('tcd')
+        d = controller.delete_group(self.log, 'transid', self.group, True)
+        self.assertEqual(self.successResultOf(d), 'tcd')
+        # delete_group() or modify_state() not called
+        self.assertFalse(self.group.delete_group.called)
+        self.assertFalse(self.group.modify_state.called)
 
-        d = controller.force_delete_group(self.log, 'transid', self.group)
+    def test_convergence_tenant_no_force(self):
+        """
+        When deleting convergence group without force, `delete_group` triggers
+        convergence deletion only if desired=0. This desired check is done
+        under lock using `modify_state`
+        """
+        set_config_data({'convergence-tenants': ['tid']})
+        self.addCleanup(set_config_data, {})
+        self.mock_tcd.return_value = defer.succeed('tcd')
+        self.group.pause_modify_state = True
 
-        # First DELETING status is set
+        d = controller.delete_group(self.log, 'transid', self.group, False)
+
+        # trigger_convergence has been called and no result because
+        # modify_state is paused
         self.assertNoResult(d)
-        self.group.update_status.assert_called_once_with(
-            ScalingGroupStatus.DELETING)
+        self.assertTrue(self.group.modify_state.called)
+        self.mock_tcd.assert_called_once_with(self.log, self.group)
+        self.assertEqual(self.group.modify_state_values, [self.state])
 
-        # Then start_convergence
-        upd.callback(None)
-        self.assertEqual(self.successResultOf(d), 'sc')
-        self.cs.start_convergence.assert_called_once_with(
-            self.log, 'tid', 'gid')
+        # unpause modify_state
+        self.group.modify_state_pause_d.callback(None)
+        self.assertIsNone(self.successResultOf(d))
+
+        # delete_group() not called
+        self.assertFalse(self.group.delete_group.called)
+
+    def test_convergence_tenant_no_force_with_servers(self):
+        """
+        When deleting convergence group without force, `delete_group` raises
+        `GroupNotEmptyError` if desired > 0. This desired check is done
+        under lock using `modify_state`
+        """
+        set_config_data({'convergence-tenants': ['tid']})
+        self.addCleanup(set_config_data, {})
+        self.mock_tcd.return_value = defer.succeed('tcd')
+        self.state.desired = 1
+        self.group.pause_modify_state = True
+
+        d = controller.delete_group(self.log, 'transid', self.group, False)
+
+        # trigger_convergence has been called and no result because
+        # modify_state is paused
+        self.assertNoResult(d)
+        self.assertTrue(self.group.modify_state.called)
+        # Nothing returned from modifier since it raised error
+        self.assertEqual(self.group.modify_state_values, [])
+
+        # trigger_convergence_deletion is not called
+        self.assertFalse(self.mock_tcd.called)
+
+        # unpause modify_state
+        self.group.modify_state_pause_d.callback(None)
+        self.failureResultOf(d, GroupNotEmptyError)
+
+        # delete_group() not called
+        self.assertFalse(self.group.delete_group.called)
 
 
 class EmptyGroupTests(SynchronousTestCase):
@@ -802,7 +899,7 @@ class EmptyGroupTests(SynchronousTestCase):
         """
         self.mock_occ = patch(self, 'otter.controller.obey_config_change')
         self.log = mock_log()
-        self.state = GroupState('tid', 'gid', 'g', {}, {}, False, None, {})
+        self.state = sample_group_state()
         self.group = util_mock_group(self.state, 'tid', 'gid')
 
     def test_updates_modifies(self):
