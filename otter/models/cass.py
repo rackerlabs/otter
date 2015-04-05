@@ -514,7 +514,7 @@ def verified_view(connection, view_query, del_query, data, consistency,
             log.msg('Resurrected row', row=result[0], row_params=data)
             connection.execute(del_query, data, consistency)
             raise exception_if_empty
-        # Do not return group if group is deleting and we are told to do so
+        # Do not return group if group is deleting unless we are told to do so
         if not get_deleting and group.get('deleting', False):
             raise exception_if_empty
         return group
