@@ -3319,6 +3319,11 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                         policy_touched={},
                                         paused=False)])
 
+    def _extract_execute_query(self, call):
+        args, _ = call
+        query, params, c = args
+        return query
+
     def test_list_states_filters_deleting_groups(self):
         """
         Groups that are deleting based on "deleting" column to be true are not
@@ -3339,6 +3344,11 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                         group_touched='0001-01-01T00:00:00Z',
                                         policy_touched={},
                                         paused=False)])
+        # No call to delete row was made
+        self.assertEqual(len(self.connection.execute.call_args_list), 1)
+        self.assertNotIn(
+            'DELETE', self._extract_execute_query(
+                self.connection.execute.call_args_list[0]))
 
     def test_get_scaling_group(self):
         """
