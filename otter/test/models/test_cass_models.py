@@ -2168,7 +2168,7 @@ class ViewManifestTests(CassScalingGroupTestCase):
         self.verified_view.return_value = defer.succeed(self.vv_return)
 
         # Getting policies
-        policies = [group_examples.policy()[i] for i in range(3)]
+        policies = group_examples.policy()[:3]
         [policy.update({'id': str(i)}) for i, policy in enumerate(policies)]
         self.group._naive_list_policies = mock.Mock(
             return_value=defer.succeed(policies))
