@@ -2177,7 +2177,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
         self.kz_client.delete.assert_called_once_with(
-            '/locks/' + self.group.uuid, recursive=True)
+            '/locks/' + self.group.uuid)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
@@ -2222,7 +2222,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
         self.kz_client.delete.assert_called_once_with(
-            '/locks/' + self.group.uuid, recursive=True)
+            '/locks/' + self.group.uuid)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     def test_delete_lock_not_acquired(self, mock_view_state):
@@ -2265,18 +2265,17 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                                               mock_view_state):
         """
         ``delete_group``, if the rest is successful, attempts to delete the
-        lock znode but if that fails, succeeds anyway. The znode deletion is
-        logged, though.
+        lock znode but if that fails, succeeds anyway, while retrying to delete
+        the lock asynchronously.  If it never succeeds, an error is logged.
         """
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
         mock_naive.return_value = defer.succeed([])
         called = []
 
-        def not_empty_error(lockpath, recursive):
+        def not_empty_error(lockpath):
             called.append(0)
             self.assertEqual(lockpath, '/locks/' + self.group.uuid)
-            self.assertTrue(recursive)
             return defer.fail(NotEmptyError((), {}))
 
         self.kz_client.delete.side_effect = not_empty_error
@@ -2284,8 +2283,11 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.returns = [None]
         self.clock.advance(34.575)
         result = self.successResultOf(self.group.delete_group())
+        for i in range(70):
+            self.clock.advance(5)
+
         self.assertIsNone(result)  # delete returns None
-        self.assertEqual(len(called), 1)
+        self.assertEqual(len(called), 61)
         self.group.log.msg.assert_called_with(
             "Error cleaning up lock path (when deleting group)",
             exc=matches(IsInstance(NotEmptyError)),
