@@ -6,6 +6,7 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 """
 
 import time
+from functools import partial
 from hashlib import sha1
 
 from effect import Effect, FirstError, Func, parallel
@@ -341,9 +342,6 @@ def converge_all_groups(log, currently_converging, my_buckets, all_buckets,
     # convergence manually when it's spiraling out of control.
     # https://github.com/rackerlabs/otter/issues/1215
 
-    if divergent_flags is None:
-        divergent_flags = yield Effect(GetChildren(CONVERGENCE_DIRTY_DIR))
-
     group_infos = get_my_divergent_groups(
         my_buckets, all_buckets, divergent_flags)
     # filter out currently converging groups
@@ -420,19 +418,24 @@ class Converger(MultiService):
         self.currently_converging = Reference(pset())
         self._converge_all_groups = converge_all_groups
 
-    def buckets_acquired(self, my_buckets, divergent_flags=None):
+    def _converge_all(self, my_buckets, divergent_flags):
+        """Run :func:`converge_all_groups` and log errors."""
+        eff = self._converge_all_groups(self.log, self.currently_converging,
+                                        my_buckets, self._buckets,
+                                        divergent_flags)
+        return eff.on(
+            error=lambda e: self.log.err(
+                exc_info_to_failure(e), 'converge-all-groups-error'))
+
+    def buckets_acquired(self, my_buckets):
         """
-        Perform the effectful result of :func:`check_convergence`.
+        Get dirty flags from zookeeper and run convergence with them.
 
         This is used as the partitioner callback.
         """
-        eff = self._converge_all_groups(self.log, self.currently_converging,
-                                        my_buckets, self._buckets,
-                                        divergent_flags=divergent_flags)
-        result = perform(self._dispatcher, eff).addErrback(
-            self.log.err, 'converge-all-groups-error')
-        # the return value is ignored, but we return this for testing
-        return result
+        eff = Effect(GetChildren(CONVERGENCE_DIRTY_DIR)).on(
+            partial(self._converge_all, my_buckets))
+        return perform(self._dispatcher, eff)
 
     def divergent_changed(self, children):
         """
@@ -441,9 +444,6 @@ class Converger(MultiService):
         tenants associated with this service's buckets, a convergence will be
         triggered.
         """
-        # It'd sure be nice if we could know *exactly which* flag was just
-        # created, but ZK watches simply don't provide that information.
-        # So we must simply converge all groups.
         my_buckets = self.partitioner.get_current_buckets()
         changed_buckets = set(
             bucket_of_tenant(parse_dirty_flag(child)[0], len(self._buckets))
@@ -451,7 +451,8 @@ class Converger(MultiService):
         if (self.partitioner.get_current_state() == PartitionState.ACQUIRED and
                 set(my_buckets).intersection(changed_buckets)):
             # the return value is ignored, but we return this for testing
-            return self.buckets_acquired(my_buckets, divergent_flags=children)
+            eff = self._converge_all(my_buckets, children)
+            return perform(self._dispatcher, eff)
 
 # We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this
