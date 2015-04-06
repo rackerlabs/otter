@@ -51,6 +51,7 @@ from otter.util.config import config_value
 from otter.util.cqlbatch import Batch, batch
 from otter.util.deferredutils import with_lock
 from otter.util.hashkey import generate_capability, generate_key_str
+from otter.util.retry import repeating_interval, retry, retry_times
 
 
 LOCK_PATH = '/locks'
@@ -1231,15 +1232,18 @@ class CassScalingGroup(object):
             return d
 
         def _delete_lock_znode(result):
-            d = self.kz_client.delete(LOCK_PATH + '/' + self.uuid,
-                                      recursive=True)
-
+            # retry every 5 seconds for 5 minutes
+            d = retry(
+                lambda: self.kz_client.delete(LOCK_PATH + '/' + self.uuid),
+                can_retry=retry_times(60),
+                next_interval=repeating_interval(5),
+                clock=self.reactor,
+            )
             d.addErrback(
                 lambda f: self.log.msg(
                     "Error cleaning up lock path (when deleting group)",
                     exc=f.value,
                     otter_msg_type="ignore-delete-lock-error"))
-            return d
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
