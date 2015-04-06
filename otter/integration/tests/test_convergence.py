@@ -128,37 +128,20 @@ class TestConvergence(unittest.TestCase):
             scaling_group=self.scaling_group
         )
 
-        def exercise_converger():
-            """The test works by spinning up a scaling group with N_SERVERS.
-            After that's done, we delete half the servers created directly via
-            Nova.  We then perform a scaling policy operation to convince the
-            Autoscale Converger to take action on this tenant, and we wait.
-
-            If convergence is doing its job, we should see half the number of
-            servers in the ``active`` list returned by
-            ``get_scaling_group_state``.  If we timeout before this happens,
-            either Autoscale is *really* busy, convergence isn't enabled for
-            this tenant, or it's just not working.  In any of these cases,
-            human intervention should be sought.
-            """
-
-            d = (
-                self.identity.authenticate_user(rcs)
-                .addCallback(find_end_points)
-                .addCallback(self.scaling_group.start, self)
-                .addCallback(
-                    self.scaling_group.wait_for_N_servers,
-                    N_SERVERS, timeout=1800
-                ).addCallback(self.scaling_group.get_scaling_group_state)
-                .addCallback(self._choose_half_the_servers)
-                .addCallback(self._delete_those_servers, rcs)
-                .addCallback(self.scaling_policy.start, self)
-                .addCallback(self.scaling_policy.execute)
-                .addCallback(self._wait_for_autoscale_to_catch_up, rcs)
-            )
-            return d
-
-        return exercise_converger()
+        return (
+            self.identity.authenticate_user(rcs)
+            .addCallback(find_end_points)
+            .addCallback(self.scaling_group.start, self)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers,
+                N_SERVERS, timeout=1800
+            ).addCallback(self.scaling_group.get_scaling_group_state)
+            .addCallback(self._choose_half_the_servers)
+            .addCallback(self._delete_those_servers, rcs)
+            .addCallback(self.scaling_policy.start, self)
+            .addCallback(self.scaling_policy.execute)
+            .addCallback(self._wait_for_autoscale_to_catch_up, rcs)
+        )
     test_reaction_to_oob_server_deletion.timeout = 600
 
     def _choose_half_the_servers(self, t):
