@@ -150,43 +150,53 @@ class TestConvergence(unittest.TestCase):
                     self.scaling_group.wait_for_N_servers,
                     N_SERVERS, timeout=1800
                 ).addCallback(self.scaling_group.get_scaling_group_state)
-                .addCallback(choose_half_the_servers)
-                .addCallback(delete_those_servers)
+                .addCallback(self._choose_half_the_servers)
+                .addCallback(self._delete_those_servers, rcs)
                 .addCallback(self.scaling_policy.start, self)
                 .addCallback(self.scaling_policy.execute)
-                .addCallback(wait_for_autoscale_to_catch_up)
+                .addCallback(self._wait_for_autoscale_to_catch_up, rcs)
             )
             return d
 
-        def choose_half_the_servers(t):
-            """Select the first half of the servers returned by the
-            ``get_scaling_group_state`` function.
-            """
+        return exercise_converger()
+    test_reaction_to_oob_server_deletion.timeout = 600
 
-            if t[0] != 200:
-                raise Exception("Got 404; where'd the scaling group go?")
-            ids = map(lambda obj: obj['id'], t[1]['group']['active'])
-            self.n_servers = len(ids)
-            self.n_killed = self.n_servers / 2
-            return ids[:self.n_killed]
+    def _choose_half_the_servers(self, t):
+        """Select the first half of the servers returned by the
+        ``get_scaling_group_state`` function.  Record the number of servers
+        received in ``n_servers`` attribute, and the number killed (which
+        should be roughly half) in ``n_killed``.
+        """
 
-        def delete_those_servers(ids):
-            """Delete each of the servers selected."""
+        if t[0] != 200:
+            raise Exception("Got 404; where'd the scaling group go?")
+        ids = map(lambda obj: obj['id'], t[1]['group']['active'])
+        self.n_servers = len(ids)
+        self.n_killed = self.n_servers / 2
+        return ids[:self.n_killed]
 
-            def delete_server_by_id(i):
-                return (
-                    treq.delete(
-                        "{}/servers/{}".format(str(rcs.endpoints["nova"]), i),
-                        headers=headers(str(rcs.token)),
-                        pool=self.pool
-                    ).addCallback(check_success, [204])
-                    .addCallback(lambda _: rcs)
-                )
+    def _delete_those_servers(self, ids, rcs):
+        """Delete each of the servers selected."""
 
-            deferreds = map(lambda i: delete_server_by_id(i), ids)
-            # If no error occurs while deleting, all the results will be the
-            # same.  So just return the 1st, which is just our rcs value.
-            return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
+        def delete_server_by_id(i):
+            return (
+                treq.delete(
+                    "{}/servers/{}".format(str(rcs.endpoints["nova"]), i),
+                    headers=headers(str(rcs.token)),
+                    pool=self.pool
+                ).addCallback(check_success, [204])
+                .addCallback(lambda _: rcs)
+            )
+
+        deferreds = map(lambda i: delete_server_by_id(i), ids)
+        # If no error occurs while deleting, all the results will be the
+        # same.  So just return the 1st, which is just our rcs value.
+        return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
+
+    def _wait_for_autoscale_to_catch_up(self, _, rcs, timeout=60, period=1):
+        """Wait for the converger to recognize the reality of this tenant's
+        situation and reflect it in the scaling group state accordingly.
+        """
 
         def check(state):
             if state[0] != 200:
@@ -195,8 +205,8 @@ class TestConvergence(unittest.TestCase):
                 )
 
             # Our scaling policy (see above) is configured to scale up by 1
-            # server.  Thus, we check to see if our server quantity equals the
-            # remaining servers plus 1.
+            # server.  Thus, we check to see if our server quantity equals
+            # the remaining servers plus 1.
 
             n_remaining = self.n_servers - self.n_killed + 1
             if len(state[1]["group"]["active"]) == n_remaining:
@@ -204,25 +214,16 @@ class TestConvergence(unittest.TestCase):
 
             raise TransientRetryError()
 
-        def wait_for_autoscale_to_catch_up(_, timeout=60, period=1):
-            """Wait for the converger to recognize the reality of this tenant's
-            situation and reflect it in the scaling group state accordingly.
-            """
+        def poll():
+            return self.get_scaling_group_state(rcs).addCallback(check)
 
-            def poll():
-                return self.get_scaling_group_state(rcs).addCallback(check)
-
-            return retry_and_timeout(
-                poll, timeout,
-                can_retry=transient_errors_except(BreakLoopException),
-                next_interval=repeating_interval(period),
-                clock=reactor,
-                deferred_description=(
-                    "Waiting for Autoscale to see we killed {} servers of "
-                    "{}.".format(self.n_killed, self.n_servers)
-                )
+        return retry_and_timeout(
+            poll, timeout,
+            can_retry=transient_errors_except(BreakLoopException),
+            next_interval=repeating_interval(period),
+            clock=reactor,
+            deferred_description=(
+                "Waiting for Autoscale to see we killed {} servers of "
+                "{}.".format(self.n_killed, self.n_servers)
             )
-
-        return exercise_converger()
-
-    test_reaction_to_oob_server_deletion.timeout = 600
+        )
