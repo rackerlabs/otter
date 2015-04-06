@@ -338,12 +338,6 @@ def converge_all_groups(log, currently_converging, my_buckets, all_buckets,
     Check for groups that need convergence and which match up to the
     buckets we've been allocated.
     """
-    # TODO: If we find that there's a group in `currently_converging` that's
-    # *not* found in the divergent list in ZK, we should stop retrying
-    # convergence for that group.  This gives us a mechanism to stop
-    # convergence manually when it's spiraling out of control.
-    # https://github.com/rackerlabs/otter/issues/1215
-
     group_infos = yield get_my_divergent_groups(my_buckets, all_buckets)
     # filter out currently converging groups
     cc = yield currently_converging.read()
