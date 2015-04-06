@@ -5,7 +5,7 @@ import unittest
 
 from cafe.drivers.unittest.decorators import tags
 
-from test_repo.autoscale.fixtures import AutoscaleFixture
+from test_repo.autoscale.fixtures import AutoscaleFixture, only_run_if_mimic_is
 
 
 class NegativeGroupFixture(AutoscaleFixture):
@@ -97,6 +97,7 @@ class NegativeGroupFixture(AutoscaleFixture):
             group_state.desiredCapacity, 0,
             msg='Desired capacity is not equal to expected number of servers')
 
+    @only_run_if_mimic_is(True)
     @tags(speed='quick', convergence='never')
     def test_user_delete_some_servers_out_of_band(self):
         """
