@@ -648,8 +648,16 @@ class CassScalingGroup(object):
         return wrapper
 
     def _group_status(self, status, deleting):
-        return (ScalingGroupStatus.DELETING
-                if deleting else ScalingGroupStatus.lookupByName(status))
+        if deleting:
+            return ScalingGroupStatus.DELETING
+        else:
+            # TODO: #1304
+            if status is None:
+                return ScalingGroupStatus.ACTIVE
+            elif status == 'DISABLED':
+                return ScalingGroupStatus.ERROR
+            else:
+                return ScalingGroupStatus.lookupByName(status)
 
     def view_manifest(self, with_policies=True, with_webhooks=False,
                       get_deleting=False):

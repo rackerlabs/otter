@@ -2247,6 +2247,13 @@ class ViewManifestTests(CassScalingGroupTestCase):
             matches(IsInstance(NoSuchScalingGroupError)),
             self.mock_log, get_deleting=True)
 
+    def _check_with_deleting(self, status):
+        self.verified_view.return_value = defer.succeed(self.vv_return)
+        resp = self.validate_view_manifest_return_value(with_policies=False,
+                                                        get_deleting=True)
+        self.manifest['status'] = status
+        self.assertEqual(resp, self.manifest)
+
     def test_with_deleting_normal_group(self):
         """
         Viewing manifest with `get_deleting=True` returns group manifest
@@ -2254,13 +2261,36 @@ class ViewManifestTests(CassScalingGroupTestCase):
         """
         self.vv_return['status'] = 'ACTIVE'
         self.vv_return['deleting'] = None
-        self.verified_view.return_value = defer.succeed(self.vv_return)
+        self._check_with_deleting('ACTIVE')
 
-        # Getting the result and comparing
-        resp = self.validate_view_manifest_return_value(with_policies=False,
-                                                        get_deleting=True)
-        self.manifest['status'] = 'ACTIVE'
-        self.assertEqual(resp, self.manifest)
+    def test_with_deleting_none_status(self):
+        """
+        Viewing manifest with `get_deleting=True` returns group manifest
+        including ACTIVE status when group is not deleting and status is None
+        """
+        self.vv_return['status'] = None
+        self.vv_return['deleting'] = None
+        self._check_with_deleting('ACTIVE')
+
+    def test_with_deleting_disabled_status(self):
+        """
+        Viewing manifest with `get_deleting=True` returns group manifest
+        including ERROR status when group is not deleting and status is
+        DISABLED
+        """
+        self.vv_return['status'] = 'DISABLED'
+        self.vv_return['deleting'] = None
+        self._check_with_deleting('ERROR')
+
+    def test_with_deleting_error_status(self):
+        """
+        Viewing manifest with `get_deleting=True` returns group manifest
+        including ERROR status when group is not deleting and status is
+        ERROR
+        """
+        self.vv_return['status'] = 'ERROR'
+        self.vv_return['deleting'] = None
+        self._check_with_deleting('ERROR')
 
     def test_no_such_group(self):
         """
