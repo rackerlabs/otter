@@ -889,9 +889,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
 
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
-
+        self.assertIsNone(self.successResultOf(self.completion_deferred))
+        self.assertEqual(self.group.modify_state_values, [self.state])
         self.assertEqual(self.state.pending, {})
         self.assertEqual(
             self.state.active,
@@ -927,8 +926,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
 
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
+        self.assertIsNone(self.successResultOf(self.completion_deferred))
+        self.assertEqual(self.group.modify_state_values, [self.state])
 
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
@@ -969,8 +968,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.job.start(self.mock_launch)
         self.completion_deferred.errback(DummyException('e'))
 
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
+        self.assertIsNone(self.successResultOf(self.completion_deferred))
+        self.assertEqual(self.group.modify_state_values, [self.state])
 
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
@@ -990,8 +989,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.job.start(self.mock_launch)
         self.completion_deferred.errback(DummyException('e'))
 
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
+        self.assertIsNone(self.successResultOf(self.completion_deferred))
+        self.assertEqual(self.group.modify_state_values, [self.state])
 
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
