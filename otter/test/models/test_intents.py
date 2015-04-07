@@ -18,7 +18,7 @@ class ModifyGroupStateTests(SynchronousTestCase):
                                modifier=lambda g, o: 'new state')
         dispatcher = get_model_dispatcher(mock_log(), None)
         result = sync_perform(dispatcher, Effect(mgs))
-        self.assertEqual(result, 'new state')
+        self.assertIsNone(result)
         self.assertEqual(group.modify_state_values, ['new state'])
 
 
