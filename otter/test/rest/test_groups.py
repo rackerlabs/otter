@@ -943,43 +943,41 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
 
     def test_group_delete(self):
         """
-        Deleting an existing group succeeds with a 204.
+        Deleting an existing group succeeds with a 204 by delegating it
+        to `controller.delete_group`
         """
-        self.mock_group.delete_group.return_value = defer.succeed(None)
+        self.mock_controller.delete_group.return_value = defer.succeed(None)
         response_body = self.assert_status_code(204, method="DELETE")
         self.assertEqual(response_body, "")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
-        self.mock_group.delete_group.assert_called_once_with()
+        self.mock_controller.delete_group.assert_called_once_with(
+            mock.ANY, 'transaction-id', self.mock_group, False)
 
     def test_group_delete_force(self):
         """
         Force deleting a group will be delegated to
-        `controller.force_delete_group`
+        `controller.delete_group` with force argument as True
         """
-        self.mock_controller.force_delete_group.return_value = defer.succeed(
-            None)
-        self.mock_group.delete_group.return_value = defer.succeed(None)
-
+        self.mock_controller.delete_group.return_value = defer.succeed(None)
         self.assert_status_code(
             204, endpoint="{0}?force=true".format(self.endpoint),
             method="DELETE")
-
-        # force_delete_group called
-        self.mock_controller.force_delete_group.assert_called_once_with(
-            mock.ANY, "transaction-id", self.mock_group)
+        self.mock_controller.delete_group.assert_called_once_with(
+            mock.ANY, "transaction-id", self.mock_group, True)
 
     def test_group_delete_404(self):
         """
         Deleting a non-existant group fails with a 404.
         """
-        self.mock_group.delete_group.return_value = defer.fail(
+        self.mock_controller.delete_group.return_value = defer.fail(
             NoSuchScalingGroupError('11111', '1'))
 
         response_body = self.assert_status_code(404, method="DELETE")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
-        self.mock_group.delete_group.assert_called_once_with()
+        self.mock_controller.delete_group.assert_called_once_with(
+            mock.ANY, "transaction-id", self.mock_group, False)
 
         resp = json.loads(response_body)
         self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
@@ -989,13 +987,14 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Deleting a non-empty group fails with a 403.
         """
-        self.mock_group.delete_group.return_value = defer.fail(
+        self.mock_controller.delete_group.return_value = defer.fail(
             GroupNotEmptyError('11111', '1'))
 
         response_body = self.assert_status_code(403, method="DELETE")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
-        self.mock_group.delete_group.assert_called_once_with()
+        self.mock_controller.delete_group.assert_called_once_with(
+            mock.ANY, "transaction-id", self.mock_group, False)
 
         resp = json.loads(response_body)
         self.assertEqual(resp['error']['type'], 'GroupNotEmptyError')
