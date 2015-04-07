@@ -1,5 +1,7 @@
 """Tests for otter.util.zkpartitioner"""
 
+from kazoo.recipe.partitioner import PartitionState
+
 import mock
 
 from twisted.internet.task import Clock
@@ -224,3 +226,17 @@ class PartitionerTests(SynchronousTestCase):
         self.assertEqual(
             self.successResultOf(self.partitioner.health_check()),
             (True, {'buckets': [2, 3]}))
+
+    def test_get_current_buckets(self):
+        """The current buckets can be retrieved."""
+        self.kz_partitioner.acquired = True
+        self.partitioner.startService()
+        self.kz_partitioner.__iter__.return_value = iter([2, 3])
+        self.assertEqual(self.partitioner.get_current_buckets(), [2, 3])
+
+    def test_get_current_state(self):
+        """The current state can be retrieved."""
+        self.kz_partitioner.state = PartitionState.ACQUIRED
+        self.partitioner.startService()
+        self.assertEqual(self.partitioner.get_current_state(),
+                         PartitionState.ACQUIRED)

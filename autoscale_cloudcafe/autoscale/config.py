@@ -162,14 +162,14 @@ class AutoscaleConfig(ConfigSectionInterface):
         """
         Interval time for polling group state table for active servers
         """
-        return self.get('interval_time')
+        return int(self.get('interval_time', 0))
 
     @property
     def timeout(self):
         """
         Timeout is the wait time for all servers on that group to be active
         """
-        return self.get('timeout')
+        return int(self.get('timeout', 0))
 
     @property
     def autoscale_endpoint_name(self):

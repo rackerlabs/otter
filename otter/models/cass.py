@@ -42,6 +42,7 @@ from otter.models.interface import (
     NoSuchWebhookError,
     PoliciesOverLimitError,
     ScalingGroupOverLimitError,
+    ScalingGroupStatus,
     UnrecognizedCapabilityError,
     WebhooksOverLimitError,
     next_cron_occurrence)
@@ -50,6 +51,7 @@ from otter.util.config import config_value
 from otter.util.cqlbatch import Batch, batch
 from otter.util.deferredutils import with_lock
 from otter.util.hashkey import generate_capability, generate_key_str
+from otter.util.retry import repeating_interval, retry, retry_times
 
 
 LOCK_PATH = '/locks'
@@ -450,7 +452,7 @@ def _unmarshal_state(state_dict):
         _jsonloads_data(state_dict["pending"]),
         state_dict["groupTouched"],
         _jsonloads_data(state_dict["policyTouched"]),
-        bool(ord(state_dict["paused"])),
+        state_dict["paused"],
         desired=desired_capacity
     )
 
@@ -808,7 +810,24 @@ class CassScalingGroup(object):
                  'status': status.name},
                 DEFAULT_CONSISTENCY)
 
-        return self.view_config().addCallback(_do_update)
+        @self.with_timestamp
+        def set_deleting(ts, _):
+            return self.connection.execute(
+                _cql_update.format(cf=self.group_table,
+                                   column='deleting',
+                                   name=':deleting'),
+                {'tenantId': self.tenant_id,
+                 'groupId': self.uuid,
+                 'ts': ts,
+                 'deleting': True},
+                DEFAULT_CONSISTENCY)
+
+        d = self.view_config()
+        if status == ScalingGroupStatus.DELETING:
+            d.addCallback(set_deleting)
+        else:
+            d.addCallback(_do_update)
+        return d
 
     def update_config(self, data):
         """
@@ -1213,15 +1232,18 @@ class CassScalingGroup(object):
             return d
 
         def _delete_lock_znode(result):
-            d = self.kz_client.delete(LOCK_PATH + '/' + self.uuid,
-                                      recursive=True)
-
+            # retry every 5 seconds for 5 minutes
+            d = retry(
+                lambda: self.kz_client.delete(LOCK_PATH + '/' + self.uuid),
+                can_retry=retry_times(60),
+                next_interval=repeating_interval(5),
+                clock=self.reactor,
+            )
             d.addErrback(
                 lambda f: self.log.msg(
                     "Error cleaning up lock path (when deleting group)",
                     exc=f.value,
                     otter_msg_type="ignore-delete-lock-error"))
-            return d
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)

@@ -14,6 +14,8 @@ from effect.testing import (
     resolve_effect as eff_resolve_effect,
     resolve_stubs as eff_resolve_stubs)
 
+from kazoo.recipe.partitioner import PartitionState
+
 import mock
 
 from pyrsistent import freeze, pmap
@@ -702,16 +704,24 @@ def defaults_by_name(fn):
 
 class FakePartitioner(Service):
     """A fake version of a :obj:`Partitioner`."""
-    def __init__(self, log, callback):
+    def __init__(self, log, callback, current_state=PartitionState.ALLOCATING):
         self.log = log
         self.got_buckets = callback
-        self.health = (True, {'buckets': []})
+        self.my_buckets = []
+        self.health = (True, {'buckets': self.my_buckets})
+        self.current_state = current_state
+
+    def get_current_state(self):
+        return self.current_state
 
     def reset_path(self, new_path):
         return 'partitioner reset to {}'.format(new_path)
 
     def health_check(self):
         return defer.succeed(self.health)
+
+    def get_current_buckets(self):
+        return self.my_buckets
 
 
 def transform_eq(transformer, rhs):

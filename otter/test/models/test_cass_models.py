@@ -512,7 +512,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x00',
+             'paused': False,
              'created_at': 23,
              'desired': 10}]
         self.returns = [cass_response]
@@ -550,7 +550,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x00',
+             'paused': False,
              'created_at': 23,
              'desired': None}]
         self.returns = [cass_response]
@@ -577,7 +577,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x00',
+             'paused': False,
              'desired': 0,
              'created_at': 23}]
         self.returns = [cass_response]
@@ -611,7 +611,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x00',
+             'paused': False,
              'desired': None,
              'created_at': None}]
         self.returns = [cass_response, None]
@@ -642,7 +642,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x01',
+             'paused': True,
              'desired': 0,
              'created_at': 3}])
 
@@ -876,7 +876,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         expectedData = {"status": 'ERROR',
                         "groupId": '12345678g',
                         "tenantId": '11111', 'ts': 10345000}
-        self.connection.execute.assert_called_with(
+        self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
@@ -890,6 +890,24 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.update_status(ScalingGroupStatus.ACTIVE)
         self.failureResultOf(d, NoSuchScalingGroupError)
         self.assertFalse(self.connection.execute.called)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.succeed({}))
+    def test_update_status_deleting(self, mock_vc):
+        """
+        Sets "deleting" column to true when status set is DELETING
+        """
+        self.clock.advance(10.345)
+        d = self.group.update_status(ScalingGroupStatus.DELETING)
+        self.assertIsNone(self.successResultOf(d))  # update returns None
+        expectedCql = (
+            'INSERT INTO scaling_group("tenantId", "groupId", deleting) '
+            'VALUES (:tenantId, :groupId, :deleting) USING TIMESTAMP :ts')
+        expectedData = {"deleting": True,
+                        "groupId": '12345678g',
+                        "tenantId": '11111', 'ts': 10345000}
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     def test_view_config_no_such_group(self):
         """
@@ -1873,7 +1891,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'pending': '{"P":"R"}',
             'groupTouched': '2014-01-01T00:00:05Z.1234',
             'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         })
@@ -1928,7 +1946,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'pending': '{"P":"R"}',
             'groupTouched': '2014-01-01T00:00:05Z.1234',
             'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         })
@@ -1966,7 +1984,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'pending': '{"P":"R"}',
             'groupTouched': '2014-01-01T00:00:05Z.1234',
             'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         })
@@ -2018,7 +2036,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'pending': '{"P":"R"}',
             'groupTouched': '2014-01-01T00:00:05Z.1234',
             'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         })
@@ -2159,7 +2177,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
         self.kz_client.delete.assert_called_once_with(
-            '/locks/' + self.group.uuid, recursive=True)
+            '/locks/' + self.group.uuid)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
@@ -2204,7 +2222,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
         self.kz_client.delete.assert_called_once_with(
-            '/locks/' + self.group.uuid, recursive=True)
+            '/locks/' + self.group.uuid)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     def test_delete_lock_not_acquired(self, mock_view_state):
@@ -2247,18 +2265,17 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                                               mock_view_state):
         """
         ``delete_group``, if the rest is successful, attempts to delete the
-        lock znode but if that fails, succeeds anyway. The znode deletion is
-        logged, though.
+        lock znode but if that fails, succeeds anyway, while retrying to delete
+        the lock asynchronously.  If it never succeeds, an error is logged.
         """
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
         mock_naive.return_value = defer.succeed([])
         called = []
 
-        def not_empty_error(lockpath, recursive):
+        def not_empty_error(lockpath):
             called.append(0)
             self.assertEqual(lockpath, '/locks/' + self.group.uuid)
-            self.assertTrue(recursive)
             return defer.fail(NotEmptyError((), {}))
 
         self.kz_client.delete.side_effect = not_empty_error
@@ -2266,8 +2283,11 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.returns = [None]
         self.clock.advance(34.575)
         result = self.successResultOf(self.group.delete_group())
+        for i in range(70):
+            self.clock.advance(5)
+
         self.assertIsNone(result)  # delete returns None
-        self.assertEqual(len(called), 1)
+        self.assertEqual(len(called), 61)
         self.group.log.msg.assert_called_with(
             "Error cleaning up lock path (when deleting group)",
             exc=matches(IsInstance(NotEmptyError)),
@@ -3141,7 +3161,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         } for i in range(2)]]
@@ -3235,7 +3255,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         }, {
@@ -3246,7 +3266,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': None
         }]
@@ -3288,7 +3308,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': 23
         }, {
@@ -3299,7 +3319,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': None
         }, {
@@ -3310,7 +3330,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
+            'paused': False,
             'desired': 0,
             'created_at': None
         }]

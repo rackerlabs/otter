@@ -9,7 +9,7 @@ import sys
 class ScalingPolicyNegative(AutoscaleFixture):
 
     """
-    Verify negative scenarios for a scaling policy
+    Verify negative scenarios for a scaling policy.
     """
 
     def setUp(self):
@@ -25,18 +25,20 @@ class ScalingPolicyNegative(AutoscaleFixture):
 
     def test_scaling_policy_nonexistant(self):
         """
-        Negative Test: A newly created scaling group does not contain a scaling policy,
-        by default
+        Negative test: A newly created scaling group does not contain a
+        scaling policy, by default.
         """
         list_policy_resp = self.autoscale_client.list_policies(self.group.id)
         list_policy = (list_policy_resp.entity).policies
-        self.assertEquals(list_policy_resp.status_code, 200,
-                          msg='List scaling policies for group {0} failed with '
-                          '{0}'.format(self.group.id, list_policy_resp.status_code))
+        self.assertEquals(
+            list_policy_resp.status_code, 200,
+            msg='List scaling policies for group {0} failed with {0}'
+            .format(self.group.id, list_policy_resp.status_code))
         self.validate_headers(list_policy_resp.headers)
-        self.assertEquals(list_policy, [],
-                          msg='Some scaling policies exist on the scaling group'
-                          ' {0}'.format(self.group.id))
+        self.assertEquals(
+            list_policy, [],
+            msg='Some scaling policies exist on the scaling group {0}'
+            .format(self.group.id))
 
     def test_scaling_policy_name_blank(self):
         """
@@ -50,17 +52,20 @@ class ScalingPolicyNegative(AutoscaleFixture):
             change=self.sp_change,
             policy_type=self.sp_policy_type)
         create_error = error_create_resp.entity
-        self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling policy succeeded with invalid request: {0}'
-                          ' for group {1}'.format(error_create_resp.status_code,
-                                                  self.group.id))
-        self.assertTrue(create_error is None,
-                        msg='Create scaling policy with invalid request returned: {0}'
-                        ' for group {1}'.format(create_error, self.group.id))
+        self.assertEquals(
+            error_create_resp.status_code, expected_status_code,
+            msg='Create scaling policy succeeded with invalid request: {0} '
+            'for group {1}'.format(error_create_resp.status_code,
+                                   self.group.id))
+        self.assertTrue(
+            create_error is None,
+            msg='Create scaling policy with invalid request returned: {0}'
+            ' for group {1}'.format(create_error, self.group.id))
 
     def test_scaling_policy_name_whitespace(self):
         """
-        Negative Test: Scaling policy should not get created with name as whitespace.
+        Negative test: Scaling policy should not get created with name as
+        whitespace.
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
         error_create_resp = self.autoscale_client.create_policy(
@@ -70,13 +75,15 @@ class ScalingPolicyNegative(AutoscaleFixture):
             change=self.sp_change,
             policy_type=self.sp_policy_type)
         create_error = error_create_resp.entity
-        self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling policy succeeded with invalid request: {0}'
-                          ' for group {1}'.format(error_create_resp.status_code,
-                                                  self.group.id))
-        self.assertTrue(create_error is None,
-                        msg='Create scaling policy with invalid request returned: {0}'
-                        ' for group {1}'.format(create_error, self.group.id))
+        self.assertEquals(
+            error_create_resp.status_code, expected_status_code,
+            msg='Create scaling policy succeeded with invalid request: {0}'
+            ' for group {1}'.format(error_create_resp.status_code,
+                                    self.group.id))
+        self.assertTrue(
+            create_error is None,
+            msg='Create scaling policy with invalid request returned: {0}'
+            ' for group {1}'.format(create_error, self.group.id))
 
     def test_scaling_policy_cooldown_lessthan_zero(self):
         """
@@ -91,17 +98,20 @@ class ScalingPolicyNegative(AutoscaleFixture):
             change=self.sp_change,
             policy_type=self.sp_policy_type)
         create_error = error_create_resp.entity
-        self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling policy succeeded with invalid request: {0}'
-                          ' for group {1}'.format(error_create_resp.status_code,
-                                                  self.group.id))
-        self.assertTrue(create_error is None,
-                        msg='Create scaling policy with invalid request returned: {0}'
-                        ' for group {1}'.format(create_error, self.group.id))
+        self.assertEquals(
+            error_create_resp.status_code, expected_status_code,
+            msg='Create scaling policy succeeded with invalid request: {0}'
+            ' for group {1}'.format(error_create_resp.status_code,
+                                    self.group.id))
+        self.assertTrue(
+            create_error is None,
+            msg='Create scaling policy with invalid request returned: {0}'
+            ' for group {1}'.format(create_error, self.group.id))
 
     def test_scaling_policy_change_lessthan_zero(self):
         """
-        Negative Test: Scaling policy should not get created with change less than zero
+        Negative Test: Scaling policy should not get created with change
+        less than zero.
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
         error_create_resp = self.autoscale_client.create_policy(
@@ -110,13 +120,15 @@ class ScalingPolicyNegative(AutoscaleFixture):
             cooldown=self.sp_cooldown,
             change='0.001')
         create_error = error_create_resp.entity
-        self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling policy succeeded with invalid request: {0}'
-                          ' for group {1}'.format(error_create_resp.status_code,
-                                                  self.group.id))
-        self.assertTrue(create_error is None,
-                        msg='Create scaling policy with invalid request returned: {0}'
-                        ' for group {1}'.format(create_error, self.group.id))
+        self.assertEquals(
+            error_create_resp.status_code, expected_status_code,
+            msg='Create scaling policy succeeded with invalid request: {0}'
+            ' for group {1}'.format(error_create_resp.status_code,
+                                    self.group.id))
+        self.assertTrue(
+            create_error is None,
+            msg='Create scaling policy with invalid request returned: {0}'
+            ' for group {1}'.format(create_error, self.group.id))
 
     def test_get_invalid_policy_id(self):
         """
@@ -129,13 +141,15 @@ class ScalingPolicyNegative(AutoscaleFixture):
             group_id=self.group.id,
             policy_id=policy)
         create_error = error_create_resp.entity
-        self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create policies succeeded with invalid request: {0}'
-                          ' for group {1}'.format(error_create_resp.status_code,
-                                                  self.group.id))
-        self.assertTrue(create_error is None,
-                        msg='Create policies with invalid request returned: {0}'
-                        ' for group {1}'.format(create_error, self.group.id))
+        self.assertEquals(
+            error_create_resp.status_code, expected_status_code,
+            msg='Create policies succeeded with invalid request: {0}'
+            ' for group {1}'.format(error_create_resp.status_code,
+                                    self.group.id))
+        self.assertTrue(
+            create_error is None,
+            msg='Create policies with invalid request returned: {0}'
+            ' for group {1}'.format(create_error, self.group.id))
 
     def test_update_invalid_policy_id(self):
         """
@@ -152,13 +166,15 @@ class ScalingPolicyNegative(AutoscaleFixture):
             change=self.sp_change,
             policy_type=self.sp_policy_type)
         create_error = error_create_resp.entity
-        self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create policies succeeded with invalid request: {0}'
-                          ' for group {1}'.format(error_create_resp.status_code,
-                                                  self.group.id))
-        self.assertTrue(create_error is None,
-                        msg='Create policies with invalid request returned: {0}'
-                        ' for group {1}'.format(create_error, self.group.id))
+        self.assertEquals(
+            error_create_resp.status_code, expected_status_code,
+            msg='Create policies succeeded with invalid request: {0}'
+            ' for group {1}'.format(error_create_resp.status_code,
+                                    self.group.id))
+        self.assertTrue(
+            create_error is None,
+            msg='Create policies with invalid request returned: {0}'
+            ' for group {1}'.format(create_error, self.group.id))
 
     def test_get_policy_after_deletion(self):
         """
@@ -170,20 +186,22 @@ class ScalingPolicyNegative(AutoscaleFixture):
             group_id=self.group.id,
             policy_id=policy['id'])
         self.assertEquals(
-            del_resp.status_code, 204, msg='Delete policy failed for group '
-            '{0}'.format(self.group.id))
+            del_resp.status_code, 204,
+            msg='Delete policy failed for group {0}'.format(self.group.id))
         expected_status_code = HttpStatusCodes.NOT_FOUND
         error_create_resp = self.autoscale_client.get_policy_details(
             group_id=self.group.id,
             policy_id=policy['id'])
         create_error = error_create_resp.entity
-        self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Get policies succeeded for deleted policy request: {0}'
-                          ' for group {1}'.format(error_create_resp.status_code,
-                                                  self.group.id))
-        self.assertTrue(create_error is None,
-                        msg='Create policies with invalid request returned: {0}'
-                        ' for group {1}'.format(create_error, self.group.id))
+        self.assertEquals(
+            error_create_resp.status_code, expected_status_code,
+            msg='Get policies succeeded for deleted policy request: {0}'
+            ' for group {1}'.format(error_create_resp.status_code,
+                                    self.group.id))
+        self.assertTrue(
+            create_error is None,
+            msg='Create policies with invalid request returned: {0}'
+            ' for group {1}'.format(create_error, self.group.id))
 
     def test_update_policy_after_deletion(self):
         """
@@ -207,17 +225,21 @@ class ScalingPolicyNegative(AutoscaleFixture):
             change=self.sp_change,
             policy_type=self.sp_policy_type)
         create_error = error_create_resp.entity
-        self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Update policy after deletion succeeded with : {0},'
-                          'policy/groupid: {1} / {2}'.format(error_create_resp.status_code,
-                                                             self.group.id, policy['id']))
-        self.assertTrue(create_error is None,
-                        msg='Create policies with invalid request returned: {0}'
-                        ' for group {1}'.format(create_error, self.group.id))
+        self.assertEquals(
+            error_create_resp.status_code, expected_status_code,
+            msg='Update policy after deletion succeeded with : {0}, '
+            'policy/groupid: {1} / {2}'
+            .format(error_create_resp.status_code,
+                    self.group.id, policy['id']))
+        self.assertTrue(
+            create_error is None,
+            msg='Create policies with invalid request returned: {0}'
+            ' for group {1}'.format(create_error, self.group.id))
 
     def test_scaling_policy_maxint_change(self):
         """
-        Negative Test: Test scaling policy when change is maxint does not fail with 400
+        Negative test: Test scaling policy when change is maxint does not
+        fail with 400.
         """
         change = sys.maxint
         create_resp = self.autoscale_client.create_policy(
@@ -227,16 +249,19 @@ class ScalingPolicyNegative(AutoscaleFixture):
             change=change,
             policy_type=self.sp_policy_type)
         policy = create_resp.entity
-        self.assertEquals(create_resp.status_code, 201,
-                          msg='Create scaling policy failed with maxint as change: {0}'
-                          'for group {1}'.format(create_resp.status_code, self.group.id))
-        self.assertTrue(policy is not None,
-                        msg='Create scaling policy failed: {0} for group'
-                        ' {1}'.format(policy, self.group.id))
+        self.assertEquals(
+            create_resp.status_code, 201,
+            msg='Create scaling policy failed with maxint as change: {0}'
+            'for group {1}'.format(create_resp.status_code, self.group.id))
+        self.assertTrue(
+            policy is not None,
+            msg='Create scaling policy failed: {0} for group {1}'
+            .format(policy, self.group.id))
 
     def test_scaling_policy_max_cooldown(self):
         """
-        Negative Test: Create scaling policy with cooldown over max fails with response code 400
+        Negative test: Create scaling policy with cooldown over max fails
+        with response code 400.
         """
         create_resp = self.autoscale_client.create_policy(
             group_id=self.group.id,
@@ -244,13 +269,16 @@ class ScalingPolicyNegative(AutoscaleFixture):
             cooldown=self.max_cooldown + 1,
             change=self.sp_change,
             policy_type=self.sp_policy_type)
-        self.assertEquals(create_resp.status_code, 400,
-                          msg='Created scaling policy with cooldown over 24 hrs with response code: '
-                          '{0} for group {1}'.format(create_resp.status_code, self.group.id))
+        self.assertEquals(
+            create_resp.status_code, 400,
+            msg='Created scaling policy with cooldown over 24 hrs '
+            'with response code: {0} for group {1}'
+            .format(create_resp.status_code, self.group.id))
 
     def test_scaling_policy_invalid_type(self):
         """
-        Negative Test: Create scaling policy with invalid type will result in response code 400
+        Negative test: Create scaling policy with invalid type will result
+        in response code 400.
         """
         create_resp = self.autoscale_client.create_policy(
             group_id=self.group.id,
@@ -258,6 +286,7 @@ class ScalingPolicyNegative(AutoscaleFixture):
             cooldown=self.sp_cooldown,
             change=self.sp_change,
             policy_type='myowntype')
-        self.assertEquals(create_resp.status_code, 400,
-                          msg='Created scaling policy with invalid type with response code: {0}'
-                          ' for group {1}'.format(create_resp.status_code, self.group.id))
+        self.assertEquals(
+            create_resp.status_code, 400,
+            msg='Created scaling policy with invalid type with response code: '
+            '{0} for group {1}'.format(create_resp.status_code, self.group.id))
