@@ -32,17 +32,17 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
     def test_launch_config_personality_with_invalid_personality(self):
         """
         Create a scaling group with invalid personality and verify the creation
-        fails with an error 400
+        fails with an error 400.
         """
         personalities = ['abc', 0, {'path': '/abc'}, {'contents': 'test'},
-                        [{'path': self.path}], [{'content': 'test'}]]
+                         [{'path': self.path}], [{'content': 'test'}]]
         for personality in personalities:
             self._assert_create_group(personality)
 
     def test_launch_config_personality_with_max_path_size(self):
         """
-        Create a scaling group with path over 255 characters and verify the creation
-        fails with an error 400
+        Create a scaling group with path over 255 characters and verify the
+        creation fails with an error 400.
         """
         long_path = 'z' * (self.personality_maxlength + 1)
         personality = [{'path': '/root/{0}.txt'.format(long_path),
@@ -51,8 +51,8 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
 
     def test_launch_config_personality_with_max_file_content_size(self):
         """
-        Create a scaling group with file contents over 1000 characters and verify the creation
-        fails with an error 400
+        Create a scaling group with file contents over 1000 characters and
+        verify the creation fails with an error 400.
         """
         file_content = 'z' * (self.personality_max_file_size + 1)
         personality = [{'path': self.path,
@@ -61,12 +61,13 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
 
     def test_launch_config_personality_with_max_personalities(self):
         """
-        Create a scaling group with over max personalities allowed and verify the creation
-        fails with an error 400
+        Create a scaling group with over max personalities allowed and
+        verify the creation fails with an error 400.
         """
         personality_content = {'path': self.path,
                                'contents': base64.b64encode('tests')}
-        personality = [personality_content for _ in range(self.max_personalities + 1)]
+        personality = [personality_content
+                       for _ in range(self.max_personalities + 1)]
         self._assert_create_group(personality)
 
     def _assert_create_group(self, personality, response=400):

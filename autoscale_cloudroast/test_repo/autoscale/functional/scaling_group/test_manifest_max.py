@@ -8,33 +8,37 @@ import unittest
 
 class GetMaxManifest(ScalingGroupFixture):
     """
-    Verify that the webhook manifest is provided when using /groups/[group_id]?webhooks=True
-    on a group with the maximum number of policies and the maximum number of webhooks.
-
+    Verify that the webhook manifest is provided when using
+    /groups/[group_id]?webhooks=True on a group with the maximum
+    number of policies and the maximum number of webhooks.
     """
 
     @unittest.skip("Reserved for stress testing due to API call volume")
     @tags(stress='true')
     def test_manifest_max(self):
         """
-        Create MAX_POLICIES scaling policies, each with MAX_WEBHOOKS webhooks and comfirm that all are
-        listed in the manifest. Each policy and webhook is created using a separate
-        API call.
-        Note: BaseTestFixture imports max_policies and max_webhooks from otter_constants.py
+        Create MAX_POLICIES scaling policies, each with MAX_WEBHOOKS
+        webhooks and comfirm that all are listed in the manifest.
+
+        Each policy and webhook is created using a separate API call.
+
+        Note: BaseTestFixture imports max_policies and max_webhooks
+        from otter_constants.py
         """
         # Create and record ids for the maximum number of policies and webhooks
         manifest_dict = {}
         for p in range(0, self.max_policies):
-            policy_resp = self.autoscale_behaviors.create_policy_min(self.group.id,
-                                                                     sp_name=("policy_{0}".format(p)))
+            policy_resp = self.autoscale_behaviors.create_policy_min(
+                self.group.id, sp_name=('policy_{0}'.format(p)))
             p_id = policy_resp['id']
             webhook_ids = []
             for w in range(0, self.max_webhooks):
-                webhook_resp = self.autoscale_client.create_webhook(self.group.id, p_id,
-                                                                    "hook_{0}".format(w))
+                webhook_resp = self.autoscale_client.create_webhook(
+                    self.group.id, p_id, 'hook_{0}'.format(w))
                 hook_obj = webhook_resp.entity[0]
                 webhook_ids.append(hook_obj.id)
-            manifest_dict[p_id] = sorted(webhook_ids)  # Sort webhooks to verify against rx'd manifest
+            # Sort webhooks to verify against rx'd manifest
+            manifest_dict[p_id] = sorted(webhook_ids)
         # Issue the manifest query, capture resluts, and compare
         list_manifest_resp = \
             self.autoscale_client.view_manifest_config_for_scaling_group(
@@ -46,16 +50,18 @@ class GetMaxManifest(ScalingGroupFixture):
             rx_webhook_ids = []
             for hook in policy.webhooks:
                 rx_webhook_ids.append(hook.id)
-            actual_ids[sp_id] = rx_webhook_ids  # Unsorted to verify that the order is correct
+            # Unsorted to verify that the order is correct
+            actual_ids[sp_id] = rx_webhook_ids
         self.assertTrue(manifest_dict == actual_ids,
                         "Recieved manifest did not match expected")
 
     def test_manifest_max_batch(self):
         """
-        Create MAX_POLICIES scaling policies, each with MAX_WEBHOOKS webhooks and comfirm that all are
-        listed in the manifest.
-        Note: BaseTestFixture imports max_policies and max_webhooks from otter_constants.py
+        Create MAX_POLICIES scaling policies, each with MAX_WEBHOOKS
+        webhooks and comfirm that all are listed in the manifest.
 
+        Note: BaseTestFixture imports max_policies and max_webhooks
+        from otter_constants.py
         """
 
         # Create and record ids for the maximum number of policies and webhooks
@@ -68,9 +74,10 @@ class GetMaxManifest(ScalingGroupFixture):
             webhook_req_list = []
             for w in range(self.max_webhooks):
                 w_name_num = p['name'] + '_hook_{0}'.format(w)
-                webhook_req_list.append({'name': w_name_num, 'metadata': {'notes': str(w)}})
-            web_resp = self.autoscale_client.create_webhooks_multiple(self.group.id, p_id,
-                                                                      webhook_req_list)
+                webhook_req_list.append(
+                    {'name': w_name_num, 'metadata': {'notes': str(w)}})
+            web_resp = self.autoscale_client.create_webhooks_multiple(
+                self.group.id, p_id, webhook_req_list)
             webhook_ids = []
             for wr in web_resp.entity:
                 webhook_ids.append(wr.id)
@@ -86,6 +93,7 @@ class GetMaxManifest(ScalingGroupFixture):
             rx_webhook_ids = []
             for hook in policy.webhooks:
                 rx_webhook_ids.append(hook.id)
-            actual_ids[sp_id] = rx_webhook_ids  # Unsorted to verify that the order is correct
+            # Unsorted to verify that the order is correct
+            actual_ids[sp_id] = rx_webhook_ids
         self.assertTrue(manifest_dict == actual_ids,
                         "Recieved manifest did not match expected")

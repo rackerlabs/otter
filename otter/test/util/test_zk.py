@@ -4,19 +4,20 @@ from functools import partial
 
 from characteristic import attributes
 
-from effect import Effect, TypeDispatcher
-from effect.twisted import perform
+from effect import ComposedDispatcher, Effect, TypeDispatcher, sync_perform
 
 from kazoo.exceptions import BadVersionError, NoNodeError, NodeExistsError
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.test.utils import test_dispatcher
 from otter.util.zk import (
     CreateOrSet, CreateOrSetLoopLimitReachedError,
-    DeleteNode, GetChildrenWithStats,
-    perform_create_or_set, perform_delete_node,
-    perform_get_children_with_stats)
+    DeleteNode, GetChildren, GetChildrenWithStats,
+    GetStat,
+    get_zk_dispatcher,
+    perform_create_or_set, perform_delete_node)
 
 
 @attributes(['version'])
@@ -80,6 +81,13 @@ class ZKCrudModel(object):
         del self.nodes[path]
         return succeed('delete return value')
 
+    def exists(self, path):
+        """Return a ZnodeStat for a node if it exists, otherwise None."""
+        if path in self.nodes:
+            return ZNodeStatStub(version=self.nodes[path][1])
+        else:
+            return None
+
 
 class CreateOrSetTests(SynchronousTestCase):
     """Tests for :func:`create_or_set`."""
@@ -90,19 +98,19 @@ class CreateOrSetTests(SynchronousTestCase):
         eff = Effect(CreateOrSet(path=path, content=content))
         performer = partial(perform_create_or_set, self.model)
         dispatcher = TypeDispatcher({CreateOrSet: performer})
-        return perform(dispatcher, eff)
+        return sync_perform(dispatcher, eff)
 
     def test_create(self):
         """Creates a node when it doesn't exist."""
-        d = self._cos('/foo', 'bar')
-        self.assertEqual(self.successResultOf(d), '/foo')
+        result = self._cos('/foo', 'bar')
+        self.assertEqual(result, '/foo')
         self.assertEqual(self.model.nodes, {'/foo': ('bar', 0)})
 
     def test_update(self):
         """Uses `set` to update the node when it does exist."""
         self.model.create('/foo', 'initial', makepath=True)
-        d = self._cos('/foo', 'bar')
-        self.assertEqual(self.successResultOf(d), '/foo')
+        result = self._cos('/foo', 'bar')
+        self.assertEqual(result, '/foo')
         self.assertEqual(self.model.nodes, {'/foo': ('bar', 1)})
 
     def test_node_disappears_during_update(self):
@@ -117,8 +125,8 @@ class CreateOrSetTests(SynchronousTestCase):
         self.model.set = hacked_set
 
         self.model.create('/foo', 'initial', makepath=True)
-        d = self._cos('/foo', 'bar')
-        self.assertEqual(self.successResultOf(d), '/foo')
+        result = self._cos('/foo', 'bar')
+        self.assertEqual(result, '/foo')
         # It must be at version 0 because it's a creation, whereas normally if
         # the node were being updated it'd be at version 1.
         self.assertEqual(self.model.nodes, {'/foo': ('bar', 0)})
@@ -138,10 +146,9 @@ class CreateOrSetTests(SynchronousTestCase):
         self.model.set = hacked_set
         self.model.create = hacked_create
 
-        d = self._cos('/foo', 'bar')
-        failure = self.failureResultOf(d)
-        self.assertEqual(failure.type, CreateOrSetLoopLimitReachedError)
-        self.assertEqual(failure.getErrorMessage(), '/foo')
+        exc = self.assertRaises(CreateOrSetLoopLimitReachedError,
+                                self._cos, '/foo', 'bar')
+        self.assertEqual(str(exc), '/foo')
 
 
 class GetChildrenWithStatsTests(SynchronousTestCase):
@@ -155,9 +162,9 @@ class GetChildrenWithStatsTests(SynchronousTestCase):
 
     def _gcws(self, path):
         eff = Effect(GetChildrenWithStats(path))
-        performer = partial(perform_get_children_with_stats, self.model)
-        dispatcher = TypeDispatcher({GetChildrenWithStats: performer})
-        return perform(dispatcher, eff)
+        dispatcher = ComposedDispatcher([test_dispatcher(),
+                                         get_zk_dispatcher(self.model)])
+        return sync_perform(dispatcher, eff)
 
     def test_get_children_with_stats(self):
         """
@@ -175,10 +182,55 @@ class GetChildrenWithStatsTests(SynchronousTestCase):
         self.model.get_children = {'/path': succeed(['foo', 'bar', 'baz'])}.get
         self.model.exists = exists
 
-        d = self._gcws('/path')
-        self.assertEqual(self.successResultOf(d),
+        result = self._gcws('/path')
+        self.assertEqual(result,
                          [('foo', ZNodeStatStub(version=0)),
                           ('bar', ZNodeStatStub(version=1))])
+
+
+class GetChildrenTests(SynchronousTestCase):
+    """Tests for :obj:`GetChildren`."""
+
+    def setUp(self):
+        # It'd be nice if we used the standard ZK CRUD model, but implementing
+        # a tree of nodes supporting get_children is a pain
+        class Model(object):
+            pass
+        self.model = Model()
+
+    def _gc(self, path):
+        eff = Effect(GetChildren(path))
+        dispatcher = get_zk_dispatcher(self.model)
+        return sync_perform(dispatcher, eff)
+
+    def test_get_children(self):
+        """Returns children."""
+        self.model.get_children = {'/path': succeed(['foo', 'bar', 'baz'])}.get
+
+        result = self._gc('/path')
+        self.assertEqual(result,
+                         ['foo', 'bar', 'baz'])
+
+
+class GetStatTests(SynchronousTestCase):
+    def setUp(self):
+        self.model = ZKCrudModel()
+
+    def _gs(self, path):
+        eff = Effect(GetStat(path))
+        dispatcher = get_zk_dispatcher(self.model)
+        return sync_perform(dispatcher, eff)
+
+    def test_get_stat(self):
+        """Returns the ZnodeStat when the node exists."""
+        self.model.create('/foo/bar', content='foo', makepath=True)
+        result = self._gs('/foo/bar')
+        self.assertEqual(result, ZNodeStatStub(version=0))
+
+    def test_get_stat_not_exists(self):
+        """Returns None when no node exists."""
+        result = self._gs('/foo/bar')
+        self.assertEqual(result, None)
 
 
 class DeleteTests(SynchronousTestCase):
@@ -190,6 +242,6 @@ class DeleteTests(SynchronousTestCase):
         model.set('/foo', 'bar')
         performer = partial(perform_delete_node, model)
         dispatcher = TypeDispatcher({DeleteNode: performer})
-        d = perform(dispatcher, eff)
+        result = sync_perform(dispatcher, eff)
         self.assertEqual(model.nodes, {})
-        self.assertEqual(self.successResultOf(d), 'delete return value')
+        self.assertEqual(result, 'delete return value')

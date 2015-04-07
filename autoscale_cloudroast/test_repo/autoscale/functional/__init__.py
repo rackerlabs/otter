@@ -1,3 +1,3 @@
 """
- Tests for AUtoscaling API
+Tests for AUtoscaling API.
 """

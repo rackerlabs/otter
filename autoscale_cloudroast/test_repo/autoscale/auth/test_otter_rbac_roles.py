@@ -26,18 +26,18 @@ class OtterRbacTests(AutoscaleFixture):
         create_group = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=0)
         self.group = create_group.entity
-        self.policy_webhook = self.autoscale_behaviors.create_policy_webhook(self.group.id,
-                                                                             {'change': 1,
-                                                                              'cooldown': 0})
+        self.policy_webhook = self.autoscale_behaviors.create_policy_webhook(
+            self.group.id, {'change': 1, 'cooldown': 0})
         self.resources.add(self.group, self.empty_scaling_group)
 
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_admin_autoscale_observer(self):
         """
-        Given a user with the observer role for Autoscale and admin role for nova
-        and lbaas, verify the user has permissions to GET groups, GET a group,
-        GET the group state for a group, GET the configs of a group, GET the launch
-        configs of a group, LIST policies and GET a policy
+        Given a user with the observer role for Autoscale and admin role
+        for nova and lbaas, verify the user has permissions to GET
+        groups, GET a group, GET the group state for a group, GET the
+        configs of a group, GET the launch configs of a group, LIST
+        policies and GET a policy
         """
         autoscale_na_la_ao = self.autoscale_config.autoscale_na_la_ao
         user_client = self._create_client(autoscale_na_la_ao, self.password)
@@ -47,8 +47,9 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_autoscale_admin(self):
         """
-        Given a user with an admin role for Autscale, nova and lbaas, verify the user
-        has permissions to perform all CRUD operations in otter.
+        Given a user with an admin role for Autscale, nova and lbaas,
+        verify the user has permissions to perform all CRUD operations
+        in otter.
         """
         autoscale_na_la_aa = self.autoscale_config.autoscale_na_la_aa
         user_client = self._create_client(autoscale_na_la_aa, self.password)
@@ -58,8 +59,9 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_autoscale_observer(self):
         """
-        Given a user with observer role for Autoscale, nova and lbaas, ensure the user
-        can still perform all the GET operations on Otter.
+        Given a user with observer role for Autoscale, nova and lbaas,
+        ensure the user can still perform all the GET operations on
+        Otter.
         """
         autoscale_no_lo_ao = self.autoscale_config.autoscale_no_lo_ao
         user_client = self._create_client(autoscale_no_lo_ao, self.password)
@@ -69,8 +71,9 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_observer_autoscale_admin(self):
         """
-        Given a user with an admin role for Autoscale, and observer role for nova and lbaas,
-        ensure the user can still perform all admin operations on Otter.
+        Given a user with an admin role for Autoscale, and observer role
+        for nova and lbaas, ensure the user can still perform all
+        admin operations on Otter.
         """
         autoscale_no_lo_aa = self.autoscale_config.autoscale_no_lo_aa
         user_client = self._create_client(autoscale_no_lo_aa, self.password)
@@ -80,8 +83,9 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_admin_lbaas_observer_autoscale_admin(self):
         """
-        Given a user with an admin role for Autoscale and Nova, and observer role for lbaas,
-        ensure the user can still perform all admin operations on Otter.
+        Given a user with an admin role for Autoscale and Nova, and
+        observer role for lbaas, ensure the user can still perform all
+        admin operations on Otter.
         """
         autoscale_na_lo_aa = self.autoscale_config.autoscale_na_lo_aa
         user_client = self._create_client(autoscale_na_lo_aa, self.password)
@@ -91,8 +95,9 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_creator_autoscale_admin(self):
         """
-        Given a user with an admin role for Autoscale, and creator role for nova and lbaas,
-        ensure the user can still perform all admin operations on Otter.
+        Given a user with an admin role for Autoscale, and creator role
+        for nova and lbaas, ensure the user can still perform all
+        admin operations on Otter.
         """
         autoscale_nc_lc_aa = self.autoscale_config.autoscale_nc_lc_aa
         user_client = self._create_client(autoscale_nc_lc_aa, self.password)
@@ -102,8 +107,9 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_creator_autoscale_observer(self):
         """
-        Given a user with an observer role for Autoscale, and creator role for nova and lbaas,
-        ensure the user can still perform all observer operations on Otter.
+        Given a user with an observer role for Autoscale, and creator role
+        for nova and lbaas, ensure the user can still perform all
+        observer operations on Otter.
         """
         autoscale_nc_lc_ao = self.autoscale_config.autoscale_nc_lc_ao
         user_client = self._create_client(autoscale_nc_lc_ao, self.password)
@@ -113,8 +119,9 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_no_access_autoscale_admin(self):
         """
-        Given a user with an admin role for Autoscale, and no access to nova and lbaas,
-        ensure the user can still perform all admin operations on Otter.
+        Given a user with an admin role for Autoscale, and no access to
+        nova and lbaas, ensure the user can still perform all admin
+        operations on Otter.
         """
         autoscale_nno_lno_aa = self.autoscale_config.autoscale_nno_lno_aa
         user_client = self._create_client(autoscale_nno_lno_aa, self.password)
@@ -124,8 +131,9 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_no_access_autoscale_observer(self):
         """
-        Given a user with an observer role for Autoscale, and no access to nova and lbaas,
-        ensure the user can still perform all observer operations on Otter.
+        Given a user with an observer role for Autoscale, and no access to
+        nova and lbaas, ensure the user can still perform all observer
+        operations on Otter.
         """
         autoscale_nno_lno_ao = self.autoscale_config.autoscale_nno_lno_ao
         user_client = self._create_client(autoscale_nno_lno_ao, self.password)
@@ -135,8 +143,9 @@ class OtterRbacTests(AutoscaleFixture):
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_admin_autoscale_no_access(self):
         """
-        Given a user with no access to Autoscale, and admin roles for nova and lbaas,
-        ensure the user can not perform any operations on Otter.
+        Given a user with no access to Autoscale, and admin roles for nova
+        and lbaas, ensure the user can not perform any operations on
+        Otter.
         """
         autoscale_na_la_ano = self.autoscale_config.autoscale_na_la_ano
         user_client = self._create_client(autoscale_na_la_ano, self.password)
@@ -153,23 +162,28 @@ class OtterRbacTests(AutoscaleFixture):
         access_data = token_behaviors.get_access_data(username,
                                                       password,
                                                       self.tenant_id)
-        autoscale_temp_client = AutoscalingAPIClient(url=self.url,
-                                                     auth_token=access_data.token.id_,
-                                                     serialize_format='json',
-                                                     deserialize_format='json')
+        autoscale_temp_client = AutoscalingAPIClient(
+            url=self.url,
+            auth_token=access_data.token.id_,
+            serialize_format='json',
+            deserialize_format='json')
         return autoscale_temp_client
 
-    def _verify_otter_observer_role(self, user_client, expected_response_code=200):
+    def _verify_otter_observer_role(
+            self, user_client, expected_response_code=200):
         """
-        verify all the GET calls on a group and policy. Uses the group, policy and webhook
-        created as part of the setUp.
+        verify all the GET calls on a group and policy. Uses the group,
+        policy and webhook created as part of the setUp.
         """
         list_groups_response = user_client.list_scaling_groups()
         self.assertEquals(
-            list_groups_response.status_code, expected_response_code,
-            msg='List groups returned response code {0}'.format(list_groups_response.status_code))
-        get_group_response = user_client.view_manifest_config_for_scaling_group(
-            self.group.id)
+            list_groups_response.status_code,
+            expected_response_code,
+            msg='List groups returned response code {0}'.format(
+                list_groups_response.status_code))
+        get_group_response = (user_client
+                              .view_manifest_config_for_scaling_group(
+                                  self.group.id))
         self.assertEquals(
             get_group_response.status_code, expected_response_code,
             msg='Get group returned response code {0} on group '
@@ -189,9 +203,11 @@ class OtterRbacTests(AutoscaleFixture):
         get_launch_config_response = user_client.view_launch_config(
             self.group.id)
         self.assertEquals(
-            get_launch_config_response.status_code, expected_response_code,
-            msg='Get launch config returned response code {0} on group '
-            '{1}'.format(get_launch_config_response.status_code, self.group.id))
+            get_launch_config_response.status_code,
+            expected_response_code,
+            msg='Get launch config returned response code {0} on group {1}'
+            .format(get_launch_config_response.status_code,
+                    self.group.id))
         list_policies_response = user_client.list_policies(self.group.id)
         self.assertEquals(
             list_policies_response.status_code, expected_response_code,
@@ -204,9 +220,11 @@ class OtterRbacTests(AutoscaleFixture):
             msg='Get group returned response code {0} on group '
             '{1}'.format(get_policy_response.status_code, self.group.id))
 
-    def _verify_otter_admin_roles_other_than_GET_calls(self, user_client,
-                                                       expected_response_code=None,
-                                                       lc_load_balancers=None):
+    def _verify_otter_admin_roles_other_than_GET_calls(
+            self,
+            user_client,
+            expected_response_code=None,
+            lc_load_balancers=None):
         """
         verify all the otter api calls except for all the GET calls, as
         _verify_otter_observer_role covers them already.

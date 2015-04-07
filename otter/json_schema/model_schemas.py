@@ -74,6 +74,8 @@ policy_list = array_type(policy)
 
 
 # create group and view manifest returns a dictionary with keys being the ids
+m_pol_list = deepcopy(policy_list)
+m_pol_list['required'] = False
 manifest = {
     "type": "object",
     "description": "Schema returned by the interface for viewing a manifest",
@@ -82,7 +84,14 @@ manifest = {
         "state": {},
         "groupConfiguration": group_schemas.config,
         "launchConfiguration": group_schemas.launch_config,
-        "scalingPolicies": policy_list
+        "scalingPolicies": m_pol_list,
+        "status": {
+            "type": "string",
+            "required": False,
+            "decription": (
+                "Status of the group. One of 'ACTIVE', 'ERROR' or 'DELETING'"),
+            "pattern": "ACTIVE|ERROR|DELETING"
+        },
     },
     "additionalProperties": False
 }

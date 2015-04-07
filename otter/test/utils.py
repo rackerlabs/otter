@@ -14,6 +14,8 @@ from effect.testing import (
     resolve_effect as eff_resolve_effect,
     resolve_stubs as eff_resolve_stubs)
 
+from kazoo.recipe.partitioner import PartitionState
+
 import mock
 
 from pyrsistent import freeze, pmap
@@ -370,6 +372,16 @@ class StubResponse(object):
         # Data is not part of twisted response object
         self._data = data
 
+    def __eq__(self, other):
+        return (
+            isinstance(other, self.__class__) and
+            self.code == other.code and
+            self.headers == other.headers and
+            self._data == other._data)
+
+    def __ne__(self, other):
+        return not self == other
+
 
 def stub_pure_response(body, code=200, response_headers=None):
     """
@@ -610,7 +622,7 @@ def mock_group(state, tenant_id='tenant', group_id='group'):
 
     def fake_modify_state(f, *args, **kwargs):
         d = maybeDeferred(f, group, state, *args, **kwargs)
-        d.addCallback(lambda r: group.modify_state_values.append(r) or r)
+        d.addCallback(lambda r: group.modify_state_values.append(r))
         if group.pause_modify_state:
             group.modify_state_pause_d = Deferred()
             return group.modify_state_pause_d.addCallback(lambda _: d)
@@ -692,16 +704,24 @@ def defaults_by_name(fn):
 
 class FakePartitioner(Service):
     """A fake version of a :obj:`Partitioner`."""
-    def __init__(self, log, callback):
+    def __init__(self, log, callback, current_state=PartitionState.ALLOCATING):
         self.log = log
         self.got_buckets = callback
-        self.health = (True, {'buckets': []})
+        self.my_buckets = []
+        self.health = (True, {'buckets': self.my_buckets})
+        self.current_state = current_state
+
+    def get_current_state(self):
+        return self.current_state
 
     def reset_path(self, new_path):
         return 'partitioner reset to {}'.format(new_path)
 
     def health_check(self):
         return defer.succeed(self.health)
+
+    def get_current_buckets(self):
+        return self.my_buckets
 
 
 def transform_eq(transformer, rhs):
