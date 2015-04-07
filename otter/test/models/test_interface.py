@@ -3,19 +3,15 @@ Tests for :mod:`otter.models.interface`
 """
 from collections import namedtuple
 
-
-import mock
+from twisted.trial.unittest import SynchronousTestCase
 
 from zope.interface.verify import verifyObject
 
-from twisted.internet import defer
-from twisted.trial.unittest import SynchronousTestCase
-
-from otter.models.interface import (
-    GroupState, IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection,
-    NoSuchScalingGroupError)
-from otter.json_schema.group_schemas import launch_config
 from otter.json_schema import model_schemas, validate
+from otter.json_schema.group_schemas import launch_config
+from otter.models.interface import (
+    GroupState, IScalingGroup, IScalingGroupCollection,
+    IScalingScheduleCollection)
 
 
 class GroupStateTestCase(SynchronousTestCase):
@@ -222,33 +218,6 @@ class IScalingGroupProviderMixin(object):
         :class:`otter.models.interface.IScalingGroup`.
         """
         verifyObject(IScalingGroup, self.group)
-
-    def test_modify_state_calls_modifier_with_group_and_state_and_others(self):
-        """
-        ``modify_state`` calls the modifier callable with the group and the
-        state as the first two arguments, and the other args and keyword args
-        passed to it.
-        """
-        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
-        # calling with a Deferred that never gets callbacked, because we aren't
-        # testing the saving portion in this test
-        modifier = mock.Mock(return_value=defer.Deferred())
-        self.group.modify_state(modifier, 'arg1', kwarg1='1')
-        modifier.assert_called_once_with(self.group, 'state', 'arg1', kwarg1='1')
-
-    def test_modify_state_propagates_view_state_error(self):
-        """
-        ``modify_state`` should propagate a :class:`NoSuchScalingGroupError`
-        that is raised by ``view_state``
-        """
-        self.group.view_state = mock.Mock(
-            return_value=defer.fail(NoSuchScalingGroupError(1, 1)))
-
-        modifier = mock.Mock()
-        d = self.group.modify_state(modifier)
-        f = self.failureResultOf(d)
-        self.assertTrue(f.check(NoSuchScalingGroupError))
-        self.assertEqual(modifier.call_count, 0)
 
     def validate_view_manifest_return_value(self, *args, **kwargs):
         """
