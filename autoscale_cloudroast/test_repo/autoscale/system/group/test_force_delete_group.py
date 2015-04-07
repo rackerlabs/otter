@@ -14,8 +14,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
     """
 
     params = ['true', 'TRUE', 'TrUe', 'True', 'truE', True]
-    invalid_params = [0, '', '$%^#', 'false', 'False', False, 'anything',
-                      'truee']
+    invalid_params = [0, '', '$%^#', 'anything', 'truee']
 
     @tags(speed='slow', convergence='error')
     def test_minentities_over_zero(self):
