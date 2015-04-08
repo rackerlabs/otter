@@ -726,8 +726,15 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.manifest['status'] = 'DELETING'
         exp_intents = [(del_group, None),
                        (self.gsgi, (self.group, self.manifest))]
-
-        disp = self._get_dispatcher(exp_intents)
+        disp = ComposedDispatcher([
+            EQDispatcher(exp_intents),
+            TypeDispatcher({
+                ParallelEffects: perform_parallel_async,
+            }),
+            base_dispatcher,
+        ])
+        # This succeeded without `ModifyGroupState` dispatcher in it
+        # ensuring that it was not called
         self.assertEqual(sync_perform(disp, eff), StepResult.SUCCESS)
 
         # desired capacity was changed to 0

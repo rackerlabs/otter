@@ -126,7 +126,8 @@ def execute_convergence(tenant_id, group_id, log,
     log.msg('execute-convergence',
             servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
             desired=desired_group_state, active=active)
-    yield _update_active(scaling_group, active)
+    if group_status != ScalingGroupStatus.DELETING:
+        yield _update_active(scaling_group, active)
     if len(steps) == 0:
         yield do_return(StepResult.SUCCESS)
     results = yield steps_to_effect(steps)
