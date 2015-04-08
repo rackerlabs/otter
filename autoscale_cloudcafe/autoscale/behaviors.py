@@ -483,7 +483,7 @@ class AutoscaleBehaviors(BaseBehavior):
         if time_scale and self.autoscale_config.mimic:
             # scale time down if using mimic - no shorter than 1 second, though
             scale_down_factor = 0.25
-            timeout = timeout * scale_down_factor
+            timeout = max(timeout * scale_down_factor, 1)
             interval_time = interval_time * scale_down_factor
             # max out mimic waiting to 60 seconds, no matter what the timeout
             timeout = min(timeout, 60)
