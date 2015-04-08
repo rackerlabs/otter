@@ -480,13 +480,11 @@ class AutoscaleBehaviors(BaseBehavior):
         if interval_time is None:
             interval_time = self.autoscale_config.interval_time
 
-        if time_scale:
+        if time_scale and self.autoscale_config.mimic:
             # scale time down if using mimic - no shorter than 1 second, though
-            time_scaling_factor = 0.25 if self.autoscale_config.mimic else 1
-            timeout, interval_time = [
-                max(val * time_scaling_factor, 1)
-                for val in (timeout, interval_time)
-            ]
+            scale_down_factor = 0.25
+            timeout = timeout * scale_down_factor
+            interval_time = interval_time * scale_down_factor
             # max out mimic waiting to 60 seconds, no matter what the timeout
             timeout = min(timeout, 60)
 
