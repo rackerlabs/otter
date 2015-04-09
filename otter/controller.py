@@ -148,24 +148,24 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
         are to be made to the group, None will synchronously be returned.
     """
     if tenant_is_enabled(scaling_group.tenant_id, config_value):
-        # Note that convergence must be run whether or not delta is 0, because
-        # delta will be zero when a group is initially created with a non-zero
-        # min-entities (desired=min entities, so there is technically no
-        # change).
-
-        # For non-convergence tenants, the value used for desired-capacity is
-        # the sum of active+pending, which is 0, so the delta ends up being
-        # the min entities due to constraint calculation.
-
-        apply_delta(log, state.desired, state, config, policy)
+        # For convergence tenants, find delta based on group's desired
+        # capacity
+        delta = apply_delta(log, state.desired, state, config, policy)
+        # Delta could be 0, however we may still want to trigger convergence
         d = get_convergence_starter().start_convergence(
             log, scaling_group.tenant_id, scaling_group.uuid)
+        if delta == 0:
+            # No change in servers. Return None synchronously
+            return None
+        else:
+            # We honor start_convergence's deferred here so that we can
+            # communicate back a strong acknowledgement that convergence
+            # has been triggered on the group
+            return d.addCallback(lambda _: state)
 
-        # We honor start_convergence's deferred here so that we can communicate
-        # back a strong acknowledgement that a group has been marked dirty for
-        # convergence.
-        return d.addCallback(lambda _: state)
-
+    # For non-convergence tenants, the value used for desired-capacity is
+    # the sum of active+pending, which is 0, so the delta ends up being
+    # the min entities due to constraint calculation.
     delta = calculate_delta(log, state, config, policy)
     execute_log = log.bind(server_delta=delta)
 
