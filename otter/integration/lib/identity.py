@@ -2,8 +2,6 @@
 
 from characteristic import Attribute, attributes
 
-from pyrsistent import freeze
-
 
 @attributes([
     Attribute('auth'),
