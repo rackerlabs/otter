@@ -127,16 +127,16 @@ class TestConvergence(unittest.TestCase):
         )
     test_reaction_to_oob_server_deletion.timeout = 600
 
-    def _choose_half_the_servers(self, t):
+    def _choose_half_the_servers(self, (code, response)):
         """Select the first half of the servers returned by the
         ``get_scaling_group_state`` function.  Record the number of servers
         received in ``n_servers`` attribute, and the number killed (which
         should be roughly half) in ``n_killed``.
         """
 
-        if t[0] != 200:
+        if code != 200:
             raise Exception("Got 404; where'd the scaling group go?")
-        ids = map(lambda obj: obj['id'], t[1]['group']['active'])
+        ids = map(lambda obj: obj['id'], response['group']['active'])
         self.n_servers = len(ids)
         self.n_killed = self.n_servers / 2
         return ids[:self.n_killed]
