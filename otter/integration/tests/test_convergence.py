@@ -53,9 +53,6 @@ def find_end_points(rcs):
         rcs.endpoints["otter"] = 'http://localhost:9000/v1.0/{0}'.format(
             rcs.access['access']['token']['tenant']['id'])
 
-    rcs.endpoints["loadbalancers"] = auth.public_endpoint_url(
-        sc, "cloudLoadBalancers", region
-    )
     rcs.endpoints["nova"] = auth.public_endpoint_url(
         sc, "cloudServersOpenStack", region
     )
@@ -181,8 +178,8 @@ class TestConvergence(unittest.TestCase):
         situation and reflect it in the scaling group state accordingly.
         """
 
-        def check(state):
-            if state[0] != 200:
+        def check((code, response)):
+            if code != 200:
                 raise BreakLoopException(
                     "Scaling group appears to have disappeared"
                 )
@@ -192,7 +189,7 @@ class TestConvergence(unittest.TestCase):
             # the remaining servers plus 1.
 
             n_remaining = self.n_servers - self.n_killed + 1
-            if len(state[1]["group"]["active"]) == n_remaining:
+            if len(response["group"]["active"]) == n_remaining:
                 return rcs
 
             raise TransientRetryError()
