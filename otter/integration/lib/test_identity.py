@@ -9,67 +9,6 @@ from otter.integration.lib.identity import IdentityV2, find_endpoint
 from otter.integration.lib.resources import TestResources
 
 
-class IdentityV2Tests(SynchronousTestCase):
-    """Tests for the :class:`IdentityV2` class."""
-
-    def test_missing_params(self):
-        """Missing parameters to the IdentityV2 constructor should raise
-        a ValueError exception.
-        """
-        def x(u, p, e):
-            self.assertRaises(ValueError, IdentityV2, None, u, p, e)
-        x("", "pw", "ep")
-        x("un", "", "ep")
-        x("un", "pw", "")
-        x(None, "pw", "ep")
-        x("un", None, "ep")
-        x("un", "pw", None)
-
-    def test_pool_kwarg(self):
-        """The pool keyword argument should be passed through to the
-        authenticate_user Otter function.
-        """
-        rcs = TestResources()
-
-        class Stub(object):
-            def __init__(self):
-                self.pool = None
-
-            def authenticate_user(self, endpt, user, passwd, pool=None):
-                self.pool = pool
-                return defer.succeed({})
-
-        stub = Stub()
-        IdentityV2(
-            auth=stub, username="username",
-            password="password", endpoint="endpoint"
-        ).authenticate_user(rcs)
-        self.assertFalse(stub.pool)
-
-        IdentityV2(
-            auth=stub, username="username",
-            password="password", endpoint="endpoint", pool=42
-        ).authenticate_user(rcs)
-        self.assertEquals(stub.pool, 42)
-
-    def test_records_results(self):
-        """The IdentityV2 instance you create should cache its
-        results when it receives them.
-        """
-        class Stub(object):
-            def authenticate_user(self, *unused_args, **unused_kwargs):
-                return defer.succeed("cached")
-
-        rcs = TestResources()
-        stub = Stub()
-        i = IdentityV2(
-            auth=stub, username="username",
-            password="password", endpoint="endpoint"
-        )
-        i.authenticate_user(rcs)
-        self.assertEqual(rcs.access, "cached")
-
-
 _test_catalog = {
     "access": {
         "serviceCatalog": [
@@ -119,6 +58,70 @@ _test_catalog = {
         }
     }
 }
+
+
+class IdentityV2Tests(SynchronousTestCase):
+    """Tests for the :class:`IdentityV2` class."""
+
+    def test_missing_params(self):
+        """Missing parameters to the IdentityV2 constructor should raise
+        a ValueError exception.
+        """
+        def x(u, p, e):
+            self.assertRaises(ValueError, IdentityV2, None, u, p, e)
+        x("", "pw", "ep")
+        x("un", "", "ep")
+        x("un", "pw", "")
+        x(None, "pw", "ep")
+        x("un", None, "ep")
+        x("un", "pw", None)
+
+    def test_pool_kwarg(self):
+        """The pool keyword argument should be passed through to the
+        authenticate_user Otter function.
+        """
+        rcs = TestResources()
+
+        class Stub(object):
+            def __init__(self):
+                self.pool = None
+
+            def authenticate_user(self, endpt, user, passwd, pool=None):
+                self.pool = pool
+                return defer.succeed(_test_catalog)
+
+        stub = Stub()
+        IdentityV2(
+            auth=stub, username="username",
+            password="password", endpoint="endpoint"
+        ).authenticate_user(rcs)
+        self.assertFalse(stub.pool)
+
+        IdentityV2(
+            auth=stub, username="username",
+            password="password", endpoint="endpoint", pool=42
+        ).authenticate_user(rcs)
+        self.assertEquals(stub.pool, 42)
+
+    def test_records_results(self):
+        """The IdentityV2 instance you create should cache its
+        results when it receives them.
+        """
+        class Stub(object):
+            def authenticate_user(self, *unused_args, **unused_kwargs):
+                return defer.succeed(_test_catalog)
+
+        rcs = TestResources()
+        stub = Stub()
+        i = IdentityV2(
+            auth=stub, username="username",
+            password="password", endpoint="endpoint"
+        )
+        i.authenticate_user(rcs)
+        self.assertEqual(
+            rcs.access["access"]["token"]["expires"],
+            _test_catalog["access"]["token"]["expires"]
+        )
 
 
 class FindEndpointTests(SynchronousTestCase):
