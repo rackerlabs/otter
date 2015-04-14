@@ -80,7 +80,7 @@ class TestConvergence(unittest.TestCase):
         """
 
         def _check_fds(_):
-            fds = set(reactor.getReaders() + reactor.getReaders())
+            fds = set(reactor.getReaders() + reactor.getWriters())
             if not [fd for fd in fds if isinstance(fd, Client)]:
                 return
             return deferLater(reactor, 0, _check_fds, None)
