@@ -51,13 +51,9 @@ class IdentityV2(object):
             dictionary representation of the Identity authentication results.
         """
 
-        def record_result(r):
-            rcs.access = freeze(r)
-            return rcs
-
         return self.auth.authenticate_user(
             self.endpoint, self.username, self.password, pool=self.pool
-        ).addCallback(record_result)
+        ).addCallback(rcs.init_from_access)
 
 
 def find_endpoint(catalog, service_type, region):

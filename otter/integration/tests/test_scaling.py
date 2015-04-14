@@ -45,22 +45,15 @@ def dump_state(s):
     dump_js(s)
 
 
-def find_end_point(rcs):
-    rcs.token = rcs.access["access"]["token"]["id"]
-    sc = rcs.access["access"]["serviceCatalog"]
-    try:
-        rcs.endpoints["otter"] = auth.public_endpoint_url(sc,
-                                                          "autoscale",
-                                                          region)
-    except auth.NoSuchEndpoint:
-        # If the autoscale endpoint is not defined, use local otter
-        rcs.endpoints["otter"] = 'http://localhost:9000/v1.0/{0}'.format(
-            rcs.access['access']['token']['tenant']['id'])
-
-    rcs.endpoints["loadbalancers"] = auth.public_endpoint_url(
-        sc, "cloudLoadBalancers", region
+def find_end_points(rcs):
+    return rcs.find_end_point(
+        rcs,  # ignored, but that's what would be passed in anyway.
+        "otter", "autoscale", region,
+        default_url="http://localhost:9000/v1.0/{0}"
+    ).addCallback(
+        rcs.find_end_point,
+        "loadbalancers", "cloudLoadBalancers", region
     )
-    return rcs
 
 
 def print_token_and_ep(rcs):
@@ -118,7 +111,7 @@ class TestScaling(unittest.TestCase):
         rcs = TestResources()
         d = (
             self.identity.authenticate_user(rcs)
-            .addCallback(find_end_point)
+            .addCallback(find_end_points)
             .addCallback(print_token_and_ep)
             .addCallback(self.scaling_group.start, self)
             .addCallback(dump_groups)
@@ -173,7 +166,7 @@ class TestScaling(unittest.TestCase):
         rcs = TestResources()
         d = (
             self.identity.authenticate_user(rcs)
-            .addCallback(find_end_point)
+            .addCallback(find_end_points)
             .addCallback(print_token_and_ep)
             .addCallback(self.scaling_group.start, self)
             .addCallback(self.scaling_policy_up_2.start, self)
@@ -208,7 +201,7 @@ class TestScaling(unittest.TestCase):
 
             return (
                 self.identity.authenticate_user(rcs)
-                .addCallback(find_end_point)
+                .addCallback(find_end_points)
                 .addCallback(self.clb1.start, self)
                 .addCallback(self.clb1.wait_for_state, "ACTIVE", 600)
             ).addCallback(add_2nd_load_balancer, self)

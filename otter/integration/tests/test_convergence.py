@@ -39,26 +39,6 @@ image_ref = os.environ['AS_IMAGE_REF']
 region = os.environ['AS_REGION']
 
 
-def find_end_points(rcs):
-    """Locates the endpoints we need to conduct convergence tests."""
-
-    rcs.token = rcs.access["access"]["token"]["id"]
-    sc = rcs.access["access"]["serviceCatalog"]
-    try:
-        rcs.endpoints["otter"] = auth.public_endpoint_url(sc,
-                                                          "autoscale",
-                                                          region)
-    except auth.NoSuchEndpoint:
-        # If the autoscale endpoint is not defined, use local otter
-        rcs.endpoints["otter"] = 'http://localhost:9000/v1.0/{0}'.format(
-            rcs.access['access']['token']['tenant']['id'])
-
-    rcs.endpoints["nova"] = auth.public_endpoint_url(
-        sc, "cloudServersOpenStack", region
-    )
-    return rcs
-
-
 class TestConvergence(unittest.TestCase):
     """This class contains test cases aimed at the Otter Converger."""
 
@@ -127,8 +107,14 @@ class TestConvergence(unittest.TestCase):
 
         return (
             self.identity.authenticate_user(rcs)
-            .addCallback(find_end_points)
-            .addCallback(self.scaling_group.start, self)
+            .addCallback(
+                rcs.find_end_point,
+                "otter", "autoscale", region,
+                default_url='http://localhost:9000/v1.0/{0}'
+            ).addCallback(
+                rcs.find_end_point,
+                "nova", "cloudServersOpenStack", region
+            ).addCallback(self.scaling_group.start, self)
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
                 N_SERVERS, timeout=1800
