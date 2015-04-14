@@ -78,25 +78,10 @@ class TestScaling(unittest.TestCase):
         return self.pool.closeCachedConnections().addBoth(_check_fds)
 
     def test_scaling_up(self):
-        group_configuration = {
-            "name": "my-group-configuration",
-            "cooldown": 0,
-            "minEntities": 0,
-        }
-        launch_configuration = {
-            "type": "launch_server",
-            "args": {
-                "server": {
-                    "flavorRef": flavor_ref,
-                    "imageRef": image_ref,
-                }
-            }
-        }
-        scaling_group_body = {
-            "launchConfiguration": launch_configuration,
-            "groupConfiguration": group_configuration,
-            "scalingPolicies": [],
-        }
+        scaling_group_body = autoscale.create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            name="my-group-configuration"
+        )
 
         self.scaling_group = autoscale.ScalingGroup(
             group_config=scaling_group_body,
@@ -130,25 +115,11 @@ class TestScaling(unittest.TestCase):
         """
         Verify that a basic scale down operation completes as expected.
         """
-        group_configuration = {
-            "name": "tr-scaledown-conf",
-            "cooldown": 0,
-            "minEntities": 0,
-        }
-        launch_configuration = {
-            "type": "launch_server",
-            "args": {
-                "server": {
-                    "flavorRef": flavor_ref,
-                    "imageRef": image_ref,
-                }
-            }
-        }
-        scaling_group_body = {
-            "launchConfiguration": launch_configuration,
-            "groupConfiguration": group_configuration,
-            "scalingPolicies": [],
-        }
+        scaling_group_body = autoscale.create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            name="tr-scaledown-conf",
+        )
+
         self.scaling_group = autoscale.ScalingGroup(
             group_config=scaling_group_body,
             pool=self.pool

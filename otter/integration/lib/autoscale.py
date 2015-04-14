@@ -23,6 +23,53 @@ class BreakLoopException(Exception):
     """This serves to break out of a `retry_and_timeout` loop."""
 
 
+def create_scaling_group_dict(
+    image_ref=None, flavor_ref=None, min_entities=0, name=None
+):
+    """This function returns a dictionary containing a scaling group's JSON
+    payload.  Note: this function does NOT create a scaling group.
+
+    :param str image_ref: An OpenStack image reference ID (typically a UUID).
+        If not provided, the content of the AS_IMAGE_REF environment variable
+        will be taken as default.  If that doesn't exist, "" will be used.
+    :param str flavor_ref: As with image_ref above, but for the launch config's
+        flavor setting.
+    :param int min_entities: The minimum number of servers to bring up when
+        the scaling group is eventually created or operating.  If not
+        specified, 0 is assumed.
+    :param str name: The scaling group name.  If not provided, a default is
+        chosen.
+    :return: A dictionary containing a scaling group JSON descriptor.  Inside,
+        it will contain a default launch config with the provided (or assumed)
+        flavor and image IDs.
+    """
+
+    if not image_ref:
+        image_ref = os.environ['AS_IMAGE_REF']
+    if not flavor_ref:
+        flavor_ref = os.environ['AS_FLAVOR_REF']
+    if not name:
+        name = "automatically-generated-test-configuration"
+
+    return {
+        "launchConfiguration": {
+            "type": "launch_server",
+            "args": {
+                "server": {
+                    "flavorRef": flavor_ref,
+                    "imageRef": image_ref,
+                }
+            }
+        },
+        "groupConfiguration": {
+            "name": name,
+            "cooldown": 0,
+            "minEntities": min_entities,
+        },
+        "scalingPolicies": [],
+    }
+
+
 @attributes([
     Attribute('group_config', instance_of=dict),
     Attribute('pool', default_value=None),

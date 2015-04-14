@@ -18,6 +18,7 @@ from otter.integration.lib.autoscale import (
     BreakLoopException,
     ScalingGroup,
     ScalingPolicy,
+    create_scaling_group_dict,
 )
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
@@ -77,23 +78,10 @@ class TestConvergence(unittest.TestCase):
 
         rcs = TestResources()
 
-        scaling_group_body = {
-            "launchConfiguration": {
-                "type": "launch_server",
-                "args": {
-                    "server": {
-                        "flavorRef": flavor_ref,
-                        "imageRef": image_ref,
-                    }
-                }
-            },
-            "groupConfiguration": {
-                "name": "converger-test-configuration",
-                "cooldown": 0,
-                "minEntities": N_SERVERS,
-            },
-            "scalingPolicies": [],
-        }
+        scaling_group_body = create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=N_SERVERS
+        )
 
         self.scaling_group = ScalingGroup(
             group_config=scaling_group_body,
