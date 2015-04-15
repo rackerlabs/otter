@@ -115,6 +115,71 @@ class TestConvergence(unittest.TestCase):
         )
     test_reaction_to_oob_server_deletion.timeout = 600
 
+
+    def test_scale_down_after_oobd_non_constrained(self):
+        """
+        Validate that when scaling down after an out of band delete (OOBD)
+        the group stabilizes at the correct number of servers with the deleted
+        server taken into account.
+
+            Create a group with min N servers
+            Scale group to (N+ x) servers
+            Delete z of the servers out of band
+            Scale down by (y) servers
+            Validate end state of (N + x - y) servers
+                TODO: Consider the case where z == y - does this produce an error?
+        """
+
+        min_servers = 2
+        scale_to_servers = 7
+        oobd_servers = 2
+        scale_down_servers = 3
+        converged_servers = scale_to_servers - scale_down_servers
+
+        rcs = TestResources()
+
+        scaling_group_body = create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=min_servers
+        )
+
+        self.scaling_group = ScalingGroup(
+            group_config=scaling_group_body,
+            pool=self.pool
+        )
+
+        self.scaling_policy = ScalingPolicy(
+            scale_by=1,
+            scaling_group=self.scaling_group
+        )
+
+        return (
+            self.identity.authenticate_user(rcs)
+            .addCallback(
+                rcs.find_end_point,
+                "otter", "autoscale", region,
+                default_url='http://localhost:9000/v1.0/{0}'
+            ).addCallback(
+                rcs.find_end_point,
+                "nova", "cloudServersOpenStack", region
+            ).addCallback(self.scaling_group.start, self)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers,
+                N_SERVERS, timeout=1800
+            ).addCallback(self.scaling_group.get_scaling_group_state)
+            .addCallback(self._choose_half_the_servers)
+            .addCallback(self._delete_those_servers, rcs)
+            .addCallback(self.scaling_policy.start, self)
+            .addCallback(self.scaling_policy.execute)
+            .addCallback(self._wait_for_autoscale_to_catch_up, rcs)
+        )
+    test_scale_down_after_oobd_non_constrained.timeout = 600
+
+
+
+
+
+
     def _choose_half_the_servers(self, (code, response)):
         """Select the first half of the servers returned by the
         ``get_scaling_group_state`` function.  Record the number of servers
