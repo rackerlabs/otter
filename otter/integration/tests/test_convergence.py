@@ -104,14 +104,14 @@ class TestConvergence(unittest.TestCase):
                 "nova", "cloudServersOpenStack", region
             ).addCallback(self.scaling_group.start, self)
             .addCallback(
-                self.scaling_group.wait_for_N_servers, 3, timeout=60
+                self.scaling_group.wait_for_N_servers, 3, timeout=1800
             ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_random_servers, 1)
             .addCallback(self._delete_those_servers, rcs)
             .addCallback(self.scaling_policy.start, self)
             .addCallback(self.scaling_policy.execute)
             .addCallback(
-                self.scaling_group.wait_for_N_servers, 4, timeout=60
+                self.scaling_group.wait_for_N_servers, 4, timeout=1800
             )
         )
     test_reaction_to_oob_deletion_after_scale_up.timeout = 1800
