@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import json
+import os
 
 from characteristic import Attribute, attributes
 
