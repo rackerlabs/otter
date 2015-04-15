@@ -194,10 +194,10 @@ class ScalingGroup(object):
             Otherwise, an exception is raised.
         """
 
-        def check(state):
-            if state[0] != 200:
+        def check((code, response)):
+            if code != 200:
                 raise BreakLoopException("Scaling group not found.")
-            servers_active = len(state[1]["group"]["active"])
+            servers_active = len(response["group"]["active"])
             if servers_active == servers_desired:
                 return rcs
 

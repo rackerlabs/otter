@@ -3,6 +3,7 @@ Tests covering self-healing should be placed in a separate test file.
 """
 
 import os
+import random
 
 import treq
 
@@ -67,6 +68,54 @@ class TestConvergence(unittest.TestCase):
             return deferLater(reactor, 0, _check_fds, None)
         return self.pool.closeCachedConnections().addBoth(_check_fds)
 
+    def test_reaction_to_oob_deletion_after_scale_up(self):
+        """Exercise out-of-band server deletion, but then scale up afterwards.
+        The goal is to spin up, say, three servers, then use Nova to delete
+        one of them directly, without Autoscale's knowledge.  Then we scale up
+        by, say, two servers.  If convergence is working as expected, we expect
+        four servers at the end.
+        """
+
+        rcs = TestResources()
+
+        scaling_group_body = create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=3
+        )
+
+        self.scaling_group = ScalingGroup(
+            group_config=scaling_group_body,
+            pool=self.pool
+        )
+
+        self.scaling_policy = ScalingPolicy(
+            scale_by=2,
+            scaling_group=self.scaling_group
+        )
+
+        return (
+            self.identity.authenticate_user(rcs)
+            .addCallback(
+                rcs.find_end_point,
+                "otter", "autoscale", region,
+                default_url='http://localhost:9000/v1.0/{0}'
+            ).addCallback(
+                rcs.find_end_point,
+                "nova", "cloudServersOpenStack", region
+            ).addCallback(self.scaling_group.start, self)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers, 3, timeout=60
+            ).addCallback(self.scaling_group.get_scaling_group_state)
+            .addCallback(self._choose_random_servers, 1)
+            .addCallback(self._delete_those_servers, rcs)
+            .addCallback(self.scaling_policy.start, self)
+            .addCallback(self.scaling_policy.execute)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers, 4, timeout=60
+            )
+        )
+    test_reaction_to_oob_deletion_after_scale_up.timeout = 1800
+
     def test_reaction_to_oob_server_deletion(self):
         """Exercise out-of-band server deletion.  The goal is to spin up, say,
         eight servers, then use Nova to delete four of them.  We should be able
@@ -113,7 +162,7 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self.scaling_policy.execute)
             .addCallback(self._wait_for_autoscale_to_catch_up, rcs)
         )
-    test_reaction_to_oob_server_deletion.timeout = 600
+    test_reaction_to_oob_server_deletion.timeout = 1800
 
     def _choose_half_the_servers(self, (code, response)):
         """Select the first half of the servers returned by the
@@ -128,6 +177,16 @@ class TestConvergence(unittest.TestCase):
         self.n_servers = len(ids)
         self.n_killed = self.n_servers / 2
         return ids[:self.n_killed]
+
+    def _choose_random_servers(self, (code, response), n):
+        """Selects ``n`` randomly selected servers from those returned by the
+        ``get_scaling_group_state`` function.
+        """
+
+        if code != 200:
+            raise Exception("Got 404; dude, where's my scaling group?")
+        ids = map(lambda obj: obj['id'], response['group']['active'])
+        return random.sample(ids, n)
 
     def _delete_those_servers(self, ids, rcs):
         """Delete each of the servers selected."""
