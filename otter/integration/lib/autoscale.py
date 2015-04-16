@@ -25,7 +25,8 @@ class BreakLoopException(Exception):
 
 
 def create_scaling_group_dict(
-    image_ref=None, flavor_ref=None, min_entities=0, name=None
+    image_ref=None, flavor_ref=None, min_entities=0, name=None,
+    use_lbs=None
 ):
     """This function returns a dictionary containing a scaling group's JSON
     payload.  Note: this function does NOT create a scaling group.
@@ -40,6 +41,11 @@ def create_scaling_group_dict(
         specified, 0 is assumed.
     :param str name: The scaling group name.  If not provided, a default is
         chosen.
+    :param list use_lbs: Specifies a list of one or more cloud or RackConnect
+        load balancer JSON *dictionary* objects.  These are *not* instances of
+        ``otter.lib.CloudLoadBalancer``.  However, you can get the dicts by
+        invoking the o.l.CLB.scaling_group_spec() method on such objects.  If
+        not given, no load balancers will be used.
     :return: A dictionary containing a scaling group JSON descriptor.  Inside,
         it will contain a default launch config with the provided (or assumed)
         flavor and image IDs.
@@ -52,7 +58,7 @@ def create_scaling_group_dict(
     if not name:
         name = "automatically-generated-test-configuration"
 
-    return {
+    obj = {
         "launchConfiguration": {
             "type": "launch_server",
             "args": {
@@ -69,6 +75,11 @@ def create_scaling_group_dict(
         },
         "scalingPolicies": [],
     }
+
+    if use_lbs:
+        obj["launchConfiguration"]["args"]["loadBalancers"] = use_lbs
+
+    return obj
 
 
 @attributes([
