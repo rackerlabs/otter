@@ -78,8 +78,30 @@ class TestConvergence(unittest.TestCase):
 
         Further, we want to make sure the deleted servers are removed from the
         CLB.
-        """
 
+        This variant assumes a scaling group's max_entities field matches that
+        for a CLB (as of this writing).
+        """
+        return self._perform_oobd_clb_test(25)
+    test_scaling_to_clb_max_after_oob_delete_type1.timeout = 1800
+
+    def test_scaling_to_clb_max_after_oob_delete_type2(self):
+        """This test starts with a scaling group with no servers.  We scale up
+        to 24 servers, but after that's done, we delete 2 directly through
+        Nova.  After that, we scale up once more by 1 server, thus max'ing out
+        the CLB's ports.  We expect that the group will return to 25 servers,
+        and does not overshoot in the process.
+
+        Further, we want to make sure the deleted servers are removed from the
+        CLB.
+
+        This variant assumes a scaling group's max_entities field exceeds that
+        for a CLB (as of this writing).  We use max of CLB + 25.
+        """
+        return self._perform_oobd_clb_test(50)
+    test_scaling_to_clb_max_after_oob_delete_type2.timeout = 1800
+
+    def _perform_oobd_clb_test(self, scaling_group_max_entities):
         rcs = TestResources()
 
         def create_clb_first():
@@ -104,6 +126,7 @@ class TestConvergence(unittest.TestCase):
             scaling_group_body = create_scaling_group_dict(
                 image_ref=image_ref, flavor_ref=flavor_ref,
                 use_lbs=[self.clb.scaling_group_spec()],
+                max_entities=scaling_group_max_entities,
             )
 
             self.scaling_group = ScalingGroup(
@@ -167,7 +190,6 @@ class TestConvergence(unittest.TestCase):
             )
 
         return create_clb_first().addCallback(then_test)
-    test_scaling_to_clb_max_after_oob_delete_type1.timeout = 1800
 
     def test_reaction_to_oob_server_deletion(self):
         """Exercise out-of-band server deletion.  The goal is to spin up, say,
