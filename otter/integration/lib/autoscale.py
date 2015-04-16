@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import json
 import os
+import datetime
 
 from characteristic import Attribute, attributes
 
@@ -26,7 +27,7 @@ class BreakLoopException(Exception):
 
 def create_scaling_group_dict(
     image_ref=None, flavor_ref=None, min_entities=0, name=None,
-    use_lbs=None
+    max_entities=25, use_lbs=None
 ):
     """This function returns a dictionary containing a scaling group's JSON
     payload.  Note: this function does NOT create a scaling group.
@@ -39,6 +40,8 @@ def create_scaling_group_dict(
     :param int min_entities: The minimum number of servers to bring up when
         the scaling group is eventually created or operating.  If not
         specified, 0 is assumed.
+    :param int max_entities: The maximum number of servers to allow in the
+        scaling group. If not specified, 25 is the default.
     :param str name: The scaling group name.  If not provided, a default is
         chosen.
     :param list use_lbs: Specifies a list of one or more cloud or RackConnect
@@ -72,6 +75,7 @@ def create_scaling_group_dict(
             "name": name,
             "cooldown": 0,
             "minEntities": min_entities,
+            "maxEntities": max_entities,
         },
         "scalingPolicies": [],
     }
@@ -259,25 +263,50 @@ class ScalingGroup(object):
 
 
 @attributes([
-    Attribute('scale_by', instance_of=int),
+    Attribute('scale_by', default_value=None),
     Attribute('scaling_group', instance_of=ScalingGroup),
+    Attribute('set_to', default_value=None),
+    Attribute('scale_percent', default_value=None),
+    Attribute('name', instance_of=str, default_value='integration-test-policy')
 ])
 class ScalingPolicy(object):
     """ScalingPolicy class instances represent individual policies which your
-    integration tests can execute at their convenience.
+    integration tests can execute at their convenience. Only one of (scale_by,
+    set_to, scale_percent) should be provided. If more than one is provided,
+    this function will blindly include them in the policy creation request.
 
     :param int scale_by: The number of servers to scale up (positive) or down
         (negative) by.  Cannot be zero, lest an API-generated error occur.
     :param ScalingGroup scaling_group: The scaling group to which this policy
         applies.
+    :param int set_to: The number of servers to set as the desired capacity
+    :param float scale_percent: The percentage by which to scale the group up
+        (positive) or down (negative)
+    :param str name: A string to use as the name of the scaling policy. A
+        timestamp will be appended automatically for differentiation.
     """
 
     def __init__(self):
+
+        name_time = '{0}_{1}'.format(self.name,
+                                     datetime.datetime.utcnow().isoformat())
+        change_type = ""
+        change_factor = 0
+        if self.scale_by:
+            change_type = "change"
+            change_factor = self.scale_by
+        elif self.set_to:
+            change_type = "desiredCapacity"
+            change_factor = self.set_to
+        elif self.scale_percent:
+            change_type = "changePercent"
+            change_factor = self.scale_percent
+
         self.policy = [{
-            "name": "integration-test-policy",
+            "name": name_time,
             "cooldown": 0,
             "type": "webhook",
-            "change": self.scale_by
+            change_type: change_factor
         }]
 
     def stop(self, rcs):
