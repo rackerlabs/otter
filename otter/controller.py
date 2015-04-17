@@ -411,7 +411,7 @@ def _can_scale_down(group, server_id):
 
 @do
 def convergence_remove_server_from_group(
-        group, state, server_id, replace, purge):
+        log, transaction_id, group, state, server_id, replace, purge):
     """
     Remove a specific server from the group, optionally decrementing the
     desired capacity.
@@ -419,6 +419,8 @@ def convergence_remove_server_from_group(
     The server may just be scheduled for deletion, or it may be evicted from
     the group by removing otter-specific metdata from the server.
 
+    :param log: A bound logger
+    :param bytes transaction_id: The transaction id for this operation.
     :param group: The scaling group to remove a server from.
     :type group: :class:`~otter.models.interface.IScalingGroup`
     :param bytes server_id: The id of the server to be removed.
@@ -449,7 +451,9 @@ def convergence_remove_server_from_group(
         eff = set_nova_metadata_item(server_id, *DRAINING_METADATA)
     else:
         eff = Effect(
-            EvictServerFromScalingGroup(scaling_group=group,
+            EvictServerFromScalingGroup(log=log,
+                                        transaction_id=transaction_id,
+                                        scaling_group=group,
                                         server_id=server_id))
     yield retry_effect(eff, retry_times(3), exponential_backoff_interval(2))
 

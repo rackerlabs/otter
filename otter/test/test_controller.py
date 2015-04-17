@@ -1231,7 +1231,8 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             dispatcher])
 
         eff = controller.convergence_remove_server_from_group(
-            self.group, self.state, 'server_id', replace, purge)
+            self.log, self.trans_id, self.group, self.state, 'server_id',
+            replace, purge)
         return sync_perform(full_dispatcher, eff)
 
     def test_no_such_server_replace_true(self):
@@ -1383,7 +1384,9 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         dispatcher = SequenceDispatcher([
             (get_server_details('server_id').intent,
                 lambda _: self.server_details),
-            (EvictServerFromScalingGroup(scaling_group=self.group,
+            (EvictServerFromScalingGroup(log=self.log,
+                                         transaction_id=self.trans_id,
+                                         scaling_group=self.group,
                                          server_id='server_id'),
                 lambda _: None)
         ])
@@ -1404,7 +1407,9 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 lambda _: self.server_details),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
                 lambda _: self.group_manifest_info),
-            (EvictServerFromScalingGroup(scaling_group=self.group,
+            (EvictServerFromScalingGroup(log=self.log,
+                                         transaction_id=self.trans_id,
+                                         scaling_group=self.group,
                                          server_id='server_id'),
                 lambda _: None)
         ])
@@ -1422,7 +1427,9 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         dispatcher = SequenceDispatcher([
             (get_server_details('server_id').intent,
                 lambda _: self.server_details),
-            (EvictServerFromScalingGroup(scaling_group=self.group,
+            (EvictServerFromScalingGroup(log=self.log,
+                                         transaction_id=self.trans_id,
+                                         scaling_group=self.group,
                                          server_id='server_id'),
                 lambda _: raise_(ValueError('oops')))
         ])
