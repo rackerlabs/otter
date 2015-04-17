@@ -239,7 +239,7 @@ class TestConvergence(unittest.TestCase):
         # same.  So just return the 1st, which is just our rcs value.
         return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
 
-    def _wait_for_expected_state(self, _, rcs, timeout=60, period=1,
+    def _wait_for_expected_state(self, _, rcs, timeout=260, period=1,
                                  active=None, pending=None, desired=None):
         """
         Repeatedly get the group state until either the specified timeout has
@@ -282,7 +282,7 @@ class TestConvergence(unittest.TestCase):
             )
         )
 
-    def _wait_for_autoscale_to_catch_up(self, _, rcs, timeout=60, period=1):
+    def _wait_for_autoscale_to_catch_up(self, _, rcs, timeout=260, period=1):
         """Wait for the converger to recognize the reality of this tenant's
         situation and reflect it in the scaling group state accordingly.
         """
@@ -312,7 +312,7 @@ class TestConvergence(unittest.TestCase):
             next_interval=repeating_interval(period),
             clock=reactor,
             deferred_description=(
-                "Waiting for Autoscale to see we killed {} servers off "
+                "Waiting for Autoscale to see we killed {} servers of "
                 "{}.".format(self.n_killed, self.n_servers)
             )
         )
