@@ -44,7 +44,6 @@ from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
 from otter.convergence.service import get_convergence_starter
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
-from otter.models.interface import GroupState
 from otter.models.intents import GetScalingGroupInfo
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,
@@ -54,6 +53,7 @@ from otter.supervisor import (
     execute_launch_config)
 from otter.util.config import config_value
 from otter.util.deferredutils import unwrap_first_error
+from otter.util.fp import assoc_obj
 from otter.util.retry import (
     exponential_backoff_interval,
     retry_effect,
@@ -454,9 +454,6 @@ def convergence_remove_server_from_group(
     yield retry_effect(eff, retry_times(3), exponential_backoff_interval(2))
 
     if not replace:
-        yield do_return(GroupState(
-            state.tenant_id, state.group_id, state.group_name, state.active,
-            state.pending, state.group_touched, state.policy_touched,
-            state.paused, state.desired - 1, state.now))
+        yield do_return(assoc_obj(state, desired=state.desired - 1))
     else:
         yield do_return(state)
