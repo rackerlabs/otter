@@ -126,6 +126,7 @@ class TestConvergence(unittest.TestCase):
             raise Exception("Got 404; where'd the scaling group go?")
         ids = map(lambda obj: obj['id'], response['group']['active'])
         self.n_servers = len(ids)
+        print ids
         self.n_killed = self.n_servers / 2
         return ids[:self.n_killed]
 
@@ -157,7 +158,7 @@ class TestConvergence(unittest.TestCase):
                 raise BreakLoopException(
                     "Scaling group appears to have disappeared"
                 )
-
+            print response
             # Our scaling policy (see above) is configured to scale up by 1
             # server.  Thus, we check to see if our server quantity equals
             # the remaining servers plus 1.
