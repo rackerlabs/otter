@@ -393,7 +393,7 @@ def _is_server_in_group(group, server_id):
 
 
 @do
-def _can_maybe_scale_down(group, server_id):
+def _can_scale_down(group, server_id):
     """
     Given a group and a server ID, determines if the group can be scaled down.
     If not, it raises a :class:`CannotDeleteServerBelowMinError`.
@@ -433,7 +433,7 @@ def convergence_remove_server_from_group(
     """
     effects = [_is_server_in_group(group, server_id)]
     if not replace:
-        effects.append(_can_maybe_scale_down(group, server_id))
+        effects.append(_can_scale_down(group, server_id))
 
     # the (possibly) two checks can happen in parallel, but we want
     # ServerNotFoundError to take precedence over
