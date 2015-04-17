@@ -1201,6 +1201,17 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             'state': self.state
         }
 
+    def assert_states_equivalent_except_desired(self, state1, state2):
+        """
+        Compare the given states and check that all the attributes except
+        ``desired`` are equivalent.
+        """
+        for attribute in ("tenant_id", "group_id", "group_name", "active",
+                          "pending", "group_touched", "policy_touched",
+                          "paused"):
+            self.assertEqual(getattr(state1, attribute),
+                             getattr(state2, attribute))
+
     def _remove(self, replace, purge, dispatcher):
         # Retry intents can't really be compared if the effect inside
         # has callbacks, so just unpack and assert something about the retry
@@ -1343,7 +1354,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 lambda _: None)
         ])
         result = self._remove(False, True, dispatcher)
-        self.assertEqual(result, self.state)
+        self.assert_states_equivalent_except_desired(result, self.state)
         self.assertEqual(result.desired, old_desired - 1)
         self.assertEqual(dispatcher.sequence, [])
 
@@ -1398,7 +1409,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 lambda _: None)
         ])
         result = self._remove(False, False, dispatcher)
-        self.assertEqual(result, self.state)
+        self.assert_states_equivalent_except_desired(result, self.state)
         self.assertEqual(result.desired, old_desired - 1)
         self.assertEqual(dispatcher.sequence, [])
 
