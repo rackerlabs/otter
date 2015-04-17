@@ -34,7 +34,7 @@ class IdentityV2(object):
     def __init__(self):
         self.access = None
 
-    def authenticate_user(self, rcs):
+    def authenticate_user(self, rcs, tenant_id=None):
         """Authenticates against the Identity API.  Prior to success, the
         :attr:`access` member will be set to `None`.  After authentication
         completes, :attr:`access` will hold the raw Identity V2 API results as
@@ -50,7 +50,8 @@ class IdentityV2(object):
         """
 
         return self.auth.authenticate_user(
-            self.endpoint, self.username, self.password, pool=self.pool
+            self.endpoint, self.username, self.password, pool=self.pool,
+            tenant_id="000000"
         ).addCallback(rcs.init_from_access)
 
 
