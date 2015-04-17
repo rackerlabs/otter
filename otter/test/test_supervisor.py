@@ -1263,7 +1263,7 @@ class PerformEvictionTests(SynchronousTestCase):
     """
     def test_perform_eviction(self):
         """
-        Calls supervisor's scrub metadata function.
+        Call supervisor's scrub metadata function.
         """
         supervisor = FakeSupervisor()
         set_supervisor(supervisor)
@@ -1271,12 +1271,14 @@ class PerformEvictionTests(SynchronousTestCase):
 
         log, group = (object(), mock_group(None))
         intent = EvictServerFromScalingGroup(
+            log=log, transaction_id='transaction_id',
             scaling_group=group, server_id='server_id')
 
         r = sync_perform(
             TypeDispatcher({
                 EvictServerFromScalingGroup: partial(
-                    perform_evict_server, log, "transaction_id")}),
+                    perform_evict_server, supervisor)
+            }),
             Effect(intent))
 
         self.assertIsNone(r)
