@@ -115,7 +115,6 @@ class TestConvergence(unittest.TestCase):
         )
     test_reaction_to_oob_server_deletion.timeout = 600
 
-
     def test_scale_down_after_oobd_non_constrained(self):
         """
         Validate that when scaling down after an out of band delete (OOBD)
@@ -127,7 +126,8 @@ class TestConvergence(unittest.TestCase):
             Delete z of the servers out of band
             Scale down by (y) servers
             Validate end state of (N + x - y) servers
-                TODO: Consider the case where z == y - does this produce an error?
+                TODO: Consider the case where z == y
+                - does this produce an error?
         """
 
         min_servers = 2
@@ -154,7 +154,6 @@ class TestConvergence(unittest.TestCase):
             scaling_group=self.scaling_group
         )
 
-
         self.policy_scale = ScalingPolicy(
             scale_by=scale_servers,
             scaling_group=self.scaling_group
@@ -178,16 +177,16 @@ class TestConvergence(unittest.TestCase):
             ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_servers_from_active_list, oobd_servers)
             .addCallback(self._delete_those_servers, rcs)
+            .addCallback(self._wait_for_expected_state, rcs,
+                         active=set_to_servers - oobd_servers,
+                         desired=set_to_servers
+                         )
             .addCallback(self.policy_scale.start, self)
             .addCallback(self.policy_scale.execute)
-            .addCallback(self._wait_for_autoscale_to_catch_up, rcs)
+            .addCallback(self._wait_for_expected_state, rcs,
+                         active=converged_servers, pending=0)
         )
     test_scale_down_after_oobd_non_constrained.timeout = 600
-
-
-
-
-
 
     def _choose_half_the_servers(self, (code, response)):
         """Select the first half of the servers returned by the
@@ -203,7 +202,8 @@ class TestConvergence(unittest.TestCase):
         self.n_killed = self.n_servers / 2
         return ids[:self.n_killed]
 
-def _choose_servers_from_active_list(self, (code, response), num_servers=None):
+    def _choose_servers_from_active_list(self, (code, response),
+                                         num_servers=None):
         """Select the first 'num_servers' of the servers returned by the
         ``get_scaling_group_state`` function.  Record the number of servers
         received in ``active_servers`` attribute. If no num_servers is
@@ -239,6 +239,49 @@ def _choose_servers_from_active_list(self, (code, response), num_servers=None):
         # same.  So just return the 1st, which is just our rcs value.
         return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
 
+    def _wait_for_expected_state(self, _, rcs, timeout=60, period=1,
+                                 active=None, pending=None, desired=None):
+        """
+        Repeatedly get the group state until either the specified timeout has
+        occurred or the specified number of active, pending, and desired
+        servers is observed. Unspecifed quantities default to None and are
+        treated as don't cares.
+        """
+
+        def check((code, response)):
+            if code != 200:
+                raise BreakLoopException(
+                    "Could not get the scaling group state"
+                )
+
+            n_active = len(response["group"]["active"])
+            n_pending = response["group"]["pendingCapacity"]
+            n_desired = response["group"]["desiredCapacity"]
+
+            if ((active is None or active == n_active)
+                    and
+                    (pending is None or pending == n_pending)
+                    and
+                    (desired is None or desired == n_desired)):
+                return rcs
+
+            raise TransientRetryError()
+
+        def poll():
+            return self.get_scaling_group_state(rcs).addCallback(check)
+
+        return retry_and_timeout(
+            poll, timeout,
+            can_retry=transient_errors_except(BreakLoopException),
+            next_interval=repeating_interval(period),
+            clock=reactor,
+            deferred_description=(
+                "Waiting for Autoscale to see we expected state of"
+                "(active, pending, desired) = "
+                "({0}, {1}, {2}.".format(active, pending, desired)
+            )
+        )
+
     def _wait_for_autoscale_to_catch_up(self, _, rcs, timeout=60, period=1):
         """Wait for the converger to recognize the reality of this tenant's
         situation and reflect it in the scaling group state accordingly.
@@ -269,7 +312,7 @@ def _choose_servers_from_active_list(self, (code, response), num_servers=None):
             next_interval=repeating_interval(period),
             clock=reactor,
             deferred_description=(
-                "Waiting for Autoscale to see we killed {} servers of "
+                "Waiting for Autoscale to see we killed {} servers off "
                 "{}.".format(self.n_killed, self.n_servers)
             )
         )
