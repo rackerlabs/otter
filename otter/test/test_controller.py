@@ -1092,9 +1092,8 @@ class ConvergeTestCase(SynchronousTestCase):
 
     def test_real_convergence_nonzero_delta(self):
         """
-        When a tenant is configured to for convergence, if the delta is
-        non-zero, the Convergence service's ``converge`` method is invoked and
-        a Deferred that fires with `None` is returned.
+        When a tenant is configured for convergence, convergence is triggered
+        and state is returned after convergence triggering is successful
         """
         log = mock_log()
         state = GroupState('tenant', 'group', "test", [], [], None, {},
@@ -1119,7 +1118,7 @@ class ConvergeTestCase(SynchronousTestCase):
         """
         When a tenant is configured for convergence, if the delta is zero, the
         ConvergenceStarter service's ``start_convergence`` method is still
-        invoked.
+        invoked. However, None is returned synchronously
         """
         log = mock_log()
         state = GroupState('tenant', 'group-id', "test", [], [], None, {},
@@ -1134,7 +1133,7 @@ class ConvergeTestCase(SynchronousTestCase):
         result = controller.converge(log, 'txn-id', group_config, self.group,
                                      state, 'launch', policy,
                                      config_value=config_data.get)
-        self.assertIs(self.successResultOf(result), state)
+        self.assertIsNone(result)
         start_convergence.assert_called_once_with(log, 'tenant', 'group')
 
         # And execute_launch_config is _not_ called
