@@ -119,7 +119,12 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self._delete_those_servers, rcs)
             .addCallback(self.scaling_policy.start, self)
             .addCallback(self.scaling_policy.execute)
-            .addCallback(self._wait_for_autoscale_to_catch_up, rcs)
+            .addCallback(lambda _: self.removed_ids)
+            .addCallback(
+                self.scaling_group.wait_for_deleted_id_removal,
+                rcs,
+                total_servers=3,
+            )
             .addCallback(
                 self.scaling_group.wait_for_N_servers, 5, timeout=1800
             )
@@ -214,7 +219,7 @@ class TestConvergence(unittest.TestCase):
             )
 
         deferreds = map(delete_server_by_id, ids)
-        self.ids_deleted = ids
+        self.removed_ids = ids
         # If no error occurs while deleting, all the results will be the
         # same.  So just return the 1st, which is just our rcs value.
         return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
