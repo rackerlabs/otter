@@ -16,7 +16,6 @@ from twisted.web.client import HTTPConnectionPool
 
 from otter import auth
 from otter.integration.lib.autoscale import (
-    BreakLoopException,
     ScalingGroup,
     ScalingPolicy,
     create_scaling_group_dict,
@@ -25,13 +24,7 @@ from otter.integration.lib.autoscale import (
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
 
-from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
-from otter.util.retry import (
-    TransientRetryError,
-    repeating_interval,
-    transient_errors_except,
-)
 
 
 username = os.environ['AS_USERNAME']
