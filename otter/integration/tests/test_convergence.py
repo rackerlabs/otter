@@ -41,6 +41,15 @@ image_ref = os.environ['AS_IMAGE_REF']
 region = os.environ['AS_REGION']
 
 
+def extract_active_ids(group_status):
+    """Extracts all server IDs from a scaling group's status report.
+    :param dict group_status: The successful result from
+        ``get_scaling_group_state``.
+    :result: A list of server IDs known to the scaling group.
+    """
+    return [obj['id'] for obj in group_status['group']['active']]
+
+
 class TestConvergence(unittest.TestCase):
     """This class contains test cases aimed at the Otter Converger."""
 
@@ -73,7 +82,7 @@ class TestConvergence(unittest.TestCase):
         The goal is to spin up, say, three servers, then use Nova to delete
         one of them directly, without Autoscale's knowledge.  Then we scale up
         by, say, two servers.  If convergence is working as expected, we expect
-        four servers at the end.
+        five servers at the end.
         """
 
         rcs = TestResources()
@@ -110,8 +119,9 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self._delete_those_servers, rcs)
             .addCallback(self.scaling_policy.start, self)
             .addCallback(self.scaling_policy.execute)
+            .addCallback(self._wait_for_autoscale_to_catch_up, rcs)
             .addCallback(
-                self.scaling_group.wait_for_N_servers, 4, timeout=1800
+                self.scaling_group.wait_for_N_servers, 5, timeout=1800
             )
         )
     test_reaction_to_oob_deletion_after_scale_up.timeout = 1800
@@ -173,7 +183,7 @@ class TestConvergence(unittest.TestCase):
 
         if code != 200:
             raise Exception("Got 404; where'd the scaling group go?")
-        ids = map(lambda obj: obj['id'], response['group']['active'])
+        ids = extract_active_ids(response)
         self.n_servers = len(ids)
         self.n_killed = self.n_servers / 2
         return ids[:self.n_killed]
@@ -185,7 +195,9 @@ class TestConvergence(unittest.TestCase):
 
         if code != 200:
             raise Exception("Got 404; dude, where's my scaling group?")
-        ids = map(lambda obj: obj['id'], response['group']['active'])
+        ids = extract_active_ids(response)
+        self.n_servers = len(ids)
+        self.n_killed = n
         return random.sample(ids, n)
 
     def _delete_those_servers(self, ids, rcs):
@@ -202,30 +214,31 @@ class TestConvergence(unittest.TestCase):
             )
 
         deferreds = map(delete_server_by_id, ids)
+        self.ids_deleted = ids
         # If no error occurs while deleting, all the results will be the
         # same.  So just return the 1st, which is just our rcs value.
         return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
 
     def _wait_for_autoscale_to_catch_up(self, _, rcs, timeout=60, period=1):
-        """Wait for the converger to recognize the reality of this tenant's
-        situation and reflect it in the scaling group state accordingly.
+        """Wait for the converger to recognize the servers that were somehow
+        deleted out-of-band and update the tenant's state, accordingly.  This
+        function depends on the successful completion of
+        ``_delete_those_servers`` or any other function that sets the
+        ``self.ids_deleted`` attribute.
         """
 
         def check((code, response)):
-            if code != 200:
+            if code == 404:
                 raise BreakLoopException(
                     "Scaling group appears to have disappeared"
                 )
 
-            # Our scaling policy (see above) is configured to scale up by 1
-            # server.  Thus, we check to see if our server quantity equals
-            # the remaining servers plus 1.
+            active_ids = extract_active_ids(response)
+            for deleted_id in self.ids_deleted:
+                if deleted_id in active_ids:
+                    raise TransientRetryError()
 
-            n_remaining = self.n_servers - self.n_killed + 1
-            if len(response["group"]["active"]) == n_remaining:
-                return rcs
-
-            raise TransientRetryError()
+            return rcs
 
         def poll():
             return self.get_scaling_group_state(rcs).addCallback(check)
@@ -240,3 +253,4 @@ class TestConvergence(unittest.TestCase):
                 "{}.".format(self.n_killed, self.n_servers)
             )
         )
+
