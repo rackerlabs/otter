@@ -73,6 +73,7 @@ class TestConvergence(unittest.TestCase):
         to see, over time, more servers coming into existence to replace those
         deleted.
         """
+        print "!!! I am Executing!!!"
 
         N_SERVERS = 4
 
@@ -111,7 +112,7 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self._delete_those_servers, rcs)
             .addCallback(self.scaling_policy.start, self)
             .addCallback(self.scaling_policy.execute)
-            .addCallback(self._wait_for_autoscale_to_catch_up, rcs)
+            .addCallback(self._wait_for_id_removal, rcs)
         )
     test_reaction_to_oob_server_deletion.timeout = 600
 
@@ -177,10 +178,7 @@ class TestConvergence(unittest.TestCase):
             ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_servers_from_active_list, oobd_servers)
             .addCallback(self._delete_those_servers, rcs)
-            .addCallback(self._wait_for_expected_state, rcs,
-                         active=set_to_servers - oobd_servers,
-                         desired=set_to_servers
-                         )
+            .addCallback(self._wait_for_id_removal, rcs)
             .addCallback(self.policy_scale.start, self)
             .addCallback(self.policy_scale.execute)
             .addCallback(self._wait_for_expected_state, rcs,
@@ -222,7 +220,9 @@ class TestConvergence(unittest.TestCase):
         return ids
 
     def _delete_those_servers(self, ids, rcs):
-        """Delete each of the servers selected."""
+        """
+        Delete each of the servers selected, and save a list of the
+        ids of the deleted servers."""
 
         def delete_server_by_id(i):
             return (
@@ -234,6 +234,7 @@ class TestConvergence(unittest.TestCase):
                 .addCallback(lambda _: rcs)
             )
 
+        self.deleted_server_ids = ids
         deferreds = map(delete_server_by_id, ids)
         # If no error occurs while deleting, all the results will be the
         # same.  So just return the 1st, which is just our rcs value.
@@ -258,6 +259,7 @@ class TestConvergence(unittest.TestCase):
             n_pending = response["group"]["pendingCapacity"]
             n_desired = response["group"]["desiredCapacity"]
 
+            print response["group"]
             if ((active is None or active == n_active)
                     and
                     (pending is None or pending == n_pending)
@@ -276,13 +278,13 @@ class TestConvergence(unittest.TestCase):
             next_interval=repeating_interval(period),
             clock=reactor,
             deferred_description=(
-                "Waiting for Autoscale to see we expected state of"
-                "(active, pending, desired) = "
-                "({0}, {1}, {2}.".format(active, pending, desired)
+                "Waiting for Autoscale to see expected state of"
+                "(active, pending, desired) "
+                "= ({0}, {1}, {2}".format(active, pending, desired)
             )
         )
 
-    def _wait_for_autoscale_to_catch_up(self, _, rcs, timeout=260, period=1):
+    def _wait_for_id_removal(self, _, rcs, timeout=60, period=1):
         """Wait for the converger to recognize the reality of this tenant's
         situation and reflect it in the scaling group state accordingly.
         """
@@ -293,17 +295,28 @@ class TestConvergence(unittest.TestCase):
                     "Scaling group appears to have disappeared"
                 )
 
-            # Our scaling policy (see above) is configured to scale up by 1
-            # server.  Thus, we check to see if our server quantity equals
-            # the remaining servers plus 1.
+            print "-------------- Checking Response:   "
+            print response
+            # Confirm that the deleted server ids are no longer in the
+            # server list
+            # This should be put into a helper function
+            ids = map(lambda obj: obj['id'], response['group']['active'])
 
-            n_remaining = self.n_servers - self.n_killed + 1
-            if len(response["group"]["active"]) == n_remaining:
-                return rcs
+            # If none of the deleted server ids are in the active list
+            for d in self.deleted_server_ids:
+                if d in ids:
+                    raise TransientRetryError()
+                print "... Server {0} is not in active list".format(d)
+            return rcs
 
-            raise TransientRetryError()
+            # n_remaining = self.n_servers - self.n_killed + 1
+            # if len(response["group"]["active"]) == n_remaining:
+            #     return rcs
+
+            # raise TransientRetryError()
 
         def poll():
+            print "... polling"
             return self.get_scaling_group_state(rcs).addCallback(check)
 
         return retry_and_timeout(
