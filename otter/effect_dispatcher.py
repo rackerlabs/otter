@@ -16,7 +16,6 @@ from .auth import (
     perform_invalidate_token,
 )
 from .cloud_client import TenantScope, perform_tenant_scope
-from .models.cass import CQLQueryExecute, perform_cql_query
 from .models.intents import get_model_dispatcher
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
@@ -68,19 +67,4 @@ def get_legacy_dispatcher(reactor, authenticator, log, service_configs):
             TenantScope: partial(perform_tenant_scope, authenticator, log,
                                  service_configs)}),
         get_simple_dispatcher(reactor),
-    ])
-
-
-def get_cql_dispatcher(reactor, connection):
-    """
-    Get dispatcher with `CQLQueryExecute`'s performer in it
-
-    :param reactor: Twisted reactor
-    :param connection: Silverberg connection
-    """
-    return ComposedDispatcher([
-        get_simple_dispatcher(reactor),
-        TypeDispatcher({
-            CQLQueryExecute: partial(perform_cql_query, connection)
-        })
     ])

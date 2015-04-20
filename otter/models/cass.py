@@ -12,8 +12,8 @@ from datetime import datetime
 
 from characteristic import attributes
 
-from effect import Effect, parallel
-from effect.twisted import deferred_performer
+from effect import ComposedDispatcher, Effect, TypeDispatcher, catch, parallel
+from effect.twisted import deferred_performer, perform
 
 from jsonschema import ValidationError
 
@@ -30,6 +30,7 @@ from twisted.internet import defer
 
 from zope.interface import implementer
 
+from otter.effect_dispatcher import get_simple_dispatcher
 from otter.log import log as otter_log
 from otter.models.interface import (
     GroupNotEmptyError,
@@ -72,6 +73,21 @@ def perform_cql_query(conn, disp, intent):
     """
     return conn.execute(
         intent.query, intent.params, intent.consistency_level)
+
+
+def get_cql_dispatcher(reactor, connection):
+    """
+    Get dispatcher with `CQLQueryExecute`'s performer in it
+
+    :param reactor: Twisted reactor
+    :param connection: Silverberg connection
+    """
+    return ComposedDispatcher([
+        get_simple_dispatcher(reactor),
+        TypeDispatcher({
+            CQLQueryExecute: functools.partial(perform_cql_query, connection)
+        })
+    ])
 
 
 def serialize_json_data(data, ver):
@@ -1279,6 +1295,41 @@ class CassScalingGroup(object):
         return d
 
 
+def webhook_by_hash_effect(log, cap_hash, webhook_keys_table, webhooks_table):
+    """
+    Return effect of `CQLQueryExecute` to get webhook info by hash
+    """
+    if len(cap_hash) != 64:
+        raise UnrecognizedCapabilityError(cap_hash, 1)
+
+    def extract_info(rows):
+        if len(rows) == 1:
+            r = rows[0]
+            return (r['tenantId'], r['groupId'], r['policyId'])
+        else:
+            raise UnrecognizedCapabilityError(cap_hash, 1)
+
+    def try_table(table):
+        return Effect(
+            CQLQueryExecute(
+                query=_cql_find_webhook_token.format(cf=table),
+                params={"webhookKey": cap_hash},
+                consistency_level=ConsistencyLevel.ONE)).on(extract_info)
+
+    def try_webhooks_table(e):
+        return try_table(webhooks_table).on(log_err)
+
+    def log_err(r):
+        log.err(
+            None,
+            ('Webhook hash not in webhook_keys table but in '
+             'policy_webhooks table'))
+        return r
+
+    return try_table(webhook_keys_table).on(
+        error=catch(UnrecognizedCapabilityError, try_webhooks_table))
+
+
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
 class CassScalingGroupCollection:
     """
@@ -1524,18 +1575,11 @@ class CassScalingGroupCollection:
         """
         see :meth:`IScalingGroupCollection.webhook_info_by_hash`
         """
-        d = self.connection.execute(
-            _cql_find_webhook_token.format(cf=self.webhook_keys_table),
-            {"webhookKey": capability_hash}, ConsistencyLevel.ONE)
-
-        def extract_info(rows):
-            if len(rows) == 0:
-                raise UnrecognizedCapabilityError(capability_hash, 1)
-            r = rows[0]
-            return (r['tenantId'], r['groupId'], r['policyId'])
-
-        d.addCallback(extract_info)
-        return d
+        return perform(
+            get_cql_dispatcher(self.reactor, self.connection),
+            webhook_by_hash_effect(
+                log, capability_hash, self.webhook_keys_table,
+                self.webhooks_table))
 
     def get_webhook_index_only(self):
         """
