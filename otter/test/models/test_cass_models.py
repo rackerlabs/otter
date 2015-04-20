@@ -9,7 +9,7 @@ from datetime import datetime
 from functools import partial
 
 from effect import Effect, ParallelEffects, TypeDispatcher, sync_perform
-from effect.testing import resolve_effect
+from effect.testing import SequenceDispatcher, resolve_effect
 
 from jsonschema import ValidationError
 
@@ -41,7 +41,8 @@ from otter.models.cass import (
     assemble_webhooks_in_policies,
     perform_cql_query,
     serialize_json_data,
-    verified_view
+    verified_view,
+    webhook_by_hash_effect
 )
 from otter.models.interface import (
     GroupNotEmptyError,
@@ -65,7 +66,8 @@ from otter.test.utils import (
     LockMixin,
     matches,
     mock_log,
-    patch)
+    patch,
+    raise_)
 from otter.util.config import set_config_data
 from otter.util.timestamp import from_timestamp
 
@@ -2756,6 +2758,87 @@ class ScalingGroupWebhookMigrateTests(SynchronousTestCase):
                             consistency_level=ConsistencyLevel.ONE))
 
 
+class WebhookHashEffectTests(SynchronousTestCase):
+    """
+    Tests for :func:`webhook_by_hash_effect`
+    """
+    def setUp(self):
+        self.log = mock_log()
+        self.ch = 'h' * 64
+
+    def _get_intent(self, query):
+        return CQLQueryExecute(
+            query=query, params={'webhookKey': self.ch},
+            consistency_level=ConsistencyLevel.ONE)
+
+    def test_not_64_len(self):
+        """
+        Raises error if cap_hash is not 64 chars
+        """
+        self.assertRaises(
+            UnrecognizedCapabilityError, webhook_by_hash_effect,
+            self.log, 'hash', 'wk', 'pw')
+        self.assertRaises(
+            UnrecognizedCapabilityError, webhook_by_hash_effect,
+            self.log, 'ha' * 65, 'wk', 'pw')
+
+    def test_from_keys_table(self):
+        """
+        Returns info from keys table if found and does not check webhooks table
+        Does not log err
+        """
+        eff = webhook_by_hash_effect(self.log, self.ch, 'wk', 'pw')
+        disp = SequenceDispatcher(
+            [(self._get_intent(
+                'SELECT "tenantId", "groupId", "policyId" FROM wk '
+                'WHERE "webhookKey" = :webhookKey;'),
+              lambda i: [
+                  {'tenantId': 't1', 'groupId': 'g1', 'policyId': 'p1'}])])
+        self.assertEqual(sync_perform(disp, eff), ('t1', 'g1', 'p1'))
+        self.assertFalse(self.log.err.called)
+
+    def test_from_webhooks_table(self):
+        """
+        If info is not found in keys table, finds info in webhooks table
+        and logs error
+        """
+        eff = webhook_by_hash_effect(self.log, self.ch, 'wk', 'pw')
+        disp = SequenceDispatcher(
+            [(self._get_intent(
+                'SELECT "tenantId", "groupId", "policyId" FROM wk '
+                'WHERE "webhookKey" = :webhookKey;'),
+              lambda i: raise_(UnrecognizedCapabilityError(self.ch, 1))),
+             (self._get_intent(
+                'SELECT "tenantId", "groupId", "policyId" FROM pw '
+                'WHERE "webhookKey" = :webhookKey;'),
+              lambda i: [
+                  {'tenantId': 't1', 'groupId': 'g1', 'policyId': 'p1'}])])
+        self.assertEqual(sync_perform(disp, eff), ('t1', 'g1', 'p1'))
+        self.log.err.assert_called_once_with(
+            None,
+            ('Webhook hash not in webhook_keys table but in '
+             'policy_webhooks table'))
+
+    def test_not_found(self):
+        """
+        It tries the keys table and if not found tries the webhooks table
+        and if not found raises error
+        """
+        eff = webhook_by_hash_effect(self.log, self.ch, 'wk', 'pw')
+        disp = SequenceDispatcher(
+            [(self._get_intent(
+                'SELECT "tenantId", "groupId", "policyId" FROM wk '
+                'WHERE "webhookKey" = :webhookKey;'),
+              lambda i: raise_(UnrecognizedCapabilityError(self.ch, 1))),
+             (self._get_intent(
+                'SELECT "tenantId", "groupId", "policyId" FROM pw '
+                'WHERE "webhookKey" = :webhookKey;'),
+              lambda i: raise_(UnrecognizedCapabilityError(self.ch, 1)))])
+        self.assertRaises(
+            UnrecognizedCapabilityError, sync_perform, disp, eff)
+        self.assertFalse(self.log.err.called)
+
+
 class CassScalingScheduleCollectionTestCase(
         IScalingScheduleCollectionProviderMixin, SynchronousTestCase):
     """
@@ -3420,37 +3503,23 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(g.tenant_id, '123')
         self.assertIs(g.local_locks, self.collection.local_locks)
 
-    def test_webhook_info_by_hash(self):
+    @mock.patch('otter.models.cass.perform')
+    @mock.patch('otter.models.cass.get_cql_dispatcher')
+    @mock.patch('otter.models.cass.webhook_by_hash_effect')
+    def test_webhook_info_by_hash(self, mock_wbhe, mock_gqd, mock_p):
         """
-        `webhook_info_by_hash` gets the info from webhook_keys table
+        `webhook_info_by_hash` gets effect from `webhook_by_hash_effect`
+        and performs it
         """
-        self.returns = [_cassandrify_data([
-            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1'}]),
-            _cassandrify_data([{'data': '{}'}])
-        ]
-        expectedData = {'webhookKey': 'x'}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId" '
-                       'FROM webhook_keys '
-                       'WHERE "webhookKey" = :webhookKey;')
+        # NOTE: This is gnarly
         d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
-        r = self.successResultOf(d)
-        self.assertEqual(r, ('123', 'group1', 'pol1'))
-        self.connection.execute.assert_called_once_with(
-            expectedCql, expectedData, ConsistencyLevel.ONE)
-
-    def test_webhook_bad(self):
-        """
-        Test that a bad webhook will fail with UnrecognizedCapabilityError
-        """
-        self.returns = [[]]
-        expectedData = {'webhookKey': 'x'}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId" '
-                       'FROM webhook_keys '
-                       'WHERE "webhookKey" = :webhookKey;')
-        d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
-        self.failureResultOf(d, UnrecognizedCapabilityError)
-        self.connection.execute.assert_called_once_with(
-            expectedCql, expectedData, ConsistencyLevel.ONE)
+        self.assertEqual(d, mock_p.return_value)
+        mock_wbhe.assert_called_once_with(
+            self.mock_log, 'x', 'webhook_keys', 'policy_webhooks')
+        mock_gqd.assert_called_once_with(
+            self.collection.reactor, self.collection.connection)
+        mock_p.assert_called_once_with(
+            mock_gqd.return_value, mock_wbhe.return_value)
 
     def test_get_counts(self):
         """

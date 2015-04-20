@@ -20,8 +20,7 @@ from silverberg.client import CQLClient
 from twisted.internet import task
 from twisted.internet.endpoints import clientFromString
 
-from otter.effect_dispatcher import get_cql_dispatcher
-from otter.models.cass import CassScalingGroupCollection
+from otter.models.cass import CassScalingGroupCollection, get_cql_dispatcher
 from otter.test.resources import CQLGenerator
 
 
