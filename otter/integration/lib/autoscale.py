@@ -24,6 +24,16 @@ class BreakLoopException(Exception):
     """This serves to break out of a `retry_and_timeout` loop."""
 
 
+def extract_active_ids(group_status):
+    """Extracts all server IDs from a scaling group's status report.
+
+    :param dict group_status: The successful result from
+        ``get_scaling_group_state``.
+    :result: A list of server IDs known to the scaling group.
+    """
+    return [obj['id'] for obj in group_status['group']['active']]
+
+
 def create_scaling_group_dict(
     image_ref=None, flavor_ref=None, min_entities=0, name=None
 ):
@@ -292,7 +302,7 @@ class ScalingGroup(object):
         else:
             report = (
                 "Scaling group failed to reflect {} servers removed."
-                .format(len(ids_deleted))
+                .format(len(removed_ids))
             )
 
         return retry_and_timeout(

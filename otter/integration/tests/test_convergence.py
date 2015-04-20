@@ -20,6 +20,7 @@ from otter.integration.lib.autoscale import (
     ScalingGroup,
     ScalingPolicy,
     create_scaling_group_dict,
+    extract_active_ids,
 )
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
@@ -39,15 +40,6 @@ endpoint = os.environ['AS_IDENTITY']
 flavor_ref = os.environ['AS_FLAVOR_REF']
 image_ref = os.environ['AS_IMAGE_REF']
 region = os.environ['AS_REGION']
-
-
-def extract_active_ids(group_status):
-    """Extracts all server IDs from a scaling group's status report.
-    :param dict group_status: The successful result from
-        ``get_scaling_group_state``.
-    :result: A list of server IDs known to the scaling group.
-    """
-    return [obj['id'] for obj in group_status['group']['active']]
 
 
 class TestConvergence(unittest.TestCase):
