@@ -20,20 +20,44 @@ Storage model for state information:
  * last touched information for group
  * last touched information for policy
 """
+import json
 from datetime import datetime
 from decimal import Decimal, ROUND_UP
+
+from effect import Effect, parallel_all_errors
+from effect.do import do, do_return
+
 import iso8601
-import json
+
+from six import reraise
+
+from toolz.dicttoolz import get_in
 
 from twisted.internet import defer
 
+from otter.cloud_client import (
+    NoSuchServerError,
+    get_server_details,
+    set_nova_metadata_item)
 from otter.convergence.composition import tenant_is_enabled
+from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
 from otter.convergence.service import get_convergence_starter
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
-from otter.supervisor import exec_scale_down, execute_launch_config
+from otter.models.intents import GetScalingGroupInfo
+from otter.supervisor import (
+    CannotDeleteServerBelowMinError,
+    EvictServerFromScalingGroup,
+    ServerNotFoundError,
+    exec_scale_down,
+    execute_launch_config)
 from otter.util.config import config_value
 from otter.util.deferredutils import unwrap_first_error
+from otter.util.fp import assoc_obj
+from otter.util.retry import (
+    exponential_backoff_interval,
+    retry_effect,
+    retry_times)
 from otter.util.timestamp import from_timestamp
 
 
@@ -348,3 +372,92 @@ def calculate_delta(log, state, config, policy):
     """
     current = len(state.active) + len(state.pending)
     return apply_delta(log, current, state, config, policy)
+
+
+@do
+def _is_server_in_group(group, server_id):
+    """
+    Given a group and server ID, determines if the server is a member of
+    the group.  If it isn't, it raises a :class:`ServerNotFoundError`.
+    """
+    try:
+        server_info = yield retry_effect(get_server_details(server_id),
+                                         retry_times(3),
+                                         exponential_backoff_interval(2))
+    except NoSuchServerError:
+        raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
+
+    group_id = group_id_from_metadata(
+        get_in(('server', 'metadata'), server_info, {}))
+    if group_id != group.uuid:
+        raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
+
+
+@do
+def _can_scale_down(group, server_id):
+    """
+    Given a group and a server ID, determines if the group can be scaled down.
+    If not, it raises a :class:`CannotDeleteServerBelowMinError`.
+    """
+    manifest = yield Effect(GetScalingGroupInfo(
+        tenant_id=group.tenant_id, group_id=group.uuid))
+    min_entities = manifest['groupConfiguration']['minEntities']
+    state = manifest['state']
+
+    if state.desired == min_entities:
+        raise CannotDeleteServerBelowMinError(
+            group.tenant_id, group.uuid, server_id, min_entities)
+
+
+@do
+def convergence_remove_server_from_group(
+        log, transaction_id, group, state, server_id, replace, purge):
+    """
+    Remove a specific server from the group, optionally decrementing the
+    desired capacity.
+
+    The server may just be scheduled for deletion, or it may be evicted from
+    the group by removing otter-specific metdata from the server.
+
+    :param log: A bound logger
+    :param bytes transaction_id: The transaction id for this operation.
+    :param group: The scaling group to remove a server from.
+    :type group: :class:`~otter.models.interface.IScalingGroup`
+    :param bytes server_id: The id of the server to be removed.
+    :param bool replace: Should the server be replaced?
+    :param bool purge: Should the server be deleted from Nova?
+
+    :return: The updated state.
+    :rtype: deferred :class:`~otter.models.interface.GroupState`
+
+    :raise: :class:`CannotDeleteServerBelowMinError` if the server cannot
+        be deleted without replacement, and :class:`ServerNotFoundError` if
+        there is no such server to be deleted.
+    """
+    effects = [_is_server_in_group(group, server_id)]
+    if not replace:
+        effects.append(_can_scale_down(group, server_id))
+
+    # the (possibly) two checks can happen in parallel, but we want
+    # ServerNotFoundError to take precedence over
+    # CannotDeleteServerBelowMinError
+    both_checks = yield parallel_all_errors(effects)
+    for is_error, result in both_checks:
+        if is_error:
+            reraise(*result)
+
+    # Remove the server
+    if purge:
+        eff = set_nova_metadata_item(server_id, *DRAINING_METADATA)
+    else:
+        eff = Effect(
+            EvictServerFromScalingGroup(log=log,
+                                        transaction_id=transaction_id,
+                                        scaling_group=group,
+                                        server_id=server_id))
+    yield retry_effect(eff, retry_times(3), exponential_backoff_interval(2))
+
+    if not replace:
+        yield do_return(assoc_obj(state, desired=state.desired - 1))
+    else:
+        yield do_return(state)

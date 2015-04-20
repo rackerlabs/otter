@@ -1,7 +1,14 @@
 """
 Tests for :mod:`otter.controller`
 """
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
+
+from effect import (
+    ComposedDispatcher,
+    TypeDispatcher,
+    sync_perform,
+    sync_performer)
+from effect.testing import SequenceDispatcher
 
 import mock
 
@@ -11,13 +18,30 @@ from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter import controller
-
+from otter.cloud_client import (
+    NoSuchServerError,
+    get_server_details,
+    set_nova_metadata_item)
+from otter.convergence.model import DRAINING_METADATA
 from otter.convergence.service import (
     get_convergence_starter, set_convergence_starter)
+from otter.models.intents import GetScalingGroupInfo
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError)
+from otter.supervisor import (
+    CannotDeleteServerBelowMinError,
+    EvictServerFromScalingGroup,
+    ServerNotFoundError)
+from otter.test.utils import (
+    iMock,
+    matches,
+    mock_log,
+    patch,
+    raise_,
+    test_dispatcher)
+from otter.util.retry import (
+    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN
-from otter.test.utils import iMock, matches, patch, mock_log
 
 
 class CalculateDeltaTestCase(SynchronousTestCase):
@@ -1139,3 +1163,275 @@ class ConvergeTestCase(SynchronousTestCase):
 
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)
+
+
+class ConvergenceRemoveServerTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.controller.convergence_remove_server_from_group`
+    """
+    def setUp(self):
+        """
+        Fake supervisor, group and state
+        """
+        self.config_data = {'convergence-tenants': ['tenant_id']}
+
+        self.trans_id = 'trans_id'
+        self.log = mock_log()
+        self.state = GroupState('tenant_id', 'group_id', 'group_name',
+                                active={'s0': {'id': 's0'}},
+                                pending={},
+                                group_touched=None,
+                                policy_touched=None,
+                                paused=None,
+                                desired=1)
+        self.group = iMock(IScalingGroup, tenant_id='tenant_id',
+                           uuid='group_id')
+        self.server_details = {
+            'server': {
+                'id': 'server_id',
+                'metadata': {
+                    'rax:autoscale:group:id': 'group_id',
+                    'rax:auto_scaling_group_id': 'group_id'
+                }
+            }
+        }
+        self.group_manifest_info = {
+            'groupConfiguration': {'minEntities': 0},
+            'launchConfiguration': {'this is not used': 'here'},
+            'state': self.state
+        }
+
+    def assert_states_equivalent_except_desired(self, state1, state2):
+        """
+        Compare the given states and check that all the attributes except
+        ``desired`` are equivalent.
+        """
+        for attribute in ("tenant_id", "group_id", "group_name", "active",
+                          "pending", "group_touched", "policy_touched",
+                          "paused"):
+            self.assertEqual(getattr(state1, attribute),
+                             getattr(state2, attribute))
+
+    def _remove(self, replace, purge, dispatcher):
+        # Retry intents can't really be compared if the effect inside
+        # has callbacks, so just unpack and assert something about the retry
+        # params, and perform the wrapped effect.
+        expected_retry_params = ShouldDelayAndRetry(
+            can_retry=retry_times(3),
+            next_interval=exponential_backoff_interval(2))
+
+        @sync_performer
+        def handle_retry(_disp, retry_intent):
+            self.assertEqual(retry_intent.should_retry, expected_retry_params)
+            return sync_perform(_disp, retry_intent.effect)
+
+        full_dispatcher = ComposedDispatcher([
+            test_dispatcher(),
+            TypeDispatcher({Retry: handle_retry}),
+            dispatcher])
+
+        eff = controller.convergence_remove_server_from_group(
+            self.log, self.trans_id, self.group, self.state, 'server_id',
+            replace, purge)
+        return sync_perform(full_dispatcher, eff)
+
+    def test_no_such_server_replace_true(self):
+        """
+        If there is no such server at all in Nova, a
+        :class:`ServerNotFoundError` is raised.  No additional checking
+        for config is needed because replace is set True.
+        """
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda _: raise_(NoSuchServerError(server_id=u'server_id')))
+        ])
+        self.assertRaises(
+            ServerNotFoundError, self._remove, True, False, dispatcher)
+        self.assertEqual(dispatcher.sequence, [])
+
+    def test_server_not_autoscale_server_replace_true(self):
+        """
+        If there is such a server in Nova, but it does not have
+        autoscale-specific metadata, then :class:`ServerNotFoundError` is
+        raised.  No additional checking for config is needed because
+        replace is set True.
+        """
+        self.server_details['server'].pop('metadata')
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda _: self.server_details)
+        ])
+        self.assertRaises(
+            ServerNotFoundError, self._remove, True, False, dispatcher)
+        self.assertEqual(dispatcher.sequence, [])
+
+    def test_server_in_wrong_group_replace_true(self):
+        """
+        If there is such a server in Nova, but it belongs to a different group,
+        then :class:`ServerNotFoundError` is raised.  No additional checking
+        for config is needed because replace is set True.
+        """
+        self.server_details['server']['metadata'] = {
+            'rax:autoscale:group:id': 'other_group_id',
+            'rax:auto_scaling_group_id': 'other_group_id'
+        }
+
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda _: self.server_details)
+        ])
+        self.assertRaises(
+            ServerNotFoundError, self._remove, True, False, dispatcher)
+        self.assertEqual(dispatcher.sequence, [])
+
+    def test_server_in_group_cannot_scale_down(self):
+        """
+        If ``replace=False`` a check is done to see if the group can be scaled
+        down by 1.  If not, then removing fails with a
+        :class:`CannotExecutePolicyError` even if the server is in the group.
+        """
+        self.state.desired = 1
+        self.group_manifest_info['groupConfiguration']['minEntities'] = 1
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda _: self.server_details),
+            (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
+                lambda _: self.group_manifest_info)
+        ])
+        self.assertRaises(
+            CannotDeleteServerBelowMinError, self._remove, False, False,
+            dispatcher)
+        self.assertEqual(dispatcher.sequence, [])
+
+    def test_server_not_in_group_cannot_scale_down(self):
+        """
+        If both the server check and the scaling down check fail,
+        the exception that gets raised is :class:`ServerNotFoundError`.
+        """
+        self.server_details['server'].pop('metadata')
+        self.state.desired = 1
+        self.group_manifest_info['groupConfiguration']['minEntities'] = 1
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda _: self.server_details),
+            (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
+                lambda _: self.group_manifest_info)
+        ])
+        self.assertRaises(
+            ServerNotFoundError, self._remove, False, False, dispatcher)
+        self.assertEqual(dispatcher.sequence, [])
+
+    def test_checks_pass_replace_true_purge_success(self):
+        """
+        If all the checks pass, and purge is true, then "DRAINING" is added
+        to the server's metadata.  If this is successful, then the whole
+        effect is a success, and returns same state the function was called
+        with.
+        """
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda _: self.server_details),
+            (set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
+                lambda _: None)
+        ])
+        result = self._remove(True, True, dispatcher)
+        self.assertEqual(result, self.state)
+        self.assertEqual(dispatcher.sequence, [])
+
+    def test_checks_pass_replace_false_purge_success(self):
+        """
+        If all the checks pass, and purge is true and replace is false, then
+        "DRAINING" is added to the server's metadata.  If this is successful,
+        then the whole effect is a success, and returns the state the function
+        was called with, with the desired value decremented.
+        """
+        old_desired = self.state.desired = 2
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda _: self.server_details),
+            (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
+                lambda _: self.group_manifest_info),
+            (set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
+                lambda _: None)
+        ])
+        result = self._remove(False, True, dispatcher)
+        self.assert_states_equivalent_except_desired(result, self.state)
+        self.assertEqual(result.desired, old_desired - 1)
+        self.assertEqual(dispatcher.sequence, [])
+
+    def test_checks_pass_replace_true_purge_failure(self):
+        """
+        If all the checks pass, and purge is true, then "DRAINING" is added
+        to the server's metadata.  If this fails, then the failure is
+        propagated and the state is not returned.
+        """
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda _: self.server_details),
+            (set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
+                lambda _: raise_(ValueError('oops!')))
+        ])
+        self.assertRaises(ValueError, self._remove, True, True, dispatcher)
+        self.assertEqual(dispatcher.sequence, [])
+
+    def test_checks_pass_replace_true_no_purge_success(self):
+        """
+        If all the checks pass, and purge is false, then autoscale-specific
+        metadata is removed from the server's metadata.  If this is successful,
+        then the whole effect is a success, and returns same state the function
+        was called with.
+        """
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda _: self.server_details),
+            (EvictServerFromScalingGroup(log=self.log,
+                                         transaction_id=self.trans_id,
+                                         scaling_group=self.group,
+                                         server_id='server_id'),
+                lambda _: None)
+        ])
+        result = self._remove(True, False, dispatcher)
+        self.assertEqual(result, self.state)
+        self.assertEqual(dispatcher.sequence, [])
+
+    def test_checks_pass_replace_false_no_purge_success(self):
+        """
+        If all the checks pass, and purge is true and replace is false, then
+        "DRAINING" is added to the server's metadata.  If this is successful,
+        then the whole effect is a success, and returns the state the function
+        was called with, with the desired value decremented.
+        """
+        old_desired = self.state.desired = 2
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda _: self.server_details),
+            (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
+                lambda _: self.group_manifest_info),
+            (EvictServerFromScalingGroup(log=self.log,
+                                         transaction_id=self.trans_id,
+                                         scaling_group=self.group,
+                                         server_id='server_id'),
+                lambda _: None)
+        ])
+        result = self._remove(False, False, dispatcher)
+        self.assert_states_equivalent_except_desired(result, self.state)
+        self.assertEqual(result.desired, old_desired - 1)
+        self.assertEqual(dispatcher.sequence, [])
+
+    def test_checks_pass_replace_true_no_purge_failure(self):
+        """
+        If all the checks pass, and purge is true, then "DRAINING" is added
+        to the server's metadata.  If this fails, then the failure is
+        propagated and the state is not returned.
+        """
+        dispatcher = SequenceDispatcher([
+            (get_server_details('server_id').intent,
+                lambda _: self.server_details),
+            (EvictServerFromScalingGroup(log=self.log,
+                                         transaction_id=self.trans_id,
+                                         scaling_group=self.group,
+                                         server_id='server_id'),
+                lambda _: raise_(ValueError('oops')))
+        ])
+        self.assertRaises(ValueError, self._remove, True, False, dispatcher)
+        self.assertEqual(dispatcher.sequence, [])
