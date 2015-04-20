@@ -10,6 +10,7 @@ from functools import partial
 
 from effect import Effect, ParallelEffects, TypeDispatcher, sync_perform
 from effect.testing import SequenceDispatcher, resolve_effect
+from effect.twisted import deferred_performer
 
 from jsonschema import ValidationError
 
@@ -30,6 +31,7 @@ from twisted.internet import defer
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.effect_dispatcher import get_simple_dispatcher
 from otter.json_schema import group_examples
 from otter.models.cass import (
     CQLQueryExecute,
@@ -39,6 +41,7 @@ from otter.models.cass import (
     WeakLocks,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
+    get_cql_dispatcher,
     perform_cql_query,
     serialize_json_data,
     verified_view,
@@ -61,6 +64,7 @@ from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingScheduleCollectionProviderMixin
 )
+from otter.test.test_effect_dispatcher import simple_intents
 from otter.test.utils import (
     DummyException,
     LockMixin,
@@ -138,6 +142,31 @@ class PerformTests(SynchronousTestCase):
         self.assertEqual(r, 'ret')
         conn.execute.assert_called_once_with(
             'query', {'w': 2}, ConsistencyLevel.ONE)
+
+
+class CQLDispatcherTests(SynchronousTestCase):
+    """Tests for :func:`get_cql_dispatcher`."""
+
+    def test_intent_support(self):
+        """Basic intents are supported by the dispatcher."""
+        dispatcher = get_simple_dispatcher(None)
+        for intent in simple_intents():
+            self.assertIsNot(dispatcher(intent), None)
+
+    @mock.patch('otter.models.cass.perform_cql_query')
+    def test_cql_disp(self, mock_pcq):
+        """The :obj:`CQLQueryExecute` performer is called."""
+
+        @deferred_performer
+        def performer(c, d, i):
+            return defer.succeed('p' + c)
+
+        mock_pcq.side_effect = performer
+
+        dispatcher = get_cql_dispatcher(object(), 'conn')
+        intent = CQLQueryExecute(query='q', params='p', consistency_level=1)
+        eff = Effect(intent)
+        self.assertEqual(sync_perform(dispatcher, eff), 'pconn')
 
 
 class SerialJsonDataTestCase(SynchronousTestCase):
