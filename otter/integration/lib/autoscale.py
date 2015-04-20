@@ -195,7 +195,7 @@ class ScalingGroup(object):
         """
 
         def check((code, response)):
-            if code != 200:
+            if code == 404:
                 raise BreakLoopException("Scaling group not found.")
             servers_active = len(response["group"]["active"])
             if servers_active == servers_desired:
