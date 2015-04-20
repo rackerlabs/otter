@@ -176,7 +176,7 @@ class TestConvergence(unittest.TestCase):
         should be roughly half) in ``n_killed``.
         """
 
-        if code != 200:
+        if code == 404:
             raise Exception("Got 404; where'd the scaling group go?")
         ids = extract_active_ids(response)
         self.n_servers = len(ids)
@@ -188,7 +188,7 @@ class TestConvergence(unittest.TestCase):
         ``get_scaling_group_state`` function.
         """
 
-        if code != 200:
+        if code == 404:
             raise Exception("Got 404; dude, where's my scaling group?")
         ids = extract_active_ids(response)
         self.n_servers = len(ids)
