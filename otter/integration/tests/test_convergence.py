@@ -175,7 +175,12 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self._delete_those_servers, rcs)
             .addCallback(self.scaling_policy.start, self)
             .addCallback(self.scaling_policy.execute)
-            .addCallback(self._wait_for_autoscale_to_catch_up, rcs)
+            .addCallback(lambda _: self.removed_ids)
+            .addCallback(
+                self.scaling_group.wait_for_deleted_id_removal,
+                rcs,
+                total_servers=N_SERVERS,
+            )
         )
     test_reaction_to_oob_server_deletion.timeout = 1800
 
@@ -223,39 +228,3 @@ class TestConvergence(unittest.TestCase):
         # If no error occurs while deleting, all the results will be the
         # same.  So just return the 1st, which is just our rcs value.
         return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
-
-    def _wait_for_autoscale_to_catch_up(self, _, rcs, timeout=60, period=1):
-        """Wait for the converger to recognize the servers that were somehow
-        deleted out-of-band and update the tenant's state, accordingly.  This
-        function depends on the successful completion of
-        ``_delete_those_servers`` or any other function that sets the
-        ``self.ids_deleted`` attribute.
-        """
-
-        def check((code, response)):
-            if code == 404:
-                raise BreakLoopException(
-                    "Scaling group appears to have disappeared"
-                )
-
-            active_ids = extract_active_ids(response)
-            for deleted_id in self.ids_deleted:
-                if deleted_id in active_ids:
-                    raise TransientRetryError()
-
-            return rcs
-
-        def poll():
-            return self.get_scaling_group_state(rcs).addCallback(check)
-
-        return retry_and_timeout(
-            poll, timeout,
-            can_retry=transient_errors_except(BreakLoopException),
-            next_interval=repeating_interval(period),
-            clock=reactor,
-            deferred_description=(
-                "Waiting for Autoscale to see we killed {} servers of "
-                "{}.".format(self.n_killed, self.n_servers)
-            )
-        )
-
