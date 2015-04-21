@@ -31,7 +31,9 @@ from twisted.internet.task import deferLater
 from twisted.python.failure import Failure
 
 from otter.auth import public_endpoint_url
-from otter.convergence.composition import json_to_LBConfigs
+from otter.convergence.composition import (
+    json_to_LBConfigs,
+    prepare_server_launch_config)
 from otter.convergence.model import _servicenet_address, generate_metadata
 from otter.convergence.steps import UnexpectedServerStatus, set_server_name
 from otter.util import logging_treq as treq
@@ -548,42 +550,17 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
 
     :return dict: The prepared launch config.
     """
-    launch_config = deepcopy(launch_config)
-    server_config = launch_config['server']
+    launch_config = freeze(launch_config)
 
-    if 'metadata' not in server_config:
-        server_config['metadata'] = {}
+    lb_descriptions = json_to_LBConfigs(launch_config.get('loadBalancers', []))
 
-    server_config['metadata'].update(generate_server_metadata(
-        scaling_group_uuid, launch_config))
+    launch_config = prepare_server_launch_config(
+        scaling_group_uuid, launch_config, lb_descriptions)
 
     suffix = generate_server_name()
-    launch_config = thaw(set_server_name(freeze(launch_config), suffix))
+    launch_config = set_server_name(launch_config, suffix)
 
-    for lb_config in launch_config.get('loadBalancers', []):
-        if 'metadata' not in lb_config:
-            lb_config['metadata'] = {}
-        lb_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
-        lb_config['metadata']['rax:auto_scaling_server_name'] = (
-            launch_config['server']['name'])
-
-    return launch_config
-
-
-def generate_server_metadata(group_id, launch_config):
-    """
-    Given a scaling group ID and the launch config, generate the scaling-group
-    specific metadata that should be on the server.
-
-    :param str group_id: The ID of the scaling group
-    :param dict launch_config: The complete launch config args we want to build
-        the servers from
-
-    :return dict: The autoscaling-specific part of the metadata with which to
-        create a server of this particular autoscaling group
-    """
-    lbs = freeze(launch_config.get('loadBalancers', []))
-    return generate_metadata(group_id, json_to_LBConfigs(lbs))
+    return thaw(launch_config)
 
 
 def _without_otter_metadata(metadata):
