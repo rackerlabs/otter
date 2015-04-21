@@ -185,6 +185,7 @@ class ScalingGroup(object):
             if resp.code == 200:
                 return treq.json_content(resp).addCallback(lambda x: (200, x))
             return (404, None)
+        # ids = map(lambda obj: obj['id'], response['group']['active'])
 
         return (
             treq.get(
@@ -300,6 +301,7 @@ class ScalingGroup(object):
                 )
 
             active_ids = extract_active_ids(response)
+            print("wait_for_deleted_id_removal: {0}".format(active_ids))
             for deleted_id in removed_ids:
                 if deleted_id in active_ids:
                     raise TransientRetryError()
@@ -326,6 +328,53 @@ class ScalingGroup(object):
             next_interval=repeating_interval(period),
             clock=reactor,
             deferred_description=report,
+        )
+
+    def wait_for_expected_state(self, _, rcs, timeout=60, period=1,
+                                active=None, pending=None, desired=None):
+        """
+        Repeatedly get the group state until either the specified timeout has
+        occurred or the specified number of active, pending, and desired
+        servers is observed. Unspecifed quantities default to None and are
+        treated as don't cares.
+        """
+
+        def check((code, response)):
+            if code != 200:
+                raise BreakLoopException(
+                    "Could not get the scaling group state"
+                )
+
+            n_active = len(response["group"]["active"])
+            n_pending = response["group"]["pendingCapacity"]
+            n_desired = response["group"]["desiredCapacity"]
+            print("Active: {0}, Pending: {1}, Desired: {2}".format(n_active,
+                                                                   n_pending,
+                                                                   n_desired))
+
+            # print(response["group"])
+            if ((active is None or active == n_active)
+                    and
+                    (pending is None or pending == n_pending)
+                    and
+                    (desired is None or desired == n_desired)):
+                return rcs
+
+            raise TransientRetryError()
+
+        def poll():
+            return self.get_scaling_group_state(rcs).addCallback(check)
+
+        return retry_and_timeout(
+            poll, timeout,
+            can_retry=transient_errors_except(BreakLoopException),
+            next_interval=repeating_interval(period),
+            clock=reactor,
+            deferred_description=(
+                "Waiting for Autoscale to see expected state of"
+                "(active, pending, desired) "
+                "= ({0}, {1}, {2}".format(active, pending, desired)
+            )
         )
 
 

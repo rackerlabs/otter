@@ -33,6 +33,7 @@ endpoint = os.environ['AS_IDENTITY']
 flavor_ref = os.environ['AS_FLAVOR_REF']
 image_ref = os.environ['AS_IMAGE_REF']
 region = os.environ['AS_REGION']
+ce_tenant = "000000"  # Convergnece Enabled Tenant
 
 
 class TestConvergence(unittest.TestCase):
@@ -88,7 +89,7 @@ class TestConvergence(unittest.TestCase):
         )
 
         return (
-            self.identity.authenticate_user(rcs)
+            self.identity.authenticate_user(rcs, tenant_id="000000")
             .addCallback(
                 rcs.find_end_point,
                 "otter", "autoscale", region,
@@ -144,7 +145,7 @@ class TestConvergence(unittest.TestCase):
         )
 
         return (
-            self.identity.authenticate_user(rcs)
+            self.identity.authenticate_user(rcs, tenant_id="000000")
             .addCallback(
                 rcs.find_end_point,
                 "otter", "autoscale", region,
@@ -170,76 +171,94 @@ class TestConvergence(unittest.TestCase):
         )
     test_reaction_to_oob_server_deletion.timeout = 1800
 
-    # def test_scale_down_after_oobd_non_constrained(self):
-    #     """
-    #     Validate that when scaling down after an out of band delete (OOBD)
-    #     the group stabilizes at the correct number of servers with
-    #     the deleted
-    #     server taken into account.
+    def test_scale_down_after_oobd_non_constrained(self):
+        """
+        Validate that when scaling down after an out of band delete (OOBD)
+        the group stabilizes at the correct number of servers with
+        the deleted
+        server taken into account.
 
-    #         Create a group with min N servers
-    #         Scale group to (N+ x) servers
-    #         Delete z of the servers out of band
-    #         Scale down by (y) servers
-    #         Validate end state of (N + x - y) servers
-    #             TODO: Consider the case where z == y
-    #             - does this produce an error?
-    #     """
+            Create a group with min N servers
+            Scale group to (N+ x) servers
+            Delete z of the servers out of band
+            Scale down by (y) servers
+            Validate end state of (N + x - y) servers
+                TODO: Consider the case where z == y
+                - does this produce an error?
+        """
 
-    #     min_servers = 2
-    #     set_to_servers = 7
-    #     oobd_servers = 2
-    #     scale_servers = -3
-    #     # This only applies if not constrained by max/min
-    #     converged_servers = set_to_servers + scale_servers
+        min_servers = 2
+        set_to_servers = 7
+        oobd_servers = 2
+        scale_servers = -3
+        # This only applies if not constrained by max/min
+        converged_servers = set_to_servers + scale_servers
 
-    #     rcs = TestResources()
+        rcs = TestResources()
 
-    #     scaling_group_body = create_scaling_group_dict(
-    #         image_ref=image_ref, flavor_ref=flavor_ref,
-    #         min_entities=min_servers
-    #     )
+        scaling_group_body = create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=min_servers
+        )
 
-    #     self.scaling_group = ScalingGroup(
-    #         group_config=scaling_group_body,
-    #         pool=self.pool
-    #     )
+        self.scaling_group = ScalingGroup(
+            group_config=scaling_group_body,
+            pool=self.pool
+        )
 
-    #     self.policy_set = ScalingPolicy(
-    #         set_to=set_to_servers,
-    #         scaling_group=self.scaling_group
-    #     )
+        self.policy_set = ScalingPolicy(
+            set_to=set_to_servers,
+            scaling_group=self.scaling_group
+        )
 
-    #     self.policy_scale = ScalingPolicy(
-    #         scale_by=scale_servers,
-    #         scaling_group=self.scaling_group
-    #     )
+        self.policy_scale = ScalingPolicy(
+            scale_by=scale_servers,
+            scaling_group=self.scaling_group
+        )
 
-    #     return (
-    #         self.identity.authenticate_user(rcs)
-    #         .addCallback(
-    #             rcs.find_end_point,
-    #             "otter", "autoscale", region,
-    #             default_url='http://localhost:9000/v1.0/{0}'
-    #         ).addCallback(
-    #             rcs.find_end_point,
-    #             "nova", "cloudServersOpenStack", region
-    #         ).addCallback(self.scaling_group.start, self)
-    #         .addCallback(self.policy_set.start, self)
-    #         .addCallback(self.policy_set.execute)
-    #         .addCallback(
-    #             self.scaling_group.wait_for_N_servers,
-    #             set_to_servers, timeout=1800
-    #         ).addCallback(self.scaling_group.get_scaling_group_state)
-    #         .addCallback(self._choose_servers_from_active_list, oobd_servers)
-    #         .addCallback(self._delete_those_servers, rcs)
-    #         .addCallback(self._wait_for_id_removal, rcs)
-    #         .addCallback(self.policy_scale.start, self)
-    #         .addCallback(self.policy_scale.execute)
-    #         .addCallback(self._wait_for_expected_state, rcs,
-    #                      active=converged_servers, pending=0)
-    #     )
-    # test_scale_down_after_oobd_non_constrained.timeout = 600
+        return (
+            self.identity.authenticate_user(rcs, tenant_id=ce_tenant)
+            .addCallback(
+                rcs.find_end_point,
+                "otter", "autoscale", region,
+                default_url='http://localhost:9000/v1.0/{0}'
+            ).addCallback(
+                rcs.find_end_point,
+                "nova", "cloudServersOpenStack", region
+            ).addCallback(self.scaling_group.start, self)
+            .addCallback(self.policy_set.start, self)
+            .addCallback(self.policy_set.execute)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers,
+                set_to_servers, timeout=1800
+            ).addCallback(self.scaling_group.get_scaling_group_state)
+            .addCallback(self._choose_servers_from_active_list, oobd_servers)
+            .addCallback(self._delete_those_servers, rcs)
+            # Until something triggers convergence, it will take a very long
+            # time for Otter to notice the deltion, though it should eventually
+            # .addCallback(lambda _: self.removed_ids)
+            # .addCallback(
+            #     self.scaling_group.wait_for_deleted_id_removal,
+            #     rcs, timeout=300,
+            #     total_servers=set_to_servers,
+            # )
+
+            # What if: Trigger convergence manually, servers in building for
+            # a time, then execute policy while still building? - All building
+            # should be reaped, and one deleted.
+
+            .addCallback(self.policy_scale.start, self)
+            .addCallback(self.policy_scale.execute)
+            .addCallback(lambda _: self.removed_ids)
+            .addCallback(
+                self.scaling_group.wait_for_deleted_id_removal,
+                rcs,
+                total_servers=set_to_servers,
+            )
+            .addCallback(self.scaling_group.wait_for_expected_state, rcs,
+                         active=converged_servers, pending=0)
+        )
+    test_scale_down_after_oobd_non_constrained.timeout = 600
 
     def _choose_half_the_servers(self, (code, response)):
         """Select the first half of the servers returned by the
@@ -304,11 +323,12 @@ class TestConvergence(unittest.TestCase):
         self.deleted_server_ids = ids
         deferreds = map(delete_server_by_id, ids)
         self.removed_ids = ids
+        print " removed ids: {0}".format(self.removed_ids)
         # If no error occurs while deleting, all the results will be the
         # same.  So just return the 1st, which is just our rcs value.
         return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
 
-    # def _wait_for_expected_state(self, _, rcs, timeout=260, period=1,
+    # def _wait_for_expected_state(self, _, rcs, timeout=60, period=1,
     #                              active=None, pending=None, desired=None):
     #     """
     #     Repeatedly get the group state until either the specified timeout has
@@ -326,6 +346,9 @@ class TestConvergence(unittest.TestCase):
     #         n_active = len(response["group"]["active"])
     #         n_pending = response["group"]["pendingCapacity"]
     #         n_desired = response["group"]["desiredCapacity"]
+    #         print "Active: {0}, Pending: {1}, Desired: {2}".format(n_active,
+    #                                                                n_pending,
+    #                                                                n_desired)
 
     #         print response["group"]
     #         if ((active is None or active == n_active)
