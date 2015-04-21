@@ -18,7 +18,7 @@ class ModifyGroupStateTests(SynchronousTestCase):
                                modifier=lambda g, o: 'new state')
         dispatcher = get_model_dispatcher(mock_log(), None)
         result = sync_perform(dispatcher, Effect(mgs))
-        self.assertEqual(result, 'new state')
+        self.assertIsNone(result)
         self.assertEqual(group.modify_state_values, ['new state'])
 
 
@@ -26,9 +26,10 @@ class GetScalingGroupInfoTests(SynchronousTestCase):
     """Tests for :obj:`GetScalingGroupInfo`."""
     def test_perform(self):
         """Performing returns the group, the state, and the launch config."""
-        def view_manifest(with_policies, with_webhooks):
+        def view_manifest(with_policies, with_webhooks, get_deleting):
             self.assertEqual(with_policies, False)
             self.assertEqual(with_webhooks, False)
+            self.assertEqual(get_deleting, True)
             return succeed(manifest)
 
         def get_scaling_group(log, tenant_id, group_id):

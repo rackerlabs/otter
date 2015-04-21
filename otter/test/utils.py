@@ -622,7 +622,7 @@ def mock_group(state, tenant_id='tenant', group_id='group'):
 
     def fake_modify_state(f, *args, **kwargs):
         d = maybeDeferred(f, group, state, *args, **kwargs)
-        d.addCallback(lambda r: group.modify_state_values.append(r) or r)
+        d.addCallback(lambda r: group.modify_state_values.append(r))
         if group.pause_modify_state:
             group.modify_state_pause_d = Deferred()
             return group.modify_state_pause_d.addCallback(lambda _: d)

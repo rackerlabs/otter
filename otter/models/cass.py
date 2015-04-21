@@ -23,6 +23,7 @@ from pyrsistent import freeze
 
 from silverberg.client import ConsistencyLevel
 
+from toolz.curried import filter
 from toolz.dicttoolz import keymap
 
 from twisted.internet import defer
@@ -51,6 +52,7 @@ from otter.util.config import config_value
 from otter.util.cqlbatch import Batch, batch
 from otter.util.deferredutils import with_lock
 from otter.util.hashkey import generate_capability, generate_key_str
+from otter.util.retry import repeating_interval, retry, retry_times
 
 
 LOCK_PATH = '/locks'
@@ -90,7 +92,7 @@ def serialize_json_data(data, ver):
 # Otherwise it won't.
 #
 # Thus, selects have a semicolon, everything else doesn't.
-_cql_view = ('SELECT {column}, created_at FROM {cf} '
+_cql_view = ('SELECT {column}, created_at, deleting FROM {cf} '
              'WHERE "tenantId" = :tenantId AND '
              '"groupId" = :groupId;')
 _cql_view_policy = (
@@ -113,7 +115,7 @@ _cql_create_group = (
 _cql_view_manifest = (
     'SELECT "tenantId", "groupId", group_config, '
     'launch_config, active, pending, "groupTouched", '
-    '"policyTouched", paused, desired, created_at '
+    '"policyTouched", paused, desired, created_at, status, deleting '
     'FROM {cf} '
     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
@@ -127,7 +129,7 @@ _cql_insert_group_state = (
     'USING TIMESTAMP :ts')
 _cql_view_group_state = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at '
+    '"groupTouched", "policyTouched", paused, desired, created_at, deleting '
     'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
 
 # --- Event related queries
@@ -181,7 +183,7 @@ _cql_delete_one_webhook = (
     '"webhookId" = :webhookId')
 _cql_list_states = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at '
+    '"groupTouched", "policyTouched", paused, desired, created_at, deleting '
     'FROM {cf} WHERE "tenantId" = :tenantId;')
 _cql_list_policy = (
     'SELECT "policyId", data FROM {cf} WHERE '
@@ -284,6 +286,8 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
 
 
 DEFAULT_CONSISTENCY = ConsistencyLevel.QUORUM
+
+QUERY_LIMIT = 10000
 
 
 def _build_policies(policies, policies_table, event_table, queries, data,
@@ -494,25 +498,29 @@ def assemble_webhooks_in_policies(policies, webhooks):
 
 
 def verified_view(connection, view_query, del_query, data, consistency,
-                  exception_if_empty, log):
+                  exception_if_empty, log, get_deleting=False):
     """
-    Ensures the view query does not get resurrected row, i.e. one that does
-    not have "created_at" in it.  Any resurrected entry is deleted and
-    `exception_if_empty` is raised.
+    Ensures the view query on the group does not get resurrected row,
+    i.e. one that does not have "created_at" in it.  Any resurrected entry is
+    deleted and `exception_if_empty` is raised. Also raises
+    `exception_if_empty` if group's status is DELETING
 
-    TODO: Should there be seperate argument for view_consistency and
-    del_consistency.
+    :param bool get_deleting: Should it return deleting group?
+    :return: Deferred that fires with result of executing view query
     """
     def _check_resurrection(result):
         if len(result) == 0:
             raise exception_if_empty
-        if result[0].get('created_at'):
-            return result[0]
-        else:
+        group = result[0]
+        if group.get('created_at') is None:
             # resurrected row, trigger its deletion and raise empty exception
             log.msg('Resurrected row', row=result[0], row_params=data)
             connection.execute(del_query, data, consistency)
             raise exception_if_empty
+        # Do not return group if group is deleting unless we are told to do so
+        if not get_deleting and group.get('deleting', False):
+            raise exception_if_empty
+        return group
 
     d = connection.execute(view_query, data, consistency)
     return d.addCallback(_check_resurrection)
@@ -642,7 +650,20 @@ class CassScalingGroup(object):
             return d
         return wrapper
 
-    def view_manifest(self, with_policies=True, with_webhooks=False):
+    def _group_status(self, status, deleting):
+        if deleting:
+            return ScalingGroupStatus.DELETING
+        else:
+            # TODO: #1304
+            if status is None:
+                return ScalingGroupStatus.ACTIVE
+            elif status == 'DISABLED':
+                return ScalingGroupStatus.ERROR
+            else:
+                return ScalingGroupStatus.lookupByName(status)
+
+    def view_manifest(self, with_policies=True, with_webhooks=False,
+                      get_deleting=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
@@ -667,12 +688,16 @@ class CassScalingGroup(object):
                 group)
 
         def _generate_manifest_group_part(group):
-            return {
+            m = {
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'id': self.uuid,
                 'state': _unmarshal_state(group)
             }
+            if get_deleting:
+                status = self._group_status(group['status'], group['deleting'])
+                m['status'] = status.name
+            return m
 
         view_query = _cql_view_manifest.format(
             cf=self.group_table)
@@ -683,7 +708,7 @@ class CassScalingGroup(object):
                            "groupId": self.uuid},
                           DEFAULT_CONSISTENCY,
                           NoSuchScalingGroupError(self.tenant_id, self.uuid),
-                          self.log)
+                          self.log, get_deleting=get_deleting)
         d.addCallback(_generate_manifest_group_part)
 
         if with_policies:
@@ -1017,7 +1042,8 @@ class CassScalingGroup(object):
         def _do_delete(webhooks):
             # delete webhook keys
             queries, params = _del_webhook_queries(
-                self.webhooks_keys_table, webhooks)
+                self.webhooks_keys_table,
+                [{'webhookKey': w['id']} for w in webhooks])
             queries.extend([
                 _cql_delete_all_in_policy.format(cf=self.policies_table),
                 _cql_delete_all_in_policy.format(cf=self.webhooks_table)])
@@ -1028,7 +1054,8 @@ class CassScalingGroup(object):
             return b.execute(self.connection)
 
         d = self.get_policy(policy_id)
-        d.addCallback(lambda _: self._naive_list_all_webhooks())
+        d.addCallback(
+            lambda _: self._naive_list_webhooks(policy_id, QUERY_LIMIT, None))
         d.addCallback(_do_delete)
         return d
 
@@ -1231,15 +1258,18 @@ class CassScalingGroup(object):
             return d
 
         def _delete_lock_znode(result):
-            d = self.kz_client.delete(LOCK_PATH + '/' + self.uuid,
-                                      recursive=True)
-
+            # retry every 5 seconds for 5 minutes
+            d = retry(
+                lambda: self.kz_client.delete(LOCK_PATH + '/' + self.uuid),
+                can_retry=retry_times(60),
+                next_interval=repeating_interval(5),
+                clock=self.reactor,
+            )
             d.addErrback(
                 lambda f: self.log.msg(
                     "Error cleaning up lock path (when deleting group)",
                     exc=f.value,
                     otter_msg_type="ignore-delete-lock-error"))
-            return d
 
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
@@ -1433,6 +1463,7 @@ class CassScalingGroupCollection:
         d = self.connection.execute(cql.format(cf=self.group_table), params,
                                     DEFAULT_CONSISTENCY)
         d.addCallback(_filter_resurrected)
+        d.addCallback(filter(lambda g: not g['deleting']))
         d.addCallback(_build_states)
         return d
 

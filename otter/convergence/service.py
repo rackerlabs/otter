@@ -33,7 +33,7 @@ from otter.convergence.planning import plan
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
 from otter.models.interface import NoSuchScalingGroupError
 from otter.util.fp import assoc_obj
-from otter.util.zk import CreateOrSet, DeleteNode, GetChildrenWithStats
+from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 
 def server_to_json(server):
@@ -213,7 +213,8 @@ def delete_divergent_flag(log, tenant_id, group_id, version):
     path = CONVERGENCE_DIRTY_DIR + '/' + flag
     return Effect(DeleteNode(path=path, version=version)).on(
         success=lambda r: log.msg('mark-clean-success'),
-        error=lambda e: log.err(exc_info_to_failure(e), 'mark-clean-failure'))
+        error=lambda e: log.err(exc_info_to_failure(e), 'mark-clean-failure',
+                                path=path, dirty_version=version))
 
 
 class ConvergenceStarter(object):
@@ -242,20 +243,6 @@ class ConcurrentError(Exception):
     """Tried to run an effect concurrently when it shouldn't be."""
 
 
-def make_lock_set():
-    """
-    Create a multi-lock function, which is a function that takes a key and an
-    effect, and runs the effect as long as no other multi-locked effect for the
-    same key is being run.
-
-    :return: a callable of (key, Effect) -> Effect, where the result of the
-        returned Effect will be the given effect's result, or an error of
-        :obj:`ConcurrentError` if the given key already has an effect being
-        performed by the same multi-lock function.
-    """
-    return partial(non_concurrently, Reference(pset()))
-
-
 @do
 def non_concurrently(locks, key, eff):
     """
@@ -282,56 +269,47 @@ def non_concurrently(locks, key, eff):
     yield do_return(result)
 
 
-def get_my_divergent_groups(my_buckets, all_buckets):
+def get_my_divergent_groups(my_buckets, all_buckets, divergent_flags):
     """
-    Look up groups that are divergent and that are this node's
-    responsibility, according to ``my_buckets``.
+    Given a list of dirty-flags, filter out the ones that aren't associated
+    with our buckets and return them as structured data.
 
     :param my_buckets: collection of buckets allocated to this node
     :param all_buckets: collection of all buckets
+    :param divergent_flags: divergent flags that were found in zookeeper.
 
     :returns: list of dicts, where each dict has ``tenant_id``,
-        ``group_id``, and ``version`` keys.
+        ``group_id``, and ``dirty-flag`` keys.
     """
-    def structure_info(x):
+    def structure_info(path):
         # Names of the dirty flags are {tenant_id}_{group_id}.
-        path, stat = x
-        tenant, group = parse_dirty_flag(x[0])
-        return {'tenant_id': tenant, 'group_id': group,
-                'version': stat.version}
+        tenant, group = parse_dirty_flag(path)
+        return {'tenant_id': tenant,
+                'group_id': group,
+                'dirty-flag': CONVERGENCE_DIRTY_DIR + '/' + path}
 
-    def got_children_with_stats(children_with_stats):
-        dirty_info = map(structure_info, children_with_stats)
-        num_buckets = len(all_buckets)
-        converging = (
-            info for info in dirty_info
-            if bucket_of_tenant(info['tenant_id'], num_buckets) in my_buckets)
-        return list(converging)
-
-    # TODO: This is inefficient since we're getting stat information about
-    # nodes that we don't necessarily care about, but this is convenient for
-    # now.
-    # - flags of groups that aren't associated with our buckets
-    # - flags of groups that we are already converging
-    # https://github.com/rackerlabs/otter/issues/1288
-    eff = Effect(GetChildrenWithStats(CONVERGENCE_DIRTY_DIR))
-    return eff.on(got_children_with_stats)
+    dirty_info = map(structure_info, divergent_flags)
+    num_buckets = len(all_buckets)
+    converging = [
+        info for info in dirty_info
+        if bucket_of_tenant(info['tenant_id'], num_buckets) in my_buckets]
+    return converging
 
 
 @do
-def converge_one_group(log, group_locks, tenant_id, group_id, version,
+def converge_one_group(log, currently_converging, tenant_id, group_id, version,
                        execute_convergence=execute_convergence):
     """
     Converge one group, non-concurrently, and clean up the dirty flag when
     done.
 
-    :param group_locks: A lock function, produced from :func:`make_lock_set`.
+    :param Reference currently_converging: pset of currently converging groups
     :param version: version number of ZNode of the group's dirty flag
     """
     log = log.bind(tenant_id=tenant_id, group_id=group_id)
     eff = execute_convergence(tenant_id, group_id, log)
     try:
-        result = yield group_locks(group_id, eff)
+        result = yield non_concurrently(currently_converging, group_id, eff)
     except ConcurrentError:
         # We don't need to spam the logs about this, it's to be expected
         return
@@ -351,31 +329,31 @@ def converge_one_group(log, group_locks, tenant_id, group_id, version,
 
 
 @do
-def converge_all_groups(log, group_locks, my_buckets, all_buckets,
-                        get_my_divergent_groups=get_my_divergent_groups,
+def converge_all_groups(log, currently_converging, my_buckets, all_buckets,
+                        divergent_flags,
                         converge_one_group=converge_one_group):
     """
     Check for groups that need convergence and which match up to the
     buckets we've been allocated.
     """
-    # TODO: If we find that there's a group in `group_locks` that's *not* found
-    # in the divergent list in ZK, we should stop retrying convergence for that
-    # group.  This gives us a mechanism to stop convergence manually when it's
-    # spiraling out of control.
-    # https://github.com/rackerlabs/otter/issues/1215
-    group_infos = yield get_my_divergent_groups(my_buckets, all_buckets)
+    group_infos = get_my_divergent_groups(
+        my_buckets, all_buckets, divergent_flags)
+    # filter out currently converging groups
+    cc = yield currently_converging.read()
+    group_infos = [info for info in group_infos if info['group_id'] not in cc]
     if not group_infos:
         return
-    log.msg('converge-all-groups', group_infos=group_infos)
-    # TODO: Log currently converging
-    # https://github.com/rackerlabs/otter/issues/1216
+    log.msg('converge-all-groups', group_infos=group_infos,
+            currently_converging=list(cc))
+
     effs = [
-        Effect(TenantScope(
-            converge_one_group(log, group_locks,
-                               info['tenant_id'],
-                               info['group_id'],
-                               info['version']),
-            info['tenant_id']))
+        Effect(GetStat(info['dirty-flag'])).on(
+            lambda stat, info=info: Effect(TenantScope(
+                converge_one_group(log, currently_converging,
+                                   info['tenant_id'],
+                                   info['group_id'],
+                                   stat.version),
+                info['tenant_id'])))
         for info in group_infos]
     yield do_return(parallel(effs))
 
@@ -428,24 +406,30 @@ class Converger(MultiService):
         MultiService.__init__(self)
         self._dispatcher = dispatcher
         self._buckets = buckets
-        self.log = log.bind(system='converger')
+        self.log = log.bind(otter_service='converger')
         self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self.partitioner.setServiceParent(self)
-        self.group_locks = make_lock_set()
+        self.currently_converging = Reference(pset())
         self._converge_all_groups = converge_all_groups
+
+    def _converge_all(self, my_buckets, divergent_flags):
+        """Run :func:`converge_all_groups` and log errors."""
+        eff = self._converge_all_groups(self.log, self.currently_converging,
+                                        my_buckets, self._buckets,
+                                        divergent_flags)
+        return eff.on(
+            error=lambda e: self.log.err(
+                exc_info_to_failure(e), 'converge-all-groups-error'))
 
     def buckets_acquired(self, my_buckets):
         """
-        Perform the effectful result of :func:`check_convergence`.
+        Get dirty flags from zookeeper and run convergence with them.
 
         This is used as the partitioner callback.
         """
-        eff = self._converge_all_groups(self.log, self.group_locks,
-                                        my_buckets, self._buckets)
-        result = perform(self._dispatcher, eff).addErrback(
-            self.log.err, 'converge-all-groups-error')
-        # the return value is ignored, but we return this for testing
-        return result
+        eff = Effect(GetChildren(CONVERGENCE_DIRTY_DIR)).on(
+            partial(self._converge_all, my_buckets))
+        return perform(self._dispatcher, eff)
 
     def divergent_changed(self, children):
         """
@@ -454,9 +438,6 @@ class Converger(MultiService):
         tenants associated with this service's buckets, a convergence will be
         triggered.
         """
-        # It'd sure be nice if we could know *exactly which* flag was just
-        # created, but ZK watches simply don't provide that information.
-        # So we must simply converge all groups.
         my_buckets = self.partitioner.get_current_buckets()
         changed_buckets = set(
             bucket_of_tenant(parse_dirty_flag(child)[0], len(self._buckets))
@@ -464,7 +445,8 @@ class Converger(MultiService):
         if (self.partitioner.get_current_state() == PartitionState.ACQUIRED and
                 set(my_buckets).intersection(changed_buckets)):
             # the return value is ignored, but we return this for testing
-            return self.buckets_acquired(my_buckets)
+            eff = self._converge_all(my_buckets, children)
+            return perform(self._dispatcher, eff)
 
 # We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this
