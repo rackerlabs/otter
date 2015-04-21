@@ -25,6 +25,16 @@ class BreakLoopException(Exception):
     """This serves to break out of a `retry_and_timeout` loop."""
 
 
+def extract_active_ids(group_status):
+    """Extracts all server IDs from a scaling group's status report.
+
+    :param dict group_status: The successful result from
+        ``get_scaling_group_state``.
+    :result: A list of server IDs known to the scaling group.
+    """
+    return [obj['id'] for obj in group_status['group']['active']]
+
+
 def create_scaling_group_dict(
     image_ref=None, flavor_ref=None, min_entities=0, name=None,
     max_entities=25, use_lbs=None
@@ -210,9 +220,10 @@ class ScalingGroup(object):
         """
 
         def check(state):
-            if state[0] != 200:
+            code, response = state
+            if code == 404:
                 raise BreakLoopException("Scaling group not found.")
-            servers_active = len(state[1]["group"]["active"])
+            servers_active = len(response["group"]["active"])
             if servers_active == servers_desired:
                 return rcs
 
@@ -259,6 +270,64 @@ class ScalingGroup(object):
             .addCallback(check_success, [201])
             .addCallback(treq.json_content)
             .addCallback(record_results)
+        )
+
+    def wait_for_deleted_id_removal(
+        self, removed_ids, rcs, timeout=60, period=1, total_servers=None
+    ):
+        """Wait for the scaling group to reflect the true state of the tenant's
+        server states.  Out-of-band server deletions or servers which
+        transition to an ERROR state should eventually be removed from the
+        scaling group's list of active servers.
+
+        :param list removed_ids: A list of server IDs that we should expect
+            the scaling group to realize are gone eventually.
+        :param TestResources rcs: The test resources necessary to invoke API
+            calls and manage state.
+        :param int timeout: The number of seconds to wait before giving up.
+        :param int period: The number of seconds between each check for ID
+            removal.
+        :param int total_servers: If provided, the total number of servers in
+            your scaling group.  This parameter is used for error reporting
+            purposes only.
+        :return: It'll return the value of ``rcs`` if successful.  An exception
+            will be raised otherwise, including timeout.
+        """
+
+        def check(state):
+            code, response = state
+            if code == 404:
+                raise BreakLoopException(
+                    "Scaling group appears to have disappeared"
+                )
+
+            active_ids = extract_active_ids(response)
+            for deleted_id in removed_ids:
+                if deleted_id in active_ids:
+                    raise TransientRetryError()
+
+            return rcs
+
+        def poll():
+            return self.get_scaling_group_state(rcs).addCallback(check)
+
+        if total_servers:
+            report = (
+                "Scaling group failed to reflect {} of {} servers removed."
+                .format(len(removed_ids), total_servers)
+            )
+        else:
+            report = (
+                "Scaling group failed to reflect {} servers removed."
+                .format(len(removed_ids))
+            )
+
+        return retry_and_timeout(
+            poll, timeout,
+            can_retry=transient_errors_except(BreakLoopException),
+            next_interval=repeating_interval(period),
+            clock=reactor,
+            deferred_description=report,
         )
 
 

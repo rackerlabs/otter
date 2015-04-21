@@ -16,22 +16,16 @@ from twisted.web.client import HTTPConnectionPool
 
 from otter import auth
 from otter.integration.lib.autoscale import (
-    BreakLoopException,
     ScalingGroup,
     ScalingPolicy,
     create_scaling_group_dict,
+    extract_active_ids,
 )
 from otter.integration.lib.cloud_load_balancer import CloudLoadBalancer
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
 
-from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
-from otter.util.retry import (
-    TransientRetryError,
-    repeating_interval,
-    transient_errors_except,
-)
 
 
 username = os.environ['AS_USERNAME']
@@ -191,6 +185,60 @@ class TestConvergence(unittest.TestCase):
 
         return create_clb_first().addCallback(then_test)
 
+    def test_reaction_to_oob_deletion_then_scale_up(self):
+        """Exercise out-of-band server deletion, but then scale up afterwards.
+        The goal is to spin up, say, three servers, then use Nova to delete
+        one of them directly, without Autoscale's knowledge.  Then we scale up
+        by, say, two servers.  If convergence is working as expected, we expect
+        five servers at the end.
+        """
+
+        rcs = TestResources()
+
+        scaling_group_body = create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=3
+        )
+
+        self.scaling_group = ScalingGroup(
+            group_config=scaling_group_body,
+            pool=self.pool
+        )
+
+        self.scaling_policy = ScalingPolicy(
+            scale_by=2,
+            scaling_group=self.scaling_group
+        )
+
+        return (
+            self.identity.authenticate_user(rcs)
+            .addCallback(
+                rcs.find_end_point,
+                "otter", "autoscale", region,
+                default_url='http://localhost:9000/v1.0/{0}'
+            ).addCallback(
+                rcs.find_end_point,
+                "nova", "cloudServersOpenStack", region
+            ).addCallback(self.scaling_group.start, self)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers, 3, timeout=1800
+            ).addCallback(self.scaling_group.get_scaling_group_state)
+            .addCallback(self._choose_random_servers, 1)
+            .addCallback(self._delete_those_servers, rcs)
+            .addCallback(self.scaling_policy.start, self)
+            .addCallback(self.scaling_policy.execute)
+            .addCallback(lambda _: self.removed_ids)
+            .addCallback(
+                self.scaling_group.wait_for_deleted_id_removal,
+                rcs,
+                total_servers=3,
+            )
+            .addCallback(
+                self.scaling_group.wait_for_N_servers, 5, timeout=1800
+            )
+        )
+    test_reaction_to_oob_deletion_then_scale_up.timeout = 1800
+
     def test_reaction_to_oob_server_deletion(self):
         """Exercise out-of-band server deletion.  The goal is to spin up, say,
         eight servers, then use Nova to delete four of them.  We should be able
@@ -235,9 +283,14 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self._delete_those_servers, rcs)
             .addCallback(self.scaling_policy.start, self)
             .addCallback(self.scaling_policy.execute)
-            .addCallback(self._wait_for_autoscale_to_catch_up, rcs)
+            .addCallback(lambda _: self.removed_ids)
+            .addCallback(
+                self.scaling_group.wait_for_deleted_id_removal,
+                rcs,
+                total_servers=N_SERVERS,
+            )
         )
-    test_reaction_to_oob_server_deletion.timeout = 600
+    test_reaction_to_oob_server_deletion.timeout = 1800
 
     def _choose_half_the_servers(self, (code, response)):
         """Select the first half of the servers returned by the
@@ -246,9 +299,9 @@ class TestConvergence(unittest.TestCase):
         should be roughly half) in ``n_killed``.
         """
 
-        if code != 200:
+        if code == 404:
             raise Exception("Got 404; where'd the scaling group go?")
-        ids = map(lambda obj: obj['id'], response['group']['active'])
+        ids = extract_active_ids(response)
         self.n_servers = len(ids)
         self.n_killed = self.n_servers / 2
         return ids[:self.n_killed]
@@ -258,9 +311,9 @@ class TestConvergence(unittest.TestCase):
         ``get_scaling_group_state`` function.
         """
 
-        if code != 200:
+        if code == 404:
             raise Exception("Got 404; dude, where's my scaling group?")
-        ids = map(lambda obj: obj['id'], response['group']['active'])
+        ids = extract_active_ids(response)
         self.n_servers = len(ids)
         self.n_killed = n
         return random.sample(ids, n)
@@ -279,44 +332,7 @@ class TestConvergence(unittest.TestCase):
             )
 
         deferreds = map(delete_server_by_id, ids)
+        self.removed_ids = ids
         # If no error occurs while deleting, all the results will be the
         # same.  So just return the 1st, which is just our rcs value.
         return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
-
-    def _wait_for_autoscale_to_catch_up(
-        self, _, rcs, timeout=60, period=1, delta=1
-    ):
-        """Wait for the converger to recognize the reality of this tenant's
-        situation and reflect it in the scaling group state accordingly.
-
-        Most tests are organized to execute a scale-up policy with a +1 delta.
-        For this reason, if you don't specify a ``delta`` kwArg, it defaults to
-        1.  For those tests which have a different scale-up policy, you'll need
-        to specify the delta you use explicitly.
-        """
-
-        def check((code, response)):
-            if code != 200:
-                raise BreakLoopException(
-                    "Scaling group appears to have disappeared"
-                )
-
-            n_remaining = self.n_servers - self.n_killed + delta
-            if len(response["group"]["active"]) == n_remaining:
-                return rcs
-
-            raise TransientRetryError()
-
-        def poll():
-            return self.get_scaling_group_state(rcs).addCallback(check)
-
-        return retry_and_timeout(
-            poll, timeout,
-            can_retry=transient_errors_except(BreakLoopException),
-            next_interval=repeating_interval(period),
-            clock=reactor,
-            deferred_description=(
-                "Waiting for Autoscale to see we killed {} servers of "
-                "{}.".format(self.n_killed, self.n_servers)
-            )
-        )
