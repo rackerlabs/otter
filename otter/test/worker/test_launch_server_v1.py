@@ -1591,9 +1591,9 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
             'imageRef': '1', 'flavorRef': '1', 'name': 'as000000',
             'metadata': {
                 'rax:auto_scaling_group_id': '1111111-11111-11111-11111111',
-                'rax:auto_scaling_lbids': '[12345, 54321]',
-                'rax:auto_scaling:lb:12345': '{"port": 80}',
-                'rax:auto_scaling:lb:54321': '{"port": 81}'
+                'rax:autoscale:group:id': '1111111-11111-11111-11111111',
+                'rax:autoscale:lb:CloudLoadBalancer:12345': '[{"port": 80}]',
+                'rax:autoscale:lb:CloudLoadBalancer:54321': '[{"port": 81}]'
             }
         }
 
@@ -2042,8 +2042,10 @@ class ConfigPreparationTests(SynchronousTestCase):
         """
         output = generate_server_metadata(self.scaling_group_uuid,
                                           {'server': {}})
-        self.assertEqual(output,
-                         {'rax:auto_scaling_group_id': self.scaling_group_uuid})
+        self.assertEqual(
+            output,
+            {'rax:auto_scaling_group_id': self.scaling_group_uuid,
+             'rax:autoscale:group:id': self.scaling_group_uuid})
 
     def test_generate_server_metadata_adds_lb_index_and_lb_keys(self):
         """
@@ -2059,9 +2061,9 @@ class ConfigPreparationTests(SynchronousTestCase):
             ]})
         self.assertEqual(output, {
             'rax:auto_scaling_group_id': self.scaling_group_uuid,
-            'rax:auto_scaling_lbids': '[1, 2]',
-            'rax:auto_scaling:lb:1': '{"port": 80}',
-            'rax:auto_scaling:lb:2': '{"port": 2200}'
+            'rax:autoscale:group:id': self.scaling_group_uuid,
+            'rax:autoscale:lb:CloudLoadBalancer:1': '[{"port": 80}]',
+            'rax:autoscale:lb:CloudLoadBalancer:2': '[{"port": 2200}]'
         })
 
     def test_server_name_suffix(self):
@@ -2095,7 +2097,8 @@ class ConfigPreparationTests(SynchronousTestCase):
         """
         test_config = {'server': {}}
         expected_metadata = {
-            'rax:auto_scaling_group_id': self.scaling_group_uuid}
+            'rax:auto_scaling_group_id': self.scaling_group_uuid,
+            'rax:autoscale:group:id': self.scaling_group_uuid}
 
         launch_config = prepare_launch_config(self.scaling_group_uuid,
                                               test_config)
@@ -2110,6 +2113,7 @@ class ConfigPreparationTests(SynchronousTestCase):
         test_config = {'server': {'metadata': {'foo': 'bar'}}}
         expected_metadata = {
             'rax:auto_scaling_group_id': self.scaling_group_uuid,
+            'rax:autoscale:group:id': self.scaling_group_uuid,
             'foo': 'bar'}
 
         launch_config = prepare_launch_config(self.scaling_group_uuid,

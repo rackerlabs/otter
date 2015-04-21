@@ -31,7 +31,8 @@ from twisted.internet.task import deferLater
 from twisted.python.failure import Failure
 
 from otter.auth import public_endpoint_url
-from otter.convergence.model import _servicenet_address
+from otter.convergence.composition import json_to_LBConfigs
+from otter.convergence.model import _servicenet_address, generate_metadata
 from otter.convergence.steps import UnexpectedServerStatus, set_server_name
 from otter.util import logging_treq as treq
 from otter.util.config import config_value
@@ -581,20 +582,8 @@ def generate_server_metadata(group_id, launch_config):
     :return dict: The autoscaling-specific part of the metadata with which to
         create a server of this particular autoscaling group
     """
-    metadata = {'rax:auto_scaling_group_id': group_id}
-    lbs = launch_config.get('loadBalancers', [])
-
-    if lbs:
-        lbids = []
-        for lb_config in lbs:
-            config_without_lbid = lb_config.copy()
-            lb_id = config_without_lbid.pop('loadBalancerId')
-            lbids.append(lb_id)
-            metadata['rax:auto_scaling:lb:{0}'.format(lb_id)] = json.dumps(
-                config_without_lbid)
-
-        metadata['rax:auto_scaling_lbids'] = json.dumps(lbids)
-    return metadata
+    lbs = freeze(launch_config.get('loadBalancers', []))
+    return generate_metadata(group_id, json_to_LBConfigs(lbs))
 
 
 def _without_otter_metadata(metadata):
