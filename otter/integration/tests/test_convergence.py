@@ -174,10 +174,12 @@ class TestConvergence(unittest.TestCase):
                 .addCallback(self._choose_random_servers, 2)
                 .addCallback(self._delete_those_servers, rcs)
                 .addCallback(self.second_scaling_policy.execute)
+                .addCallback(lambda _: self.removed_ids)
                 .addCallback(
-                    self._wait_for_autoscale_to_catch_up, rcs, delta=-1
-                )
-                .addCallback(self.third_scaling_policy.execute)
+                    self.scaling_group.wait_for_deleted_id_removal,
+                    rcs,
+                    total_servers=24,
+                ).addCallback(self.third_scaling_policy.execute)
                 .addCallback(
                     self.scaling_group.wait_for_N_servers, 25, timeout=1800
                 )
@@ -232,8 +234,7 @@ class TestConvergence(unittest.TestCase):
                 self.scaling_group.wait_for_deleted_id_removal,
                 rcs,
                 total_servers=3,
-            )
-            .addCallback(
+            ).addCallback(
                 self.scaling_group.wait_for_N_servers, 5, timeout=1800
             )
         )
