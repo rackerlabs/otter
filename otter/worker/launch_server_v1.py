@@ -16,7 +16,6 @@ initiating a launch_server job.
 
 import json
 import re
-from copy import deepcopy
 from functools import partial
 from urllib import urlencode
 
@@ -34,7 +33,7 @@ from otter.auth import public_endpoint_url
 from otter.convergence.composition import (
     json_to_LBConfigs,
     prepare_server_launch_config)
-from otter.convergence.model import _servicenet_address, generate_metadata
+from otter.convergence.model import _servicenet_address
 from otter.convergence.steps import UnexpectedServerStatus, set_server_name
 from otter.util import logging_treq as treq
 from otter.util.config import config_value

@@ -1866,10 +1866,11 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_active')
-    def test_launch_retries_on_error(self, mock_wfa, mock_cs, mock_addlb, mock_vd):
+    def test_launch_retries_on_error(self, mock_wfa, mock_cs, mock_addlb,
+                                     mock_vd):
         """
-        If server goes into ERROR state, launch_server deletes it and creates a new
-        one instead
+        If server goes into ERROR state, launch_server deletes it and creates
+        a new one instead
         """
         launch_config = {
             'server': {'imageRef': '1', 'flavorRef': '1'},
