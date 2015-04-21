@@ -287,6 +287,8 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
 
 DEFAULT_CONSISTENCY = ConsistencyLevel.QUORUM
 
+QUERY_LIMIT = 10000
+
 
 def _build_policies(policies, policies_table, event_table, queries, data,
                     buckets):
@@ -1040,7 +1042,8 @@ class CassScalingGroup(object):
         def _do_delete(webhooks):
             # delete webhook keys
             queries, params = _del_webhook_queries(
-                self.webhooks_keys_table, webhooks)
+                self.webhooks_keys_table,
+                [{'webhookKey': w['id']} for w in webhooks])
             queries.extend([
                 _cql_delete_all_in_policy.format(cf=self.policies_table),
                 _cql_delete_all_in_policy.format(cf=self.webhooks_table)])
@@ -1051,7 +1054,8 @@ class CassScalingGroup(object):
             return b.execute(self.connection)
 
         d = self.get_policy(policy_id)
-        d.addCallback(lambda _: self._naive_list_all_webhooks())
+        d.addCallback(
+            lambda _: self._naive_list_webhooks(policy_id, QUERY_LIMIT, None))
         d.addCallback(_do_delete)
         return d
 

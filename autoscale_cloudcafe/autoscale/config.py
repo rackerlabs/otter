@@ -356,4 +356,4 @@ class AutoscaleConfig(ConfigSectionInterface):
         """
         Specify whether this configuration is against a mimic instance.
         """
-        return bool(self.get('mimic'))
+        return self.get('mimic', 'false').lower() == 'true'
