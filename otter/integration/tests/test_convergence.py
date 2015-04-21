@@ -62,7 +62,7 @@ class TestConvergence(unittest.TestCase):
             return deferLater(reactor, 0, _check_fds, None)
         return self.pool.closeCachedConnections().addBoth(_check_fds)
 
-    def test_reaction_to_oob_deletion_after_scale_up(self):
+    def test_reaction_to_oob_deletion_then_scale_up(self):
         """Exercise out-of-band server deletion, but then scale up afterwards.
         The goal is to spin up, say, three servers, then use Nova to delete
         one of them directly, without Autoscale's knowledge.  Then we scale up
@@ -114,7 +114,7 @@ class TestConvergence(unittest.TestCase):
                 self.scaling_group.wait_for_N_servers, 5, timeout=1800
             )
         )
-    test_reaction_to_oob_deletion_after_scale_up.timeout = 1800
+    test_reaction_to_oob_deletion_then_scale_up.timeout = 1800
 
     def test_reaction_to_oob_server_deletion(self):
         """Exercise out-of-band server deletion.  The goal is to spin up, say,
