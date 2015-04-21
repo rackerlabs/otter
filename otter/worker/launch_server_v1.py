@@ -564,8 +564,8 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
 
 def _without_otter_metadata(metadata):
     """
-    Return a copy of the metadata with all the otter-group-ID-specific keys
-    removed.  (We want to leave the load balancer)
+    Return a copy of the metadata with all the otter-specific keys
+    removed.
     """
     return {k: v for (k, v) in metadata.iteritems()
             if not (k.startswith("rax:auto_scaling") or
