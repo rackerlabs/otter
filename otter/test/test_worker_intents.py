@@ -10,9 +10,9 @@ from effect import sync_perform
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.supervisor import set_supervisor
+from otter.test.utils import FakeSupervisor, mock_group
 from otter.worker_intents import (
     EvictServerFromScalingGroup, perform_evict_server)
-from otter.test.utils import FakeSupervisor, mock_group
 
 
 class PerformEvictionTests(SynchronousTestCase):
