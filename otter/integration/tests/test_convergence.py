@@ -217,14 +217,13 @@ class TestConvergence(unittest.TestCase):
         )
 
         return (
-            self.identity.authenticate_user(rcs)
-            .addCallback(
-                rcs.find_end_point,
-                "otter", "autoscale", region,
-                default_url='http://localhost:9000/v1.0/{0}'
-            ).addCallback(
-                rcs.find_end_point,
-                "nova", "cloudServersOpenStack", region
+            self.identity.authenticate_user(
+                rcs,
+                resources={
+                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
+                    "nova": ("cloudServersOpenStack",),
+                },
+                region=region
             ).addCallback(self.scaling_group.start, self)
             .addCallback(
                 self.scaling_group.wait_for_N_servers, 3, timeout=1800
@@ -271,14 +270,13 @@ class TestConvergence(unittest.TestCase):
         )
 
         return (
-            self.identity.authenticate_user(rcs)
-            .addCallback(
-                rcs.find_end_point,
-                "otter", "autoscale", region,
-                default_url='http://localhost:9000/v1.0/{0}'
-            ).addCallback(
-                rcs.find_end_point,
-                "nova", "cloudServersOpenStack", region
+            self.identity.authenticate_user(
+                rcs,
+                resources={
+                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
+                    "nova": ("cloudServersOpenStack",),
+                },
+                region=region
             ).addCallback(self.scaling_group.start, self)
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
