@@ -38,6 +38,7 @@ region = os.environ['AS_REGION']
 # not throw an exception.  None is a valid value for convergence_tenant.
 convergence_tenant = os.environ.get('AS_CONVERGENCE_TENANT')
 
+
 class TestConvergence(unittest.TestCase):
     """This class contains test cases aimed at the Otter Converger."""
 
