@@ -95,7 +95,7 @@ class TestConvergence(unittest.TestCase):
         )
 
         return (
-            self.identity.authenticate_user(rcs, tenant_id="000000")
+            self.identity.authenticate_user(rcs, tenant_id=ce_tenant)
             .addCallback(
                 rcs.find_end_point,
                 "otter", "autoscale", region,
@@ -155,7 +155,7 @@ class TestConvergence(unittest.TestCase):
         )
 
         return (
-            self.identity.authenticate_user(rcs, tenant_id="000000")
+            self.identity.authenticate_user(rcs, tenant_id=ce_tenant)
             .addCallback(
                 rcs.find_end_point,
                 "otter", "autoscale", region,
@@ -273,7 +273,7 @@ class TestConvergence(unittest.TestCase):
         self.n_killed = self.n_servers / 2
         return ids[:self.n_killed]
 
-    def _choose_servers_from_active_list(self, (code, response),
+    def _choose_servers_from_active_list(self, state,
                                          num_servers=None):
         """Select the first 'num_servers' of the servers returned by the
         ``get_scaling_group_state`` function.  Record the number of servers
@@ -283,7 +283,7 @@ class TestConvergence(unittest.TestCase):
         If the number of servers requested is less than the number active,
         an error will be raised.
         """
-
+        code, response = state
         if code != 200:
             raise Exception("Not 200!; Asking for the state didn't work.")
         ids = extract_active_ids(response)
@@ -292,11 +292,11 @@ class TestConvergence(unittest.TestCase):
             return ids[:num_servers]
         return ids
 
-    def _choose_random_servers(self, (code, response), n):
+    def _choose_random_servers(self, state, n):
         """Selects ``n`` randomly selected servers from those returned by the
         ``get_scaling_group_state`` function.
         """
-
+        code, response = state
         if code == 404:
             raise Exception("Got 404; dude, where's my scaling group?")
         ids = extract_active_ids(response)
@@ -319,7 +319,6 @@ class TestConvergence(unittest.TestCase):
                 .addCallback(lambda _: rcs)
             )
 
-        self.deleted_server_ids = ids
         deferreds = map(delete_server_by_id, ids)
         self.removed_ids = ids
         # If no error occurs while deleting, all the results will be the
