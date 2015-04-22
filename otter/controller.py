@@ -57,8 +57,7 @@ from otter.supervisor import (
     ServerNotFoundError,
     get_supervisor,
     exec_scale_down,
-    execute_launch_config,
-    perform_evict_server)
+    execute_launch_config)
 from otter.supervisor import (
     remove_server_from_group as worker_remove_server_from_group)
 from otter.util.config import config_value
@@ -69,7 +68,7 @@ from otter.util.retry import (
     retry_effect,
     retry_times)
 from otter.util.timestamp import from_timestamp
-from otter.worker_intents import EvictServerFromScalingGroup
+from otter.worker_intents import EvictServerFromScalingGroup, perform_evict_server
 
 
 class CannotExecutePolicyError(Exception):
@@ -422,7 +421,7 @@ def _can_scale_down(group, server_id):
 
 @do
 def convergence_remove_server_from_group(
-        log, transaction_id, group, state, server_id, replace, purge):
+        log, transaction_id, server_id, replace, purge, group, state):
     """
     Remove a specific server from the group, optionally decrementing the
     desired capacity.
@@ -505,7 +504,7 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
     # convergence case
     cs = get_convergence_starter()
     eff = convergence_remove_server_from_group(
-        log, trans_id, group, server_id, replace, purge)
+        log, trans_id, server_id, replace, purge, group, state)
 
     # Not setting up a function go get dispatcher in `effect_dispatcher`
     # because that would cause a circular import (supervisor currently

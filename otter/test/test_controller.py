@@ -1234,8 +1234,8 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
 
     def _remove(self, replace, purge, dispatcher):
         eff = controller.convergence_remove_server_from_group(
-            self.log, self.trans_id, self.group, self.state, 'server_id',
-            replace, purge)
+            self.log, self.trans_id, 'server_id', replace, purge,
+            self.group, self.state)
         return sync_perform(self._composed_dispatcher(dispatcher), eff)
 
     def test_no_such_server_replace_true(self):
@@ -1460,22 +1460,21 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.log, self.trans_id, 'server_id', False, False,
             self.group, self.state)
 
-    @mock.patch('otter.controller.get_convergence_starter',
-                dispatcher=test_dispatcher)
+    @mock.patch('otter.controller.get_convergence_starter')
     @mock.patch('otter.controller.get_supervisor',
                 return_value=FakeSupervisor())
     @mock.patch('otter.controller.convergence_remove_server_from_group',
                 wraps=controller.convergence_remove_server_from_group)
     def test_convergence_uses_convergence_remove(self, mock_converge_remove,
                                                  mock_get_supervisor,
-                                                 mock_get_convergence_starter):
+                                                 mock_get_starter):
         """
         If the tenant is convergence-enabled, the controller's
         :func:`remove_server_from_group` calls
         :func:`convergence_remove_server_from_group` and performs the effect
         with a dispatcher that can handle :class:`EvictServerFromScalingGroup`
         """
-        mock_get_convergence_starter.dispatcher = self._composed_dispatcher(
+        mock_get_starter.return_value.dispatcher = self._composed_dispatcher(
             SequenceDispatcher([
                 (get_server_details('server_id').intent,
                     lambda _: self.server_details),
@@ -1484,15 +1483,16 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                     lambda _: self.group_manifest_info)]))
 
         d = controller.remove_server_from_group(
-            self.log, self.trans_id, 'server_id', False, False,
+            self.log, self.trans_id, 'server_id', True, False,
             self.group, self.state,
             config_value={'convergence-tenants': [self.group.tenant_id]}.get)
 
-        self.assertEqual(self.successResultOf(d), None)
+        self.assertEqual(self.successResultOf(d), self.state)
 
         # this just wraps the call so we can tell that it was called
         mock_converge_remove.assert_called_once_with(
-            self.log, self.trans_id, self.group, 'server_id', False, False)
+            self.log, self.trans_id, 'server_id', True, False, self.group,
+            self.state)
 
         self.assertEqual(mock_get_supervisor.return_value.scrub_calls,
                          [(self.log, self.trans_id, self.group.tenant_id,
