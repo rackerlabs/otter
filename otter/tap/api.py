@@ -196,7 +196,8 @@ def makeService(config):
             config_value('cassandra.timeout') or 30),
         log.bind(system='otter.silverberg'))
 
-    store = CassScalingGroupCollection(cassandra_cluster, reactor)
+    store = CassScalingGroupCollection(
+        cassandra_cluster, reactor, config_value('limits.absolute.maxGroups'))
     admin_store = CassAdmin(cassandra_cluster)
 
     bobby_url = config_value('bobby_url')

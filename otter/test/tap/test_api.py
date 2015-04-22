@@ -51,7 +51,8 @@ test_config = {
     'cloudLoadBalancers': 'cloudLoadBalancers',
     'rackconnect': 'rackconnect',
     'metrics': {'service': 'cloudMetricsIngest',
-                'region': 'IAD'}
+                'region': 'IAD'},
+    'limits': {'absolute': {'maxGroups': 100}}
 }
 
 
@@ -423,6 +424,14 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.Otter.assert_called_once_with(self.store, 'ord',
                                            self.health_checker.health_check,
                                            es_host=None)
+
+    def test_max_groups(self):
+        """
+        CassScalingGroupCollection is created with max groups taken from
+        config
+        """
+        makeService(test_config)
+        self.assertEqual(self.store.max_groups, 100)
 
     @mock.patch('otter.tap.api.reactor')
     @mock.patch('otter.tap.api.generate_authenticator')
