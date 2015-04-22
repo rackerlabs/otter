@@ -46,7 +46,10 @@ def legacy_intents():
 def full_intents():
     return legacy_intents() + [
         CreateOrSet(path='foo', content='bar'),
-        GetScalingGroupInfo(tenant_id='foo', group_id='bar')
+        GetScalingGroupInfo(tenant_id='foo', group_id='bar'),
+        EvictServerFromScalingGroup(log='log', transaction_id='transaction_id',
+                                    scaling_group='scaling_group',
+                                    server_id='server_id')
     ]
 
 
@@ -87,7 +90,8 @@ class LegacyDispatcherTests(SynchronousTestCase, IntentSupportMixin):
         # This is not testing much, but at least that it calls
         # perform_tenant_scope in a vaguely working manner. There are
         # more specific TenantScope performer tests in otter.test.test_http
-        dispatcher = get_full_dispatcher(None, None, None, None, None, None)
+        dispatcher = get_full_dispatcher(
+            None, None, None, None, None, None, None)
         scope = TenantScope(Effect(Constant('foo')), 1)
         eff = Effect(scope)
         self.assertEqual(sync_perform(dispatcher, eff), 'foo')
@@ -97,7 +101,7 @@ class FullDispatcherTests(SynchronousTestCase, IntentSupportMixin):
     """Tests for :func:`get_full_dispatcher`."""
 
     def get_dispatcher(self):
-        return get_full_dispatcher(None, None, None, None, None, None)
+        return get_full_dispatcher(None, None, None, None, None, None, None)
 
     def get_intents(self):
         return full_intents()
@@ -131,12 +135,6 @@ class CQLDispatcherTests(SynchronousTestCase):
 class EvictionDispatcherTests(SynchronousTestCase):
     """Tests for :func:`get_eviction_dispatcher`."""
 
-    def test_intent_support(self):
-        """Basic intents are supported by the dispatcher."""
-        dispatcher = get_simple_dispatcher(None)
-        for intent in simple_intents():
-            self.assertIsNot(dispatcher(intent), None)
-
     @mock.patch('otter.effect_dispatcher.perform_evict_server')
     def test_eviction_dispatcher(self, mock_performer):
         """The :obj:`EvictServerFromScalingGroup` performer is called."""
@@ -149,7 +147,7 @@ class EvictionDispatcherTests(SynchronousTestCase):
 
         mock_performer.side_effect = performer
 
-        dispatcher = get_eviction_dispatcher(object(), 'supervisor')
+        dispatcher = get_eviction_dispatcher('supervisor')
         intent = EvictServerFromScalingGroup(
             log='log', transaction_id='transaction_id',
             scaling_group='scaling_group', server_id='server_id')

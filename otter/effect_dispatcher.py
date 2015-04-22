@@ -48,7 +48,7 @@ def get_simple_dispatcher(reactor):
 
 
 def get_full_dispatcher(reactor, authenticator, log, service_configs,
-                        kz_client, store):
+                        kz_client, store, supervisor):
     """
     Return a dispatcher that can perform all of Otter's effects.
     """
@@ -56,6 +56,7 @@ def get_full_dispatcher(reactor, authenticator, log, service_configs,
         get_legacy_dispatcher(reactor, authenticator, log, service_configs),
         get_zk_dispatcher(kz_client),
         get_model_dispatcher(log, store),
+        get_eviction_dispatcher(supervisor)
     ])
 
 
@@ -87,17 +88,13 @@ def get_cql_dispatcher(reactor, connection):
     ])
 
 
-def get_eviction_dispatcher(reactor, supervisor):
+def get_eviction_dispatcher(supervisor):
     """
     Get a dispatcher with :class:`EvictServerFromScalingGroup`'s performer.
 
     :param reactor: Twisted reactor
     :param supervisor: a :class:`otter.supervisor.ISupervisor` provider
     """
-    return ComposedDispatcher([
-        get_simple_dispatcher(reactor),
-        TypeDispatcher({
-            EvictServerFromScalingGroup: partial(
-                perform_evict_server, supervisor)
-        })
-    ])
+    return TypeDispatcher({
+        EvictServerFromScalingGroup: partial(perform_evict_server, supervisor)
+    })
