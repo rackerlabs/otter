@@ -247,6 +247,14 @@ class PerformServiceRequestTests(SynchronousTestCase):
 
         self.assertEqual(cm.exception.body, "THIS IS A FAILURE")
 
+    def test_params(self):
+        """Params are passed through."""
+        svcreq = service_request(ServiceType.CLOUD_SERVERS, "GET", "servers",
+                                 params={"foo": ["bar"]}).intent
+        eff = self._concrete(svcreq)
+        pure_request_eff = resolve_authenticate(eff)
+        self.assertEqual(pure_request_eff.intent.params, {"foo": ["bar"]})
+
 
 class PerformTenantScopeTests(SynchronousTestCase):
     """Tests for :func:`perform_tenant_scope`."""
