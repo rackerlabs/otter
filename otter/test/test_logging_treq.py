@@ -41,18 +41,19 @@ class LoggingTreqTest(SynchronousTestCase):
 
         self.url = 'myurl'
 
-    def _assert_success_logging(self, method, status, request_time):
+    def _assert_success_logging(self, method, status, request_time,
+                                url_params=None):
         """
         msg expected to be made on a successful request are logged
         """
         self.assertEqual(self.log.msg.mock_calls, [
             mock.call(mock.ANY, url=self.url, system="treq.request",
                       method=method, treq_request_id=mock.ANY,
-                      url_params=None),
+                      url_params=url_params),
             mock.call(
                 mock.ANY, url=self.url, status_code=status, headers={'1': '2'},
                 system="treq.request", request_time=request_time,
-                method=method, treq_request_id=mock.ANY, url_params=None)
+                method=method, treq_request_id=mock.ANY, url_params=url_params)
         ])
 
     def _assert_failure_logging(self, method, exception_type, request_time):
@@ -84,6 +85,18 @@ class LoggingTreqTest(SynchronousTestCase):
 
         self.assertIs(self.successResultOf(d), self.response)
         self._assert_success_logging('patch', 204, 5)
+
+    def test_url_params(self):
+        """`params` is logged as `url_params`."""
+        params = {'key': 'val'}
+        d = logging_treq.request('get', self.url, headers={}, data='',
+                                 log=self.log, params=params, clock=self.clock)
+        self.clock.advance(5)
+        self.treq.request.return_value.callback(self.response)
+        self.treq.request.assert_called_once_with(
+            method='get', url=self.url, headers={}, data='', params=params)
+        self.assertIs(self.successResultOf(d), self.response)
+        self._assert_success_logging('get', 204, 5, url_params=params)
 
     def test_request_failure(self):
         """
