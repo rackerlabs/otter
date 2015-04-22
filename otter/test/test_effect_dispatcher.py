@@ -12,13 +12,17 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.auth import Authenticate, InvalidateToken
 from otter.cloud_client import TenantScope
 from otter.effect_dispatcher import (
-    get_cql_dispatcher, get_full_dispatcher, get_legacy_dispatcher,
+    get_cql_dispatcher,
+    get_eviction_dispatcher,
+    get_full_dispatcher,
+    get_legacy_dispatcher,
     get_simple_dispatcher)
 from otter.models.cass import CQLQueryExecute
 from otter.models.intents import GetScalingGroupInfo
 from otter.util.pure_http import Request
 from otter.util.retry import Retry
 from otter.util.zk import CreateOrSet
+from otter.worker_intents import EvictServerFromScalingGroup
 
 
 def simple_intents():
@@ -122,3 +126,34 @@ class CQLDispatcherTests(SynchronousTestCase):
         intent = CQLQueryExecute(query='q', params='p', consistency_level=1)
         eff = Effect(intent)
         self.assertEqual(sync_perform(dispatcher, eff), 'pconn')
+
+
+class EvictionDispatcherTests(SynchronousTestCase):
+    """Tests for :func:`get_eviction_dispatcher`."""
+
+    def test_intent_support(self):
+        """Basic intents are supported by the dispatcher."""
+        dispatcher = get_simple_dispatcher(None)
+        for intent in simple_intents():
+            self.assertIsNot(dispatcher(intent), None)
+
+    @mock.patch('otter.effect_dispatcher.perform_evict_server')
+    def test_eviction_dispatcher(self, mock_performer):
+        """The :obj:`EvictServerFromScalingGroup` performer is called."""
+
+        @deferred_performer
+        def performer(supervisor, d, i):
+            return succeed(
+                (supervisor,
+                 i.log, i.transaction_id, i.scaling_group, i.server_id))
+
+        mock_performer.side_effect = performer
+
+        dispatcher = get_eviction_dispatcher(object(), 'supervisor')
+        intent = EvictServerFromScalingGroup(
+            log='log', transaction_id='transaction_id',
+            scaling_group='scaling_group', server_id='server_id')
+        eff = Effect(intent)
+        self.assertEqual(sync_perform(dispatcher, eff),
+                         ('supervisor', 'log', 'transaction_id',
+                          'scaling_group', 'server_id'))
