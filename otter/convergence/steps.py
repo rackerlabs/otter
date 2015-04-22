@@ -331,7 +331,9 @@ class AddNodesToCLB(object):
                 _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN)))
 
         def report_success(result):
-            return StepResult.SUCCESS, []
+            return StepResult.RETRY, [
+                'must re-gather after adding to CLB in order to update the '
+                'active cache']
 
         def report_api_failure(result):
             """
@@ -384,8 +386,9 @@ class RemoveNodesFromCLB(object):
                                _CLB_DELETED_PATTERN)))
         # 400 means that there are some nodes that are no longer on the
         # load balancer.  Parse them out and try again.
-        return eff.on(partial(
+        eff = eff.on(partial(
             _clb_check_bulk_delete, self.lb_id, self.node_ids))
+        return eff.on(lambda r: (StepResult.SUCCESS, []))
 
 
 def _clb_check_bulk_delete(lb_id, attempted_nodes, result):
@@ -575,7 +578,9 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
         next_step = BulkAddToRCv3(lb_node_pairs=to_retry)
         return next_step.as_effect()
     else:
-        return StepResult.SUCCESS, []
+        return StepResult.RETRY, [
+            'must re-gather after adding to LB in order to update the active '
+            'cache']
 
 
 @implementer(IStep)
