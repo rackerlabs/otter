@@ -349,10 +349,8 @@ class ScalingGroup(object):
             n_pending = response["group"]["pendingCapacity"]
             n_desired = response["group"]["desiredCapacity"]
 
-            if ((active is None or active == n_active)
-                    and
-                    (pending is None or pending == n_pending)
-                    and
+            if ((active is None or active == n_active) and
+                    (pending is None or pending == n_pending) and
                     (desired is None or desired == n_desired)):
                 return rcs
 
