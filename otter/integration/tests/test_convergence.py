@@ -243,7 +243,7 @@ class TestConvergence(unittest.TestCase):
                 self.scaling_group.wait_for_N_servers,
                 set_to_servers, timeout=120
             ).addCallback(self.scaling_group.get_scaling_group_state)
-            .addCallback(self._choose_servers_from_active_list, oobd_servers)
+            .addCallback(self._choose_random_servers, oobd_servers)
             .addCallback(self._delete_those_servers, rcs)
             # The execution of the policy triggers convergence
             .addCallback(self.policy_scale.start, self)
@@ -272,25 +272,6 @@ class TestConvergence(unittest.TestCase):
         self.n_servers = len(ids)
         self.n_killed = self.n_servers / 2
         return ids[:self.n_killed]
-
-    def _choose_servers_from_active_list(self, state,
-                                         num_servers=None):
-        """Select the first 'num_servers' of the servers returned by the
-        ``get_scaling_group_state`` function.  Record the number of servers
-        received in ``active_servers`` attribute. If no num_servers is
-        provided, all active servers will be returned.
-
-        If the number of servers requested is less than the number active,
-        an error will be raised.
-        """
-        code, response = state
-        if code != 200:
-            raise Exception("Not 200!; Asking for the state didn't work.")
-        ids = extract_active_ids(response)
-        self.active_servers = len(ids)
-        if num_servers:
-            return ids[:num_servers]
-        return ids
 
     def _choose_random_servers(self, state, n):
         """Selects ``n`` randomly selected servers from those returned by the
