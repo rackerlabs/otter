@@ -10,19 +10,16 @@ from effect.testing import EQDispatcher, EQFDispatcher, SequenceDispatcher
 from kazoo.exceptions import BadVersionError
 from kazoo.recipe.partitioner import PartitionState
 
-import mock
-
 from pyrsistent import freeze, pbag, pmap, pset, s
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.cloud_client import TenantScope, service_request
-from otter.constants import CONVERGENCE_DIRTY_DIR, ServiceType
+from otter.cloud_client import TenantScope
+from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.model import (
-    CLBDescription, CLBNode, DesiredGroupState, NovaServer, ServerState,
-    StepResult)
+    CLBDescription, CLBNode, NovaServer, ServerState, StepResult)
 from otter.convergence.service import (
     ConcurrentError,
     ConvergenceStarter,
@@ -649,6 +646,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
+
         def plan(dgs, servers, lb_nodes, now):
             return [
                 TestStep(
