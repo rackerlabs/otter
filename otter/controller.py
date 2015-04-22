@@ -505,19 +505,7 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
     cs = get_convergence_starter()
     eff = convergence_remove_server_from_group(
         log, trans_id, server_id, replace, purge, group, state)
-
-    # Not setting up a function go get dispatcher in `effect_dispatcher`
-    # because that would cause a circular import (supervisor currently
-    # imports from effect_dispatcher)
-    dispatcher = ComposedDispatcher([
-        cs.dispatcher,
-        TypeDispatcher({
-            EvictServerFromScalingGroup: partial(
-                perform_evict_server, get_supervisor())
-        })
-    ])
-
-    d = perform(dispatcher, eff)
+    d = perform(cs.dispatcher, eff)
     d.addCallback(lambda _: cs.start_convergence(
         log, group.tenant_id, group.uuid))
     d.addCallback(lambda _: state)
