@@ -23,8 +23,14 @@ Storage model for state information:
 import json
 from datetime import datetime
 from decimal import Decimal, ROUND_UP
+from functools import partial
 
-from effect import Effect, parallel_all_errors
+from effect import (
+    Effect,
+    ComposedDispatcher,
+    TypeDispatcher,
+    parallel_all_errors)
+
 from effect.do import do, do_return
 from effect.twisted import perform
 
@@ -50,6 +56,7 @@ from otter.supervisor import (
     CannotDeleteServerBelowMinError,
     EvictServerFromScalingGroup,
     ServerNotFoundError,
+    get_supervisor,
     exec_scale_down,
     execute_launch_config,
     perform_evict_server)
@@ -498,8 +505,20 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
     # convergence case
     cs = get_convergence_starter()
     eff = convergence_remove_server_from_group(
-        group, server_id, replace, purge)
-    d = perform(cs.dispatcher, eff)
+        log, trans_id, group, server_id, replace, purge)
+
+    # Not setting up a function go get dispatcher in `effect_dispatcher`
+    # because that would cause a circular import (supervisor currently
+    # imports from effect_dispatcher)
+    dispatcher = ComposedDispatcher([
+        cs.dispatcher,
+        TypeDispatcher({
+            EvictServerFromScalingGroup: partial(
+                perform_evict_server, get_supervisor())
+        })
+    ])
+
+    d = perform(dispatcher, eff)
     d.addCallback(lambda _: cs.start_convergence(
         log, group.tenant_id, group.uuid))
     d.addCallback(lambda _: state)

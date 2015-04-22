@@ -33,6 +33,7 @@ from otter.supervisor import (
     EvictServerFromScalingGroup,
     ServerNotFoundError)
 from otter.test.utils import (
+    FakeSupervisor,
     iMock,
     matches,
     mock_log,
@@ -1213,7 +1214,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.assertEqual(getattr(state1, attribute),
                              getattr(state2, attribute))
 
-    def _remove(self, replace, purge, dispatcher):
+    def _composed_dispatcher(self, dispatcher):
         # Retry intents can't really be compared if the effect inside
         # has callbacks, so just unpack and assert something about the retry
         # params, and perform the wrapped effect.
@@ -1226,15 +1227,16 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.assertEqual(retry_intent.should_retry, expected_retry_params)
             return sync_perform(_disp, retry_intent.effect)
 
-        full_dispatcher = ComposedDispatcher([
+        return ComposedDispatcher([
             test_dispatcher(),
             TypeDispatcher({Retry: handle_retry}),
             dispatcher])
 
+    def _remove(self, replace, purge, dispatcher):
         eff = controller.convergence_remove_server_from_group(
             self.log, self.trans_id, self.group, self.state, 'server_id',
             replace, purge)
-        return sync_perform(full_dispatcher, eff)
+        return sync_perform(self._composed_dispatcher(dispatcher), eff)
 
     def test_no_such_server_replace_true(self):
         """
@@ -1397,7 +1399,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
 
     def test_checks_pass_replace_false_no_purge_success(self):
         """
-        If all the checks pass, and purge is true and replace is false, then
+        If all the checks pass, and purge is false and replace is false, then
         "DRAINING" is added to the server's metadata.  If this is successful,
         then the whole effect is a success, and returns the state the function
         was called with, with the desired value decremented.
@@ -1439,21 +1441,59 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
 
     def test_non_convergence_uses_supervisor_remove(self):
         """
-        If the tenant is not convergence-enabled, the supervisor's
-        :func:`remove_server_from_group` function is called with the same
-        arguments.
+        If the tenant is not convergence-enabled, the controller's
+        :func:`remove_server_from_group` calls the supervisor's
+        :func:`remove_server_from_group` function with the same arguments.
         """
         supervisor_remove = patch(
             self, 'otter.controller.worker_remove_server_from_group',
             return_value=defer.succeed('worker success'))
 
         d = controller.remove_server_from_group(
-            self.trans_id, self.log, 'server_id', False, False,
+            self.log, self.trans_id, 'server_id', False, False,
             self.group, self.state,
             config_value={'convergence-tenants': []}.get)
 
         self.assertEqual(self.successResultOf(d), 'worker success')
 
         supervisor_remove.assert_called_once_with(
-            self.trans_id, self.log, 'server_id', False, False,
+            self.log, self.trans_id, 'server_id', False, False,
             self.group, self.state)
+
+    @mock.patch('otter.controller.get_convergence_starter',
+                dispatcher=test_dispatcher)
+    @mock.patch('otter.controller.get_supervisor',
+                return_value=FakeSupervisor())
+    @mock.patch('otter.controller.convergence_remove_server_from_group',
+                wraps=controller.convergence_remove_server_from_group)
+    def test_convergence_uses_convergence_remove(self, mock_converge_remove,
+                                                 mock_get_supervisor,
+                                                 mock_get_convergence_starter):
+        """
+        If the tenant is convergence-enabled, the controller's
+        :func:`remove_server_from_group` calls
+        :func:`convergence_remove_server_from_group` and performs the effect
+        with a dispatcher that can handle :class:`EvictServerFromScalingGroup`
+        """
+        mock_get_convergence_starter.dispatcher = self._composed_dispatcher(
+            SequenceDispatcher([
+                (get_server_details('server_id').intent,
+                    lambda _: self.server_details),
+                (GetScalingGroupInfo(tenant_id='tenant_id',
+                                     group_id='group_id'),
+                    lambda _: self.group_manifest_info)]))
+
+        d = controller.remove_server_from_group(
+            self.log, self.trans_id, 'server_id', False, False,
+            self.group, self.state,
+            config_value={'convergence-tenants': [self.group.tenant_id]}.get)
+
+        self.assertEqual(self.successResultOf(d), None)
+
+        # this just wraps the call so we can tell that it was called
+        mock_converge_remove.assert_called_once_with(
+            self.log, self.trans_id, self.group, 'server_id', False, False)
+
+        self.assertEqual(mock_get_supervisor.return_value.scrub_calls,
+                         [(self.log, self.trans_id, self.group.tenant_id,
+                           'server_id')])
