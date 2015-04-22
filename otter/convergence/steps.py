@@ -553,7 +553,9 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
     response, body = result
 
     if response.code == 201:  # All done!
-        return StepResult.SUCCESS, []
+        return StepResult.RETRY, [
+            'must re-gather after adding to LB in order to update the active '
+            'cache']
 
     failure_reasons = []
     to_retry = pset(attempted_pairs)
@@ -578,9 +580,9 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
         next_step = BulkAddToRCv3(lb_node_pairs=to_retry)
         return next_step.as_effect()
     else:
-        return StepResult.RETRY, [
-            'must re-gather after adding to LB in order to update the active '
-            'cache']
+        # It's unclear when this condition is reached. Should we really be
+        # returning SUCCESS?
+        return StepResult.SUCCESS, []
 
 
 @implementer(IStep)
