@@ -34,6 +34,9 @@ endpoint = os.environ['AS_IDENTITY']
 flavor_ref = os.environ['AS_FLAVOR_REF']
 image_ref = os.environ['AS_IMAGE_REF']
 region = os.environ['AS_REGION']
+# Get vs dict lookup because it will return None if not found,
+# not throw an exception.  None is a valid value for convergence_tenant.
+convergence_tenant = os.environ.get('AS_CONVERGENCE_TENANT')
 
 
 class TestConvergence(unittest.TestCase):
@@ -48,7 +51,8 @@ class TestConvergence(unittest.TestCase):
         self.pool = HTTPConnectionPool(reactor, False)
         self.identity = IdentityV2(
             auth=auth, username=username, password=password,
-            endpoint=endpoint, pool=self.pool
+            endpoint=endpoint, pool=self.pool,
+            convergence_tenant_override=convergence_tenant,
         )
 
     def tearDown(self):
