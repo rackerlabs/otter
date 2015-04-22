@@ -30,7 +30,6 @@ from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError)
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,
-    EvictServerFromScalingGroup,
     ServerNotFoundError)
 from otter.test.utils import (
     iMock,
@@ -42,6 +41,7 @@ from otter.test.utils import (
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN
+from otter.worker_intents import EvictServerFromScalingGroup
 
 
 class CalculateDeltaTestCase(SynchronousTestCase):
