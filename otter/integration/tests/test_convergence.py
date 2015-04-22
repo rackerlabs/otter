@@ -322,7 +322,6 @@ class TestConvergence(unittest.TestCase):
         self.deleted_server_ids = ids
         deferreds = map(delete_server_by_id, ids)
         self.removed_ids = ids
-        print " removed ids: {0}".format(self.removed_ids)
         # If no error occurs while deleting, all the results will be the
         # same.  So just return the 1st, which is just our rcs value.
         return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
