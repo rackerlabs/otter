@@ -6,8 +6,6 @@ This code is specific to the launch_server_v1 worker.
 
 from characteristic import attributes
 
-from effect.twisted import deferred_performer
-
 from twisted.application.service import Service
 from twisted.internet import reactor
 from twisted.internet.defer import succeed
@@ -685,22 +683,3 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge, group, st
 
     d.addCallback(remove_server_from_state)
     return d
-
-
-@attributes(['log', 'transaction_id', 'scaling_group', 'server_id'])
-class EvictServerFromScalingGroup(object):
-    """
-    An Effect intent which indicates that a server should be evicted from a
-    particular group.
-    """
-
-
-@deferred_performer
-def perform_evict_server(supervisor, dispatcher, intent):
-    """
-    Perform evicting a server from the group.
-    """
-    return supervisor.scrub_otter_metadata(
-        intent.log, intent.transaction_id,
-        intent.scaling_group.tenant_id,
-        intent.server_id)
