@@ -86,7 +86,8 @@ class IdentityV2Tests(SynchronousTestCase):
             def __init__(self):
                 self.pool = None
 
-            def authenticate_user(self, endpt, user, passwd, pool=None):
+            def authenticate_user(self, endpt, user, passwd, pool=None,
+                                  tenant_id=None):
                 self.pool = pool
                 return defer.succeed(_test_catalog)
 

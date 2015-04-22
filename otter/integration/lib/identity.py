@@ -43,12 +43,13 @@ class IdentityV2(object):
 
         :param TestResources rcs: A :class:`TestResources` instance used to
             record the identity results.
+        :param str tenant_id: An optional tenant id that can be used in
+            authentication.
 
         :return: A Deferred which, when fired, returns a copy of the resources
             given.  The :attr:`access` field will be set to the Python
             dictionary representation of the Identity authentication results.
         """
-
         return self.auth.authenticate_user(
             self.endpoint, self.username, self.password, pool=self.pool,
             tenant_id=tenant_id).addCallback(rcs.init_from_access)
@@ -65,6 +66,7 @@ def find_endpoint(catalog, service_type, region):
     :return: The endpoint offering the desired type of service for the
         desired region, if available.  None otherwise.
     """
+
     for entry in catalog["access"]["serviceCatalog"]:
         if entry["type"] != service_type:
             continue
