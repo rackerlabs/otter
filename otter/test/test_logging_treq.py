@@ -28,7 +28,8 @@ class LoggingTreqTest(SynchronousTestCase):
 
         configuration = {}
 
-        for method in ('request', 'head', 'get', 'put', 'patch', 'post', 'delete'):
+        for method in ('request', 'head', 'get', 'put', 'patch', 'post',
+                       'delete'):
             configuration['{0}.__name__'.format(method)] = method
             configuration['{0}.return_value'.format(method)] = Deferred()
 
@@ -46,11 +47,12 @@ class LoggingTreqTest(SynchronousTestCase):
         """
         self.assertEqual(self.log.msg.mock_calls, [
             mock.call(mock.ANY, url=self.url, system="treq.request",
-                      method=method, treq_request_id=mock.ANY, url_params=None),
+                      method=method, treq_request_id=mock.ANY,
+                      url_params=None),
             mock.call(
                 mock.ANY, url=self.url, status_code=status, headers={'1': '2'},
-                system="treq.request", request_time=request_time, method=method,
-                treq_request_id=mock.ANY, url_params=None)
+                system="treq.request", request_time=request_time,
+                method=method, treq_request_id=mock.ANY, url_params=None)
         ])
 
     def _assert_failure_logging(self, method, exception_type, request_time):
@@ -59,11 +61,12 @@ class LoggingTreqTest(SynchronousTestCase):
         """
         self.assertEqual(self.log.msg.mock_calls, [
             mock.call(mock.ANY, url=self.url, system="treq.request",
-                      method=method, treq_request_id=mock.ANY, url_params=None),
+                      method=method, treq_request_id=mock.ANY,
+                      url_params=None),
             mock.call(
                 mock.ANY, url=self.url, reason=CheckFailure(exception_type),
-                system="treq.request", request_time=request_time, method=method,
-                treq_request_id=mock.ANY, url_params=None)
+                system="treq.request", request_time=request_time,
+                method=method, treq_request_id=mock.ANY, url_params=None)
         ])
 
     def test_request(self):
