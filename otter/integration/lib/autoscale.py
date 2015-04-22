@@ -219,7 +219,8 @@ class ScalingGroup(object):
             Otherwise, an exception is raised.
         """
 
-        def check((code, response)):
+        def check(state):
+            code, response = state
             if code == 404:
                 raise BreakLoopException("Scaling group not found.")
             servers_active = len(response["group"]["active"])
@@ -293,14 +294,14 @@ class ScalingGroup(object):
             will be raised otherwise, including timeout.
         """
 
-        def check((code, response)):
+        def check(state):
+            code, response = state
             if code == 404:
                 raise BreakLoopException(
                     "Scaling group appears to have disappeared"
                 )
 
             active_ids = extract_active_ids(response)
-            print("wait_for_deleted_id_removal: {0}".format(active_ids))
             for deleted_id in removed_ids:
                 if deleted_id in active_ids:
                     raise TransientRetryError()

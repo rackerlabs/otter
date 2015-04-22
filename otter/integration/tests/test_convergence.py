@@ -63,13 +63,12 @@ class TestConvergence(unittest.TestCase):
             return deferLater(reactor, 0, _check_fds, None)
         return self.pool.closeCachedConnections().addBoth(_check_fds)
 
-    def test_reaction_to_oob_deletion_after_scale_up(self):
+    def test_reaction_to_oob_deletion_then_scale_up(self):
         """
         Validate the following edge case:
         - When out of band deletions bring the number of active servers below
           the group min, the servers are replaced in addition to adding the
           requested servers when a policy scales to over the group min.
-
 
         Exercise out-of-band server deletion, but then scale up afterwards.
         The goal is to spin up, say, three servers, then use Nova to delete
@@ -122,7 +121,7 @@ class TestConvergence(unittest.TestCase):
                 self.scaling_group.wait_for_N_servers, 5, timeout=1800
             )
         )
-    test_reaction_to_oob_deletion_after_scale_up.timeout = 1800
+    test_reaction_to_oob_deletion_then_scale_up.timeout = 1800
 
     def test_reaction_to_oob_server_deletion(self):
         """
