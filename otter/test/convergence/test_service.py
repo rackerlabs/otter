@@ -62,7 +62,7 @@ class ConvergenceStarterTests(SynchronousTestCase):
              Effect(CreateOrSet(path='/groups/divergent/tenant_group',
                                 content='dirty'))))
         log.msg.assert_called_once_with(
-            'mark-dirty-success', tenant_id='tenant', group_id='group')
+            'mark-dirty-success', tenant_id='tenant', scaling_group_id='group')
 
     def test_error_marking_dirty(self):
         """An error is logged when marking dirty fails."""
@@ -75,7 +75,7 @@ class ConvergenceStarterTests(SynchronousTestCase):
         self.assertEqual(self.successResultOf(d), None)
         log.err.assert_called_once_with(
             CheckFailureValue(RuntimeError('oh no')),
-            'mark-dirty-failure', tenant_id='tenant', group_id='group')
+            'mark-dirty-failure', tenant_id='tenant', scaling_group_id='group')
 
 
 class ConvergerTests(SynchronousTestCase):
@@ -232,11 +232,11 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             calls,
             [(self.tenant_id, self.group_id,
               matches(IsBoundWith(tenant_id=self.tenant_id,
-                                  group_id=self.group_id)))])
+                                  scaling_group_id=self.group_id)))])
         self.assertEqual(self.deletions, [True])
         self.log.msg.assert_any_call(
             'mark-clean-success',
-            tenant_id=self.tenant_id, group_id=self.group_id)
+            tenant_id=self.tenant_id, scaling_group_id=self.group_id)
 
     def test_non_concurrent(self):
         """
@@ -277,12 +277,12 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         self.log.err.assert_any_call(
             None,
             'converge-fatal-error',
-            tenant_id=self.tenant_id, group_id=self.group_id)
+            tenant_id=self.tenant_id, scaling_group_id=self.group_id)
 
         self.assertEqual(self.deletions, [True])
         self.log.msg.assert_any_call(
             'mark-clean-success',
-            tenant_id=self.tenant_id, group_id=self.group_id)
+            tenant_id=self.tenant_id, scaling_group_id=self.group_id)
 
     def test_unexpected_errors(self):
         """
@@ -301,7 +301,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         self.log.err.assert_any_call(
             None,
             'converge-non-fatal-error',
-            tenant_id=self.tenant_id, group_id=self.group_id)
+            tenant_id=self.tenant_id, scaling_group_id=self.group_id)
         self.assertEqual(self.deletions, [])
 
     def test_delete_node_version_mismatch(self):
@@ -331,7 +331,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         self.log.err.assert_any_call(
             CheckFailureValue(BadVersionError()),
             'mark-clean-failure',
-            tenant_id=self.tenant_id, group_id=self.group_id,
+            tenant_id=self.tenant_id, scaling_group_id=self.group_id,
             dirty_version=5,
             path='/groups/divergent/tenant-id_g1')
 

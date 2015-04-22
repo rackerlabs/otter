@@ -30,6 +30,7 @@ def _log_request(treq_call, url, **kwargs):
 
     treq_transaction = str(uuid4())
     log = log.bind(system='treq.request', url=url, method=method,
+                   url_params=kwargs.get('params'),
                    treq_request_id=treq_transaction)
     start_time = clock.seconds()
 
