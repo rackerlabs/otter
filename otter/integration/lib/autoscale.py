@@ -185,7 +185,6 @@ class ScalingGroup(object):
             if resp.code == 200:
                 return treq.json_content(resp).addCallback(lambda x: (200, x))
             return (404, None)
-        # ids = map(lambda obj: obj['id'], response['group']['active'])
 
         return (
             treq.get(
@@ -348,11 +347,7 @@ class ScalingGroup(object):
             n_active = len(response["group"]["active"])
             n_pending = response["group"]["pendingCapacity"]
             n_desired = response["group"]["desiredCapacity"]
-            print("Active: {0}, Pending: {1}, Desired: {2}".format(n_active,
-                                                                   n_pending,
-                                                                   n_desired))
 
-            # print(response["group"])
             if ((active is None or active == n_active)
                     and
                     (pending is None or pending == n_pending)
@@ -365,16 +360,20 @@ class ScalingGroup(object):
         def poll():
             return self.get_scaling_group_state(rcs).addCallback(check)
 
+        if active or pending or desired:
+            report = (
+                "Scaling group failed to reflect (active, pending, desired) "
+                "= ({0}, {1}, {2} servers.".format(active, pending, desired))
+        else:
+            report = (
+                "No expected capcity was specified"
+            )
         return retry_and_timeout(
             poll, timeout,
             can_retry=transient_errors_except(BreakLoopException),
             next_interval=repeating_interval(period),
             clock=reactor,
-            deferred_description=(
-                "Waiting for Autoscale to see expected state of"
-                "(active, pending, desired) "
-                "= ({0}, {1}, {2}".format(active, pending, desired)
-            )
+            deferred_description=report
         )
 
 

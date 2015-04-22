@@ -64,7 +64,14 @@ class TestConvergence(unittest.TestCase):
         return self.pool.closeCachedConnections().addBoth(_check_fds)
 
     def test_reaction_to_oob_deletion_after_scale_up(self):
-        """Exercise out-of-band server deletion, but then scale up afterwards.
+        """
+        Validate the following edge case:
+        - When out of band deletions bring the number of active servers below
+          the group min, the servers are replaced in addition to adding the
+          requested servers when a policy scales to over the group min.
+
+
+        Exercise out-of-band server deletion, but then scale up afterwards.
         The goal is to spin up, say, three servers, then use Nova to delete
         one of them directly, without Autoscale's knowledge.  Then we scale up
         by, say, two servers.  If convergence is working as expected, we expect
@@ -118,13 +125,17 @@ class TestConvergence(unittest.TestCase):
     test_reaction_to_oob_deletion_after_scale_up.timeout = 1800
 
     def test_reaction_to_oob_server_deletion(self):
-        """Exercise out-of-band server deletion.  The goal is to spin up, say,
+        """
+        Validate the following edge case:
+        - When out of band deletions bring the number of active servers below
+          the group min, the servers are replaced up to the group min when
+          convergence is triggered
+
+        Exercise out-of-band server deletion.  The goal is to spin up, say,
         eight servers, then use Nova to delete four of them.  We should be able
         to see, over time, more servers coming into existence to replace those
         deleted.
         """
-        print "!!! I am Executing!!!"
-
         N_SERVERS = 4
 
         rcs = TestResources()
@@ -140,7 +151,7 @@ class TestConvergence(unittest.TestCase):
         )
 
         self.scaling_policy = ScalingPolicy(
-            scale_by=1,
+            scale_by=-1,
             scaling_group=self.scaling_group
         )
 
@@ -160,6 +171,7 @@ class TestConvergence(unittest.TestCase):
             ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_half_the_servers)
             .addCallback(self._delete_those_servers, rcs)
+            # This policy is simply ussed to trigger convergence
             .addCallback(self.scaling_policy.start, self)
             .addCallback(self.scaling_policy.execute)
             .addCallback(lambda _: self.removed_ids)
@@ -173,18 +185,18 @@ class TestConvergence(unittest.TestCase):
 
     def test_scale_down_after_oobd_non_constrained(self):
         """
-        Validate that when scaling down after an out of band delete (OOBD)
-        the group stabilizes at the correct number of servers with
-        the deleted
-        server taken into account.
+        Validate the following edge case:
+        - When scaling down after an out of band delete (OOBD) that is
+          not constrained by the group max or min, the group stabilizes at a
+          number of servers consistent with scaling from the active capacity
+          before the OOBD. (i.e. The final result should be as if the OOBD
+          never happened.)
 
             Create a group with min N servers
-            Scale group to (N+ x) servers
-            Delete z of the servers out of band
-            Scale down by (y) servers
-            Validate end state of (N + x - y) servers
-                TODO: Consider the case where z == y
-                - does this produce an error?
+            Scale group to (N + x) servers
+            Delete z (where z<x) of the servers out of band
+            Scale down by (y) servers (where z + y < x)
+            Validate end state of (N + x - y) servers for:
         """
 
         min_servers = 2
@@ -230,23 +242,11 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self.policy_set.execute)
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
-                set_to_servers, timeout=1800
+                set_to_servers, timeout=120
             ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_servers_from_active_list, oobd_servers)
             .addCallback(self._delete_those_servers, rcs)
-            # Until something triggers convergence, it will take a very long
-            # time for Otter to notice the deltion, though it should eventually
-            # .addCallback(lambda _: self.removed_ids)
-            # .addCallback(
-            #     self.scaling_group.wait_for_deleted_id_removal,
-            #     rcs, timeout=300,
-            #     total_servers=set_to_servers,
-            # )
-
-            # What if: Trigger convergence manually, servers in building for
-            # a time, then execute policy while still building? - All building
-            # should be reaped, and one deleted.
-
+            # The execution of the policy triggers convergence
             .addCallback(self.policy_scale.start, self)
             .addCallback(self.policy_scale.execute)
             .addCallback(lambda _: self.removed_ids)
@@ -287,7 +287,7 @@ class TestConvergence(unittest.TestCase):
 
         if code != 200:
             raise Exception("Not 200!; Asking for the state didn't work.")
-        ids = map(lambda obj: obj['id'], response['group']['active'])
+        ids = extract_active_ids(response)
         self.active_servers = len(ids)
         if num_servers:
             return ids[:num_servers]
@@ -327,96 +327,3 @@ class TestConvergence(unittest.TestCase):
         # If no error occurs while deleting, all the results will be the
         # same.  So just return the 1st, which is just our rcs value.
         return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
-
-    # def _wait_for_expected_state(self, _, rcs, timeout=60, period=1,
-    #                              active=None, pending=None, desired=None):
-    #     """
-    #     Repeatedly get the group state until either the specified timeout has
-    #     occurred or the specified number of active, pending, and desired
-    #     servers is observed. Unspecifed quantities default to None and are
-    #     treated as don't cares.
-    #     """
-
-    #     def check((code, response)):
-    #         if code != 200:
-    #             raise BreakLoopException(
-    #                 "Could not get the scaling group state"
-    #             )
-
-    #         n_active = len(response["group"]["active"])
-    #         n_pending = response["group"]["pendingCapacity"]
-    #         n_desired = response["group"]["desiredCapacity"]
-    #         print "Active: {0}, Pending: {1}, Desired: {2}".format(n_active,
-    #                                                                n_pending,
-    #                                                                n_desired)
-
-    #         print response["group"]
-    #         if ((active is None or active == n_active)
-    #                 and
-    #                 (pending is None or pending == n_pending)
-    #                 and
-    #                 (desired is None or desired == n_desired)):
-    #             return rcs
-
-    #         raise TransientRetryError()
-
-    #     def poll():
-    #         return self.get_scaling_group_state(rcs).addCallback(check)
-
-    #     return retry_and_timeout(
-    #         poll, timeout,
-    #         can_retry=transient_errors_except(BreakLoopException),
-    #         next_interval=repeating_interval(period),
-    #         clock=reactor,
-    #         deferred_description=(
-    #             "Waiting for Autoscale to see expected state of"
-    #             "(active, pending, desired) "
-    #             "= ({0}, {1}, {2}".format(active, pending, desired)
-    #         )
-    #     )
-
-    # def _wait_for_id_removal(self, _, rcs, timeout=60, period=1):
-    #     """Wait for the converger to recognize the reality of this tenant's
-    #     situation and reflect it in the scaling group state accordingly.
-    #     """
-
-    #     def check((code, response)):
-    #         if code != 200:
-    #             raise BreakLoopException(
-    #                 "Scaling group appears to have disappeared"
-    #             )
-
-    #         print "-------------- Checking Response:   "
-    #         print response
-    #         # Confirm that the deleted server ids are no longer in the
-    #         # server list
-    #         # This should be put into a helper function
-    #         ids = map(lambda obj: obj['id'], response['group']['active'])
-
-    #         # If none of the deleted server ids are in the active list
-    #         for d in self.deleted_server_ids:
-    #             if d in ids:
-    #                 raise TransientRetryError()
-    #             print "... Server {0} is not in active list".format(d)
-    #         return rcs
-
-    #         # n_remaining = self.n_servers - self.n_killed + 1
-    #         # if len(response["group"]["active"]) == n_remaining:
-    #         #     return rcs
-
-    #         # raise TransientRetryError()
-
-    #     def poll():
-    #         print "... polling"
-    #         return self.get_scaling_group_state(rcs).addCallback(check)
-
-    #     return retry_and_timeout(
-    #         poll, timeout,
-    #         can_retry=transient_errors_except(BreakLoopException),
-    #         next_interval=repeating_interval(period),
-    #         clock=reactor,
-    #         deferred_description=(
-    #             "Waiting for Autoscale to see we killed {} servers of "
-    #             "{}.".format(self.n_killed, self.n_servers)
-    #         )
-    #     )
