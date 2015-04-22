@@ -23,7 +23,6 @@ from pyrsistent import freeze
 
 from silverberg.client import ConsistencyLevel
 
-from toolz.curried import filter
 from toolz.dicttoolz import keymap
 
 from twisted.internet import defer
@@ -207,7 +206,7 @@ _cql_del_on_key = 'DELETE FROM {cf} WHERE "webhookKey"=:{name}webhookKey'
 
 _cql_count_for_tenant = (
     'SELECT COUNT(*) FROM {cf} '
-    'WHERE "tenantId"=:tenantId AND deleting=false;')
+    'WHERE "tenantId"=:tenantId {deleting};')
 _cql_count_for_policy = (
     'SELECT COUNT(*) FROM {cf} '
     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
@@ -947,8 +946,8 @@ class CassScalingGroup(object):
             query = _cql_view_policy.format(cf=self.policies_table)
             d = self.connection.execute(query,
                                         {"tenantId": self.tenant_id,
-                                        "groupId": self.uuid,
-                                        "policyId": policy_id},
+                                         "groupId": self.uuid,
+                                         "policyId": policy_id},
                                         DEFAULT_CONSISTENCY)
             return d.addCallback(_extract_policy)
 
@@ -1173,9 +1172,9 @@ class CassScalingGroup(object):
             query = _cql_view_webhook.format(cf=self.webhooks_table)
             d = self.connection.execute(query,
                                         {"tenantId": self.tenant_id,
-                                        "groupId": self.uuid,
-                                        "policyId": policy_id,
-                                        "webhookId": webhook_id},
+                                         "groupId": self.uuid,
+                                         "policyId": policy_id,
+                                         "webhookId": webhook_id},
                                         DEFAULT_CONSISTENCY)
             d.addCallback(_assemble_webhook)
             return d
@@ -1328,16 +1327,17 @@ class CassScalingGroupCollection:
     Also, because deletes are done as tombstones rather than actually deleting,
     deletes are also updates and hence a read must be performed before deletes.
     """
-    def __init__(self, connection, reactor):
+    def __init__(self, connection, reactor, max_groups):
         """
         Init
 
-        :param connection: Thrift connection to use
-
-        :param cflist: Column family list
+        :param CQLClient connection: Silverberg client implementation
+        :param reactor: Twisted reactor
+        :param int max_groups: Maximum number of groups allowed per tenant
         """
         self.connection = connection
         self.reactor = reactor
+        self.max_groups = max_groups
         self.local_locks = WeakLocks()
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
@@ -1365,17 +1365,14 @@ class CassScalingGroupCollection:
         log = log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id)
 
         # obey limits
-        max_groups = config_value('limits.absolute.maxGroups')
-        d = self.connection.execute(_cql_count_for_tenant.format(
-            cf="scaling_group"), {'tenantId': tenant_id},
-            DEFAULT_CONSISTENCY)
+        d = self.get_groups_count(log, tenant_id)
 
-        def check_groups(cur_groups, max_groups):
-            if cur_groups[0]['count'] >= max_groups:
+        def check_groups(cur_count):
+            if cur_count >= self.max_groups:
                 log.msg('client has reached maxGroups limit')
-                raise ScalingGroupOverLimitError(tenant_id, max_groups)
+                raise ScalingGroupOverLimitError(tenant_id, self.max_groups)
 
-        d.addCallback(check_groups, max_groups)
+        d.addCallback(check_groups)
 
         def _create_group(ts):
             log.msg("Creating scaling group")
@@ -1593,20 +1590,30 @@ class CassScalingGroupCollection:
             CQLQueryExecute(query=batch(stmts), params=data,
                             consistency_level=ConsistencyLevel.ONE))
 
+    def _extract_count(self, r):
+        return r[0]['count']
+
+    def get_groups_count(self, log, tenant_id):
+        d = self.connection.execute(
+            _cql_count_for_tenant.format(cf='scaling_group',
+                                         deleting='AND deleting=false'),
+            {'tenantId': tenant_id}, ConsistencyLevel.ONE)
+        return d.addCallback(self._extract_count)
+
     def get_counts(self, log, tenant_id):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.get_counts`
         """
+        deferreds = []
+        for table in ['scaling_policies', 'policy_webhooks']:
+            d = self.connection.execute(
+                _cql_count_for_tenant.format(cf=table, deleting=''),
+                {'tenantId': tenant_id}, ConsistencyLevel.ONE)
+            d.addCallback(self._extract_count)
+            deferreds.append(d)
 
-        fields = ['scaling_group', 'scaling_policies', 'policy_webhooks']
-        deferred = [
-            self.connection.execute(_cql_count_for_tenant.format(cf=field),
-                                    {'tenantId': tenant_id},
-                                    ConsistencyLevel.ONE)
-            for field in fields]
-
-        d = defer.gatherResults(deferred)
-        d.addCallback(lambda results: [r[0]['count'] for r in results])
+        deferreds = [self.get_groups_count(log, tenant_id)] + deferreds
+        d = defer.gatherResults(deferreds)
         d.addCallback(lambda results: dict(zip(
             ('groups', 'policies', 'webhooks'), results)))
         return d
