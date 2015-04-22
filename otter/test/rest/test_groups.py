@@ -1191,9 +1191,9 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         Mock remove_server_from_group
         """
         super(GroupServersTests, self).setUp()
-        self.mock_rsfg = patch(self,
-                               'otter.rest.groups.remove_server_from_group',
-                               return_value=None)
+        self.mock_rsfg = patch(
+            self, 'otter.rest.groups.controller.remove_server_from_group',
+            return_value=None)
         self.patch(groups, "extract_bool_arg", self._extract_bool_arg)
         self._replace = self._purge = True
 

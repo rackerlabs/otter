@@ -2,6 +2,7 @@
 Tests for :mod:`otter.controller`
 """
 from datetime import datetime, timedelta
+from functools import partial
 
 from effect import (
     ComposedDispatcher,
@@ -42,7 +43,9 @@ from otter.test.utils import (
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN
-from otter.worker_intents import EvictServerFromScalingGroup
+from otter.worker_intents import (
+    EvictServerFromScalingGroup,
+    perform_evict_server)
 
 
 class CalculateDeltaTestCase(SynchronousTestCase):
@@ -1214,7 +1217,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.assertEqual(getattr(state1, attribute),
                              getattr(state2, attribute))
 
-    def _composed_dispatcher(self, dispatcher):
+    def _composed_dispatcher(self, *dispatchers):
         # Retry intents can't really be compared if the effect inside
         # has callbacks, so just unpack and assert something about the retry
         # params, and perform the wrapped effect.
@@ -1227,10 +1230,10 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.assertEqual(retry_intent.should_retry, expected_retry_params)
             return sync_perform(_disp, retry_intent.effect)
 
-        return ComposedDispatcher([
-            test_dispatcher(),
-            TypeDispatcher({Retry: handle_retry}),
-            dispatcher])
+        return ComposedDispatcher(
+            [test_dispatcher(),
+             TypeDispatcher({Retry: handle_retry})] +
+            list(dispatchers))
 
     def _remove(self, replace, purge, dispatcher):
         eff = controller.convergence_remove_server_from_group(
@@ -1461,12 +1464,9 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.group, self.state)
 
     @mock.patch('otter.controller.get_convergence_starter')
-    @mock.patch('otter.controller.get_supervisor',
-                return_value=FakeSupervisor())
     @mock.patch('otter.controller.convergence_remove_server_from_group',
                 wraps=controller.convergence_remove_server_from_group)
     def test_convergence_uses_convergence_remove(self, mock_converge_remove,
-                                                 mock_get_supervisor,
                                                  mock_get_starter):
         """
         If the tenant is convergence-enabled, the controller's
@@ -1474,13 +1474,19 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         :func:`convergence_remove_server_from_group` and performs the effect
         with a dispatcher that can handle :class:`EvictServerFromScalingGroup`
         """
+        fake_super = FakeSupervisor()
+
         mock_get_starter.return_value.dispatcher = self._composed_dispatcher(
             SequenceDispatcher([
                 (get_server_details('server_id').intent,
                     lambda _: self.server_details),
                 (GetScalingGroupInfo(tenant_id='tenant_id',
                                      group_id='group_id'),
-                    lambda _: self.group_manifest_info)]))
+                    lambda _: self.group_manifest_info)]),
+            TypeDispatcher({
+                EvictServerFromScalingGroup: partial(
+                    perform_evict_server, fake_super)
+                }))
 
         d = controller.remove_server_from_group(
             self.log, self.trans_id, 'server_id', True, False,
@@ -1494,6 +1500,6 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.log, self.trans_id, 'server_id', True, False, self.group,
             self.state)
 
-        self.assertEqual(mock_get_supervisor.return_value.scrub_calls,
+        self.assertEqual(fake_super.scrub_calls,
                          [(self.log, self.trans_id, self.group.tenant_id,
                            'server_id')])

@@ -23,12 +23,9 @@ Storage model for state information:
 import json
 from datetime import datetime
 from decimal import Decimal, ROUND_UP
-from functools import partial
 
 from effect import (
     Effect,
-    ComposedDispatcher,
-    TypeDispatcher,
     parallel_all_errors)
 
 from effect.do import do, do_return
@@ -55,7 +52,6 @@ from otter.models.intents import GetScalingGroupInfo
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,
     ServerNotFoundError,
-    get_supervisor,
     exec_scale_down,
     execute_launch_config)
 from otter.supervisor import (
@@ -68,7 +64,7 @@ from otter.util.retry import (
     retry_effect,
     retry_times)
 from otter.util.timestamp import from_timestamp
-from otter.worker_intents import EvictServerFromScalingGroup, perform_evict_server
+from otter.worker_intents import EvictServerFromScalingGroup
 
 
 class CannotExecutePolicyError(Exception):
@@ -501,7 +497,8 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
         return worker_remove_server_from_group(
             log, trans_id, server_id, replace, purge, group, state)
 
-    # convergence case
+    # convergence case - requires that the convergence dispatcher handles
+    # EvictServerFromScalingGroup
     cs = get_convergence_starter()
     eff = convergence_remove_server_from_group(
         log, trans_id, server_id, replace, purge, group, state)
