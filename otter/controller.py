@@ -47,7 +47,6 @@ from otter.log import audit
 from otter.models.intents import GetScalingGroupInfo
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,
-    EvictServerFromScalingGroup,
     ServerNotFoundError,
     exec_scale_down,
     execute_launch_config)
@@ -59,6 +58,7 @@ from otter.util.retry import (
     retry_effect,
     retry_times)
 from otter.util.timestamp import from_timestamp
+from otter.worker_intents import EvictServerFromScalingGroup
 
 
 class CannotExecutePolicyError(Exception):
