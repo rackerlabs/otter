@@ -119,7 +119,7 @@ def execute_convergence(tenant_id, group_id, log,
     steps = plan(desired_group_state, servers, lb_nodes, now)
     active = determine_active(servers, lb_nodes)
     log.msg('execute-convergence',
-            servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
+            servers=servers, lb_nodes=lb_nodes, steps=list(steps), now=now,
             desired=desired_group_state, active=active)
     yield _update_active(scaling_group, active)
     if len(steps) == 0:
@@ -132,7 +132,7 @@ def execute_convergence(tenant_id, group_id, log,
     worst_status = priority[0][0]
     log.msg('execute-convergence-results',
             results=zip(steps, results),
-            worst_status=worst_status)
+            worst_status=worst_status.name)
 
     yield do_return(worst_status)
 
@@ -228,7 +228,7 @@ class ConvergenceStarter(object):
 
     def start_convergence(self, log, tenant_id, group_id, perform=perform):
         """Record that a group needs converged by creating a ZooKeeper node."""
-        log = log.bind(tenant_id=tenant_id, group_id=group_id)
+        log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id)
         eff = mark_divergent(tenant_id, group_id)
         d = perform(self._dispatcher, eff)
 
@@ -306,7 +306,7 @@ def converge_one_group(log, currently_converging, tenant_id, group_id, version,
     :param Reference currently_converging: pset of currently converging groups
     :param version: version number of ZNode of the group's dirty flag
     """
-    log = log.bind(tenant_id=tenant_id, group_id=group_id)
+    log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id)
     eff = execute_convergence(tenant_id, group_id, log)
     try:
         result = yield non_concurrently(currently_converging, group_id, eff)

@@ -9,6 +9,7 @@ from characteristic import Attribute, attributes
     Attribute('password', instance_of=str),
     Attribute('endpoint', instance_of=str),
     Attribute('pool', default_value=None),
+    Attribute('convergence_tenant_override', default_value=None),
 ])
 class IdentityV2(object):
     """This class provides a way to configure commonly used parameters
@@ -59,7 +60,8 @@ class IdentityV2(object):
         resources = resources or {}
 
         d = self.auth.authenticate_user(
-            self.endpoint, self.username, self.password, pool=self.pool
+            self.endpoint, self.username, self.password, pool=self.pool,
+            tenant_id=self.convergence_tenant_override,
         ).addCallback(rcs.init_from_access)
 
         for r in resources:
