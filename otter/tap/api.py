@@ -271,7 +271,7 @@ def makeService(config):
         def on_client_ready(_):
             dispatcher = get_full_dispatcher(reactor, authenticator, log,
                                              get_service_configs(config),
-                                             kz_client, store)
+                                             kz_client, store, supervisor)
             # Setup scheduler service after starting
             scheduler = setup_scheduler(s, store, kz_client)
             health_checker.checks['scheduler'] = scheduler.health_check
