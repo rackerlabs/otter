@@ -33,7 +33,6 @@ def get_eviction_dispatcher(supervisor):
     """
     Get a dispatcher with :class:`EvictServerFromScalingGroup`'s performer.
 
-    :param reactor: Twisted reactor
     :param supervisor: a :class:`otter.supervisor.ISupervisor` provider
     """
     return TypeDispatcher({
