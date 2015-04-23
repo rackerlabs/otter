@@ -1594,6 +1594,9 @@ class CassScalingGroupCollection:
         return r[0]['count']
 
     def get_groups_count(self, log, tenant_id):
+        """
+        Return number of valid (non-deleting) groups of the tenant
+        """
         d = self.connection.execute(
             _cql_count_for_tenant.format(cf='scaling_group',
                                          deleting='AND deleting=false'),
