@@ -67,6 +67,45 @@ class TestConvergence(unittest.TestCase):
             return deferLater(reactor, 0, _check_fds, None)
         return self.pool.closeCachedConnections().addBoth(_check_fds)
 
+    def test_scale_over_group_max_after_metadata_removal(self):
+        """
+        Attempt to scale over the group max, but only after metadata removal on
+        some random sampling of servers.
+        """
+
+        rcs = TestResources()
+
+        scaling_group_body = create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+        )
+
+        self.scaling_group = ScalingGroup(
+            group_config=scaling_group_body,
+            pool=self.pool
+        )
+
+        self.scale_up_to_max = ScalingPolicy(
+            scale_by=25,
+            scaling_group=self.scaling_group
+        )
+
+        return (
+            self.identity.authenticate_user(
+                rcs,
+                resources={
+                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
+                },
+            ).addCallback(self.scaling_group.start, self)
+            .addCallback(self.scale_up_to_max.start, self)
+            .addCallback(self.scale_up_to_max.execute)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers, 25, timeout=1800
+            )
+        )
+
+    def test_aaa(self):  # XXX: Testing purposes only
+        return self.test_scale_over_group_max_after_metadata_removal()
+
     def test_scaling_to_clb_max_after_oob_delete_type1(self):
         """This test starts with a scaling group with no servers.  We scale up
         to 24 servers, but after that's done, we delete 2 directly through
