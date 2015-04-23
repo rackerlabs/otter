@@ -317,7 +317,7 @@ class TestConvergence(unittest.TestCase):
           never happened.)
 
             Create a group with min N servers
-            Scale group to (N + x) servers
+            Scale the group up by x for a total of (N + x) servers
             Delete z (where z<x) of the servers out of band
             Scale down by (y) servers (where z + y < x)
             Validate end state of (N + x - y) servers for:
@@ -329,7 +329,7 @@ class TestConvergence(unittest.TestCase):
         N = 2
         x = 7
         z = 2
-        y = -3  # Scale down 3 servers
+        y = -3
 
         return self._scale_down_after_oobd_non_constrained_param(
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
@@ -347,7 +347,7 @@ class TestConvergence(unittest.TestCase):
           never happened.)
 
             Create a group with min N servers
-            Scale group to (N + x) servers
+            Scale the group up by x for a total of (N + x) servers
             Delete z (where z<x) of the servers out of band
             Scale down by (y) servers (where z + y < x)
             Validate end state of (N + x - y) servers for:
@@ -360,7 +360,7 @@ class TestConvergence(unittest.TestCase):
         N = 2
         x = 7
         z = 3
-        y = -2  # Scale down 3 servers
+        y = -2
 
         return self._scale_down_after_oobd_non_constrained_param(
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
@@ -378,7 +378,7 @@ class TestConvergence(unittest.TestCase):
           never happened.)
 
             Create a group with min N servers
-            Scale group to (N + x) servers
+            Scale the group up by x for a total of (N + x) servers
             Delete z (where z<x) of the servers out of band
             Scale down by (y) servers (where z + y < x)
             Validate end state of (N + x - y) servers for:
@@ -390,7 +390,7 @@ class TestConvergence(unittest.TestCase):
         N = 2
         x = 7
         z = 3
-        y = -3  # Scale down 3 servers
+        y = -3
 
         return self._scale_down_after_oobd_non_constrained_param(
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
