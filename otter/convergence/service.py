@@ -116,16 +116,16 @@ def execute_convergence(tenant_id, group_id, log,
     now = yield Effect(Func(time.time))
 
     group_status = ScalingGroupStatus.lookupByName(manifest['status'])
-    if group_status == ScalingGroupStatus.DELETING:
-        group_state.desired = 0
-
+    desired_capacity = (0 if group_status == ScalingGroupStatus.DELETING
+                        else group_state.desired)
     desired_group_state = get_desired_group_state(
-        group_id, launch_config, group_state.desired)
+        group_id, launch_config, desired_capacity)
     steps = plan(desired_group_state, servers, lb_nodes, now)
     active = determine_active(servers, lb_nodes)
     log.msg('execute-convergence',
             servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
             desired=desired_group_state, active=active)
+    # Since deleting groups are not publicly visible
     if group_status != ScalingGroupStatus.DELETING:
         yield _update_active(scaling_group, active)
     if len(steps) == 0:
