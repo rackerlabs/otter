@@ -1682,9 +1682,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         mock_naive.assert_called_once_with('1234', limit=5, marker='blah')
 
-    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed('watever'))
-    def test_view_webhook(self, mock_gp):
+    def test_view_webhook(self, mock_vc):
         """
         Test that you can call view and receive a valid parsed response
         """
@@ -1692,7 +1692,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             [{'data': '{"name": "pokey"}', 'capability': '{"1": "h"}'}])]
         d = self.group.get_webhook("3444", "4555")
         r = self.successResultOf(d)
-        mock_gp.assert_called_once_with('3444')
+        mock_vc.assert_called_once_with()
         expectedCql = ('SELECT data, capability FROM policy_webhooks WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND '
                        '"policyId" = :policyId AND "webhookId" = :webhookId;')
@@ -1704,15 +1704,15 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.assertEqual(
             r, {'name': 'pokey', 'capability': {"version": "1", "hash": "h"}})
 
-    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
-    def test_view_webhook_no_such_webhook(self, mock_gp):
+    def test_view_webhook_no_such_webhook(self, mock_vc):
         """
         Tests what happens if you try to view a policy that doesn't exist.
         """
         self.returns = [[]]
         d = self.group.get_webhook('3444', '4555')
-        mock_gp.assert_called_once_with('3444')
+        mock_vc.assert_called_once_with()
         self.failureResultOf(d, NoSuchWebhookError)
         self.flushLoggedErrors(NoSuchPolicyError)
 

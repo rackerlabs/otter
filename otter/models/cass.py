@@ -1179,7 +1179,11 @@ class CassScalingGroup(object):
             d.addCallback(_assemble_webhook)
             return d
 
-        return self.get_policy(policy_id).addCallback(fetch_webhook)
+        # Ensure group is there since it can be deleting group and its
+        # corresponding policy and webhook entries will remain.
+        # We need not check if policy exists since corresponding
+        # webhook row will not be there if policy is not there
+        return self.view_config().addCallback(fetch_webhook)
 
     def update_webhook(self, policy_id, webhook_id, data):
         """
