@@ -536,8 +536,11 @@ class StepAsEffectTests(SynchronousTestCase):
                 }),
                 request)
 
-        self.assertEqual(get_result(StubResponse(202, {}), ''),
-                         (StepResult.SUCCESS, []))
+        self.assertEqual(
+            get_result(StubResponse(202, {}), ''),
+            (StepResult.RETRY,
+             ['must re-gather after adding to CLB in order to update the '
+              'active cache']))
 
         self.assertEqual(
             get_result(
@@ -548,7 +551,9 @@ class StepAsEffectTests(SynchronousTestCase):
                                "balancer.",
                     "code": 422
                 }),
-            (StepResult.SUCCESS, []))
+            (StepResult.RETRY,
+             ['must re-gather after adding to CLB in order to update the '
+              'active cache']))
 
     def test_add_nodes_to_clb_failure_response_codes(self):
         """
@@ -929,7 +934,9 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
     """
     def test_good_response(self):
         """
-        If the response code indicates success, the response was successful.
+        If the response code indicates success, the step returns a RETRY so
+        that another convergence cycle can be done to update the active server
+        list.
         """
         node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
         lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
@@ -944,7 +951,11 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
                  "load_balancer_pool": {"id": lb_id}}
                 for (lb_id, node_id) in pairs]
         res = _rcv3_check_bulk_add(pairs, (resp, body))
-        self.assertEqual(res, (StepResult.SUCCESS, []))
+        self.assertEqual(
+            res,
+            (StepResult.RETRY,
+             ['must re-gather after adding to LB in order to update the '
+              'active cache']))
 
     def test_try_again(self):
         """
