@@ -21,7 +21,7 @@ from .models.intents import get_model_dispatcher
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
 from .util.zk import get_zk_dispatcher
-from .worker_intents import EvictServerFromScalingGroup, perform_evict_server
+from .worker_intents import get_eviction_dispatcher
 
 
 def get_simple_dispatcher(reactor):
@@ -86,15 +86,3 @@ def get_cql_dispatcher(reactor, connection):
             CQLQueryExecute: partial(perform_cql_query, connection)
         })
     ])
-
-
-def get_eviction_dispatcher(supervisor):
-    """
-    Get a dispatcher with :class:`EvictServerFromScalingGroup`'s performer.
-
-    :param reactor: Twisted reactor
-    :param supervisor: a :class:`otter.supervisor.ISupervisor` provider
-    """
-    return TypeDispatcher({
-        EvictServerFromScalingGroup: partial(perform_evict_server, supervisor)
-    })
