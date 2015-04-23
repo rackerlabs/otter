@@ -2,6 +2,8 @@
 Tests covering self-healing should be placed in a separate test file.
 """
 
+from __future__ import print_function
+
 import os
 import random
 
@@ -94,13 +96,17 @@ class TestConvergence(unittest.TestCase):
                 rcs,
                 resources={
                     "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
+                    "nova": ("cloudServersOpenStack",),
                 },
+                region=region,
             ).addCallback(self.scaling_group.start, self)
             .addCallback(self.scale_up_to_max.start, self)
             .addCallback(self.scale_up_to_max.execute)
             .addCallback(
                 self.scaling_group.wait_for_N_servers, 25, timeout=1800
-            )
+            ).addCallback(self.scaling_group.get_scaling_group_state)
+            .addCallback(self._choose_random_servers, 3)
+            .addCallback(self._remove_metadata, rcs)
         )
 
     def test_aaa(self):  # XXX: Testing purposes only
@@ -539,3 +545,33 @@ class TestConvergence(unittest.TestCase):
         # If no error occurs while deleting, all the results will be the
         # same.  So just return the 1st, which is just our rcs value.
         return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
+
+    def _list_metadata(self, svr_id, rcs):
+        """Uses Nova to get the server's metadata."""
+        return (
+            treq.get(
+                "{}/servers/{}/metadata".format(str(rcs.endpoints["nova"]), svr_id),
+                headers=headers(str(rcs.token)),
+                pool=self.pool,
+            ).addCallback(check_success, [200])
+            .addCallback(treq.json_content)
+        )
+
+    def _remove_metadata(self, ids, rcs):
+        """Given a list of server IDs, use Nova to remove their metadata.
+        This will strip them of their association with Autoscale.
+        """
+
+        def remove_metadata(id):
+            return (
+                self._list_metadata(id, rcs)
+                .addCallback(print)
+                .addCallback(lambda _: rcs)
+            )
+            return rcs
+
+        print(ids)
+        deferreds = map(remove_metadata, ids)
+        return gatherResults(deferreds).addCallback(lambda r: r[0])
+
+
