@@ -69,6 +69,65 @@ class TestConvergence(unittest.TestCase):
             return deferLater(reactor, 0, _check_fds, None)
         return self.pool.closeCachedConnections().addBoth(_check_fds)
 
+    def test_scale_over_group_max_after_metadata_removal_reduced_grp_max(self):
+        """
+        Attempt to scale over the group max, but only after metadata removal on
+        some random sampling of servers.  Note that this version exercises the
+        path that group max is less than CLB max.
+        """
+
+        rcs = TestResources()
+
+        scaling_group_body = create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            max_entities=12,
+        )
+
+        self.scaling_group = ScalingGroup(
+            group_config=scaling_group_body,
+            pool=self.pool
+        )
+
+        self.scale_up_to_max = ScalingPolicy(
+            scale_by=12,
+            scaling_group=self.scaling_group
+        )
+
+        self.scale_beyond_max = ScalingPolicy(
+            scale_by=5,
+            scaling_group=self.scaling_group
+        )
+
+        return (
+            self.identity.authenticate_user(
+                rcs,
+                resources={
+                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
+                    "nova": ("cloudServersOpenStack",),
+                },
+                region=region,
+            ).addCallback(self.scaling_group.start, self)
+            .addCallback(self.scale_up_to_max.start, self)
+            .addCallback(self.scale_beyond_max.start, self)
+            .addCallback(self.scale_up_to_max.execute)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers, 12, timeout=1800
+            ).addCallback(self.scaling_group.get_scaling_group_state)
+            .addCallback(self._choose_random_servers, 3)
+            # Beyond this point, untested. XXX
+            .addCallback(self._remove_metadata, rcs)
+            .addCallback(lambda _: rcs)
+            .addCallback(self.scale_beyond_max.execute)
+            .addCallback(lambda _: self.removed_ids)
+            .addCallback(
+                self.scaling_group.wait_for_deleted_id_removal,
+                rcs,
+                total_servers=12,
+            ).addCallback(
+                self.scaling_group.wait_for_N_servers, 12, timeout=1800
+            )
+        )
+
     def test_scale_over_group_max_after_metadata_removal(self):
         """
         Attempt to scale over the group max, but only after metadata removal on
@@ -127,7 +186,10 @@ class TestConvergence(unittest.TestCase):
         )
 
     def test_aaa(self):  # XXX: Testing purposes only
-        return self.test_scale_over_group_max_after_metadata_removal()
+        return (
+            self
+            .test_scale_over_group_max_after_metadata_removal_reduced_grp_max()
+        )
 
     def test_scaling_to_clb_max_after_oob_delete_type1(self):
         """This test starts with a scaling group with no servers.  We scale up
