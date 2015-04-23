@@ -78,13 +78,17 @@ class TestConvergence(unittest.TestCase):
 
         rcs = TestResources()
 
-        scaling_group_body = create_scaling_group_dict(
-            image_ref=image_ref, flavor_ref=flavor_ref,
-            max_entities=12,
+        self.untouchable_scaling_group = ScalingGroup(
+            group_config=create_scaling_group_dict(
+                image_ref=image_ref, flavor_ref=flavor_ref, min_entities=4,
+            ),
+            pool=self.pool
         )
 
         self.scaling_group = ScalingGroup(
-            group_config=scaling_group_body,
+            group_config=create_scaling_group_dict(
+                image_ref=image_ref, flavor_ref=flavor_ref, max_entities=12,
+            ),
             pool=self.pool
         )
 
@@ -107,7 +111,10 @@ class TestConvergence(unittest.TestCase):
                 },
                 region=region,
             ).addCallback(self.scaling_group.start, self)
-            .addCallback(self.scale_up_to_max.start, self)
+            .addCallback(self.untouchable_scaling_group.start, self)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers, 4, timeout=1800
+            ).addCallback(self.scale_up_to_max.start, self)
             .addCallback(self.scale_beyond_max.start, self)
             .addCallback(self.scale_up_to_max.execute)
             .addCallback(
