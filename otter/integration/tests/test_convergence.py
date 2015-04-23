@@ -91,6 +91,11 @@ class TestConvergence(unittest.TestCase):
             scaling_group=self.scaling_group
         )
 
+        self.scale_beyond_max = ScalingPolicy(
+            scale_by=5,
+            scaling_group=self.scaling_group
+        )
+
         return (
             self.identity.authenticate_user(
                 rcs,
@@ -101,12 +106,24 @@ class TestConvergence(unittest.TestCase):
                 region=region,
             ).addCallback(self.scaling_group.start, self)
             .addCallback(self.scale_up_to_max.start, self)
+            .addCallback(self.scale_beyond_max.start, self)
             .addCallback(self.scale_up_to_max.execute)
             .addCallback(
                 self.scaling_group.wait_for_N_servers, 25, timeout=1800
             ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_random_servers, 3)
+            # Beyond this point, untested. XXX
             .addCallback(self._remove_metadata, rcs)
+            .addCallback(lambda _: rcs)
+            .addCallback(self.scale_beyond_max.execute)
+            .addCallback(lambda _: self.removed_ids)
+            .addCallback(
+                self.scaling_group.wait_for_deleted_id_removal,
+                rcs,
+                total_servers=25,
+            ).addCallback(
+                self.scaling_group.wait_for_N_servers, 25, timeout=1800
+            )
         )
 
     def test_aaa(self):  # XXX: Testing purposes only
@@ -570,8 +587,6 @@ class TestConvergence(unittest.TestCase):
             )
             return rcs
 
-        print(ids)
+        self.removed_ids = ids
         deferreds = map(remove_metadata, ids)
         return gatherResults(deferreds).addCallback(lambda r: r[0])
-
-
