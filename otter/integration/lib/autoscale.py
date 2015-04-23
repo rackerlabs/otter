@@ -330,6 +330,51 @@ class ScalingGroup(object):
             deferred_description=report,
         )
 
+    def wait_for_expected_state(self, _, rcs, timeout=60, period=1,
+                                active=None, pending=None, desired=None):
+        """
+        Repeatedly get the group state until either the specified timeout has
+        occurred or the specified number of active, pending, and desired
+        servers is observed. Unspecifed quantities default to None and are
+        treated as don't cares.
+        """
+
+        def check((code, response)):
+            if code != 200:
+                raise BreakLoopException(
+                    "Could not get the scaling group state"
+                )
+
+            n_active = len(response["group"]["active"])
+            n_pending = response["group"]["pendingCapacity"]
+            n_desired = response["group"]["desiredCapacity"]
+
+            if ((active is None or active == n_active) and
+                    (pending is None or pending == n_pending) and
+                    (desired is None or desired == n_desired)):
+                return rcs
+
+            raise TransientRetryError()
+
+        def poll():
+            return self.get_scaling_group_state(rcs).addCallback(check)
+
+        if active or pending or desired:
+            report = (
+                "Scaling group failed to reflect (active, pending, desired) "
+                "= ({0}, {1}, {2} servers.".format(active, pending, desired))
+        else:
+            report = (
+                "No expected capcity was specified"
+            )
+        return retry_and_timeout(
+            poll, timeout,
+            can_retry=transient_errors_except(BreakLoopException),
+            next_interval=repeating_interval(period),
+            clock=reactor,
+            deferred_description=report
+        )
+
 
 @attributes([
     Attribute('scale_by', default_value=None),

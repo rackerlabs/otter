@@ -56,7 +56,6 @@ class IdentityV2(object):
             given.  The :attr:`access` field will be set to the Python
             dictionary representation of the Identity authentication results.
         """
-
         resources = resources or {}
 
         d = self.auth.authenticate_user(
