@@ -12,13 +12,16 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.auth import Authenticate, InvalidateToken
 from otter.cloud_client import TenantScope
 from otter.effect_dispatcher import (
-    get_cql_dispatcher, get_full_dispatcher, get_legacy_dispatcher,
+    get_cql_dispatcher,
+    get_full_dispatcher,
+    get_legacy_dispatcher,
     get_simple_dispatcher)
 from otter.models.cass import CQLQueryExecute
 from otter.models.intents import GetScalingGroupInfo
 from otter.util.pure_http import Request
 from otter.util.retry import Retry
 from otter.util.zk import CreateOrSet
+from otter.worker_intents import EvictServerFromScalingGroup
 
 
 def simple_intents():
@@ -42,7 +45,10 @@ def legacy_intents():
 def full_intents():
     return legacy_intents() + [
         CreateOrSet(path='foo', content='bar'),
-        GetScalingGroupInfo(tenant_id='foo', group_id='bar')
+        GetScalingGroupInfo(tenant_id='foo', group_id='bar'),
+        EvictServerFromScalingGroup(log='log', transaction_id='transaction_id',
+                                    scaling_group='scaling_group',
+                                    server_id='server_id')
     ]
 
 
@@ -83,7 +89,8 @@ class LegacyDispatcherTests(SynchronousTestCase, IntentSupportMixin):
         # This is not testing much, but at least that it calls
         # perform_tenant_scope in a vaguely working manner. There are
         # more specific TenantScope performer tests in otter.test.test_http
-        dispatcher = get_full_dispatcher(None, None, None, None, None, None)
+        dispatcher = get_full_dispatcher(
+            None, None, None, None, None, None, None)
         scope = TenantScope(Effect(Constant('foo')), 1)
         eff = Effect(scope)
         self.assertEqual(sync_perform(dispatcher, eff), 'foo')
@@ -93,7 +100,7 @@ class FullDispatcherTests(SynchronousTestCase, IntentSupportMixin):
     """Tests for :func:`get_full_dispatcher`."""
 
     def get_dispatcher(self):
-        return get_full_dispatcher(None, None, None, None, None, None)
+        return get_full_dispatcher(None, None, None, None, None, None, None)
 
     def get_intents(self):
         return full_intents()

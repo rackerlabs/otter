@@ -30,6 +30,7 @@ from otter.tap.api import (
     setup_scheduler
 )
 from otter.test.test_auth import identity_config
+from otter.test.test_effect_dispatcher import full_intents
 from otter.test.utils import CheckFailure, matches, patch
 from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
@@ -648,6 +649,31 @@ class APIMakeServiceTests(SynchronousTestCase):
         sd.callback(None)
         self.successResultOf(d)
         self.assertTrue(kz_client.stop.called)
+
+    @mock.patch('otter.tap.api.setup_scheduler')
+    @mock.patch('otter.tap.api.TxKazooClient')
+    @mock.patch('otter.tap.api.setup_converger')
+    def test_converger_dispatcher(self, mock_setup_converger,
+                                  mock_txkz, mock_setup_scheduler):
+        """
+        The converger dispatcher that is set up after kazoo is ready can handle
+        all intents.
+        """
+        config = test_config.copy()
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
+        kz_client = mock.Mock(spec=['start', 'stop'])
+        kz_client.start.return_value = defer.succeed(None)
+        mock_txkz.return_value = kz_client
+
+        parent = makeService(config)
+
+        mock_setup_converger.assert_called_once_with(
+            parent, kz_client, mock.ANY, 10)
+
+        dispatcher = mock_setup_converger.call_args[0][2]
+
+        for intent in full_intents():
+            self.assertIsNot(dispatcher(intent), None)
 
 
 class ConvergerSetupTests(SynchronousTestCase):
