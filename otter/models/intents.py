@@ -44,11 +44,27 @@ def perform_get_scaling_group_info(log, store, dispatcher, intent):
     returnValue((group, manifest))
 
 
+@attributes(['tenant_id', 'group_id'])
+class DeleteGroup(object):
+    """
+    Delete scaling group
+    """
+
+
+@deferred_performer
+def perform_delete_group(log, store, dispatcher, intent):
+    """
+    Perform `DeleteGroup`
+    """
+    group = store.get_scaling_group(log, intent.tenant_id, intent.group_id)
+    return group.delete_group()
+
+
 def get_model_dispatcher(log, store):
     """Get a dispatcher that can handle all the model-related intents."""
     return TypeDispatcher({
-        ModifyGroupState:
-            perform_modify_group_state,
+        ModifyGroupState: perform_modify_group_state,
         GetScalingGroupInfo:
-            partial(perform_get_scaling_group_info, log, store)
+            partial(perform_get_scaling_group_info, log, store),
+        DeleteGroup: partial(perform_delete_group, log, store)
     })
