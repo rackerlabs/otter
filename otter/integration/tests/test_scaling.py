@@ -45,17 +45,6 @@ def dump_state(s):
     dump_js(s)
 
 
-def find_end_points(rcs):
-    return rcs.find_end_point(
-        rcs,  # ignored, but that's what would be passed in anyway.
-        "otter", "autoscale", region,
-        default_url="http://localhost:9000/v1.0/{0}"
-    ).addCallback(
-        rcs.find_end_point,
-        "loadbalancers", "cloudLoadBalancers", region
-    )
-
-
 def print_token_and_ep(rcs):
     print("TOKEN(%s) EP(%s)" % (rcs.token, rcs.endpoints["otter"]))
     return rcs
@@ -95,9 +84,14 @@ class TestScaling(unittest.TestCase):
 
         rcs = TestResources()
         d = (
-            self.identity.authenticate_user(rcs)
-            .addCallback(find_end_points)
-            .addCallback(print_token_and_ep)
+            self.identity.authenticate_user(
+                rcs,
+                resources={
+                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
+                    "loadbalancers": ("cloudLoadBalancers",),
+                },
+                region=region,
+            ).addCallback(print_token_and_ep)
             .addCallback(self.scaling_group.start, self)
             .addCallback(dump_groups)
             .addCallback(self.scaling_policy.start, self)
@@ -136,9 +130,14 @@ class TestScaling(unittest.TestCase):
 
         rcs = TestResources()
         d = (
-            self.identity.authenticate_user(rcs)
-            .addCallback(find_end_points)
-            .addCallback(print_token_and_ep)
+            self.identity.authenticate_user(
+                rcs,
+                resources={
+                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
+                    "loadbalancers": ("cloudLoadBalancers",),
+                },
+                region=region
+            ).addCallback(print_token_and_ep)
             .addCallback(self.scaling_group.start, self)
             .addCallback(self.scaling_policy_up_2.start, self)
             .addCallback(self.scaling_policy_up_2.execute)
@@ -171,9 +170,16 @@ class TestScaling(unittest.TestCase):
             self.clb1 = cloud_load_balancer.CloudLoadBalancer(pool=self.pool)
 
             return (
-                self.identity.authenticate_user(rcs)
-                .addCallback(find_end_points)
-                .addCallback(self.clb1.start, self)
+                self.identity.authenticate_user(
+                    rcs,
+                    resources={
+                        "otter": (
+                            "autoscale", "http://localhost:9000/v1.0/{0}"
+                        ),
+                        "loadbalancers": ("cloudLoadBalancers",),
+                    },
+                    region=region
+                ).addCallback(self.clb1.start, self)
                 .addCallback(self.clb1.wait_for_state, "ACTIVE", 600)
             ).addCallback(add_2nd_load_balancer, self)
 

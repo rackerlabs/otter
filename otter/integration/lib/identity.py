@@ -9,6 +9,7 @@ from characteristic import Attribute, attributes
     Attribute('password', instance_of=str),
     Attribute('endpoint', instance_of=str),
     Attribute('pool', default_value=None),
+    Attribute('convergence_tenant_override', default_value=None),
 ])
 class IdentityV2(object):
     """This class provides a way to configure commonly used parameters
@@ -34,7 +35,7 @@ class IdentityV2(object):
     def __init__(self):
         self.access = None
 
-    def authenticate_user(self, rcs, tenant_id=None):
+    def authenticate_user(self, rcs, resources=None, region=None):
         """Authenticates against the Identity API.  Prior to success, the
         :attr:`access` member will be set to `None`.  After authentication
         completes, :attr:`access` will hold the raw Identity V2 API results as
@@ -43,14 +44,40 @@ class IdentityV2(object):
 
         :param TestResources rcs: A :class:`TestResources` instance used to
             record the identity results.
-
+        :param dict resources: A dictionary that maps a `TestResources` service
+            catalog key to a tuple.  The tuple, then, contains the actual
+            service catalog key, and default URL (or None if not).  For
+            example, {"nova": ("cloudComputeOpenStack",), "autoscale":
+            ("rax:autoscale", "http://localhost:9000/v1.0")}.
+        :param string region: Required if `resources` provided; ignored
+            otherwise.  This provides the OpenStack region to use for all
+            service catalog queries.
         :return: A Deferred which, when fired, returns a copy of the resources
             given.  The :attr:`access` field will be set to the Python
             dictionary representation of the Identity authentication results.
         """
-        return self.auth.authenticate_user(
+        resources = resources or {}
+
+        d = self.auth.authenticate_user(
             self.endpoint, self.username, self.password, pool=self.pool,
-            tenant_id=tenant_id).addCallback(rcs.init_from_access)
+            tenant_id=self.convergence_tenant_override,
+        ).addCallback(rcs.init_from_access)
+
+        for r in resources:
+            # This pads the provided tuple or list out to the minimum length
+            # needed to perform the multi-assignment.  Saves on special-cases.
+            service_catalog_key, default_url = (resources[r]+(None,))[:2]
+
+            kwArgs = {}
+            if default_url:
+                kwArgs = {"default_url": default_url}
+
+            d.addCallback(
+                rcs.find_end_point,
+                r, service_catalog_key, region,
+                **kwArgs
+            )
+        return d
 
 
 def find_endpoint(catalog, service_type, region):
@@ -64,7 +91,6 @@ def find_endpoint(catalog, service_type, region):
     :return: The endpoint offering the desired type of service for the
         desired region, if available.  None otherwise.
     """
-
     for entry in catalog["access"]["serviceCatalog"]:
         if entry["type"] != service_type:
             continue

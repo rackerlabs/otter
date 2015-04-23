@@ -190,6 +190,7 @@ def concretize_service_request(
             service_request.url,
             headers=service_request.headers,
             data=service_request.data,
+            params=service_request.params,
             log=log)
     return auth_eff.on(got_auth)
 
