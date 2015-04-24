@@ -1,3 +1,5 @@
+import time
+
 from effect import (
     ComposedDispatcher, Constant, Effect, Error, Func, ParallelEffects,
     TypeDispatcher, base_dispatcher, sync_perform)
@@ -8,15 +10,14 @@ from effect.testing import EQDispatcher, EQFDispatcher, SequenceDispatcher
 from kazoo.exceptions import BadVersionError
 from kazoo.recipe.partitioner import PartitionState
 
-import mock
-
 from pyrsistent import freeze, pbag, pmap, pset, s
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.cloud_client import TenantScope, service_request
-from otter.constants import CONVERGENCE_DIRTY_DIR, ServiceType
+from otter.cloud_client import TenantScope
+from otter.constants import CONVERGENCE_DIRTY_DIR
+from otter.convergence.composition import get_desired_group_state
 from otter.convergence.model import (
     CLBDescription, CLBNode, NovaServer, ServerState, StepResult)
 from otter.convergence.service import (
@@ -29,7 +30,10 @@ from otter.convergence.service import (
     non_concurrently)
 from otter.convergence.steps import ConvergeLater
 from otter.models.intents import (
-    GetScalingGroupInfo, ModifyGroupState, perform_modify_group_state)
+    DeleteGroup,
+    GetScalingGroupInfo,
+    ModifyGroupState,
+    perform_modify_group_state)
 from otter.models.interface import GroupState, NoSuchScalingGroupError
 from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
@@ -61,7 +65,7 @@ class ConvergenceStarterTests(SynchronousTestCase):
              Effect(CreateOrSet(path='/groups/divergent/tenant_group',
                                 content='dirty'))))
         log.msg.assert_called_once_with(
-            'mark-dirty-success', tenant_id='tenant', group_id='group')
+            'mark-dirty-success', tenant_id='tenant', scaling_group_id='group')
 
     def test_error_marking_dirty(self):
         """An error is logged when marking dirty fails."""
@@ -74,7 +78,7 @@ class ConvergenceStarterTests(SynchronousTestCase):
         self.assertEqual(self.successResultOf(d), None)
         log.err.assert_called_once_with(
             CheckFailureValue(RuntimeError('oh no')),
-            'mark-dirty-failure', tenant_id='tenant', group_id='group')
+            'mark-dirty-failure', tenant_id='tenant', scaling_group_id='group')
 
 
 class ConvergerTests(SynchronousTestCase):
@@ -231,11 +235,11 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             calls,
             [(self.tenant_id, self.group_id,
               matches(IsBoundWith(tenant_id=self.tenant_id,
-                                  group_id=self.group_id)))])
+                                  scaling_group_id=self.group_id)))])
         self.assertEqual(self.deletions, [True])
         self.log.msg.assert_any_call(
             'mark-clean-success',
-            tenant_id=self.tenant_id, group_id=self.group_id)
+            tenant_id=self.tenant_id, scaling_group_id=self.group_id)
 
     def test_non_concurrent(self):
         """
@@ -276,12 +280,12 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         self.log.err.assert_any_call(
             None,
             'converge-fatal-error',
-            tenant_id=self.tenant_id, group_id=self.group_id)
+            tenant_id=self.tenant_id, scaling_group_id=self.group_id)
 
         self.assertEqual(self.deletions, [True])
         self.log.msg.assert_any_call(
             'mark-clean-success',
-            tenant_id=self.tenant_id, group_id=self.group_id)
+            tenant_id=self.tenant_id, scaling_group_id=self.group_id)
 
     def test_unexpected_errors(self):
         """
@@ -300,7 +304,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         self.log.err.assert_any_call(
             None,
             'converge-non-fatal-error',
-            tenant_id=self.tenant_id, group_id=self.group_id)
+            tenant_id=self.tenant_id, scaling_group_id=self.group_id)
         self.assertEqual(self.deletions, [])
 
     def test_delete_node_version_mismatch(self):
@@ -330,7 +334,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         self.log.err.assert_any_call(
             CheckFailureValue(BadVersionError()),
             'mark-clean-failure',
-            tenant_id=self.tenant_id, group_id=self.group_id,
+            tenant_id=self.tenant_id, scaling_group_id=self.group_id,
             dirty_version=5,
             path='/groups/divergent/tenant-id_g1')
 
@@ -593,9 +597,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
         gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
                                    group_id='group-id')
+        self.gsgi = gsgi
         self.manifest = {  # Many details elided!
             'state': self.state,
             'launchConfiguration': self.lc,
+            'status': 'ACTIVE'
         }
         gsgi_result = (self.group, self.manifest)
         self.expected_intents = [(gsgi, gsgi_result)]
@@ -640,38 +646,39 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
     def test_success(self):
         """
-        Executes optimized steps if state of world does not match desired and
-        returns the result of all the steps.
+        Executes the plan and returns SUCCESS when that's the most severe
+        result.
         """
-        # The scenario: We have two servers but they're not in the LBs
-        # yet. convergence should add them to the LBs.
         log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
+
+        def plan(dgs, servers, lb_nodes, now):
+            return [
+                TestStep(
+                    Effect(
+                        {'dgs': dgs,
+                         'servers': servers,
+                         'lb_nodes': lb_nodes,
+                         'now': now})
+                    .on(lambda _: (StepResult.SUCCESS, [])))]
+
         eff = execute_convergence(self.tenant_id, self.group_id, log,
-                                  get_all_convergence_data=gacd)
-        expected_req = service_request(
-            ServiceType.CLOUD_LOAD_BALANCERS,
-            'POST',
-            'loadbalancers/23/nodes',
-            data=transform_eq(
-                freeze,
-                pmap({
-                    'nodes': transform_eq(
-                        lambda nodes: set(freeze(nodes)),
-                        set([pmap({'weight': 1, 'type': 'PRIMARY',
-                                   'port': 80,
-                                   'condition': 'ENABLED',
-                                   'address': '10.0.0.2'}),
-                             pmap({'weight': 1, 'type': 'PRIMARY',
-                                   'port': 80,
-                                   'condition': 'ENABLED',
-                                   'address': '10.0.0.1'})]))})),
-            success_pred=mock.ANY)
-        expected_intents = self.expected_intents + [
-            (expected_req.intent, 'successful response')]
-        result = sync_perform(self._get_dispatcher(expected_intents), eff)
+                                  get_all_convergence_data=gacd,
+                                  plan=plan)
+
+        sequence = SequenceDispatcher([
+            (Func(time.time), lambda i: 500),
+            ({'dgs': get_desired_group_state(self.group_id, self.lc, 2),
+              'servers': tuple(self.servers),
+              'lb_nodes': (),
+              'now': 500},
+             lambda i: None)
+        ])
+        dispatcher = ComposedDispatcher([sequence, self._get_dispatcher()])
+        result = sync_perform(dispatcher, eff)
         self.assertEqual(self.group.modify_state_values[-1].active, {})
         self.assertEqual(result, StepResult.SUCCESS)
+        self.assertEqual(sequence.sequence, [])
 
     def test_first_error_extraction(self):
         """
@@ -698,6 +705,53 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         # And make sure that exception isn't wrapped in FirstError.
         e = self.assertRaises(RuntimeError, sync_perform, dispatcher, eff)
         self.assertEqual(str(e), 'foo')
+
+    def test_deleting_group(self):
+        """
+        If group's status is DELETING, plan will be generated to delete
+        all servers and group is deleted if the steps return SUCCESS. The
+        group is not deleted is the step do not succeed
+        """
+        log = mock_log()
+        gacd = self._get_gacd_func(self.group.uuid)
+
+        def _plan(dsg, *a):
+            self.dsg = dsg
+            return [TestStep(Effect(Constant((StepResult.SUCCESS, []))))]
+
+        eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                  get_all_convergence_data=gacd, plan=_plan)
+
+        # setup intents for DeleteGroup and GetScalingGroupInfo
+        del_group = DeleteGroup(tenant_id=self.tenant_id,
+                                group_id=self.group_id)
+        self.manifest['status'] = 'DELETING'
+        exp_intents = [(del_group, None),
+                       (self.gsgi, (self.group, self.manifest))]
+        disp = ComposedDispatcher([
+            EQDispatcher(exp_intents),
+            TypeDispatcher({
+                ParallelEffects: perform_parallel_async,
+            }),
+            base_dispatcher,
+        ])
+        # This succeeded without `ModifyGroupState` dispatcher in it
+        # ensuring that it was not called
+        self.assertEqual(sync_perform(disp, eff), StepResult.SUCCESS)
+
+        # desired capacity was changed to 0
+        self.assertEqual(self.dsg.capacity, 0)
+
+        # Group is not deleted if step result was not successful
+        def fplan(*a):
+            return [TestStep(Effect(Constant((StepResult.RETRY, []))))]
+
+        eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                  get_all_convergence_data=gacd, plan=fplan)
+        disp = self._get_dispatcher([(self.gsgi, (self.group, self.manifest))])
+        # This succeeded without DeleteGroup performer being there ensuring
+        # that it was not called
+        self.assertEqual(sync_perform(disp, eff), StepResult.RETRY)
 
     def test_returns_retry(self):
         """

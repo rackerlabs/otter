@@ -41,7 +41,8 @@ metrics_log = otter_log.bind(system='otter.metrics')
 
 
 @defer.inlineCallbacks
-def get_scaling_groups(client, props=None, batch_size=100, group_pred=None):
+def get_scaling_groups(client, props=None, batch_size=100, group_pred=None,
+                       with_null_desired=False):
     """
     Return scaling groups from Cassandra as a list of ``dict`` where each
     dict has 'tenantId', 'groupId', 'desired', 'active', 'pending'
@@ -49,7 +50,10 @@ def get_scaling_groups(client, props=None, batch_size=100, group_pred=None):
 
     :param :class:`silverber.client.CQLClient` client: A cassandra client
     :param ``list`` props: List of extra properties to extract
-    :oaram int batch_size: Number of groups to fetch at a time
+    :param int batch_size: Number of groups to fetch at a time
+    :param callable group_pred: A dict -> bool function used to filter groups
+        returned
+    :param bool with_null_desired: Include groups that has no desired?
     :return: `Deferred` with ``list`` of ``dict``
     """
     # TODO: Currently returning all groups as one giant list for now.
@@ -61,13 +65,16 @@ def get_scaling_groups(client, props=None, batch_size=100, group_pred=None):
     where_key = 'WHERE "tenantId"=:tenantId AND "groupId">:groupId'
     where_token = 'WHERE token("tenantId") > token(:tenantId)'
 
-    # setup function that removes groups not having desired
-    has_desired = lambda g: g['desired'] is not None
-    has_created_at = lambda g: g['created_at'] is not None
+    # setup group filtering function
+    def has_created_at(g): return g['created_at'] is not None
     group_pred = group_pred or identity
-    group_filter = filter(predicate_all(has_desired,
-                                        has_created_at,
-                                        group_pred))
+    if with_null_desired:
+        group_filter = filter(predicate_all(has_created_at, group_pred))
+    else:
+        def has_desired(g): return g['desired'] is not None
+        group_filter = filter(predicate_all(has_desired,
+                                            has_created_at,
+                                            group_pred))
 
     # We first start by getting all groups limited on batch size
     # It will return groups sorted first based on hash of tenant id

@@ -30,8 +30,9 @@ from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
-from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
-from otter.models.interface import NoSuchScalingGroupError
+from otter.models.intents import (
+    DeleteGroup, GetScalingGroupInfo, ModifyGroupState)
+from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.fp import assoc_obj
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
@@ -96,7 +97,7 @@ def execute_convergence(tenant_id, group_id, log,
     :param get_all_convergence_data: like :func`get_all_convergence_data`, used
         for testing.
 
-    :return: An Effect of a list containing the individual step results.
+    :return: Effect of most severe StepResult
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
     # Huh! It turns out we can parallelize the gathering of data with the
@@ -114,14 +115,19 @@ def execute_convergence(tenant_id, group_id, log,
     launch_config = manifest['launchConfiguration']
     now = yield Effect(Func(time.time))
 
+    group_status = ScalingGroupStatus.lookupByName(manifest['status'])
+    desired_capacity = (0 if group_status == ScalingGroupStatus.DELETING
+                        else group_state.desired)
     desired_group_state = get_desired_group_state(
-        group_id, launch_config, group_state.desired)
+        group_id, launch_config, desired_capacity)
     steps = plan(desired_group_state, servers, lb_nodes, now)
     active = determine_active(servers, lb_nodes)
     log.msg('execute-convergence',
-            servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
+            servers=servers, lb_nodes=lb_nodes, steps=list(steps), now=now,
             desired=desired_group_state, active=active)
-    yield _update_active(scaling_group, active)
+    # Since deleting groups are not publicly visible
+    if group_status != ScalingGroupStatus.DELETING:
+        yield _update_active(scaling_group, active)
     if len(steps) == 0:
         yield do_return(StepResult.SUCCESS)
     results = yield steps_to_effect(steps)
@@ -132,7 +138,12 @@ def execute_convergence(tenant_id, group_id, log,
     worst_status = priority[0][0]
     log.msg('execute-convergence-results',
             results=zip(steps, results),
-            worst_status=worst_status)
+            worst_status=worst_status.name)
+
+    if (worst_status == StepResult.SUCCESS and
+            group_status == ScalingGroupStatus.DELETING):
+            # servers have been deleted. Delete the group for real
+        yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
 
     yield do_return(worst_status)
 
@@ -228,7 +239,7 @@ class ConvergenceStarter(object):
 
     def start_convergence(self, log, tenant_id, group_id, perform=perform):
         """Record that a group needs converged by creating a ZooKeeper node."""
-        log = log.bind(tenant_id=tenant_id, group_id=group_id)
+        log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id)
         eff = mark_divergent(tenant_id, group_id)
         d = perform(self._dispatcher, eff)
 
@@ -306,7 +317,7 @@ def converge_one_group(log, currently_converging, tenant_id, group_id, version,
     :param Reference currently_converging: pset of currently converging groups
     :param version: version number of ZNode of the group's dirty flag
     """
-    log = log.bind(tenant_id=tenant_id, group_id=group_id)
+    log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id)
     eff = execute_convergence(tenant_id, group_id, log)
     try:
         result = yield non_concurrently(currently_converging, group_id, eff)
