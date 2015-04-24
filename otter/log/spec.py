@@ -7,6 +7,9 @@ from twisted.python.failure import Failure
 
 # mapping from msg type -> message
 msg_types = {
+    "execute-convergence": "Executing convergence",
+    "execute-convergence-results": (
+        "Got result of {worst_status} after executing convergence"),
     "launch-servers": "Launching {num_servers} servers",
     "delete-server": "Deleting {server_id} server",
     "add-server-clb": ("Adding {server_id} with IP address {ip_address} "
