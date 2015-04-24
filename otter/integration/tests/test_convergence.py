@@ -42,6 +42,7 @@ convergence_tenant = os.environ.get('AS_CONVERGENCE_TENANT')
 
 class TestConvergence(unittest.TestCase):
     """This class contains test cases aimed at the Otter Converger."""
+    timeout = 1800
 
     def setUp(self):
         """Establish an HTTP connection pool and commonly used resources for
@@ -472,10 +473,25 @@ class TestConvergence(unittest.TestCase):
         y = 5
 
         return self._scale_down_after_oobd_hitting_constraints(
-            rcs, set_to_servers=x, oobd_servers=z,
+            rcs, set_to_servers=x, oobd_servers=z, max_servers=max_servers,
             scale_servers=y, converged_servers=max_servers)
 
-    test_scale_up_after_oobd_at_group_max.timeout = 1800
+    def test_scale_down_past_group_min_after_oobd(self):
+        """
+        Validate the following edge case:
+
+
+        """
+        rcs = TestResources()
+
+        min_servers = 5
+        z = 2
+        y = -2
+
+        return self._scale_down_after_oobd_hitting_constraints(
+            rcs, oobd_servers=z, min_servers=min_servers,
+            scale_servers=y,
+            converged_servers=min_servers)
 
     def _assert_error_status_code(self, result, code, rcs):
         """
@@ -495,7 +511,7 @@ class TestConvergence(unittest.TestCase):
             return rcs
 
     def _scale_down_after_oobd_hitting_constraints(
-            self, rcs, min_servers=0, max_servers=25, set_to_servers=0,
+            self, rcs, min_servers=0, max_servers=25, set_to_servers=None,
             oobd_servers=0, scale_servers=1, converged_servers=0):
 
         converged_servers = set_to_servers
@@ -510,47 +526,48 @@ class TestConvergence(unittest.TestCase):
             pool=self.pool
         )
 
-        self.policy_set = ScalingPolicy(
-            set_to=set_to_servers,
-            scaling_group=self.scaling_group
-        )
-
         self.policy_scale = ScalingPolicy(
             scale_by=scale_servers,
             scaling_group=self.scaling_group
         )
-        return (
-            self.identity.authenticate_user(
-                rcs,
-                resources={
-                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
-                    "nova": ("cloudServersOpenStack",),
-                },
-                region=region
-            ).addCallback(self.scaling_group.start, self)
-            .addCallback(self.policy_set.start, self)
-            .addCallback(self.policy_set.execute)
-            .addCallback(
-                self.scaling_group.wait_for_N_servers,
-                set_to_servers, timeout=120
+        d = self.identity.authenticate_user(
+            rcs,
+            resources={
+                "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
+                "nova": ("cloudServersOpenStack",),
+            },
+            region=region
+        ).addCallback(self.scaling_group.start, self)
+
+        if set_to_servers is not None:
+            self.policy_set = ScalingPolicy(
+                set_to=set_to_servers,
+                scaling_group=self.scaling_group
             )
-            .addCallback(self.scaling_group.get_scaling_group_state)
-            .addCallback(self._choose_random_servers, oobd_servers)
-            .addCallback(self._delete_those_servers, rcs)
-            # The execution of the policy triggers convergence
-            .addCallback(self.policy_scale.start, self)
-            .addCallback(self.policy_scale.execute)
-            .addBoth(self._assert_error_status_code, 403, rcs)
-            # Need to add a check for the expected 403
-            .addCallback(lambda _: self.removed_ids)
-            .addCallback(
-                self.scaling_group.wait_for_deleted_id_removal,
-                rcs,
-                total_servers=set_to_servers,
-            )
-            .addCallback(self.scaling_group.wait_for_expected_state, rcs,
-                         active=converged_servers, pending=0)
-        )
+            (d.addCallback(self.policy_set.start, self)
+             .addCallback(self.policy_set.execute))
+
+        (d.addCallback(
+            self.scaling_group.wait_for_N_servers,
+            min_servers if set_to_servers is None else set_to_servers,
+            timeout=120)
+         .addCallback(self.scaling_group.get_scaling_group_state)
+         .addCallback(self._choose_random_servers, oobd_servers)
+         .addCallback(self._delete_those_servers, rcs)
+         # The execution of the policy triggers convergence
+         .addCallback(self.policy_scale.start, self)
+          .addCallback(self.policy_scale.execute)
+         .addBoth(self._assert_error_status_code, 403, rcs)
+         # Need to add a check for the expected 403
+         .addCallback(lambda _: self.removed_ids)
+         .addCallback(
+            self.scaling_group.wait_for_deleted_id_removal,
+            rcs,
+            total_servers=set_to_servers,)
+         .addCallback(self.scaling_group.wait_for_expected_state, rcs,
+                      active=converged_servers, pending=0))
+
+        return d
 
     def _choose_half_the_servers(self, (code, response)):
         """Select the first half of the servers returned by the
