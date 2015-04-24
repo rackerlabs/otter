@@ -20,6 +20,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter import controller
 from otter.cloud_client import (
     NoSuchServerError,
+    TenantScope,
     get_server_details,
     set_nova_metadata_item)
 from otter.convergence.model import DRAINING_METADATA
@@ -32,6 +33,7 @@ from otter.supervisor import (
     CannotDeleteServerBelowMinError,
     ServerNotFoundError)
 from otter.test.utils import (
+    StubResponse,
     iMock,
     matches,
     mock_log,
@@ -1199,6 +1201,8 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             'launchConfiguration': {'this is not used': 'here'},
             'state': self.state
         }
+        self.unpacked_tenant_scopes = []
+        self.unpacked_retries = []
 
     def assert_states_equivalent_except_desired(self, state1, state2):
         """
@@ -1221,17 +1225,36 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
 
         @sync_performer
         def handle_retry(_disp, retry_intent):
+            self.unpacked_retries.append(retry_intent.effect.intent)
             self.assertEqual(retry_intent.should_retry, expected_retry_params)
             return sync_perform(_disp, retry_intent.effect)
 
+        # Some TenantScopes also can't be compared, because the wrapped effect
+        # has callbacks.  But we want to assert that certain calls were wrapped
+        # in a TenantScope so just and store the underlying (non-Retry) intent.
+        @sync_performer
+        def unpack_tenant_scope(_disp, tenant_scope_intent):
+            # we're expecting TenantScope to be called with a Retry Effect, so
+            # store the Retry's effect's intent
+            self.assertIsInstance(tenant_scope_intent.effect.intent, Retry)
+            self.unpacked_tenant_scopes.append(
+                tenant_scope_intent.effect.intent.effect.intent)
+
+            self.assertEqual(tenant_scope_intent.tenant_id, 'tenant_id')
+            return sync_perform(_disp, tenant_scope_intent.effect)
+
         full_dispatcher = ComposedDispatcher([
             test_dispatcher(),
-            TypeDispatcher({Retry: handle_retry}),
+            TypeDispatcher({
+                Retry: handle_retry,
+                TenantScope: unpack_tenant_scope
+            }),
             dispatcher])
 
         eff = controller.convergence_remove_server_from_group(
             self.log, self.trans_id, self.group, self.state, 'server_id',
             replace, purge)
+
         return sync_perform(full_dispatcher, eff)
 
     def test_no_such_server_replace_true(self):
@@ -1240,13 +1263,18 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         :class:`ServerNotFoundError` is raised.  No additional checking
         for config is needed because replace is set True.
         """
+        server_details_intent = get_server_details('server_id').intent
         dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
+            (server_details_intent,
                 lambda _: raise_(NoSuchServerError(server_id=u'server_id')))
         ])
-        self.assertRaises(
-            ServerNotFoundError, self._remove, True, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+
+        with dispatcher.consume():
+            self.assertRaises(
+                ServerNotFoundError, self._remove, True, False, dispatcher)
+
+        self.assertEqual(self.unpacked_retries, [server_details_intent])
+        self.assertEqual(self.unpacked_tenant_scopes, [server_details_intent])
 
     def test_server_not_autoscale_server_replace_true(self):
         """
@@ -1256,13 +1284,17 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         replace is set True.
         """
         self.server_details['server'].pop('metadata')
+        server_details_intent = get_server_details('server_id').intent
         dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details)
+            (server_details_intent,
+                lambda _: (StubResponse(200, {}), self.server_details))
         ])
-        self.assertRaises(
-            ServerNotFoundError, self._remove, True, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        with dispatcher.consume():
+            self.assertRaises(
+                ServerNotFoundError, self._remove, True, False, dispatcher)
+
+        self.assertEqual(self.unpacked_retries, [server_details_intent])
+        self.assertEqual(self.unpacked_tenant_scopes, [server_details_intent])
 
     def test_server_in_wrong_group_replace_true(self):
         """
@@ -1275,13 +1307,18 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             'rax:auto_scaling_group_id': 'other_group_id'
         }
 
+        server_details_intent = get_server_details('server_id').intent
         dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details)
+            (server_details_intent,
+                lambda _: (StubResponse(200, {}), self.server_details))
         ])
-        self.assertRaises(
-            ServerNotFoundError, self._remove, True, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+
+        with dispatcher.consume():
+            self.assertRaises(
+                ServerNotFoundError, self._remove, True, False, dispatcher)
+
+        self.assertEqual(self.unpacked_retries, [server_details_intent])
+        self.assertEqual(self.unpacked_tenant_scopes, [server_details_intent])
 
     def test_server_in_group_cannot_scale_down(self):
         """
@@ -1291,16 +1328,21 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         """
         self.state.desired = 1
         self.group_manifest_info['groupConfiguration']['minEntities'] = 1
+
+        server_details_intent = get_server_details('server_id').intent
         dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details),
+            (server_details_intent,
+                lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
                 lambda _: self.group_manifest_info)
         ])
-        self.assertRaises(
-            CannotDeleteServerBelowMinError, self._remove, False, False,
-            dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        with dispatcher.consume():
+            self.assertRaises(
+                CannotDeleteServerBelowMinError, self._remove, False, False,
+                dispatcher)
+
+        self.assertEqual(self.unpacked_retries, [server_details_intent])
+        self.assertEqual(self.unpacked_tenant_scopes, [server_details_intent])
 
     def test_server_not_in_group_cannot_scale_down(self):
         """
@@ -1310,15 +1352,21 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         self.server_details['server'].pop('metadata')
         self.state.desired = 1
         self.group_manifest_info['groupConfiguration']['minEntities'] = 1
+
+        server_details_intent = get_server_details('server_id').intent
         dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details),
+            (server_details_intent,
+                lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
                 lambda _: self.group_manifest_info)
         ])
-        self.assertRaises(
-            ServerNotFoundError, self._remove, False, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+
+        with dispatcher.consume():
+            self.assertRaises(
+                ServerNotFoundError, self._remove, False, False, dispatcher)
+
+        self.assertEqual(self.unpacked_retries, [server_details_intent])
+        self.assertEqual(self.unpacked_tenant_scopes, [server_details_intent])
 
     def test_checks_pass_replace_true_purge_success(self):
         """
@@ -1329,13 +1377,18 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         """
         dispatcher = SequenceDispatcher([
             (get_server_details('server_id').intent,
-                lambda _: self.server_details),
+                lambda _: (StubResponse(200, {}), self.server_details)),
             (set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
-                lambda _: None)
+                lambda _: (StubResponse(200, {}), None))
         ])
-        result = self._remove(True, True, dispatcher)
+        expected_unpacked = [intent for (intent, resp) in dispatcher.sequence]
+
+        with dispatcher.consume():
+            result = self._remove(True, True, dispatcher)
+
         self.assertEqual(result, self.state)
-        self.assertEqual(dispatcher.sequence, [])
+        self.assertEqual(self.unpacked_retries, expected_unpacked)
+        self.assertEqual(self.unpacked_tenant_scopes, expected_unpacked)
 
     def test_checks_pass_replace_false_purge_success(self):
         """
@@ -1347,16 +1400,22 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         old_desired = self.state.desired = 2
         dispatcher = SequenceDispatcher([
             (get_server_details('server_id').intent,
-                lambda _: self.server_details),
+                lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
                 lambda _: self.group_manifest_info),
             (set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
-                lambda _: None)
+                lambda _: (StubResponse(200, {}), None))
         ])
-        result = self._remove(False, True, dispatcher)
+        expected_unpacked = [intent for (intent, resp) in dispatcher.sequence
+                             if not isinstance(intent, GetScalingGroupInfo)]
+
+        with dispatcher.consume():
+            result = self._remove(False, True, dispatcher)
+
         self.assert_states_equivalent_except_desired(result, self.state)
         self.assertEqual(result.desired, old_desired - 1)
-        self.assertEqual(dispatcher.sequence, [])
+        self.assertEqual(self.unpacked_retries, expected_unpacked)
+        self.assertEqual(self.unpacked_tenant_scopes, expected_unpacked)
 
     def test_checks_pass_replace_true_purge_failure(self):
         """
@@ -1366,12 +1425,17 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         """
         dispatcher = SequenceDispatcher([
             (get_server_details('server_id').intent,
-                lambda _: self.server_details),
+                lambda _: (StubResponse(200, {}), self.server_details)),
             (set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
                 lambda _: raise_(ValueError('oops!')))
         ])
-        self.assertRaises(ValueError, self._remove, True, True, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        expected_unpacked = [intent for (intent, resp) in dispatcher.sequence]
+
+        with dispatcher.consume():
+            self.assertRaises(ValueError, self._remove, True, True, dispatcher)
+
+        self.assertEqual(self.unpacked_retries, expected_unpacked)
+        self.assertEqual(self.unpacked_tenant_scopes, expected_unpacked)
 
     def test_checks_pass_replace_true_no_purge_success(self):
         """
@@ -1382,16 +1446,21 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         """
         dispatcher = SequenceDispatcher([
             (get_server_details('server_id').intent,
-                lambda _: self.server_details),
+                lambda _: (StubResponse(200, {}), self.server_details)),
             (EvictServerFromScalingGroup(log=self.log,
                                          transaction_id=self.trans_id,
                                          scaling_group=self.group,
                                          server_id='server_id'),
-                lambda _: None)
+                lambda _: (StubResponse(200, {}), None))
         ])
-        result = self._remove(True, False, dispatcher)
+        expected_unpacked = [intent for (intent, resp) in dispatcher.sequence]
+
+        with dispatcher.consume():
+            result = self._remove(True, False, dispatcher)
+
         self.assertEqual(result, self.state)
-        self.assertEqual(dispatcher.sequence, [])
+        self.assertEqual(self.unpacked_retries, expected_unpacked)
+        self.assertEqual(self.unpacked_tenant_scopes, expected_unpacked)
 
     def test_checks_pass_replace_false_no_purge_success(self):
         """
@@ -1403,19 +1472,25 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         old_desired = self.state.desired = 2
         dispatcher = SequenceDispatcher([
             (get_server_details('server_id').intent,
-                lambda _: self.server_details),
+                lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
                 lambda _: self.group_manifest_info),
             (EvictServerFromScalingGroup(log=self.log,
                                          transaction_id=self.trans_id,
                                          scaling_group=self.group,
                                          server_id='server_id'),
-                lambda _: None)
+                lambda _: (StubResponse(200, {}), None))
         ])
-        result = self._remove(False, False, dispatcher)
+        expected_unpacked = [intent for (intent, resp) in dispatcher.sequence
+                             if not isinstance(intent, GetScalingGroupInfo)]
+
+        with dispatcher.consume():
+            result = self._remove(False, False, dispatcher)
+
         self.assert_states_equivalent_except_desired(result, self.state)
         self.assertEqual(result.desired, old_desired - 1)
-        self.assertEqual(dispatcher.sequence, [])
+        self.assertEqual(self.unpacked_retries, expected_unpacked)
+        self.assertEqual(self.unpacked_tenant_scopes, expected_unpacked)
 
     def test_checks_pass_replace_true_no_purge_failure(self):
         """
@@ -1425,12 +1500,18 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         """
         dispatcher = SequenceDispatcher([
             (get_server_details('server_id').intent,
-                lambda _: self.server_details),
+                lambda _: (StubResponse(200, {}), self.server_details)),
             (EvictServerFromScalingGroup(log=self.log,
                                          transaction_id=self.trans_id,
                                          scaling_group=self.group,
                                          server_id='server_id'),
                 lambda _: raise_(ValueError('oops')))
         ])
-        self.assertRaises(ValueError, self._remove, True, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        expected_unpacked = [intent for (intent, resp) in dispatcher.sequence]
+
+        with dispatcher.consume():
+            self.assertRaises(ValueError, self._remove, True, False,
+                              dispatcher)
+
+        self.assertEqual(self.unpacked_retries, expected_unpacked)
+        self.assertEqual(self.unpacked_tenant_scopes, expected_unpacked)
