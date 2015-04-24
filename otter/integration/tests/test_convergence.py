@@ -439,15 +439,12 @@ class TestConvergence(unittest.TestCase):
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
                 set_to_servers, timeout=120
-            )
-            .addCallback(self.scaling_group.get_scaling_group_state)
+            ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_random_servers, oobd_servers)
             .addCallback(self._delete_those_servers, rcs)
             # The execution of the policy triggers convergence
             .addCallback(self.policy_scale.start, self)
             .addCallback(self.policy_scale.execute)
-            .addErrback(self._got_403)
-            # Need to add a check for the expected 403
             .addCallback(lambda _: self.removed_ids)
             .addCallback(
                 self.scaling_group.wait_for_deleted_id_removal,
@@ -461,9 +458,15 @@ class TestConvergence(unittest.TestCase):
     def test_scale_up_after_oobd_at_group_max(self):
         """
         Validate the following edge case:
-         - Attempting to scale over the group max, even after and oobd
-         will return 403 and trigger convergence
+        - Scaling up when already at the max returns a 403 even after an out
+          of band delete (OOBD) has reduced the number of servers below the
+          group max. Even though the policy cannot execute, convergence is
+          triggered and the deleted servers are replaced.
 
+            Create a group and set the group a capacity of max_servers
+            Delete z of the servers out of band
+            Attempt to scale up by (y) servers
+            Validate end state max_servers
         """
         rcs = TestResources()
 
@@ -479,8 +482,15 @@ class TestConvergence(unittest.TestCase):
     def test_scale_down_past_group_min_after_oobd(self):
         """
         Validate the following edge case:
+        - Scaling down when already at the min returns a 403 after an out
+          of band delete (OOBD) has reduced the number of servers below the
+          group min. Even though the policy cannot execute, convergence is
+          triggered and the deleted servers are replaced.
 
-
+            Create a group with min_servers
+            Delete z of the servers out of band
+            Attempt to scale down by (y) servers
+            Validate end state min_servers
         """
         rcs = TestResources()
 
@@ -495,7 +505,7 @@ class TestConvergence(unittest.TestCase):
 
     def _assert_error_status_code(self, result, code, rcs):
         """
-        Validate the the returned value was a failure with the specified
+        Validate that the returned value was a failure with the specified
         status code.
         """
         if not isinstance(result, Failure):
