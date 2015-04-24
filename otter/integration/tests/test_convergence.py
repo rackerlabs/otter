@@ -102,6 +102,23 @@ class TestConvergence(unittest.TestCase):
             scaling_group=self.scaling_group
         )
 
+        def check_state(state, then=None):
+            code, response = state
+            if code == 404:
+                raise Exception("Enterprise to Scaling Group, please respond.")
+            if then:
+                return then(response)
+
+        def keep_state(response):
+            self.untouchable_group_ids = extract_active_ids(response)
+            return rcs
+
+        def double_check_state(response):
+            latest_ids = extract_active_ids(response)
+            if not all(i in self.untouchable_group_ids for i in latest_ids):
+                raise Exception("Untouchable group mutilated somehow.")
+            return rcs
+
         return (
             self.identity.authenticate_user(
                 rcs,
@@ -113,8 +130,12 @@ class TestConvergence(unittest.TestCase):
             ).addCallback(self.scaling_group.start, self)
             .addCallback(self.untouchable_scaling_group.start, self)
             .addCallback(
-                self.scaling_group.wait_for_N_servers, 4, timeout=1800
-            ).addCallback(self.scale_up_to_max.start, self)
+                self.untouchable_scaling_group.wait_for_N_servers, 4,
+                timeout=1800
+            ).addCallback(
+                self.untouchable_scaling_group.get_scaling_group_state
+            ).addCallback(check_state, then=keep_state)
+            .addCallback(self.scale_up_to_max.start, self)
             .addCallback(self.scale_beyond_max.start, self)
             .addCallback(self.scale_up_to_max.execute)
             .addCallback(
@@ -132,7 +153,10 @@ class TestConvergence(unittest.TestCase):
                 total_servers=12,
             ).addCallback(
                 self.scaling_group.wait_for_N_servers, 12, timeout=1800
-            )
+            ).addCallback(
+            .addCallback(
+                self.untouchable_scaling_group.get_scaling_group_state
+            ).addCallback(check_state, then=double_check_state)
         )
 
     def test_scale_over_group_max_after_metadata_removal(self):
