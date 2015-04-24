@@ -1244,9 +1244,9 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             (get_server_details('server_id').intent,
                 lambda _: raise_(NoSuchServerError(server_id=u'server_id')))
         ])
-        self.assertRaises(
-            ServerNotFoundError, self._remove, True, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        with dispatcher.consumed():
+            self.assertRaises(
+                ServerNotFoundError, self._remove, True, False, dispatcher)
 
     def test_server_not_autoscale_server_replace_true(self):
         """
@@ -1260,9 +1260,9 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             (get_server_details('server_id').intent,
                 lambda _: self.server_details)
         ])
-        self.assertRaises(
-            ServerNotFoundError, self._remove, True, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        with dispatcher.consumed():
+            self.assertRaises(
+                ServerNotFoundError, self._remove, True, False, dispatcher)
 
     def test_server_in_wrong_group_replace_true(self):
         """
@@ -1279,9 +1279,9 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             (get_server_details('server_id').intent,
                 lambda _: self.server_details)
         ])
-        self.assertRaises(
-            ServerNotFoundError, self._remove, True, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        with dispatcher.consumed():
+            self.assertRaises(
+                ServerNotFoundError, self._remove, True, False, dispatcher)
 
     def test_server_in_group_cannot_scale_down(self):
         """
@@ -1297,10 +1297,10 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
                 lambda _: self.group_manifest_info)
         ])
-        self.assertRaises(
-            CannotDeleteServerBelowMinError, self._remove, False, False,
-            dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        with dispatcher.consumed():
+            self.assertRaises(
+                CannotDeleteServerBelowMinError, self._remove, False, False,
+                dispatcher)
 
     def test_server_not_in_group_cannot_scale_down(self):
         """
@@ -1316,9 +1316,9 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
                 lambda _: self.group_manifest_info)
         ])
-        self.assertRaises(
-            ServerNotFoundError, self._remove, False, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        with dispatcher.consumed():
+            self.assertRaises(
+                ServerNotFoundError, self._remove, False, False, dispatcher)
 
     def test_checks_pass_replace_true_purge_success(self):
         """
@@ -1333,9 +1333,9 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             (set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
                 lambda _: None)
         ])
-        result = self._remove(True, True, dispatcher)
+        with dispatcher.consumed():
+            result = self._remove(True, True, dispatcher)
         self.assertEqual(result, self.state)
-        self.assertEqual(dispatcher.sequence, [])
 
     def test_checks_pass_replace_false_purge_success(self):
         """
@@ -1353,10 +1353,10 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             (set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
                 lambda _: None)
         ])
-        result = self._remove(False, True, dispatcher)
+        with dispatcher.consumed():
+            result = self._remove(False, True, dispatcher)
         self.assert_states_equivalent_except_desired(result, self.state)
         self.assertEqual(result.desired, old_desired - 1)
-        self.assertEqual(dispatcher.sequence, [])
 
     def test_checks_pass_replace_true_purge_failure(self):
         """
@@ -1370,8 +1370,8 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             (set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
                 lambda _: raise_(ValueError('oops!')))
         ])
-        self.assertRaises(ValueError, self._remove, True, True, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        with dispatcher.consumed():
+            self.assertRaises(ValueError, self._remove, True, True, dispatcher)
 
     def test_checks_pass_replace_true_no_purge_success(self):
         """
@@ -1389,9 +1389,9 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                                          server_id='server_id'),
                 lambda _: None)
         ])
-        result = self._remove(True, False, dispatcher)
+        with dispatcher.consumed():
+            result = self._remove(True, False, dispatcher)
         self.assertEqual(result, self.state)
-        self.assertEqual(dispatcher.sequence, [])
 
     def test_checks_pass_replace_false_no_purge_success(self):
         """
@@ -1412,10 +1412,10 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                                          server_id='server_id'),
                 lambda _: None)
         ])
-        result = self._remove(False, False, dispatcher)
+        with dispatcher.consumed():
+            result = self._remove(False, False, dispatcher)
         self.assert_states_equivalent_except_desired(result, self.state)
         self.assertEqual(result.desired, old_desired - 1)
-        self.assertEqual(dispatcher.sequence, [])
 
     def test_checks_pass_replace_true_no_purge_failure(self):
         """
@@ -1432,5 +1432,6 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                                          server_id='server_id'),
                 lambda _: raise_(ValueError('oops')))
         ])
-        self.assertRaises(ValueError, self._remove, True, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        with dispatcher.consumed():
+            self.assertRaises(ValueError, self._remove, True, False,
+                              dispatcher)
