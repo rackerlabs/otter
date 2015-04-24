@@ -556,7 +556,7 @@ class OtterGroup(object):
                                              self.group_id)
         force = extract_bool_arg(request, 'force', False)
         return controller.delete_group(
-                log, transaction_id(request), group, force)
+            log, transaction_id(request), group, force)
 
     @app.route('/state/', methods=['GET'])
     @with_transaction_id()
