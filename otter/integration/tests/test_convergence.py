@@ -137,32 +137,8 @@ class TestConvergence(unittest.TestCase):
                 scaling_group=self.scaling_group
             )
 
-            # If we didn't have this policy, then this test would always pass
-            # on an Otter deployment w/out Convergence enabled.  Reason: we
-            # start off with 24 servers.  We OOB-delete 2 of them, leaving 22
-            # actually running; however, Otter will still think 24 exist.  We
-            # scale up by one, and:
-            #
-            # - If Otter doesn't converge, then it'll just spin up another
-            # server, and will meet the test criteria, OR,
-            #
-            # - If Otter converges, it's entirely possible for it to notice
-            # that two servers are gone, for it to attempt to provision
-            # replacements, and then provision the third and final server, all
-            # before we get a response back from
-            # scaling_group.get_scaling_group_state.
-            #
-            # So, we need an intermediate step that *guarantees* our test the
-            # ability to inspect Otter's behavior.  This is that step.
             self.second_scaling_policy = ScalingPolicy(
-                scale_by=-1,
-                scaling_group=self.scaling_group
-            )
-
-            # We scale up by 2 here instead of 1, to make up for the -1 in the
-            # previous scaling policy.
-            self.third_scaling_policy = ScalingPolicy(
-                scale_by=2,
+                scale_by=1,
                 scaling_group=self.scaling_group
             )
 
@@ -170,7 +146,6 @@ class TestConvergence(unittest.TestCase):
                 self.scaling_group.start(rcs, self)
                 .addCallback(self.first_scaling_policy.start, self)
                 .addCallback(self.second_scaling_policy.start, self)
-                .addCallback(self.third_scaling_policy.start, self)
                 .addCallback(self.first_scaling_policy.execute)
                 .addCallback(
                     self.scaling_group.wait_for_N_servers, 24, timeout=1800
@@ -183,8 +158,7 @@ class TestConvergence(unittest.TestCase):
                     self.scaling_group.wait_for_deleted_id_removal,
                     rcs,
                     total_servers=24,
-                ).addCallback(self.third_scaling_policy.execute)
-                .addCallback(
+                ).addCallback(
                     self.scaling_group.wait_for_N_servers, 25, timeout=1800
                 )
             )
