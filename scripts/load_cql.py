@@ -176,7 +176,7 @@ def insert_deleting_false(reactor, conn):
     """
     Insert false to all group's deleting column
     """
-    groups = yield get_scaling_groups(conn)
+    groups = yield get_scaling_groups(conn, with_null_desired=True)
     query = (
         'INSERT INTO scaling_group ("tenantId", "groupId", deleting) '
         'VALUES (:tenantId{i}, :groupId{i}, false);')
