@@ -21,6 +21,7 @@ from .models.intents import get_model_dispatcher
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
 from .util.zk import get_zk_dispatcher
+from .worker_intents import get_eviction_dispatcher
 
 
 def get_simple_dispatcher(reactor):
@@ -47,7 +48,7 @@ def get_simple_dispatcher(reactor):
 
 
 def get_full_dispatcher(reactor, authenticator, log, service_configs,
-                        kz_client, store):
+                        kz_client, store, supervisor):
     """
     Return a dispatcher that can perform all of Otter's effects.
     """
@@ -55,6 +56,7 @@ def get_full_dispatcher(reactor, authenticator, log, service_configs,
         get_legacy_dispatcher(reactor, authenticator, log, service_configs),
         get_zk_dispatcher(kz_client),
         get_model_dispatcher(log, store),
+        get_eviction_dispatcher(supervisor)
     ])
 
 

@@ -15,7 +15,9 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import CachingAuthenticator, SingleTenantAuthenticator
-from otter.constants import ServiceType, get_service_configs
+from otter.constants import (
+    CONVERGENCE_DIRTY_DIR, ServiceType, get_service_configs)
+from otter.convergence.service import Converger
 from otter.log.cloudfeeds import CloudFeedsObserver
 from otter.models.cass import CassScalingGroupCollection as OriginalStore
 from otter.supervisor import SupervisorService, get_supervisor, set_supervisor
@@ -24,12 +26,15 @@ from otter.tap.api import (
     Options,
     call_after_supervisor,
     makeService,
+    setup_converger,
     setup_scheduler
 )
 from otter.test.test_auth import identity_config
+from otter.test.test_effect_dispatcher import full_intents
 from otter.test.utils import CheckFailure, matches, patch
 from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
+from otter.util.zkpartitioner import Partitioner
 
 
 test_config = {
@@ -497,7 +502,12 @@ class APIMakeServiceTests(SynchronousTestCase):
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
-    def test_kazoo_client_success(self, mock_txkz, mock_setup_scheduler):
+    @mock.patch('otter.tap.api.KazooClient')
+    @mock.patch('otter.tap.api.ThreadPool')
+    @mock.patch('otter.tap.api.TxLogger')
+    def test_kazoo_client_success(self, mock_tx_logger, mock_thread_pool,
+                                  mock_kazoo_client, mock_txkz,
+                                  mock_setup_scheduler):
         """
         TxKazooClient is started and calls `setup_scheduler`. Its instance
         is also set in store.kz_client after start has finished, and the
@@ -510,14 +520,24 @@ class APIMakeServiceTests(SynchronousTestCase):
         start_d = defer.Deferred()
         kz_client.start.return_value = start_d
         mock_txkz.return_value = kz_client
+        thread_pool = mock.Mock()
+        mock_thread_pool.return_value = thread_pool
+        logger = mock.Mock()
+        mock_tx_logger.return_value = logger
+        kazoo_client = mock.Mock()
+        mock_kazoo_client.return_value = kazoo_client
 
         parent = makeService(config)
 
         self.log.bind.assert_called_with(system='kazoo')
         mock_txkz.assert_called_once_with(
-            hosts='zk_hosts', threads=20,
+            self.reactor, thread_pool, kazoo_client)
+        mock_kazoo_client.assert_called_once_with(
+            hosts='zk_hosts',
             connection_retry=dict(max_tries=-1, max_delay=600),
-            txlog=self.log.bind.return_value)
+            logger=logger)
+        mock_tx_logger.assert_called_once_with(self.log.bind.return_value)
+        mock_thread_pool.assert_called_once_with(maxthreads=20)
         kz_client.start.assert_called_once_with(timeout=None)
 
         # setup_scheduler and store.kz_client is not called yet, and nothing
@@ -540,12 +560,16 @@ class APIMakeServiceTests(SynchronousTestCase):
         config['zookeeper']['no_logs'] = True
         parent = makeService(config)
         mock_txkz.assert_called_once_with(
-            hosts='zk_hosts', threads=20,
-            connection_retry=dict(max_tries=-1, max_delay=600), txlog=None)
+            self.reactor, thread_pool, kazoo_client)
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
-    def test_kazoo_client_failed(self, mock_txkz, mock_setup_scheduler):
+    @mock.patch('otter.tap.api.KazooClient')
+    @mock.patch('otter.tap.api.ThreadPool')
+    @mock.patch('otter.tap.api.TxLogger')
+    def test_kazoo_client_failed(self, mock_tx_logger, mock_thread_pool,
+                                 mock_kazoo_client, mock_txkz,
+                                 mock_setup_scheduler):
         """
         `setup_scheduler` is not called if TxKazooClient is not able to start
         Error is logged
@@ -555,12 +579,17 @@ class APIMakeServiceTests(SynchronousTestCase):
         kz_client = mock.Mock(spec=['start', 'stop'])
         kz_client.start.return_value = defer.fail(ValueError('e'))
         mock_txkz.return_value = kz_client
+        thread_pool = mock.Mock()
+        mock_thread_pool.return_value = thread_pool
+        logger = mock.Mock()
+        mock_tx_logger.return_value = logger
+        kazoo_client = mock.Mock()
+        mock_kazoo_client.return_value = kazoo_client
 
         makeService(config)
 
         mock_txkz.assert_called_once_with(
-            hosts='zk_hosts', threads=20,
-            connection_retry=dict(max_tries=-1, max_delay=600), txlog=mock.ANY)
+            self.reactor, thread_pool, kazoo_client)
         kz_client.start.assert_called_once_with(timeout=None)
         self.assertFalse(mock_setup_scheduler.called)
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
@@ -568,7 +597,11 @@ class APIMakeServiceTests(SynchronousTestCase):
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
-    def test_kazoo_client_stops(self, mock_txkz, mock_setup_scheduler):
+    @mock.patch('otter.tap.api.setup_converger')
+    def test_kazoo_client_stops(self,
+                                mock_setup_converger,
+                                mock_txkz,
+                                mock_setup_scheduler):
         """
         TxKazooClient is stopped when parent service stops
         """
@@ -590,7 +623,10 @@ class APIMakeServiceTests(SynchronousTestCase):
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
-    def test_kazoo_client_stops_after_supervisor(self, mock_txkz,
+    @mock.patch('otter.tap.api.setup_converger')
+    def test_kazoo_client_stops_after_supervisor(self,
+                                                 mock_setup_converger,
+                                                 mock_txkz,
                                                  mock_setup_scheduler):
         """
         Kazoo is stopped after supervisor stops
@@ -613,6 +649,58 @@ class APIMakeServiceTests(SynchronousTestCase):
         sd.callback(None)
         self.successResultOf(d)
         self.assertTrue(kz_client.stop.called)
+
+    @mock.patch('otter.tap.api.setup_scheduler')
+    @mock.patch('otter.tap.api.TxKazooClient')
+    @mock.patch('otter.tap.api.setup_converger')
+    def test_converger_dispatcher(self, mock_setup_converger,
+                                  mock_txkz, mock_setup_scheduler):
+        """
+        The converger dispatcher that is set up after kazoo is ready can handle
+        all intents.
+        """
+        config = test_config.copy()
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
+        kz_client = mock.Mock(spec=['start', 'stop'])
+        kz_client.start.return_value = defer.succeed(None)
+        mock_txkz.return_value = kz_client
+
+        parent = makeService(config)
+
+        mock_setup_converger.assert_called_once_with(
+            parent, kz_client, mock.ANY, 10)
+
+        dispatcher = mock_setup_converger.call_args[0][2]
+
+        for intent in full_intents():
+            self.assertIsNot(dispatcher(intent), None)
+
+
+class ConvergerSetupTests(SynchronousTestCase):
+    """Tests for :func:`setup_converger`."""
+
+    @mock.patch('otter.tap.api.watch_children')
+    def test_setup_converger(self, mock_watch_children):
+        """
+        Puts a :obj:`Converger` with a :obj:`Partitioner` in the given parent
+        service.
+        """
+        ms = MultiService()
+        kz_client = object()
+        dispatcher = object()
+        interval = 50
+        setup_converger(ms, kz_client, dispatcher, interval)
+        [converger] = ms.services
+        self.assertIs(converger.__class__, Converger)
+        self.assertEqual(converger._dispatcher, dispatcher)
+        [partitioner] = converger.services
+        [timer] = partitioner.services
+        self.assertIs(partitioner.__class__, Partitioner)
+        self.assertIs(partitioner, converger.partitioner)
+        self.assertIs(partitioner.kz_client, kz_client)
+        self.assertEqual(timer.step, interval)
+        mock_watch_children.assert_called_once_with(
+            kz_client, CONVERGENCE_DIRTY_DIR, converger.divergent_changed)
 
 
 class SchedulerSetupTests(SynchronousTestCase):

@@ -7,7 +7,6 @@ This launch config worker is responsible for:
 2) Adding the server to a load balancer.
 
 On delete, this worker:
-0) (TODO) Puts the server into draining mode on the load balancer
 1) Removes the the server from the load balancer(s)
 2) Deletes the server
 
@@ -17,7 +16,6 @@ initiating a launch_server job.
 
 import json
 import re
-from copy import deepcopy
 from functools import partial
 from urllib import urlencode
 
@@ -32,11 +30,14 @@ from twisted.internet.task import deferLater
 from twisted.python.failure import Failure
 
 from otter.auth import public_endpoint_url
+from otter.convergence.composition import (
+    json_to_LBConfigs,
+    prepare_server_launch_config)
 from otter.convergence.model import _servicenet_address
 from otter.convergence.steps import UnexpectedServerStatus, set_server_name
 from otter.util import logging_treq as treq
 from otter.util.config import config_value
-from otter.util.deferredutils import log_with_time, retry_and_timeout
+from otter.util.deferredutils import delay, log_with_time, retry_and_timeout
 from otter.util.hashkey import generate_server_name
 from otter.util.http import (
     APIError, RequestError, append_segments, check_success, headers,
@@ -151,8 +152,8 @@ def wait_for_active(log,
         deferred_description=timeout_description)
 
 
-# limit on 2 servers to be created simultaneously
-MAX_CREATE_SERVER = 2
+# limit on 1 servers to be created simultaneously
+MAX_CREATE_SERVER = 1
 create_server_sem = DeferredSemaphore(MAX_CREATE_SERVER)
 
 
@@ -309,6 +310,13 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
         d.addBoth(_check_results, f)
         return d
 
+    def _create_with_delay():
+        d = _treq.post(path, headers=headers(auth_token),
+                       data=json.dumps({'server': server_config}), log=log)
+        # Add 1 second delay to space 1 second between server creations
+        d.addCallback(delay, clock, 1)
+        return d
+
     def _create_server():
         """
         Attempt to create a server, handling spurious non-400 errors from Nova
@@ -317,9 +325,7 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
 
         If not, and if no further errors occur, server creation can be retried.
         """
-        d = create_server_sem.run(_treq.post, path, headers=headers(auth_token),
-                                  data=json.dumps({'server': server_config}),
-                                  log=log)
+        d = create_server_sem.run(_create_with_delay)
         d.addCallback(check_success, [202], _treq=_treq)
         d.addCallback(_treq.json_content)
         d.addErrback(_check_server_created)
@@ -413,13 +419,13 @@ def check_deleted_clb(f, clb_id, node_id=None):
     return f
 
 
-def add_to_load_balancer(log, request_func, lb_config, server_details, undo,
+def add_to_load_balancer(log, request_bag, lb_config, server_details, undo,
                          clock=None):
     """
     Adds a given server to a given load balancer.
 
     :param log: A bound logger.
-    :param callable request_func: A request function.
+    :param callable request_bag: A request function.
     :param str lb_config: An ``lb_config`` dictionary specifying which load
         balancer to add the server to.
     :param dict server_details: The server details, as returned by Nova.
@@ -429,17 +435,17 @@ def add_to_load_balancer(log, request_func, lb_config, server_details, undo,
     lb_type = lb_config.get("type", "CloudLoadBalancer")
     if lb_type == "CloudLoadBalancer":
         cloudLoadBalancers = config_value('cloudLoadBalancers')
-        endpoint = public_endpoint_url(request_func.service_catalog,
+        endpoint = public_endpoint_url(request_bag.service_catalog,
                                        cloudLoadBalancers,
-                                       request_func.lb_region)
-        auth_token = request_func.auth_token
+                                       request_bag.lb_region)
+        auth_token = request_bag.auth_token
         ip_address = _servicenet_address(server_details["server"])
         return add_to_clb(log, endpoint, auth_token, lb_config, ip_address,
                           undo, clock)
     elif lb_type == "RackConnectV3":
         lb_id = lb_config["loadBalancerId"]
         server_id = server_details["server"]["id"]
-        return add_to_rcv3(request_func, lb_id, server_id)
+        return add_to_rcv3(request_bag, lb_id, server_id)
     else:
         raise RuntimeError("Unknown cloud load balancer type! config: {}"
                            .format(lb_config))
@@ -499,12 +505,12 @@ def add_to_clb(log, endpoint, auth_token, lb_config, ip_address, undo, clock=Non
     return d.addCallback(treq.json_content).addCallback(when_done)
 
 
-def add_to_load_balancers(log, request_func, lb_configs, server, undo):
+def add_to_load_balancers(log, request_bag, lb_configs, server, undo):
     """
     Add the given server to the load balancers specified by ``lb_configs``.
 
     :param log: A bound logger.
-    :param callable request_func: A request function.
+    :param callable request_bag: A request function.
     :param list lb_configs: List of lb_config dictionaries.
     :param dict server: Server dict of the server to add, as per server details
         response from Nova.
@@ -513,7 +519,7 @@ def add_to_load_balancers(log, request_func, lb_configs, server, undo):
     :return: Deferred that fires with a list of 2-tuples of the load
         balancer configuration, and that load balancer's respective response.
     """
-    _add = partial(add_to_load_balancer, log, request_func,
+    _add = partial(add_to_load_balancer, log, request_bag,
                    server_details=server, undo=undo)
 
     dl = DeferredLock()
@@ -543,62 +549,27 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
 
     :return dict: The prepared launch config.
     """
-    launch_config = deepcopy(launch_config)
-    server_config = launch_config['server']
+    launch_config = freeze(launch_config)
 
-    if 'metadata' not in server_config:
-        server_config['metadata'] = {}
+    lb_descriptions = json_to_LBConfigs(launch_config.get('loadBalancers', []))
 
-    server_config['metadata'].update(generate_server_metadata(
-        scaling_group_uuid, launch_config))
+    launch_config = prepare_server_launch_config(
+        scaling_group_uuid, launch_config, lb_descriptions)
 
     suffix = generate_server_name()
-    launch_config = thaw(set_server_name(freeze(launch_config), suffix))
+    launch_config = set_server_name(launch_config, suffix)
 
-    for lb_config in launch_config.get('loadBalancers', []):
-        if 'metadata' not in lb_config:
-            lb_config['metadata'] = {}
-        lb_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
-        lb_config['metadata']['rax:auto_scaling_server_name'] = (
-            launch_config['server']['name'])
-
-    return launch_config
-
-
-def generate_server_metadata(group_id, launch_config):
-    """
-    Given a scaling group ID and the launch config, generate the scaling-group
-    specific metadata that should be on the server.
-
-    :param str group_id: The ID of the scaling group
-    :param dict launch_config: The complete launch config args we want to build
-        the servers from
-
-    :return dict: The autoscaling-specific part of the metadata with which to
-        create a server of this particular autoscaling group
-    """
-    metadata = {'rax:auto_scaling_group_id': group_id}
-    lbs = launch_config.get('loadBalancers', [])
-
-    if lbs:
-        lbids = []
-        for lb_config in lbs:
-            config_without_lbid = lb_config.copy()
-            lb_id = config_without_lbid.pop('loadBalancerId')
-            lbids.append(lb_id)
-            metadata['rax:auto_scaling:lb:{0}'.format(lb_id)] = json.dumps(
-                config_without_lbid)
-
-        metadata['rax:auto_scaling_lbids'] = json.dumps(lbids)
-    return metadata
+    return thaw(launch_config)
 
 
 def _without_otter_metadata(metadata):
     """
-    Returns a copy of the metadata with all the otter-specific keys removed.
+    Return a copy of the metadata with all the otter-specific keys
+    removed.
     """
     return {k: v for (k, v) in metadata.iteritems()
-            if not k.startswith("rax:auto_scaling")}
+            if not (k.startswith("rax:auto_scaling") or
+                    k.startswith("rax:autoscale:"))}
 
 
 def scrub_otter_metadata(log, auth_token, service_catalog, region, server_id,
@@ -632,13 +603,15 @@ def scrub_otter_metadata(log, auth_token, service_catalog, region, server_id,
             .addCallback(_treq.content))
 
 
-def launch_server(log, request_func, scaling_group, launch_config, undo, clock=None):
+def launch_server(log, request_bag, scaling_group, launch_config, undo,
+                  clock=None):
     """
-    Launch a new server given the launch config auth tokens and service catalog.
-    Possibly adding the newly launched server to a load balancer.
+    Launch a new server given the launch config auth tokens and service
+    catalog. Possibly adding the newly launched server to a load balancer.
 
     :param BoundLog log: A bound logger.
-    :param callable request_func: A request function.
+    :param request_bag: An object with a bunch of useful data on it, including
+        a callable to re-auth and get a new token.
     :param IScalingGroup scaling_group: The scaling group to add the launched
         server to.
     :param dict launch_config: A launch_config args structure as defined for
@@ -651,11 +624,10 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
     cloudServersOpenStack = config_value('cloudServersOpenStack')
-    server_endpoint = public_endpoint_url(request_func.service_catalog,
+    server_endpoint = public_endpoint_url(request_bag.service_catalog,
                                           cloudServersOpenStack,
-                                          request_func.region)
+                                          request_bag.region)
 
-    auth_token = request_func.auth_token
     lb_config = launch_config.get('loadBalancers', [])
     server_config = launch_config['server']
 
@@ -675,61 +647,67 @@ def launch_server(log, request_func, scaling_group, launch_config, undo, clock=N
                         nova_metadata=result)
         return server
 
-    def wait_for_server(server):
+    def wait_for_server(server, new_request_bag):
         server_id = server['server']['id']
 
         # NOTE: If server create is retried, each server delete will be pushed
-        # to undo stack even after it will be deleted in check_error which is fine
-        # since verified_delete succeeds on deleted server
+        # to undo stack even after it will be deleted in check_error which is
+        # fine since verified_delete succeeds on deleted server
         undo.push(
-            verified_delete, log, server_endpoint, auth_token, server_id)
+            verified_delete, log, server_endpoint, new_request_bag, server_id)
 
         ilog[0] = log.bind(server_id=server_id)
         return wait_for_active(
             ilog[0],
             server_endpoint,
-            auth_token,
+            new_request_bag.auth_token,
             server_id).addCallback(check_metadata)
 
-    def add_lb(server):
+    def add_lb(server, new_request_bag):
         if lb_config:
             lbd = add_to_load_balancers(
-                ilog[0], request_func, lb_config, server, undo)
+                ilog[0], new_request_bag, lb_config, server, undo)
             lbd.addCallback(lambda lb_response: (server, lb_response))
             return lbd
 
         return (server, [])
 
-    def _create_server():
+    def _real_create_server(new_request_bag):
+        auth_token = new_request_bag.auth_token
         d = create_server(server_endpoint, auth_token, server_config, log=log)
-        d.addCallback(wait_for_server)
-        d.addCallback(add_lb)
+        d.addCallback(wait_for_server, new_request_bag)
+        d.addCallback(add_lb, new_request_bag)
         return d
+
+    def _create_server():
+        return request_bag.re_auth().addCallback(_real_create_server)
 
     def check_error(f):
         f.trap(UnexpectedServerStatus)
         if f.value.status == 'ERROR':
-            log.msg('{server_id} errored, deleting and creating new server instead',
-                    server_id=f.value.server_id)
+            log.msg('{server_id} errored, deleting and creating new '
+                    'server instead', server_id=f.value.server_id)
             # trigger server delete and return True to allow retry
-            verified_delete(log, server_endpoint, auth_token, f.value.server_id)
+            verified_delete(log, server_endpoint, request_bag,
+                            f.value.server_id)
             return True
         else:
             return False
 
-    d = retry(_create_server, can_retry=compose_retries(retry_times(3), check_error),
+    d = retry(_create_server,
+              can_retry=compose_retries(retry_times(3), check_error),
               next_interval=repeating_interval(15), clock=clock)
 
     return d
 
 
-def remove_from_load_balancer(log, request_func, lb_config, lb_response,
+def remove_from_load_balancer(log, request_bag, lb_config, lb_response,
                               clock=None):
     """
     Remove a node from a load balancer.
 
     :param BoundLog log: A bound logger.
-    :param callable request_func: A request function.
+    :param request_bag: A request function.
     :param dict lb_config: An ``lb_config`` dictionary.
     :param lb_response: The response the load balancer provided when the server
         being removed was added. Type and shape is dependant on type of load
@@ -743,10 +721,10 @@ def remove_from_load_balancer(log, request_func, lb_config, lb_response,
     lb_type = lb_config.get("type", "CloudLoadBalancer")
     if lb_type == "CloudLoadBalancer":
         cloudLoadBalancers = config_value('cloudLoadBalancers')
-        endpoint = public_endpoint_url(request_func.service_catalog,
+        endpoint = public_endpoint_url(request_bag.service_catalog,
                                        cloudLoadBalancers,
-                                       request_func.lb_region)
-        auth_token = request_func.auth_token
+                                       request_bag.lb_region)
+        auth_token = request_bag.auth_token
         loadbalancer_id = lb_config["loadBalancerId"]
         node_id = next(node_info["id"] for node_info in lb_response["nodes"])
         return _remove_from_clb(log, endpoint, auth_token, loadbalancer_id,
@@ -754,7 +732,7 @@ def remove_from_load_balancer(log, request_func, lb_config, lb_response,
     elif lb_type == "RackConnectV3":
         lb_id = lb_config["loadBalancerId"]
         node_id = next(pair["cloud_server"]["id"] for pair in lb_response)
-        return remove_from_rcv3(request_func, lb_id, node_id)
+        return remove_from_rcv3(request_bag, lb_id, node_id)
     else:
         raise RuntimeError("Unknown cloud load balancer type! config: {}"
                            .format(lb_config))
@@ -801,14 +779,14 @@ def _remove_from_clb(log, endpoint, auth_token, loadbalancer_id, node_id, clock=
     return d
 
 
-def delete_server(log, request_func, instance_details):
+def delete_server(log, request_bag, instance_details):
     """
     Delete the server specified by instance_details.
 
     TODO: Load balancer draining.
 
     :param BoundLog log: A bound logger.
-    :param callable request_func: A request function.
+    :param callable request_bag: A request function.
     :param tuple instance_details: A 2-tuple of the server_id and a list of
         2-tuples of load balancer configurations and respective load balancer
         responses. Example for some CLB load balancers::
@@ -831,7 +809,7 @@ def delete_server(log, request_func, instance_details):
     :return: TODO
 
     """
-    _remove_from_lb = partial(remove_from_load_balancer, log, request_func)
+    _remove_from_lb = partial(remove_from_load_balancer, log, request_bag)
     server_id, lb_details = _as_new_style_instance_details(instance_details)
     d = gatherResults([_remove_from_lb(lb_config, lb_response)
                        for (lb_config, lb_response) in lb_details],
@@ -839,11 +817,10 @@ def delete_server(log, request_func, instance_details):
 
     def when_removed_from_loadbalancers(_ignore):
         cloudServersOpenStack = config_value('cloudServersOpenStack')
-        server_endpoint = public_endpoint_url(request_func.service_catalog,
+        server_endpoint = public_endpoint_url(request_bag.service_catalog,
                                               cloudServersOpenStack,
-                                              request_func.region)
-        auth_token = request_func.auth_token
-        return verified_delete(log, server_endpoint, auth_token, server_id)
+                                              request_bag.region)
+        return verified_delete(log, server_endpoint, request_bag, server_id)
 
     d.addCallback(when_removed_from_loadbalancers)
     return d
@@ -887,7 +864,7 @@ def _as_new_style_instance_details(maybe_old_style):
     return server_id, updated_lb_specs
 
 
-def delete_and_verify(log, server_endpoint, auth_token, server_id):
+def delete_and_verify(log, server_endpoint, request_bag, server_id):
     """
     Check the status of the server to see if it's actually been deleted.
     Succeeds only if it has been either deleted (404) or acknowledged by Nova
@@ -899,11 +876,12 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
     """
     path = append_segments(server_endpoint, 'servers', server_id)
 
-    def delete():
-        del_d = treq.delete(path, headers=headers(auth_token), log=log)
+    def delete(request_bag):
+        del_d = treq.delete(path, headers=headers(request_bag.auth_token),
+                            log=log)
         del_d.addCallback(check_success, [404])
         del_d.addCallback(treq.content)
-        return del_d
+        return del_d.addErrback(verify, request_bag.auth_token)
 
     def check_task_state(json_blob):
         server_details = json_blob['server']
@@ -911,7 +889,7 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
         if is_deleting.strip().lower() != "deleting":
             raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
 
-    def verify(f):
+    def verify(f, auth_token):
         f.trap(APIError)
         if f.value.code != 204:
             return wrap_request_error(f, path, 'delete_server')
@@ -921,12 +899,12 @@ def delete_and_verify(log, server_endpoint, auth_token, server_id):
         ver_d.addErrback(lambda f: f.trap(ServerDeleted))
         return ver_d
 
-    return delete().addErrback(verify)
+    return request_bag.re_auth().addCallback(delete)
 
 
 def verified_delete(log,
                     server_endpoint,
-                    auth_token,
+                    request_bag,
                     server_id,
                     exp_start=2,
                     max_retries=10,
@@ -958,7 +936,8 @@ def verified_delete(log,
         clock = reactor
 
     d = retry(
-        partial(delete_and_verify, serv_log, server_endpoint, auth_token, server_id),
+        partial(delete_and_verify, serv_log, server_endpoint, request_bag,
+                server_id),
         can_retry=retry_times(max_retries),
         next_interval=exponential_backoff_interval(exp_start),
         clock=clock)

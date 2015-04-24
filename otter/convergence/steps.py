@@ -1,5 +1,4 @@
 """Steps for convergence."""
-import json
 import re
 
 from functools import partial
@@ -8,7 +7,7 @@ from characteristic import Attribute, attributes
 
 from effect import Constant, Effect, Func, catch
 
-from pyrsistent import PMap, PSet, pset, thaw
+from pyrsistent import PMap, PSet, freeze, pset, thaw
 
 from toolz.dicttoolz import get_in
 from toolz.itertoolz import concat
@@ -17,14 +16,19 @@ from twisted.python.constants import NamedConstant
 
 from zope.interface import Interface, implementer
 
-from otter.cloud_client import has_code, service_request
+from otter.cloud_client import (
+    has_code,
+    service_request,
+    set_nova_metadata_item)
 from otter.constants import ServiceType
 from otter.convergence.model import StepResult
 from otter.util.fp import predicate_any
 from otter.util.hashkey import generate_server_name
-from otter.util.http import APIError, append_segments
+from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.retry import (
-    exponential_backoff_interval, retry_effect, retry_times)
+    exponential_backoff_interval,
+    retry_effect,
+    retry_times)
 
 
 class IStep(Interface):
@@ -54,20 +58,6 @@ def set_server_name(server_config_args, name_suffix):
     return server_config_args.set_in(('server', 'name'), name)
 
 
-def _try_json_message(maybe_json_error, keys):
-    """
-    Attemp to grab the message body from possibly a JSON error body.  If
-    invalid JSON, or if the JSON is of an unexpected format (keys are not
-    found), `None` is returned.
-    """
-    try:
-        error_body = json.loads(maybe_json_error)
-    except (ValueError, TypeError):
-        return None
-    else:
-        return get_in(keys, error_body, None)
-
-
 def _forbidden_plaintext(message):
     return re.compile(
         "^403 Forbidden\n\nAccess was denied to this resource\.\n\n ({0})$"
@@ -94,14 +84,14 @@ def _parse_nova_user_error(api_error):
     :rtype: `str` or `None`
     """
     if api_error.code == 400:
-        message = _try_json_message(api_error.body,
-                                    ("badRequest", "message"))
+        message = try_json_with_keys(api_error.body,
+                                     ("badRequest", "message"))
         if message:
             return message
 
     elif api_error.code == 403:
-        message = _try_json_message(api_error.body,
-                                    ("forbidden", "message"))
+        message = try_json_with_keys(api_error.body,
+                                     ("forbidden", "message"))
         if message:
             return message
 
@@ -142,7 +132,7 @@ class CreateServer(object):
             a while, and we need to retry convergence to ensure it goes into
             active.
             """
-            return StepResult.RETRY, []
+            return StepResult.RETRY, ['waiting for server to become active']
 
         def report_failure(result):
             """
@@ -157,7 +147,7 @@ class CreateServer(object):
                 if message is not None:
                     return StepResult.FAILURE, [message]
 
-            return StepResult.RETRY, []
+            return StepResult.RETRY, [error]
 
         return eff.on(got_name).on(success=report_success,
                                    error=report_failure)
@@ -230,12 +220,11 @@ class DeleteServer(object):
             next_interval=exponential_backoff_interval(2))
 
         def report_success(result):
-            return StepResult.SUCCESS, []
+            return StepResult.RETRY, [
+                'must re-gather after deletion in order to update the active '
+                'cache']
 
-        def report_failure(result):
-            return StepResult.RETRY, []
-
-        return eff.on(success=report_success, error=report_failure)
+        return eff.on(success=report_success)
 
 
 @implementer(IStep)
@@ -250,25 +239,15 @@ class SetMetadataItemOnServer(object):
     :ivar str key: The metadata key to set (<=256 characters)
     :ivar str value: The value to assign to the metadata key (<=256 characters)
 
-    Succeed unconditionally on 200 (success) or 404 (if the server's gone, no
-    need to retry or fail).
+    Succeed unconditionally on 200 (success).  Everything else can probably
+    be retried, since nothing is a catastrophic group failure.
     """
     def as_effect(self):
         """Produce a :obj:`Effect` to set a metadata item on a server"""
-        eff = service_request(
-            ServiceType.CLOUD_SERVERS,
-            'PUT',
-            append_segments('servers', self.server_id, 'metadata', self.key),
-            data={'meta': {self.key: self.value}},
-            success_pred=has_code(200, 404))
+        eff = set_nova_metadata_item(
+            server_id=self.server_id, key=self.key, value=self.value)
 
-        def report_success(result):
-            return StepResult.SUCCESS, []
-
-        def report_failure(result):
-            return StepResult.RETRY, [result[1]]
-
-        return eff.on(success=report_success, error=report_failure)
+        return eff.on(success=lambda _: (StepResult.SUCCESS, []))
 
 
 _CLB_DUPLICATE_NODES_PATTERN = re.compile(
@@ -302,8 +281,9 @@ def _check_clb_422(*regex_matches):
         which it should be by default.
         """
         if response.code == 422:
-            message = content.get('message', '')
-            return any([regex.search(message) for regex in regex_matches])
+            message = try_json_with_keys(content, ('message',))
+            return any([regex.search(message or '')
+                        for regex in regex_matches])
         return False
 
     return check_response
@@ -351,25 +331,26 @@ class AddNodesToCLB(object):
                 _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN)))
 
         def report_success(result):
-            return StepResult.SUCCESS, []
+            return StepResult.RETRY, [
+                'must re-gather after adding to CLB in order to update the '
+                'active cache']
 
-        def report_failure(result):
+        def report_api_failure(result):
             """
-            If the error is a 422 - PENDING UPDATE, retry.  Otherwise, fail.
+            If the error is a 404 or 422 PENDING_DELETE then fail.
+            Otherwise, retry.
             """
             err_type, error, traceback = result
-            if err_type == APIError and error.code == 413:
-                # over-limit, retry
-                return StepResult.RETRY, [error]
-            if err_type == APIError and error.code == 422:
-                # body has already become JSON
-                message = error.body.get("message", None)
-                if message and _CLB_PENDING_UPDATE_PATTERN.search(message):
-                    return StepResult.RETRY, [error]
+            if error.code == 404:
+                return StepResult.FAILURE, [error]
+            if error.code == 422:
+                message = try_json_with_keys(error.body, ("message",))
+                if message and _CLB_DELETED_PATTERN.search(message):
+                    return StepResult.FAILURE, [error]
+            return StepResult.RETRY, [error]
 
-            return StepResult.FAILURE, [error]
-
-        return eff.on(success=report_success, error=report_failure)
+        return eff.on(success=report_success,
+                      error=catch(APIError, report_api_failure))
 
 
 @implementer(IStep)
@@ -405,8 +386,9 @@ class RemoveNodesFromCLB(object):
                                _CLB_DELETED_PATTERN)))
         # 400 means that there are some nodes that are no longer on the
         # load balancer.  Parse them out and try again.
-        return eff.on(partial(
+        eff = eff.on(partial(
             _clb_check_bulk_delete, self.lb_id, self.node_ids))
+        return eff.on(lambda r: (StepResult.SUCCESS, []))
 
 
 def _clb_check_bulk_delete(lb_id, attempted_nodes, result):
@@ -453,14 +435,40 @@ class ChangeCLBNode(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to modify a load balancer node."""
-        return service_request(
+        handled_codes = _clb_check_change_node_handlers.keys()
+        eff = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'PUT',
             append_segments('loadbalancers', self.lb_id,
                             'nodes', self.node_id),
             data={'condition': self.condition.name,
                   'weight': self.weight},
-            success_pred=has_code(202))
+            success_pred=has_code(*handled_codes))
+        return eff.on(partial(_clb_check_change_node, self))
+
+
+def _clb_check_change_node(step, result):
+    """
+    Check to what extent a :class:`ChangeCLBNode` response was successful.
+    """
+    response, body = result
+    handler = _clb_check_change_node_handlers[response.code]
+    return handler(step, result)
+
+
+def _clb_check_change_node_retry_on_404(step, result):
+    """
+    When updating a node results in a 404, convergence should be retried.
+    """
+    return StepResult.RETRY, [{'reason': 'CLB node not found',
+                               'lb': step.lb_id,
+                               'node': step.node_id}]
+
+
+_clb_check_change_node_handlers = {
+    202: lambda _step, _result: (StepResult.SUCCESS, []),
+    404: _clb_check_change_node_retry_on_404
+}
 
 
 def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
@@ -545,7 +553,9 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
     response, body = result
 
     if response.code == 201:  # All done!
-        return StepResult.SUCCESS, []
+        return StepResult.RETRY, [
+            'must re-gather after adding to LB in order to update the active '
+            'cache']
 
     failure_reasons = []
     to_retry = pset(attempted_pairs)
@@ -570,6 +580,8 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
         next_step = BulkAddToRCv3(lb_node_pairs=to_retry)
         return next_step.as_effect()
     else:
+        # It's unclear when this condition is reached. Should we really be
+        # returning SUCCESS?
         return StepResult.SUCCESS, []
 
 
@@ -650,13 +662,17 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
 
 
 @implementer(IStep)
+@attributes(['reasons'], apply_with_init=False)
 class ConvergeLater(object):
     """
     Converge later in some time
     """
 
+    def __init__(self, reasons):
+        self.reasons = freeze(reasons)
+
     def as_effect(self):
         """
         Return an effect that always results in retry
         """
-        return Effect(Constant((StepResult.RETRY, [])))
+        return Effect(Constant((StepResult.RETRY, list(self.reasons))))

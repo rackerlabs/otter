@@ -45,24 +45,6 @@ def dump_state(s):
     dump_js(s)
 
 
-def find_end_point(rcs):
-    rcs.token = rcs.access["access"]["token"]["id"]
-    sc = rcs.access["access"]["serviceCatalog"]
-    try:
-        rcs.endpoints["otter"] = auth.public_endpoint_url(sc,
-                                                          "autoscale",
-                                                          region)
-    except auth.NoSuchEndpoint:
-        # If the autoscale endpoint is not defined, use local otter
-        rcs.endpoints["otter"] = 'http://localhost:9000/v1.0/{0}'.format(
-            rcs.access['access']['token']['tenant']['id'])
-
-    rcs.endpoints["loadbalancers"] = auth.public_endpoint_url(
-        sc, "cloudLoadBalancers", region
-    )
-    return rcs
-
-
 def print_token_and_ep(rcs):
     print("TOKEN(%s) EP(%s)" % (rcs.token, rcs.endpoints["otter"]))
     return rcs
@@ -85,25 +67,10 @@ class TestScaling(unittest.TestCase):
         return self.pool.closeCachedConnections().addBoth(_check_fds)
 
     def test_scaling_up(self):
-        group_configuration = {
-            "name": "my-group-configuration",
-            "cooldown": 0,
-            "minEntities": 0,
-        }
-        launch_configuration = {
-            "type": "launch_server",
-            "args": {
-                "server": {
-                    "flavorRef": flavor_ref,
-                    "imageRef": image_ref,
-                }
-            }
-        }
-        scaling_group_body = {
-            "launchConfiguration": launch_configuration,
-            "groupConfiguration": group_configuration,
-            "scalingPolicies": [],
-        }
+        scaling_group_body = autoscale.create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            name="my-group-configuration"
+        )
 
         self.scaling_group = autoscale.ScalingGroup(
             group_config=scaling_group_body,
@@ -117,9 +84,14 @@ class TestScaling(unittest.TestCase):
 
         rcs = TestResources()
         d = (
-            self.identity.authenticate_user(rcs)
-            .addCallback(find_end_point)
-            .addCallback(print_token_and_ep)
+            self.identity.authenticate_user(
+                rcs,
+                resources={
+                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
+                    "loadbalancers": ("cloudLoadBalancers",),
+                },
+                region=region,
+            ).addCallback(print_token_and_ep)
             .addCallback(self.scaling_group.start, self)
             .addCallback(dump_groups)
             .addCallback(self.scaling_policy.start, self)
@@ -137,25 +109,11 @@ class TestScaling(unittest.TestCase):
         """
         Verify that a basic scale down operation completes as expected.
         """
-        group_configuration = {
-            "name": "tr-scaledown-conf",
-            "cooldown": 0,
-            "minEntities": 0,
-        }
-        launch_configuration = {
-            "type": "launch_server",
-            "args": {
-                "server": {
-                    "flavorRef": flavor_ref,
-                    "imageRef": image_ref,
-                }
-            }
-        }
-        scaling_group_body = {
-            "launchConfiguration": launch_configuration,
-            "groupConfiguration": group_configuration,
-            "scalingPolicies": [],
-        }
+        scaling_group_body = autoscale.create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            name="tr-scaledown-conf",
+        )
+
         self.scaling_group = autoscale.ScalingGroup(
             group_config=scaling_group_body,
             pool=self.pool
@@ -172,9 +130,14 @@ class TestScaling(unittest.TestCase):
 
         rcs = TestResources()
         d = (
-            self.identity.authenticate_user(rcs)
-            .addCallback(find_end_point)
-            .addCallback(print_token_and_ep)
+            self.identity.authenticate_user(
+                rcs,
+                resources={
+                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
+                    "loadbalancers": ("cloudLoadBalancers",),
+                },
+                region=region
+            ).addCallback(print_token_and_ep)
             .addCallback(self.scaling_group.start, self)
             .addCallback(self.scaling_policy_up_2.start, self)
             .addCallback(self.scaling_policy_up_2.execute)
@@ -202,9 +165,30 @@ class TestScaling(unittest.TestCase):
         """
         rcs = TestResources()
 
-        self.clb1 = cloud_load_balancer.CloudLoadBalancer(pool=self.pool)
+        def create_1st_load_balancer():
+            """First, we authenticate and create a single load balancer."""
+            self.clb1 = cloud_load_balancer.CloudLoadBalancer(pool=self.pool)
 
-        def finish_setup(x, self):
+            return (
+                self.identity.authenticate_user(
+                    rcs,
+                    resources={
+                        "otter": (
+                            "autoscale", "http://localhost:9000/v1.0/{0}"
+                        ),
+                        "loadbalancers": ("cloudLoadBalancers",),
+                    },
+                    region=region
+                ).addCallback(self.clb1.start, self)
+                .addCallback(self.clb1.wait_for_state, "ACTIVE", 600)
+            ).addCallback(add_2nd_load_balancer, self)
+
+        def add_2nd_load_balancer(_, self):
+            """After that, we scale up to two servers, then create the second
+            load balancer.
+            """
+            self.clb2 = cloud_load_balancer.CloudLoadBalancer(pool=self.pool)
+
             scaling_group_body = {
                 "launchConfiguration": {
                     "type": "launch_server",
@@ -246,15 +230,42 @@ class TestScaling(unittest.TestCase):
                 self.scaling_group.start(rcs, self)
                 .addCallback(self.scale_up_policy.start, self)
                 .addCallback(self.scale_down_policy.start, self)
+                .addCallback(self.scale_up_policy.execute)
+                .addCallback(self.scaling_group.wait_for_N_servers, 2,
+                             timeout=1800)
+                .addCallback(self.clb2.start, self)
+                .addCallback(self.clb2.wait_for_state, "ACTIVE", 600)
+            ).addCallback(scale_after_lc_changed, self)
+            return d
+
+        def scale_after_lc_changed(_, self):
+            """After that, we attempt to execute a scaling policy (doesn't
+            matter which one).  According to the bug report, this yields an
+            error.
+            """
+            lc_alt = {
+                "type": "launch_server",
+                "args": {
+                    "loadBalancers": [{
+                        "port": 80,
+                        "loadBalancerId": self.clb1.clb_id,
+                    }, {
+                        "port": 80,
+                        "loadBalancerId": self.clb2.clb_id,
+                    }],
+                    "server": {
+                        "flavorRef": flavor_ref,
+                        "imageRef": image_ref,
+                    }
+                }
+            }
+            d = (
+                self.scaling_group.set_launch_config(rcs, lc_alt)
+                .addCallback(self.scale_down_policy.execute)
+                .addCallback(self.scaling_group.wait_for_N_servers, 0,
+                             timeout=1800)
             )
             return d
 
-        d = (
-            self.identity.authenticate_user(rcs)
-            .addCallback(find_end_point)
-            .addCallback(self.clb1.start, self)
-            .addCallback(self.clb1.wait_for_state, "ACTIVE", 600)
-        ).addCallback(finish_setup, self)
-        return d
-
+        return create_1st_load_balancer()
     test_policy_execution_after_adding_clb.timeout = 1800

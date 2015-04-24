@@ -1,14 +1,18 @@
 """
 HTTP utils, such as formulation of URLs
 """
-
+import json
 from itertools import chain
 from urllib import quote, urlencode
-import json
-from urlparse import urlsplit, urlunsplit, parse_qs
+from urlparse import parse_qs, urlsplit, urlunsplit
+
+from characteristic import Attribute, attributes
+
+from toolz.dicttoolz import get_in
 
 import treq
 
+from otter.log.formatters import serialize_to_jsonable
 from otter.util.config import config_value
 
 
@@ -112,6 +116,14 @@ class UpstreamError(Exception):
         return d
 
 
+@serialize_to_jsonable.register(UpstreamError)
+def serialize_upstream_exception(upstream_error):
+    """
+    Serialize UpstreamError
+    """
+    return upstream_error.details
+
+
 def wrap_upstream_error(f, system, operation, url=None):
     """
     Wrap error in UpstreamError
@@ -158,6 +170,8 @@ def append_segments(uri, *segments):
     return uri
 
 
+@attributes(['code', 'body',
+             Attribute('headers', default_value=None)], apply_with_init=False)
 class APIError(Exception):
     """
     An error raised when a non-success response is returned by the API.
@@ -503,3 +517,17 @@ def retry_on_unauth(func, auth):
 
     d.addErrback(check_401)
     return d
+
+
+def try_json_with_keys(maybe_json_error, keys):
+    """
+    Attemp to grab the message body from possibly a JSON error body.  If
+    invalid JSON, or if the JSON is of an unexpected format (keys are not
+    found), `None` is returned.
+    """
+    try:
+        error_body = json.loads(maybe_json_error)
+    except (ValueError, TypeError):
+        return None
+    else:
+        return get_in(keys, error_body, None)

@@ -164,7 +164,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         at_style_policies_list = []
         for policy in (1, 2, 3):
             policy = {
-                'args': {'at': self.autoscale_behaviors.get_time_in_utc(1)},
+                'args': {'at': self.autoscale_behaviors.get_time_in_utc(5)},
                 'cooldown': 0,
                 'type': 'schedule',
                 'name': 'multi_at_style{0}'.format(policy),
@@ -175,7 +175,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             sp_list=at_style_policies_list)
         group = create_group_reponse.entity
         self.resources.add(group, self.empty_scaling_group)
-        sleep(self.scheduler_interval)
+        sleep(5 + self.scheduler_interval)
         self.verify_group_state(group.id, 1 + 2 + 3)
 
     @tags(speed='quick')

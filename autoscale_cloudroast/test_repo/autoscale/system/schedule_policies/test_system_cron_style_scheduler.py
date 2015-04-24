@@ -100,5 +100,13 @@ class CronStyleSchedulerTests(AutoscaleFixture):
             sp_cooldown=0,
             sp_change=self.sp_change,
             schedule_cron='* * * * *')
-        sleep(120 + self.scheduler_interval)
-        self.verify_group_state(self.group.id, self.sp_change * 2)
+        # Wait for first execution
+        self.wait_for_expected_group_state(
+            self.group.id,
+            self.group.groupConfiguration.minEntities + self.sp_change,
+            60 + self.scheduler_interval, 2, time_scale=False)
+        # Now wait for next execution
+        self.wait_for_expected_group_state(
+            self.group.id,
+            self.group.groupConfiguration.minEntities + self.sp_change * 2,
+            60 + self.scheduler_interval, 2, time_scale=False)

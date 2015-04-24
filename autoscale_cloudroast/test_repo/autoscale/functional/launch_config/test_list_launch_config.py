@@ -1,24 +1,20 @@
-"""
-Test to launch config of a group.
-"""
+"""Test to launch config of a group."""
 from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
 class ListLaunchConfigTest(AutoscaleFixture):
 
-    """
-    Verify launch config.
-    """
+    """Verify launch config."""
 
     @classmethod
     def setUpClass(cls):
-        """
-        Creates a scaling group.
-        """
+        """Creates a scaling group."""
         super(ListLaunchConfigTest, cls).setUpClass()
         cls.lc_disk_config = 'AUTO'
-        cls.lc_personality = [{'path': '/root/.ssh/authorized_keys',
-                               'contents': ('DQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp')}]
+        cls.lc_personality = [
+            {'path': '/root/.ssh/authorized_keys',
+             'contents': ('DQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp')}
+        ]
         cls.lc_metadata = {'lc_meta_key_1': 'lc_meta_value_1',
                            'lc_meta_key_2': 'lc_meta_value_2'}
         cls.lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'}]
@@ -43,12 +39,11 @@ class ListLaunchConfigTest(AutoscaleFixture):
         cls.launch_config = cls.launch_config_response.entity
 
     def test_list_launch_config_response(self):
-        """
-        Verify the list config call for response code, headers and data.
-        """
-        self.assertEquals(self.launch_config_response.status_code, 200,
-                          msg='List launch config failed with {0} for group '
-                          '{1} '.format(self.launch_config_response.status_code, self.group.id))
+        """Verify the list config call for response code, headers and data."""
+        self.assertEquals(
+            self.launch_config_response.status_code, 200,
+            msg='List launch config failed with {0} for group {1} '
+            .format(self.launch_config_response.status_code, self.group.id))
         self.validate_headers(self.launch_config_response.headers)
         self.assertEquals(
             self.launch_config.server.name, self.lc_name,
@@ -62,12 +57,13 @@ class ListLaunchConfigTest(AutoscaleFixture):
             self.launch_config.server.imageRef, self.lc_image_ref,
             msg='Server ImageRef in the launch config did not match'
                 ' for group {0}'.format(self.group.id))
-        self.assertEquals(self.autoscale_behaviors.personality_list(
-                          self.launch_config.server.personality),
-                          self.autoscale_behaviors.personality_list(
-                              self.lc_personality),
-                          msg='Server personality in the launch config did not match'
-                          ' for group {0}'.format(self.group.id))
+        self.assertEquals(
+            self.autoscale_behaviors.personality_list(
+                self.launch_config.server.personality),
+            self.autoscale_behaviors.personality_list(
+                self.lc_personality),
+            msg='Server personality in the launch config did not match'
+            ' for group {0}'.format(self.group.id))
         self.assertEquals(
             self.autoscale_behaviors.to_data(
                 self.launch_config.server.metadata),

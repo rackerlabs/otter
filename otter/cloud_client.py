@@ -1,14 +1,24 @@
 """
 Integration point for HTTP clients in otter.
 """
-from functools import wraps
+import re
+from functools import partial, wraps
 
-from characteristic import attributes
+from characteristic import Attribute, attributes
 
-from effect import (ComposedDispatcher, Effect, TypeDispatcher, perform,
-                    sync_performer)
+from effect import (
+    ComposedDispatcher,
+    Effect,
+    TypeDispatcher,
+    catch,
+    perform,
+    sync_performer)
+
+import six
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
+from otter.constants import ServiceType
+from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
     add_bind_root,
@@ -66,6 +76,7 @@ def service_request(
         auth cache.
     :param bool json_response: Specifies whether the response should be
         parsed as JSON.
+    :param bool parse_errors: Whether to parse :class:`APIError`
 
     :raise APIError: Raised asynchronously when the response HTTP code is not
         in success_codes.
@@ -169,15 +180,17 @@ def concretize_service_request(
         else:
             request_ = add_bind_service(
                 catalog, service_name, region, log, request_)
-        if service_request.json_response:
-            request_ = add_json_response(request_)
         request_ = add_error_handling(
             service_request.success_pred, request_)
+        if service_request.json_response:
+            request_ = add_json_response(request_)
+
         return request_(
             service_request.method,
             service_request.url,
             headers=service_request.headers,
             data=service_request.data,
+            params=service_request.params,
             log=log)
     return auth_eff.on(got_auth)
 
@@ -205,3 +218,243 @@ def perform_tenant_scope(
         TypeDispatcher({ServiceRequest: scoped_performer}),
         dispatcher])
     perform(new_disp, tenant_scope.effect.on(box.succeed, box.fail))
+
+
+# ----- CLB requests and error parsing -----
+
+_CLB_PENDING_UPDATE_PATTERN = re.compile(
+    "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
+    "immutable.$")
+_CLB_DELETED_PATTERN = re.compile(
+    "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
+    "The load balancer is deleted and) considered immutable.$")
+_CLB_NO_SUCH_NODE_PATTERN = re.compile(
+    "^Node with id #\d+ not found for loadbalancer #\d+$")
+_CLB_NO_SUCH_LB_PATTERN = re.compile(
+    "^Load balancer not found.$")
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBPendingUpdateError(Exception):
+    """
+    Error to be raised when the CLB is in PENDING_UPDATE status and is
+    immutable (temporarily).
+    """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBDeletedError(Exception):
+    """
+    Error to be raised when the CLB has been deleted or is being deleted.
+    This is distinct from it not existing.
+    """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class NoSuchCLBError(Exception):
+    """
+    Error to be raised when the CLB never existed in the first place (or it
+    has been deleted so long that there is no longer a record of it).
+    """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type),
+             Attribute('node_id', instance_of=six.text_type)])
+class NoSuchCLBNodeError(Exception):
+    """
+    Error to be raised when attempting to modify a CLB node that no longer
+    exists.
+    """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBRateLimitError(Exception):
+    """
+    Error to be raised when CLB returns 413 (rate limiting).
+    """
+
+
+def change_clb_node(lb_id, node_id, condition, weight):
+    """
+    Generate effect to change a node on a load balancer.
+
+    :param str lb_id: The load balancer ID to add the nodes to
+    :param str node_id: The node id to change.
+    :param str condition: The condition to change to: one of "ENABLED",
+        "DRAINING", or "DISABLED"
+    :param int weight: The weight to change to.
+
+    Note: this does not support "type" yet, since it doesn't make sense to add
+    autoscaled servers as secondary.
+
+    :return: :class:`ServiceRequest` effect
+
+    :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
+        :class:`NoSuchCLBError`, :class:`NoSuchCLBNodeError`, :class:`APIError`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'PUT',
+        append_segments('loadbalancers', lb_id, 'nodes', node_id),
+        data={'condition': condition, 'weight': weight},
+        success_pred=has_code(202))
+
+    def _check_no_such_node(api_error_code, json_body):
+        if (api_error_code == 404 and _CLB_NO_SUCH_NODE_PATTERN.match(
+                json_body.get('message', ''))):
+            raise NoSuchCLBNodeError(lb_id=lb_id, node_id=node_id)
+
+    parse_err = partial(_process_clb_api_error, lb_id=lb_id,
+                        extra_parsing=_check_no_such_node)
+
+    return eff.on(error=catch(APIError, parse_err))
+
+
+def _process_clb_api_error(exc_info, lb_id, extra_parsing):
+    """
+    Attempt to parse generic CLB API error messages, and raise recognized
+    exceptions in their place.  If that doesn't work, calls the
+    ``extra_parsing`` callable with the HTTP status code, and parsed JSON body.
+
+    If that still doesn't cut it, re-raise the original exception.
+
+    :param string lb_id: The load balancer ID
+    :param int api_error_code: The status code from the HTTP request
+    :param dict error_json: The error message, parsed as a JSON dict.
+
+    :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
+        :class:`NoSuchCLBError`, :class:`APIError` by itself
+    """
+    api_error = exc_info[1]
+    message = try_json_with_keys(api_error.body, ['message'])
+
+    if message:
+        if api_error.code == 413:
+            raise CLBRateLimitError(message, lb_id=lb_id)
+
+        generic_mappings = [
+            (422, _CLB_DELETED_PATTERN, CLBDeletedError),
+            (422, _CLB_PENDING_UPDATE_PATTERN, CLBPendingUpdateError),
+            (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)
+        ]
+        for status, pattern, exc_type in generic_mappings:
+            if status == api_error.code and pattern.match(message):
+                raise exc_type(message, lb_id=lb_id)
+
+        # No generic exceptions were raised - try the extra_parsing.
+        extra_parsing(api_error.code, try_json_with_keys(api_error.body, []))
+
+    # No? Re-raise, then
+    six.reraise(*exc_info)
+
+
+# ----- Nova requests and error parsing -----
+
+@attributes([Attribute('server_id', instance_of=six.text_type)])
+class NoSuchServerError(Exception):
+    """
+    Exception to be raised when there is no such server in Nova.
+    """
+
+
+@attributes([Attribute('server_id', instance_of=six.text_type)])
+class ServerMetadataOverLimitError(Exception):
+    """
+    Exception to be raised when there are too many metadata items on the
+    server already.
+    """
+
+
+@attributes([])
+class NovaRateLimitError(Exception):
+    """
+    Exception to be raised when Nova has rate-limited requests.
+    """
+
+
+_MAX_METADATA_PATTERN = re.compile('^Maximum number of metadata items .*$')
+
+
+def set_nova_metadata_item(server_id, key, value):
+    """
+    Set metadata key/value item on the given server.
+
+    :ivar str server_id: a Nova server ID.
+    :ivar str key: The metadata key to set (<=256 characters)
+    :ivar str value: The value to assign to the metadata key (<=256 characters)
+
+    Succeed on 200.
+
+    :raise: :class:`NoSuchServer`, :class:`MetadataOverLimit`,
+        :class:`NovaRateLimitError`, :class:`APIError`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_SERVERS,
+        'PUT',
+        append_segments('servers', server_id, 'metadata', key),
+        data={'meta': {key: value}},
+        reauth_codes=(401,),
+        success_pred=has_code(200))
+
+    def _parse_err(exc_info):
+        api_error = exc_info[1]
+        _check_nova_rate_limit(api_error)
+
+        matches = [
+            (404, ('itemNotFound', 'message'), None, NoSuchServerError),
+            (403, ('forbidden', 'message'), _MAX_METADATA_PATTERN,
+             ServerMetadataOverLimitError),
+        ]
+
+        for code, keys, pattern, exc_class in matches:
+            if api_error.code == code:
+                message = try_json_with_keys(api_error.body, keys)
+                if message and (not pattern or pattern.match(message)):
+                    raise exc_class(message,
+                                    server_id=six.text_type(server_id))
+
+        six.reraise(*exc_info)
+
+    return eff.on(error=catch(APIError, _parse_err))
+
+
+def get_server_details(server_id):
+    """
+    Get details for one particular server.
+
+    :ivar str server_id: a Nova server ID.
+
+    Succeed on 200.
+
+    :raise: :class:`NoSuchServer`, :class:`NovaRateLimitError`,
+        :class:`APIError`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_SERVERS,
+        'GET',
+        append_segments('servers', server_id),
+        success_pred=has_code(200))
+
+    def _parse_err(exc_info):
+        api_error = exc_info[1]
+        _check_nova_rate_limit(api_error)
+
+        if api_error.code == 404:
+            message = try_json_with_keys(api_error.body,
+                                         ('itemNotFound', 'message'))
+            if message:
+                raise NoSuchServerError(message, server_id=server_id)
+
+        six.reraise(*exc_info)
+
+    return eff.on(error=catch(APIError, _parse_err))
+
+
+def _check_nova_rate_limit(api_error):
+    """
+    Check if the API error is a nova rate limiting error.
+    """
+    if api_error.code == 413:
+        message = try_json_with_keys(api_error.body, ('overLimit', 'message'))
+        if message:
+            raise NovaRateLimitError(message)

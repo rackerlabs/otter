@@ -1,5 +1,5 @@
 """
-Tests for :mod:`otter.models.mock`
+Tests for :mod:`otter.models.cass`
 """
 import itertools
 import json
@@ -23,6 +23,8 @@ from pyrsistent import freeze
 from silverberg.client import CQLClient, ConsistencyLevel
 
 from testtools.matchers import IsInstance
+
+from toolz.dicttoolz import assoc
 
 from twisted.internet import defer
 from twisted.internet.task import Clock
@@ -248,21 +250,16 @@ class VerifiedViewTests(SynchronousTestCase):
         """
         Mock connection object.
         """
-        self.connection = mock.MagicMock(spec=['execute'])
+        self.connection = mock.Mock(spec=CQLClient)
         self.log = mock_log()
 
-    def _verified_view(self):
+    def _verified_view(self, get_deleting=False):
         """
         Returns a verified view, with some test arguments.
         """
-        view = verified_view(connection=self.connection,
-                             view_query='vq',
-                             del_query='dq',
-                             data={'d': 2},
-                             consistency=ConsistencyLevel.TWO,
-                             exception_if_empty=ValueError,
-                             log=self.log)
-        return view
+        return verified_view(
+            self.connection, 'vq', 'dq', {'d': 2}, ConsistencyLevel.TWO,
+            ValueError, self.log, get_deleting=get_deleting)
 
     def test_valid_view(self):
         """
@@ -272,6 +269,32 @@ class VerifiedViewTests(SynchronousTestCase):
             [{'c1': 2, 'created_at': 23}])
         r = self._verified_view()
         self.assertEqual(self.successResultOf(r), {'c1': 2, 'created_at': 23})
+        self.connection.execute.assert_called_once_with(
+            'vq', {'d': 2}, ConsistencyLevel.TWO)
+        self.assertFalse(self.log.msg.called)
+
+    def test_get_deleting_group(self):
+        """
+        Get DELETING group when get_deleting=True
+        """
+        self.connection.execute.return_value = defer.succeed(
+            [{'c1': 2, 'created_at': 23, 'deleting': True}])
+        r = self._verified_view(get_deleting=True)
+        self.assertEqual(
+            self.successResultOf(r),
+            {'c1': 2, 'created_at': 23, 'deleting': True})
+        self.connection.execute.assert_called_once_with(
+            'vq', {'d': 2}, ConsistencyLevel.TWO)
+        self.assertFalse(self.log.msg.called)
+
+    def test_false_get_deleting_group(self):
+        """
+        Raises empty exception when get_deleting=False and group is deleting
+        """
+        self.connection.execute.return_value = defer.succeed(
+            [{'c1': 2, 'created_at': 23, 'deleting': True}])
+        r = self._verified_view(get_deleting=False)
+        self.failureResultOf(r, ValueError)
         self.connection.execute.assert_called_once_with(
             'vq', {'d': 2}, ConsistencyLevel.TWO)
         self.assertFalse(self.log.msg.called)
@@ -474,7 +497,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.returns = [[{'group_config': '{}', 'created_at': 24}]]
         d = self.group.view_config()
         r = self.successResultOf(d)
-        expectedCql = ('SELECT group_config, created_at FROM scaling_group '
+        expectedCql = ('SELECT group_config, created_at, deleting '
+                       'FROM scaling_group '
                        'WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
@@ -491,7 +515,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.returns = [[{'group_config': '{}', 'created_at': None}], None]
         r = self.group.view_config()
         self.failureResultOf(r, NoSuchScalingGroupError)
-        view_cql = ('SELECT group_config, created_at FROM scaling_group '
+        view_cql = ('SELECT group_config, created_at, deleting '
+                    'FROM scaling_group '
                     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         del_cql = ('DELETE FROM scaling_group WHERE '
                    '"tenantId" = :tenantId AND "groupId" = :groupId')
@@ -512,7 +537,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x00',
+             'paused': False,
              'created_at': 23,
              'desired': 10}]
         self.returns = [cass_response]
@@ -520,8 +545,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         r = self.successResultOf(d)
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
-            'FROM scaling_group '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.connection.execute.assert_called_once_with(
@@ -550,7 +575,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x00',
+             'paused': False,
              'created_at': 23,
              'desired': None}]
         self.returns = [cass_response]
@@ -577,7 +602,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x00',
+             'paused': False,
              'desired': 0,
              'created_at': 23}]
         self.returns = [cass_response]
@@ -611,7 +636,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x00',
+             'paused': False,
              'desired': None,
              'created_at': None}]
         self.returns = [cass_response, None]
@@ -619,8 +644,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(d, NoSuchScalingGroupError)
         viewCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
-            'FROM scaling_group '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         delCql = ('DELETE FROM scaling_group '
                   'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
@@ -642,7 +667,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'pending': '{"P":"R"}',
              'groupTouched': '2014-01-01T00:00:05Z.1234',
              'policyTouched': '{"PT":"R"}',
-             'paused': '\x01',
+             'paused': True,
              'desired': 0,
              'created_at': 3}])
 
@@ -656,6 +681,34 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                        {'PT': 'R'},
                                        True,
                                        desired=0))
+
+    def test_modify_state_calls_modifier_with_group_and_state_and_others(self):
+        """
+        ``modify_state`` calls the modifier callable with the group and the
+        state as the first two arguments, and the other args and keyword args
+        passed to it.
+        """
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+        # calling with a Deferred that never gets callbacked, because we aren't
+        # testing the saving portion in this test
+        modifier = mock.Mock(return_value=defer.Deferred())
+        self.group.modify_state(modifier, 'arg1', kwarg1='1')
+        modifier.assert_called_once_with(
+            self.group, 'state', 'arg1', kwarg1='1')
+
+    def test_modify_state_propagates_view_state_error(self):
+        """
+        ``modify_state`` should propagate a :class:`NoSuchScalingGroupError`
+        that is raised by ``view_state``
+        """
+        self.group.view_state = mock.Mock(
+            return_value=defer.fail(NoSuchScalingGroupError(1, 1)))
+
+        modifier = mock.Mock()
+        d = self.group.modify_state(modifier)
+        f = self.failureResultOf(d)
+        self.assertTrue(f.check(NoSuchScalingGroupError))
+        self.assertEqual(modifier.call_count, 0)
 
     @mock.patch('otter.models.cass.serialize_json_data',
                 side_effect=lambda *args: _S(args[0]))
@@ -876,7 +929,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         expectedData = {"status": 'ERROR',
                         "groupId": '12345678g',
                         "tenantId": '11111', 'ts': 10345000}
-        self.connection.execute.assert_called_with(
+        self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
@@ -891,6 +944,24 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(d, NoSuchScalingGroupError)
         self.assertFalse(self.connection.execute.called)
 
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.succeed({}))
+    def test_update_status_deleting(self, mock_vc):
+        """
+        Sets "deleting" column to true when status set is DELETING
+        """
+        self.clock.advance(10.345)
+        d = self.group.update_status(ScalingGroupStatus.DELETING)
+        self.assertIsNone(self.successResultOf(d))  # update returns None
+        expectedCql = (
+            'INSERT INTO scaling_group("tenantId", "groupId", deleting) '
+            'VALUES (:tenantId, :groupId, :deleting) USING TIMESTAMP :ts')
+        expectedData = {"deleting": True,
+                        "groupId": '12345678g',
+                        "tenantId": '11111', 'ts': 10345000}
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
     def test_view_config_no_such_group(self):
         """
         Tests what happens if you try to view a group that doesn't exist.
@@ -900,7 +971,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.view_config()
         self.failureResultOf(d, NoSuchScalingGroupError)
         expectedCql = (
-            'SELECT group_config, created_at FROM scaling_group '
+            'SELECT group_config, created_at, deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(
@@ -929,7 +1000,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.view_launch_config()
         r = self.successResultOf(d)
         expectedCql = (
-            'SELECT launch_config, created_at FROM scaling_group '
+            'SELECT launch_config, created_at, deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(
@@ -946,7 +1017,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.view_launch_config()
         self.failureResultOf(d, NoSuchScalingGroupError)
         expectedCql = (
-            'SELECT launch_config, created_at FROM scaling_group '
+            'SELECT launch_config, created_at, deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId '
             'AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
@@ -976,7 +1047,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             NoSuchScalingGroupError('a', 'b'))
         d = self.group.view_launch_config()
         self.failureResultOf(d, NoSuchScalingGroupError)
-        viewCql = ('SELECT launch_config, created_at FROM scaling_group WHERE '
+        viewCql = ('SELECT launch_config, created_at, deleting '
+                   'FROM scaling_group WHERE '
                    '"tenantId" = :tenantId AND "groupId" = :groupId;')
         delCql = ('DELETE FROM scaling_group WHERE '
                   '"tenantId" = :tenantId AND "groupId" = :groupId')
@@ -1276,9 +1348,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.succeed({}))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks',
-                return_value=defer.succeed([{'webhookKey': 'w1'},
-                                            {'webhookKey': 'w2'}]))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
+                return_value=defer.succeed([{'id': 'w1'},
+                                            {'id': 'w2'}]))
     def test_delete_policy_valid_policy(self, mock_webhooks, mock_get_policy):
         """
         When you delete a scaling policy, it checks if the policy exists and
@@ -1288,6 +1360,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         # delete returns None
         self.assertIsNone(self.successResultOf(d))
         mock_get_policy.assert_called_once_with('3222')
+        mock_webhooks.assert_called_once_with('3222', 10000, None)
 
         expected_cql = (
             'BEGIN BATCH '
@@ -1330,7 +1403,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.update_config({"b": "lah"})
         self.failureResultOf(d, NoSuchScalingGroupError)
         expectedCql = (
-            'SELECT group_config, created_at FROM scaling_group '
+            'SELECT group_config, created_at, deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(
@@ -1856,242 +1929,6 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                          1)  # only view
         self.flushLoggedErrors(NoSuchWebhookError)
 
-    @mock.patch('otter.models.cass.config_value', return_value=10)
-    @mock.patch('otter.models.cass.verified_view')
-    def test_view_manifest_success(self, verified_view, _):
-        """
-        When viewing the manifest, if the group exists a dictionary with the
-        config, launch config, and scaling policies is returned.
-        """
-        verified_view.return_value = defer.succeed({
-            'tenantId': self.tenant_id,
-            "groupId": self.group_id,
-            'id': "12345678g",
-            'group_config': serialize_json_data(self.config, 1.0),
-            'launch_config': serialize_json_data(self.launch_config, 1.0),
-            'active': '{"A":"R"}',
-            'pending': '{"P":"R"}',
-            'groupTouched': '2014-01-01T00:00:05Z.1234',
-            'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
-            'desired': 0,
-            'created_at': 23
-        })
-        self.group._naive_list_policies = mock.Mock(
-            return_value=defer.succeed([]))
-
-        self.assertEqual(self.validate_view_manifest_return_value(), {
-            'groupConfiguration': self.config,
-            'launchConfiguration': self.launch_config,
-            'scalingPolicies': [],
-            'id': "12345678g",
-            'state': GroupState(
-                self.tenant_id,
-                self.group_id,
-                'a', {'A': 'R'},
-                {'P': 'R'}, '2014-01-01T00:00:05Z.1234',
-                {'PT': 'R'}, False)
-        })
-
-        self.group._naive_list_policies.assert_called_once_with()
-
-        view_cql = (
-            'SELECT "tenantId", "groupId", group_config, launch_config, '
-            'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at '
-            'FROM scaling_group '
-            'WHERE "tenantId" = :tenantId '
-            'AND "groupId" = :groupId')
-        del_cql = ('DELETE FROM scaling_group '
-                   'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
-        exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
-        verified_view.assert_called_once_with(
-            self.connection, view_cql, del_cql,
-            exp_data, ConsistencyLevel.QUORUM,
-            matches(IsInstance(NoSuchScalingGroupError)),
-            self.mock_log)
-
-    @mock.patch('otter.models.cass.assemble_webhooks_in_policies')
-    @mock.patch('otter.models.cass.verified_view')
-    def test_view_manifest_with_webhooks(self, verified_view, mock_awip):
-        """
-        Viewing manifest with_webhooks=True returns webhooks inside policies by
-        calling `assemble_webhooks_in_policies`
-        """
-        verified_view.return_value = defer.succeed({
-            'tenantId': self.tenant_id,
-            "groupId": self.group_id,
-            'id': "12345678g",
-            'group_config': serialize_json_data(self.config, 1.0),
-            'launch_config': serialize_json_data(self.launch_config, 1.0),
-            'active': '{"A":"R"}',
-            'pending': '{"P":"R"}',
-            'groupTouched': '2014-01-01T00:00:05Z.1234',
-            'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
-            'desired': 0,
-            'created_at': 23
-        })
-        mock_awip.return_value = 'assembled scaling policies'
-
-        # Getting policies
-        self.group._naive_list_policies = mock.Mock(
-            return_value=defer.succeed('raw policies'))
-
-        # Getting webhooks
-        self.group._naive_list_all_webhooks = mock.Mock(
-            return_value=defer.succeed('raw webhooks'))
-
-        # Getting the result and comparing
-        d = self.group.view_manifest(with_webhooks=True)
-        resp = self.successResultOf(d)
-        self.assertEqual(resp['scalingPolicies'], 'assembled scaling policies')
-        mock_awip.assert_called_once_with('raw policies', 'raw webhooks')
-        self.group._naive_list_policies.assert_called_once_with()
-        self.group._naive_list_all_webhooks.assert_called_once_with()
-
-    @mock.patch('otter.models.cass.verified_view')
-    def test_view_manifest_with_webhooks_integration(self, verified_view):
-        """
-        Viewing manifest with_webhooks=True returns webhooks inside policies
-        that matches the `model_schemas.manifest`
-        """
-        verified_view.return_value = defer.succeed({
-            'tenantId': self.tenant_id,
-            "groupId": self.group_id,
-            'id': "12345678g",
-            'group_config': serialize_json_data(self.config, 1.0),
-            'launch_config': serialize_json_data(self.launch_config, 1.0),
-            'active': '{"A":"R"}',
-            'pending': '{"P":"R"}',
-            'groupTouched': '2014-01-01T00:00:05Z.1234',
-            'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
-            'desired': 0,
-            'created_at': 23
-        })
-
-        # Getting policies
-        policies = [group_examples.policy()[i] for i in range(3)]
-        [policy.update({'id': str(i)}) for i, policy in enumerate(policies)]
-        self.group._naive_list_policies = mock.Mock(
-            return_value=defer.succeed(policies))
-
-        # Getting webhooks
-        wh_part = {'data': '{"name": "a", "metadata": {"a": "b"}}',
-                   'capability': '{"version": "v1"}'}
-        webhooks = [{'policyId': '0', 'webhookId': '11'},
-                    {'policyId': '0', 'webhookId': '12'},
-                    {'policyId': '2', 'webhookId': '21'},
-                    {'policyId': '2', 'webhookId': '22'},
-                    {'policyId': '2', 'webhookId': '23'}]
-        [webhook.update(wh_part) for webhook in webhooks]
-        self.group._naive_list_all_webhooks = mock.Mock(
-            return_value=defer.succeed(webhooks))
-
-        # Getting the result and comparing
-        resp = self.validate_view_manifest_return_value(with_webhooks=True)
-        exp_policies = deepcopy(policies)
-        exp_policies[0]['webhooks'] = [
-            _assemble_webhook_from_row(webhook, True)
-            for webhook in webhooks[:2]]
-        exp_policies[1]['webhooks'] = []
-        exp_policies[2]['webhooks'] = [
-            _assemble_webhook_from_row(webhook, True)
-            for webhook in webhooks[2:]]
-        self.assertEqual(resp['scalingPolicies'], exp_policies)
-
-    @mock.patch('otter.models.cass.assemble_webhooks_in_policies')
-    @mock.patch('otter.models.cass.verified_view')
-    def test_view_manifest_no_policies(self, verified_view, mock_awip):
-        """
-        Viewing manifest ``with_policies=False`` returns a manifest view with
-        no policies and no webhooks, even though ``with_webhooks=True``.
-        """
-        verified_view.return_value = defer.succeed({
-            'tenantId': self.tenant_id,
-            "groupId": self.group_id,
-            'id': "12345678g",
-            'group_config': serialize_json_data(self.config, 1.0),
-            'launch_config': serialize_json_data(self.launch_config, 1.0),
-            'active': '{"A":"R"}',
-            'pending': '{"P":"R"}',
-            'groupTouched': '2014-01-01T00:00:05Z.1234',
-            'policyTouched': '{"PT":"R"}',
-            'paused': '\x00',
-            'desired': 0,
-            'created_at': 23
-        })
-
-        # Getting policies
-        self.group._naive_list_policies = mock.Mock()
-        # Getting webhooks
-        self.group._naive_list_all_webhooks = mock.Mock()
-
-        # Getting the result and comparing
-        d = self.group.view_manifest(with_policies=False, with_webhooks=True)
-        resp = self.successResultOf(d)
-        self.assertEqual(resp, {
-            'groupConfiguration': self.config,
-            'launchConfiguration': self.launch_config,
-            'id': "12345678g",
-            'state': GroupState(
-                self.tenant_id,
-                self.group_id,
-                'a', {'A': 'R'},
-                {'P': 'R'}, '2014-01-01T00:00:05Z.1234',
-                {'PT': 'R'}, False)
-        })
-
-        self.assertFalse(mock_awip.called)
-        self.assertFalse(self.group._naive_list_policies.called)
-        self.assertFalse(self.group._naive_list_all_webhooks.called)
-
-    @mock.patch('otter.models.cass.verified_view',
-                return_value=defer.fail(NoSuchScalingGroupError(2, 3)))
-    def test_view_manifest_no_such_group(self, verified_view):
-        """
-        When viewing the manifest, if the group doesn't exist
-        ``NoSuchScalingGroupError`` is raised and the policies is never
-        retrieved.
-        """
-        self.group._naive_list_policies = mock.MagicMock(
-            return_value=defer.succeed('policies'))
-
-        d = self.group.view_manifest()
-        self.failureResultOf(d, NoSuchScalingGroupError)
-        self.flushLoggedErrors()
-        self.assertFalse(self.group._naive_list_policies.called)
-
-    def test_view_manifest_resurrected_entry(self):
-        """
-        If returned view is resurrected, i.e. that does not contain
-        'created_at', then it is triggered for deletion and
-        NoSuchScalingGroupError is raised
-        """
-        # This may not be required since verified_view call is checked in
-        # test_view_manifest_success
-        select_return = [{
-            'group_config': serialize_json_data(self.config, 1.0),
-            'launch_config': serialize_json_data(self.launch_config, 1.0)}]
-        self.returns = [select_return, None]
-        self.group._naive_list_policies = mock.MagicMock(
-            return_value=defer.succeed({}))
-        r = self.group.view_manifest()
-        self.failureResultOf(r, NoSuchScalingGroupError)
-        view_cql = (
-            'SELECT "tenantId", "groupId", group_config, launch_config, '
-            'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at '
-            'FROM scaling_group '
-            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
-        del_cql = ('DELETE FROM scaling_group '
-                   'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
-        exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
-        self.connection.execute.assert_has_calls(
-            [mock.call(view_cql, exp_data, ConsistencyLevel.QUORUM),
-             mock.call(del_cql, exp_data, ConsistencyLevel.QUORUM)])
-
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     def test_delete_non_empty_scaling_group_fails(self, mock_view_state):
         """
@@ -2159,7 +1996,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
         self.kz_client.delete.assert_called_once_with(
-            '/locks/' + self.group.uuid, recursive=True)
+            '/locks/' + self.group.uuid)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
@@ -2204,7 +2041,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
         self.kz_client.delete.assert_called_once_with(
-            '/locks/' + self.group.uuid, recursive=True)
+            '/locks/' + self.group.uuid)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     def test_delete_lock_not_acquired(self, mock_view_state):
@@ -2247,18 +2084,17 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                                               mock_view_state):
         """
         ``delete_group``, if the rest is successful, attempts to delete the
-        lock znode but if that fails, succeeds anyway. The znode deletion is
-        logged, though.
+        lock znode but if that fails, succeeds anyway, while retrying to delete
+        the lock asynchronously.  If it never succeeds, an error is logged.
         """
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
         mock_naive.return_value = defer.succeed([])
         called = []
 
-        def not_empty_error(lockpath, recursive):
+        def not_empty_error(lockpath):
             called.append(0)
             self.assertEqual(lockpath, '/locks/' + self.group.uuid)
-            self.assertTrue(recursive)
             return defer.fail(NotEmptyError((), {}))
 
         self.kz_client.delete.side_effect = not_empty_error
@@ -2266,12 +2102,232 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.returns = [None]
         self.clock.advance(34.575)
         result = self.successResultOf(self.group.delete_group())
+        for i in range(70):
+            self.clock.advance(5)
+
         self.assertIsNone(result)  # delete returns None
-        self.assertEqual(len(called), 1)
+        self.assertEqual(len(called), 61)
         self.group.log.msg.assert_called_with(
             "Error cleaning up lock path (when deleting group)",
             exc=matches(IsInstance(NotEmptyError)),
             otter_msg_type="ignore-delete-lock-error")
+
+
+class ViewManifestTests(CassScalingGroupTestCase):
+    """
+    Tests for :func:`view_manifest`
+    """
+
+    def setUp(self):
+        """
+        Mock verified view
+        """
+        super(ViewManifestTests, self).setUp()
+        self.verified_view = patch(self, 'otter.models.cass.verified_view')
+        self.vv_return = {
+            'tenantId': self.tenant_id,
+            "groupId": self.group_id,
+            'id': "12345678g",
+            'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}',
+            'pending': '{"P":"R"}',
+            'groupTouched': '2014-01-01T00:00:05Z.1234',
+            'policyTouched': '{"PT":"R"}',
+            'paused': False,
+            'desired': 0,
+            'created_at': 23
+        }
+        self.manifest = {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch_config,
+            'id': "12345678g",
+            'state': GroupState(
+                self.tenant_id,
+                self.group_id,
+                'a', {'A': 'R'},
+                {'P': 'R'}, '2014-01-01T00:00:05Z.1234',
+                {'PT': 'R'}, False)
+        }
+        self.group._naive_list_policies = mock.Mock()
+        self.group._naive_list_all_webhooks = mock.Mock()
+
+    def test_success(self):
+        """
+        When viewing the manifest, if the group exists a dictionary with the
+        config, launch config, and scaling policies is returned.
+        """
+        self.verified_view.return_value = defer.succeed(self.vv_return)
+        self.group._naive_list_policies.return_value = defer.succeed([])
+
+        self.manifest['scalingPolicies'] = []
+        self.assertEqual(
+            self.validate_view_manifest_return_value(), self.manifest)
+
+        self.group._naive_list_policies.assert_called_once_with()
+
+        view_cql = (
+            'SELECT "tenantId", "groupId", group_config, launch_config, '
+            'active, pending, "groupTouched", "policyTouched", paused, '
+            'desired, created_at, status, deleting '
+            'FROM scaling_group '
+            'WHERE "tenantId" = :tenantId '
+            'AND "groupId" = :groupId')
+        del_cql = ('DELETE FROM scaling_group '
+                   'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
+        exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
+        self.verified_view.assert_called_once_with(
+            self.connection, view_cql, del_cql,
+            exp_data, ConsistencyLevel.QUORUM,
+            matches(IsInstance(NoSuchScalingGroupError)),
+            self.mock_log, get_deleting=False)
+
+    def test_with_webhooks(self):
+        """
+        Viewing manifest with_webhooks=True returns webhooks inside policies
+        that matches the `model_schemas.manifest`
+        """
+        self.verified_view.return_value = defer.succeed(self.vv_return)
+
+        # Getting policies
+        policies = group_examples.policy()[:3]
+        [policy.update({'id': str(i)}) for i, policy in enumerate(policies)]
+        self.group._naive_list_policies.return_value = defer.succeed(policies)
+
+        # Getting webhooks
+        wh_part = {'data': '{"name": "a", "metadata": {"a": "b"}}',
+                   'capability': '{"version": "v1"}'}
+        webhooks = [{'policyId': '0', 'webhookId': '11'},
+                    {'policyId': '0', 'webhookId': '12'},
+                    {'policyId': '2', 'webhookId': '21'},
+                    {'policyId': '2', 'webhookId': '22'},
+                    {'policyId': '2', 'webhookId': '23'}]
+        [webhook.update(wh_part) for webhook in webhooks]
+        self.group._naive_list_all_webhooks.return_value = defer.succeed(
+            webhooks)
+
+        # Getting the result and comparing
+        resp = self.validate_view_manifest_return_value(with_webhooks=True)
+        exp_policies = deepcopy(policies)
+        exp_policies[0]['webhooks'] = [
+            _assemble_webhook_from_row(webhook, True)
+            for webhook in webhooks[:2]]
+        exp_policies[1]['webhooks'] = []
+        exp_policies[2]['webhooks'] = [
+            _assemble_webhook_from_row(webhook, True)
+            for webhook in webhooks[2:]]
+        self.manifest['scalingPolicies'] = exp_policies
+        self.assertEqual(resp, self.manifest)
+
+    @mock.patch('otter.models.cass.assemble_webhooks_in_policies')
+    def test_no_policies(self, mock_awip):
+        """
+        Viewing manifest ``with_policies=False`` returns a manifest view with
+        no policies and no webhooks, even though ``with_webhooks=True``.
+        """
+        self.verified_view.return_value = defer.succeed(self.vv_return)
+
+        # Getting the result and comparing
+        resp = self.validate_view_manifest_return_value(with_policies=False,
+                                                        with_webhooks=True)
+        self.assertEqual(resp, self.manifest)
+
+        self.assertFalse(mock_awip.called)
+        self.assertFalse(self.group._naive_list_policies.called)
+        self.assertFalse(self.group._naive_list_all_webhooks.called)
+
+    def test_with_deleting(self):
+        """
+        Viewing manifest ``get_deleting=True`` returns a manifest view with
+        group status in it even if the group is deleting
+        """
+        self.vv_return['status'] = 'ERROR'
+        self.vv_return['deleting'] = True
+        self.verified_view.return_value = defer.succeed(self.vv_return)
+
+        # Getting the result and comparing
+        resp = self.validate_view_manifest_return_value(with_policies=False,
+                                                        get_deleting=True)
+        self.manifest['status'] = 'DELETING'
+        self.assertEqual(resp, self.manifest)
+
+        # verified_view called with `get_deleting=True`
+        view_cql = (
+            'SELECT "tenantId", "groupId", group_config, launch_config, '
+            'active, pending, "groupTouched", "policyTouched", paused, '
+            'desired, created_at, status, deleting '
+            'FROM scaling_group '
+            'WHERE "tenantId" = :tenantId '
+            'AND "groupId" = :groupId')
+        del_cql = ('DELETE FROM scaling_group '
+                   'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
+        exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
+        self.verified_view.assert_called_once_with(
+            self.connection, view_cql, del_cql,
+            exp_data, ConsistencyLevel.QUORUM,
+            matches(IsInstance(NoSuchScalingGroupError)),
+            self.mock_log, get_deleting=True)
+
+    def _check_with_deleting(self, status):
+        self.verified_view.return_value = defer.succeed(self.vv_return)
+        resp = self.validate_view_manifest_return_value(with_policies=False,
+                                                        get_deleting=True)
+        self.manifest['status'] = status
+        self.assertEqual(resp, self.manifest)
+
+    def test_with_deleting_normal_group(self):
+        """
+        Viewing manifest with `get_deleting=True` returns group manifest
+        including status when group is not deleting
+        """
+        self.vv_return['status'] = 'ACTIVE'
+        self.vv_return['deleting'] = None
+        self._check_with_deleting('ACTIVE')
+
+    def test_with_deleting_none_status(self):
+        """
+        Viewing manifest with `get_deleting=True` returns group manifest
+        including ACTIVE status when group is not deleting and status is None
+        """
+        self.vv_return['status'] = None
+        self.vv_return['deleting'] = None
+        self._check_with_deleting('ACTIVE')
+
+    def test_with_deleting_disabled_status(self):
+        """
+        Viewing manifest with `get_deleting=True` returns group manifest
+        including ERROR status when group is not deleting and status is
+        DISABLED
+        """
+        self.vv_return['status'] = 'DISABLED'
+        self.vv_return['deleting'] = None
+        self._check_with_deleting('ERROR')
+
+    def test_with_deleting_error_status(self):
+        """
+        Viewing manifest with `get_deleting=True` returns group manifest
+        including ERROR status when group is not deleting and status is
+        ERROR
+        """
+        self.vv_return['status'] = 'ERROR'
+        self.vv_return['deleting'] = None
+        self._check_with_deleting('ERROR')
+
+    def test_no_such_group(self):
+        """
+        When viewing the manifest, if the group doesn't exist
+        ``NoSuchScalingGroupError`` is raised and the policies is never
+        retrieved.
+        """
+        self.verified_view.return_value = defer.fail(
+            NoSuchScalingGroupError(2, 3))
+        self.group._naive_list_policies = mock.MagicMock(
+            return_value=defer.succeed('policies'))
+
+        d = self.group.view_manifest()
+        self.failureResultOf(d, NoSuchScalingGroupError)
+        self.flushLoggedErrors()
+        self.assertFalse(self.group._naive_list_policies.called)
 
 
 class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
@@ -2896,6 +2952,20 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
                                  side_effect=lambda *args: _S(args[0]))
 
+        self.group = {
+            'tenantId': '123',
+            'groupId': 'group',
+            'group_config': '{"name": "test"}',
+            'active': '{}',
+            'pending': '{}',
+            'groupTouched': None,
+            'policyTouched': '{}',
+            'paused': False,
+            'desired': 0,
+            'created_at': 23,
+            'deleting': False
+        }
+
     @mock.patch('otter.models.cass.WeakLocks', return_value=2)
     def test_locks(self, mock_wl):
         """
@@ -3133,24 +3203,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         ``list_scaling_group_states`` returns a list of :class:`GroupState`
         objects from cassandra
         """
-        self.returns = [[{
-            'tenantId': '123',
-            'groupId': 'group{}'.format(i),
-            'group_config': '{"name": "test"}',
-            'active': '{}',
-            'pending': '{}',
-            'groupTouched': None,
-            'policyTouched': '{}',
-            'paused': '\x00',
-            'desired': 0,
-            'created_at': 23
-        } for i in range(2)]]
+        self.returns = [[assoc(self.group, 'groupId', 'group{}'.format(i))
+                         for i in range(2)]]
 
         expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
-            'FROM scaling_group '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.connection.execute.assert_called_once_with(
@@ -3180,7 +3240,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
+            '"groupTouched", "policyTouched", paused, desired, '
+            'created_at, deleting '
             'FROM scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
@@ -3196,8 +3257,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '123', 'limit': 5}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
-            'FROM scaling_group '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId '
             'LIMIT :limit;')
         self.collection.list_scaling_group_states(
@@ -3213,8 +3274,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '123', 'limit': 100, 'marker': '345'}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
-            'FROM scaling_group '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId '
             'AND "groupId" > :marker LIMIT :limit;')
         self.collection.list_scaling_group_states(self.mock_log, '123',
@@ -3227,36 +3288,19 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         If any of the rows returned is resurrected, i.e. does not contain
         created_at then it is not returned.
         """
-        group_dicts = [{
-            'tenantId': '123',
-            'groupId': 'group123',
-            'group_config': '{"name": "test123"}',
-            'active': '{}',
-            'pending': '{}',
-            'groupTouched': None,
-            'policyTouched': '{}',
-            'paused': '\x00',
-            'desired': 0,
-            'created_at': 23
-        }, {
-            'tenantId': '23',
-            'groupId': 'group23',
-            'group_config': '{"name": "test123"}',
-            'active': '{}',
-            'pending': '{}',
-            'groupTouched': None,
-            'policyTouched': '{}',
-            'paused': '\x00',
-            'desired': 0,
-            'created_at': None
-        }]
-        self.returns = [group_dicts, None]
+        group1 = self.group.copy()
+        group1['groupId'] = 'group123'
+        group2 = self.group.copy()
+        group2['tenantId'] = '23'
+        group2['groupId'] = 'group23'
+        group2['created_at'] = None
+        self.returns = [[group1, group2], None]
 
         expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
-            'FROM scaling_group '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'deleting FROM scaling_group '
             'WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(
@@ -3264,7 +3308,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             mock.call(expectedCql, expectedData, ConsistencyLevel.QUORUM))
         self.assertEqual(r, [GroupState(tenant_id='123',
                                         group_id='group123',
-                                        group_name='test123',
+                                        group_name='test',
                                         active={},
                                         pending={},
                                         group_touched='0001-01-01T00:00:00Z',
@@ -3273,48 +3317,22 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_log.msg.assert_called_once_with(
             'Resurrected rows',
             tenant_id='123',
-            rows=[_de_identify(group_dicts[1])])
+            rows=[_de_identify(group2)])
 
     def test_list_states_deletes_resurrected_groups(self):
         """
         If any of the rows returned is resurrected, i.e. does not contain
         created_at, then it is triggered for deletion.
         """
-        group_dicts = [{
-            'tenantId': '123',
-            'groupId': 'group123',
-            'group_config': '{"name": "test123"}',
-            'active': '{}',
-            'pending': '{}',
-            'groupTouched': None,
-            'policyTouched': '{}',
-            'paused': '\x00',
-            'desired': 0,
-            'created_at': 23
-        }, {
-            'tenantId': '123',
-            'groupId': 'group124',
-            'group_config': '{"name": "test123"}',
-            'active': '{}',
-            'pending': '{}',
-            'groupTouched': None,
-            'policyTouched': '{}',
-            'paused': '\x00',
-            'desired': 0,
-            'created_at': None
-        }, {
-            'tenantId': '123',
-            'groupId': 'group125',
-            'group_config': '{"name": "test123"}',
-            'active': '{}',
-            'pending': '{}',
-            'groupTouched': None,
-            'policyTouched': '{}',
-            'paused': '\x00',
-            'desired': 0,
-            'created_at': None
-        }]
-        self.returns = [group_dicts, None]
+        g1 = self.group.copy()
+        g1['groupId'] = 'group123'
+        groups = [g1]
+        for i in range(4, 6):
+            g = self.group.copy()
+            g['groupId'] = 'group12{}'.format(i)
+            g['created_at'] = None
+            groups.append(g)
+        self.returns = [groups, None]
 
         expectedCql = ('BEGIN BATCH '
 
@@ -3353,12 +3371,43 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             mock.call(expectedCql, expectedData, ConsistencyLevel.QUORUM))
         self.assertEqual(r, [GroupState(tenant_id='123',
                                         group_id='group123',
-                                        group_name='test123',
+                                        group_name='test',
                                         active={},
                                         pending={},
                                         group_touched='0001-01-01T00:00:00Z',
                                         policy_touched={},
                                         paused=False)])
+
+    def _extract_execute_query(self, call):
+        args, _ = call
+        query, params, c = args
+        return query
+
+    def test_list_states_filters_deleting_groups(self):
+        """
+        Groups that are deleting based on "deleting" column to be true are not
+        returned
+        """
+        g1 = self.group.copy()
+        g1['groupId'] = 'group123'
+        g2 = self.group.copy()
+        g2['groupId'] = 'group124'
+        g2['deleting'] = True
+        self.returns = [[g1, g2], None]
+        r = self.validate_list_states_return_value(self.mock_log, '123')
+        self.assertEqual(r, [GroupState(tenant_id='123',
+                                        group_id='group123',
+                                        group_name='test',
+                                        active={},
+                                        pending={},
+                                        group_touched='0001-01-01T00:00:00Z',
+                                        policy_touched={},
+                                        paused=False)])
+        # No call to delete row was made
+        self.assertEqual(len(self.connection.execute.call_args_list), 1)
+        self.assertNotIn(
+            'DELETE', self._extract_execute_query(
+                self.connection.execute.call_args_list[0]))
 
     def test_get_scaling_group(self):
         """

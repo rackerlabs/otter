@@ -23,20 +23,23 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         self.wb_policy = dict(cooldown=self.gc_cooldown,
                               type='webhook', name='multiple_wb_policies',
                               change=self.change)
-        self.at_style_policy = dict(
+        self.cron_style_policy = dict(
+            args=dict(cron='* * * * *'),
+            cooldown=self.gc_cooldown, type='schedule',
+            name='multi_cron_style', change=self.change)
+
+    @property
+    def at_style_policy(self):
+        return dict(
             args=dict(at=self.autoscale_behaviors.get_time_in_utc(self.delta)),
             cooldown=self.gc_cooldown, type='schedule', name='multi_at_style',
             change=self.change)
-        self.cron_style_policy = dict(
-            args=dict(cron='* * * * *'),
-            cooldown=self.gc_cooldown, type='schedule', name='multi_cron_style',
-            change=self.change)
 
     @tags(speed='quick')
-    def test_system_create_group_with_multiple_webhook_policies_with_same_attributes(self):
+    def test_group_multiple_webhook_policies_with_same_attributes(self):
         """
-        Creating a group with a list of multiple webhook policies, with the same
-        attributes, is succcessful
+        Creating a group with a list of multiple webhook policies,
+        with the same attributes, is succcessful
         """
         self._create_multi_policy_group(2, 201, self.wb_policy)
 
@@ -128,21 +131,18 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
     @tags(speed='quick')
     def test_system_webhook_and_scheduler_policies_many_different_groups(self):
         """
-        Create many groups each with the same type of scheduler and webhook policies and
-        verify the servers after each of their executions
+        Create many groups each with the same type of scheduler and webhook
+        policies and verify the servers after each of their executions
         """
-        at_style_policy = dict(
-            args=dict(at=self.autoscale_behaviors.get_time_in_utc(30)),
-            cooldown=self.gc_cooldown, type='schedule', name='multi_at_style',
-            change=self.change)
-        group_list = []
-        for each in range(4):
-            group = self._create_multi_policy_group(1, 201, at_style_policy)
-            group_list.append(group.id)
+        self.delta = 30
+        group_ids = [
+            self._create_multi_policy_group(1, 201, self.at_style_policy).id
+            for _ in range(4)]
         sleep(self.scheduler_interval + 30)
-        for each_group in group_list:
-            self.verify_group_state(each_group, self.change)
-            self.verify_server_count_using_server_metadata(each_group, self.change)
+        for group_id in group_ids:
+            self.verify_group_state(group_id, self.change)
+            self.verify_server_count_using_server_metadata(group_id,
+                                                           self.change)
 
     def _unchanged_policy(self, policy_list):
         return {i: policy_list[i] for i in policy_list if i != 'change'}

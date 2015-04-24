@@ -1,26 +1,24 @@
 """Tests for convergence effecting."""
 
-from effect import Constant, Effect, parallel
+from effect import Constant, Effect, Error, ParallelEffects, sync_perform
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from zope.interface import implementer
-
 from otter.convergence.effecting import steps_to_effect
-from otter.convergence.steps import IStep
-
-
-@implementer(IStep)
-class _Steppy(object):
-    def as_effect(self):
-        return Effect(Constant(None))
+from otter.convergence.model import StepResult
+from otter.test.utils import TestStep, test_dispatcher, transform_eq
 
 
 class StepsToEffectTests(SynchronousTestCase):
     """Tests for :func:`steps_to_effect`"""
     def test_uses_step_request(self):
         """Steps are converted to requests."""
-        steps = [_Steppy(), _Steppy()]
-        expected_effects = [Effect(Constant(None))] * 2
+        steps = [TestStep(Effect(Constant((StepResult.SUCCESS, 'foo')))),
+                 TestStep(Effect(Error(RuntimeError('uh oh'))))]
         effect = steps_to_effect(steps)
-        self.assertEqual(effect, parallel(expected_effects))
+        self.assertIs(type(effect.intent), ParallelEffects)
+        self.assertEqual(
+            sync_perform(test_dispatcher(), effect),
+            [(StepResult.SUCCESS, 'foo'),
+             (StepResult.RETRY, [transform_eq(lambda e: (type(e), e.args),
+                                              (RuntimeError, ('uh oh',)))])])

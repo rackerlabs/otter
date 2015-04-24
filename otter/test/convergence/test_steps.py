@@ -11,7 +11,13 @@ from testtools.matchers import IsInstance
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.cloud_client import ServiceRequest, has_code, service_request
+from otter.cloud_client import (
+    NoSuchServerError,
+    NovaRateLimitError,
+    ServerMetadataOverLimitError,
+    ServiceRequest,
+    has_code,
+    service_request)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
@@ -29,6 +35,8 @@ from otter.convergence.steps import (
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
     UnexpectedServerStatus,
+    _clb_check_change_node,
+    _clb_check_change_node_handlers,
     _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_ALREADY_A_MEMBER_PATTERN,
@@ -122,7 +130,7 @@ class CreateServerTests(SynchronousTestCase):
 
         self.assertEqual(
             resolve_effect(eff, (StubResponse(202, {}), {"server": {}})),
-            (StepResult.RETRY, []))
+            (StepResult.RETRY, ['waiting for server to become active']))
 
     def test_create_server_400_parseable_failures(self):
         """
@@ -184,7 +192,7 @@ class CreateServerTests(SynchronousTestCase):
             self.assertEqual(
                 resolve_effect(eff, service_request_error_response(api_error),
                                is_error=True),
-                (StepResult.RETRY, []))
+                (StepResult.RETRY, [api_error]))
 
     def test_create_server_403_json_parseable_failures(self):
         """
@@ -277,7 +285,7 @@ class CreateServerTests(SynchronousTestCase):
             self.assertEqual(
                 resolve_effect(eff, service_request_error_response(api_error),
                                is_error=True),
-                (StepResult.RETRY, []))
+                (StepResult.RETRY, [api_error]))
 
     def test_create_server_non_400_or_403_failures(self):
         """
@@ -293,7 +301,7 @@ class CreateServerTests(SynchronousTestCase):
         self.assertEqual(
             resolve_effect(eff, service_request_error_response(api_error),
                            is_error=True),
-            (StepResult.RETRY, []))
+            (StepResult.RETRY, [api_error]))
 
 
 class DeleteServerTests(SynchronousTestCase):
@@ -318,13 +326,9 @@ class DeleteServerTests(SynchronousTestCase):
 
         self.assertEqual(
             resolve_effect(eff, (None, {})),
-            (StepResult.SUCCESS, []))
-
-        self.assertEqual(
-            resolve_effect(eff,
-                           (APIError, APIError(500, None, None), None),
-                           is_error=True),
-            (StepResult.RETRY, []))
+            (StepResult.RETRY, [
+                'must re-gather after deletion in order to update the active '
+                'cache']))
 
     def test_delete_and_verify_del_404(self):
         """
@@ -421,51 +425,55 @@ class StepAsEffectTests(SynchronousTestCase):
     def test_set_metadata_item(self):
         """
         :obj:`SetMetadataItemOnServer.as_effect` produces a request for
-        setting a metadata item on a particular server.
+        setting a metadata item on a particular server.  It succeeds if
+        successful, but does not fail for any errors.
         """
-        meta = SetMetadataItemOnServer(server_id='abc123', key='metadata_key',
+        server_id = u'abc123'
+        meta = SetMetadataItemOnServer(server_id=server_id, key='metadata_key',
                                        value='teapot')
         eff = meta.as_effect()
-        self.assertEqual(
-            eff.intent,
-            service_request(
-                ServiceType.CLOUD_SERVERS,
-                'PUT',
-                'servers/abc123/metadata/metadata_key',
-                data={'meta': {'metadata_key': 'teapot'}},
-                success_pred=has_code(200, 404)).intent)
-
         self.assertEqual(
             resolve_effect(eff, (None, {})),
             (StepResult.SUCCESS, []))
 
-        err = APIError(500, None, None)
-        self.assertEqual(
-            resolve_effect(eff,
-                           (APIError, err, None),
-                           is_error=True),
-            (StepResult.RETRY, [err]))
+        exceptions = (NoSuchServerError("msg", server_id=server_id),
+                      ServerMetadataOverLimitError("msg", server_id=server_id),
+                      NovaRateLimitError("msg"),
+                      APIError(code=500, body="", headers={}))
+        for exception in exceptions:
+            self.assertRaises(
+                type(exception),
+                resolve_effect,
+                eff, (type(exception), exception, None),
+                is_error=True)
 
     def test_change_load_balancer_node(self):
         """
         :obj:`ChangeCLBNode.as_effect` produces a request for
         modifying a load balancer node.
         """
-        changenode = ChangeCLBNode(
+        change_node = ChangeCLBNode(
             lb_id='abc123',
             node_id='node1',
             condition=CLBNodeCondition.DRAINING,
             weight=50,
             type=CLBNodeType.PRIMARY)
-        self.assertEqual(
-            changenode.as_effect(),
-            service_request(
-                ServiceType.CLOUD_LOAD_BALANCERS,
-                'PUT',
-                'loadbalancers/abc123/nodes/node1',
-                data={'condition': 'DRAINING',
-                      'weight': 50},
-                success_pred=has_code(202)))
+        eff = change_node.as_effect()
+
+        handled_codes = _clb_check_change_node_handlers.keys()
+        expected_intent = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'PUT',
+            'loadbalancers/abc123/nodes/node1',
+            data={'condition': 'DRAINING',
+                  'weight': 50},
+            success_pred=has_code(*handled_codes)).intent
+        self.assertEqual(eff.intent, expected_intent)
+
+        (on_success, on_error), = eff.callbacks
+        self.assertIdentical(on_error, None)
+        self.assertIdentical(on_success.func, _clb_check_change_node)
+        self.assertEqual(on_success.args, (change_node,))
 
     def test_add_nodes_to_clb(self):
         """
@@ -513,7 +521,7 @@ class StepAsEffectTests(SynchronousTestCase):
 
     def test_add_nodes_to_clb_success_response_codes(self):
         """
-        :obj:`AddNodesToCLB` only accepts 202, 413, and some 422 responses.
+        :obj:`AddNodesToCLB` succeeds on 202 or if duplicate nodes are detected
         """
         lb_id = "12345"
         lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
@@ -528,8 +536,11 @@ class StepAsEffectTests(SynchronousTestCase):
                 }),
                 request)
 
-        self.assertEqual(get_result(StubResponse(202, {}), ''),
-                         (StepResult.SUCCESS, []))
+        self.assertEqual(
+            get_result(StubResponse(202, {}), ''),
+            (StepResult.RETRY,
+             ['must re-gather after adding to CLB in order to update the '
+              'active cache']))
 
         self.assertEqual(
             get_result(
@@ -540,12 +551,14 @@ class StepAsEffectTests(SynchronousTestCase):
                                "balancer.",
                     "code": 422
                 }),
-            (StepResult.SUCCESS, []))
+            (StepResult.RETRY,
+             ['must re-gather after adding to CLB in order to update the '
+              'active cache']))
 
     def test_add_nodes_to_clb_failure_response_codes(self):
         """
-        :obj:`AddNodesToCLB` retries on 422 Pending Update responses, and
-        fails on non-202, non-413 errors, non-422 recognized responses.
+        :obj:`AddNodesToCLB` returns FAILURE on 404 or 422 PENDING_DELETE and
+        returns RETRY on any other error.
         """
         lb_id = "12345"
         lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
@@ -560,27 +573,18 @@ class StepAsEffectTests(SynchronousTestCase):
                 }),
                 request)
 
-        # Retry on pending update or on over-limit
+        # Fail on 404 or 422 PENDING_DELETE
+        self.assertEqual(get_result(StubResponse(404, {}), ''),
+                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
         self.assertEqual(
             get_result(
                 StubResponse(422, {}),
                 {
                     "message": "Load Balancer '12345' has a status of "
-                               "'PENDING_UPDATE' and is considered immutable.",
+                               "'PENDING_DELETE' and is considered immutable.",
                     "code": 422
                 }),
-            (StepResult.RETRY, [matches(IsInstance(APIError))]))
-
-        self.assertEqual(get_result(StubResponse(413, {}), ''),
-                         (StepResult.RETRY, [matches(IsInstance(APIError))]))
-
-        # Fail on everything else
-        self.assertEqual(get_result(StubResponse(404, {}), ''),
-                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
-
-        self.assertEqual(get_result(StubResponse(400, {}), ''),
-                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
-
+            (StepResult.FAILURE, [matches(IsInstance(APIError))]))
         self.assertEqual(
             get_result(
                 StubResponse(422, {}),
@@ -591,15 +595,28 @@ class StepAsEffectTests(SynchronousTestCase):
                 }),
             (StepResult.FAILURE, [matches(IsInstance(APIError))]))
 
+        # Retry on other API errors
         self.assertEqual(
             get_result(
                 StubResponse(422, {}),
                 {
                     "message": "Load Balancer '12345' has a status of "
-                               "'PENDING_DELETE' and is considered immutable.",
+                               "'PENDING_UPDATE' and is considered immutable.",
                     "code": 422
                 }),
-            (StepResult.FAILURE, [matches(IsInstance(APIError))]))
+            (StepResult.RETRY, [matches(IsInstance(APIError))]))
+        self.assertEqual(get_result(StubResponse(413, {}), ''),
+                         (StepResult.RETRY, [matches(IsInstance(APIError))]))
+        self.assertEqual(get_result(StubResponse(500, {}), ''),
+                         (StepResult.RETRY, [matches(IsInstance(APIError))]))
+
+        # Any unknown errors are propogated
+        self.assertRaises(
+            ValueError,
+            resolve_effect,
+            request,
+            service_request_error_response(ValueError('no')),
+            is_error=True)
 
     def test_remove_nodes_from_clb(self):
         """
@@ -640,42 +657,42 @@ class StepAsEffectTests(SynchronousTestCase):
         self.assertTrue(predicate(StubResponse(413, {}), None))
         self.assertTrue(predicate(
             StubResponse(422, {}),
-            {
+            json.dumps({
                 "message": "The load balancer is deleted and considered "
                            "immutable.",
                 "code": 422
-            }))
+            })))
         self.assertTrue(predicate(
             StubResponse(422, {}),
-            {
+            json.dumps({
                 "message": "Load Balancer '12345' has a status of "
                            "'PENDING_UPDATE' and is considered immutable.",
                 "code": 422
-            }))
+            })))
         self.assertTrue(predicate(
             StubResponse(422, {}),
-            {
+            json.dumps({
                 "message": "Load Balancer '12345' has a status of "
                            "'PENDING_DELETE' and is considered immutable.",
                 "code": 422
-            }))
+            })))
 
         self.assertFalse(predicate(StubResponse(404, {}), None))
         self.assertFalse(predicate(
             StubResponse(422, {}),
-            {
+            json.dumps({
                 "message": "Duplicate nodes detected. One or more "
                            "nodes already configured on load "
                            "balancer.",
                 "code": 422
-            }))
+            })))
         # This one is just malformed but similar to a good message.
         self.assertFalse(predicate(
             StubResponse(422, {}),
-            {
+            json.dumps({
                 "message": "The load balancer is considered immutable.",
                 "code": 422
-            }))
+            })))
 
     def test_remove_nodes_from_clb_retry(self):
         """
@@ -780,8 +797,40 @@ class StepAsEffectTests(SynchronousTestCase):
         for removing any combination of nodes from any combination of RCv3
         load balancers.
         """
-        self._generic_bulk_rcv3_step_test(
-            BulkRemoveFromRCv3, "DELETE")
+        self._generic_bulk_rcv3_step_test(BulkRemoveFromRCv3, "DELETE")
+
+
+class CLBCheckChangeNodeTests(SynchronousTestCase):
+    """
+    Tests for :func:`_clb_check_change_node`.
+    """
+    example_step = ChangeCLBNode(lb_id="lb_id",
+                                 node_id="node_id",
+                                 condition=CLBNodeCondition.ENABLED,
+                                 weight=10,
+                                 type=CLBNodeType.PRIMARY)
+
+    def test_good_response(self):
+        """
+        If the response code indicates success, the response was successful.
+        """
+        response = StubResponse(202, {})
+        body = None
+        result = _clb_check_change_node(self.example_step, (response, body))
+        self.assertEqual(result, (StepResult.SUCCESS, []))
+
+    def test_disappearing_server(self):
+        """
+        If the node we're trying to update has vanished, retry convergence.
+        """
+        response = StubResponse(404, {})
+        body = None
+        result = _clb_check_change_node(self.example_step, (response, body))
+        self.assertEqual(
+            result,
+            (StepResult.RETRY, [{"reason": "CLB node not found",
+                                 "node": self.example_step.node_id,
+                                 "lb": self.example_step.lb_id}]))
 
 
 _RCV3_TEST_DATA = {
@@ -885,7 +934,9 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
     """
     def test_good_response(self):
         """
-        If the response code indicates success, the response was successful.
+        If the response code indicates success, the step returns a RETRY so
+        that another convergence cycle can be done to update the active server
+        list.
         """
         node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
         lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
@@ -900,7 +951,11 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
                  "load_balancer_pool": {"id": lb_id}}
                 for (lb_id, node_id) in pairs]
         res = _rcv3_check_bulk_add(pairs, (resp, body))
-        self.assertEqual(res, (StepResult.SUCCESS, []))
+        self.assertEqual(
+            res,
+            (StepResult.RETRY,
+             ['must re-gather after adding to LB in order to update the '
+              'active cache']))
 
     def test_try_again(self):
         """
@@ -1216,6 +1271,7 @@ class ConvergeLaterTests(SynchronousTestCase):
         """
         `ConvergeLater.as_effect` returns effect with RETRY
         """
-        eff = ConvergeLater().as_effect()
+        eff = ConvergeLater(reasons=['building']).as_effect()
         self.assertEqual(
-            sync_perform(base_dispatcher, eff), (StepResult.RETRY, []))
+            sync_perform(base_dispatcher, eff),
+            (StepResult.RETRY, ['building']))
