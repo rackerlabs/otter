@@ -93,7 +93,6 @@ def create_scaling_group_dict(
     if use_lbs:
         obj["launchConfiguration"]["args"]["loadBalancers"] = use_lbs
 
-    print(obj)
     return obj
 
 
@@ -424,7 +423,6 @@ class ScalingPolicy(object):
             "type": "webhook",
             change_type: change_factor
         }]
-        print(self.policy)
 
     def stop(self, rcs):
         """Disposes of the policy.

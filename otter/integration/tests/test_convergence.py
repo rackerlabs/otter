@@ -278,7 +278,7 @@ class TestConvergence(unittest.TestCase):
         )
 
         self.scaling_policy = ScalingPolicy(
-            scale_by=-1,
+            scale_by=1,
             scaling_group=self.scaling_group
         )
 
@@ -438,7 +438,7 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self.policy_set.execute)
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
-                set_to_servers, timeout=120
+                set_to_servers, timeout=1800
             ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_random_servers, oobd_servers)
             .addCallback(self._delete_those_servers, rcs)
