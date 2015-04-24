@@ -2,9 +2,12 @@
 Tests for log_spec.py
 """
 
+import mock
+
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.log.spec import SpecificationObserverWrapper
+from otter.log.spec import SpecificationObserverWrapper, get_validated_event
+from otter.test.utils import CheckFailure
 
 
 class SpecificationObserverWrapperTests(SynchronousTestCase):
@@ -32,14 +35,25 @@ class SpecificationObserverWrapperTests(SynchronousTestCase):
             {'message': ("launch-servers",), "num_servers": 2})
         self.assertEqual(
             self.e,
-            {'message': ('Launching 2 servers', ),
+            {'message': ('Launching {num_servers} servers', ),
+             'num_servers': 2,
              'otter_msg_type': 'launch-servers'})
 
-    def test_error_validating_observer(self):
+    @mock.patch('otter.log.spec.get_validated_event', side_effect=ValueError)
+    def test_error_validating_observer(self, mock_gve):
         """
         The observer returned replaces event with error if it fails to
         type check
         """
+        SpecificationObserverWrapper(self.observer)(
+            {'message': ("something-bad",)})
+        self.assertEqual(
+            self.e,
+            {'original_message': ("something-bad",),
+             'isError': True,
+             'failure': CheckFailure(ValueError),
+             'why': 'Error validating event',
+             'message': ()})
 
 
 class GetValidatedEventTests(SynchronousTestCase):
@@ -54,38 +68,35 @@ class GetValidatedEventTests(SynchronousTestCase):
         """
         Nothing is changed if Error-based event is not found in msg_types
         """
+        e = {'isError': True, 'why': 'unknown', 'a': 'b'}
+        self.assertEqual(get_validated_event(e), e)
 
     def test_error_why_is_changed(self):
         """
         Error-based event's why is changed if found in msg_types.
         otter_msg_type is added
         """
-
-    def test_error_invalid(self):
-        """
-        If any of the fields in error-based event is invalid, it raises
-        `ValueError`. Event is not modified
-        """
-
-    def test_error_details_invalid(self):
-        """
-        If Error-based's details have invalid fields, it raises ValueError.
-        Event is not modified
-        """
+        e = {'isError': True, 'why': 'delete-server', 'a': 'b'}
+        self.assertEqual(
+            get_validated_event(e),
+            {'why': 'Deleting {server_id} server',
+             'isError': True, 'a': 'b',
+             'otter_msg_type': 'delete-server'})
 
     def test_msg_not_found(self):
         """
         Event is not changed if msg_type is not found
         """
+        e = {'message': ('unknown',), 'a': 'b'}
+        self.assertEqual(get_validated_event(e), e)
 
     def test_message_is_changed(self):
         """
         Event's message is changed with msg type if found.
         otter_msg_type is added
         """
-
-    def test_msg_invalid(self):
-        """
-        Raises `ValueError` if any of the fields is invalid
-        """
-
+        e = {'message': ('delete-server',), 'a': 'b'}
+        self.assertEqual(
+            get_validated_event(e),
+            {'message': ('Deleting {server_id} server',),
+             'a': 'b', 'otter_msg_type': 'delete-server'})

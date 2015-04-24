@@ -2,45 +2,7 @@
 Format logs based on specification
 """
 
-from copy import deepcopy
-
-from otter.constants import ServiceType
-from otter.log.formatters import ERROR_FIELDS, PRIMITIVE_FIELDS
-
 from twisted.python.failure import Failure
-
-
-class UUID(basestring):
-    """
-    UUID
-    """
-
-
-class IPAddress(basestring):
-    """
-    IP Address
-    """
-
-
-# Allowed fields with their types
-fields = {
-    "num_servers": int,
-    "server_id": UUID,
-    "clb_id": int,
-    "ip_address": IPAddress,
-}
-
-
-# Fields that will occur in error details
-error_fields = {
-    "system": ServiceType,
-    "operation": basestring,
-    "url": basestring,
-    "code": int,
-    "message": basestring,
-    "body": basestring,
-    "headers": dict     # need more validation. I miss type system :(
-}
 
 
 # mapping from msg type -> message
@@ -74,8 +36,7 @@ def SpecificationObserverWrapper(observer):
     def validating_observer(event_dict):
         try:
             speced_event = get_validated_event(event_dict)
-        except (ValueError, TypeError) as e:
-            print e
+        except (ValueError, TypeError):
             speced_event = error_event(
                 event_dict, Failure(), "Error validating event")
         observer(speced_event)
@@ -84,6 +45,9 @@ def SpecificationObserverWrapper(observer):
 
 
 def try_msg_type(msg_type):
+    """
+    Try message type and return None if not found
+    """
     return msg_type is not None and msg_types.get(msg_type, None)
 
 
@@ -97,45 +61,28 @@ def get_validated_event(event):
     """
     # Is this message speced?
     if event.get('isError', False):
-        msg = try_msg_type(event.get("why", None))
+        msg_type = event.get("why", None)
+        msg = try_msg_type(msg_type)
         if msg is None:
             return event
-        validate_error(event_dict)
+        validate_error(event)
         event['why'] = msg
     else:
         # message is tuple of strings
-        msg = try_msg_type(''.join(event["message"]))
+        msg_type = ''.join(event["message"])
+        msg = try_msg_type(msg_type)
         if msg is None:
             return event
         event["message"] = (msg, )
 
-    # Validate non-primitive fields
-    for field in set(event) - (PRIMITIVE_FIELDS | ERROR_FIELDS):
-        validate_field(fields, field, event[field])
+    # TODO: Validate non-primitive fields
 
     event["otter_msg_type"] = msg_type
     return event
-
-
-def validate_field(fields, field, value):
-    """
-    Validate field value based on its type in fields
-    """
-    field_type = fields.get(field)
-    if field_type is not None:
-        raise ValueError('unknown field ' + field)
-    print value, field_type
-    if not isinstance(value, field_type):
-        raise TypeError('{} of unexpected type {}'.format(value, field))
 
 
 def validate_error(event):
     """
     Validate failure in the event
     """
-    details = getattr(eventDict['failure'].value, 'details', None)
-    if details is None:
-        return
-
-    for field, value in details.iteritems():
-        validate_field(error_fields, field, value)
+    # TODO: Left blank to fill implementation using JSON schema
