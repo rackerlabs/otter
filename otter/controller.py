@@ -503,13 +503,14 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
         return worker_remove_server_from_group(
             log, trans_id, server_id, replace, purge, group, state)
 
+    def kick_off_convergence(new_state):
+        cs.start_convergence(log, group.tenant_id, group.uuid)
+        return new_state
+
     # convergence case - requires that the convergence dispatcher handles
     # EvictServerFromScalingGroup
     cs = get_convergence_starter()
     eff = convergence_remove_server_from_group(
         log, trans_id, server_id, replace, purge, group, state)
     d = perform(cs.dispatcher, eff)
-    d.addCallback(lambda _: cs.start_convergence(
-        log, group.tenant_id, group.uuid))
-    d.addCallback(lambda _: state)
-    return d
+    return d.addCallback(kick_off_convergence)
