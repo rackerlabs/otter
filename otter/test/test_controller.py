@@ -2,11 +2,10 @@
 Tests for :mod:`otter.controller`
 """
 from datetime import datetime, timedelta
-from functools import partial
 
 from effect import (
     ComposedDispatcher,
-    TypeDispatcher,
+    Effect,
     sync_perform)
 from effect.testing import SequenceDispatcher
 
@@ -46,7 +45,7 @@ from otter.util.retry import (
 from otter.util.timestamp import MIN
 from otter.worker_intents import (
     EvictServerFromScalingGroup,
-    perform_evict_server)
+    get_eviction_dispatcher)
 
 
 class CalculateDeltaTestCase(SynchronousTestCase):
@@ -1508,15 +1507,17 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         mock_get_starter.return_value.dispatcher = ComposedDispatcher([
             test_dispatcher(),
             SequenceDispatcher([
-                (get_server_details('server_id').intent,
-                    lambda _: self.server_details),
-                (GetScalingGroupInfo(tenant_id='tenant_id',
-                                     group_id='group_id'),
-                    lambda _: self.group_manifest_info)]),
-            TypeDispatcher({
-                EvictServerFromScalingGroup: partial(
-                    perform_evict_server, fake_super)
-                })
+                self._tenant_retry(
+                    get_server_details('server_id').intent,
+                    lambda _: (StubResponse(200, {}), self.server_details)),
+                # we want the next one to go to EvictionServerFromScalingGroup
+                self._tenant_retry(
+                    mock.ANY,
+                    lambda i: sync_perform(
+                        mock_get_starter.return_value.dispatcher,
+                        Effect(i)))
+            ]),
+            get_eviction_dispatcher(fake_super)
         ])
 
         d = controller.remove_server_from_group(
