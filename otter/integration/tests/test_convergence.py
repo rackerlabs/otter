@@ -272,8 +272,7 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self._choose_half_the_servers)
             .addCallback(self._delete_those_servers, rcs)
             # This policy is simply ussed to trigger convergence
-            .addCallback(self.scaling_policy.start, self)
-            .addCallback(self.scaling_policy.execute)
+            .addCallback(self.scaling_group.trigger_convergence)
             .addCallback(lambda _: self.removed_ids)
             .addCallback(
                 self.scaling_group.wait_for_deleted_id_removal,

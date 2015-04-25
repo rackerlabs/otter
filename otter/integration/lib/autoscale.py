@@ -150,6 +150,8 @@ class ScalingGroup(object):
 
         :return:
         """
+        # Retrieve the configuration from the stored response to group
+        # creation since that will include non-provided values
         config = [g['group']['groupConfiguration'] for g in rcs.groups
                   if g['group']['id'] == self.group_id]
         # Since this should always provide a match for a valid scaling group,
@@ -158,6 +160,58 @@ class ScalingGroup(object):
             print('ScalingGroup.get_group_config will return: ')
             pp.pprint(config[0])
         return config[0]
+
+    def update_group_config(self, rcs, name=None, cooldown=None,
+                            minEntities=None, maxEntities=None, metadata=None,
+                            replacement_config=None):
+        """
+        Update the group configuration of a scaling group. Ifa replacement
+        configuration is provide, it will be used to replace all values.
+        Otherwise, only the specified parameters will be altered.
+        """
+        # Get the old config
+        old_config = self.get_group_config(rcs)
+        new_config = {}
+        if replacement_config is not None:
+            new_config = replacement_config
+        else:
+            new_config["name"] = name or old_config["name"]
+            new_config["cooldown"] = cooldown or old_config["cooldown"]
+            new_config["minEntities"] = \
+                minEntities or old_config["minEntities"]
+            new_config["maxEntities"] = \
+                maxEntities or old_config["maxEntities"]
+            new_config["metadata"] = metadata or old_config["metadata"]
+
+        def record_results(_, new_config):
+            # Replace the stored value in slightly misnamed ScalingGroup
+            self.group_config["groupConfiguration"] = new_config
+            # Find the correct group from the list (by id)
+            for g in rcs.groups:
+                if g['group']['id'] == self.group_id:
+                    g['group']['groupConfiguration'] = new_config
+            if verbosity > 0:
+                print('Updated group_config with {}'.format(new_config))
+            return rcs
+
+        return (
+            treq.put(
+                "%s/groups/%s/config" % (
+                    str(rcs.endpoints["otter"]), self.group_id
+                ),
+                json.dumps(new_config),
+                headers=headers(str(rcs.token)),
+                pool=self.pool,
+            )
+            .addCallback(check_success, [204])
+            .addCallback(record_results, new_config)
+        )
+
+    def trigger_convergence(self, rcs):
+        """
+        Trigger convergence on a group
+        """
+        return self.update_group_config(rcs)
 
     def stop(self, rcs):
         """Clean up a scaling group.  Although safe to call yourself, you
