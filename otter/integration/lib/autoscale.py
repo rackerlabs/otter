@@ -5,6 +5,7 @@ from __future__ import print_function
 import datetime
 import json
 import os
+import pprint
 
 from characteristic import Attribute, attributes
 
@@ -19,6 +20,13 @@ from otter.util.retry import (
     repeating_interval,
     transient_errors_except,
 )
+
+pp = pprint.PrettyPrinter(indent=4)
+# Get vs dict lookup because it will return 0 if not found, not throw an
+# exception.  Not setting verbosity is valid, and is interpreted as 0.
+verbosity = int(os.environ.get('AS_VERBOSITY', 0))
+if verbosity > 0:
+    print('Verbosity level ... {0}'.format(verbosity))
 
 
 class BreakLoopException(Exception):
@@ -131,6 +139,25 @@ class ScalingGroup(object):
             ).addCallback(check_success, [204])
             .addCallback(lambda _: rcs)
         )
+
+    def get_group_config(self, rcs):
+        """
+        Returns the group configuration recorded in the TestResources object.
+
+        :param TestResources rcs: The integration test resources instance.
+            This provides useful information to complete the request, like
+            which endpoint to use to make the API request.
+
+        :return:
+        """
+        config = [g['group']['groupConfiguration'] for g in rcs.groups
+                  if g['group']['id'] == self.group_id]
+        # Since this should always provide a match for a valid scaling group,
+        # allow the exception to be raised if nothing is found.
+        if verbosity > 0:
+            print('ScalingGroup.get_group_config will return: ')
+            pp.pprint(config[0])
+        return config[0]
 
     def stop(self, rcs):
         """Clean up a scaling group.  Although safe to call yourself, you
@@ -259,6 +286,9 @@ class ScalingGroup(object):
         def record_results(resp):
             rcs.groups.append(resp)
             self.group_id = str(resp["group"]["id"])
+            if verbosity > 0:
+                print('Created scaling group {0} \n'.format(self.group_id))
+                pp.pprint(rcs.groups)
             return rcs
 
         return (
