@@ -30,7 +30,10 @@ from otter.convergence.service import (
     non_concurrently)
 from otter.convergence.steps import ConvergeLater
 from otter.models.intents import (
-    GetScalingGroupInfo, ModifyGroupState, perform_modify_group_state)
+    DeleteGroup,
+    GetScalingGroupInfo,
+    ModifyGroupState,
+    perform_modify_group_state)
 from otter.models.interface import GroupState, NoSuchScalingGroupError
 from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
@@ -123,9 +126,9 @@ class ConvergerTests(SynchronousTestCase):
 
         converger = self._converger(converge_all_groups, dispatcher=sequence)
 
-        result = self.fake_partitioner.got_buckets(my_buckets)
+        with sequence.consume():
+            result = self.fake_partitioner.got_buckets(my_buckets)
         self.assertEqual(self.successResultOf(result), 'foo')
-        self.assertEqual(sequence.sequence, [])
 
     def test_buckets_acquired_errors(self):
         """
@@ -140,14 +143,15 @@ class ConvergerTests(SynchronousTestCase):
             (GetChildren(CONVERGENCE_DIRTY_DIR), lambda i: ['flag1', 'flag2']),
             ('converge-all', lambda i: raise_(RuntimeError('foo')))
         ])
+        # relying on the side-effect of setting up self.fake_partitioner
         self._converger(converge_all_groups, dispatcher=sequence)
 
-        result = self.fake_partitioner.got_buckets([0])
+        with sequence.consume():
+            result = self.fake_partitioner.got_buckets([0])
         self.assertEqual(self.successResultOf(result), None)
         self.log.err.assert_called_once_with(
             CheckFailureValue(RuntimeError('foo')),
             'converge-all-groups-error', otter_service='converger')
-        self.assertEqual(sequence.sequence, [])
 
     def test_divergent_changed_not_acquired(self):
         """
@@ -184,12 +188,13 @@ class ConvergerTests(SynchronousTestCase):
             (('converge-all-groups', ['group1', 'group2']),
              lambda i: None)
         ])
-        converger = self._converger(converge_all_groups, dispatcher=dispatcher)
+        converger = self._converger(converge_all_groups,
+                                    dispatcher=dispatcher)
         # sha1('group1') % 10 == 3
         self.fake_partitioner.current_state = PartitionState.ACQUIRED
         self.fake_partitioner.my_buckets = [3]
-        converger.divergent_changed(['group1', 'group2'])
-        self.assertEqual(dispatcher.sequence, [])  # All side-effects performed
+        with dispatcher.consume():
+            converger.divergent_changed(['group1', 'group2'])
 
 
 class ConvergeOneGroupTests(SynchronousTestCase):
@@ -423,14 +428,14 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
 
-        self.assertEqual(
-            sync_perform(dispatcher, eff),
-            ['converged one!', 'converged two!'])
+        with sequence.consume():
+            self.assertEqual(
+                sync_perform(dispatcher, eff),
+                ['converged one!', 'converged two!'])
         self.log.msg.assert_called_once_with(
             'converge-all-groups',
             group_infos=self.group_infos,
             currently_converging=[])
-        self.assertEqual(sequence.sequence, [])  # All side-effects performed
 
     def test_filter_out_currently_converging(self):
         """
@@ -453,12 +458,12 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
 
-        self.assertEqual(sync_perform(dispatcher, eff), ['converged two!'])
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), ['converged two!'])
         self.log.msg.assert_called_once_with(
             'converge-all-groups',
             group_infos=[self.group_infos[1]],
             currently_converging=['g1'])
-        self.assertEqual(sequence.sequence, [])  # All side-effects performed
 
     def test_no_log_on_no_groups(self):
         """When there's no work, no log message is emitted."""
@@ -594,9 +599,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
         gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
                                    group_id='group-id')
+        self.gsgi = gsgi
         self.manifest = {  # Many details elided!
             'state': self.state,
             'launchConfiguration': self.lc,
+            'status': 'ACTIVE'
         }
         gsgi_result = (self.group, self.manifest)
         self.expected_intents = [(gsgi, gsgi_result)]
@@ -670,10 +677,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              lambda i: None)
         ])
         dispatcher = ComposedDispatcher([sequence, self._get_dispatcher()])
-        result = sync_perform(dispatcher, eff)
+        with sequence.consume():
+            result = sync_perform(dispatcher, eff)
         self.assertEqual(self.group.modify_state_values[-1].active, {})
         self.assertEqual(result, StepResult.SUCCESS)
-        self.assertEqual(sequence.sequence, [])
 
     def test_first_error_extraction(self):
         """
@@ -700,6 +707,53 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         # And make sure that exception isn't wrapped in FirstError.
         e = self.assertRaises(RuntimeError, sync_perform, dispatcher, eff)
         self.assertEqual(str(e), 'foo')
+
+    def test_deleting_group(self):
+        """
+        If group's status is DELETING, plan will be generated to delete
+        all servers and group is deleted if the steps return SUCCESS. The
+        group is not deleted is the step do not succeed
+        """
+        log = mock_log()
+        gacd = self._get_gacd_func(self.group.uuid)
+
+        def _plan(dsg, *a):
+            self.dsg = dsg
+            return [TestStep(Effect(Constant((StepResult.SUCCESS, []))))]
+
+        eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                  get_all_convergence_data=gacd, plan=_plan)
+
+        # setup intents for DeleteGroup and GetScalingGroupInfo
+        del_group = DeleteGroup(tenant_id=self.tenant_id,
+                                group_id=self.group_id)
+        self.manifest['status'] = 'DELETING'
+        exp_intents = [(del_group, None),
+                       (self.gsgi, (self.group, self.manifest))]
+        disp = ComposedDispatcher([
+            EQDispatcher(exp_intents),
+            TypeDispatcher({
+                ParallelEffects: perform_parallel_async,
+            }),
+            base_dispatcher,
+        ])
+        # This succeeded without `ModifyGroupState` dispatcher in it
+        # ensuring that it was not called
+        self.assertEqual(sync_perform(disp, eff), StepResult.SUCCESS)
+
+        # desired capacity was changed to 0
+        self.assertEqual(self.dsg.capacity, 0)
+
+        # Group is not deleted if step result was not successful
+        def fplan(*a):
+            return [TestStep(Effect(Constant((StepResult.RETRY, []))))]
+
+        eff = execute_convergence(self.tenant_id, self.group_id, log,
+                                  get_all_convergence_data=gacd, plan=fplan)
+        disp = self._get_dispatcher([(self.gsgi, (self.group, self.manifest))])
+        # This succeeded without DeleteGroup performer being there ensuring
+        # that it was not called
+        self.assertEqual(sync_perform(disp, eff), StepResult.RETRY)
 
     def test_returns_retry(self):
         """
