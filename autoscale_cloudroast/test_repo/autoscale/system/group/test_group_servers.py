@@ -69,7 +69,7 @@ class ServersTests(AutoscaleFixture):
         """
         self.test_delete_removes_and_replaces('true')
 
-    @tags(speed='slow', convergence='yes', run='YES')
+    @tags(speed='slow', convergence='yes')
     def test_delete_removed_not_replaced(self):
         """
         `DELETE serverId?replace=false` removes the sever and does not replace
