@@ -1323,7 +1323,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 get_server_details('server_id').intent,
                 lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
-                lambda _: self.group_manifest_info)
+                lambda _: (self.group, self.group_manifest_info))
         ])
         self.assertRaises(
             CannotDeleteServerBelowMinError, self._remove, False, False,
@@ -1343,7 +1343,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 get_server_details('server_id').intent,
                 lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
-                lambda _: self.group_manifest_info)
+                lambda _: (self.group, self.group_manifest_info))
         ])
         self.assertRaises(
             ServerNotFoundError, self._remove, False, False, seq_dispatcher)
@@ -1379,7 +1379,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 get_server_details('server_id').intent,
                 lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
-                lambda _: self.group_manifest_info),
+                lambda _: (self.group, self.group_manifest_info)),
             self._tenant_retry(
                 set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
                 lambda _: (StubResponse(200, {}), None))
@@ -1438,7 +1438,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 get_server_details('server_id').intent,
                 lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
-                lambda _: self.group_manifest_info),
+                lambda _: (self.group, self.group_manifest_info)),
             self._tenant_retry(
                 EvictServerFromScalingGroup(log=self.log,
                                             transaction_id=self.trans_id,

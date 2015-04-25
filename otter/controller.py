@@ -409,7 +409,7 @@ def _can_scale_down(group, server_id):
     Given a group and a server ID, determines if the group can be scaled down.
     If not, it raises a :class:`CannotDeleteServerBelowMinError`.
     """
-    manifest = yield Effect(GetScalingGroupInfo(
+    _, manifest = yield Effect(GetScalingGroupInfo(
         tenant_id=group.tenant_id, group_id=group.uuid))
     min_entities = manifest['groupConfiguration']['minEntities']
     state = manifest['state']
