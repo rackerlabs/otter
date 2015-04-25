@@ -14,6 +14,7 @@ from twisted.internet import reactor
 from twisted.internet.defer import gatherResults
 from twisted.internet.task import deferLater
 from twisted.internet.tcp import Client
+from twisted.python.failure import Failure
 from twisted.trial import unittest
 from twisted.web.client import HTTPConnectionPool
 
@@ -98,6 +99,8 @@ class TestConvergence(unittest.TestCase):
         )
 
         def expect_403(failure):
+            if not isinstance(failure, Failure):
+                raise Exception("Failure expected")
             failure.trap(APIError)
             if failure.value.code != 403:
                 failure.raiseException()
@@ -122,7 +125,7 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self._remove_metadata, rcs)
             .addCallback(lambda _: rcs)
             .addCallback(self.scale_beyond_max.execute)
-            .addErrback(expect_403)
+            .addBoth(expect_403)
             .addCallback(lambda _: self.removed_ids)
             .addCallback(
                 self.scaling_group.wait_for_deleted_id_removal,
