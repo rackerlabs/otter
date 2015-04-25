@@ -540,7 +540,7 @@ class TestConvergence(unittest.TestCase):
          .addCallback(self._delete_those_servers, rcs)
          # The execution of the policy triggers convergence
          .addCallback(self.policy_scale.start, self)
-          .addCallback(self.policy_scale.execute)
+         .addCallback(self.policy_scale.execute)
          .addBoth(self._assert_error_status_code, 403, rcs)
          # Need to add a check for the expected 403
          .addCallback(lambda _: self.removed_ids)
