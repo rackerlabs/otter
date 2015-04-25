@@ -37,6 +37,7 @@ from twisted.internet import defer
 
 from otter.cloud_client import (
     NoSuchServerError,
+    TenantScope,
     get_server_details,
     set_nova_metadata_item)
 from otter.convergence.composition import tenant_is_enabled
@@ -381,14 +382,17 @@ def _is_server_in_group(group, server_id):
     the group.  If it isn't, it raises a :class:`ServerNotFoundError`.
     """
     try:
-        server_info = yield retry_effect(get_server_details(server_id),
-                                         retry_times(3),
-                                         exponential_backoff_interval(2))
+        response, server_info = yield Effect(TenantScope(
+            retry_effect(get_server_details(server_id),
+                         retry_times(3),
+                         exponential_backoff_interval(2)),
+            group.tenant_id))
     except NoSuchServerError:
         raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
 
     group_id = group_id_from_metadata(
         get_in(('server', 'metadata'), server_info, {}))
+
     if group_id != group.uuid:
         raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
 
@@ -455,7 +459,9 @@ def convergence_remove_server_from_group(
                                         transaction_id=transaction_id,
                                         scaling_group=group,
                                         server_id=server_id))
-    yield retry_effect(eff, retry_times(3), exponential_backoff_interval(2))
+    yield Effect(TenantScope(
+        retry_effect(eff, retry_times(3), exponential_backoff_interval(2)),
+        group.tenant_id))
 
     if not replace:
         yield do_return(assoc_obj(state, desired=state.desired - 1))
