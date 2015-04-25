@@ -140,7 +140,6 @@ class CloudLoadBalancer(object):
         test.addCleanup(self.stop, rcs)
 
         def record_results(resp):
-            print(resp)
             rcs.clbs.append(resp)
             self.clb_id = str(resp["loadBalancer"]["id"])
             return rcs
