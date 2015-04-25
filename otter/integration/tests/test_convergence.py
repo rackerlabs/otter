@@ -26,7 +26,7 @@ from otter.integration.lib.cloud_load_balancer import CloudLoadBalancer
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
 
-from otter.util.http import check_success, headers, APIError
+from otter.util.http import APIError, check_success, headers
 
 
 username = os.environ['AS_USERNAME']
@@ -404,7 +404,7 @@ class TestConvergence(unittest.TestCase):
             self, rcs, min_servers=0, max_servers=25, set_to_servers=0,
             oobd_servers=0, scale_servers=1):
         # This only applies if not constrained by max/min
-        converged_servers = set_to_servers
+        converged_servers = set_to_servers + scale_servers
 
         scaling_group_body = create_scaling_group_dict(
             image_ref=image_ref, flavor_ref=flavor_ref,
