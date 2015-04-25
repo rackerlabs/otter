@@ -103,6 +103,22 @@ class GetScalingGroupsTests(SynchronousTestCase):
         d = get_scaling_groups(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups[-1:])
 
+    def test_does_not_filter_on_desired(self):
+        """
+        If `with_null_desired=True` then groups with null desired are returned
+        """
+        groups = [{'tenantId': 1, 'groupId': 2,
+                   'desired': 3, 'created_at': None},
+                  {'tenantId': 1, 'groupId': 3,
+                   'desired': None, 'created_at': 'c'},
+                  {'tenantId': 1, 'groupId': 5,
+                   'desired': 3, 'created_at': 'c'}]
+        self._add_exec_args(
+            self.select + ' LIMIT :limit;', {'limit': 5}, groups)
+        d = get_scaling_groups(self.client, batch_size=5,
+                               with_null_desired=True)
+        self.assertEqual(list(self.successResultOf(d)), groups[1:])
+
     def test_filters_on_group_pred_arg(self):
         """
         If group_pred arg is given then returns groups for which
