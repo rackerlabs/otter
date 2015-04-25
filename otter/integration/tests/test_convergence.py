@@ -5,6 +5,7 @@ Tests covering self-healing should be placed in a separate test file.
 from __future__ import print_function
 
 import os
+import json
 import random
 
 import treq
@@ -27,7 +28,7 @@ from otter.integration.lib.cloud_load_balancer import CloudLoadBalancer
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
 
-from otter.util.http import check_success, headers
+from otter.util.http import APIError, check_success, headers
 
 
 username = os.environ['AS_USERNAME']
@@ -96,6 +97,12 @@ class TestConvergence(unittest.TestCase):
             scaling_group=self.scaling_group
         )
 
+        def expect_403(failure):
+            failure.trap(APIError)
+            if failure.value.code != 403:
+                failure.raiseException()
+            return rcs
+
         return (
             self.identity.authenticate_user(
                 rcs,
@@ -112,10 +119,10 @@ class TestConvergence(unittest.TestCase):
                 self.scaling_group.wait_for_N_servers, 25, timeout=1800
             ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_random_servers, 3)
-            # Beyond this point, untested. XXX
             .addCallback(self._remove_metadata, rcs)
             .addCallback(lambda _: rcs)
             .addCallback(self.scale_beyond_max.execute)
+            .addErrback(expect_403)
             .addCallback(lambda _: self.removed_ids)
             .addCallback(
                 self.scaling_group.wait_for_deleted_id_removal,
@@ -567,11 +574,27 @@ class TestConvergence(unittest.TestCase):
         """Uses Nova to get the server's metadata."""
         return (
             treq.get(
-                "{}/servers/{}/metadata".format(str(rcs.endpoints["nova"]), svr_id),
+                "{}/servers/{}/metadata".format(
+                    str(rcs.endpoints["nova"]), svr_id
+                ),
                 headers=headers(str(rcs.token)),
                 pool=self.pool,
             ).addCallback(check_success, [200])
             .addCallback(treq.json_content)
+        )
+
+    def _update_metadata(self, metadata, svr_id, rcs):
+        """Uses Nova to alter a server's metadata."""
+        return (
+            treq.put(
+                "{}/servers/{}/metadata".format(
+                    str(rcs.endpoints["nova"]), svr_id
+                ),
+                json.dumps(metadata),
+                headers=headers(str(rcs.token)),
+                pool=self.pool,
+            ).addCallback(check_success, [200])
+            .addCallback(lambda _: rcs)
         )
 
     def _remove_metadata(self, ids, rcs):
@@ -582,10 +605,10 @@ class TestConvergence(unittest.TestCase):
         def remove_metadata(id):
             return (
                 self._list_metadata(id, rcs)
-                .addCallback(print)
-                .addCallback(lambda _: rcs)
+                .addCallback(
+                    lambda m: {'metadata': {k: "" for k in m['metadata']}}
+                ).addCallback(self._update_metadata, id, rcs)
             )
-            return rcs
 
         self.removed_ids = ids
         deferreds = map(remove_metadata, ids)
