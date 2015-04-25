@@ -520,4 +520,3 @@ class ScalingPolicy(object):
             # So, we forcefully return our resources here.
             .addCallback(lambda _, x: x, rcs)
         )
-        return rcs
