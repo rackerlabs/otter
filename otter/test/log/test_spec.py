@@ -61,9 +61,6 @@ class GetValidatedEventTests(SynchronousTestCase):
     Tests for `get_validated_event`
     """
 
-    def setUp(self):
-        self.event = {}
-
     def test_error_not_found(self):
         """
         Nothing is changed if Error-based event is not found in msg_types
@@ -82,6 +79,14 @@ class GetValidatedEventTests(SynchronousTestCase):
             {'why': 'Deleting {server_id} server',
              'isError': True, 'a': 'b',
              'otter_msg_type': 'delete-server'})
+
+    def test_error_why_not_found(self):
+        """
+        If error-based event's why is not found in msg_types, then event
+        is not changed
+        """
+        e = {'isError': True, 'why': 'unknown', 'a': 'b'}
+        self.assertEqual(get_validated_event(e), e)
 
     def test_msg_not_found(self):
         """

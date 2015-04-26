@@ -47,13 +47,6 @@ def SpecificationObserverWrapper(observer):
     return validating_observer
 
 
-def try_msg_type(msg_type):
-    """
-    Try message type and return None if not found
-    """
-    return msg_type is not None and msg_types.get(msg_type, None)
-
-
 def get_validated_event(event):
     """
     Validate event's message as per msg_types and error details as
@@ -65,7 +58,7 @@ def get_validated_event(event):
     # Is this message speced?
     if event.get('isError', False):
         msg_type = event.get("why", None)
-        msg = try_msg_type(msg_type)
+        msg = msg_types.get(msg_type, None)
         if msg is None:
             return event
         validate_error(event)
@@ -73,7 +66,7 @@ def get_validated_event(event):
     else:
         # message is tuple of strings
         msg_type = ''.join(event["message"])
-        msg = try_msg_type(msg_type)
+        msg = msg_types.get(msg_type, None)
         if msg is None:
             return event
         event["message"] = (msg, )
