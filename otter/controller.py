@@ -481,7 +481,7 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
     Remove a specific server from the group, optionally replacing it
     with a new one, and optionally deleting the old one from Nova.
 
-    If the old server is not deleted from Nova, otter-specific metdata
+    If the old server is not deleted from Nova, otter-specific metadata
     is removed: otherwise, a different part of otter may later mistake
     the server as one that *should* still be in the group.
 
