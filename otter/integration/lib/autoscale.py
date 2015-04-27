@@ -11,6 +11,7 @@ from characteristic import Attribute, attributes
 import treq
 
 from twisted.internet import reactor
+from twisted.internet.defer import gatherResults
 
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
@@ -100,11 +101,26 @@ def create_scaling_group_dict(
     Attribute('group_config', instance_of=dict),
     Attribute('pool', default_value=None),
     Attribute('reactor', default_value=None),
+    Attribute('treq', default_value=treq)
 ])
 class ScalingGroup(object):
     """This class encapsulates a scaling group resource.  It provides a means
     which lets you create new scaling groups and, later, automatically
     dispose of them upon integration test completion.
+
+    :ivar group_config: The complete JSON dictionary the group was
+        created with - a dictionary including 'groupConfiguration',
+        'launhConfiguration', and maybe 'scalingPolicies'
+
+    :ivar pool: a :class:`twisted.web.client.HTTPConnectionPool` to pass to
+        all treq requests
+
+    :ivar reactor: a :class:`twisted.internet.interfaces.IReactorTime`
+        provider, to be used for timeouts and retries
+
+    :ivar _treq: the treq module to use for making requests - if not provided,
+        the default library :mod:`treq` will be used.  Mainly to be used for
+        injecting stubs during tests.
     """
 
     def set_launch_config(self, rcs, launch_config):
@@ -121,7 +137,7 @@ class ScalingGroup(object):
             provided will be returned.  Otherwise, an exception will rise.
         """
         return (
-            treq.put(
+            self.treq.put(
                 "%s/groups/%s/launch" % (
                     str(rcs.endpoints["otter"]), self.group_id
                 ),
@@ -160,7 +176,7 @@ class ScalingGroup(object):
             scaling group.
         """
 
-        return (treq.delete(
+        return (self.treq.delete(
             "%s/groups/%s?force=true" % (
                 str(rcs.endpoints["otter"]), self.group_id
             ),
@@ -169,7 +185,7 @@ class ScalingGroup(object):
         ).addCallback(check_success, [204, 404, 403]))  # HACKITY HACK - Set to
         # 403 until force delete is fixed in convergence
 
-    def get_scaling_group_state(self, rcs):
+    def get_scaling_group_state(self, rcs, success_codes=None):
         """Retrieve the state of the scaling group.
 
         :param TestResources rcs: The integration test resources instance.
@@ -181,20 +197,23 @@ class ScalingGroup(object):
             order.  If not found, the result code will be 404, and the state
             will be None.
         """
+        if success_codes is None:
+            success_codes = [200, 404]
 
         def decide(resp):
             if resp.code == 200:
-                return treq.json_content(resp).addCallback(lambda x: (200, x))
+                return self.treq.json_content(resp).addCallback(
+                    lambda x: (200, x))
             return (404, None)
 
         return (
-            treq.get(
+            self.treq.get(
                 "%s/groups/%s/state" % (
                     str(rcs.endpoints["otter"]), self.group_id
                 ),
                 headers=headers(str(rcs.token)),
                 pool=self.pool
-            ).addCallback(check_success, [200, 404])
+            ).addCallback(check_success, success_codes)
             .addCallback(decide)
         )
 
@@ -219,7 +238,6 @@ class ScalingGroup(object):
         :return: If the operation succeeds, the same instance of TestResources.
             Otherwise, an exception is raised.
         """
-
         def check(state):
             code, response = state
             if code == 404:
@@ -262,16 +280,57 @@ class ScalingGroup(object):
             return rcs
 
         return (
-            treq.post(
+            self.treq.post(
                 "%s/groups" % str(rcs.endpoints["otter"]),
                 json.dumps(self.group_config),
                 headers=headers(str(rcs.token)),
                 pool=self.pool
             )
             .addCallback(check_success, [201])
-            .addCallback(treq.json_content)
+            .addCallback(self.treq.json_content)
             .addCallback(record_results)
         )
+
+    def get_servicenet_ips(self, rcs, server_ids=None):
+        """
+        Gets the servicenet IPs for the following server IDs - if no IDs are
+        provided, gets the servicenet IPs for all the active servers on the
+        group.
+
+        :param iterable server_ids: An iterable of server ids - this function
+            does not check whether the servers belong the the group
+
+        :return: A mapping of server ID to servicenet address
+        :rtype: ``dict``
+        """
+        def _extract_servicenet_id(server_info):
+            private = server_info['server']['addresses'].get('private')
+            if private is not None:
+                return [addr['addr'] for addr in private
+                        if addr['version'] == 4][0]
+            return None
+
+        def _get_the_ips(the_server_ids):
+            the_server_ids = set(the_server_ids)
+            return gatherResults([
+                self.treq.get(
+                    "{0}/servers/{1}".format(rcs.endpoints["nova"], server_id),
+                    headers=headers(str(rcs.token)),
+                    pool=self.pool)
+                .addCallback(check_success, [200])
+                .addCallback(self.treq.json_content)
+                .addCallback(_extract_servicenet_id)
+
+                for server_id in the_server_ids
+            ]).addCallback(lambda results: dict(zip(the_server_ids, results)))
+
+        if server_ids is not None:
+            return _get_the_ips(server_ids)
+
+        return (
+            self.get_scaling_group_state(rcs, success_codes=[200])
+            .addCallback(extract_active_ids)
+            .addCallback(_get_the_ips))
 
     def wait_for_deleted_id_removal(
         self, removed_ids, rcs, timeout=60, period=1, total_servers=None

@@ -2,6 +2,8 @@
 
 from __future__ import print_function
 
+from characteristic import attributes
+
 from twisted.internet import defer
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
@@ -98,3 +100,83 @@ class WaitForNServersTestCase(SynchronousTestCase):
             self.assertNoResult(d)
         self.clock.advance(10)
         self.failureResultOf(d, TimedOutError)
+
+
+class GetServicenetIPs(SynchronousTestCase):
+    """
+    Tests for :func:`ScalingGroup.get_servicenet_ips`.
+    """
+    def setUp(self):
+        """Create our simulated clock and scaling group."""
+        self.clock = Clock()
+        self.pool = object()
+        self.queried_server_ids = []
+
+        class FakeRCS(object):
+            endpoints = {'nova': 'novaurl'}
+            token = "token"
+
+        @attributes(['code', 'fake_json_response'])
+        class Resp(object):
+            pass
+
+        class FakeTreq(object):
+
+            @classmethod
+            def get(cls, url, headers, pool):
+                self.assertIs(self.pool, pool)
+                self.assertEqual(["token"], headers.get('x-auth-token'))
+                url_segments = url.split('/')
+                self.assertEqual(3, len(url_segments))
+                self.assertEqual(['novaurl', 'servers'], url_segments[:2])
+                self.queried_server_ids.append(url_segments[-1])
+                return defer.succeed(Resp(code=200, fake_json_response={
+                    'server': {
+                        'addresses': {
+                            'private': [
+                                {'addr': '10.0.0.{0}'.format(
+                                    len(self.queried_server_ids)),
+                                 'version': 4}
+                            ]
+                        }
+                    }
+                }))
+
+            @classmethod
+            def json_content(cls, resp):
+                return defer.succeed(resp.fake_json_response)
+
+        self.rcs = FakeRCS()
+        self.sg = ScalingGroup(group_config={}, pool=self.pool,
+                               reactor=self.clock, treq=FakeTreq)
+
+    def test_queries_for_provided_server_ids(self):
+        """
+        If server IDs are provided, IPs are queried for those server IDs.
+        And if the same server ID is given multiple times, only one query is
+        made for any given server ID.
+        """
+        server_ids = ['1', '2', '2', '2', '3']
+        d = self.sg.get_servicenet_ips(self.rcs, server_ids)
+        result = self.successResultOf(d)
+        self.assertEqual(['10.0.0.1', '10.0.0.2', '10.0.0.3'],
+                         sorted(result.values()))
+        self.assertEqual(['1', '2', '3'], sorted(result.keys()))
+        self.assertEqual(['1', '2', '3'], sorted(self.queried_server_ids))
+
+    def test_gets_active_server_ids_if_server_ids_not_provided(self):
+        """
+        If server IDs are not provided, IPs are queried for the active servers
+        on the group server IDs.
+        """
+        def get_scaling_group_state(_, success_codes):
+            self.assertEqual(success_codes, [200])
+            return defer.succeed(
+                {'group': {'active': [{'id': '11'}, {'id': '12'}]}}
+            )
+
+        self.sg.get_scaling_group_state = get_scaling_group_state
+        d = self.sg.get_servicenet_ips(self.rcs)
+        self.assertEqual({'11': '10.0.0.1', '12': '10.0.0.2'},
+                         self.successResultOf(d))
+        self.assertEqual(['11', '12'], self.queried_server_ids)
