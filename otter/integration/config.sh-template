@@ -25,5 +25,5 @@ export AS_REGION=IAD
 # Mimic defaults to using ORD as the region
 #export AS_REGION=ORD
 
-# This is the tset tenant ID that is enabled for convergence in mimic
+# This is the test tenant ID that is enabled for convergence in mimic.
 export AS_CONVERGENCE_TENANT=000000
