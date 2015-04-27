@@ -4,8 +4,8 @@ Tests covering self-healing should be placed in a separate test file.
 
 from __future__ import print_function
 
-import os
 import json
+import os
 import random
 
 import treq
