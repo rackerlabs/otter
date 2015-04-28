@@ -36,7 +36,7 @@ class DeleteGroupTest(AutoscaleFixture):
         self.resources.add(self.group0, self.empty_scaling_group)
         self.resources.add(self.group1, self.empty_scaling_group)
 
-    @tags(speed='quick', convergence='error')
+    @tags(speed='quick', convergence='yes')
     def test_system_delete_group_with_minentities_over_zero(self):
         """
         A scaling group cannot be deleted when minentities > zero
@@ -50,7 +50,7 @@ class DeleteGroupTest(AutoscaleFixture):
             msg='Deleted group {0} while servers were building on the group'
             .format(self.group1.id))
 
-    @tags(speed='quick', convergence='error')
+    @tags(speed='quick', convergence='yes')
     def test_system_delete_group_update_minentities_to_zero(self):
         """
         When minenetities of the group are updated to be zero,
@@ -89,7 +89,7 @@ class DeleteGroupTest(AutoscaleFixture):
             msg='Delete group {0} failed even when group was empty'
             .format(self.group0.id))
 
-    @tags(speed='quick', convergence='error')
+    @tags(speed='quick', convergence='yes')
     def test_system_delete_group_zero_minentities_execute_webhook(self):
         """
         Create a scaling group with zero minentities and execute a webhook,
@@ -107,7 +107,7 @@ class DeleteGroupTest(AutoscaleFixture):
             msg='Deleted group {0} while servers were building on the group'
             .format(self.group0.id))
 
-    @tags(speed='quick', convergence='error')
+    @tags(speed='quick', convergence='yes')
     def test_system_delete_group_zero_minentities_execute_policy(self):
         """
         Create a scaling group with zero min entities and execute a scaling

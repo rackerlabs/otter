@@ -16,7 +16,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
     params = ['true', 'TRUE', 'TrUe', 'True', 'truE', True]
     invalid_params = [0, '', '$%^#', 'anything', 'truee']
 
-    @tags(speed='slow', convergence='error')
+    @tags(speed='slow', convergence='yes')
     def test_minentities_over_zero(self):
         """
         Force deleting a scaling group with active servers, updates the desired
