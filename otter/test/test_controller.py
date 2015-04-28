@@ -1476,7 +1476,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 wraps=controller.convergence_remove_server_from_group)
     def test_perform_convergence_remove_from_group(self, mock_converge_remove):
         """
-        Performs :func:`convergence_remove_server_from_group` with the given
+        Perform :func:`convergence_remove_server_from_group` with the given
         dispatcher.
         """
         self.state.desired = 2
@@ -1491,7 +1491,6 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 (GetScalingGroupInfo(tenant_id='tenant_id',
                                      group_id='group_id'),
                     lambda _: (self.group, self.group_manifest_info)),
-                # we want the next one to go to EvictionServerFromScalingGroup
                 self._tenant_retry(
                     mock.ANY,
                     lambda i: sync_perform(dispatcher, Effect(i)))
@@ -1503,17 +1502,14 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.log, self.trans_id, 'server_id', False, False,
             self.group, self.state, dispatcher)
 
-        # this just wraps the call so we can tell that it was called
         mock_converge_remove.assert_called_once_with(
             self.log, self.trans_id, 'server_id', False, False, self.group,
             self.state)
 
-        # make sure that the correct state gets propagated
         result = self.successResultOf(d)
         self.assert_states_equivalent_except_desired(result, self.state)
         self.assertEqual(result.desired, self.state.desired - 1)
 
-        # make sure that the scrub was performed
         self.assertEqual(fake_super.scrub_calls,
                          [(self.log, self.trans_id, self.group.tenant_id,
                            'server_id')])
