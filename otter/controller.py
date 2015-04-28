@@ -23,6 +23,7 @@ Storage model for state information:
 import json
 from datetime import datetime
 from decimal import Decimal, ROUND_UP
+from functools import partial
 
 from effect import (
     Effect,
@@ -50,6 +51,7 @@ from otter.convergence.service import get_convergence_starter
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
 from otter.models.intents import GetScalingGroupInfo
+from otter.models.interface import GroupNotEmptyError, ScalingGroupStatus
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,
     ServerNotFoundError,
@@ -153,6 +155,98 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
                  launch_config, {'change': 0})
     if d is None:
         return defer.succeed(state)
+    return d
+
+
+def delete_group(log, trans_id, group, force):
+    """
+    Delete group based on the kind of tenant
+
+    :param log: Bound logger
+    :param str trans_id: Transaction ID of request doing this
+    :param otter.models.interface.IScalingGroup scaling_group: the scaling
+        group object
+    :param bool force: Should group be deleted even if it has servers?
+
+    :return: Deferred that fires with None
+    :raise: `GroupNotEmptyError` if group is not empty and force=False
+    """
+
+    def check_and_delete(_group, state):
+        if state.desired == 0:
+            d = trigger_convergence_deletion(log, group)
+            return d.addCallback(lambda _: state)
+        else:
+            raise GroupNotEmptyError(group.tenant_id, group.uuid)
+
+    if tenant_is_enabled(group.tenant_id, config_value):
+        if force:
+            # We don't care about servers in the group. So trigger deletion
+            # since it will take precedence over other status
+            d = trigger_convergence_deletion(log, group)
+        else:
+            # Delete only if desired is 0 which must be done with a lock to
+            # ensure desired is not getting modified by another thread/node
+            # when executing policy
+            d = group.modify_state(check_and_delete)
+    else:
+        if force:
+            d = empty_group(log, trans_id, group)
+            d.addCallback(lambda _: group.delete_group())
+        else:
+            d = group.delete_group()
+    return d
+
+
+def trigger_convergence_deletion(log, group):
+    """
+    Trigger deletion of group that belongs to convergence tenant
+
+    :param log: Bound logger
+    :param otter.models.interface.IScalingGroup scaling_group: the scaling
+        group object
+    """
+    # Update group status and trigger convergence
+    # DELETING status will take precedence over other status
+    d = group.update_status(ScalingGroupStatus.DELETING)
+    cs = get_convergence_starter()
+    d.addCallback(
+        lambda _: cs.start_convergence(log, group.tenant_id, group.uuid))
+    return d
+
+
+def empty_group(log, trans_id, group):
+    """
+    Empty a scaling group by deleting all its resources (Servers/CLB)
+
+    :param log: Bound logger
+    :param str trans_id: Transaction ID of request doing this
+    :param otter.models.interface.IScalingGroup scaling_group: the scaling
+        group object
+
+    :return: Deferred that fires with None
+    """
+    d = group.view_manifest(with_policies=False)
+
+    def update_config(group_info):
+        group_info['groupConfiguration']['minEntities'] = 0
+        group_info['groupConfiguration']['maxEntities'] = 0
+        du = group.update_config(group_info['groupConfiguration'])
+        return du.addCallback(lambda _: group_info)
+
+    d.addCallback(update_config)
+
+    def modify_state(group_info):
+        d = group.modify_state(
+            partial(
+                obey_config_change,
+                log,
+                trans_id,
+                group_info['groupConfiguration'],
+                launch_config=group_info['launchConfiguration']))
+        return d
+
+    d.addCallback(modify_state)
     return d
 
 
