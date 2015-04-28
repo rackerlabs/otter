@@ -61,7 +61,17 @@ def SpecificationObserverWrapper(observer,
                                  get_validated_event=get_validated_event):
     """
     Return observer that validates messages based on specification
-    and delegates to given observer
+    and delegates to given observer.
+
+    Messages are expected to be logged like
+
+    >>> log.msg("launch-servers", num_servers=2)
+
+    where "launch-servers" is message type that will be expanded based on
+    entry in msg_types. For errors, the string should be provided in
+    "why" field like:
+
+    >>> log.err(f, "execute-convergence-error")
     """
     def validating_observer(event_dict):
         try:
