@@ -1490,7 +1490,10 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                                      group_id='group_id'),
                     lambda _: (self.group, self.group_manifest_info)),
                 self._tenant_retry(
-                    mock.ANY,
+                    EvictServerFromScalingGroup(log=self.log,
+                                                transaction_id=self.trans_id,
+                                                scaling_group=self.group,
+                                                server_id='server_id'),
                     lambda i: sync_perform(dispatcher, Effect(i)))
             ]),
             get_eviction_dispatcher(fake_super)
