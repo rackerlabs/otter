@@ -207,13 +207,16 @@ class ScalingGroup(object):
         old_config = self.get_group_config(rcs)
         new_config = {}
 
-        new_config["name"] = name or old_config["name"]
-        new_config["cooldown"] = cooldown or old_config["cooldown"]
-        new_config["minEntities"] = \
-            minEntities or old_config["minEntities"]
-        new_config["maxEntities"] = \
-            maxEntities or old_config["maxEntities"]
-        new_config["metadata"] = metadata or old_config["metadata"]
+        new_config["name"] = name if name is not None \
+            else old_config["name"]
+        new_config["cooldown"] = cooldown if cooldown is not None \
+            else old_config["cooldown"]
+        new_config["minEntities"] = minEntities if minEntities is not None \
+            else old_config["minEntities"]
+        new_config["maxEntities"] = maxEntities if maxEntities is not None \
+            else old_config["maxEntities"]
+        new_config["metadata"] = metadata if metadata is not None \
+            else old_config["metadata"]
 
         return self.replace_group_config(rcs, new_config)
 
