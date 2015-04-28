@@ -1472,9 +1472,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         self.assertRaises(ValueError, self._remove, True, False,
                           seq_dispatcher)
 
-    @mock.patch('otter.controller.convergence_remove_server_from_group',
-                wraps=controller.convergence_remove_server_from_group)
-    def test_perform_convergence_remove_from_group(self, mock_converge_remove):
+    def test_perform_convergence_remove_from_group(self):
         """
         Perform :func:`convergence_remove_server_from_group` with the given
         dispatcher.
@@ -1501,10 +1499,6 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         d = controller.perform_convergence_remove_from_group(
             self.log, self.trans_id, 'server_id', False, False,
             self.group, self.state, dispatcher)
-
-        mock_converge_remove.assert_called_once_with(
-            self.log, self.trans_id, 'server_id', False, False, self.group,
-            self.state)
 
         result = self.successResultOf(d)
         self.assert_states_equivalent_except_desired(result, self.state)
