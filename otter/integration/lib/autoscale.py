@@ -22,9 +22,8 @@ from otter.util.retry import (
 )
 
 pp = pprint.PrettyPrinter(indent=4)
-# Get vs dict lookup because it will return 0 if not found, not throw an
-# exception.  Not setting verbosity is valid, and is interpreted as 0.
 verbosity = int(os.environ.get('AS_VERBOSITY', 0))
+
 if verbosity > 0:
     print('Verbosity level ... {0}'.format(verbosity))
 
@@ -130,9 +129,8 @@ class ScalingGroup(object):
         """
         return (
             treq.put(
-                "%s/groups/%s/launch" % (
-                    str(rcs.endpoints["otter"]), self.group_id
-                ),
+                "{0}/groups/{1}/launch".format(rcs.endpoints["otter"],
+                                               self.group_id),
                 json.dumps(launch_config),
                 headers=headers(str(rcs.token)),
                 pool=self.pool
@@ -161,51 +159,63 @@ class ScalingGroup(object):
             pp.pprint(config[0])
         return config[0]
 
-    def update_group_config(self, rcs, name=None, cooldown=None,
-                            minEntities=None, maxEntities=None, metadata=None,
-                            replacement_config=None):
+    def replace_group_config(self, rcs, replacement_config):
         """
-        Update the group configuration of a scaling group. Ifa replacement
-        configuration is provide, it will be used to replace all values.
-        Otherwise, only the specified parameters will be altered.
-        """
-        # Get the old config
-        old_config = self.get_group_config(rcs)
-        new_config = {}
-        if replacement_config is not None:
-            new_config = replacement_config
-        else:
-            new_config["name"] = name or old_config["name"]
-            new_config["cooldown"] = cooldown or old_config["cooldown"]
-            new_config["minEntities"] = \
-                minEntities or old_config["minEntities"]
-            new_config["maxEntities"] = \
-                maxEntities or old_config["maxEntities"]
-            new_config["metadata"] = metadata or old_config["metadata"]
+        Replace the current group configuration with the provided config
+        and update the stored groupConfiguration information.
 
-        def record_results(_, new_config):
-            # Replace the stored value in slightly misnamed ScalingGroup
-            self.group_config["groupConfiguration"] = new_config
+        :param TestResources rcs: The integration test resources instance.
+            This provides useful information to complete the request, like
+            which endpoint to use to make the API request.
+        :param dict replacement_config: A dictionary representation of
+            the JSON description of a scaling group groupConfiguration
+            Note that since this is a replacement config, all fields
+            in the JSON descirptor are mandatory.
+
+        """
+
+        def record_results(_, replacement_config):
+            # Replace the stored value in the group_config
+            self.group_config["groupConfiguration"] = replacement_config
             # Find the correct group from the list (by id)
             for g in rcs.groups:
                 if g['group']['id'] == self.group_id:
-                    g['group']['groupConfiguration'] = new_config
+                    g['group']['groupConfiguration'] = replacement_config
             if verbosity > 0:
-                print('Updated group_config with {}'.format(new_config))
+                print('Update group_config with {}'.format(replacement_config))
             return rcs
 
         return (
             treq.put(
-                "%s/groups/%s/config" % (
-                    str(rcs.endpoints["otter"]), self.group_id
-                ),
-                json.dumps(new_config),
+                "{0}/groups/{1}/config".format(rcs.endpoints["otter"],
+                                               self.group_id),
+                json.dumps(replacement_config),
                 headers=headers(str(rcs.token)),
                 pool=self.pool,
             )
             .addCallback(check_success, [204])
-            .addCallback(record_results, new_config)
+            .addCallback(record_results, replacement_config)
         )
+
+    def update_group_config(self, rcs, name=None, cooldown=None,
+                            minEntities=None, maxEntities=None, metadata=None):
+        """
+        Update the group configuration of a scaling group. The provided
+        values will be updated, any others will remain unchanged.
+        """
+        # Get the old config
+        old_config = self.get_group_config(rcs)
+        new_config = {}
+
+        new_config["name"] = name or old_config["name"]
+        new_config["cooldown"] = cooldown or old_config["cooldown"]
+        new_config["minEntities"] = \
+            minEntities or old_config["minEntities"]
+        new_config["maxEntities"] = \
+            maxEntities or old_config["maxEntities"]
+        new_config["metadata"] = metadata or old_config["metadata"]
+
+        return self.replace_group_config(rcs, new_config)
 
     def trigger_convergence(self, rcs):
         """
