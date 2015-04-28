@@ -222,7 +222,7 @@ class TestConvergence(unittest.TestCase):
             )
         )
 
-    def test_reaction_to_oob_server_deletion(self):
+    def test_reaction_to_oob_server_deletion_below_min(self):
         """
         Validate the following edge case:
         - When out of band deletions bring the number of active servers below
@@ -270,6 +270,60 @@ class TestConvergence(unittest.TestCase):
                 self.scaling_group.wait_for_deleted_id_removal,
                 rcs,
                 total_servers=N_SERVERS,
+            )
+        )
+
+    def test_group_config_update_triggers_convergence(self):
+        """
+        Validate the following edge case:
+        - On a group that has experienced and out of band delete,
+          when the group configuration is updated convergence is triggered
+        """
+        set_to_servers = 5
+        max_servers = 10
+
+        rcs = TestResources()
+
+        scaling_group_body = create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            max_entities=max_servers
+        )
+
+        self.scaling_group = ScalingGroup(
+            group_config=scaling_group_body,
+            pool=self.pool
+        )
+
+        self.policy_set = ScalingPolicy(
+            set_to=set_to_servers,
+            scaling_group=self.scaling_group
+        )
+
+        return (
+            self.identity.authenticate_user(
+                rcs,
+                resources={
+                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
+                    "nova": ("cloudServersOpenStack",),
+                },
+                region=region
+            ).addCallback(self.scaling_group.start, self)
+            .addCallback(self.policy_set.start, self)
+            .addCallback(self.policy_set.execute)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers,
+                set_to_servers, timeout=1800
+            ).addCallback(self.scaling_group.get_scaling_group_state)
+            .addCallback(self._choose_half_the_servers)
+            .addCallback(self._delete_those_servers, rcs)
+            .addCallback(
+                self.scaling_group.update_group_config,
+                maxEntities=max_servers + 2)
+            .addCallback(lambda _: self.removed_ids)
+            .addCallback(
+                self.scaling_group.wait_for_deleted_id_removal,
+                rcs,
+                total_servers=set_to_servers,
             )
         )
 
