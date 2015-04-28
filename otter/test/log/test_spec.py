@@ -2,12 +2,10 @@
 Tests for log_spec.py
 """
 
-import mock
-
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.log.spec import SpecificationObserverWrapper, get_validated_event
-from otter.test.utils import CheckFailure
+from otter.test.utils import CheckFailureValue, raise_
 
 
 class SpecificationObserverWrapperTests(SynchronousTestCase):
@@ -39,19 +37,19 @@ class SpecificationObserverWrapperTests(SynchronousTestCase):
              'num_servers': 2,
              'otter_msg_type': 'launch-servers'})
 
-    @mock.patch('otter.log.spec.get_validated_event', side_effect=ValueError)
-    def test_error_validating_observer(self, mock_gve):
+    def test_error_validating_observer(self):
         """
         The observer returned replaces event with error if it fails to
         type check
         """
-        SpecificationObserverWrapper(self.observer)(
-            {'message': ("something-bad",)})
+        wrapper = SpecificationObserverWrapper(
+            self.observer, lambda e: raise_(ValueError('hm')))
+        wrapper({'message': ("something-bad",), 'a': 'b'})
         self.assertEqual(
             self.e,
-            {'original_message': ("something-bad",),
+            {'original_event': {'message': ("something-bad",), 'a': 'b'},
              'isError': True,
-             'failure': CheckFailure(ValueError),
+             'failure': CheckFailureValue(ValueError('hm')),
              'why': 'Error validating event',
              'message': ()})
 

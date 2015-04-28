@@ -23,28 +23,8 @@ def error_event(event, failure, why):
     """
     Convert event to error with failure and why
     """
-    event["isError"] = True
-    event["failure"] = failure
-    event["why"] = why
-    event["original_message"] = event["message"]
-    event["message"] = ()
-    return event
-
-
-def SpecificationObserverWrapper(observer):
-    """
-    Return observer that validates messages based on specification
-    and delegates to given observer
-    """
-    def validating_observer(event_dict):
-        try:
-            speced_event = get_validated_event(event_dict)
-        except (ValueError, TypeError):
-            speced_event = error_event(
-                event_dict, Failure(), "Error validating event")
-        observer(speced_event)
-
-    return validating_observer
+    return {"isError": True, "failure": failure,
+            "why": why, "original_event": event, "message": ()}
 
 
 def get_validated_event(event):
@@ -75,6 +55,23 @@ def get_validated_event(event):
 
     event["otter_msg_type"] = msg_type
     return event
+
+
+def SpecificationObserverWrapper(observer,
+                                 get_validated_event=get_validated_event):
+    """
+    Return observer that validates messages based on specification
+    and delegates to given observer
+    """
+    def validating_observer(event_dict):
+        try:
+            speced_event = get_validated_event(event_dict)
+        except (ValueError, TypeError):
+            speced_event = error_event(
+                event_dict, Failure(), "Error validating event")
+        observer(speced_event)
+
+    return validating_observer
 
 
 def validate_error(event):
