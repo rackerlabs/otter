@@ -32,7 +32,7 @@ from otter.rest.errors import InvalidMinEntities, exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.webhooks import _format_webhook
-from otter.supervisor import get_supervisor, remove_server_from_group
+from otter.supervisor import get_supervisor
 from otter.util.config import config_value
 from otter.util.http import (
     get_autoscale_links,
@@ -704,7 +704,7 @@ class OtterServers(object):
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.scaling_group_id)
         d = group.modify_state(
-            partial(remove_server_from_group,
+            partial(controller.remove_server_from_group,
                     self.log.bind(server_id=server_id),
                     transaction_id(request), server_id,
                     extract_bool_arg(request, 'replace', True),

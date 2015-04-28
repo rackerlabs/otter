@@ -126,9 +126,9 @@ class ConvergerTests(SynchronousTestCase):
 
         converger = self._converger(converge_all_groups, dispatcher=sequence)
 
-        result = self.fake_partitioner.got_buckets(my_buckets)
+        with sequence.consume():
+            result = self.fake_partitioner.got_buckets(my_buckets)
         self.assertEqual(self.successResultOf(result), 'foo')
-        self.assertEqual(sequence.sequence, [])
 
     def test_buckets_acquired_errors(self):
         """
@@ -143,14 +143,15 @@ class ConvergerTests(SynchronousTestCase):
             (GetChildren(CONVERGENCE_DIRTY_DIR), lambda i: ['flag1', 'flag2']),
             ('converge-all', lambda i: raise_(RuntimeError('foo')))
         ])
+        # relying on the side-effect of setting up self.fake_partitioner
         self._converger(converge_all_groups, dispatcher=sequence)
 
-        result = self.fake_partitioner.got_buckets([0])
+        with sequence.consume():
+            result = self.fake_partitioner.got_buckets([0])
         self.assertEqual(self.successResultOf(result), None)
         self.log.err.assert_called_once_with(
             CheckFailureValue(RuntimeError('foo')),
             'converge-all-groups-error', otter_service='converger')
-        self.assertEqual(sequence.sequence, [])
 
     def test_divergent_changed_not_acquired(self):
         """
@@ -160,6 +161,8 @@ class ConvergerTests(SynchronousTestCase):
         dispatcher = SequenceDispatcher([])  # "nothing happens"
         converger = self._converger(lambda *a, **kw: 1 / 0,
                                     dispatcher=dispatcher)
+        # Doesn't try to get buckets
+        self.fake_partitioner.get_current_buckets = lambda s: 1 / 0
         converger.divergent_changed(['group1', 'group2'])
 
     def test_divergent_changed_not_ours(self):
@@ -187,12 +190,13 @@ class ConvergerTests(SynchronousTestCase):
             (('converge-all-groups', ['group1', 'group2']),
              lambda i: None)
         ])
-        converger = self._converger(converge_all_groups, dispatcher=dispatcher)
+        converger = self._converger(converge_all_groups,
+                                    dispatcher=dispatcher)
         # sha1('group1') % 10 == 3
         self.fake_partitioner.current_state = PartitionState.ACQUIRED
         self.fake_partitioner.my_buckets = [3]
-        converger.divergent_changed(['group1', 'group2'])
-        self.assertEqual(dispatcher.sequence, [])  # All side-effects performed
+        with dispatcher.consume():
+            converger.divergent_changed(['group1', 'group2'])
 
 
 class ConvergeOneGroupTests(SynchronousTestCase):
@@ -426,14 +430,14 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
 
-        self.assertEqual(
-            sync_perform(dispatcher, eff),
-            ['converged one!', 'converged two!'])
+        with sequence.consume():
+            self.assertEqual(
+                sync_perform(dispatcher, eff),
+                ['converged one!', 'converged two!'])
         self.log.msg.assert_called_once_with(
             'converge-all-groups',
             group_infos=self.group_infos,
             currently_converging=[])
-        self.assertEqual(sequence.sequence, [])  # All side-effects performed
 
     def test_filter_out_currently_converging(self):
         """
@@ -456,12 +460,12 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
 
-        self.assertEqual(sync_perform(dispatcher, eff), ['converged two!'])
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), ['converged two!'])
         self.log.msg.assert_called_once_with(
             'converge-all-groups',
             group_infos=[self.group_infos[1]],
             currently_converging=['g1'])
-        self.assertEqual(sequence.sequence, [])  # All side-effects performed
 
     def test_no_log_on_no_groups(self):
         """When there's no work, no log message is emitted."""
@@ -675,10 +679,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              lambda i: None)
         ])
         dispatcher = ComposedDispatcher([sequence, self._get_dispatcher()])
-        result = sync_perform(dispatcher, eff)
+        with sequence.consume():
+            result = sync_perform(dispatcher, eff)
         self.assertEqual(self.group.modify_state_values[-1].active, {})
         self.assertEqual(result, StepResult.SUCCESS)
-        self.assertEqual(sequence.sequence, [])
 
     def test_first_error_extraction(self):
         """
