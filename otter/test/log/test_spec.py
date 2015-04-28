@@ -80,12 +80,11 @@ class GetValidatedEventTests(SynchronousTestCase):
              'isError': True, 'a': 'b',
              'otter_msg_type': 'delete-server'})
 
-    def test_error_why_not_found(self):
+    def test_error_no_why_in_event(self):
         """
-        If error-based event's why is not found in msg_types, then event
-        is not changed
+        If error-based event's does not have "why", then it is not changed
         """
-        e = {'isError': True, 'why': 'unknown', 'a': 'b'}
+        e = {'isError': True, 'a': 'b'}
         self.assertEqual(get_validated_event(e), e)
 
     def test_msg_not_found(self):
