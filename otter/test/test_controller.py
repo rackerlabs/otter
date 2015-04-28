@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 
 from effect import (
     ComposedDispatcher,
-    Effect,
     sync_perform)
 from effect.testing import SequenceDispatcher
 
@@ -32,7 +31,6 @@ from otter.supervisor import (
     CannotDeleteServerBelowMinError,
     ServerNotFoundError)
 from otter.test.utils import (
-    FakeSupervisor,
     StubResponse,
     iMock,
     matches,
@@ -44,9 +42,7 @@ from otter.util.fp import assoc_obj
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN
-from otter.worker_intents import (
-    EvictServerFromScalingGroup,
-    get_eviction_dispatcher)
+from otter.worker_intents import EvictServerFromScalingGroup
 
 
 class CalculateDeltaTestCase(SynchronousTestCase):
