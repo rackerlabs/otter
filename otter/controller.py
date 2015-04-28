@@ -430,12 +430,14 @@ def convergence_remove_server_from_group(
     the group by removing otter-specific metdata from the server.
 
     :param log: A bound logger
-    :param bytes transaction_id: The transaction id for this operation.
-    :param group: The scaling group to remove a server from.
-    :type group: :class:`~otter.models.interface.IScalingGroup`
+    :param bytes trans_id: The transaction id for this operation.
     :param bytes server_id: The id of the server to be removed.
     :param bool replace: Should the server be replaced?
     :param bool purge: Should the server be deleted from Nova?
+    :param group: The scaling group to remove a server from.
+    :type group: :class:`~otter.models.interface.IScalingGroup`
+    :param state: The current state of the group.
+    :type state: :class:`~otter.models.interface.GroupState`
 
     :return: The updated state.
     :rtype: deferred :class:`~otter.models.interface.GroupState`
@@ -475,6 +477,33 @@ def convergence_remove_server_from_group(
         yield do_return(state)
 
 
+def perform_convergence_remove_from_group(
+        log, trans_id, server_id, replace, purge, group, state, dispatcher):
+    """
+    Create the effect to remove a server from a group and performs it with
+    the given dispatcher.
+
+    :param log: A bound logger
+    :param bytes trans_id: The transaction id for this operation.
+    :param bytes server_id: The id of the server to be removed.
+    :param bool replace: Should the server be replaced?
+    :param bool purge: Should the server be deleted from Nova?
+    :param group: The scaling group to remove a server from.
+    :type group: :class:`~otter.models.interface.IScalingGroup`
+    :param state: The current state of the group.
+    :type state: :class:`~otter.models.interface.GroupState`
+    :param dispatcher: A dispatcher that can perform all the effects used by
+        :func:`convergence_remove_server_from_group`.
+
+    :return: The end result of :func:`convergence_remove_server_from_group`
+        (the new state).
+    :rtype: deferred :class:`~otter.models.interface.GroupState`
+    """
+    eff = convergence_remove_server_from_group(
+        log, trans_id, server_id, replace, purge, group, state)
+    return perform(dispatcher, eff)
+
+
 def remove_server_from_group(log, trans_id, server_id, replace, purge,
                              group, state, config_value=config_value):
     """
@@ -503,14 +532,15 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
         return worker_remove_server_from_group(
             log, trans_id, server_id, replace, purge, group, state)
 
+    # convergence case - requires that the convergence dispatcher handles
+    # EvictServerFromScalingGroup
+    cs = get_convergence_starter()
+    d = perform_convergence_remove_from_group(
+        log, trans_id, server_id, replace, purge, group, state,
+        cs.dispatcher)
+
     def kick_off_convergence(new_state):
         cs.start_convergence(log, group.tenant_id, group.uuid)
         return new_state
 
-    # convergence case - requires that the convergence dispatcher handles
-    # EvictServerFromScalingGroup
-    cs = get_convergence_starter()
-    eff = convergence_remove_server_from_group(
-        log, trans_id, server_id, replace, purge, group, state)
-    d = perform(cs.dispatcher, eff)
     return d.addCallback(kick_off_convergence)

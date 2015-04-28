@@ -40,6 +40,7 @@ from otter.test.utils import (
     patch,
     raise_,
     test_dispatcher)
+from otter.util.fp import assoc_obj
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN
@@ -1175,8 +1176,9 @@ _should_retry_params = ShouldDelayAndRetry(
 
 class ConvergenceRemoveServerTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.controller.convergence_remove_server_from_group`
-    and :func:`otter.controller.remove_server_from_group`
+    Tests for :func:`otter.controller.convergence_remove_server_from_group`,
+    :func:`otter.controller.perform_convergence_remove_from_group`, and
+    :func:`otter.controller.remove_server_from_group`
     """
     def setUp(self):
         """
@@ -1470,6 +1472,52 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         self.assertRaises(ValueError, self._remove, True, False,
                           seq_dispatcher)
 
+    @mock.patch('otter.controller.convergence_remove_server_from_group',
+                wraps=controller.convergence_remove_server_from_group)
+    def test_perform_convergence_remove_from_group(self, mock_converge_remove):
+        """
+        Performs :func:`convergence_remove_server_from_group` with the given
+        dispatcher.
+        """
+        self.state.desired = 2
+        fake_super = FakeSupervisor()
+
+        dispatcher = ComposedDispatcher([
+            test_dispatcher(),
+            SequenceDispatcher([
+                self._tenant_retry(
+                    get_server_details('server_id').intent,
+                    lambda _: (StubResponse(200, {}), self.server_details)),
+                (GetScalingGroupInfo(tenant_id='tenant_id',
+                                     group_id='group_id'),
+                    lambda _: (self.group, self.group_manifest_info)),
+                # we want the next one to go to EvictionServerFromScalingGroup
+                self._tenant_retry(
+                    mock.ANY,
+                    lambda i: sync_perform(dispatcher, Effect(i)))
+            ]),
+            get_eviction_dispatcher(fake_super)
+        ])
+
+        d = controller.perform_convergence_remove_from_group(
+            self.log, self.trans_id, 'server_id', False, False,
+            self.group, self.state, dispatcher)
+
+        # this just wraps the call so we can tell that it was called
+        mock_converge_remove.assert_called_once_with(
+            self.log, self.trans_id, 'server_id', False, False, self.group,
+            self.state)
+
+        # make sure that the correct state gets propagated
+        result = self.successResultOf(d)
+        self.assert_states_equivalent_except_desired(result, self.state)
+        self.assertEqual(result.desired, self.state.desired - 1)
+
+        # make sure that the scrub was performed
+        self.assertEqual(fake_super.scrub_calls,
+                         [(self.log, self.trans_id, self.group.tenant_id,
+                           'server_id')])
+
     def test_non_convergence_uses_supervisor_remove(self):
         """
         If the tenant is not convergence-enabled, the controller's
@@ -1491,64 +1539,38 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.log, self.trans_id, 'server_id', False, False,
             self.group, self.state)
 
-    @mock.patch('otter.controller.get_convergence_starter')
-    @mock.patch('otter.controller.convergence_remove_server_from_group',
-                wraps=controller.convergence_remove_server_from_group)
-    def test_convergence_uses_convergence_remove(self, mock_converge_remove,
-                                                 mock_get_starter):
+    @mock.patch('otter.controller.perform_convergence_remove_from_group',
+                autospec=True)
+    @mock.patch('otter.controller.get_convergence_starter', autospec=True)
+    def test_convergence_uses_convergence_remove(self, mock_get_starter,
+                                                 mock_performer):
         """
         If the tenant is convergence-enabled, the controller's
         :func:`remove_server_from_group` calls
-        :func:`convergence_remove_server_from_group` and performs the effect
-        with a dispatcher that can handle :class:`EvictServerFromScalingGroup`.
+        :func:`perform_convergence_remove_from_group` with a dispatcher that
+        can handle :class:`EvictServerFromScalingGroup`.
 
         Then, a convergence cycle is kicked off, and whatever state that
         :func:`convergence_remove_server_from_group` returned is propagated as
         the return value.
         """
-        self.state.desired = 2
-        fake_super = FakeSupervisor()
-        mock_starter = mock_get_starter.return_value
-
-        mock_starter.dispatcher = ComposedDispatcher([
-            test_dispatcher(),
-            SequenceDispatcher([
-                self._tenant_retry(
-                    get_server_details('server_id').intent,
-                    lambda _: (StubResponse(200, {}), self.server_details)),
-                (GetScalingGroupInfo(tenant_id='tenant_id',
-                                     group_id='group_id'),
-                    lambda _: (self.group, self.group_manifest_info)),
-                # we want the next one to go to EvictionServerFromScalingGroup
-                self._tenant_retry(
-                    mock.ANY,
-                    lambda i: sync_perform(
-                        mock_get_starter.return_value.dispatcher,
-                        Effect(i)))
-            ]),
-            get_eviction_dispatcher(fake_super)
-        ])
+        new_state = assoc_obj(self.state, desired=self.state.desired - 1)
+        mock_performer.return_value = defer.succeed(new_state)
+        mock_starter = mock.MagicMock(
+            spec=['start_convergence'], dispatcher=object())
+        mock_get_starter.return_value = mock_starter
 
         d = controller.remove_server_from_group(
             self.log, self.trans_id, 'server_id', False, False,
             self.group, self.state,
             config_value={'convergence-tenants': [self.group.tenant_id]}.get)
 
-        # this just wraps the call so we can tell that it was called
-        mock_converge_remove.assert_called_once_with(
+        mock_performer.assert_called_once_with(
             self.log, self.trans_id, 'server_id', False, False, self.group,
-            self.state)
+            self.state, mock_starter.dispatcher)
 
-        # make sure that the correct state gets propagated
         result = self.successResultOf(d)
-        self.assert_states_equivalent_except_desired(result, self.state)
-        self.assertEqual(result.desired, self.state.desired - 1)
+        self.assertIs(result, new_state)
 
-        # make sure that the scrub was performed
-        self.assertEqual(fake_super.scrub_calls,
-                         [(self.log, self.trans_id, self.group.tenant_id,
-                           'server_id')])
-
-        # make sure convergence cycle was kicked off
         mock_starter.start_convergence.assert_called_once_with(
             self.log, 'tenant_id', 'group_id')
